@@ -53,8 +53,8 @@ Every rule exists in ONE document only.
 |---|---|
 | Action engine | `docs/ACTION-FLOW-STANDARD.md` |
 | UI wording | `docs/COPY-STANDARD.md` |
-| A module's working flow | `docs/<MODULE>-WORKING-FLOW.md` |
-| Execution queue | `../CLAUDE.md` |
+| A module's working flow | its current `docs/<module>/MASTER.md` |
+| Execution/build law | `../CLAUDE.md` |
 
 Never duplicate a rule into a second document. When a rule changes, the source document is
 updated and nothing else — a copy elsewhere is how Delivery gets fixed and Purchasing is

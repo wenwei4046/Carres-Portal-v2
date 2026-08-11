@@ -769,7 +769,7 @@ function MiniBadge({
 }) {
   // v4 §6 — status = soft tint + dark same-hue text, NEVER a solid block
   // (the old solid-red nopo badge is gone). red = blocks · amber = warning ·
-  // green = ok; values from docs/UI-KIT.md §1.
+  // green = ok; values governed by docs/ui/MASTER.md.
   const TONE: Record<string, string> = {
     nopo: "bg-[#FCEBEB] text-[#A32D2D]",
     waiting: "bg-[#FAEEDA] text-[#854F0B]",
@@ -7580,4 +7580,3 @@ function PrintDoButton({
     </button>
   );
 }
-

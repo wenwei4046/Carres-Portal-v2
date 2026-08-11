@@ -3,11 +3,13 @@
 > **The only UI-architecture document.** Overwritten when re-ruled; never versioned.
 > **You read `CLAUDE.md` and this file.**
 >
-> **THE TOKEN VALUES ARE NOT HERE AND NEVER WILL BE.** They live in three standards that are
-> the vocabulary itself, and this file links to them rather than copying them:
+> **This MASTER is the only current UI authority.** The three files below are implementation
+> reference tables owned by this MASTER, not separate governance and never a competing source:
 > [`../01-design-tokens.md`](../01-design-tokens.md) (spacing · colour · typography · icons) ·
 > [`../02-components.md`](../02-components.md) · [`../03-page-patterns.md`](../03-page-patterns.md).
-> **Open one only when you need a value. A number in two files is a number that drifts.**
+> **Open one only when you need a value. If a reference conflicts with this MASTER, this MASTER
+> governs and the reference is corrected in the same change.** A number in two files is a number
+> that drifts.
 
 | I am working on | Read |
 |---|---|

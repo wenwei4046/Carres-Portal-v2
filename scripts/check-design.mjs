@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * THE BUILD GUARD — `docs/UI-KIT.md` §13. Card D1.
+ * THE BUILD GUARD — governed by `docs/ui/MASTER.md`.
  * =============================================================================
  * FOLLOWS: **UI-KIT 2026-07-27** (§0.3 — every kit artifact declares its edition).
  *
@@ -63,7 +63,7 @@ import { dirname, join } from "node:path";
 import { blankComments } from "./lib/source-segments.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-const LAW = join(ROOT, "docs/UI-KIT.md");
+const LAW = join(ROOT, "docs/ui/MASTER.md");
 const BASELINE_PATH = join(ROOT, "scripts/design-guard-baseline.json");
 const TOKENS = join(ROOT, "apps/web/src/components/kit/tokens.ts");
 const ICON = join(ROOT, "apps/web/src/components/kit/Icon.tsx");
@@ -78,7 +78,7 @@ const REPORT = ARG.has("--report");
 const EDITION = "UI-KIT 2026-07-27";
 
 /**
- * The Design System superseded `UI-KIT.md` on 2026-07-31, so a kit artifact may
+ * The current UI MASTER superseded `UI-KIT.md` on 2026-07-31, so a kit artifact may
  * now declare EITHER law. Additive on purpose: a file already citing `UI-KIT §`
  * still passes, so this moved no existing finding — a new file simply stopped
  * being required to cite a document that has been retired.
@@ -371,7 +371,7 @@ function scan(files, rec, words) {
         );
     }
     for (const m of full.matchAll(/\bv4 wins\b|\bthis file wins\b|\boverrides? (?:docs\/)?UI-KIT\b/gi)) {
-      if (!/UI-KIT\.md$/.test(f)) push("K", f, full, m.index, "only docs/UI-KIT.md may claim to win (§0.3)");
+      push("K", f, full, m.index, "source files may not claim UI authority; docs/ui/MASTER.md is the sole UI authority");
     }
 
     /* L · M — storage keys.
@@ -617,7 +617,7 @@ function renderReport() {
   const law = read(LAW);
   const re = new RegExp(`${HEALTH_START.replace(/[.*+?^${}()|[\]\\-]/g, "\\$&")}[\\s\\S]*?${HEALTH_END}`);
   if (!re.test(law)) {
-    console.error(`✗ check-design --report: no ${HEALTH_START} … ${HEALTH_END} markers in docs/UI-KIT.md.`);
+    console.error(`✗ check-design --report: no ${HEALTH_START} … ${HEALTH_END} markers in docs/ui/MASTER.md.`);
     process.exit(2);
   }
   writeFileSync(LAW, law.replace(re, block));

@@ -203,8 +203,8 @@ name the act with a verb from the table, name the artefact with the artefact's r
 ## Where the engine law lives
 
 **This file defines WORDING only.** Action behaviour → `docs/ACTION-FLOW-STANDARD.md` ·
-a module's workflow → `docs/<MODULE>-WORKING-FLOW.md` · execution queues →
-`../CLAUDE.md`. A rule lives in one document and is never copied here.
+a module's workflow → its current `docs/<module>/MASTER.md` · execution/build law →
+`../CLAUDE.md`. A rule lives in one authority and is never copied here.
 
 ## The delivery queue words (re-ruled by Jess 2026-07-27 — this is the only version)
 

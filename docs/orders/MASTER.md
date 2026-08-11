@@ -108,68 +108,37 @@ Nothing survives merely because it is already there.**
 
 ---
 
-# ⛔ START HERE — SALES ORDER IS NOT FINISHED, AND THE LAST PROGRAMME MISSED WHY
+# ⛔ START HERE — CURRENT SALES ORDER BUILD STATE
 
-> **Loo, 2026-08-08, on the live page:** *"my page now all messy and don't know how to work —
-> you fail advise me."* **He is right, and this block exists so the next chat does not repeat it.**
+**Current authority path:** `CLAUDE.md` → this MASTER → `docs/ui/MASTER.md` when UI detail is
+needed. There is no build queue, handover, checkpoint, cutover spec, or separate Stage 3 law.
 
-**WHAT WENT WRONG.** Ten cards shipped between 2026-08-07 and 2026-08-08 — S1 · S2.0 · S2.1 ·
-S2.2 · S2.3 · S3.1 · S3.2 · S3.3 · P20 · D9. **Every one of them upgraded HOW THE TABLE IS
-DRAWN. Not one of them asked what the operator should SEE.** The engine is now correct, tested
-and measured to the pixel; the page is not easier to work. **A grid programme was run where a
-product question was owed.**
+**Built and closed:** Stage 1 register/read-only workspace (`182d1cae`); Stage 2 create/edit and
+append-only revision engine (`2a6a5e9e`); Stage 3 cards 3.0–3.5 through the amendment spine and
+`base_contractual_hash` (`8e8224dd`). Stage 3 runs continuously between approved cards, with a
+separate commit and fresh evidence for each card. Green CI is the floor: exercise each route,
+database function branch, screen at 1440 and 1130, guard negative control, and migration for real.
 
-**The tell was there the whole time and nobody acted on it.** `../research/grid-findings.md` §6
-has carried this line through every round: *"What the operator actually does with the list.
-Nobody in this investigation has watched one work."* Ten cards were built past it.
+**The wall:** do not build 3.6 ISSUE, 3.7 ACCEPT, or 3.8 Class-A APPLY. The amendment document's
+visual form and ACCEPT signing mechanism remain undecided; APPLY continues to refuse until both
+exist. Approval is permission to try, acceptance binds the customer to the exact issued document,
+and only APPLY may move the order. An approved request currently has no withdrawal path; that is
+an unresolved business ruling, not an engineering cleanup decision.
 
-**WHAT IS SAFE — do not rebuild any of it.** All of it is live and covered by 2,715 passing
-tests:
-```
-the APIs · every calculation · the action ladder (§2.1) · the queue logic ·
-PIC / ownership (§2.2) · stock · delivery · money · permissions ·
-every order record · D9's readiness fix · the whole §2 engine
-```
-**And the grid foundation is DONE.** Sorting, per-column filters, footer totals, content-sized
-columns that no longer squeeze, the flag column back to 30px. **None of that is in question.**
+**Current approved card — Sales Order production cutover, then stop:**
+1. Make the new Sales Order register the official Sales Orders navigation entry.
+2. Keep the old Orders page on a separate, explicitly temporary legacy route for unmigrated
+   Delivery, Payment, Purchasing, AutoCount/import, and PIC work.
+3. Do not delete, hide, enhance, or copy from the old page; do not start downstream migration or
+   change Stage 1–3 business design.
+4. On production, verify the new register, order open/edit/revision, PDF, both target widths and
+   clean console; verify the legacy queues/actions/import/PIC filters still work.
+5. Exercise the exact rollback on production, roll forward, post evidence, and stop.
 
-**WHAT IS NOT DECIDED, and is the whole of the next phase:**
-```
-what the operator sees FIRST          the information hierarchy
-which columns stay / merge / go        the queue hierarchy
-what belongs in the row expansion      what belongs in the detail workspace
-what belongs in the right context      what is duplicated
-```
-
-### HOW THE NEXT CHAT MUST WORK — and this is the correction, not a preference
-
-```
-1  STUDY FIRST.   Read this file + CLAUDE.md. Open the LIVE page.
-                  Read `../research/grid-findings.md` (the measurements are done —
-                  do NOT re-measure widths, densities or engines).
-
-2  CONSULT, DO NOT PROPOSE-AND-SHIP.  Ask Loo what the page is FOR before
-                  recommending what it shows. He is the operator's proxy and he
-                  has said plainly he cannot judge a technical table.
-                  ONE question at a time. Conclusion first. Simple Chinese.
-                  ASCII shapes, never a wall of numbers.
-
-3  ONLY THEN CARD IT.  He approves the information hierarchy → write it HERE →
-                  commit immediately → then layout → then build.
-```
-
-**⛔ WHAT THE NEXT CHAT MAY NOT DO**
-```
-✗ create a new Orders page          the route stays /operation/orders
-✗ touch any business logic          the list above is PRESERVED
-✗ add another grid capability       S2.5 is STOPPED; the foundation is done
-✗ re-run the width / density work   it is finished and recorded
-✗ propose a hierarchy from CODE     the last one did, and this block is why
-```
-
-**A REGISTER-ONLY IA RECOMMENDATION WAS DRAFTED 2026-08-08 AND NOT APPROVED.** It is
-deliberately NOT recorded here: it was reasoned from the source and the measurements, which is
-exactly the method that produced this checkpoint. **The next chat starts from the operator.**
+After the cutover passes, dismantling is module-by-module and begins from each owning module's
+operator journey, never by copying the old widget. The old page is frozen except for blockers and
+data-defect fixes until all responsibilities and the import surface have moved; its end state is
+hidden, then deleted.
 
 ---
 

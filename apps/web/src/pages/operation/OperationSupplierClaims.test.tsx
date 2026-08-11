@@ -489,7 +489,7 @@ describe("R3 — the close keeps both sides", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-// P2 — the click behaviour (docs/UI-KIT.md §8.2)
+// P2 — the click behaviour (docs/ui/MASTER.md)
 // ═══════════════════════════════════════════════════════════════════════════
 //
 // Before this card the page had NO facet rail and NO filter state, so not one

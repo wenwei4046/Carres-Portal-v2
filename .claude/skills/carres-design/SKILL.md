@@ -1,13 +1,13 @@
 ---
 name: carres-design
-description: "SUPERSEDED 2026-07-27 — DO NOT USE FOR DESIGN DECISIONS. This skill holds the RETIRED UI-KIT v4 law, whose tokens (44px rows, 14-15px text, #F3F4F6 canvas, .t4-* classes, flame in the nav) now contradict the rewritten docs/UI-KIT.md. Read docs/UI-KIT.md instead. Kept only as a historical asset store (logo files, old screenshots) until the /ui showcase replaces it in card D0.5."
+description: "SUPERSEDED 2026-07-27 — DO NOT USE FOR DESIGN DECISIONS. Historical asset store only. Read docs/ui/MASTER.md, the sole current UI authority."
 user-invocable: false
 ---
 
 # ⛔ SUPERSEDED — 2026-07-27
 
 > **This skill's design law is the OLD kit and it CONTRADICTS the current law.**
-> **Read [`docs/UI-KIT.md`](../../../docs/UI-KIT.md). Take nothing from this file.**
+> **Read [`docs/ui/MASTER.md`](../../../docs/ui/MASTER.md). Take nothing from this file.**
 >
 > Do NOT take from here: spacing · colour · typography · row height · icon
 > stroke · component specs · page templates · `styles.css` · `components.css` ·
@@ -83,4 +83,4 @@ mocks, or production-shaped React for real code.
 ---
 
 ⛔ **End of retired content.** Everything above the `<details>` line is the only
-part still in force: read [`docs/UI-KIT.md`](../../../docs/UI-KIT.md).
+part still in force: read [`docs/ui/MASTER.md`](../../../docs/ui/MASTER.md).

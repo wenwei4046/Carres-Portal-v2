@@ -1,5 +1,5 @@
 /**
- * 3.1 · THE CLASSIFICATION REGISTRY — GATE 1 (docs/STAGE-3-GATES.md, FROZEN
+ * 3.1 · THE CLASSIFICATION REGISTRY — GATE 1 (docs/orders/MASTER.md, FROZEN
  * owner 我同意 2026-08-09): **two explicit allowlists, no residue.**
  *
  * ```

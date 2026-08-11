@@ -4,7 +4,7 @@
  *   docs/01-design-tokens.md · docs/02-components.md · docs/03-page-patterns.md
  * Wired as `@carres/web`'s `lint` script; runs in CI + locally.
  *
- * ⚠ THIS FILE USED TO SAY IT ENFORCED `docs/UI-KIT.md`, WHICH IS SUPERSEDED
+ * ⚠ THIS FILE ENFORCES RULES GOVERNED BY `docs/ui/MASTER.md`
  * (CLAUDE.md, 2026-07-31). The §-references still printed in the messages
  * below are UI-KIT's and are retired with it; each rule's LAW now lives in the
  * three files above. Re-pointing a message is a copy change; re-pointing a
@@ -42,7 +42,7 @@
  *     importing the shell fails — annotate `// design-standard: not-a-list-page`
  *     with a reason to opt out.
  *
- *   UI-KIT hard rules (docs/UI-KIT.md §E) — NOT ratcheted; any violation fails.
+ *   UI hard rules (docs/ui/MASTER.md) — NOT ratcheted; any violation fails.
  *   Kit scope = KIT_FILES below (the order-drawer family + shared section
  *   chrome; ADD each file here as it is migrated to the kit). POS
  *   (pages/dealer/**) has its own contract and is never in scope.
@@ -159,13 +159,13 @@ const errors = [];
 // and the primary action, and nothing else — so hover, selection and the
 // expanded row are all grey. An accent that marks four things marks nothing.
 // The baseline moved 94 → 96 for To Order's two greys, which are a ruling
-// rather than drift. `docs/UI-KIT.md` §3.5 has to be rewritten before this
+// rather than drift. `docs/ui/MASTER.md` has to be rewritten before this
 // rule can go back to being the truth, and until then it is measuring the
 // opposite of the law. Reported, not quietly re-pointed.
 if (currentHoverGrey > (baseline.hoverGrey ?? Infinity)) {
   errors.push(
     `RULE I · grey hover — ${currentHoverGrey} grey hover(s) across web (baseline ${baseline.hoverGrey}). ` +
-      `A clickable row/nav/chip hovers BLUE: use \`hover:bg-hovertint\`, not \`hover:bg-base-50/100\` (docs/UI-KIT.md hover law).`,
+      `A clickable row/nav/chip hovers BLUE: use \`hover:bg-hovertint\`, not \`hover:bg-base-50/100\` (docs/ui/MASTER.md).`,
   );
 }
 
@@ -175,7 +175,7 @@ for (const [f, n] of Object.entries(currentHex)) {
   if (n > base) {
     errors.push(
       `RULE A · hard-coded hex — ${f}: ${n} hex literal(s) (baseline ${base}). ` +
-        `Use a token class (bg-*/text-*/border-*) from docs/UI-KIT.md §A1.`,
+        `Use a token class (bg-*/text-*/border-*) governed by docs/ui/MASTER.md.`,
     );
   }
 }
@@ -187,7 +187,7 @@ for (const f of MUST_USE_SHELL) {
   if (!files.includes(p)) continue;
   const src = readFileSync(join(ROOT, p), "utf8");
   if (!SHELL_IMPORT_RE.test(src)) {
-    errors.push(`RULE B · shell removed — ${p} must import ListPageShell/PageHeader (docs/UI-KIT.md §A9).`);
+    errors.push(`RULE B · shell removed — ${p} must import ListPageShell/PageHeader (docs/ui/MASTER.md).`);
   }
 }
 for (const f of files) {
@@ -197,13 +197,13 @@ for (const f of files) {
   if (LIST_MARKER_RE.test(src) && !SHELL_IMPORT_RE.test(src) && !OPT_OUT_RE.test(src)) {
     errors.push(
       `RULE B · new List page without shell — ${f} renders a table/DataGrid but does not use ` +
-        `ListPageShell/PageHeader. Adopt the shell (docs/UI-KIT.md §A9) or add ` +
+        `ListPageShell/PageHeader. Adopt the shell (docs/ui/MASTER.md) or add ` +
         `\`// design-standard: not-a-list-page\` with a reason.`,
     );
   }
 }
 
-// ---- UI-KIT hard rules C–G (docs/UI-KIT.md §E) ---------------------------------
+// ---- UI hard rules C–G (docs/ui/MASTER.md) --------------------------------------
 // Kit-governed files — hard rules C/D/F apply here. ADD a file when you
 // migrate it to the kit; never remove one.
 const KIT_FILES = new Set([
@@ -265,7 +265,7 @@ for (const f of files) {
     const kpiRe = /#F7F4EE/gi;
     while ((m = kpiRe.exec(src))) {
       errors.push(
-        `RULE E · inline KPI fill — ${f}:${lineOf(src, m.index)} uses #F7F4EE; use the \`.kpi-box\` token (docs/UI-KIT.md §A8).`,
+        `RULE E · inline KPI fill — ${f}:${lineOf(src, m.index)} uses #F7F4EE; use the \`.kpi-box\` token (docs/ui/MASTER.md).`,
       );
     }
   }
@@ -279,7 +279,7 @@ for (const f of files) {
     const selRe = /inset_3px_0_0_hsl\(var\(--info\)\)/g;
     while ((m = selRe.exec(src))) {
       errors.push(
-        `RULE H · hand-rolled selection — ${f}:${lineOf(src, m.index)} paints its own blue selection bar; use the \`.is-selected\` class (docs/UI-KIT.md §A6 — one selection blue).`,
+        `RULE H · hand-rolled selection — ${f}:${lineOf(src, m.index)} paints its own blue selection bar; use the \`.is-selected\` class (docs/ui/MASTER.md — one selection blue).`,
       );
     }
   }
@@ -290,7 +290,7 @@ for (const f of files) {
     BAND_CLASS_RE.lastIndex = 0;
     while ((m = BAND_CLASS_RE.exec(src))) {
       errors.push(
-        `RULE G · hand-rolled section chrome — ${f}:${lineOf(src, m.index)} uses the \`section-band\` class directly; render <SectionBand>/<SectionCard> from components/SectionPanel.tsx (docs/UI-KIT.md §A8).`,
+        `RULE G · hand-rolled section chrome — ${f}:${lineOf(src, m.index)} uses the \`section-band\` class directly; render <SectionBand>/<SectionCard> from components/SectionPanel.tsx (docs/ui/MASTER.md).`,
       );
     }
   }
@@ -330,7 +330,7 @@ for (const f of files) {
       const n = Number(m[1]);
       if (!ICON_SIZES.has(n)) {
         errors.push(
-          `RULE C · icon size — ${f}:${lineOf(src, m.index)} size={${n}}; icons are 14 (pill/inline) / 16 (default UI) / 18 (top bar) only (docs/UI-KIT.md §A4).`,
+          `RULE C · icon size — ${f}:${lineOf(src, m.index)} size={${n}}; icons are 14 (pill/inline) / 16 (default UI) / 18 (top bar) only (docs/ui/MASTER.md).`,
         );
       }
     }
@@ -344,7 +344,7 @@ for (const f of files) {
       const n = Number(m[1]);
       if (!TEXT_SIZES.has(n)) {
         errors.push(
-          `RULE D · text size — ${f}:${lineOf(src, m.index)} text-[${m[1]}px]; inline sizes are 11 micro / 12 caption / 13 body (+18 money hero) — typography law, docs/UI-KIT.md §2.1.`,
+          `RULE D · text size — ${f}:${lineOf(src, m.index)} text-[${m[1]}px]; inline sizes are 11 micro / 12 caption / 13 body (+18 money hero) — docs/ui/MASTER.md.`,
         );
       }
     }
@@ -360,7 +360,7 @@ for (const f of files) {
       const n = Number(m[1]);
       if (!ROW_HEIGHTS.has(n)) {
         errors.push(
-          `RULE F · row height — ${f}:${lineOf(src, m.index)} h-[${n}px]; rows are 36 panel/KV · 40 list · 52 product-line only — table law, docs/UI-KIT.md §7 (row height is written there by card D0.5c).`,
+          `RULE F · row height — ${f}:${lineOf(src, m.index)} h-[${n}px]; rows are 36 panel/KV · 40 list · 52 product-line only — docs/ui/MASTER.md.`,
         );
       }
     }
@@ -370,7 +370,7 @@ for (const f of files) {
 if (errors.length) {
   console.error(`\n✗ design-standard: ${errors.length} violation(s)\n`);
   for (const e of errors) console.error("  • " + e);
-  console.error("\nSee docs/UI-KIT.md. Legacy debt is baselined; this only flags NEW violations.\n");
+  console.error("\nSee docs/ui/MASTER.md. Legacy debt is baselined; this only flags NEW violations.\n");
   process.exit(1);
 }
 console.log("✓ design-standard: no new violations.");

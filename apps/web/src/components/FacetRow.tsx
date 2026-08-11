@@ -1,5 +1,5 @@
 /**
- * FacetRow — one clickable row inside a facet rail (`docs/UI-KIT.md` §8.2 /
+ * FacetRow — one clickable row inside a facet rail (`docs/ui/MASTER.md` /
  * §8.4).
  *
  * It was written inline on Purchasing → To Order. P2's Receiving half needs the

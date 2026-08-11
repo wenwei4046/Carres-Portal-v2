@@ -1,7 +1,7 @@
 /**
  * `/ui` — THE live showcase (UI-KIT's third body, card D0.5a).
  *
- * `docs/UI-KIT.md` explains what the kit means; `lib/design-standard.ts`
+ * `docs/ui/MASTER.md` explains what the kit means; `lib/design-standard.ts`
  * records it; **this page IS it.** It imports the real components and renders
  * the real tokens, so it structurally cannot describe something the code does
  * not do — which is the one failure the first two bodies cannot rule out.
@@ -204,7 +204,7 @@ export default function UiShowcase() {
           <h1 className="text-page text-kit-slate-12">Carres UI-KIT</h1>
           <p className="text-body text-kit-slate-11">
             The live showcase. Every box below is the real component — if it renders here, it exists in
-            the code. Read the law in <span className="font-mono">docs/UI-KIT.md</span>.
+            the code. Read the UI authority in <span className="font-mono">docs/ui/MASTER.md</span>.
           </p>
         </header>
 

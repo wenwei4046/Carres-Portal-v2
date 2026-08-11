@@ -1,10 +1,10 @@
 /**
  * CARRES PORTAL — DESIGN STANDARD (the machine mirror)
  * =========================================================
- * FOLLOWS: **UI-KIT 2026-07-27** — the edition declared by `docs/UI-KIT.md`
+ * FOLLOWS: `docs/ui/MASTER.md` — the current UI authority.
  * §0.3. This module is a MIRROR of that law and nothing else.
  *
- * ⚠️ **`docs/UI-KIT.md` WINS.** Its own first line says so, and §0.3 makes a
+ * ⚠️ **`docs/ui/MASTER.md` GOVERNS.** It is the one current UI authority; this is a
  * second authority claim a Build-Guard failure (D1). This header used to read
  * *"where any older doc, code comment, or token conflicts with UI-KIT v4, v4
  * wins"* — two bodies of one kit each declaring itself the winner. That claim
@@ -16,7 +16,7 @@
  * 2026-07-27 and several tokens moved (see the per-block notes). Correcting a
  * value is a VISUAL change and belongs to the codemod cards **D2 · D3 · D4** —
  * card D0.6 corrected this file's CLAIMS and deliberately touched no exported
- * value. Read a token from `docs/UI-KIT.md` §2–§5, never from here.
+ * value. Read the governed token reference linked from `docs/ui/MASTER.md`, never from here.
  *
  * Measured 2026-07-28, because it changes how much this file matters:
  *   real importers ............................ 1  (lib/staff-avatar.ts, for

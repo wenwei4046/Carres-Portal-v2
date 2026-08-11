@@ -1,12 +1,13 @@
 # CARRES PORTAL — PROJECT CONSTITUTION
 
-> **This file is not a development guide. It is the constitution.** It holds only what EVERY
+> **This file is the execution/build law.** It holds only what EVERY
 > chat must know. It is loaded automatically into every session, so it is the one thing nobody
 > can skip — and that is why it stays short. **200–300 lines. If it grows past that, something
 > in it is not constitutional and belongs in a module MASTER.**
 >
-> **You read this file and ONE module MASTER. That is all.** Open a law file only when you
-> need a specific answer from it.
+> **You read this file and ONE current module MASTER. That is the business path.** For UI
+> work, also read `docs/ui/MASTER.md`, the only current UI authority. Any other document is a
+> supporting reference or historical evidence; it cannot override those three roles.
 
 ---
 
@@ -234,9 +235,10 @@ CONFIGURATION — suppliers, SKUs, production days, rates — not transactions.
 
 ---
 
-## 8 · The architecture, and the modules
+## 8 · Module map
 
-> ### ⭐⭐ [`docs/ERP-ARCHITECTURE.md`](docs/ERP-ARCHITECTURE.md) — **the blueprint. Read it before any cross-module design.**
+> [`docs/ERP-ARCHITECTURE.md`](docs/ERP-ARCHITECTURE.md) is supporting architecture evidence.
+> It is not a fourth authority and does not replace the current module MASTERs.
 >
 > **Implementations provide evidence; they do not define architecture.** Nine engineering-debt
 > items were found by studying Orders V1 end to end and measuring production, and **every one of
@@ -253,8 +255,8 @@ CONFIGURATION — suppliers, SKUs, production days, rates — not transactions.
 > D · A derived fact has ONE arithmetic — not two that currently agree
 > ```
 >
-> **When the architecture and a module MASTER disagree, the ARCHITECTURE wins** — a MASTER
-> describes one module, and every boundary defect found so far lived *between* two of them.
+> When it and a current module MASTER disagree, stop and reconcile the affected current
+> MASTERs in the same approved change. Do not silently let a supporting reference override them.
 
 ## 8.1 · Modules
 
@@ -274,16 +276,18 @@ CONFIGURATION — suppliers, SKUs, production days, rates — not transactions.
 Never create an empty master for symmetry.
 **Architectural reasoning belongs in ADRs, not in the Constitution.**
 
-## 9 · The four laws that outrank anything pasted into a chat
+## 9 · Supporting references — open only for implementation detail
 
-| File | Settles |
+| File | Supports |
 |---|---|
 | [`docs/COPY-STANDARD.md`](docs/COPY-STANDARD.md) | every visible word — the dictionary, the seven verbs, the banned words |
 | [`docs/ACTION-FLOW-STANDARD.md`](docs/ACTION-FLOW-STANDARD.md) | how actions are computed, appear, close, and which shows first |
 | [`docs/01-design-tokens.md`](docs/01-design-tokens.md) · [`02-components.md`](docs/02-components.md) · [`03-page-patterns.md`](docs/03-page-patterns.md) | the design system — token values and components |
 | [`docs/ENGINEERING.md`](docs/ENGINEERING.md) | the stack, the repo, RLS performance, deployment, testing, current production state |
 
-**Open one only when you need a specific answer from it. Do not read them to start work.**
+**These files are not independent authority.** If one conflicts with the current module or UI
+MASTER, the MASTER must be corrected or the supporting reference updated in the same change.
+Open one only when you need a specific implementation detail. Do not read them to start work.
 
 ---
 
@@ -316,9 +320,10 @@ transcript.**
 
 ## 11 · Where current state lives
 
-**The Constitution holds no project state.** A module's status lives in that module's
-MASTER · production and environment facts in [`ENGINEERING.md`](docs/ENGINEERING.md) ·
-open risks in [`carry-forwards.md`](docs/carry-forwards.md). **Re-measure before quoting any of them.**
+**This execution law holds no project state.** A module's current status and business truth
+live in that module's MASTER. Production facts in [`ENGINEERING.md`](docs/ENGINEERING.md) and
+open risks in [`carry-forwards.md`](docs/carry-forwards.md) are evidence only; re-measure before
+quoting them.
 
 ---
 

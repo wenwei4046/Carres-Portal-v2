@@ -1,6 +1,6 @@
 /**
  * ListPageShell — the ONE frame every List page renders through (Jess, 2026-07-12).
- * See docs/UI-KIT.md §A9 for the contract; values in lib/design-standard.ts.
+ * See docs/ui/MASTER.md for the contract; values in lib/design-standard.ts.
  *
  * WHY: ~80% of portal pages are "a table you scan, filter, and act on". Before this
  * they each hand-rolled the same chrome (header bar, facet panel, white sticky table,

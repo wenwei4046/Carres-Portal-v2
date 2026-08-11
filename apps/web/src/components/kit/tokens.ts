@@ -1,5 +1,5 @@
 /**
- * KIT TOKENS — the machine-readable half of `docs/UI-KIT.md` §2 · §3 · §4 · §5.
+ * KIT TOKENS — the machine-readable implementation of `docs/ui/MASTER.md`.
  *
  * Card D0.5a. Every Foundation Component in `components/kit/` reads its type,
  * radius, tone and icon size FROM HERE, and `/ui` renders the same records — so

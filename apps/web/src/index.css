@@ -4,7 +4,7 @@
 
 @layer base {
   :root {
-    /* ===== ⭐ UI-KIT v4 (2026-07-15, docs/UI-KIT.md) — overwrites
+    /* ===== ⭐ UI-KIT v4 (2026-07-15 historical edition; current authority docs/ui/MASTER.md) — overwrites
      * all prior baselines (v17 cream et al). White content base; brand colour
      * only in the left nav; colour = action/selection/status/alert ONLY.
      * Token NAMES unchanged (zero component churn) — VALUES follow v4.
@@ -180,7 +180,7 @@
   .t4-row        { @apply text-[13px] font-medium text-foreground; }
   .t4-row-strong { @apply text-[13px] font-semibold text-foreground; }
 
-  /* v4 button hierarchy (2026-07-17, Jess — docs/UI-KIT.md §A5): `.btn-hero` =
+  /* v4 button hierarchy (2026-07-17, Jess — current authority docs/ui/MASTER.md): `.btn-hero` =
    * the ONE flame CTA per page/block; `.btn-primary` = the GREY-SOFT workhorse
    * (solid black is retired — "no heavy black buttons"); `.btn-secondary` =
    * white box, tertiary; `.btn-danger` = red text on white, never red-filled.
