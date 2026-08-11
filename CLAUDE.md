@@ -144,6 +144,18 @@ copied blindly.
   names both preserved business/capability truth and any explicitly locked placement/presentation;
   its unresolved list includes presentation that the MASTER has not ruled and useful missing
   capabilities whose value is not yet decided. Repository absence is evidence of a gap, not a veto.
+- **OWNER-APPROVED PLAN OWNERSHIP / COMPLETENESS LAW (Jess, 2026-08-12).** Jess owns business
+  decisions and final approval. The Plan chat owns research completeness, dependency discovery,
+  cross-module consequences, gap detection, sequencing and the proposed plan. Jess is not the
+  research checklist: do not ask what to inspect next when repository/task evidence can answer it.
+  Proactively find missing capabilities, ownership or terminology/IA conflicts, scalability risks
+  and the next unresolved decision surfaces, then perform a completeness pass before claiming the
+  plan or design is complete.
+- **Official Card governance and planning are different.** Never invent an official Card number or
+  status. This does not excuse failure to plan: maintain a clearly labelled **PROPOSED ROADMAP /
+  BACKLOG / DEPENDENCY ORDER** for remaining approved or discovered work, without representing
+  unapproved entries as numbered Cards. Only governed/approved work receives official numbering or
+  status.
 - **Every new or restarted Plan/Design chat is the Carres UI architect, not merely a repository
   checker.** Jess is the business owner and final decision-maker; she is not expected to enumerate
   every UI or ERP implication. Before presenting any UI proposal, mockup or layout recommendation,
@@ -165,7 +177,17 @@ copied blindly.
   only then research the unresolved surface and propose.
 - For a genuinely **UNRESOLVED** design decision, proactively research only that declared surface.
   Use the relevant governed references — including Linear, Shopify, AutoCount, 2990, current
-  Carres UI and other mature ERP patterns when useful — and exclude unrelated history and pages.
+  Carres UI and appropriate mature/international ERP patterns when useful — and exclude unrelated
+  history and pages. **Reference research is function mining, not a visual glance:** systematically
+  inventory the relevant capabilities, interactions, workflows, settings/maintenance, navigation,
+  details, preview/edit/print/export, search/filter/columns, scan/copy, bulk/context actions and
+  other applicable functions before Jess has to name them one by one. For 2990 `SO Maintenance`,
+  proactively determine Carres' equivalent Settings/maintenance destination and owner.
+- Produce a **REFERENCE-TO-CARRES CAPABILITY MATRIX** for the unresolved surface:
+  `REFERENCE CAPABILITY | CARRES CURRENT EQUIVALENT/OWNER | KEEP/ADAPT/RELOCATE/BUILD/REJECT |
+  WHY | DEPENDENCY/CONFLICT`. “Copy” means reuse a proven principle/function/interaction where it
+  fits; Carres locked truth, architecture, dictionary, navigation/module ownership, capability and
+  tokens win. Reference discovery never makes the reference a design authority.
 - Derive the common patterns and real trade-offs, then give **one evidence-based Carres
   recommendation**, not arbitrary A/B/C options. Carres semantics, ownership and destination come
   first. Linear, Shopify, AutoCount, 2990 and other mature ERP products contribute principles and
@@ -177,6 +199,12 @@ copied blindly.
 - When the owner approves a complete decision, immediately overwrite the appropriate authoritative
   MASTER with the current **APPROVED / LOCKED** truth before moving to another major decision.
   PLAN mode forbids application implementation, not governing-document updates.
+- **PLAN COMPLETION GATE.** Before recommending implementation or declaring the surface complete,
+  show coverage of: current Carres capabilities · locked governance · UI dictionary/IA/module
+  ownership · relevant reference-product function mining · mature/international benchmark where
+  materially useful · missing-capability/gap analysis · cross-module/future consequences ·
+  dependencies · proposed sequencing. Then ask Jess only for genuine owner decisions. A fresh or
+  restarted Plan/Design chat performs this automatically; Jess never has to spoon-feed these checks.
 
 **A DECISION THAT STAYS IN THE CHAT IS A DECISION THAT DIES.** The moment the owner agrees to
 something, it is written to its file and committed **before the conversation moves on** — not

@@ -1165,10 +1165,16 @@ Payment remain the authority for what operationally happened.
    the contract) · ③ the deferred items each card's own record names (supplier labelling
    surface · loan-claim atomicity · the proceeded-cancel approval lane · refunds on the desk ·
    the Settings working calendar).
-5. Re-measure current code and production before quoting implementation state. Preserve unrelated
+5. **Do not invent Card 11 or later. Do not stop planning either.** For any Sales Orders/Register
+   Plan/Design restart, apply `../ui/MASTER.md` §1.2 automatically: mine 2990's relevant Sales Order
+   functions (including `SO Maintenance`) and other useful scoped references; map each to the current
+   Carres equivalent/owner; check Settings, scan, copy, register/context actions and cross-module
+   dependencies as applicable; then maintain an explicitly **PROPOSED**, unnumbered roadmap and
+   dependency order until Jess approves formal governance. Jess does not supply the research list.
+6. Re-measure current code and production before quoting implementation state. Preserve unrelated
    dirty work. Do not reopen the approved business flow merely from preference; raise only a real
    repo/production contradiction or implementation impossibility.
-6. **Do not start new architecture from this section.** The next structural work (Issue
+7. **Do not start new architecture from this section.** The next structural work (Issue
    Tracker's four identities · the cross-module work feeds) gets its own owner-approved card
    first.
 
