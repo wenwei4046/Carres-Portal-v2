@@ -286,6 +286,20 @@ readability follow the governed 2990 reference: its listing engine, controls, co
 row disclosure and table hierarchy are the reference. GitHub is evidence for tab admission,
 not the Carres Register shell. Carres business ownership remains authoritative over all three.
 
+**REFERENCE PRODUCTS NEVER AUTHOR CARRES VISUAL TOKENS — APPROVED / LOCKED.** Linear, 2990,
+GitHub, Shopify, AutoCount and every other reference may supply a proven structure, behaviour
+or trade-off; they never supply Carres colour, typography, radius, elevation, icon treatment or
+component styling. Those come exclusively from frozen `../01-design-tokens.md` and the existing
+Carres UI Kit component that owns the element. Copying 2990 cream/yellow surfaces, orange ink or
+another product's control shape is a defect even when its listing behaviour is the reference.
+A design mockup must use the governed Carres tokens and components too; mockup status never
+permits invented styling.
+
+**LOCAL RAIL ACTIVE ROW — APPROVED / LOCKED EXISTING KIT TRUTH.** A page-owned queue/facet rail
+uses the governed Carres `NavRow` treatment: `rounded-control`; `blue-3` selection wash; one
+straight 2px `blue-9` line inset on the left; slate hover for inactive rows. It is not a bordered
+card, not a module tab, not a foreign reference colour and not a newly invented rail variant.
+
 **REGISTER TABLE DENSITY LAW — APPROVED / LOCKED.** The readable 2990 parent-list geometry is
 the Register baseline: rendered 36px table header; rendered 38px single-line parent row; 11px
 body type on 16px line-height; approximately 8px vertical cell breathing room above and below,
