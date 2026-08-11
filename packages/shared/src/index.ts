@@ -2515,3 +2515,6 @@ export * from "./schemas/delivery-attempt";
 // CARD 8 — derived completion: Goods + Money(both directions) + Loan clear
 // = No Action Required. Never a stored status, never a button.
 export * from "./sales-order-completion";
+// CARD 9 — the unified work engine: the five-part rule registry (Trigger ·
+// Owner · Action · Due · Completion fact) + WHO/ACTION/working-day composition.
+export * from "./work-engine";
