@@ -5,7 +5,12 @@
 import { describe, it, expect } from "vitest";
 import type { CatalogResponse, OrderLine } from "@carres/shared";
 import type { SofaBuildGroupRow } from "@/lib/sofa-build-display";
-import { draftFromOrderLine, draftFromSofaGroup, orderLineEditKind } from "./order-line-edit";
+import {
+  configureSurfaceFor,
+  draftFromOrderLine,
+  draftFromSofaGroup,
+  orderLineEditKind,
+} from "./order-line-edit";
 
 const CATALOG = {
   models: [
@@ -36,6 +41,20 @@ function line(over: Partial<OrderLine> = {}): OrderLine {
   };
 }
 
+// The shape 0275's `create_rental_agreement` really stamps on the order line.
+// Asserting with `{ rental: true }` would pass for a reason production never
+// produces — `isRentalLine` requires planId + termMonths.
+const RENTAL_ATTRS = {
+  rental: {
+    agreementId: "aaaaaaaa-aaaa-4aaa-8aaa-0000000000r1",
+    agreementNo: "RA-1004",
+    planId: "bbbbbbbb-bbbb-4bbb-8bbb-0000000000p1",
+    termMonths: 84,
+    monthlyFee: 69,
+    contractTotal: 5796,
+  },
+};
+
 describe("orderLineEditKind", () => {
   it("mattress/bedframe rows edit; accessory rows don't", () => {
     expect(orderLineEditKind(line(), CATALOG)).toBe("bed_mattress");
@@ -61,6 +80,53 @@ describe("orderLineEditKind", () => {
 
   it("unknown sku (not in the catalog) blocks the pencil", () => {
     expect(orderLineEditKind(line({ sku: "GONE" }), CATALOG)).toBeNull();
+  });
+
+  // The drift this refactor exists to stop: the cart learnt about rental when
+  // 0275 shipped, this gate did not, and a persisted rental line opened the
+  // OUTRIGHT-SALE configurator over a signed agreement.
+  it("a persisted RENTAL row has no pencil — there is no amendment route yet", () => {
+    expect(orderLineEditKind(line({ unitPrice: 0, attrs: RENTAL_ATTRS }), CATALOG)).toBeNull();
+  });
+});
+
+/**
+ * ONE core for "which configure surface re-opens this row?" — shared with the
+ * cart's `lineEditTarget`. It answers what the row IS; the two wrappers own
+ * what their caller is allowed to open.
+ */
+describe("configureSurfaceFor", () => {
+  it("routes by what the row carries, not by the caller", () => {
+    expect(configureSurfaceFor({ sku: "MAT-1", attrs: null }, CATALOG)).toBe("bed_mattress");
+    expect(configureSurfaceFor({ sku: "MAT-1", attrs: RENTAL_ATTRS }, CATALOG)).toBe("rental");
+    expect(
+      configureSurfaceFor({ sku: "LOTTI-1A", attrs: { sofa_build: { cells: [] } } }, CATALOG),
+    ).toBe("sofa_build");
+    expect(
+      configureSurfaceFor({ sku: "LOTTI-1A", attrs: { sofa_build_key: "bk-1" } }, CATALOG),
+    ).toBe("sofa_build");
+  });
+
+  it("rental is tested BEFORE the category — a rented mattress is still a mattress model", () => {
+    // If the category test ran first this would be "bed_mattress", which is
+    // the outright-sale configurator: RM0 price, a Remark price adjustment and
+    // a PWP bar, none of which mean anything to a rental.
+    expect(configureSurfaceFor({ sku: "MAT-1", attrs: RENTAL_ATTRS }, CATALOG)).not.toBe(
+      "bed_mattress",
+    );
+  });
+
+  it("no surface for a preset sofa, an accessory, or an unknown sku", () => {
+    // A sofa with no stored build came from the dropdown — no canvas to reopen.
+    expect(configureSurfaceFor({ sku: "LOTTI-1A", attrs: null }, CATALOG)).toBeNull();
+    expect(configureSurfaceFor({ sku: "ACC-1", attrs: null }, CATALOG)).toBeNull();
+    expect(configureSurfaceFor({ sku: "GONE", attrs: null }, CATALOG)).toBeNull();
+  });
+
+  it("says nothing about blocked markers — that belongs to the wrappers", () => {
+    const attrs = { free_gift: true };
+    expect(configureSurfaceFor({ sku: "MAT-1", attrs }, CATALOG)).toBe("bed_mattress");
+    expect(orderLineEditKind(line({ attrs }), CATALOG)).toBeNull();
   });
 });
 

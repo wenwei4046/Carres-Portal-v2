@@ -662,9 +662,23 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
   }
 
   // Escape closes; body scroll locked while open (2990s parity).
+  //
+  // Is a screen open ON TOP of this drawer right now? `editing` holds the
+  // configure screen's data, or null when it is closed; `stripeOpen` is the
+  // Stripe modal. Both of those close themselves on Escape, so the drawer must
+  // not also close — one Escape, one layer.
+  //
+  // It cannot be left to the child to stop us: the browser reaches `document`
+  // (us) BEFORE `window` (the configure screens), so we always go first.
+  // Full reasoning: docs/carry-forwards.md, entry
+  // `escape-closes-every-layer-of-the-pos-order-drawer`.
+  //
+  // Do NOT add `addOpen` / `addonEditing` / `viewChangeOpen` here. They have no
+  // Escape of their own, so gating on them leaves Escape doing NOTHING.
+  const nestedSurfaceOpen = editing !== null || stripeOpen;
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape" && !nestedSurfaceOpen) onClose();
     };
     document.addEventListener("keydown", onKey);
     const prev = document.body.style.overflow;
@@ -673,7 +687,7 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
       document.removeEventListener("keydown", onKey);
       document.body.style.overflow = prev;
     };
-  }, [onClose]);
+  }, [onClose, nestedSurfaceOpen]);
 
   // ── totals (order-totals — line + addon + stair carry) ───────────────────
   const lineSub = order ? lineSubtotal(order) : 0;

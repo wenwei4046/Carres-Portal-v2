@@ -571,11 +571,15 @@ describe("one supplier date, one door — counted across apps/web", () => {
   const files = sourceFiles(WEB_SRC);
   const hitsFor = (needle: string) =>
     files.filter((f) => readFileSync(f, "utf8").includes(needle));
+  /** `join` gives `\` on Windows and the expectations below are written with
+   *  `/`. Normalise, or this whole block fails off-CI for a reason that has
+   *  nothing to do with how many doors the endpoint has. */
+  const rel = (f: string) => f.replace(WEB_SRC, "").replace(/\\/g, "/");
 
   it("the tomorrow-delivery endpoint has exactly ONE caller", () => {
     // The URL is built in the hook, so the hook is what a caller names.
     const callers = hitsFor("useRecordSupplierDate(");
-    expect(callers.map((f) => f.replace(WEB_SRC, "")).sort()).toEqual([
+    expect(callers.map(rel).sort()).toEqual([
       "/lib/queries.ts", // where it is defined
       "/pages/operation/OperationPurchaseOrders.tsx", // the one door
     ]);
@@ -585,7 +589,7 @@ describe("one supplier date, one door — counted across apps/web", () => {
 
   it("the balance-date endpoint has exactly ONE caller, on Purchase Orders", () => {
     const callers = hitsFor("useRecordBalanceDateMutation(");
-    expect(callers.map((f) => f.replace(WEB_SRC, "")).sort()).toEqual([
+    expect(callers.map(rel).sort()).toEqual([
       "/lib/queries.ts",
       "/pages/operation/OperationPurchaseOrders.tsx",
     ]);

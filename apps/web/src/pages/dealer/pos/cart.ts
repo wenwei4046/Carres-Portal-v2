@@ -1,5 +1,6 @@
 import type { CatalogResponse } from "@carres/shared";
 import type { DraftAddon, DraftLine } from "../new-order/draft";
+import { configureSurfaceFor, type ConfigureSurface } from "./order-line-edit";
 
 /**
  * Cart math + line-merge helpers for the POS catalog flow. Pure functions so
@@ -15,8 +16,13 @@ import type { DraftAddon, DraftLine } from "../new-order/draft";
  *    - `bed_mattress` → PosConfigurePage (size / options / specials restored)
  *    - `rental` → RentalConfigurePage (size / term / quantity restored)
  *    - null → not editable in a configurator (accessory / service / preset
- *      lines — qty is already editable in the cart itself). */
-export type LineEditTarget = "sofa_build" | "bed_mattress" | "rental";
+ *      lines — qty is already editable in the cart itself).
+ *
+ *  The routing itself lives in `configureSurfaceFor` (`order-line-edit.ts`) —
+ *  ONE core, shared with the persisted-row pencil, so the two can no longer
+ *  drift the way they did over rental. This wrapper owns only the cart's own
+ *  refusal. */
+export type LineEditTarget = ConfigureSurface;
 export function lineEditTarget(
   line: DraftLine,
   catalog: CatalogResponse,
@@ -25,20 +31,7 @@ export function lineEditTarget(
   // unitPrice is a share of the bundle price, and a configurator re-emit would
   // re-price it at catalog. Remove the bundle and re-add instead.
   if (lineBundleGroup(line) !== null) return null;
-  const sku = catalog.skus.find((s) => s.sku === line.sku);
-  const model = sku ? catalog.models.find((m) => m.id === sku.modelId) : undefined;
-  if (!model) return null;
-  const attrs = line.attrs as Record<string, unknown> | null;
-  if (attrs?.sofa_build) return model.category === "sofa" ? "sofa_build" : null;
-  // BEFORE the category test, because a rented mattress is still a mattress
-  // MODEL and would otherwise open the OUTRIGHT-SALE configurator: RM0 (a
-  // rental's money lives in `rental_plans`, never on the sku), plus a Remark
-  // price adjustment and a PWP bar that mean nothing to a rental. The pencil
-  // stays, the operator must be able to change size, term and quantity — it
-  // just has to open the surface that knows what those words mean.
-  if (attrs?.rental) return "rental";
-  if (model.category === "mattress" || model.category === "bedframe") return "bed_mattress";
-  return null;
+  return configureSurfaceFor(line, catalog);
 }
 
 /** 0239 — the per-add bundle group id a bundle component line carries
