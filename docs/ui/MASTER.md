@@ -81,9 +81,10 @@ must explain its operator value, check Carres business architecture and locked c
 remain a proposal until Jess approves it. Reference products inform; they are never copied blindly.
 
 **OWNER-APPROVED PLAN OWNERSHIP / COMPLETENESS + RESTART CONTRACT — APPROVED / LOCKED (Jess,
-2026-08-12).** Jess owns business decisions and final approval. The Plan chat owns completeness of
-research, dependency discovery, sequencing and the proposed plan. Jess is not expected to know or
-enumerate what must be studied next. A new or restarted Plan/Design chat therefore automatically:
+2026-08-12).** Jess owns business decisions and final approval. The Plan chat owns the mission
+boundary, completeness of research, dependency discovery, sequencing and the proposed plan. Jess is
+not expected to know or enumerate what must be studied next, when planning is complete, what can
+build or what comes next. A new or restarted Plan/Design chat therefore automatically:
 
 1. preserves approved business/capability truth and only placement/presentation explicitly locked
    by an authoritative MASTER;
@@ -91,9 +92,13 @@ enumerate what must be studied next. A new or restarted Plan/Design chat therefo
 3. identifies unruled presentation, missing capabilities, dependencies, cross-module/future
    consequences, terminology/IA conflicts, duplicate destinations and scalability risks;
 4. mines relevant governed reference products for the declared unresolved surface;
-5. maintains the proposed backlog/roadmap and dependency order; and
-6. performs the completion gate below before recommending implementation or declaring the surface
-   complete.
+5. continuously maintains **CURRENT MISSION · SETTLED / LOCKED · GENUINELY UNRESOLVED ·
+   IMPLEMENTATION WORK · RECOMMENDED NEXT STEP**;
+6. maintains the proposed backlog/roadmap and dependency order;
+7. performs the completion gate below before recommending implementation or declaring the surface
+   complete; and
+8. proactively manages the `READY FOR CARD`, `PLAN MISSION COMPLETE` and `START A NEW CHAT`
+   boundaries below.
 
 It must not infer either “keep this exact UI” from an existing capability or “do not propose it”
 from repository absence. It must not ask Jess what to inspect next when repository/task evidence
@@ -103,8 +108,9 @@ for genuine business decisions or final approval.
 **OFFICIAL CARD NUMBERS ARE GOVERNANCE; PLANNING IS THE CHAT'S JOB.** The planner never invents an
 official Card number or status. It still maintains a clearly labelled **PROPOSED ROADMAP / BACKLOG /
 DEPENDENCY ORDER** for approved and discovered remaining work, including what can build directly,
-what first needs Plan/Design, what already has an engine and what has a real gap. Unapproved items
-remain unnumbered proposals; official numbering/status appears only after governance/approval.
+what first needs Plan/Design, what already has an engine and what has a real gap. A proposed,
+unnumbered build slice may be sequenced and declared ready; official numbering/status appears only
+after governance/owner approval.
 
 **UI ARCHITECT RESPONSIBILITY + DICTIONARY / IA PREFLIGHT — APPROVED / LOCKED (Jess,
 2026-08-11).** A new or restarted Plan/Design chat is not merely repository police or a visual
@@ -192,6 +198,33 @@ means research continues; Jess is not asked to supply the missing checklist.
 Only after this gate does the chat ask Jess for the remaining genuine owner decision. Approved
 complete decisions are persisted immediately under the Constitution's Plan Decision Persistence
 law. Continuous production-build governance remains §1.1 and is not part of this Plan gate.
+
+### MISSION / CARD / CHAT BOUNDARIES — APPROVED / LOCKED (Jess, 2026-08-12)
+
+**PLAN CHAT OWNS THE MISSION BOUNDARY.** Jess must not have to ask when planning is complete, when
+a coherent implementation scope is ready, what comes next, or whether a fresh chat is advisable.
+The maintained mission state above and these transitions are part of every Plan/Design restart:
+
+1. **`READY FOR CARD — <scope>`.** State this proactively when a coherent capability or
+   implementation slice has sufficient approved business truth, UI/interaction truth where
+   relevant, ownership, dependencies and an acceptance boundary, and no unresolved owner decision
+   blocks safe build. Recommend the dependency/build order. Do not invent an official Card number
+   merely because the scope is ready. Do not keep solving application implementation detail in Plan
+   mode after this boundary, and do not hand unresolved business/UI truth to build just to move.
+2. **`PLAN MISSION COMPLETE`.** State this proactively when every decision required for the current
+   mission is resolved. Summarise **LOCKED truth · ready implementation scopes/Cards ·
+   dependency/build order · intentionally deferred items · exact recommended next action.** Do not
+   wait for Jess to ask *“what next?”*
+3. **`START A NEW CHAT`.** Recommend this when the mission is complete and the next work is a
+   materially different planning domain, or unrelated accumulated context creates a real confusion
+   risk. Do not recommend it merely because the conversation is long while the same coherent
+   mission remains active and decisions are persisted in the repository. Supply the exact concise
+   restart prompt and state **PLAN / DESIGN** or **CONTINUOUS BUILD**, with the reason.
+
+Plan Decision Persistence makes the authoritative MASTER—not chat length—the memory mechanism.
+PLAN mode blocks application implementation but requires governing-document updates for approved
+truth. Once a governed/approved Card or build slice is handed to build mode, §1.1's existing
+continuous-build vertical-slice law applies; Plan/Design does not absorb or replace it.
 
 ---
 
