@@ -69,12 +69,28 @@ Plan/design work continues from authoritative UI truth. **APPROVED / LOCKED deci
 re-researched, reopened or offered for re-approval.** At entry, separate what is already approved
 from what is genuinely unresolved and name the single decision surface being solved.
 
+**UI PROPOSAL PREFLIGHT — APPROVED / LOCKED (Loo, 2026-08-11).** Before presenting **ANY** UI
+proposal, mockup or layout recommendation, a new or restarted Plan/Design chat must first extract
+a brief **LOCKED CONSTRAINTS** checklist appropriate to that decision surface from this MASTER,
+the current/frozen design-token authority and the target module MASTER, then validate the proposal
+against every item. When relevant, the checklist includes: Sidebar active/current treatment · page
+header law · toolbar law · typography (size, weight and line-height) · table header/body/footer
+density and row heights · pill/button treatment · spacing · Register width/scroll law · locked
+target-module column order and field semantics · existing capabilities that must be preserved ·
+retired/banned patterns. The preflight may be internal or briefly visible, but the validation is
+mandatory. A proposal that conflicts with an **APPROVED / LOCKED** constraint is **INVALID** and
+must be corrected before Jess sees it. If the authorities themselves conflict, report that
+conflict and stop the proposal; never silently choose one.
+
 For a genuinely **UNRESOLVED** UI decision, proactively research only that declared surface. Use
 the relevant governed references — including Linear, Shopify, AutoCount, 2990, current Carres UI
 and other mature ERP patterns when useful — and exclude unrelated history and pages. Derive the
 common patterns and real trade-offs, then give **one evidence-based Carres recommendation**, not
-arbitrary A/B/C options. External products and current screens are evidence, never specification;
-Carres business truth and approved information architecture still win.
+arbitrary A/B/C options. Reference products may inform only that unresolved surface; they **NEVER**
+override Carres-governed tokens, fields, semantics, column order, capabilities or locked decisions.
+Current and legacy screenshots are evidence of implementation, not authority over frozen target
+truth. The order is mandatory: establish locked constraints → research only the unresolved surface
+→ propose.
 
 When the owner approves a complete UI or layout decision, immediately overwrite this MASTER or the
 owning module MASTER with the current **APPROVED / LOCKED** truth before moving to another major
@@ -261,20 +277,6 @@ own decision and its own card.**
 
 # §6.5 · REGISTER NAVIGATION AND HEADER ADMISSION — ruled by Loo 2026-08-11
 
-**LOCKED CONSTRAINTS PREFLIGHT — APPROVED / LOCKED (Loo, 2026-08-11).** Before every UI
-proposal or mockup, Plan chat must first build a short preflight from this MASTER, frozen
-`../01-design-tokens.md`, and the relevant module MASTER. It must verify, at minimum: Sidebar
-active/current treatment · page header law · toolbar law · typography · row/header/footer
-density · pill/button treatment · spacing · Register width/scroll law · locked column order ·
-existing capabilities that must survive · retired/banned patterns. A mockup may not be shown
-until it passes. If the authorities conflict, report the conflict and stop the mockup; do not
-silently choose one.
-
-Reference products may inform only a genuinely unresolved surface after this preflight. Linear,
-2990, Shopify, AutoCount and every other reference may never overwrite a Carres field, token,
-locked decision or preserved capability. A proposal that needs to change locked truth must first
-name that reopening and receive an owner ruling; visual convenience is not authority.
-
 **TABS ARE AVOIDED BY DEFAULT — APPROVED / LOCKED.** Separate business jobs, owned records
 or destinations are separate portal-navigation entries and pages; they are never compressed
 into a module tab strip. Purchasing is the explicit reference: SO Batch Purchase · Manual
@@ -322,9 +324,10 @@ active line and wash are `blue-9` / `blue-3`. The rollout remains a separate imp
 card; new designs and mockups show the approved destination, not the legacy red state.
 
 **REGISTER TABLE DENSITY LAW — APPROVED / LOCKED.** The readable 2990 parent-list geometry is
-the Register baseline: rendered 36px table header; rendered 38px single-line parent row; 11px
-body type on 16px line-height; approximately 8px vertical cell breathing room above and below,
-with the row's 20px checkbox included in the measured height. Expanded content takes its
+the Register baseline, expressed only through frozen Carres typography tokens: rendered 36px
+table header using `text-label` (11px / 14px); rendered 38px single-line parent row using
+`text-body` (13px / 18px). The remaining height is balanced vertical breathing room, with the
+row's checkbox included in the measured height. Expanded content takes its
 natural governed child-row height and is not forced into 38px. Carres gains visible rows by
 removing tall page chrome, breadcrumbs, KPI bands and redundant headings — never by squeezing
 the parent row below this readable baseline. Footer existence, contents and height remain a
