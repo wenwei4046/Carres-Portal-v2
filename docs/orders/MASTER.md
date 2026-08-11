@@ -332,6 +332,12 @@ P9 negative control: forcing legacy delivered words on the order
    changed NOTHING in the register answer                           PASS
 ```
 
+**Deploy.** PR #727 merged as `9b530498` · API Worker version
+`1e8e8427-1ae8-4076-9477-309ec910c5a6` · `/health` 200 `{"ok":true}` ·
+`GET /:id/allocation`, `POST /ops/stock/hold`, `POST /ops/stock/hold-resolve`
+all mounted and 401 unauthenticated. No web deploy: Card 2 ships no UI.
+Tests: shared 2244 · api 2171 · api tsc clean.
+
 **Known boundaries, reported not hidden:**
 - The loan flow still reserves/releases by direct PostgREST update
   (`order-control.ts:1666/1703/1929`, ref `LOAN SO-{n}`) — human-decided and
