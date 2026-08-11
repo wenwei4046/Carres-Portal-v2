@@ -69,6 +69,23 @@ Plan/design work continues from authoritative UI truth. **APPROVED / LOCKED deci
 re-researched, reopened or offered for re-approval.** At entry, separate what is already approved
 from what is genuinely unresolved and name the single decision surface being solved.
 
+**GOVERNANCE IS NOT FEATURE FREEZE — APPROVED / LOCKED (Jess, 2026-08-11).** Plan/design must
+separate **business/capability truth** (whether a capability exists or should exist) from
+**placement/presentation truth** (where and how it appears). Existing useful capabilities default
+to **KEEP**, and approved business/capability truth is not casually reopened. But an existing
+capability does not lock its current placement, control type or visual form unless this MASTER or
+the owning module MASTER explicitly locks that placement/presentation. A capability missing from
+the repository is not automatically forbidden: on a genuinely unresolved surface, scoped research
+may and should identify and recommend a materially useful missing capability. The recommendation
+must explain its operator value, check Carres business architecture and locked constraints, and
+remain a proposal until Jess approves it. Reference products inform; they are never copied blindly.
+
+**Plan/Design restart contract.** A new or restarted chat preserves approved business/capability
+truth and only the placement/presentation that an authoritative MASTER actually locks. It lists
+unruled placement/presentation and potentially useful missing capabilities as unresolved, then
+researches only the declared decision surface. It must not infer either “keep this exact UI” from
+an existing capability or “do not propose it” from repository absence.
+
 **UI PROPOSAL PREFLIGHT — APPROVED / LOCKED (Loo, 2026-08-11).** Before presenting **ANY** UI
 proposal, mockup or layout recommendation, a new or restarted Plan/Design chat must first extract
 a brief **LOCKED CONSTRAINTS** checklist appropriate to that decision surface from this MASTER,
@@ -80,7 +97,10 @@ target-module column order and field semantics · existing capabilities that mus
 retired/banned patterns. The preflight may be internal or briefly visible, but the validation is
 mandatory. A proposal that conflicts with an **APPROVED / LOCKED** constraint is **INVALID** and
 must be corrected before Jess sees it. If the authorities themselves conflict, report that
-conflict and stop the proposal; never silently choose one.
+conflict and stop the proposal; never silently choose one. Preflight protects the capability and
+every explicitly locked placement/presentation; it must not promote the current implementation's
+unruled location, control type or styling into law, and it must not reject a justified new
+capability merely because Carres does not yet contain it.
 
 For a genuinely **UNRESOLVED** UI decision, proactively research only that declared surface. Use
 the relevant governed references — including Linear, Shopify, AutoCount, 2990, current Carres UI
@@ -89,8 +109,11 @@ common patterns and real trade-offs, then give **one evidence-based Carres recom
 arbitrary A/B/C options. Reference products may inform only that unresolved surface; they **NEVER**
 override Carres-governed tokens, fields, semantics, column order, capabilities or locked decisions.
 Current and legacy screenshots are evidence of implementation, not authority over frozen target
-truth. The order is mandatory: establish locked constraints → research only the unresolved surface
-→ propose.
+truth or over unresolved placement/presentation. For example, `Not delivered / All orders` may be
+an existing scope capability that must be preserved; that fact alone does not make permanent header
+pills its locked presentation. Conversely, Plan/Design may propose a useful missing interaction even
+when current Carres has no such capability. The order is mandatory: establish locked constraints →
+research only the unresolved surface → propose.
 
 When the owner approves a complete UI or layout decision, immediately overwrite this MASTER or the
 owning module MASTER with the current **APPROVED / LOCKED** truth before moving to another major
