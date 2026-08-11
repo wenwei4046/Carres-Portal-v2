@@ -37,6 +37,7 @@ import SalesOrderWorkspace from "./SalesOrderWorkspace";
 // procurement are path-driven), so `?tab=delivery` deep-links it.
 import OperationDelivery from "./OperationDelivery";
 import OperationPayments from "./OperationPayments";
+import OperationWork from "./OperationWork";
 import OperationRental from "./OperationRental";
 // Purchase / Procurement MRP cockpit — the "what to buy today" guided worklist.
 import OperationToOrder from "./OperationToOrder";
@@ -390,6 +391,10 @@ export default function OperationApp() {
             {/* T11 — Delivery: the 3-pane module (queues · calendar · detail).
                 Read-only by design; every write stays behind the order drawer. */}
             {tab === "delivery" && <OperationDelivery />}
+            {/* SO V2 CARD 10 — My Work / Team Work: two filters over the ONE
+                open work set (Card 9's engine). The page writes nothing; a
+                row opens the Sales Order Workspace. */}
+            {tab === "work" && <OperationWork />}
             {/* 0165 — Payments / collection (Master Sheet Balance tab) */}
             {tab === "payments" && <OperationPayments />}
             {/* 0247-0249 — Rental base: agreements + deployed-unit registry */}

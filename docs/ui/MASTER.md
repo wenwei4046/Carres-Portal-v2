@@ -39,6 +39,30 @@ STOP and ask             a component that does not exist. Never draw one inline 
 **A rule that exists only as documentation is temporary and incomplete.** Every UI rule must
 eventually become a structure the code can enforce — a type, a lint rule, or a failing test.
 
+## §1.1 · Production UI Execution Law — owner ruling 2026-08-11
+
+**Production UI is built on proactive design judgment and reviewed asynchronously.**
+This overwrites (MASTER OVERWRITE LAW) the earlier synchronous approval gates — the blanket
+"ASCII mock first, wait for yes" and the localhost "Layout Approved" hold — for production
+execution work:
+
+```
+BEFORE build   the token values, the kit, COPY-STANDARD and the page patterns
+               BIND exactly as before — the law order is unchanged. The chat
+               composes with its own best judgment inside those laws; it does
+               not wait for a layout sign-off.
+AFTER build    the owner reviews the LIVE surface asynchronously. A review
+               verdict is a normal re-ruling: it changes the next commit,
+               it does not retroactively invalidate the shipped one.
+STILL GATED    a NEW business rule · a change to an approved workflow or
+               ruled word · anything §4 of the Constitution's interrupt list
+               names. Design judgment covers COMPOSITION, never business law.
+```
+
+**The conversational rule survives where it always lived:** when the owner is IN the
+conversation deciding between options, sketch before code (Constitution §10). The gate that
+is gone is the one that parked autonomous production execution on a synchronous approval.
+
 ---
 
 # §2 · Shared architecture
