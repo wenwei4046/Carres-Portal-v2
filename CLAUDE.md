@@ -120,14 +120,38 @@ not a new guideline  →  fold the rule into this Constitution
 
 ### PLAN / DESIGN RESEARCH LAW — APPROVED / LOCKED, owner ruling 2026-08-11
 
+**GOVERNANCE IS NOT FEATURE FREEZE — APPROVED / LOCKED, owner ruling 2026-08-11.** Governance
+protects decided truth; it does not prohibit improving the product. Keep these two truths separate:
+
+```
+BUSINESS / CAPABILITY TRUTH   whether a capability exists or should exist
+PLACEMENT / PRESENTATION      where and how that capability appears
+```
+
+An **APPROVED / LOCKED** business or capability ruling is not casually reopened, and an existing
+useful capability defaults to **KEEP**. But its current screen, control type or location is not
+therefore locked: placement/presentation binds only when the authoritative MASTER explicitly locks
+that placement/presentation. Likewise, a capability absent from this repository is not forbidden.
+For genuinely unresolved design work, Plan/Design should proactively propose a materially useful
+missing capability found through scoped research, justify the operator benefit, test it against
+Carres business architecture and every locked constraint, and obtain Jess's approval before treating
+it as truth. Linear, Shopify, AutoCount, 2990 and mature ERP patterns inform the proposal; none is
+copied blindly.
+
 - **APPROVED / LOCKED decisions are not re-researched, reopened or offered for re-approval.**
-  Continue from the authoritative MASTER's recorded answer.
+  Continue from the authoritative MASTER's recorded answer, at the boundary it actually locks.
+- **Every new or restarted Plan/Design chat applies the separation above.** Its approved baseline
+  names both preserved business/capability truth and any explicitly locked placement/presentation;
+  its unresolved list includes presentation that the MASTER has not ruled and useful missing
+  capabilities whose value is not yet decided. Repository absence is evidence of a gap, not a veto.
 - **Every new or restarted Plan/Design chat performs the UI PROPOSAL PREFLIGHT before it may
   present any UI proposal, mockup or layout recommendation:** read the relevant UI MASTER laws,
   current/frozen design-token authority and target module MASTER; extract a brief **LOCKED
   CONSTRAINTS** checklist appropriate to the decision surface; validate the proposed result
   against every item. A conflict with APPROVED / LOCKED truth makes the proposal **INVALID** —
-  it is corrected before Jess sees it, never shown and repaired only after she catches it.
+  it is corrected before Jess sees it, never shown and repaired only after she catches it. The
+  checklist preserves existing useful capabilities, but may not turn an unruled current placement,
+  presentation or repository omission into a constraint.
 - At entry, state separately: **WHAT IS ALREADY APPROVED · WHAT IS GENUINELY UNRESOLVED · WHAT
   SINGLE DECISION SURFACE THIS SESSION IS SOLVING.** Establish the locked constraints first;
   only then research the unresolved surface and propose.
@@ -136,9 +160,9 @@ not a new guideline  →  fold the rule into this Constitution
   Carres UI and other mature ERP patterns when useful — and exclude unrelated history and pages.
 - Derive the common patterns and real trade-offs, then give **one evidence-based Carres
   recommendation**, not arbitrary A/B/C options. References are evidence, never specification;
-  Carres-governed tokens, fields, semantics, column order, capabilities and locked decisions
-  always win. Current or legacy screenshots are evidence of implementation, never authority over
-  frozen target truth.
+  Carres-governed tokens, fields, semantics, column order and locked decisions always win. Current
+  or legacy screenshots are evidence of implementation, never authority over frozen target truth
+  or proof that an unresolved presentation must remain unchanged.
 - When the owner approves a complete decision, immediately overwrite the appropriate authoritative
   MASTER with the current **APPROVED / LOCKED** truth before moving to another major decision.
   PLAN mode forbids application implementation, not governing-document updates.
