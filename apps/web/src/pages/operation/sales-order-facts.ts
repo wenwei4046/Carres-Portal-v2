@@ -34,6 +34,51 @@ export function isDelivered(o: operationOrderListRow): boolean {
 }
 
 /**
+ * ⭐ A BROKEN PROMISE IS A FACT ABOUT THE RECORD, NEVER AN INSTRUCTION.
+ *
+ * **The REGISTER LAW is not bent by this.** *"Every register answers only:
+ * what records exist? Never: what should I do?"* — and *"the day we promised
+ * has passed and the goods have not gone"* is the ORDER'S OWN TRUTH, read
+ * from two fields the row already carries. What to DO about it belongs to
+ * Work (SO V2 Cards 9/10), and this file still cannot say it.
+ *
+ * It therefore changes the date's TONE and never its words: no status is
+ * minted, no verb reaches the screen, and `docs/01-design-tokens.md` §2.2
+ * gives colour `status` as one of its four jobs.
+ *
+ * `today` is INJECTED — the clock is the caller's, so the fact is testable
+ * without freezing time.
+ */
+export function promiseBroken(o: operationOrderListRow, today: string): boolean {
+  if (o.delivery_date_tbd || !o.delivery_date) return false;
+  if (isDelivered(o)) return false;
+  return o.delivery_date < today;
+}
+
+/**
+ * D1's PO coverage, per line — *is this item bought yet?*
+ *
+ * Two rungs, and both are somebody's record:
+ *   1. `source_po` — the PO number the AutoCount import wrote on the line.
+ *   2. `po_skus`   — the SKUs a REAL purchase order covers for this order
+ *                    (D1's own field). No number rides it, so the answer is
+ *                    this repository's already-shipped `PO issued` string
+ *                    (`currentOf`), never a fifth spelling.
+ *
+ * **The blank carries ONE meaning: nothing proves a purchase order covers
+ * this line.** A pre-D1 Worker sends `po_skus` as `undefined`, which lands on
+ * the same blank — "we do not know" and "nothing proves it" are the same
+ * sentence here, so the cell never accuses.
+ */
+export function onPoOf(
+  o: operationOrderListRow,
+  l: { sku: string; source_po?: string | null },
+): string {
+  if (l.source_po) return l.source_po;
+  return (o.po_skus ?? []).includes(l.sku) ? "PO issued" : "";
+}
+
+/**
  * What ONE line is called, in words.
  *
  * The ladder, and every rung is a fact somebody wrote down:

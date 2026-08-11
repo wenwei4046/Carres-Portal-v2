@@ -50,7 +50,15 @@ import {
   useRef,
   useState,
 } from "react";
-import { Search, Columns3, RotateCcw, Filter, Download } from "lucide-react";
+import {
+  Search,
+  Columns3,
+  RotateCcw,
+  Filter,
+  Download,
+  ChevronDown,
+  MoreHorizontal,
+} from "lucide-react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
 import { SkeletonRows } from "./Skeleton";
@@ -131,6 +139,14 @@ export type DataGridColumn<T> = {
 
 /** A single entry in a row's right-click context menu. `divider: true`
     renders a horizontal rule (the other fields are then ignored). */
+/** The current view resolved to paper-ready strings — see `viewMatrix`. */
+export type DataGridViewMatrix = {
+  headers: string[];
+  rows: string[][];
+  /** Column indices that are right-aligned on screen (money, counts). */
+  rightAlign: number[];
+};
+
 export type DataGridContextMenuItem = {
   label?: string;
   onClick?: () => void;
@@ -138,6 +154,14 @@ export type DataGridContextMenuItem = {
   danger?: boolean;
   /** When true, this entry renders as a `<hr>` divider between groups. */
   divider?: boolean;
+  /**
+   * A CONTROLLED PLACEHOLDER (owner, 2026-08-11): the entry is an APPROVED
+   * part of the ruled menu, its engine is not built, and it must say so on
+   * its own face rather than look like a working act or invent business data.
+   */
+  disabled?: boolean;
+  /** The words shown beside a disabled entry. Defaults to `Not available yet`. */
+  note?: string;
 };
 
 export type DataGridProps<T> = {
@@ -183,6 +207,56 @@ export type DataGridProps<T> = {
       Filters / Export / Columns. The legacy `toolbar` slot is unchanged. */
   toolbarStart?: ReactNode;
   toolbarEnd?: ReactNode;
+  /**
+   * ⭐ WORK TOOLBAR EXTENSIONS — owner ruling 2026-08-11, `appearance="reference"`
+   * ONLY. Every one is OPTIONAL and no existing signature moved (ui/MASTER.md
+   * §4: "every optional power is OPTIONAL"), so the eleven non-reference grids
+   * render byte-identically without them.
+   *
+   *   Normal      View · Search · Export ▾ · Columns · + New Sales Order · …
+   *   Selected    N selected · Clear │ <page actions> · Export … (N)
+   *
+   * The ruled toolbar has ONE Export control, so `exportMenu` REPLACES the
+   * `Export Excel — current view` pill rather than sitting beside it.
+   */
+  exportMenu?: {
+    label: string;
+    /** `true` = run the ENGINE's own Excel writer. The register's Excel export
+        is not re-implemented page-side just because the menu grew two
+        siblings — that is the Law-D failure this flag exists to prevent. */
+    excel?: boolean;
+    /** Receives the rows of the CURRENT VIEW (post search · filter · sort)
+        AND that view resolved to a matrix — the visible columns in the
+        operator's own order, cells resolved by the engine's ONE ladder. */
+    onSelect?: (rows: T[], view: DataGridViewMatrix) => void;
+  }[];
+  /** The `…` overflow pill. The engine prepends its own `Filter a column`
+      door, so moving Filters off the toolbar face never costs the power. */
+  overflowMenu?: {
+    label: string;
+    onSelect: () => void;
+    /** A controlled placeholder: the entry is APPROVED and visible, the
+        engine behind it is not built, and it must not pretend otherwise. */
+    disabled?: boolean;
+    disabledReason?: string;
+  }[];
+  /**
+   * Extra buttons rendered in the SELECTED state, before the engine's own
+   * export entries. Receives the selected rows so a page can vary by count
+   * (the ruled single-selection `View Flow` shows at exactly one row).
+   */
+  selectionActions?: (rows: T[]) => ReactNode;
+  /** Selection-state export entries — `Export Excel (N)` · `Export PDF (N)`.
+      Omitted → the engine's single built-in Excel export. */
+  selectionExports?: {
+    label: (n: number) => string;
+    /** `true` = the engine's own Excel writer, over the SELECTED rows. */
+    excel?: boolean;
+    onSelect?: (rows: T[], view: DataGridViewMatrix) => void;
+  }[];
+  /** The footer's own words. Reference footers state the TRUE total of what
+      the current view holds, and stay one compact line. */
+  footerSummary?: (viewRows: T[], allRows: T[]) => ReactNode;
   /** controlled focus for the "Find" button — bump to focus the search box */
   focusSearchNonce?: number;
   /** bump to collapse every expanded drill-down row ("Collapse all") */
@@ -359,6 +433,11 @@ function DataGridInner<T>({
   toolbar,
   toolbarStart,
   toolbarEnd,
+  exportMenu,
+  overflowMenu,
+  selectionActions,
+  selectionExports,
+  footerSummary,
   focusSearchNonce,
   collapseAllNonce,
   groupBanner = true,
@@ -428,6 +507,26 @@ function DataGridInner<T>({
   );
   const [filtersMenuPos, setFiltersMenuPos] = useState<{ top: number; left: number } | null>(
     null,
+  );
+  /* WORK TOOLBAR (2026-08-11) — the `Export ▾` and `…` popovers. Same
+     fixed-position + live-rect anchoring as Columns above, for the same
+     reason: the grid card clips an absolute dropdown when the table is short. */
+  const [barMenu, setBarMenu] = useState<null | "export" | "overflow">(null);
+  const [barMenuPos, setBarMenuPos] = useState<{ top: number; left: number } | null>(null);
+  const exportBtnRef = useRef<HTMLButtonElement>(null);
+  const overflowBtnRef = useRef<HTMLButtonElement>(null);
+  const openBarMenu = useCallback(
+    (which: "export" | "overflow", el: HTMLButtonElement | null) => {
+      setBarMenu((cur) => {
+        if (cur === which) return null;
+        if (el) {
+          const r = el.getBoundingClientRect();
+          setBarMenuPos({ top: r.bottom + 4, left: r.left });
+        }
+        return which;
+      });
+    },
+    [],
   );
   /* Per-column value filter (Commander 2026-05-29 — "没有 drop-down 菜单让我
      去做选择"). filters[colKey] = the set of allowed values; absent / empty =
@@ -1151,6 +1250,38 @@ function DataGridInner<T>({
     [visibleColumns, storageKey, exportName],
   );
 
+  /**
+   * THE VIEW, AS A MATRIX — what `Export ▾ · PDF` and `Print` are handed.
+   *
+   * Excel, PDF and Print were ruled as three entries of ONE control (owner,
+   * 2026-08-11), so they must answer with ONE set of columns and cells: the
+   * operator's CURRENT visible columns, in their current order, resolved by
+   * the SAME `exportValue → filterValue → rendered` ladder Excel uses. A
+   * second resolution here is exactly the Law-D failure ("not two
+   * implementations that currently agree"), so there is only this one.
+   */
+  const viewMatrix = useCallback(
+    (whichRows: T[]) => {
+      const cols = visibleColumns.filter((c) => !c.key.startsWith("__"));
+      const header = (c: DataGridColumn<T>): string =>
+        (c.exportLabel && c.exportLabel.trim()) || (c.label && c.label.trim()) || c.key;
+      const cellText = (c: DataGridColumn<T>, row: T): string => {
+        if (c.exportValue) return String(c.exportValue(row));
+        if (c.filterValue) return c.filterValue(row);
+        const rendered = coerceSearchString(c.accessor(row)).trim();
+        if (rendered) return rendered;
+        if (c.groupValue) return c.groupValue(row);
+        return "";
+      };
+      return {
+        headers: cols.map(header),
+        rows: whichRows.map((row) => cols.map((c) => cellText(c, row))),
+        rightAlign: cols.flatMap((c, i) => (c.align === "right" ? [i] : [])),
+      };
+    },
+    [visibleColumns],
+  );
+
   // ── Sort handlers ─────────────────────────────────────────────────
   const toggleSort = (key: string) => {
     setLayout((l) => {
@@ -1359,30 +1490,20 @@ function DataGridInner<T>({
         {isReference ? null : toolbar}
         {isReference && (
           <div className={styles.columnsAnchor}>
+            {/* THE RULED TOOLBAR HAS NO `Filters` FACE (owner, 2026-08-11):
+                View · Search · Export ▾ · Columns · + New Sales Order · …
+                The launcher itself is NOT deleted — it moved into `…`, and
+                every column keeps its own header ▽ regardless, so the power
+                is untouched and only its second door moved. The `…` pill
+                carries the active-filter count so a live filter is never
+                invisible. */}
             <button
               ref={filtersBtnRef}
               type="button"
-              className={`${styles.toolbarPill} ${
-                filtersMenuOpen || activeFilterCount > 0 ? styles.toolbarPillOn : ""
-              }`}
-              onClick={(e) => {
-                e.stopPropagation();
-                setFiltersMenuOpen((open) => {
-                  const next = !open;
-                  if (next && filtersBtnRef.current) {
-                    const r = filtersBtnRef.current.getBoundingClientRect();
-                    setFiltersMenuPos({ top: r.bottom + 4, left: r.left });
-                  }
-                  return next;
-                });
-              }}
-            >
-              <Filter {...ICON} aria-hidden />
-              <span>Filters</span>
-              {activeFilterCount > 0 && (
-                <span className={styles.toolbarPillBadge}>{activeFilterCount}</span>
-              )}
-            </button>
+              className={styles.srOnlyAnchor}
+              aria-hidden
+              tabIndex={-1}
+            />
             {filtersMenuOpen && (
               <>
                 <div className={styles.columnsMenuBackdrop} onClick={() => setFiltersMenuOpen(false)} />
@@ -1478,18 +1599,81 @@ function DataGridInner<T>({
             filter + sort) across the visible data columns. System-wide: every
             list rendered through DataGrid gets it for free (Wei Siang
             2026-06-19). Wording says the scope out loud (REGISTER LAW 3). */}
-        <button
-          type="button"
-          className={styles.toolbarPill}
-          onClick={() => {
-            void exportRows(sortedRows);
-          }}
-          disabled={sortedRows.length === 0}
-          title={sortedRows.length === 0 ? "No rows to export" : "Export the visible rows to Excel"}
-        >
-          <Download size={14} strokeWidth={1.75} aria-hidden />
-          <span>Export Excel — current view</span>
-        </button>
+        {isReference && exportMenu && exportMenu.length > 0 ? (
+          /* ONE Export control (owner, 2026-08-11) — `Export ▾` opening
+             Excel · PDF · Print. Its scope is still the CURRENT VIEW, and
+             every entry is handed exactly the rows the view holds, so REGISTER
+             LAW 3 ("say the scope out loud") is kept by the menu's own title
+             rather than by a long pill word. */
+          <div className={styles.columnsAnchor}>
+            <button
+              ref={exportBtnRef}
+              type="button"
+              className={`${styles.toolbarPill} ${barMenu === "export" ? styles.toolbarPillOn : ""}`}
+              disabled={sortedRows.length === 0}
+              title={sortedRows.length === 0 ? "No rows to export" : "Export the current view"}
+              aria-haspopup="menu"
+              aria-expanded={barMenu === "export"}
+              onClick={(e) => {
+                e.stopPropagation();
+                openBarMenu("export", exportBtnRef.current);
+              }}
+            >
+              <Download size={14} strokeWidth={1.75} aria-hidden />
+              <span>Export</span>
+              <ChevronDown size={12} strokeWidth={2} aria-hidden />
+            </button>
+            {barMenu === "export" && (
+              <>
+                <div className={styles.columnsMenuBackdrop} onClick={() => setBarMenu(null)} />
+                <div
+                  className={styles.barMenu}
+                  style={
+                    barMenuPos
+                      ? { position: "fixed", top: barMenuPos.top, left: barMenuPos.left }
+                      : undefined
+                  }
+                  role="menu"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <header className={styles.columnsMenuHeader}>
+                    <span>Export — current view ({sortedRows.length})</span>
+                  </header>
+                  {exportMenu.map((m) => (
+                    <button
+                      key={m.label}
+                      type="button"
+                      role="menuitem"
+                      className={styles.barMenuItem}
+                      onClick={() => {
+                        setBarMenu(null);
+                        if (m.excel) void exportRows(sortedRows);
+                        else m.onSelect?.(sortedRows, viewMatrix(sortedRows));
+                      }}
+                    >
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        ) : (
+          <button
+            type="button"
+            className={styles.toolbarPill}
+            onClick={() => {
+              void exportRows(sortedRows);
+            }}
+            disabled={sortedRows.length === 0}
+            title={
+              sortedRows.length === 0 ? "No rows to export" : "Export the visible rows to Excel"
+            }
+          >
+            <Download size={14} strokeWidth={1.75} aria-hidden />
+            <span>Export Excel — current view</span>
+          </button>
+        )}
         <div className={styles.columnsAnchor}>
           <button
             ref={columnsBtnRef}
@@ -1573,18 +1757,121 @@ function DataGridInner<T>({
                     ));
                   })()}
                 </div>
+                {/* `Reset layout` LIVES IN COLUMNS, NEVER IN THE FOOTER
+                    (owner, 2026-08-11). The footer states what the view holds;
+                    it is not a control strip. This resets order · width ·
+                    visibility · grouping · sort — everything the layout key
+                    remembers — where the operator is already changing layout. */}
+                {isReference && (
+                  <button
+                    type="button"
+                    className={styles.barMenuItem}
+                    onClick={() => {
+                      resetLayout();
+                      setColumnsMenuOpen(false);
+                    }}
+                  >
+                    <RotateCcw size={12} strokeWidth={1.75} aria-hidden />
+                    <span>Reset layout</span>
+                  </button>
+                )}
               </div>
             </>
           )}
         </div>
         {isReference && toolbarEnd}
+        {/* `…` — the overflow. The engine's own `Filter a column` door is
+            FIRST, then the page's entries. It carries the active-filter count
+            so moving Filters off the face never hides a live filter. */}
+        {isReference && (
+          <div className={styles.columnsAnchor}>
+            <button
+              ref={overflowBtnRef}
+              type="button"
+              className={`${styles.toolbarPill} ${
+                barMenu === "overflow" || activeFilterCount > 0 ? styles.toolbarPillOn : ""
+              }`}
+              aria-label="More"
+              title="More"
+              aria-haspopup="menu"
+              aria-expanded={barMenu === "overflow"}
+              onClick={(e) => {
+                e.stopPropagation();
+                openBarMenu("overflow", overflowBtnRef.current);
+              }}
+            >
+              <MoreHorizontal size={14} strokeWidth={2} aria-hidden />
+              {activeFilterCount > 0 && (
+                <span className={styles.toolbarPillBadge}>{activeFilterCount}</span>
+              )}
+            </button>
+            {barMenu === "overflow" && (
+              <>
+                <div className={styles.columnsMenuBackdrop} onClick={() => setBarMenu(null)} />
+                <div
+                  className={styles.barMenu}
+                  style={
+                    barMenuPos
+                      ? { position: "fixed", top: barMenuPos.top, left: barMenuPos.left }
+                      : undefined
+                  }
+                  role="menu"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className={styles.barMenuItem}
+                    onClick={() => {
+                      setBarMenu(null);
+                      const r = overflowBtnRef.current?.getBoundingClientRect();
+                      setFiltersMenuPos({ top: (r?.bottom ?? 0) + 4, left: r?.left ?? 0 });
+                      setFiltersMenuOpen(true);
+                    }}
+                  >
+                    <Filter size={12} strokeWidth={1.75} aria-hidden />
+                    <span>Filter a column</span>
+                    {activeFilterCount > 0 && (
+                      <span className={styles.toolbarPillBadge}>{activeFilterCount}</span>
+                    )}
+                  </button>
+                  {(overflowMenu ?? []).map((m) => (
+                    <button
+                      key={m.label}
+                      type="button"
+                      role="menuitem"
+                      className={styles.barMenuItem}
+                      disabled={m.disabled}
+                      title={m.disabled ? m.disabledReason : undefined}
+                      onClick={() => {
+                        if (m.disabled) return;
+                        setBarMenu(null);
+                        m.onSelect();
+                      }}
+                    >
+                      <span>{m.label}</span>
+                      {m.disabled && <span className={styles.barMenuNote}>Not available yet</span>}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* RG-2 selection bar (Law 13 — extended once, every register gets it):
-          exists ONLY while ticked rows are visible under the current filters.
-          Its export writes the SELECTED rows; the toolbar's stays the view. */}
+      {/* ⭐ THE SELECTION STATE SWAPS THE TOOLBAR IN PLACE (owner, 2026-08-11):
+          "选中记录时，原 Toolbar 原位切换，不增加额外高度."
+          A reference register therefore renders its selection strip as a
+          SECOND ABSOLUTE LAYER over the same 45px band — the toolbar keeps its
+          own height whether or not anything is ticked, so the table below
+          never moves under the operator's cursor mid-selection. Non-reference
+          grids keep RG-2's stacked bar exactly as it shipped. */}
       {selectable && selectedVisibleRows.length > 0 && (
-        <div className={styles.selectionBar} data-testid="selection-bar">
+        <div
+          className={`${styles.selectionBar} ${isReference ? styles.selectionBarOverlay : ""}`}
+          data-testid="selection-bar"
+        >
           <span className={styles.selectionCount}>{selectedVisibleRows.length} selected</span>
           <button
             type="button"
@@ -1593,16 +1880,37 @@ function DataGridInner<T>({
           >
             Clear
           </button>
-          <button
-            type="button"
-            className={styles.toolbarPill}
-            onClick={() => {
-              void exportRows(selectedVisibleRows);
-            }}
-          >
-            <Download size={14} strokeWidth={1.75} aria-hidden />
-            <span>Export Excel ({selectedVisibleRows.length})</span>
-          </button>
+          {/* The ruled divider between "what is ticked" and "what may be done
+              with it" — `N selected · Clear │ …actions`. */}
+          {isReference && <span className={styles.selectionDivider} aria-hidden />}
+          {selectionActions?.(selectedVisibleRows)}
+          {selectionExports && selectionExports.length > 0 ? (
+            selectionExports.map((m) => (
+              <button
+                key={m.label(0)}
+                type="button"
+                className={styles.toolbarPill}
+                onClick={() => {
+                  if (m.excel) void exportRows(selectedVisibleRows);
+                  else m.onSelect?.(selectedVisibleRows, viewMatrix(selectedVisibleRows));
+                }}
+              >
+                <Download size={14} strokeWidth={1.75} aria-hidden />
+                <span>{m.label(selectedVisibleRows.length)}</span>
+              </button>
+            ))
+          ) : (
+            <button
+              type="button"
+              className={styles.toolbarPill}
+              onClick={() => {
+                void exportRows(selectedVisibleRows);
+              }}
+            >
+              <Download size={14} strokeWidth={1.75} aria-hidden />
+              <span>Export Excel ({selectedVisibleRows.length})</span>
+            </button>
+          )}
         </div>
       )}
 
@@ -1801,13 +2109,25 @@ function DataGridInner<T>({
       {/* Status / footer — hidden in embedded (drill-down) mode where the
           "N of M rows / Reset layout" line reads as heavy chrome. */}
       {!embedded && (
+        /* FOOTER (owner ruling 2026-08-11) — "Footer 保持紧凑并显示当前结果的
+           真实总数/summary" and "Reset layout 留在 Columns，不放 Footer".
+           A reference footer therefore STATES and does not ACT: one compact
+           line carrying the true count of what this view holds, and no
+           control. `Reset layout` moved into the Columns menu. */
         <div className={styles.statusLine} data-testid={isReference ? "grid-footer" : undefined}>
-          <span>{isLoading ? "Loading…" : `${filteredRows.length} of ${rows.length} rows`}</span>
           <span>
-            <button className={styles.tbarBtn} onClick={resetLayout} title="Reset column layout">
-              Reset layout
-            </button>
+            {isLoading
+              ? "Loading…"
+              : (footerSummary?.(sortedRows, rows) ??
+                `${filteredRows.length} of ${rows.length} rows`)}
           </span>
+          {!isReference && (
+            <span>
+              <button className={styles.tbarBtn} onClick={resetLayout} title="Reset column layout">
+                Reset layout
+              </button>
+            </span>
+          )}
         </div>
       )}
 
@@ -2133,14 +2453,19 @@ function DataGridInner<T>({
               <button
                 key={`i-${i}-${it.label}`}
                 className={`${styles.contextMenuItem} ${it.danger ? styles.contextMenuDanger : ""}`}
+                disabled={it.disabled}
                 onClick={() => {
+                  if (it.disabled) return;
                   // Close before firing — handlers may navigate or open
                   // dialogs, and we don't want a stale menu lingering.
                   setRowCtx(null);
                   it.onClick?.();
                 }}
               >
-                {it.label}
+                <span>{it.label}</span>
+                {it.disabled && (
+                  <span className={styles.barMenuNote}>{it.note ?? "Not available yet"}</span>
+                )}
               </button>
             );
           })}

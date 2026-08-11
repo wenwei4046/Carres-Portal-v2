@@ -143,14 +143,22 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     expect(screen.queryByText("Sales Order")).not.toBeInTheDocument();
   });
 
+  /* RE-RULED 2026-08-11 ("LAYOUT APPROVED"). Stage A's toolbar carried a
+     `Filters` pill and a long `Export Excel — current view` pill. The owner's
+     composition is `View · Search · Export ▾ · Columns · + New Sales Order · …`,
+     so `Filters` moved into `…` and Export became one control with three
+     entries. Stage A's real property — ONE toolbar, ONE Search — is unchanged
+     and is what this still holds; the full ruled composition is pinned in
+     `SalesOrdersTemplate.test.tsx`. */
   it("renders exactly one work toolbar and one Search", () => {
     mount();
     expect(screen.getAllByTestId("work-toolbar")).toHaveLength(1);
     expect(screen.getAllByRole("searchbox")).toHaveLength(1);
-    expect(screen.getByRole("button", { name: "Filters" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Export Excel/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Export/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Columns/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "New Sales Order" })).toBeInTheDocument();
+    /* The column-filter power did not leave — only its second door moved. */
+    expect(screen.getByRole("button", { name: "More" })).toBeInTheDocument();
   });
 
   it("keeps loading inside the work surface instead of adding an outer band", () => {

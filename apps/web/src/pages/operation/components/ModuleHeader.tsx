@@ -1,6 +1,7 @@
 import { useEffect, type ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import { TopBarIcons } from "./GlobalTopBar";
+import JumpTo from "./JumpTo";
 
 /**
  * ModuleHeader — THE fixed header row of a module (Shell pattern,
@@ -88,6 +89,12 @@ export default function ModuleHeader({
             {right}
           </div>
         )}
+        {/* OWNER RULING 2026-08-11 — the 44px page header keeps
+            `Jump to · Notifications · Help · Settings`, and none of the four
+            may fall into the Work Toolbar or its `…`. Settings in particular
+            is GLOBAL: it configures the portal, not this register, so it
+            belongs beside the Bell and never among a page's own acts. */}
+        <JumpTo />
         <TopBarIcons />
       </div>
     </div>

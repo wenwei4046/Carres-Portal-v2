@@ -5,17 +5,40 @@
    ADAPTED ONLY per the card: the token block below aliases 2990's variable
    names to Carres' design-token VALUES (docs/01-design-tokens.md /
    index.css), so every rule beneath stays byte-close to the 2990 original
-   and future engine syncs diff cleanly. The accent rgba() literals were
-   re-based from 2990 orange (232,107,58) to Carres flame (196,77,43), and
-   2990 ink (34,31,32) to Carres near-black (26,26,26). */
+   and future engine syncs diff cleanly. 2990 ink (34,31,32) became Carres
+   near-black (26,26,26).
+
+   ⭐ THE ACCENT, RE-RULED BY THE OWNER 2026-08-11 — "只使用 Carres frozen
+   tokens；不复制 2990 的黄色、橙色".
+
+   The accent literals were re-based once from 2990 orange (232,107,58) to
+   Carres flame (196,77,43). Flame is not 2990's orange, but on screen it is
+   still an ORANGE-RED accent, and `01-design-tokens.md` §2.3 already ruled
+   what this engine's fourteen accent sites actually ARE:
+
+       hover      GREY   "the mouse is here" — one second, carries no
+                         meaning, and must not spend the accent
+       selection  BLUE   "this row is in the batch" — a lasting state with
+                         a consequence
+
+   Every accent site in this file is a SELECTION or a CURRENT-THING marker —
+   the ticked row, the selection bar, the checkbox, the live sort arrow, the
+   active filter, the drag target. They are the accent's own job, so they
+   take the ruled blue (`--info` #2563EB). The two HOVER-only sites (the
+   scrollbar thumb and the resize handle) are greyed, because §2.3 says a
+   hover may never spend the accent.
+
+   THIS REPOINTS THIS FILE ONLY. The global `--primary` flame stays exactly
+   as it is: `ui/MASTER.md` §7 holds the 594-site flame repoint as its own
+   approved card needing its own visual approval, and this is not it. */
 
 .root {
   /* ── Carres token aliases — the ONE styling adaptation ── */
   --c-paper: #ffffff; /* white surface (card) */
   --c-cream: #f9fafb; /* base-50 band */
   --c-ink: #1a1a1a; /* text primary */
-  --c-burnt: #9a3d22; /* flame-dark */
-  --c-orange: #c44d2b; /* flame */
+  --c-burnt: #1d4ed8; /* blue-700 — the accent on text and small marks */
+  --c-orange: #2563eb; /* --info blue — the accent fill */
   --c-festive-b: #dc2626; /* destructive red-600 */
   --line: #e5e7eb; /* base-200 border */
   --fg-muted: #6b7280; /* base-500 */
@@ -74,6 +97,9 @@
    register baseline off frozen callers and does not create a global 32px law. */
 .rootReference {
   --fs-12: 11px;
+  /* The selection strip overlays the toolbar's own band (see the WORK TOOLBAR
+     block at the end of this file), so the grid is its positioning context. */
+  position: relative;
 }
 .rootReference .toolbar {
   box-sizing: border-box;
@@ -363,7 +389,7 @@ div:first-child > .columnsMenuGroup {
   gap: var(--space-2);
   padding: 4px var(--space-3);
   border-bottom: 1px solid var(--line);
-  background: rgba(196, 77, 43, 0.06);
+  background: rgba(37, 99, 235, 0.06);
 }
 .selectionCount {
   font-family: var(--font-button);
@@ -387,7 +413,7 @@ div:first-child > .columnsMenuGroup {
   min-height: 28px;
 }
 .groupZoneActive {
-  background: rgba(196, 77, 43, 0.08);
+  background: rgba(37, 99, 235, 0.08);
   color: var(--c-burnt);
 }
 .groupChip {
@@ -449,7 +475,8 @@ div:first-child > .columnsMenuGroup {
   border: 2px solid var(--c-cream);
 }
 .scroll::-webkit-scrollbar-thumb:hover {
-  background: var(--c-burnt);
+  /* §2.3 — hover is grey; it may not spend the accent. */
+  background: var(--fg-soft);
 }
 .scroll {
   /* Firefox */
@@ -499,7 +526,7 @@ div:first-child > .columnsMenuGroup {
   text-align: right;
 }
 .thDragOver {
-  background: rgba(196, 77, 43, 0.12);
+  background: rgba(37, 99, 235, 0.12);
 }
 .thInner {
   display: inline-flex;
@@ -531,8 +558,9 @@ div:first-child > .columnsMenuGroup {
   z-index: 3;
 }
 .resizeHandle:hover {
-  background: var(--c-orange);
-  opacity: 0.4;
+  /* §2.3 — hover is grey; it may not spend the accent. */
+  background: var(--fg-soft);
+  opacity: 0.6;
 }
 
 .tbody {
@@ -547,7 +575,7 @@ div:first-child > .columnsMenuGroup {
   background: var(--c-cream);
 }
 .trSelected {
-  background: rgba(196, 77, 43, 0.1) !important;
+  background: rgba(37, 99, 235, 0.1) !important;
   font-weight: 600;
 }
 .tr:last-child {
@@ -665,7 +693,9 @@ div:first-child > .columnsMenuGroup {
   min-width: 200px;
 }
 .contextMenuItem {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
   width: 100%;
   text-align: left;
   background: transparent;
@@ -677,8 +707,14 @@ div:first-child > .columnsMenuGroup {
   font-family: inherit;
   font-size: inherit;
 }
-.contextMenuItem:hover {
+.contextMenuItem:hover:not(:disabled) {
   background: var(--c-cream);
+}
+/* A controlled placeholder: approved entry, engine not built. It stays
+   VISIBLE (the menu's ruled order is the contract) and stays INERT. */
+.contextMenuItem:disabled {
+  color: var(--fg-soft);
+  cursor: default;
 }
 .contextMenuDivider {
   height: 1px;
@@ -732,4 +768,102 @@ div:first-child > .columnsMenuGroup {
   text-transform: uppercase;
   color: var(--fg-muted);
   min-height: 22px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   WORK TOOLBAR — owner ruling 2026-08-11. Reference appearance only.
+
+     Normal    View · Search · Export ▾ · Columns · + New Sales Order · …
+     Selected  N selected · Clear │ actions        (SAME 45px band)
+
+   "选中记录时，原 Toolbar 原位切换，不增加额外高度" — so the selection
+   strip is an ABSOLUTE second layer over the toolbar's own band rather
+   than a row beneath it. The toolbar keeps its 45px whether or not
+   anything is ticked, and the table never shifts under the cursor.
+   ═══════════════════════════════════════════════════════════════════ */
+
+
+.selectionBarOverlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 5;
+  box-sizing: border-box;
+  height: 45px;
+  min-height: 45px;
+  padding: 6px 12px;
+  /* Opaque: it REPLACES the toolbar for as long as rows are ticked, so the
+     controls underneath must not read through it. */
+  background: #eef4ff;
+  flex-wrap: nowrap;
+  overflow: hidden;
+}
+
+/* `N selected · Clear │ actions` — the ruled divider. */
+.selectionDivider {
+  width: 1px;
+  align-self: stretch;
+  margin: 2px 4px;
+  background: var(--line);
+}
+
+/* An invisible anchor: the column-filter launcher moved into `…`, but its
+   popover still positions off a live rect. Zero-size, untabbable, hidden
+   from the accessibility tree. */
+.srOnlyAnchor {
+  position: absolute;
+  width: 0;
+  height: 0;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* The `Export ▾` and `…` popovers. Same shell as the Columns popover; a
+   list of acts rather than a list of checkboxes. */
+.barMenu {
+  position: absolute;
+  z-index: 40;
+  min-width: 200px;
+  background: var(--c-paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-3, 0 8px 24px rgba(0, 0, 0, 0.16));
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: 4px 0;
+}
+.barMenuItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: 7px 12px;
+  border: 0;
+  background: none;
+  text-align: left;
+  font-family: var(--font-sans);
+  font-size: var(--fs-12);
+  color: var(--c-ink);
+  cursor: pointer;
+}
+/* §2.3 — a hover is GREY. It carries no meaning and may not spend the accent. */
+.barMenuItem:hover:not(:disabled) {
+  background: var(--c-cream);
+}
+.barMenuItem:disabled {
+  color: var(--fg-soft);
+  cursor: default;
+}
+/* A controlled placeholder says so on its own face — an approved entry whose
+   engine is not built may never look like a working one. */
+.barMenuNote {
+  margin-left: auto;
+  font-size: var(--fs-10);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fg-soft);
 }

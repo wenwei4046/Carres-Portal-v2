@@ -16,6 +16,7 @@ import {
   moneyText,
   REGISTER_FIELDS,
 } from "./sales-order-columns";
+import { onPoOf, promiseBroken } from "./sales-order-facts";
 
 const order = (over: Partial<operationOrderListRow> = {}): operationOrderListRow =>
   ({
@@ -49,26 +50,58 @@ const order = (over: Partial<operationOrderListRow> = {}): operationOrderListRow
     ...over,
   }) as operationOrderListRow;
 
-describe("the default row is Stage 1's nine, in Stage 1's order", () => {
-  it("SO No · Customer · Items · Total · Balance · Promised · Ordered · Dealer · Showroom", () => {
+describe("the default row — amended 2026-08-11", () => {
+  it("SO No · Customer · Items · Current · Total · Balance · Promised · Ordered", () => {
     expect(DEFAULT_COLUMNS).toEqual([
       "so",
       "customer",
       "items",
+      "current",
       "total",
       "balance",
       "promised",
       "ordered",
-      "dealer",
-      "showroom",
     ]);
+  });
+
+  /* THE AMENDMENT'S OWN PROPERTY, and the reason it is not a preference:
+     permanent screen space is earned by frequency and decision value, so the
+     row must have got NARROWER while saying MORE. If a later card widens the
+     default row past what Stage 1 spent, this fails and asks why. */
+  it("the operator's default row is narrower than Stage 1's, and carries the lifecycle pointer", () => {
+    const px = (k: string) =>
+      parseFloat(REGISTER_FIELDS.find((f) => f.key === k)!.width);
+    const opsRow = REGISTER_FIELDS.filter((f) => defaultOnFor(f, "operation"));
+    const opsWidth = opsRow.reduce((s, f) => s + parseFloat(f.width), 0);
+
+    /* Stage 1's operator row: the nine minus the two money columns. */
+    const stage1Width =
+      px("so") + px("customer") + px("items") + px("promised") + px("ordered") +
+      px("dealer") + px("showroom");
+
+    expect(opsRow.map((f) => f.key)).toEqual([
+      "so", "customer", "items", "current", "promised", "ordered",
+    ]);
+    expect(opsWidth).toBeLessThan(stage1Width);
+  });
+
+  it("Dealer and Showroom keep their catalog entry — demoted, never deleted", () => {
+    for (const key of ["dealer", "showroom"]) {
+      const f = REGISTER_FIELDS.find((x) => x.key === key)!;
+      expect(f.group).toBe("Source");
+      expect(f.on).toBeUndefined();
+    }
   });
 });
 
 describe("FIX 2 · Current is a DOCUMENT pointer", () => {
-  it("the DOCUMENT group reads SO No · Customer reference · Current · DO No · Invoice No", () => {
+  /* FIX 2's substance — `Current` belongs to DOCUMENT, never to OPERATION —
+     is what this pins. Its position inside the group moved when it became a
+     DEFAULT column, because a default column leads its group. */
+  it("Current sits in DOCUMENT, and leads it as the group's default column", () => {
     const doc = REGISTER_FIELDS.filter((f) => f.group === "Document").map((f) => f.key);
-    expect(doc).toEqual(["so", "source_ref", "current", "do_number", "invoice_no"]);
+    expect(doc).toEqual(["so", "current", "source_ref", "do_number", "invoice_no"]);
+    expect(REGISTER_FIELDS.find((f) => f.key === "current")!.group).not.toBe("Operation");
   });
 });
 
@@ -148,5 +181,89 @@ describe("Current — the derived lifecycle pointer never invents a document", (
       ),
     ).toBe("PO issued");
     expect(currentOf(order())).toBe("");
+  });
+
+  /* 🔴 THE DEFECT REPAIR, 2026-08-11 — held so it cannot come back.
+     `PO issued` asked `order_supplier_threads[].po_id` and nothing else. That
+     field is written 0 times in 76 on the live wire; D1's `po_skus` is written
+     19 and the import's `source_po` 37. The column measured 1% filled — it was
+     promoted to the default row on the assumption it said something, and it
+     said nothing. Each rung below is a field somebody actually writes. */
+  it("PO issued reads EVERY field that proves a purchase order — po_skus and source_po included", () => {
+    expect(currentOf(order({ po_skus: ["M1401F-K"] }))).toBe("PO issued");
+    expect(
+      currentOf(
+        order({ order_lines: [{ sku: "M1401F-K", qty: 1, source_po: "PO-2051" }] }),
+      ),
+    ).toBe("PO issued");
+  });
+
+  it("a document still outranks a PO, and an empty order still says nothing", () => {
+    expect(currentOf(order({ po_skus: ["M1401F-K"], invoice_no: "INV-1" }))).toBe("INV INV-1");
+    expect(currentOf(order({ po_skus: [] }))).toBe("");
+    expect(currentOf(order({ po_skus: undefined }))).toBe("");
+  });
+});
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * AMENDMENT 2026-08-11 — the two facts the amendment added, held as law.
+ * Both are RECORD FACTS. Neither may ever grow a verb: what to DO about a
+ * broken promise or an unbought line belongs to Work (SO V2 Cards 9/10).
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+describe("promiseBroken — the promise, judged against an INJECTED day", () => {
+  const TODAY = "2026-08-11";
+
+  it("a promised day that has passed on undelivered goods is broken", () => {
+    expect(promiseBroken(order({ delivery_date: "2026-08-10" }), TODAY)).toBe(true);
+  });
+
+  it("today itself is not yet broken — the day is not over", () => {
+    expect(promiseBroken(order({ delivery_date: TODAY }), TODAY)).toBe(false);
+  });
+
+  it("DELIVERED never reads as broken, however old the promise", () => {
+    expect(
+      promiseBroken(order({ delivery_date: "2026-01-01", status: "delivered" }), TODAY),
+    ).toBe(false);
+    expect(
+      promiseBroken(
+        order({ delivery_date: "2026-01-01", operation_stage: "delivered" }),
+        TODAY,
+      ),
+    ).toBe(false);
+  });
+
+  it("a promise with NO DATE ON IT cannot be broken — tbd or null alike", () => {
+    expect(promiseBroken(order({ delivery_date: null }), TODAY)).toBe(false);
+    expect(
+      promiseBroken(order({ delivery_date: "2026-01-01", delivery_date_tbd: true }), TODAY),
+    ).toBe(false);
+  });
+});
+
+describe("onPoOf — is this line bought? and the blank has ONE meaning", () => {
+  const line = { sku: "M1401F-K", qty: 1 };
+
+  it("the line's own PO number wins — it is the most specific record", () => {
+    expect(onPoOf(order({ po_skus: [] }), { ...line, source_po: "PO-2051" })).toBe("PO-2051");
+  });
+
+  it("D1's po_skus answers with the string this repository already ships", () => {
+    expect(onPoOf(order({ po_skus: ["M1401F-K"] }), line)).toBe("PO issued");
+    expect(onPoOf(order({ po_skus: ["M1401F-K"] }), line)).toBe(
+      currentOf(
+        order({
+          order_supplier_threads: [
+            { po_id: "po-1" } as operationOrderListRow["order_supplier_threads"][number],
+          ],
+        }),
+      ),
+    );
+  });
+
+  it("nothing proving a PO covers the line reads blank — and a pre-D1 Worker lands on the SAME blank, never an accusation", () => {
+    expect(onPoOf(order({ po_skus: ["OTHER-SKU"] }), line)).toBe("");
+    expect(onPoOf(order({ po_skus: undefined }), line)).toBe("");
   });
 });

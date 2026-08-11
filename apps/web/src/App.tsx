@@ -233,7 +233,12 @@ export default function App() {
        *  pick up our --success / --warning / --destructive tokens via the
        *  default Tailwind cascade. closeButton lets dealers dismiss long
        *  messages (e.g. server validation errors) before auto-fade. */}
-      <Toaster position="top-right" richColors closeButton />
+      {/* OWNER RULING 2026-08-11 — the toast is pinned BOTTOM-RIGHT and it
+          FLOATS: `sonner` renders into its own fixed-position host, so it
+          cannot push the 44px page header, the 45px Work Toolbar or the table
+          by a single pixel. A business blocker is an in-page message and a
+          field error sits beside its field; the toast carries neither. */}
+      <Toaster position="bottom-right" richColors closeButton />
     </>
   );
 }

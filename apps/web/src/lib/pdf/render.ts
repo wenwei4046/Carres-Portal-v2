@@ -21,6 +21,10 @@ import { PickupEventTemplate } from "./pickup-event-template";
 import { ReceiptTemplate } from "./receipt-template";
 import { ExtensionAgreementTemplate } from "./extension-agreement-template";
 import { LoanNoteTemplate } from "./loan-note-template";
+import {
+  RegisterListTemplate,
+  type RegisterListTemplateData,
+} from "./register-list-template";
 import { registerNotoSansSC } from "./fonts/noto";
 import type {
   DoTemplateData,
@@ -37,6 +41,13 @@ import type { PickupEventPrintPayload } from "@/lib/queries";
 async function toBlob(element: ReactElement): Promise<Blob> {
   registerNotoSansSC();
   return pdf(element).toBlob();
+}
+
+/** The REGISTER's own paper — `Export ▾ · PDF` and `Export PDF (N)`. Takes the
+ *  grid's already-resolved headers and cells, so paper and screen cannot
+ *  disagree (owner ruling 2026-08-11). */
+export function renderRegisterListPdf(data: RegisterListTemplateData): Promise<Blob> {
+  return toBlob(RegisterListTemplate(data));
 }
 
 export function renderSalesOrderPdf(data: SalesOrderTemplateData): Promise<Blob> {

@@ -1179,6 +1179,76 @@ reason both failures exist, so a caller that formats first is the thing to look 
 
 ---
 
+## The Sales Orders Register template words (owner ruling 2026-08-11 — "LAYOUT APPROVED")
+
+**These are the OWNER'S words, given verbatim with the layout approval, and they
+are RULINGS.** They are written here rather than left in the chat because *a
+decision that stays in the chat is a decision that dies* (`CLAUDE.md` §4).
+
+### The 44px page header — four utilities, and they never leave it
+
+| Word | What it opens | Never |
+|---|---|---|
+| **`Jump to`** | a search over the portal's OWN navigation (`PORTAL_NAV`, same role filter as the sidebar) | a command palette that acts · anything carrying business data |
+| **`Alerts`** | the notification bell | `Notifications` as a visible word — the control is the Bell, labelled `Alerts` |
+| **`Help`** | help + training | — |
+| **`Settings`** | the GLOBAL portal settings | **the Work Toolbar, or its `…`.** Settings configures the portal, not the page, so it may never sit among a page's own acts |
+
+### The 45px Work Toolbar
+
+```
+Normal      View · Search · Export ▾ · Columns · + New Sales Order · …
+Selected    1 selected · Clear │ View Flow · Export Excel (1) · Export PDF (1)
+            N selected · Clear │ Export Excel (N) · Export PDF (N)
+```
+
+| Word | Means | Not |
+|---|---|---|
+| **`View`** | the register's POPULATION — `Not delivered` · `All orders` | `Scope` · `Filter` (Search and the header ▽s narrow WITHIN it; it is not a filter) |
+| **`Export`** ▾ | ONE control opening **`Excel` · `PDF` · `Print`**, all three over the CURRENT VIEW | three separate pills · `Download` · `Export Excel — current view` as a pill word (the scope now lives in the menu title `Export — current view (N)`) |
+| **`Columns`** | the grouped chooser, and the home of **`Reset layout`** | `Fields` · `Show/Hide`. **`Reset layout` may not sit in the Footer** — a footer states, it does not act |
+| **`…`** | the overflow: `Filter a column`, then **`Scan Order`** | a second action menu · a home for anything ruled onto the toolbar face |
+| **`N selected` · `Clear`** | what is ticked, and the way out | `N rows` · `Deselect` · `Cancel` |
+| **`View Flow`** | at EXACTLY one selected row | shown at zero or many |
+
+**The selection state SWAPS the toolbar in place.** It is never a second band:
+*"选中记录时，原 Toolbar 原位切换，不增加额外高度."*
+
+### The row menu — this order, no additions, no re-ordering
+
+```
+Edit · View · Preview · Print
+─────
+Issue Delivery Order · Copy to new Sales Order
+─────
+Cancel SO
+```
+
+| Word | Means | Not |
+|---|---|---|
+| **`View`** | open the Sales Order Workspace read-only | `Open` (retired here, 2026-08-11) |
+| **`Preview`** | the order's own PDF, on screen | `Print PDF` (retired — it named two acts at once) |
+| **`Print`** | the SAME PDF, sent to the printer | a second layout |
+| **`Issue Delivery Order`** | the DO act, on its OWNING surface | `Create DO` · `Make DO` — `Delivery Order` is the document's ruled name |
+| **`Copy to new Sales Order`** | a new SO seeded from this one | `Duplicate` · `Clone` |
+| **`Cancel SO`** | cancel the order | `Void` · `Delete` — nothing is deleted |
+
+### The footer
+
+**One compact line that STATES the true total of the current view and carries
+no control:** `{n} orders · {view}` when nothing is narrowed, `{n} of {m} orders
+· {view}` when it is. Never a bare `N of M rows`.
+
+### ⛔ `Not available yet`
+
+**The words a ruled entry wears when its engine is not built.** The entry stays
+VISIBLE — the ruled order is the contract — and stays INERT. It may never be
+hidden (that would silently edit the ruling) and it may never be wired to
+invented data. As of 2026-08-11 it is worn by `View Flow` · `Scan Order` ·
+`Issue Delivery Order` · `Copy to new Sales Order` · `Cancel SO`.
+
+---
+
 ## Header rules (see UI-KIT for the shell)
 
 When a page sits under a module tab bar (Purchasing's `To Order / Purchase

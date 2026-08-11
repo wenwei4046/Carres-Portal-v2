@@ -12,9 +12,18 @@
  * stay off this page; a chooser is exactly the back door they would walk in
  * through.
  *
- * The DEFAULT ROW is Stage 1's, verbatim:
- *   ☐ ▸ SO No · Customer · Items · Total · Balance · Promised · Ordered ·
- *   Dealer · Showroom
+ * THE DEFAULT ROW — amended 2026-08-11 under the Production UI Execution Law
+ * (`docs/ui/MASTER.md` §1.1: proactive design judgment, asynchronous review):
+ *   ☐ ▸ SO No · Customer · Items · Current · Total · Balance · Promised ·
+ *   Ordered
+ *
+ * Stage 1's row ended `… Dealer · Showroom` and carried no lifecycle pointer
+ * at all. Two attribution columns held 286px permanently while the register
+ * could not say which document an order had reached — so the sheet READ like
+ * an export and the operator's own truth was the part that had to be hunted
+ * for. `Current` took the row's fourth seat; `Dealer` and `Showroom` kept
+ * everything except the default paint. **Operations therefore opens on SIX
+ * columns, not seven, and the row got NARROWER while saying MORE.**
  *
  * `text` IS THE COLUMN. It is what the cell prints, what the column's filter
  * box matches, what a sort compares and what Export writes — one string, four
@@ -100,13 +109,42 @@ export function moneyText(state: MoneyState): string {
  * that does not exist**. From what the list wire can PROVE today: an invoice,
  * a DO, Delivered, or an issued PO on one of the order's supplier threads.
  * Nothing proven yet → the engine's own empty standard (an em-dash).
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * 🔴 DEFECT REPAIRED 2026-08-11 — `PO issued` WAS ASKING A FIELD NOBODY WRITES,
+ * and the column was measured at 1% before anyone read it.
+ *
+ * The rung asked `order_supplier_threads.some(t => t.po_id)` alone. Measured
+ * on the live wire, 2026-08-11, over the 76 non-rental orders the register
+ * actually loads:
+ *
+ * ```
+ * order_supplier_threads[].po_id     0 / 76     the field this rung asked
+ * po_skus (D1)                      19 / 76     the field D1 built for this
+ * order_lines[].source_po           37 / 76     what the AutoCount import writes
+ * ──────────────────────────────────────────
+ * currentOf as shipped               1 / 76  =  1%
+ * currentOf reading all three       57 / 76  = 75%
+ * ```
+ *
+ * **`queries.ts` had already written down the cause** in D1's own comment —
+ * *"the list's only PO evidence was `order_lines.source_po`, which ONLY the
+ * AutoCount importer writes, so the ladder read every native order as
+ * 'nothing ordered'"* — and D1 added `po_skus` to end exactly that. This
+ * function was never taught to read it. **Same defect, one field further on.**
+ *
+ * `undefined` still means *we do not know* and lands on the same blank as
+ * *nothing proves it*: the cell never accuses an order of being unbought.
  */
 export function currentOf(o: operationOrderListRow): string {
   if (o.invoice_no) return `INV ${o.invoice_no}`;
   if (o.do_number) return `DO ${o.do_number}`;
   if (isDelivered(o)) return "Delivered";
-  if ((o.order_supplier_threads ?? []).some((t) => t.po_id)) return "PO issued";
-  return "";
+  const onPo =
+    (o.order_supplier_threads ?? []).some((t) => t.po_id) ||
+    (o.po_skus ?? []).length > 0 ||
+    (o.order_lines ?? []).some((l) => l.source_po);
+  return onPo ? "PO issued" : "";
 }
 
 /** Stage 1's eight chooser groups, in the order the card states them. */
@@ -163,6 +201,18 @@ export const REGISTER_FIELDS: readonly RegisterField[] = [
     text: (r) => r.customer, sortBy: (r) => r.customer },
   { key: "items", label: "Items", width: "300px", group: "Items", on: true,
     text: (r) => r.items },
+  /* AMENDMENT 2026-08-11 · `Current` JOINS THE DEFAULT ROW, and it is the one
+   * column that turns an export sheet into an operating register: WHICH
+   * FORMAL DOCUMENT OR STAGE HAS THIS ORDER REACHED. It is derived from the
+   * order's OWN papers (`currentOf`) — a record fact, never an instruction —
+   * so the REGISTER LAW holds and Work still owns what to do about it.
+   *
+   * FIX 2's substance is untouched: `Current` is a DOCUMENT-group field, not
+   * an OPERATION one. Only its position moved, because a DEFAULT column leads
+   * its group — it now reads fourth on the row, right where the eye lands
+   * after Items. */
+  { key: "current", label: "Current", width: "140px", group: "Document", on: true,
+    text: (r) => currentOf(r.o) },
   { key: "total", label: "Total", width: "109px", align: "right", numeric: true,
     group: "Money", on: true, text: (r) => moneyText(r.total),
     sortBy: (r) => (r.total.kind === "amount" ? r.total.value : -1),
@@ -186,19 +236,28 @@ export const REGISTER_FIELDS: readonly RegisterField[] = [
   { key: "ordered", label: "Ordered", width: "113px", group: "Dates", on: true,
     text: (r) => fmtDate(r.ordered), sortBy: (r) => r.ordered,
     kind: "date", iso: (r) => r.ordered },
-  { key: "dealer", label: "Dealer", width: "160px", group: "Source", on: true,
+  /* AMENDMENT 2026-08-11 · `Dealer` + `Showroom` LEAVE THE DEFAULT ROW.
+   *
+   * They were 286px — a QUARTER of the operator's whole default row — spent
+   * permanently on ATTRIBUTION: who sold it and through which door. That is a
+   * question asked once, when somebody is reporting; it is never the question
+   * asked while an order is being run. **Permanent screen space is earned by
+   * operator frequency and decision value** (CLAUDE.md §2), and these two
+   * columns lost that test to the one fact the register was hiding from
+   * itself, `Current`.
+   *
+   * NOTHING WAS DELETED. Both keep their catalog entry, their width, their
+   * filter and their SOURCE group, one click away in Columns — which is what
+   * a chooser is FOR. A register that shows every fact permanently is a
+   * database export, and that is the exact defect this amendment answers. */
+  { key: "dealer", label: "Dealer", width: "160px", group: "Source",
     text: (r) => r.o.dealers?.name || NOT_RECORDED },
-  { key: "showroom", label: "Showroom", width: "126px", group: "Source", on: true,
+  { key: "showroom", label: "Showroom", width: "126px", group: "Source",
     text: (r) => r.o.outlets?.name || NOT_RECORDED },
 
   /* ── DOCUMENT — the papers this order produced, and its references ──────── */
   { key: "source_ref", label: "Customer reference", width: "160px", group: "Document",
     text: (r) => (r.o.source_ref ?? []).filter(Boolean).join(" · ") || NOT_RECORDED },
-  /* FIX 2 (architect, Stage 1 FIX-LIST): `Current` is a document/lifecycle
-   * pointer, so it lives under DOCUMENT — between Customer reference and
-   * DO No, exactly the group's reading order. Semantics unchanged. */
-  { key: "current", label: "Current", width: "140px", group: "Document",
-    text: (r) => currentOf(r.o) },
   { key: "do_number", label: "DO No", width: "120px", group: "Document",
     text: (r) => r.o.do_number || NOT_RECORDED },
   { key: "invoice_no", label: "Invoice No", width: "130px", group: "Document",

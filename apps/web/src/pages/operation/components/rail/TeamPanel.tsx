@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { Pencil } from "lucide-react";
+import { ChevronRight, Pencil } from "lucide-react";
+import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import {
   useOperationPoDuty,
@@ -146,6 +147,12 @@ export default function TeamPanel() {
   const purchasingSettingsQ = usePurchasingSettings();
   const poDays = purchasingSettingsQ.data?.poDays ?? [];
   const nextPoIso = nextPoDayMYT(new Date(), poDays);
+  /* The heading spells the SETTING, in the week's own order, so the title and
+     the calendar under it can never disagree again. */
+  const poDaysLabel = [...poDays]
+    .sort((a, b) => a - b)
+    .map((d) => ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"][d])
+    .join(" · ");
   const nextPoLabel = nextPoIso
     ? `${new Date(`${nextPoIso}T00:00:00`).toLocaleDateString("en-US", { weekday: "short" })} ${fmtDateShort(nextPoIso)}`
     : "—";
@@ -283,7 +290,16 @@ export default function TeamPanel() {
       })}
       </div>
 
-      <div className="text-label uppercase tracking-[0.05em] text-base-500 mt-3 mb-1.5">PO DAYS · MON &amp; THU</div>
+      {/* 🔴 REPAIRED 2026-08-11 — this heading read `PO DAYS · MON & THU` as a
+          hardcoded literal while the cells beneath it were already reading the
+          SETTING. Live on this machine the setting is Mon/Wed/Fri and the
+          panel's own `next:` line said `Wed 12 Aug` — the title contradicted
+          the calendar directly under it. The cells were fixed when the P1
+          comment below was written; the LABEL was missed, so the same wrong
+          cadence survived one line higher. It now spells the setting. */}
+      <div className="text-label uppercase tracking-[0.05em] text-base-500 mt-3 mb-1.5">
+        PO DAYS{poDaysLabel ? ` · ${poDaysLabel}` : ""}
+      </div>
       <div className="grid grid-cols-7 gap-0.5 text-center">
         {WEEKDAYS.map((w, i) => (
           <span key={`w${i}`} className="text-label text-base-400 py-0.5">
@@ -312,21 +328,32 @@ export default function TeamPanel() {
         next: <span className="text-success font-semibold">{nextPoLabel}</span>
       </div>
 
+      {/* ⭐ AMENDMENT 2026-08-11 · THE SECOND WORK ENGINE IS GONE.
+          This slot used to be `EVERYONE — YOUR OWN ORDERS`, carrying
+          `Confirm delivery date` and `Owing` as chips. Both were ACTION words
+          on a rail whose own law is *"the rail is 200px and it is navigation,
+          never a second place to act"* (docs/ui/MASTER.md §5) — and since
+          SO V2 Cards 9 + 10 shipped, they named a queue that a REAL engine
+          now owns: My Work / Team Work, TWO FILTERS OVER ONE SET, composed
+          from `openActionsOf` + `workItemsForOrder`.
+          A duty board listing the same work in different words is exactly the
+          drift Card 10's one-set law exists to stop — two surfaces that CAN
+          disagree, and one of them with no clock, no owner and no completion
+          fact behind it. The rail now does what a rail does: it POINTS. */}
       <div className="text-label uppercase tracking-[0.05em] text-base-500 mt-3 mb-1.5">EVERYONE — YOUR OWN ORDERS</div>
-      <div className="flex items-center gap-1.5 rounded-lg border border-base-200 bg-white px-2.5 h-9">
+      <Link
+        to="/operation?tab=work"
+        className="flex items-center gap-1.5 rounded-lg border border-base-200 bg-white px-2.5 h-9 text-meta text-base-800 hover:bg-hovertint"
+      >
         <span
           className="text-label leading-4 border border-base-200 rounded-full px-1.5 text-base-500 bg-white"
           title="Each PIC follows up their own orders — one counterparty, one REF-first message"
         >
           PIC
         </span>
-        <span className={VERB_CHIP} title="Logistics assigned but the customer has not confirmed a date — call about your own REF">
-          {orderActionQueue("confirm_delivery_date")}
-        </span>
-        <span className={VERB_CHIP} title="Your customer still owes money — one message a day, in bulk">
-          Owing
-        </span>
-      </div>
+        <span className="truncate">My Work</span>
+        <ChevronRight size={14} strokeWidth={2} className="ml-auto shrink-0 text-base-400" />
+      </Link>
     </div>
   );
 }
