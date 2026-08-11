@@ -1,20 +1,35 @@
 import type { CatalogResponse, OrderLine } from "@carres/shared";
 import type { SofaBuildGroupRow } from "@/lib/sofa-build-display";
 import type { DraftLine } from "../new-order/draft";
+import { isRentalLine } from "./rental-cart";
 
 /**
  * 0255 — Order line EDIT (Loo 2026-07-25): which PERSISTED rows the
  * place-lane pencil can re-open, and how they turn back into the DraftLine
  * the configure surfaces' `editLine` seed expects.
  *
- * Mirrors the wizard-cart rule (`cart.ts` lineEditTarget) for persisted rows:
- *   - free / promo / bundle / combo rows are never editable — their prices
- *     are minted by promo/bundle law, not the configurator;
- *   - exploded sofa rows edit as a GROUP (SofaConfigurePage, geometry
- *     reconstructed below), never per-compartment;
- *   - mattress / bedframe rows re-open PosConfigurePage;
- *   - accessory / service rows stay pencil-less (no configurator, same as
- *     the wizard).
+ * ── ONE CORE, TWO WRAPPERS (2026-08-11, ERP-ARCHITECTURE Law C) ─────────────
+ * `configureSurfaceFor` below is the ONLY answer to *"which configure surface
+ * re-opens this row?"*. It used to be answered twice — here for persisted
+ * `order_lines` and again in `cart.ts` `lineEditTarget` for draft cart rows —
+ * over two row shapes that both carry nothing but `sku` + `attrs`. The two
+ * copies drifted: the cart learnt about rental when 0275 shipped and this one
+ * did not, which is how a persisted rental line came to open the OUTRIGHT-SALE
+ * configurator over a signed agreement. A door, never a duplicate.
+ *
+ * `cart.ts` now imports the core and keeps only what genuinely differs. What
+ * differs is real, and it is exactly two things:
+ *
+ *   BLOCKED ROWS   the cart rejects `bundle_group` only (that is the only
+ *                  marker a draft line can carry). A persisted row rejects the
+ *                  full `BLOCKED_MARKERS` set for parity with the server's own
+ *                  `line_not_editable`.
+ *   SOFA BUILDS    `attrs.sofa_build` means "open SofaConfigurePage" in the
+ *                  cart, where the canvas geometry is still on the line. On a
+ *                  persisted row it means the OPPOSITE — no pencil — because
+ *                  the row is one exploded compartment that edits via its
+ *                  GROUP (`draftFromSofaGroup`), and a RAW un-exploded build
+ *                  (ops raw-create door) cannot round-trip the engine at all.
  *
  * The ONE business rule (server-enforced, `downsell_blocked`): a replacement
  * may never total below the replaced rows — edits only up-sell.
@@ -27,21 +42,60 @@ function hasBlockedMarker(attrs: Record<string, unknown> | null): boolean {
   return BLOCKED_MARKERS.some((k) => Boolean(attrs[k]));
 }
 
-/** Pencil gate for a STANDALONE row → "bed_mattress" (PosConfigurePage) or
- *  null. Exploded sofa rows return null here — they edit via their group. */
+/** The whole row a configure surface is chosen from. A draft cart line and a
+ *  persisted `order_lines` row are different types that agree on these two. */
+export interface ConfigurableRow {
+  sku: string;
+  attrs: Record<string, unknown> | null;
+}
+
+export type ConfigureSurface = "sofa_build" | "bed_mattress" | "rental";
+
+/**
+ * Which configure surface re-opens this row — the shared core. Says nothing
+ * about whether the CALLER may open it: blocked markers and the persisted /
+ * cart difference belong to the wrappers, not here.
+ */
+export function configureSurfaceFor(
+  row: ConfigurableRow,
+  catalog: CatalogResponse,
+): ConfigureSurface | null {
+  const sku = catalog.skus.find((s) => s.sku === row.sku);
+  const model = sku ? catalog.models.find((m) => m.id === sku.modelId) : undefined;
+  if (!model) return null;
+  const attrs = row.attrs;
+  // A build only reopens on the canvas that drew it — a preset sofa picked from
+  // a dropdown carries no geometry and has nothing to reopen.
+  if (attrs?.sofa_build || attrs?.sofa_build_key) {
+    return model.category === "sofa" ? "sofa_build" : null;
+  }
+  // BEFORE the category test, because a rented mattress is still a mattress
+  // MODEL and would otherwise open the OUTRIGHT-SALE configurator: RM0 (a
+  // rental's money lives in `rental_plans`, never on the sku), plus a Remark
+  // price adjustment and a PWP bar that mean nothing to a rental.
+  if (isRentalLine(row)) return "rental";
+  return model.category === "mattress" || model.category === "bedframe" ? "bed_mattress" : null;
+}
+
+/** Pencil gate for a STANDALONE persisted row → "bed_mattress"
+ *  (PosConfigurePage) or null. */
 export function orderLineEditKind(
   line: OrderLine,
   catalog: CatalogResponse,
 ): "bed_mattress" | null {
-  const attrs = line.attrs as Record<string, unknown> | null;
-  if (hasBlockedMarker(attrs)) return null;
-  // Exploded compartment rows edit as a group; a RAW un-exploded build (ops
-  // raw-create door) can't round-trip the engine — no pencil either.
-  if (attrs?.sofa_build_key || attrs?.sofa_build) return null;
-  const sku = catalog.skus.find((s) => s.sku === line.sku);
-  const model = sku ? catalog.models.find((m) => m.id === sku.modelId) : undefined;
-  if (!model) return null;
-  return model.category === "mattress" || model.category === "bedframe" ? "bed_mattress" : null;
+  if (hasBlockedMarker(line.attrs)) return null;
+  // A saved row can only reopen the mattress/bedframe screen. The other two
+  // answers are real — the row IS a sofa build, or IS a rental — but neither
+  // may be reopened from here, so both fall through to "no pencil":
+  //
+  //   sofa build → one saved row is a fragment of the build; only the whole
+  //                group can reopen it (see `draftFromSofaGroup`).
+  //   rental     → saving would replace a signed agreement's line with an
+  //                outright mattress. There is no screen that can amend a
+  //                rental yet; when there is, it hooks in HERE.
+  //                Why it is that bad: docs/carry-forwards.md, entry
+  //                `pencil-on-a-persisted-rental-line-replaces-a-signed-agreement`.
+  return configureSurfaceFor(line, catalog) === "bed_mattress" ? "bed_mattress" : null;
 }
 
 /** A persisted standalone row as the DraftLine PosConfigurePage seeds from.

@@ -158,8 +158,25 @@ SPA fallback lives in `apps/web/public/_redirects`: `/*  /index.html  200`.
 
 ```
 api 3   supplier/pos ×2 · partner/pickups ×1        ← still open
-web 0   231 files · 2,707 tests · 0 failures        ← Orders S2.0, 2026-08-08
+web 0   234 files · 2,731 tests · 0 failures        ← 2026-08-11 on fbb1bfed
+        (was 231 · 2,707 — Orders S2.0, 2026-08-08)
 ```
+
+**Quote the commit with the number or the number is worthless.** This row was measured twice in
+one afternoon and the two runs disagreed — `237 · 2,794` on `3547ad91`, then `234 · 2,731` after
+pulling five commits that DELETED four components and their tests (`OperationOrders` ·
+`CreatePOModal` · `CogsLineEditor` · `PoDocumentPreview`). A rising count is not the only way
+this row moves, and a card that measures before a pull will "regress" the baseline by doing
+nothing wrong.
+
+**"ZERO" was true on CI and NOT true on a Windows checkout, and nobody noticed for three days.**
+Re-measured 2026-08-11: two failures in `OperationPurchaseOrders.test.tsx` — the "one supplier
+date, one door" block walks `apps/web/src` with `join`, which yields `\` on Windows, and asserts
+against `/lib/queries.ts` string literals. Deterministic, not a flake, and invisible to CI
+because CI is Linux. **The number above is only honest because a `rel()` helper now normalises
+the separator before the comparison** — the assertion still counts the doors, which is what it
+exists to do. Whoever next quotes a baseline: run it on the machine you actually work on, not
+only the one that reports.
 
 **The 16 web failures this section used to list are FIXED** (`OperationOrders` ×7 ·
 `OrderCustomerCard` ×4 · `OhanaSofaTab` ×4 · `NiceFutureMattressTab` ×1). Every one was a stale

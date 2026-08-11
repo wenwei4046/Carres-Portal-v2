@@ -529,6 +529,33 @@ describe("line edit (0255)", () => {
     expect(screen.queryByTestId("pos-od-edit-line")).toBeNull();
   });
 
+  // 0275 — a rental line is a mattress MODEL priced at zero, so it reached the
+  // outright configurator and its Save would have replaced a signed
+  // agreement's fulfilment line with a retail mattress. No pencil until a
+  // rental-amendment route exists.
+  it("a persisted RENTAL row carries no pencil", () => {
+    const base = order();
+    renderDrawer(
+      order({
+        lines: [
+          {
+            ...base.lines![0]!,
+            unitPrice: 0,
+            attrs: {
+              rental: {
+                agreementId: "aaaaaaaa-aaaa-4aaa-8aaa-0000000000r1",
+                planId: "bbbbbbbb-bbbb-4bbb-8bbb-0000000000p1",
+                termMonths: 84,
+                monthlyFee: 69,
+              },
+            },
+          },
+        ],
+      }),
+    );
+    expect(screen.queryByTestId("pos-od-edit-line")).toBeNull();
+  });
+
   it("an UP-priced re-configure calls the replace mutation with the target id", async () => {
     renderDrawer(order());
     fireEvent.click(screen.getByTestId("pos-od-edit-line"));
@@ -552,6 +579,36 @@ describe("line edit (0255)", () => {
       "edits can only upgrade the order",
     );
     expect(h.replaceMutateAsync).not.toHaveBeenCalled();
+  });
+});
+
+// The drawer's Escape listener sits on `document`; the configure surfaces put
+// theirs on `window`, which is the LAST node in the propagation path — so the
+// drawer's fires FIRST and used to take the whole order down mid-configure.
+// The parent stands down instead.
+describe("Escape gating", () => {
+  it("closes the drawer when nothing is layered over it", () => {
+    const onClose = renderDrawer(order());
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("does NOT close the drawer while the configure surface is up", () => {
+    const onClose = renderDrawer(order());
+    fireEvent.click(screen.getByTestId("pos-od-edit-line"));
+    expect(screen.getByTestId("stub-configure-page")).toBeTruthy();
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByTestId("pos-od-edit-surface")).toBeTruthy();
+  });
+
+  it("re-arms once the surface closes", async () => {
+    const onClose = renderDrawer(order());
+    fireEvent.click(screen.getByTestId("pos-od-edit-line"));
+    fireEvent.click(screen.getByTestId("stub-emit-up"));
+    await waitFor(() => expect(screen.queryByTestId("pos-od-edit-surface")).toBeNull());
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });
 
