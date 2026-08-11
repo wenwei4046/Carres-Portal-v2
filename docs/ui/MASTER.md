@@ -69,12 +69,28 @@ Plan/design work continues from authoritative UI truth. **APPROVED / LOCKED deci
 re-researched, reopened or offered for re-approval.** At entry, separate what is already approved
 from what is genuinely unresolved and name the single decision surface being solved.
 
+**UI PROPOSAL PREFLIGHT — APPROVED / LOCKED (Loo, 2026-08-11).** Before presenting **ANY** UI
+proposal, mockup or layout recommendation, a new or restarted Plan/Design chat must first extract
+a brief **LOCKED CONSTRAINTS** checklist appropriate to that decision surface from this MASTER,
+the current/frozen design-token authority and the target module MASTER, then validate the proposal
+against every item. When relevant, the checklist includes: Sidebar active/current treatment · page
+header law · toolbar law · typography (size, weight and line-height) · table header/body/footer
+density and row heights · pill/button treatment · spacing · Register width/scroll law · locked
+target-module column order and field semantics · existing capabilities that must be preserved ·
+retired/banned patterns. The preflight may be internal or briefly visible, but the validation is
+mandatory. A proposal that conflicts with an **APPROVED / LOCKED** constraint is **INVALID** and
+must be corrected before Jess sees it. If the authorities themselves conflict, report that
+conflict and stop the proposal; never silently choose one.
+
 For a genuinely **UNRESOLVED** UI decision, proactively research only that declared surface. Use
 the relevant governed references — including Linear, Shopify, AutoCount, 2990, current Carres UI
 and other mature ERP patterns when useful — and exclude unrelated history and pages. Derive the
 common patterns and real trade-offs, then give **one evidence-based Carres recommendation**, not
-arbitrary A/B/C options. External products and current screens are evidence, never specification;
-Carres business truth and approved information architecture still win.
+arbitrary A/B/C options. Reference products may inform only that unresolved surface; they **NEVER**
+override Carres-governed tokens, fields, semantics, column order, capabilities or locked decisions.
+Current and legacy screenshots are evidence of implementation, not authority over frozen target
+truth. The order is mandatory: establish locked constraints → research only the unresolved surface
+→ propose.
 
 When the owner approves a complete UI or layout decision, immediately overwrite this MASTER or the
 owning module MASTER with the current **APPROVED / LOCKED** truth before moving to another major
@@ -259,7 +275,81 @@ own decision and its own card.**
 
 ---
 
-# §6.5 · SALES ORDERS REFERENCE STRUCTURE — ruled by Loo 2026-08-10
+# §6.5 · REGISTER NAVIGATION AND HEADER ADMISSION — ruled by Loo 2026-08-11
+
+**TABS ARE AVOIDED BY DEFAULT — APPROVED / LOCKED.** Separate business jobs, owned records
+or destinations are separate portal-navigation entries and pages; they are never compressed
+into a module tab strip. Purchasing is the explicit reference: SO Batch Purchase · Manual
+Purchase · Purchase Orders · Receiving · Supplier Claim are individual destinations, with no
+Purchasing tabs and no substitute second navigation row.
+
+**TAB ADMISSION LAW — APPROVED / LOCKED.** A tab row is not a standard Register layer. Tabs
+are admitted only when every tab remains inside the same owned business object, the same
+operator responsibility and the same primary work, and switching tabs changes only the view
+or partition of that one work surface. If the owned record, operator job, primary action or
+page purpose changes, the destination must be separate navigation instead.
+
+A proposed tab may not be introduced merely to group related pages, imitate another product,
+or fill a second header. Therefore the default Register stack has no tab row: Destination
+Header → page Work Toolbar when required → Work Surface. Any exception is a new page-scoped
+design decision and must demonstrate that it passes every admission condition above.
+
+**REGISTER REFERENCE DIVISION — APPROVED / LOCKED.** Carres does not copy one product's whole
+page. Register headers follow the compact, width-spending Linear pattern: portal navigation
+owns destination switching; the content header stays one 44px identity row and uses horizontal
+room instead of adding title, breadcrumb, KPI or tab bands. Register listing behaviour and
+readability follow the governed 2990 reference: its listing engine, controls, column powers,
+row disclosure and table hierarchy are the reference. GitHub is evidence for tab admission,
+not the Carres Register shell. Carres business ownership remains authoritative over all three.
+
+**REFERENCE PRODUCTS NEVER AUTHOR CARRES VISUAL TOKENS — APPROVED / LOCKED.** Linear, 2990,
+GitHub, Shopify, AutoCount and every other reference may supply a proven structure, behaviour
+or trade-off; they never supply Carres colour, typography, radius, elevation, icon treatment or
+component styling. Those come exclusively from frozen `../01-design-tokens.md` and the existing
+Carres UI Kit component that owns the element. Copying 2990 cream/yellow surfaces, orange ink or
+another product's control shape is a defect even when its listing behaviour is the reference.
+A design mockup must use the governed Carres tokens and components too; mockup status never
+permits invented styling.
+
+**LOCAL RAIL ACTIVE ROW — APPROVED / LOCKED EXISTING KIT TRUTH.** A page-owned queue/facet rail
+uses the governed Carres `NavRow` treatment: `rounded-control`; `blue-3` selection wash; one
+straight 2px `blue-9` line inset on the left; slate hover for inactive rows. It is not a bordered
+card, not a module tab, not a foreign reference colour and not a newly invented rail variant.
+
+**PORTAL NAVIGATION ACTIVE COLOUR — APPROVED / LOCKED.** The flame repoint applies to active
+navigation too: the current destination uses the governed blue selection treatment, never a
+red/flame active line or red rounded selection block. Flame remains the Carres brand mark;
+red remains late work / alert under the token law. A navigation item is selection, so its
+active line and wash are `blue-9` / `blue-3`. The rollout remains a separate implementation
+card; new designs and mockups show the approved destination, not the legacy red state.
+
+**REGISTER TABLE DENSITY LAW — APPROVED / LOCKED.** The readable 2990 parent-list geometry is
+the Register baseline, expressed only through frozen Carres typography tokens: rendered 36px
+table header using `text-label` (11px / 14px); rendered 38px single-line parent row using
+`text-body` (13px / 18px). The remaining height is balanced vertical breathing room, with the
+row's checkbox included in the measured height. Expanded content takes its
+natural governed child-row height and is not forced into 38px. Carres gains visible rows by
+removing tall page chrome, breadcrumbs, KPI bands and redundant headings — never by squeezing
+the parent row below this readable baseline. Footer existence, contents and height remain a
+separate decision from row density.
+
+**REGISTER STATUS FOOTER — APPROVED / LOCKED.** Every Register table ends in one compact,
+always-present status footer fixed to the table frame; it never scrolls with the rows. The
+footer keeps the operator oriented without spending a full data-row height. In its resting
+state it states the current listing's total summary. When rows are selected it immediately
+states the selected business summary in the page's owned unit — for example To Order's
+`Mattress 5` — rather than replacing that consequence with a generic checkbox count. When a
+filter narrows the listing, the footer must make the narrowed-versus-total state explicit.
+
+The status footer is information, not a second toolbar: no primary action, Columns, Reset
+layout or duplicated filter controls may enter it. **Every actionable control stays above the
+table** in the page Work Toolbar, selection bar or the relevant top popover; `Reset layout`
+belongs to Columns and never to the footer. Each Register MASTER owns its truthful summary
+vocabulary and arithmetic; the global template may not invent a KPI, status or unit.
+The exact compact height and the page-by-page summary mapping remain the next unresolved
+footer decision.
+
+# §6.6 · SALES ORDERS REFERENCE STRUCTURE — ruled by Loo 2026-08-10
 
 **Stage A is owner-accepted and CLOSED.** Sales Orders is the first production reference
 implementation of the approved Carres destination/listing architecture. This ruling is

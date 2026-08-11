@@ -122,14 +122,23 @@ not a new guideline  →  fold the rule into this Constitution
 
 - **APPROVED / LOCKED decisions are not re-researched, reopened or offered for re-approval.**
   Continue from the authoritative MASTER's recorded answer.
+- **Every new or restarted Plan/Design chat performs the UI PROPOSAL PREFLIGHT before it may
+  present any UI proposal, mockup or layout recommendation:** read the relevant UI MASTER laws,
+  current/frozen design-token authority and target module MASTER; extract a brief **LOCKED
+  CONSTRAINTS** checklist appropriate to the decision surface; validate the proposed result
+  against every item. A conflict with APPROVED / LOCKED truth makes the proposal **INVALID** —
+  it is corrected before Jess sees it, never shown and repaired only after she catches it.
 - At entry, state separately: **WHAT IS ALREADY APPROVED · WHAT IS GENUINELY UNRESOLVED · WHAT
-  SINGLE DECISION SURFACE THIS SESSION IS SOLVING.**
+  SINGLE DECISION SURFACE THIS SESSION IS SOLVING.** Establish the locked constraints first;
+  only then research the unresolved surface and propose.
 - For a genuinely **UNRESOLVED** design decision, proactively research only that declared surface.
   Use the relevant governed references — including Linear, Shopify, AutoCount, 2990, current
   Carres UI and other mature ERP patterns when useful — and exclude unrelated history and pages.
 - Derive the common patterns and real trade-offs, then give **one evidence-based Carres
   recommendation**, not arbitrary A/B/C options. References are evidence, never specification;
-  Carres business truth and governing architecture still win.
+  Carres-governed tokens, fields, semantics, column order, capabilities and locked decisions
+  always win. Current or legacy screenshots are evidence of implementation, never authority over
+  frozen target truth.
 - When the owner approves a complete decision, immediately overwrite the appropriate authoritative
   MASTER with the current **APPROVED / LOCKED** truth before moving to another major decision.
   PLAN mode forbids application implementation, not governing-document updates.
