@@ -63,6 +63,23 @@ STILL GATED    a NEW business rule · a change to an approved workflow or
 conversation deciding between options, sketch before code (Constitution §10). The gate that
 is gone is the one that parked autonomous production execution on a synchronous approval.
 
+## §1.2 · Plan / Design Research Law — APPROVED / LOCKED, owner ruling 2026-08-11
+
+Plan/design work continues from authoritative UI truth. **APPROVED / LOCKED decisions are not
+re-researched, reopened or offered for re-approval.** At entry, separate what is already approved
+from what is genuinely unresolved and name the single decision surface being solved.
+
+For a genuinely **UNRESOLVED** UI decision, proactively research only that declared surface. Use
+the relevant governed references — including Linear, Shopify, AutoCount, 2990, current Carres UI
+and other mature ERP patterns when useful — and exclude unrelated history and pages. Derive the
+common patterns and real trade-offs, then give **one evidence-based Carres recommendation**, not
+arbitrary A/B/C options. External products and current screens are evidence, never specification;
+Carres business truth and approved information architecture still win.
+
+When the owner approves a complete UI or layout decision, immediately overwrite this MASTER or the
+owning module MASTER with the current **APPROVED / LOCKED** truth before moving to another major
+decision. PLAN mode forbids application implementation, not governing-document updates.
+
 ---
 
 # §2 · Shared architecture
