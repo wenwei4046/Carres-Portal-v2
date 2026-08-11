@@ -428,6 +428,89 @@ drives the window, not the seed.
 
 ---
 
+# ✅ MONEY TRUTH + COLLECTION GATE — SO V2 CARD 4, SHIPPED 2026-08-11
+
+**The question this card installed:** payment is recorded ONCE, changes money
+truth ONCE, every reader derives the same answer — and the balance is pressed
+on the working calendar (T−3 · T−2 attention, T−1 final deadline) because
+logistics ask for the DO the evening before and the DO door refuses while
+money holds.
+
+**THE TRACE CAME FIRST — what already stood, verified not assumed:**
+
+```
+ONE calculation      orderMoney (orders.paid is the truth) — four readers
+DO hard gate         deliveryOrderIssueGate refuses on money (422, tested)
+PayHold              🔒 + "you do not arrange a delivery you may not make"
+Delivered ≠ paid     collect survives delivery; money red after delivery
+Dead columns         ops_order_control.paid_amount 0 rows · payment_status 1 row
+                     · order_payments 0 rows — writers, no reader of truth
+```
+
+**And the violation:** the desk's Record-payment door wrote ONLY the dead
+ledger — an operator could record a customer's balance and `orders.paid`, the
+figure every gate reads, never moved; the DO stayed refused. Void was worse:
+it hard-DELETED the ledger row.
+
+**What shipped (migration 0343 + the routes over it):**
+
+```
+payment_record   the ONE payment writer. Ledger row + orders.paid bump
+                 (payment/deposit) or the storage gate stamp (storage) in ONE
+                 transaction. p_counts_toward_paid=false records the raw-create
+                 deposit MIRROR (already inside orders.paid at birth) —
+                 `counted_in_paid` on the row tells void what to reverse.
+payment_void     principal only. A STAMP (voided_at/by/reason), never a
+                 delete; reverses exactly the contribution the record made;
+                 a storage void closes the gate only when no live storage
+                 collection remains.
+door closed      the FOR ALL write policy dropped; authenticated lost
+                 INSERT/UPDATE/DELETE on order_payments. Reads stay internal.
+receipts         the LOCKED scheme at last — RC-DDMMYY-NNNN via docNumber
+                 (the ONE TS helper; the RPC never spells it), seeded
+                 {orderId}:{seq} so a reprint matches. The ledger held ZERO
+                 rows, so retiring R{so}-{n} cost nothing.
+collection clock packages/shared/src/collection-clock.ts — ONE arithmetic:
+                 due = delivery − 1 working day (Mon–Sat + MY holidays),
+                 attention t3/t2/t1/late; anchored on the CUSTOMER's confirmed
+                 day, else the promised date; TBD stays silent. Wired on the
+                 collections desk (`balance due {date}` beside the collect
+                 pill, tone ramps t3→late); Card 9's work engine consumes the
+                 same module.
+```
+
+**Production evidence — run 2026-08-11, not described.** 0343 applied; seven
+probes as the real operation/principal users in one aborted transaction —
+ledger 0 rows and Σ orders.paid RM 54,100.00 identical before and after:
+
+```
+P1 record as operation: orders.paid +123.45, ledger row, counted   PASS
+P2 mirror row (counts=false): paid untouched                       PASS
+P3 operation cannot void (42501)                                   PASS
+P4 principal void: paid reverts EXACTLY, the row survives stamped  PASS
+P5 double void refused                                             PASS
+P6 storage kind: gate stamps, orders.paid untouched                PASS
+P7 direct INSERT as authenticated: 42501                           PASS
+```
+
+**Known boundaries, reported not hidden:**
+- **Money is bilateral; the REFUND record arrives with Card 7** (change /
+  cancel / refund lineage) — "an approved but unpaid refund means Carres still
+  owes the customer" needs the lineage that card owns; minting a refund store
+  without it would be an unowned record.
+- `ops_order_control.balance` keeps its one legitimate role: the hand-keyed
+  OUTSTANDING for imported rows with unpriced lines (orderMoney's fallback).
+  `paid_amount` (0 rows) and `payment_status` (1 row) keep their columns and
+  lose nothing further — they never had authority over the gates.
+- `top_up_order` / `record_stripe_checkout_payment` still write orders.paid on
+  their own lanes (POS top-up · Stripe webhook). Each records once and changes
+  truth once on its own evidence; folding them into payment_record is a later
+  unification, not a defect — neither double-writes the ledger.
+- The desk's promise-to-pay (`balance_due_date`) and the Card 4 clock coexist:
+  one is the customer's word, the other is the business deadline. Both print.
+
+---
+
 # SALES ORDER V2 — CURRENT APPROVED TARGET AND BUILD CHECKPOINT
 
 > **OWNER RULING, 2026-08-11. This is current target truth under the MASTER OVERWRITE LAW.**
@@ -442,8 +525,8 @@ drives the window, not the seed.
 | **1** | Customer Obligation Truth | **COMPLETE** — `dae94301`, migration `0340`, production verified 2026-08-11; exact implementation record immediately above |
 | **2** | Unit / Stock Allocation Truth | **COMPLETE** — migration `0341`, production verified 2026-08-11 (nine rolled-back probes); exact implementation record above. The spine (unit birth at PO · receiving flips · governed draw) was measured ALREADY LIVE; the card closed the four violations of the approved law |
 | **3** | Early Logistics Assignment + Customer Booking | **COMPLETE** — migration `0342`, production verified 2026-08-11; record above. The flow was measured already unblocked; the card moved the ruled call window to 3 working days and closed the two-surface lateness drift |
-| **4** | Money Truth + Collection Gate | **NOT BUILT — NEXT CARD** |
-| **5** | Delivery Attempt + Delivery Exception | **NOT BUILT** |
+| **4** | Money Truth + Collection Gate | **COMPLETE** — migration `0343`, production verified 2026-08-11 (seven rolled-back probes); record above. The gates and the one calculation were measured already live; the card converged the write (one payment writer, void as a stamp) and shipped the T−3/T−2/T−1 collection clock |
+| **5** | Delivery Attempt + Delivery Exception | **NOT BUILT — NEXT CARD** |
 | **6** | Loan Mattress / Loan Sofa Obligations | **NOT BUILT** |
 | **7** | Change / Cancel / Refund Lineage | **NOT BUILT** |
 | **8** | Derived Completion — No Action Required | **NOT BUILT** |
@@ -521,7 +604,7 @@ plan capacity while Operations knows the ETA. Booking begins as the delivery bec
 the target call window is three actual working days before delivery, calculated with the
 applicable working calendar and public holidays.
 
-## Card 4 · Money Truth + Collection Gate — approved target, not built
+## Card 4 · Money Truth + Collection Gate — approved and built
 
 Payment is recorded once, changes money truth once, and every reader derives the same answer.
 Money is bilateral: customer → Carres outstanding, or Carres → customer refund.
@@ -667,18 +750,19 @@ Payment remain the authority for what operationally happened.
 
 1. Read root `CLAUDE.md` / `AGENTS.md` for the Constitution and MASTER OVERWRITE LAW.
 2. Read [`../ERP-ARCHITECTURE.md`](../ERP-ARCHITECTURE.md) for cross-module ownership.
-3. Read this section and the Card 1 · 2 · 3 shipped records immediately above it.
-4. Read only what Card 4 touches: §8 of this file (the money gate and the one number),
-   [`../payment/MASTER.md`](../payment/MASTER.md), and `packages/shared/src/order-money.ts` —
-   the ONE money arithmetic every reader must converge on.
+3. Read this section and the Card 1 · 2 · 3 · 4 shipped records immediately above it.
+4. Read only what Card 5 touches: §7 of this file (the delivery actions and exceptions),
+   [`../delivery/MASTER.md`](../delivery/MASTER.md), the Card 2 record (a failed delivery moves
+   the UNIT: Returning → Warehouse → Inspection → Available / Hold — the inspection doors are
+   0341's), and the live delivery doors (`operation_attach_do_and_deliver` ·
+   `ops_order_control.delivery_trips` / `delivery_photos` · the drawer's delivery acts).
 5. Re-measure current code and production before quoting implementation state. Preserve unrelated
    dirty work. Do not reopen the approved business flow merely from preference; raise only a real
    repo/production contradiction or implementation impossibility.
-6. Build **Card 4 — Money Truth + Collection Gate** next. Trace every existing money write door
-   (`orders.paid` · `order_payments` · `ops_order_control.balance` / `paid_amount` /
-   `payment_status`) and every reader before implementation — the card's own text demands they
-   converge on ONE authoritative write and calculation. Stop after Card 4 proof and update this
-   status table. **Do not start Card 5 automatically.**
+6. Build **Card 5 — Delivery Attempt + Delivery Exception** next. Trace every existing delivery
+   recording door before implementation; every vehicle trip becomes an Attempt with a result, a
+   failure records ONE Exception answering the four questions, and the Unit moves with reality.
+   Stop after Card 5 proof and update this status table. **Do not start Card 6 automatically.**
 
 ---
 

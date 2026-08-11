@@ -194,16 +194,18 @@ describe("POST /:id/payments", () => {
     expect(res.status).toBe(422);
   });
 
-  it("201 — inserts with recorded_by + a generated R{so}-{n} receipt", async () => {
-    const inserted = {
+  it("201 — records through the ONE writer (payment_record) with a locked-scheme receipt (CARD 4)", async () => {
+    const returned = {
       id: PAY_ID, order_id: ORDER_ID, amount: 1500, paid_on: "2026-06-26",
-      method: "bank", kind: "deposit", receipt_no: "R1001-3", recorded_by: "u1",
+      method: "bank", kind: "deposit", recorded_by: "u1", counted_in_paid: true,
     };
-    const sb = makeSb({
-      orders: { maybeSingle: { data: { so: 1001 }, error: null } },
-      // count query (then) → 2 existing → seq 3 → R1001-3; insert (single) → row
-      order_payments: { list: { data: null, error: null, count: 2 }, single: { data: inserted, error: null } },
-    });
+    const sb = makeSb(
+      {
+        // count query (then) → 2 existing → seq 3 (rides the receipt seed).
+        order_payments: { list: { data: null, error: null, count: 2 } },
+      },
+      { data: { payment: returned, orders_paid: 3500 }, error: null },
+    );
     vi.mocked(userClient).mockReturnValue(sb as never);
     const jwt = await makeJwt("operation");
     const res = await app.fetch(
@@ -215,16 +217,23 @@ describe("POST /:id/payments", () => {
       env,
     );
     expect(res.status).toBe(201);
-    const body = (await res.json()) as { payment: typeof inserted };
-    expect(body.payment.receipt_no).toBe("R1001-3");
-    expect(sb.calls.inserts[0]).toMatchObject({
-      order_id: ORDER_ID,
-      amount: 1500,
-      method: "bank",
-      kind: "deposit",
-      recorded_by: "u1",
-      receipt_no: "R1001-3",
+    const body = (await res.json()) as { payment: typeof returned; ordersPaid: number };
+    expect(body.payment.id).toBe(PAY_ID);
+    expect(body.ordersPaid).toBe(3500);
+    // The write went through the RPC — never a direct table insert.
+    expect(sb.calls.inserts).toHaveLength(0);
+    const rpc = sb.calls.rpc[0] as { name: string; args: Record<string, unknown> };
+    expect(rpc.name).toBe("payment_record");
+    expect(rpc.args).toMatchObject({
+      p_order_id: ORDER_ID,
+      p_amount: 1500,
+      p_method: "bank",
+      p_kind: "deposit",
+      p_counts_toward_paid: true,
     });
+    // The receipt is the LOCKED document scheme: RC-DDMMYY-NNNN, seeded on
+    // {orderId}:{seq} (seq = 3 here) — deterministic, so a reprint matches.
+    expect(rpc.args.p_receipt_no).toMatch(/^RC-260626-\d{4}$/);
   });
 });
 
@@ -244,8 +253,11 @@ describe("DELETE /:id/payments/:pid", () => {
     expect(res.status).toBe(403);
   });
 
-  it("200 — principal voids the entry", async () => {
-    const sb = makeSb({ order_payments: { list: { data: null, error: null } } });
+  it("200 — principal voids through payment_void; the row is never deleted (CARD 4)", async () => {
+    const sb = makeSb(
+      {},
+      { data: { payment_id: PAY_ID, orders_paid: 2000 }, error: null },
+    );
     vi.mocked(userClient).mockReturnValue(sb as never);
     const jwt = await makeJwt("principal");
     const res = await app.fetch(
@@ -256,7 +268,11 @@ describe("DELETE /:id/payments/:pid", () => {
       env,
     );
     expect(res.status).toBe(200);
-    expect(sb.calls.deletes).toBe(1);
+    // A void is a STAMP through the RPC — no direct delete, ever.
+    expect(sb.calls.deletes).toBe(0);
+    const rpc = sb.calls.rpc[0] as { name: string; args: Record<string, unknown> };
+    expect(rpc.name).toBe("payment_void");
+    expect(rpc.args).toMatchObject({ p_payment_id: PAY_ID });
   });
 });
 
@@ -264,15 +280,19 @@ describe("DELETE /:id/payments/:pid", () => {
 // POST /:id/storage/collect
 // =====================================================================
 describe("POST /:id/storage/collect", () => {
-  it("201 — records a kind:'storage' payment AND stamps storage_collected_at", async () => {
-    const sb = makeSb({
-      orders: { maybeSingle: { data: { so: 1001 }, error: null } },
-      order_payments: {
-        list: { data: null, error: null, count: 0 },
-        single: { data: { id: PAY_ID, kind: "storage", receipt_no: "R1001-1" }, error: null },
+  it("201 — one RPC records the storage payment AND stamps the gate (CARD 4)", async () => {
+    const sb = makeSb(
+      {
+        order_payments: { list: { data: null, error: null, count: 0 } },
+        ops_order_control: {
+          maybeSingle: {
+            data: { order_id: ORDER_ID, storage_collected_at: "2026-06-26T00:00:00Z" },
+            error: null,
+          },
+        },
       },
-      ops_order_control: { single: { data: { order_id: ORDER_ID, storage_collected_at: "2026-06-26T00:00:00Z" }, error: null } },
-    });
+      { data: { payment: { id: PAY_ID, kind: "storage" }, orders_paid: 0 }, error: null },
+    );
     vi.mocked(userClient).mockReturnValue(sb as never);
     const jwt = await makeJwt("operation");
     const res = await app.fetch(
@@ -284,11 +304,15 @@ describe("POST /:id/storage/collect", () => {
       env,
     );
     expect(res.status).toBe(201);
-    // the ledger row was forced to kind:'storage'
-    expect(sb.calls.inserts[0]).toMatchObject({ order_id: ORDER_ID, amount: 200, kind: "storage" });
-    // the overlay was stamped to open the gate
-    expect(sb.calls.upserts[0]).toMatchObject({ order_id: ORDER_ID, storage_paid: "Paid" });
-    expect((sb.calls.upserts[0] as { storage_collected_at?: string }).storage_collected_at).toBeTruthy();
+    // ONE writer: the RPC records the ledger row and stamps the gate in one
+    // transaction — no direct insert, no separate upsert race.
+    expect(sb.calls.inserts).toHaveLength(0);
+    expect(sb.calls.upserts).toHaveLength(0);
+    const rpc = sb.calls.rpc[0] as { name: string; args: Record<string, unknown> };
+    expect(rpc.name).toBe("payment_record");
+    expect(rpc.args).toMatchObject({ p_order_id: ORDER_ID, p_amount: 200, p_kind: "storage" });
+    const body = (await res.json()) as { control: { storage_collected_at: string } };
+    expect(body.control.storage_collected_at).toBeTruthy();
   });
 
   it("403 for dealer", async () => {

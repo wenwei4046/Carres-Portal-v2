@@ -22,6 +22,7 @@ import {
   ordersListResponseSchema,
   orderStatusSchema,
   parseOrderEntryConfigRow,
+  docNumber,
   resolvePaymentMethods,
   STRIPE_METHOD_KEY,
   STRIPE_PAYMENT_METHOD,
@@ -1201,11 +1202,11 @@ ordersRouter.post("/raw", async (c) => {
   if (!id) throw new HTTPException(500, { message: "Order create returned no id" });
 
   // Loo 2026-07-18 — the at-creation payment posts BACK into the order_payments
-  // ledger (the 0193 "track payment" place the Balance panel + receipt/SO PDF
-  // read), same as an operation-recorded payment: kind 'deposit', reference =
-  // the approval code, recorded_by = the operator. BEST-EFFORT after the
-  // committed create — a ledger miss must not fail the order (the PDF falls
-  // back to orders.paid); the row can still be keyed manually in Balance.
+  // ledger, same as an operation-recorded payment. CARD 4 (0343): through the
+  // ONE writer, as a HISTORY MIRROR (`p_counts_toward_paid: false`) — the
+  // create RPC already put this deposit inside `orders.paid`, so counting it
+  // again would double the money. BEST-EFFORT after the committed create — a
+  // ledger miss must not fail the order (the PDF falls back to orders.paid).
   if (input.paid > 0) {
     const LEDGER_METHOD: Record<string, string> = {
       cash: "cash",
@@ -1216,15 +1217,18 @@ ordersRouter.post("/raw", async (c) => {
       installment: "card",
       cheque: "cheque",
     };
-    const { error: ledgerErr } = await sb.from("order_payments").insert({
-      order_id: id,
-      amount: input.paid,
-      paid_on: new Date().toISOString().slice(0, 10),
-      method: LEDGER_METHOD[input.paymentMethod ?? ""] ?? "other",
-      kind: "deposit",
-      reference: input.approvalCode || null,
-      note: "Recorded at New Order (raw) creation",
-      recorded_by: auth.id,
+    const paidOn = new Date().toISOString().slice(0, 10);
+    const { error: ledgerErr } = await sb.rpc("payment_record", {
+      p_order_id: id,
+      p_amount: input.paid,
+      p_paid_on: paidOn,
+      p_method: LEDGER_METHOD[input.paymentMethod ?? ""] ?? "other",
+      p_kind: "deposit",
+      p_reference: input.approvalCode || null,
+      p_note: "Recorded at New Order (raw) creation",
+      p_receipt_url: null,
+      p_receipt_no: docNumber({ prefix: "RC", date: paidOn, seed: `${id}:1`, digits: 4 }),
+      p_counts_toward_paid: false,
     });
     if (ledgerErr) {
       console.error("raw create: order_payments ledger insert failed (non-fatal):", ledgerErr.message);
