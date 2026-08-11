@@ -292,6 +292,26 @@ The ERP Register Blueprint in §6.4 is approved baseline. A new Register-plan ch
 the historical programme that produced it and does not treat current Sales Orders, Old Orders,
 2990 or AutoCount as a fresh specification exercise.
 
+## APPROVED / LOCKED · ERP-WIDE REGISTER TEMPLATE — owner ruling 2026-08-11
+
+Every ERP Register page uses one shared Carres Register Template. **The listing capabilities are
+copied from 2990 in full** — search, column-matched filtering, column selection, export, sorting,
+row selection and read-only row expansion — so an operator learns one Register and can operate
+the rest. Carres does not copy 2990's business assumptions or page-specific content: KPI cards,
+default columns, primary actions, expansion content and business summaries remain page-owned and
+must be justified by the owning module.
+
+The template governs the complete Register composition, not only the table engine. Current pages
+whose header, controls, table and detail regions run together without sufficient separation are
+not the approved destination. They must be brought onto the same ruled header, control band,
+listing and expansion structure as their page is migrated. Each module MASTER owns what its
+Register shows; this UI MASTER owns where those parts live and how the composition stays consistent.
+
+**Explicit boundary:** copying 2990's listing capability does not license an overall `Current`,
+overall status, KPI strip or any other field the owning module does not govern. Sales Order still
+has no `Current` or overall status. The shared template is reusable layout and interaction power,
+never a source of business truth.
+
 If the chat is told **“Register Template — continue from repo governance”**, it must:
 
 1. Read `CLAUDE.md` → `docs/ERP-ARCHITECTURE.md` → this UI MASTER → the target module MASTER.
