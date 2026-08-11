@@ -304,8 +304,10 @@ states the selected business summary in the page's owned unit — for example To
 filter narrows the listing, the footer must make the narrowed-versus-total state explicit.
 
 The status footer is information, not a second toolbar: no primary action, Columns, Reset
-layout or duplicated filter controls may enter it. Each Register MASTER owns its truthful
-summary vocabulary and arithmetic; the global template may not invent a KPI, status or unit.
+layout or duplicated filter controls may enter it. **Every actionable control stays above the
+table** in the page Work Toolbar, selection bar or the relevant top popover; `Reset layout`
+belongs to Columns and never to the footer. Each Register MASTER owns its truthful summary
+vocabulary and arithmetic; the global template may not invent a KPI, status or unit.
 The exact compact height and the page-by-page summary mapping remain the next unresolved
 footer decision.
 
