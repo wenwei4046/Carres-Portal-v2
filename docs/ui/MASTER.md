@@ -80,11 +80,31 @@ may and should identify and recommend a materially useful missing capability. Th
 must explain its operator value, check Carres business architecture and locked constraints, and
 remain a proposal until Jess approves it. Reference products inform; they are never copied blindly.
 
-**Plan/Design restart contract.** A new or restarted chat preserves approved business/capability
-truth and only the placement/presentation that an authoritative MASTER actually locks. It lists
-unruled placement/presentation and potentially useful missing capabilities as unresolved, then
-researches only the declared decision surface. It must not infer either “keep this exact UI” from
-an existing capability or “do not propose it” from repository absence.
+**OWNER-APPROVED PLAN OWNERSHIP / COMPLETENESS + RESTART CONTRACT — APPROVED / LOCKED (Jess,
+2026-08-12).** Jess owns business decisions and final approval. The Plan chat owns completeness of
+research, dependency discovery, sequencing and the proposed plan. Jess is not expected to know or
+enumerate what must be studied next. A new or restarted Plan/Design chat therefore automatically:
+
+1. preserves approved business/capability truth and only placement/presentation explicitly locked
+   by an authoritative MASTER;
+2. establishes current Carres capability, repository/task evidence and the locked constraints;
+3. identifies unruled presentation, missing capabilities, dependencies, cross-module/future
+   consequences, terminology/IA conflicts, duplicate destinations and scalability risks;
+4. mines relevant governed reference products for the declared unresolved surface;
+5. maintains the proposed backlog/roadmap and dependency order; and
+6. performs the completion gate below before recommending implementation or declaring the surface
+   complete.
+
+It must not infer either “keep this exact UI” from an existing capability or “do not propose it”
+from repository absence. It must not ask Jess what to inspect next when repository/task evidence
+can decide. It must surface important unresolved matters Jess did not ask about and ask her only
+for genuine business decisions or final approval.
+
+**OFFICIAL CARD NUMBERS ARE GOVERNANCE; PLANNING IS THE CHAT'S JOB.** The planner never invents an
+official Card number or status. It still maintains a clearly labelled **PROPOSED ROADMAP / BACKLOG /
+DEPENDENCY ORDER** for approved and discovered remaining work, including what can build directly,
+what first needs Plan/Design, what already has an engine and what has a real gap. Unapproved items
+remain unnumbered proposals; official numbering/status appears only after governance/approval.
 
 **UI ARCHITECT RESPONSIBILITY + DICTIONARY / IA PREFLIGHT — APPROVED / LOCKED (Jess,
 2026-08-11).** A new or restarted Plan/Design chat is not merely repository police or a visual
@@ -116,13 +136,33 @@ freeze innovation.**
 
 For a genuinely **UNRESOLVED** UI decision, proactively research only that declared surface. Use
 the relevant governed references — including Linear, Shopify, AutoCount, 2990, current Carres UI
-and other mature ERP patterns when useful — and exclude unrelated history and pages. Derive the
-common patterns and real trade-offs, then give **one evidence-based Carres recommendation**, not
-arbitrary A/B/C options. **Carres semantics, ownership and destination come first.** Linear,
-Shopify, AutoCount, 2990 and other mature ERP references provide principles and interactions only;
-translate them into Carres architecture and never blindly copy their terminology, IA, colours,
-tokens, fields or placement. They **NEVER** override Carres-governed tokens, fields, semantics,
-column order, capabilities or locked decisions.
+and appropriate mature/international ERP patterns when useful — and exclude unrelated history and
+pages. Do not wait for Jess to ask “what does international do?” when a scoped benchmark can
+materially improve the unresolved decision.
+
+**REFERENCE PRODUCT FUNCTION MINING LAW — APPROVED / LOCKED (Jess, 2026-08-12).** Reference study
+is not satisfied by looking at colours/layout or only the element Jess mentioned. For the CURRENT
+unresolved surface, systematically inventory every applicable reference capability and interaction:
+workflow · Settings/Maintenance · navigation · detail · preview · edit · print · export · search ·
+filter · columns · scan · copy · bulk action · context action, plus other functions material to that
+surface. The required output is:
+
+| REFERENCE CAPABILITY | CARRES CURRENT EQUIVALENT / OWNER | DECISION | WHY | DEPENDENCY / CONFLICT |
+|---|---|---|---|---|
+| one relevant function or interaction | existing capability/destination and owning module, or GAP | **KEEP / ADAPT / RELOCATE / BUILD / REJECT** | operator/business reason | locked truth, duplicate, prerequisite or downstream consequence |
+
+The matrix exists to discover reusable proven ideas and missing functions **before Jess has to ask
+about them one by one**. In particular, when 2990 exposes `SO Maintenance`, the planner proactively
+checks whether Carres already has an equivalent Settings/maintenance destination, which module owns
+it, and whether Carres should adapt, relocate or reject it. A visual comparison alone fails this law.
+
+“Copy” means reuse a proven principle, function or interaction where it fits — never blindly copy
+terminology, IA, colours, tokens, fields, business rules or placement. Map every candidate through
+Carres' UI Dictionary/copy authority, navigation and module ownership, ERP architecture, current
+capabilities and locked truth first. Derive the common patterns and trade-offs, then give **one
+evidence-based Carres recommendation**, not arbitrary A/B/C options. Reference discovery is evidence,
+not design authority: Carres locked truth wins, and a missing/unresolved capability remains a
+proposal until Jess approves it.
 Current and legacy screenshots are evidence of implementation, not authority over frozen target
 truth or over unresolved placement/presentation. For example, `Not delivered / All orders` may be
 an existing scope capability that must be preserved; that fact alone does not make permanent header
@@ -133,6 +173,25 @@ research only the unresolved surface → propose.
 When the owner approves a complete UI or layout decision, immediately overwrite this MASTER or the
 owning module MASTER with the current **APPROVED / LOCKED** truth before moving to another major
 decision. PLAN mode forbids application implementation, not governing-document updates.
+
+**PLAN COMPLETION GATE.** Before recommending implementation or declaring the planning surface
+complete, the Plan chat must show that it covered all applicable rows below. A material omission
+means research continues; Jess is not asked to supply the missing checklist.
+
+| REQUIRED COVERAGE | EVIDENCE THE PLAN SHOWS |
+|---|---|
+| Current Carres capability | what exists, where it lives and who owns it |
+| Locked governance | preserved business/capability and explicitly locked presentation truth |
+| Dictionary · IA · module ownership | governed terms, destinations, doors and conflicts |
+| Reference-product function mining | completed reference-to-Carres capability matrix |
+| Mature/international benchmark | scoped finding where useful, or why it cannot materially help |
+| Gap analysis | missing, duplicate, misplaced or deliberately rejected capability |
+| Cross-module/future consequences | downstream inheritors, scalability and consistency risks |
+| Dependencies and sequencing | prerequisites plus proposed roadmap/backlog/dependency order |
+
+Only after this gate does the chat ask Jess for the remaining genuine owner decision. Approved
+complete decisions are persisted immediately under the Constitution's Plan Decision Persistence
+law. Continuous production-build governance remains §1.1 and is not part of this Plan gate.
 
 ---
 
