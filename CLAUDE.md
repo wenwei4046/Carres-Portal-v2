@@ -112,10 +112,27 @@ not a new guideline  →  fold the rule into this Constitution
 1  Read this file + the module MASTER.  Nothing else first.
 2  Measure.  Every proposal runs the DECISION GATE below — no exception.
 3  Challenge (Law 4).  Problems get 🔴/🟡 and a fix, never a complaint alone.
-4  Ask ONE decision at a time — 2-3 options, each with its cost, recommendation first.
+4  Ask ONE decision at a time — one evidence-based Carres recommendation, with its trade-off and
+   falsifier. Alternatives appear only when evidence leaves a genuine business choice.
 5  Approved → build → test → PR → merge → deploy → verify production.  Do not come back.
 6  Overwrite the MASTER in the same PR.
 ```
+
+### PLAN / DESIGN RESEARCH LAW — APPROVED / LOCKED, owner ruling 2026-08-11
+
+- **APPROVED / LOCKED decisions are not re-researched, reopened or offered for re-approval.**
+  Continue from the authoritative MASTER's recorded answer.
+- At entry, state separately: **WHAT IS ALREADY APPROVED · WHAT IS GENUINELY UNRESOLVED · WHAT
+  SINGLE DECISION SURFACE THIS SESSION IS SOLVING.**
+- For a genuinely **UNRESOLVED** design decision, proactively research only that declared surface.
+  Use the relevant governed references — including Linear, Shopify, AutoCount, 2990, current
+  Carres UI and other mature ERP patterns when useful — and exclude unrelated history and pages.
+- Derive the common patterns and real trade-offs, then give **one evidence-based Carres
+  recommendation**, not arbitrary A/B/C options. References are evidence, never specification;
+  Carres business truth and governing architecture still win.
+- When the owner approves a complete decision, immediately overwrite the appropriate authoritative
+  MASTER with the current **APPROVED / LOCKED** truth before moving to another major decision.
+  PLAN mode forbids application implementation, not governing-document updates.
 
 **A DECISION THAT STAYS IN THE CHAT IS A DECISION THAT DIES.** The moment the owner agrees to
 something, it is written to its file and committed **before the conversation moves on** — not
