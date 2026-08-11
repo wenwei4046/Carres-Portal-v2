@@ -59,8 +59,9 @@ Old queues and checkpoints live in `docs/archive/` — **no chat reads them.**
 ```
 Build  →  Reality  →  Architecture review  →  If approved  →  Overwrite MASTER
 ```
-**Documentation is not the source of truth. The repository is.** Business rules freeze before
-implementation; **UI layout does not freeze before operators have used it.** A design that is
+**Approved business truth lives in the governing MASTER; code is evidence of the current
+implementation, not authority to silently overturn that approved target.** Business rules freeze
+before implementation; **UI layout does not freeze before operators have used it.** A design that is
 worse in practice is CHANGED, not defended — *"we decided that before"* is not a reason.
 **Reality outranks documentation.** If observation and the document disagree, measure again,
 then update the document. Never defend an outdated document.
@@ -107,6 +108,61 @@ not a new guideline  →  fold the rule into this Constitution
 ---
 
 ## 4 · Golden development flow
+
+### ERP WORK START LAW
+
+Before planning, changing code, or declaring the state of any ERP module:
+
+1. Read [`docs/ERP-ARCHITECTURE.md`](docs/ERP-ARCHITECTURE.md) for the whole journey, ownership
+   boundaries and cross-module handoffs.
+2. Read the target module's current `MASTER.md` in full and, for UI work, read
+   [`docs/ui/MASTER.md`](docs/ui/MASTER.md).
+3. Read only cross-module MASTER sections explicitly referenced by the target module or the task.
+4. State separately: **APPROVED TARGET · BUILT / VERIFIED · GENUINELY UNRESOLVED · referenced
+   dependencies**. Never describe an approved target as built, or current code as the intended
+   destination.
+5. Inspect current code, migrations and production after the governing target is known. They prove
+   what exists now and reveal the gap; they do not silently veto approved business or UI truth.
+6. Never invent a missing rule. Mark it **UNKNOWN**, exhaust current governing docs and relevant
+   evidence, then ask the owner one business question only if the answer still changes the result.
+7. After an approved implementation is production-verified, overwrite the module MASTER's current
+   implementation record in the same change. Never append a competing checkpoint.
+
+### PLAN / DESIGN CHAT ENTRY LAW — owner ruling 2026-08-11
+
+**A PLAN / DESIGN chat continues from approved truth; it does not rediscover it.** At entry it must:
+
+1. Read the current governing path above before researching or advising. Current approved law is
+   the baseline, not a hypothesis to reconstruct from chat history, old screens or old commits.
+2. State exactly three things: **WHAT IS ALREADY APPROVED · WHAT IS GENUINELY UNRESOLVED · WHAT
+   SINGLE DECISION / DECISION SURFACE THIS SESSION IS SOLVING.**
+3. Research only that unresolved surface. Do not reconstruct the full UI/business history or
+   re-study 2990, Old Orders or current pages by default. Consult history or external evidence only
+   when current governing truth marks an **UNKNOWN**, two governing laws genuinely conflict, or the
+   decision needs evidence not yet captured.
+4. Never reopen approved architecture, ask Jess to repeat an answer already in governing docs, or
+   offer broad A/B/C alternatives for settled decisions. Continue from the recorded answer.
+5. Treat current code and screens as implementation evidence: study them for gaps and usability,
+   but never let them override approved target truth.
+6. Challenge approved truth only for a genuine contradiction, demonstrated impossibility, or new
+   business evidence requiring Jess's decision. State the evidence and the exact ruling affected;
+   preference is not a challenge.
+7. When Jess designates **PLAN MODE** or a **Layout Approved** gate, write no implementation code
+   and make no implementation commit until that explicit approval. Recording an approved ruling in
+   its existing authoritative MASTER is governance, not implementation.
+
+**PLAN / DESIGN restart contract.** If a new chat is told *“Register Template — continue from repo
+governance”*, it reads this Constitution → ERP Architecture → UI MASTER → target module MASTER,
+states the approved baseline and unresolved gaps, names the single decision surface, and works only
+on those gaps. It does not begin with a new survey or a blank-sheet redesign.
+
+**CONTINUOUS BUILD restart contract — separate and unchanged in purpose.** If a new chat is told
+*“Sales Order — continue next Card”* or to run continuous Card-build mode, it reads this
+Constitution → ERP Architecture → Orders MASTER → its built/verified table and next Card → UI
+MASTER's Production UI Execution Law → referenced module/UI sections → relevant approved surfaces
+→ current implementation. A single-Card instruction ships only that Card. Continuous mode repeats
+the complete production vertical slice Card by Card without waiting for layout approval, unless
+the task was explicitly placed behind a PLAN MODE / Layout Approved gate.
 
 ```
 0  Say which kind of chat you are.  PLAN writes no code.  BUILD ships one thing.

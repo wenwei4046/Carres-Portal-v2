@@ -41,6 +41,52 @@ STOP and ask             a component that does not exist. Never draw one inline 
 **A rule that exists only as documentation is temporary and incomplete.** Every UI rule must
 eventually become a structure the code can enforce — a type, a lint rule, or a failing test.
 
+## §1.1 · PRODUCTION UI EXECUTION LAW — owner ruling 2026-08-11
+
+This governs **BUILD** work. It is separate from §1.2's PLAN / DESIGN gate and does not redesign,
+infer or reopen a Card's approved business rules.
+
+- A Card requiring human interaction ships its production operator UI in the same vertical slice
+  as truth/schema/API/history/tests/deploy work. A backend without the surface needed to use it is
+  not Card complete; a Card with no human interaction gets no invented surface.
+- Required UI is not deferred to a final polish Card. Each Card is deployed, production-verified
+  and recorded in the governing module MASTER before continuous build advances.
+- Continuous build does not wait for routine UI approval. Stop for Jess only when a UI decision
+  changes how Carres operates, contradicts approved truth, or the task was explicitly designated
+  PLAN MODE / Layout Approved gate.
+- Read this MASTER and only the relevant token/component/page-pattern references before changing
+  UI. The kit is a design language, not a blind template; required layout, responsive behaviour,
+  testing and polish remain implementer-owned within approved law.
+- The final Card may run an end-to-end consistency and polish pass; it is never the first operator
+  UI.
+
+## §1.2 · PLAN / DESIGN CHAT ENTRY LAW — owner ruling 2026-08-11
+
+This governs **PLAN / DESIGN** work. A new chat continues from the current approved truth instead
+of reconstructing the thinking that produced it.
+
+```
+READ       CLAUDE.md → ERP Architecture → this UI MASTER → target module MASTER
+STATE      WHAT IS ALREADY APPROVED
+           WHAT IS GENUINELY UNRESOLVED
+           WHAT SINGLE DECISION / DECISION SURFACE THIS SESSION IS SOLVING
+RESEARCH   only that unresolved surface
+PROCEED    from the approved baseline; never from a blank sheet
+```
+
+- Do not re-study the whole UI/business history, 2990, Old Orders or current pages by default.
+  Consult history or research only for an explicit **UNKNOWN**, a genuine conflict between current
+  governing laws, or evidence the unresolved decision needs and the MASTERs do not yet capture.
+- Do not reopen approved architecture, ask Jess again, or offer broad A/B/C alternatives for a
+  settled decision. If the answer is in governing docs, use it and continue.
+- Current code and screens are implementation evidence. Inspect them for gaps, density and
+  usability when relevant, but they cannot override the approved target.
+- Challenge an approved ruling only with a genuine contradiction, demonstrated impossibility, or
+  new business evidence requiring Jess's decision. Name the exact ruling and evidence.
+- If the task is designated PLAN MODE or carries a Layout Approved gate, do not implement or make
+  an implementation commit before explicit approval. An approved ruling is written into this
+  existing MASTER or the owning module MASTER under the MASTER OVERWRITE LAW.
+
 ---
 
 # §2 · Shared architecture
@@ -220,115 +266,27 @@ own decision and its own card.**
 
 ---
 
-# ⛔ §6.5 · PAGE STRUCTURE IS NOT DECIDED — study the PORTAL before any one page
+# §6.5 · REGISTER PLAN RESTART CONTRACT — owner ruling 2026-08-11
 
-> **Loo, 2026-08-08:** *"study all portal and rearrange how to build every page structure —
-> then only start sales order page again."* **This block is the brief and the open-item list.**
-> Its sibling is `../orders/MASTER.md`'s own ⛔ START HERE block, which records why: ten cards
-> upgraded how a table is DRAWN and not one asked what the operator should SEE.
+The ERP Register Blueprint in §6.4 is approved baseline. A new Register-plan chat does not repeat
+the historical programme that produced it and does not treat current Sales Orders, Old Orders,
+2990 or AutoCount as a fresh specification exercise.
 
-### ⛔⛔ THE ENTRY GATE — the chat produces these BEFORE it advises anything
+If the chat is told **“Register Template — continue from repo governance”**, it must:
 
-> **A promise to read has already been tried here and it failed.**
-> `../research/grid-findings.md` TRAPS: *"A Study Receipt does not prove the conclusions came
-> from the reading. One was produced at the start of this investigation and four false claims
-> followed it."* **So this gate asks for no receipt. It asks for five things that cannot be
-> produced without reading, and that are worth having on their own.**
+1. Read `CLAUDE.md` → `docs/ERP-ARCHITECTURE.md` → this UI MASTER → the target module MASTER.
+2. State **ALREADY APPROVED · GENUINELY UNRESOLVED · THIS SESSION'S SINGLE DECISION SURFACE**.
+3. Preserve settled architecture and the §6.4 rulings. Research only the missing Register-template
+   decision named in step 2; use current screens and code only as implementation/usability evidence.
+4. Consult `grid-findings`, 2990, AutoCount, Old Orders or other history only when §1.2's evidence
+   exceptions are met, and say which exception triggered the lookup.
+5. Present the smallest missing decision for Jess's approval. Do not restart with a portal-wide
+   survey, broad A/B/C layouts, a new status model, or implementation.
 
-```
-A · THREE VERBATIM LINES, each with file:line — one from a module MASTER, one
-    from grid-findings, one from 2990's own source. THE LINE, not a summary.
-
-B · ONE THING IN THIS RECORD IT DISAGREES WITH, with its evidence.
-    Law 4 is not optional. A chat that agrees with everything has not read it —
-    and every good finding of the last programme came from a contradiction:
-    the PRIOR ART path that did not exist · "measured in Chromium" that had
-    measured a header with no arrow in it · C14 sizing `Actions` off nearly the
-    NARROWEST party-named line · Receiving's px widths that were never measured.
-
-C · WHAT IT DID NOT READ, named with line counts. Every round that hid this
-    inherited a false conclusion.
-
-D · 2990's PAGE STRUCTURE, first-hand — NOT its DataGrid, which is finished and
-    must not be re-studied. How its pages COMPOSE: what leads, what sits beside,
-    what opens. `SalesOrderDetail.tsx` (3,699) has NEVER been opened by anyone
-    here, and ~100 of its pages are unread. That is where a page-structure
-    answer lives, and this programme has only ever read its grid.
-
-E · AutoCount's page structure. F50–F57 are first-hand OBSERVATIONS of screens
-    already on file (nested child grid · filled status cell · bottom-left filter
-    statement · every document type exposed permanently). It must say which it
-    ACCEPTS and which it doubts, and why — they are observations of a screen,
-    never of the code behind it.
-```
-
-**AND THE STANDING RULE BINDS THE WHOLE GATE:**
-```
-copy the POWERS, never the ASSUMPTIONS
-```
-**2990 and AutoCount are EVIDENCE, never specification** (`CLAUDE.md` DECISION GATE). 2990's
-Sales Order list has no owner, no queue and no next-action anywhere in 1,669 lines
-(grid-findings F22) — **it answers a different question than ours does. Read it to learn how it
-COMPOSES a page, not to inherit what it decided to show.**
-
-**THE ORDER OF WORK IS NOW FIXED, and it is the reverse of what was done:**
-```
-1  study the WHOLE portal — every operator surface, how each is composed today
-2  agree ONE page-structure standard with Loo   ← consult, never propose-and-ship
-3  ONLY THEN re-do Sales Order against it
-```
-**Sales Order stops being an upgrade and becomes the first page BUILT to the standard.**
-
-### THE OPEN ITEMS — everything raised and NOT done, collected once
-
-**Scattered across ~15 commits and three files until now, which is the same as unrecorded.**
-
-```
-PORTAL-WIDE — the structural questions nobody has answered
-  · every page composes its own shell: Orders uses ListPageShell + a 9-group
-    facet rail; Purchasing uses a 200px rail + tabs; neither is ruled the standard
-  · §5 rules FOUR right-rail widgets (Calendar · Team · Tasks · Activity) on
-    "every main panel". Orders' right side is facets instead. Two shapes, one law
-  · the drawer REPLACES the list rather than sitting beside it (grid-findings F31,
-    OrderDetailDrawer 7,576 lines) — so opening one order costs you the list
-  · what is a QUEUE vs what is a FILTER — Orders' rail mixes 1 group of work with
-    8 of dimensions and calls them all facets
-
-ORDERS REGISTER — raised, measured, never carded
-  · Status pill reads the same word on 30 of 31 rows and costs 139px
-  · the three dots repeat what Stock, Delivery and Actions already say
-  · PIC is a constant for every non-manager (they default to their own orders)
-  · Deadline shows the ORDER's date; what actually expires is the ACTION's own
-    deadline, and the row never shows it
-
-KNOWN DEFECTS, filed and unfixed
-  · 🔴 the drawer's items table renders `PO` and `ITEM` on top of each other
-  · 🟡 D10 · D11 — dead surfaces still compiled into the bundle
-  · 🟡 an unrecognised SKU still LABELS as `Accessory` in the drawer (D9 fixed the
-    CLAIM, not the label — the fold survives while those files are frozen)
-  · 🟡 Receiving cannot raise `Confirm ready date` — half of P20.5, needs one hook
-    feeding both pages, which reaches the frozen Purchase Orders page
-  · 🟡 16 free-text SKUs need real names; the keyword list mirrors migration 0148
-    word for word, so both move together or neither does
-
-THE ONE THAT OUTRANKS ALL OF THEM
-  · NOBODY HAS WATCHED AN OPERATOR WORK. `../research/grid-findings.md` §6 has
-    carried this line through every round and ten cards were built past it.
-    Two days with Shasha and Yu Jun answers more than any further measurement.
-```
-
-**⛔ WHAT THE NEXT CHAT MAY NOT DO**
-```
-✗ start with Sales Order            the standard comes first
-✗ touch business logic              APIs · calculations · the action ladder ·
-                                    queues · PIC · stock · delivery · money ·
-                                    permissions · order records — all PRESERVED
-✗ re-measure widths, densities,     finished and recorded in grid-findings §4.7/§4.8
-  engines or row height
-✗ add grid capability               the foundation is DONE; S2.5 is STOPPED
-✗ derive a page structure from      the last programme did exactly this, and the
-  reading source                    two ⛔ blocks are the receipt
-```
+**Current unresolved Register-template surface:** exact reusable default-column hierarchy and
+automatic width allocation · truncation/hover/expansion contract · selection contract ·
+filter/overflow contract · responsive behaviour. The target module MASTER may narrow this list;
+it may not silently broaden the session beyond the single decision surface declared at entry.
 
 ---
 
