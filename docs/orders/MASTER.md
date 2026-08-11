@@ -2974,6 +2974,16 @@ excluded them merely because they were not already implemented.
   display/configuration facts, not an edit door into historical orders. It is planned after
   Card 10 and is reachable from the Sales Orders top actions; the maintenance page itself is a
   separate destination/surface, not a Sales Orders tab.
+- **Register `Edit` opens the full Sales Order Workspace — APPROVED / LOCKED.** It never edits
+  inside the grid and never opens a small generic modal. The row context menu's `Edit` navigates
+  to that Sales Order's owned full-page Workspace in edit intent. The Workspace header keeps the
+  durable History · Order Journey/Relationship Map · Print PDF controls alongside the governed
+  edit/cancel actions. A change that remains above the existing contractual floors may use the
+  governed revision Save door; a change blocked by production commitment, receiving, invoice,
+  delivered or cancelled floors never silently overwrites the order and must follow the owned
+  amendment/request lane when that lane is available. **PO existence alone is not the Carres
+  edit gate** and 2990's wording does not replace Card 1's authority. Register → Workspace is the
+  adopted behaviour; Carres revision causes, gates and evidence remain authoritative.
 - **Selected-order PDF export is approved.** Selecting one or more rows reveals a contextual
   selection action bar above the table containing the truthful selected count, `Clear` and
   `Export PDF (N)`. It uses the existing governed Sales Order PDF renderer/output per order;
