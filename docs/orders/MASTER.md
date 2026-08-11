@@ -68,15 +68,17 @@ Matt · Bed · Sofa · Acc · Total
 - The disclosure control expands read-only order detail in place. Editing never turns the
   expanded register row into a form: View and Edit open the Sales Order's separate full-page
   workspace, and PDF opens the actual generated Sales Order document.
-- **WIDE:** identity/date and quantity columns keep their governed fixed widths; `Customer`
-  automatically absorbs the remaining width.
-- **NARROW:** `Ordered` · `Customer Delivery` · `SO No` · `Customer` form one frozen left identity
-  block that stays visible. `Matt` · `Bed` · `Sofa` · `Acc` · `Total` and extra quantity/detail
-  columns sit to its right, and ONLY that right-side region scrolls horizontally.
-- Staff do not drag-resize columns to make the default register usable. This approved narrow-width
-  overflow supersedes the former blanket no-horizontal-scroll rule: the identity block never
-  scrolls, while the quantity/detail region intentionally may. `Columns` follows the same boundary
-  for optional factual columns; reload restores the shared default layout.
+- Existing useful Register capabilities default to **KEEP** unless Jess separately rules one out;
+  redesigning the columns does not silently remove selection, expansion, View, Edit or PDF.
+- Every default column has a governed, predetermined template width (or an explicitly governed
+  range) that keeps this approved default set clean and readable. `Customer` may have a governed
+  width or range but does not simply absorb all remaining width.
+- Staff do not drag-resize columns to make the default register usable, and default columns are not
+  squeezed narrower merely to avoid overflow. Horizontal scrolling is not the normal default-layout
+  solution; it becomes intentional when optional/additional columns make the table exceed the
+  available width.
+- `Columns` decides which optional factual columns to display, not staff-designed layout widths;
+  reload restores the shared default layout.
 
 ### WHAT SALES ORDER OWNS
 ```

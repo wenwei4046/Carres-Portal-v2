@@ -84,8 +84,13 @@ PROCEED    from the approved baseline; never from a blank sheet
 - Challenge an approved ruling only with a genuine contradiction, demonstrated impossibility, or
   new business evidence requiring Jess's decision. Name the exact ruling and evidence.
 - If the task is designated PLAN MODE or carries a Layout Approved gate, do not implement or make
-  an implementation commit before explicit approval. An approved ruling is written into this
-  existing MASTER or the owning module MASTER under the MASTER OVERWRITE LAW.
+  an implementation commit before explicit approval. Governing-document updates are allowed and
+  required: immediately write each complete decision Jess explicitly approves into this existing
+  MASTER or the owning module MASTER as **APPROVED / LOCKED** truth under the MASTER OVERWRITE LAW.
+- Do not move through further major design decisions while an approved ruling remains only in chat.
+  Adjacent coherent rulings may be batched into one sensible Git commit; one `yes` does not require
+  one commit. On restart, the MASTER must expose the locked decisions and the next genuinely
+  unresolved decision without depending on conversation memory.
 
 ---
 
@@ -138,10 +143,11 @@ DetailShell · DialogFrame · FieldFrame · GridToolbar · SectionHeader
   word came from, and it **formats nothing** — money and dates keep their own one home.
 - **`DetailShell` has NO `state` prop and never may have.** Seven L4 constraints are types
   checked by `tsc`, not by the runner.
-- **A Register does not offer drag-resize.** Its columns are content-aware: each has a governed
-  minimum and maximum, text columns receive available slack, and no column may be squeezed below
-  its readable minimum merely to avoid overflow. When the governed widths exceed the viewport,
-  the non-frozen region scrolls horizontally. A reload restores the shared default layout.
+- **A Register does not offer drag-resize.** The template gives every default column a governed,
+  predetermined width (or governed range where explicitly ruled) that makes the approved default
+  set clean and readable without staff designing the layout. `Customer` may have a governed width
+  or range; it does not simply absorb all remaining space. Never squeeze default columns narrower
+  merely to avoid scrolling.
 - **Register truncation is conditional, never the sizing mechanism.** A cell truncates only after
   its column reaches the governed maximum; hovering that truncated cell reveals the complete
   value. Columns added through `Columns` use the same allocation and overflow rules.
@@ -240,16 +246,15 @@ rows …                          ┌──────────────�
    word: Sales Order may REQUEST what four other modules must execute.**
 ⑩ DELETE: the Refresh button (auto) · the Back button (it is a close, not a navigation) ·
    the page header's spare height.
-⑪ APPROVED / LOCKED REGISTER LISTING WIDTH CONTRACT — no drag-resize is needed to make the
-   default Register usable. On a WIDE viewport, keep the approved identity/date columns and
-   quantity columns at their governed fixed widths, and let `Customer` automatically absorb all
-   remaining width. On a NARROW viewport, freeze the complete left identity block — `Ordered` ·
-   `Customer Delivery` · `SO No` · `Customer` — so it remains visible, and place `Matt` · `Bed` ·
-   `Sofa` · `Acc` · `Total` · extra quantity/detail columns to its right. ONLY that right-side
-   quantity/detail region may scroll horizontally. This intentionally supersedes any blanket rule
-   that the default Register must never scroll horizontally: narrow-width overflow scroll belongs
-   only to the quantity/detail region, never to the fixed identity block. This is settled law, not
-   an option for a future Register-plan chat to reopen.
+⑪ APPROVED / LOCKED REGISTER COLUMN WIDTH LAW — 2990-style intent. Every default Register column
+   has a governed, predetermined template width (or an explicitly governed range); staff do not
+   drag-resize columns to make the default view usable. The approved default visible set must be
+   clean and readable at those designed widths. `Customer` may have a governed width or range but
+   does NOT simply absorb all remaining width. Horizontal scrolling is not the normal solution for
+   the default layout. It becomes intentional when the user adds optional/additional columns and
+   the resulting table exceeds the available width. Do not squeeze all default columns narrower
+   merely to avoid that overflow. The column chooser decides WHAT to display, not user-designed
+   layout widths. This supersedes the earlier automatic-slack and narrow quantity-region wording.
 ```
 
 ### 🔴 THREE CHALLENGES — recorded with the ruling, not after it
@@ -298,14 +303,13 @@ If the chat is told **“Register Template — continue from repo governance”*
 5. Present the smallest missing decision for Jess's approval. Do not restart with a portal-wide
    survey, broad A/B/C layouts, a new status model, or implementation.
 
-**Current unresolved Register-template surface:** reusable filter/overflow contract beyond the
-locked §6.4 width behaviour. Default-column hierarchy and whether selection is permanent remain
-page-owned and are recorded in the target module MASTER; automatic wide/narrow width allocation,
-the pinned narrow identity block and the quantity/detail-only horizontal-scroll boundary are
-APPROVED / LOCKED in §6.4. Future Register-plan chats continue to the next unresolved layout
-decision and may not ask Jess to choose this width behaviour again. The target module MASTER may
-narrow this list; it may not silently broaden the session beyond the single decision surface
-declared at entry.
+**Current unresolved Register-template surface:** reusable filter/overflow behaviour beyond the
+locked §6.4 width law. Default-column hierarchy and whether selection is permanent remain
+page-owned and are recorded in the target module MASTER; governed template widths, a clean/readable
+default set, optional-column overflow, and the chooser's WHAT-not-width boundary are **APPROVED /
+LOCKED** in §6.4. Future Register-plan chats continue to the next unresolved layout decision and
+may not ask Jess to choose this width behaviour again. The target module MASTER may narrow this
+list; it may not silently broaden the session beyond the single decision surface declared at entry.
 
 ---
 

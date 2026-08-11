@@ -148,8 +148,11 @@ Before planning, changing code, or declaring the state of any ERP module:
    business evidence requiring Jess's decision. State the evidence and the exact ruling affected;
    preference is not a challenge.
 7. When Jess designates **PLAN MODE** or a **Layout Approved** gate, write no implementation code
-   and make no implementation commit until that explicit approval. Recording an approved ruling in
-   its existing authoritative MASTER is governance, not implementation.
+   and make no implementation commit until that explicit approval. Governing-document updates are
+   allowed and required: when Jess explicitly approves a complete business, UI or layout decision,
+   immediately overwrite the appropriate authoritative MASTER with that current **APPROVED / LOCKED**
+   truth. Do not move through further major design decisions while an approved ruling exists only in
+   conversation.
 
 **PLAN / DESIGN restart contract.** If a new chat is told *“Register Template — continue from repo
 governance”*, it reads this Constitution → ERP Architecture → UI MASTER → target module MASTER,
@@ -174,11 +177,15 @@ the task was explicitly placed behind a PLAN MODE / Layout Approved gate.
 6  Overwrite the MASTER in the same PR.
 ```
 
-**A DECISION THAT STAYS IN THE CHAT IS A DECISION THAT DIES.** The moment the owner agrees to
-something, it is written to its file and committed **before the conversation moves on** — not
-at the end, not in the next card. A plan nobody wrote down gets re-derived weaker by the next
-chat; a plan written as LAW gets obeyed instead of challenged. **So every line written wears
-its own label:**
+**PLAN DECISION PERSISTENCE LAW. A DECISION THAT STAYS IN THE CHAT IS A DECISION THAT DIES.**
+The moment the owner explicitly agrees to a complete business, UI or layout decision in PLAN /
+DESIGN mode, overwrite its authoritative MASTER with the current **APPROVED / LOCKED** truth.
+Do not leave the ruling only in chat or move through further major design decisions before it is
+recorded. Adjacent coherent rulings may share one sensible Git commit; one `yes` does not require
+one commit. PLAN MODE still forbids application implementation until its explicit gate, but it
+requires these governance updates. A fresh chat must be able to read the MASTER, see what is
+locked, and identify the next genuinely unresolved decision. **So every line written wears its
+own label:**
 
 ```
 FACT      measured, cited      →  the research file.  Binds nobody.
