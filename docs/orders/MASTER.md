@@ -68,12 +68,15 @@ Matt · Bed · Sofa · Acc · Total
 - The disclosure control expands read-only order detail in place. Editing never turns the
   expanded register row into a form: View and Edit open the Sales Order's separate full-page
   workspace, and PDF opens the actual generated Sales Order document.
-- `Ordered` · `Customer Delivery` · `SO No` · `Customer` are the frozen leading facts. The
-  remaining columns scroll when needed.
-- Widths are content-aware within governed minima/maxima; there is no drag-resize. Text receives
-  available slack, truncates only at its maximum, reveals the complete value on hover, and the
-  non-frozen region scrolls horizontally rather than crushing readable columns. `Columns` uses
-  the same contract for optional factual columns; reload restores the shared default layout.
+- **WIDE:** identity/date and quantity columns keep their governed fixed widths; `Customer`
+  automatically absorbs the remaining width.
+- **NARROW:** `Ordered` · `Customer Delivery` · `SO No` · `Customer` form one frozen left identity
+  block that stays visible. `Matt` · `Bed` · `Sofa` · `Acc` · `Total` and extra quantity/detail
+  columns sit to its right, and ONLY that right-side region scrolls horizontally.
+- Staff do not drag-resize columns to make the default register usable. This approved narrow-width
+  overflow supersedes the former blanket no-horizontal-scroll rule: the identity block never
+  scrolls, while the quantity/detail region intentionally may. `Columns` follows the same boundary
+  for optional factual columns; reload restores the shared default layout.
 
 ### WHAT SALES ORDER OWNS
 ```

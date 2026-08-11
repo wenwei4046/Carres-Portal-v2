@@ -224,7 +224,8 @@ rows …                          ┌──────────────�
 
 **THE RULINGS**
 ```
-① FREEZE `SO No` + `Customer` on the left. Everything else scrolls. (AutoCount's own shape.)
+① The Register's identity/freeze boundary follows the APPROVED / LOCKED wide/narrow contract in
+   ruling ⑪; no smaller legacy freeze set governs Sales Orders.
 ② EVERY FILTER MATCHES ITS COLUMN — a date column gets This week · Next week · No date ·
    Between…, never a textbox.
 ③ ITEMS READ AS HUMAN WORDS — `King Mattress`, not `B1201S-K`. The SKU rides the hover.
@@ -239,10 +240,16 @@ rows …                          ┌──────────────�
    word: Sales Order may REQUEST what four other modules must execute.**
 ⑩ DELETE: the Refresh button (auto) · the Back button (it is a close, not a navigation) ·
    the page header's spare height.
-⑪ REGISTER WIDTH CONTRACT — no drag-resize. Freeze the page's approved identity/date columns;
-   allocate widths from content within governed minima/maxima; give text columns the remaining
-   slack; truncate only at the maximum and reveal the full value on hover; when the remaining
-   columns no longer fit, scroll their region horizontally instead of crushing them.
+⑪ APPROVED / LOCKED REGISTER LISTING WIDTH CONTRACT — no drag-resize is needed to make the
+   default Register usable. On a WIDE viewport, keep the approved identity/date columns and
+   quantity columns at their governed fixed widths, and let `Customer` automatically absorb all
+   remaining width. On a NARROW viewport, freeze the complete left identity block — `Ordered` ·
+   `Customer Delivery` · `SO No` · `Customer` — so it remains visible, and place `Matt` · `Bed` ·
+   `Sofa` · `Acc` · `Total` · extra quantity/detail columns to its right. ONLY that right-side
+   quantity/detail region may scroll horizontally. This intentionally supersedes any blanket rule
+   that the default Register must never scroll horizontally: narrow-width overflow scroll belongs
+   only to the quantity/detail region, never to the fixed identity block. This is settled law, not
+   an option for a future Register-plan chat to reopen.
 ```
 
 ### 🔴 THREE CHALLENGES — recorded with the ruling, not after it
@@ -291,11 +298,14 @@ If the chat is told **“Register Template — continue from repo governance”*
 5. Present the smallest missing decision for Jess's approval. Do not restart with a portal-wide
    survey, broad A/B/C layouts, a new status model, or implementation.
 
-**Current unresolved Register-template surface:** reusable filter/overflow contract · responsive
-behaviour. Default-column hierarchy and whether selection is permanent remain page-owned and are
-recorded in the target module MASTER; automatic width allocation and truncation/hover behaviour
-are ruled in §4 and §6.4. The target module MASTER may narrow this list; it may not silently
-broaden the session beyond the single decision surface declared at entry.
+**Current unresolved Register-template surface:** reusable filter/overflow contract beyond the
+locked §6.4 width behaviour. Default-column hierarchy and whether selection is permanent remain
+page-owned and are recorded in the target module MASTER; automatic wide/narrow width allocation,
+the pinned narrow identity block and the quantity/detail-only horizontal-scroll boundary are
+APPROVED / LOCKED in §6.4. Future Register-plan chats continue to the next unresolved layout
+decision and may not ask Jess to choose this width behaviour again. The target module MASTER may
+narrow this list; it may not silently broaden the session beyond the single decision surface
+declared at entry.
 
 ---
 
