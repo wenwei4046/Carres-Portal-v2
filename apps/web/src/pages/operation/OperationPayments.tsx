@@ -16,7 +16,9 @@ import {
   PAYMENT_METHODS,
   PAYMENT_STATUSES,
   collectPillLabel,
+  collectionClock,
   computeStorageFee,
+  myHolidaySet,
   orderActionLine,
   orderActionQueue,
   orderMoney,
@@ -92,6 +94,9 @@ interface RawCtrl {
   line_etas: Record<string, string> | null;
   line_stock_status: Record<string, string> | null;
   last_chased_at: string | null;
+  /** CARD 4 — the customer's confirmed delivery day, the collection clock's
+   *  preferred anchor. */
+  confirmed_date: string | null;
 }
 interface RawLedgerEntry {
   amount: number | string;
@@ -344,6 +349,10 @@ interface Row {
   owing: number;
   /** delivery held: goods in, not delivered, money owing → the 🔒 on the money pill. */
   held: boolean;
+  /** CARD 4 — the collection clock: the final deadline (1 working day before
+   *  the delivery) and where today stands against it. */
+  collectDueIso: string | null;
+  collectAttention: "none" | "t3" | "t2" | "t1" | "late";
   lastChasedAt: string | null;
 }
 
@@ -442,6 +451,19 @@ export default function OperationPayments() {
       const storageOwing = storageCollected ? 0 : Math.max(0, effectiveStorage - sum.storageCollected);
       const dueDate = ctrl?.balance_due_date ?? null;
       const overdue = !!dueDate && dueDate < today && goodsOwing > 0;
+      // CARD 4 — the collection clock (T−3 · T−2 · T−1 final deadline on the
+      // delivery working week + Malaysian holidays). Anchored on the CUSTOMER's
+      // confirmed day, else the promised date; TBD stays silent. The T−1 exists
+      // because logistics ask for the DO the evening before, and the DO door
+      // refuses while money holds.
+      const clock = collectionClock(
+        {
+          confirmedDateIso: ctrl?.confirmed_date ?? null,
+          promisedDateIso: r.delivery_date_tbd ? null : r.delivery_date,
+        },
+        today,
+        { holidays: myHolidaySet() },
+      );
       const paymentStatus = ctrl?.payment_status ?? null;
       const stock = stockOf(ctrl);
       const delivered = r.status === "delivered";
@@ -476,6 +498,8 @@ export default function OperationPayments() {
         overdue,
         owing,
         held,
+        collectDueIso: clock.dueIso,
+        collectAttention: clock.attention,
         lastChasedAt: ctrl?.last_chased_at ?? null,
       };
     });
@@ -930,6 +954,25 @@ function PaymentRow({
                     <span className={r.overdue ? "text-danger font-semibold" : "text-base-500"}>
                       {" · "}
                       {r.overdue ? "overdue" : "promised"} {fmtDate(r.dueDate)}
+                    </span>
+                  )}
+                  {/* CARD 4 — the balance deadline: 1 working day before the
+                      delivery, because logistics ask for the DO the evening
+                      before and the DO door refuses while money holds. */}
+                  {r.collectDueIso && (
+                    <span
+                      className={
+                        r.collectAttention === "late"
+                          ? "text-danger font-semibold"
+                          : r.collectAttention === "t1"
+                            ? "text-danger"
+                            : r.collectAttention === "t2" || r.collectAttention === "t3"
+                              ? "text-warning"
+                              : "text-base-500"
+                      }
+                    >
+                      {" · "}balance due {fmtDate(r.collectDueIso)}
+                      {r.collectAttention === "late" ? " — passed" : ""}
                     </span>
                   )}
                 </div>

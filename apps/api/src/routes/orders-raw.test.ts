@@ -96,8 +96,10 @@ function buildSb(opts: { rpcError?: RpcError; fetchedRow?: unknown } = {}) {
   const rpcCalls: Array<{ name: string; payload: Record<string, unknown> }> = [];
   const inserts: Array<{ table: string; row: Record<string, unknown> }> = [];
   const sb = {
-    rpc: async (name: string, args: { payload: Record<string, unknown> }) => {
-      rpcCalls.push({ name, payload: args.payload });
+    rpc: async (name: string, args: { payload?: Record<string, unknown> } & Record<string, unknown>) => {
+      // The create RPC nests its input under `payload`; flat-arg RPCs
+      // (payment_record, CARD 4) pass their args directly.
+      rpcCalls.push({ name, payload: (args?.payload ?? args) as Record<string, unknown> });
       if (opts.rpcError) return { data: null, error: opts.rpcError };
       return {
         data: { id: "11111111-1111-1111-1111-111111111111", so: 1301, placed_at: "2026-07-03T00:00:00Z" },
@@ -377,18 +379,26 @@ describe("POST /api/orders/raw — internal raw creation (POS-parity)", () => {
       approvalCode: "472019",
     });
     expect(res.status).toBe(201);
-    const ledger = sb._inserts.filter(
-      (i: { table: string }) => i.table === "order_payments",
+    // CARD 4 (0343): the mirror rides the ONE writer — payment_record with
+    // p_counts_toward_paid=false (the create RPC already put the deposit in
+    // orders.paid, so counting it again would double the money).
+    expect(
+      sb._inserts.filter((i: { table: string }) => i.table === "order_payments").length,
+    ).toBe(0);
+    const mirror = sb._rpcCalls.filter(
+      (r: { name: string }) => r.name === "payment_record",
     );
-    expect(ledger.length).toBe(1);
-    expect(ledger[0].row).toMatchObject({
-      order_id: "11111111-1111-1111-1111-111111111111",
-      amount: 2000,
-      method: "card", // credit → the ledger's card bucket
-      kind: "deposit",
-      reference: "472019",
+    expect(mirror.length).toBe(1);
+    expect(mirror[0].payload).toMatchObject({
+      p_order_id: "11111111-1111-1111-1111-111111111111",
+      p_amount: 2000,
+      p_method: "card", // credit → the ledger's card bucket
+      p_kind: "deposit",
+      p_reference: "472019",
+      p_counts_toward_paid: false,
     });
-    expect(typeof ledger[0].row.paid_on).toBe("string");
+    expect(typeof mirror[0].payload.p_paid_on).toBe("string");
+    expect(String(mirror[0].payload.p_receipt_no)).toMatch(/^RC-\d{6}-\d{4}$/);
   });
 
   it("paid = 0 (or absent) writes NO ledger row; unknown method maps to 'other'", async () => {
@@ -397,7 +407,7 @@ describe("POST /api/orders/raw — internal raw creation (POS-parity)", () => {
     const res = await post(await makeJwt("principal"), validBody); // no paid
     expect(res.status).toBe(201);
     expect(
-      sb._inserts.filter((i: { table: string }) => i.table === "order_payments").length,
+      sb._rpcCalls.filter((r: { name: string }) => r.name === "payment_record").length,
     ).toBe(0);
 
     const sb2 = buildSb();
@@ -407,11 +417,11 @@ describe("POST /api/orders/raw — internal raw creation (POS-parity)", () => {
       paid: 100,
       paymentMethod: "my-custom-method",
     });
-    const ledger2 = sb2._inserts.filter(
-      (i: { table: string }) => i.table === "order_payments",
+    const ledger2 = sb2._rpcCalls.filter(
+      (r: { name: string }) => r.name === "payment_record",
     );
-    expect(ledger2[0].row.method).toBe("other");
-    expect(ledger2[0].row.reference).toBeNull();
+    expect(ledger2[0].payload.p_method).toBe("other");
+    expect(ledger2[0].payload.p_reference).toBeNull();
   });
 
   it("422 rule_violation when the RPC rejects a sofa + mattress/bed-frame mix", async () => {

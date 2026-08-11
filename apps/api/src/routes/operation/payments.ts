@@ -38,7 +38,10 @@ paymentsRouter.get("/", async (c) => {
     // `orders.paid` is goods money — dropping it would delete a working
     // feature with nothing to replace it.
     .select(
-      "id, so, status, operation_stage, customer_name, customer_phone, customer_address, delivery_date, delivery_date_tbd, delivered_at, source_ref, paid, order_lines(sku, qty, unit_price), order_addons(qty, unit_price), order_payments(amount, kind), ops_order_control(balance, payment_status, storage_from, storage_fee_override, balance_due_date, storage_collected_at, storage_waiver_status, extension_original_date, line_etas, line_stock_status, last_chased_at)",
+      // CARD 4: `confirmed_date` rides the select — the collection clock
+      // (T−3 · T−2 · T−1) anchors on the customer's confirmed delivery day,
+      // falling back to the promised date already here.
+      "id, so, status, operation_stage, customer_name, customer_phone, customer_address, delivery_date, delivery_date_tbd, delivered_at, source_ref, paid, order_lines(sku, qty, unit_price), order_addons(qty, unit_price), order_payments(amount, kind), ops_order_control(balance, payment_status, storage_from, storage_fee_override, balance_due_date, storage_collected_at, storage_waiver_status, extension_original_date, line_etas, line_stock_status, last_chased_at, confirmed_date)",
     )
     .in("status", ["place", "proceed_order", "delivered"])
     .order("delivery_date", { ascending: true, nullsFirst: false })

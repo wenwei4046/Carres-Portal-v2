@@ -2497,3 +2497,6 @@ export * from "./sales-order-commitment";
 // CARD 2 — unit/stock allocation truth: the one arithmetic for "which real
 // Units are reserved/sold to this SO, and what is still unallocated".
 export * from "./sales-order-allocation";
+// CARD 4 — the collection clock: T−3 · T−2 · T−1 (final deadline) on working
+// days before the delivery, one arithmetic for every surface that presses.
+export * from "./collection-clock";

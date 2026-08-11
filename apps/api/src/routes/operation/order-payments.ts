@@ -8,6 +8,7 @@ import {
   decideStorageWaiverInput,
   recordStorageExtensionInput,
   deliveryReasonLabel,
+  docNumber,
   storageHold,
 } from "@carres/shared";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
@@ -39,7 +40,7 @@ const ORDER_ID = z.string().uuid();
 const PAYMENT_ID = z.string().uuid();
 
 const PAYMENT_COLS =
-  "id, order_id, amount, paid_on, method, kind, reference, receipt_no, receipt_url, note, recorded_by, created_at";
+  "id, order_id, amount, paid_on, method, kind, reference, receipt_no, receipt_url, note, recorded_by, created_at, counted_in_paid, voided_at, voided_by, void_reason";
 
 function requireOperationOrPrincipal(
   role: string,
@@ -71,9 +72,11 @@ orderPaymentsRouter.get("/:id/payments", async (c) => {
   return c.json({ payments: data ?? [] });
 });
 
-// POST /:id/payments — record one payment. Generates a human-friendly receipt
-// number (R{so}-{n}) so a printed receipt is traceable; recorded_by comes from
-// the JWT (never the body).
+// POST /:id/payments — record one payment through the ONE writer (CARD 4,
+// 0343): the ledger row and the `orders.paid` bump are one transaction, so the
+// figure every gate reads moves the moment the desk records the money. The
+// receipt number is the LOCKED document scheme (RC-DDMMYY-NNNN, seeded so a
+// reprint matches), minted by the one TS helper and handed to the RPC.
 orderPaymentsRouter.post("/:id/payments", async (c) => {
   const auth = c.var.auth;
   requireOperationOrPrincipal(auth.role);
@@ -86,35 +89,33 @@ orderPaymentsRouter.post("/:id/payments", async (c) => {
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
 
   const sb = userClient(c.env, auth.jwt);
-  const receiptNo = await nextReceiptNo(sb, orderId);
+  const receiptNo = await nextReceiptNo(sb, orderId, parsed.data.paidOn);
 
-  const { data, error } = await sb
-    .from("order_payments")
-    .insert({
-      order_id: orderId,
-      amount: parsed.data.amount,
-      paid_on: parsed.data.paidOn,
-      method: parsed.data.method,
-      kind: parsed.data.kind,
-      reference: parsed.data.reference ?? null,
-      note: parsed.data.note ?? null,
-      // Customer proof-of-payment slip (Balance v3) — a storage path or https
-      // receipt URL. Lands on redeploy; the live schema strips the input key.
-      receipt_url: parsed.data.receiptUrl ?? null,
-      receipt_no: receiptNo,
-      recorded_by: auth.id,
-    })
-    .select(PAYMENT_COLS)
-    .single();
+  const { data, error } = await sb.rpc("payment_record", {
+    p_order_id: orderId,
+    p_amount: parsed.data.amount,
+    p_paid_on: parsed.data.paidOn,
+    p_method: parsed.data.method,
+    p_kind: parsed.data.kind,
+    p_reference: parsed.data.reference ?? null,
+    p_note: parsed.data.note ?? null,
+    p_receipt_url: parsed.data.receiptUrl ?? null,
+    p_receipt_no: receiptNo,
+    p_counts_toward_paid: true,
+  });
   if (error) {
     const m = mapPgError(error);
     return c.json(m.body, m.status);
   }
-  return c.json({ payment: data }, 201);
+  const out = data as { payment: unknown; orders_paid: number | null };
+  return c.json({ payment: out.payment, ordersPaid: out.orders_paid }, 201);
 });
 
-// DELETE /:id/payments/:pid — void a mis-keyed entry. Principal only (a junior
+// DELETE /:id/payments/:pid — VOID a mis-keyed entry. Principal only (a junior
 // operator records; only the principal reverses), mirroring the waiver gate.
+// CARD 4 (0343): a void is a STAMP, never a delete — the row survives with
+// voided_at/by, and the RPC reverses exactly the orders.paid contribution the
+// record made. The wire contract ({ok:true}) is unchanged.
 orderPaymentsRouter.delete("/:id/payments/:pid", async (c) => {
   const auth = c.var.auth;
   if (auth.role !== "principal") {
@@ -128,11 +129,10 @@ orderPaymentsRouter.delete("/:id/payments/:pid", async (c) => {
   }
 
   const sb = userClient(c.env, auth.jwt);
-  const { error } = await sb
-    .from("order_payments")
-    .delete()
-    .eq("id", pidCheck.data)
-    .eq("order_id", idCheck.data);
+  const { error } = await sb.rpc("payment_void", {
+    p_payment_id: pidCheck.data,
+    p_reason: null,
+  });
   if (error) {
     const m = mapPgError(error);
     return c.json(m.body, m.status);
@@ -161,52 +161,39 @@ orderPaymentsRouter.post("/:id/storage/collect", async (c) => {
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
 
   const sb = userClient(c.env, auth.jwt);
-  const receiptNo = await nextReceiptNo(sb, orderId);
+  const receiptNo = await nextReceiptNo(sb, orderId, parsed.data.paidOn);
 
-  const { data: payment, error: payErr } = await sb
-    .from("order_payments")
-    .insert({
-      order_id: orderId,
-      amount: parsed.data.amount,
-      paid_on: parsed.data.paidOn,
-      method: parsed.data.method,
-      kind: "storage",
-      reference: parsed.data.reference ?? null,
-      note: parsed.data.note ?? null,
-      // Customer proof-of-payment slip (Balance v3) — a storage path or https
-      // receipt URL. Lands on redeploy; the live schema strips the input key.
-      receipt_url: parsed.data.receiptUrl ?? null,
-      receipt_no: receiptNo,
-      recorded_by: auth.id,
-    })
-    .select(PAYMENT_COLS)
-    .single();
+  // CARD 4 (0343): the ledger row AND the gate stamp are one transaction inside
+  // the one writer — the two-write race this route used to carry is gone.
+  const { data, error: payErr } = await sb.rpc("payment_record", {
+    p_order_id: orderId,
+    p_amount: parsed.data.amount,
+    p_paid_on: parsed.data.paidOn,
+    p_method: parsed.data.method,
+    p_kind: "storage",
+    p_reference: parsed.data.reference ?? null,
+    p_note: parsed.data.note ?? null,
+    p_receipt_url: parsed.data.receiptUrl ?? null,
+    p_receipt_no: receiptNo,
+    p_counts_toward_paid: true,
+  });
   if (payErr) {
     const m = mapPgError(payErr);
     return c.json(m.body, m.status);
   }
 
-  // Open the gate: stamp the collection time + keep the legacy "Paid?" flag in
-  // sync. Sparse upsert creates the overlay row if the order has none yet.
   const { data: control, error: ctrlErr } = await sb
     .from("ops_order_control")
-    .upsert(
-      {
-        order_id: orderId,
-        storage_collected_at: new Date().toISOString(),
-        storage_paid: "Paid",
-        updated_by: auth.id,
-      },
-      { onConflict: "order_id" },
-    )
     .select(CONTROL_GATE_COLS)
-    .single();
+    .eq("order_id", orderId)
+    .maybeSingle();
   if (ctrlErr) {
     const m = mapPgError(ctrlErr);
     return c.json(m.body, m.status);
   }
 
-  return c.json({ payment, control }, 201);
+  const out = data as { payment: unknown };
+  return c.json({ payment: out.payment, control }, 201);
 });
 
 // POST /:id/storage/waiver/request — operator asks to waive the storage fee
@@ -485,25 +472,30 @@ orderPaymentsRouter.post("/:id/storage/extend", async (c) => {
   return c.json({ control: data }, 201);
 });
 
-/** Build the next receipt number for an order: `R{so}-{n}` where n is the
- *  1-based count of existing payments. Falls back to the order id slice when
- *  the SO lookup is unavailable. Not UNIQUE-constrained, so a (very unlikely)
- *  concurrent-insert collision is cosmetic, never an error. */
+/** The next receipt number, on the LOCKED document scheme (Jess 2026-07-19:
+ *  `PREFIX-DDMMYY-NNNN`, tail hashed from a stable seed — `docNumber`, the ONE
+ *  helper). Seeded on `{orderId}:{seq}` so each payment of one order gets its
+ *  own stable number and a reprint matches the original. `seq` counts EVERY
+ *  ledger row including voided ones, so a number is never reused. The payment
+ *  MASTER has required this scheme all along; the ledger held zero rows when
+ *  the old `R{so}-{n}` spelling was retired (CARD 4, 2026-08-11). */
 async function nextReceiptNo(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   sb: any,
   orderId: string,
+  paidOnIso: string,
 ): Promise<string> {
-  const [{ data: order }, { count }] = await Promise.all([
-    sb.from("orders").select("so").eq("id", orderId).maybeSingle(),
-    sb
-      .from("order_payments")
-      .select("id", { count: "exact", head: true })
-      .eq("order_id", orderId),
-  ]);
+  const { count } = await sb
+    .from("order_payments")
+    .select("id", { count: "exact", head: true })
+    .eq("order_id", orderId);
   const seq = (typeof count === "number" ? count : 0) + 1;
-  const label = order?.so != null ? String(order.so) : orderId.slice(0, 8);
-  return `R${label}-${seq}`;
+  return docNumber({
+    prefix: "RC",
+    date: paidOnIso,
+    seed: `${orderId}:${seq}`,
+    digits: 4,
+  });
 }
 
 export default orderPaymentsRouter;
