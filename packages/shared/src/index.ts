@@ -2512,3 +2512,6 @@ export * from "./collection-clock";
 // CARD 5 — delivery attempts: every vehicle run leaves a record; a failure is
 // ONE exception (Reason Library + where the goods are), units move with reality.
 export * from "./schemas/delivery-attempt";
+// CARD 8 — derived completion: Goods + Money(both directions) + Loan clear
+// = No Action Required. Never a stored status, never a button.
+export * from "./sales-order-completion";

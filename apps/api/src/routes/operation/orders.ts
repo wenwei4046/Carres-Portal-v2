@@ -10,8 +10,11 @@ import {
   ListOperationOrdersQuery,
   recheckStockInput,
   reselectPartnerInput,
+  orderMoney,
   resolveCurrentCustomerCommitment,
+  resolveOrderCompletion,
   resolveUnitAllocation,
+  storageHold,
   transferReadyInputSchema,
   warehousePickInput,
   type AllocationUnit,
@@ -730,6 +733,135 @@ operationOrdersRouter.get("/:id/allocation", requireOperation, async (c) => {
       units,
     }),
   });
+});
+
+// GET /:id/completion — CARD 8's derived answer: Goods + Money (both
+// directions) + Loan clear = No Action Required. NEVER stored, no button —
+// composed here from the four authoritative reads the earlier cards own:
+// Card 1 commitment → Card 2 allocation (goods), Card 4 orderMoney (money in),
+// Card 7 refunds (money out), Card 6 loans. Delivered ≠ Complete and
+// Cancelled ≠ Complete are properties of the arithmetic, not of any column.
+operationOrdersRouter.get("/:id/completion", requireOperation, async (c) => {
+  const id = c.req.param("id");
+  const sb = userClient(c.env, c.var.auth.jwt);
+
+  const { data: bundle, error: bundleErr } = await sb.rpc(
+    "sales_order_commitment_bundle",
+    { p_order_id: id },
+  );
+  if (bundleErr) {
+    const m = mapPgError(bundleErr);
+    return c.json(m.body, m.status);
+  }
+  const commitment = resolveCurrentCustomerCommitment(
+    bundle as unknown as CommitmentBundle,
+  );
+
+  const { data: ord, error: ordErr } = await sb
+    .from("orders")
+    .select(
+      "id, so, status, paid, delivery_date, order_lines(sku, qty, unit_price), order_addons(qty, unit_price), ops_order_control(balance, storage_from, storage_fee_override, storage_fee_msbf, storage_fee_sof, storage_collected_at, storage_waiver_status, extension_original_date)",
+    )
+    .eq("id", id)
+    .maybeSingle();
+  if (ordErr) {
+    const m = mapPgError(ordErr);
+    return c.json(m.body, m.status);
+  }
+  if (!ord) return c.json({ error: "Order not found" }, 404);
+  const soRef = `SO-${ord.so}`;
+
+  const [unitsRes, refundsRes, loansRes] = await Promise.all([
+    sb
+      .from("ops_stock_items")
+      .select("id, unit_code, sku, status, condition, warehouse_id, po_no, qty, date_in, sold_at")
+      .or(
+        `and(status.eq.reserved,reserved_ref.eq.${soRef}),and(status.eq.sold,sold_order_id.eq.${id})`,
+      ),
+    sb.from("order_refunds").select("status").eq("order_id", id),
+    sb
+      .from("ops_sofa_loans")
+      .select("status, source, returned_to_supplier_at")
+      .eq("order_id", id),
+  ]);
+  for (const r of [unitsRes, refundsRes, loansRes]) {
+    if (r.error) {
+      const m = mapPgError(r.error);
+      return c.json(m.body, m.status);
+    }
+  }
+
+  const units: AllocationUnit[] = ((unitsRes.data ?? []) as Array<{
+    id: string; unit_code: string | null; sku: string; status: string;
+    condition: string; warehouse_id: string | null; po_no: string | null;
+    qty: number | null; date_in: string | null; sold_at: string | null;
+  }>).map((r) => ({
+    id: r.id,
+    unitCode: r.unit_code,
+    sku: r.sku,
+    status: r.status as AllocationUnit["status"],
+    condition: r.condition,
+    warehouseId: r.warehouse_id,
+    poNo: r.po_no,
+    qty: r.qty ?? 1,
+    dateIn: r.date_in,
+    soldAt: r.sold_at,
+  }));
+
+  const allocation = resolveUnitAllocation({
+    orderId: id,
+    soRef,
+    commitmentLines: commitment.lines.map((l) => ({
+      sku: l.sku,
+      qty: Number(l.qty) || 0,
+    })),
+    units,
+  });
+
+  const lines = (ord.order_lines ?? []) as Array<{ sku: string; qty: number; unit_price: number | string | null }>;
+  const addons = (ord.order_addons ?? []) as Array<{ qty: number; unit_price: number | string | null }>;
+  const ctrl = Array.isArray(ord.ops_order_control)
+    ? (ord.ops_order_control[0] ?? null)
+    : (ord.ops_order_control as Record<string, unknown> | null);
+  const price = (x: { qty: number; unit_price?: number | string | null }) =>
+    Number(x.unit_price ?? 0) * Number(x.qty ?? 0);
+  const hold = storageHold({
+    storageFrom:
+      ((ctrl?.extension_original_date as string | null) ??
+        (ctrl?.storage_from as string | null) ??
+        (ord.delivery_date as string | null)) || null,
+    override: (ctrl?.storage_fee_override as number | string | null) ?? null,
+    importedMsbf: (ctrl?.storage_fee_msbf as number | string | null) ?? null,
+    importedSof: (ctrl?.storage_fee_sof as number | string | null) ?? null,
+    skus: lines.map((l) => String(l.sku)),
+    asOf: new Date().toISOString().slice(0, 10),
+    collectedAt: (ctrl?.storage_collected_at as string | null) ?? null,
+    waiverStatus: (ctrl?.storage_waiver_status as string | null) ?? null,
+  });
+  const money = orderMoney({
+    lineSum: lines.reduce((s, l) => s + price(l), 0),
+    addonSum: addons.reduce((s, a) => s + price(a), 0),
+    paid: ord.paid,
+    controlBalance: (ctrl?.balance as number | string | null) ?? null,
+    storageOwing: hold.fee,
+    storageReleased: hold.released,
+  });
+
+  const completion = resolveOrderCompletion({
+    cancelled: ord.status === "cancelled",
+    allocation,
+    money: { outstanding: money.outstanding, known: money.known },
+    refunds: (refundsRes.data ?? []) as Array<{
+      status: "requested" | "approved" | "rejected" | "paid";
+    }>,
+    loans: (loansRes.data ?? []) as Array<{
+      status: "on_loan" | "returned";
+      source: "warehouse" | "supplier";
+      returned_to_supplier_at: string | null;
+    }>,
+  });
+
+  return c.json({ completion });
 });
 
 // POST /:id/save — the ONE edit door. CARD 1: a save that moves the
