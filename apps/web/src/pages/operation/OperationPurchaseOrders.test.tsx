@@ -575,7 +575,7 @@ describe("one supplier date, one door — counted across apps/web", () => {
   it("the tomorrow-delivery endpoint has exactly ONE caller", () => {
     // The URL is built in the hook, so the hook is what a caller names.
     const callers = hitsFor("useRecordSupplierDate(");
-    expect(callers.map((f) => f.replace(WEB_SRC, "")).sort()).toEqual([
+    expect(callers.map((f) => f.replace(WEB_SRC, "").replaceAll("\\", "/")).sort()).toEqual([
       "/lib/queries.ts", // where it is defined
       "/pages/operation/OperationPurchaseOrders.tsx", // the one door
     ]);
@@ -585,7 +585,7 @@ describe("one supplier date, one door — counted across apps/web", () => {
 
   it("the balance-date endpoint has exactly ONE caller, on Purchase Orders", () => {
     const callers = hitsFor("useRecordBalanceDateMutation(");
-    expect(callers.map((f) => f.replace(WEB_SRC, "")).sort()).toEqual([
+    expect(callers.map((f) => f.replace(WEB_SRC, "").replaceAll("\\", "/")).sort()).toEqual([
       "/lib/queries.ts",
       "/pages/operation/OperationPurchaseOrders.tsx",
     ]);

@@ -68,6 +68,59 @@ import SalesOrderTabs from "./SalesOrderTabs";
 import { describeRevisionChanges } from "./sales-order-revisions";
 import { lineName } from "./sales-order-facts";
 
+type UnitTruth = {
+  so: number;
+  allocated: Array<{ id: string; unit_code: string | null; sku: string; condition: string; po_no: string | null }>;
+  offered: Array<{ id: string; unit_code: string | null; sku: string; condition: string; po_no: string | null }>;
+  events: Array<Record<string, unknown>>;
+};
+
+function SalesOrderUnits({ orderId }: { orderId: string }) {
+  const q = useQuery({
+    queryKey: ["operation", "orders", orderId, "units"],
+    queryFn: () => apiFetch<{ units: UnitTruth }>(`/api/operation/orders/${orderId}/units`),
+  });
+  const [busy, setBusy] = useState<string | null>(null);
+  const act = async (path: string, body: unknown, id: string) => {
+    setBusy(id);
+    try {
+      await apiFetch(path, { method: "POST", body: JSON.stringify(body) });
+      await q.refetch();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "The Unit could not be updated");
+    } finally {
+      setBusy(null);
+    }
+  };
+  if (q.isLoading) return <Loading label="Opening Units" />;
+  if (q.isError) return <p className="text-body text-danger">Units could not be opened.</p>;
+  const truth = q.data?.units;
+  if (!truth) return null;
+  const row = (unit: UnitTruth["allocated"][number], allocated: boolean) => (
+    <div key={unit.id} className="grid grid-cols-[110px_1fr_100px_72px] items-center gap-2 border-t border-kit-slate-5 py-1.5 text-body">
+      <span className="font-semibold">{unit.unit_code ?? "No Unit ID"}</span>
+      <span>{unit.sku}</span>
+      <span className="text-base-500">{unit.po_no ?? unit.condition}</span>
+      <Button size="sm" variant={allocated ? "ghost" : "neutral"} loading={busy === unit.id}
+        onClick={() => void act(
+          `/api/operation/orders/${orderId}/units/${unit.id}/${allocated ? "release" : "reserve"}`,
+          {},
+          unit.id,
+        )}>
+        {allocated ? "Release" : "Reserve"}
+      </Button>
+    </div>
+  );
+  return (
+    <div data-testid="sales-order-units">
+      <div className="text-label text-base-500">Reserved for this Order</div>
+      {truth.allocated.length ? truth.allocated.map((u) => row(u, true)) : <p className="py-2 text-body text-base-500">No Unit reserved.</p>}
+      <div className="mt-3 text-label text-base-500">Ready Stock</div>
+      {truth.offered.length ? truth.offered.map((u) => row(u, false)) : <p className="py-2 text-body text-base-500">No suitable Unit available.</p>}
+    </div>
+  );
+}
+
 /* pdf.js worker ships inside the package — nothing fetched from a CDN. */
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   "pdfjs-dist/build/pdf.worker.min.mjs",
@@ -1124,6 +1177,12 @@ export default function SalesOrderWorkspace() {
               </Section>
 
               {/* ⑥ MONEY */}
+              {!isNew && mode === "view" && orderId && (
+                <Section title="Units">
+                  <SalesOrderUnits orderId={orderId} />
+                </Section>
+              )}
+
               <Section title="Money">
                 <div className="grid grid-cols-3 gap-x-5">
                   <Fact label="Total" value={money.known && money.total != null ? <Money value={money.total} /> : "No price yet"} />

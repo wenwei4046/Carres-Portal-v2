@@ -2489,3 +2489,4 @@ export {
 export * from "./schemas/hr-team";
 export * from "./sales-order-classification";
 export * from "./sales-order-commitment";
+export * from "./sales-order-units";

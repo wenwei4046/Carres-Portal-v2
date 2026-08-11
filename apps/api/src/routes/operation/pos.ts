@@ -5,7 +5,6 @@ import {
   cancelPoInput,
   chasePoEventInput,
   listPurchaseOrdersQuery,
-  normalizeSkuKey,
   reassignPoWarehouseInput,
   officeReceiveInput,
   recordBalanceDateInput,
@@ -1116,11 +1115,8 @@ operationPosRouter.post("/:id/office-receive", requireOperation, async (c) => {
   // through the Workspace would sit unreserved while goods booked in through
   // the old modal were reserved — one act, two outcomes, decided by which
   // screen the operator happened to use.
-  try {
-    await autoReserveReceivedToSourceOrder(sb, c.req.param("id"));
-  } catch (e) {
-    console.error("post-receive auto-reserve failed (non-fatal):", e);
-  }
+  // SO V2 Card 2: Receiving records arrival only. The Sales Order may offer
+  // suitable free units, but allocation is always an explicit human action.
   return c.json(data);
 });
 
@@ -1209,6 +1205,7 @@ operationPosRouter.get("/:id/receiving", requireOperation, async (c) => {
  * what is already reserved to this SO, so a partial / repeat receive can never
  * over-reserve. The operator can release any of it from On Hand.
  */
+/* RETIRED by SO V2 Card 2: receiving must never allocate silently.
 async function autoReserveReceivedToSourceOrder(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   sb: any,
@@ -1286,7 +1283,7 @@ async function autoReserveReceivedToSourceOrder(
     .update({ status: "reserved", reserved_ref: soRef, updated_at: new Date().toISOString() })
     .in("id", idsToReserve)
     .eq("status", "free"); // guard: skip any that got grabbed concurrently.
-}
+} */
 
 // ----- POST /:id/cancel -----
 operationPosRouter.post("/:id/cancel", requireOperation, async (c) => {
