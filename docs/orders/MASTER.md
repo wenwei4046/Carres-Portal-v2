@@ -2951,20 +2951,43 @@ excluded them merely because they were not already implemented.
 - **The contextual bar follows the 2990 interaction pattern, not its appearance.** Carres
   frozen tokens/components govern colour, typography, radius and spacing. It occupies or
   replaces governed toolbar space where possible; it must not create a permanent empty band.
-- **`Order Journey` / `View Flow` is approved.** It is one map, not separate duplicate Document
-  and Journey maps. From a Sales Order it lets every authorised reader understand where the
-  customer's order has reached, what obligation is next and which real document/unit number
-  proves every completed leg. The governed route is Customer Order / what was bought → supply
-  decision (new goods through Purchasing OR suitable existing Warehouse stock, system offers and
-  human decides) → PO and Unit ID when buying → Receiving → Warehouse location → Delivery planning
-  from stock ETA + capacity + customer preference → Money due → actual Delivery result → optional
-  Loan and Issue branches → No Action Required only when all obligations clear. The map is a
-  directed graph, not a false single timeline: supply is a branch; Money and Delivery may proceed
-  in parallel; Loan and Issue are conditional.
+- **`View Flow` capability is approved; its complete route layout is still UNRESOLVED.** It is one
+  map, not separate duplicate Document and Journey maps. From a Sales Order it lets every
+  authorised reader understand where the customer's order has reached, what obligation is next
+  and which real document / Unit ID proves every completed leg. `Order Journey` is not a second
+  capability or second map.
 
-  The Sales Order is the anchor. Nodes show the real SO · PO · Unit ID · GRN · warehouse/bin · DO ·
-  Invoice · receipt/payment evidence · Loan · Case numbers, their owning module, governing dates
-  and truthful lifecycle evidence such as Generated · Sent · Signed/Accepted · Superseded/Cancelled.
+  **BUSINESS-RULE GATE — owner stop point, 2026-08-11.** The map must not be frozen or implemented
+  until the per-line goods-source and fulfilment-route decision table is complete. At minimum it
+  must cover Ready Stock · purchase into a Carres receiving location · supplier / AL direct to
+  customer · route not yet assigned · mixed routes across one SO · route change · return. This is
+  the next unresolved View Flow decision surface. UI composition does not author these routes.
+
+  Purchasing's existing two-path law is authoritative: a purchased line either enters a Carres
+  receiving location, where the governed Receiving record proves physical arrival, or it never
+  touches a Carres floor, where Operation explicitly confirms fulfilment. Direct-to-customer and
+  customer self-collection belong to that second path. **Warehouse is never the default route.**
+  A direct line must not manufacture a Warehouse node, bin, GRN or received quantity. An
+  unassigned route is shown truthfully as unassigned; it is never guessed.
+
+  The Sales Order is the anchor. The map renders only evidence that exists for the selected line's
+  actual route: real SO · PO · Unit ID · Receiving/GRN evidence when applicable · actual Carres
+  location when recorded · DO · Invoice · receipt/payment evidence · Loan · Case numbers, their
+  owning module, governing dates and truthful lifecycle evidence. Bin/location data may appear
+  only when its owning system actually records it. Demonstration names, warehouse locations, bins,
+  people, dates and statuses are never promoted into product truth.
+
+  Unit identity is shown once per real Unit and then repeated only where needed to prove that the
+  same physical item moved through later evidence; a repeated Unit ID is not a new Unit. The exact
+  Unit-creation event remains governed by Card 2 and the owning engine, not inferred by the map.
+  A Loan is an independent conditional obligation: while outstanding it blocks No Action Required;
+  after return it remains as completed evidence with the actual return date, receiver and recorded
+  condition. Loan is not nested inside Delivery merely because return may follow delivery.
+
+  The eventual map is a directed graph, not a false single timeline: goods source is a branch;
+  Money and Delivery may proceed in parallel; Loan and Issue are conditional. `No Action Required`
+  is derived only when every applicable obligation is clear.
+
   **Generated is never presented as Sent or received by the customer.** Completed/current-frontier/
   blocked/future/not-required presentation is derived from the owning modules' existing completion
   facts; it never mints a Sales Order `status` or `Current` field. Every document number opens its
