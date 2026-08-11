@@ -222,6 +222,8 @@ interface Props {
   orderId: string;
   onClose: () => void;
   nav?: DrawerNav;
+  /** Disable the Purchase Order write door on read-only legacy surfaces. */
+  allowIssuePO?: boolean;
   /** J3 — the ladder's OWN answer for this order, computed by the Orders list
    *  (see `journeySignalsFor`). Optional: absent means the order was not in the
    *  loaded list, and the journey strip renders nothing rather than run a
@@ -320,6 +322,7 @@ export default function OrderDetailDrawer({
   onClose,
   nav,
   journey,
+  allowIssuePO = true,
 }: Props) {
   const { data, isLoading, isError, error, refetch } = useOperationOrder(orderId);
   const navigate = useNavigate();
@@ -450,6 +453,7 @@ export default function OrderDetailDrawer({
               onDispatchClick={() => setShowDispatch(true)}
               onDOClick={() => setShowDO(true)}
               onIssuePOsClick={gotoProcurementWithPrefill}
+              allowIssuePO={allowIssuePO}
               onAbandonClick={() => setShowAbandon(true)}
               onConfirmProceedClick={() => setShowConfirmProceed(true)}
               onTransferReadyClick={() => setShowTransferReady(true)}
@@ -605,6 +609,7 @@ interface DrawerBodyProps {
   onDispatchClick: () => void;
   onDOClick: () => void;
   onIssuePOsClick: () => void;
+  allowIssuePO: boolean;
   onAbandonClick: () => void;
   onConfirmProceedClick: () => void;
   onTransferReadyClick: () => void;
@@ -1342,6 +1347,7 @@ function DrawerBody({
   onDispatchClick,
   onDOClick,
   onIssuePOsClick,
+  allowIssuePO,
   onAbandonClick,
   onConfirmProceedClick,
   onTransferReadyClick,
@@ -2684,6 +2690,7 @@ function DrawerBody({
           onTopUpClick={onTopUpClick}
           onAbandonClick={onAbandonClick}
           onIssuePOsClick={onIssuePOsClick}
+          allowIssuePO={allowIssuePO}
           onDispatchClick={onDispatchClick}
           onDOClick={onDOClick}
         />
@@ -2985,11 +2992,13 @@ function DrawerBody({
             actions={
               <PanelMenu
                 items={[
-                  {
-                    label: "Raise PO for shortages",
-                    icon: <PackagePlus size={14} />,
-                    onClick: () => onIssuePOsClick(),
-                  },
+                  ...(allowIssuePO
+                    ? [{
+                        label: "Raise PO for shortages",
+                        icon: <PackagePlus size={14} />,
+                        onClick: () => onIssuePOsClick(),
+                      }]
+                    : []),
                   {
                     label: recheckStock.isPending
                       ? "Rechecking…"
@@ -7223,6 +7232,7 @@ function ActionsMenu({
   onTopUpClick,
   onAbandonClick,
   onIssuePOsClick,
+  allowIssuePO,
   onDispatchClick,
   onDOClick,
 }: {
@@ -7237,6 +7247,7 @@ function ActionsMenu({
   onTopUpClick: () => void;
   onAbandonClick: () => void;
   onIssuePOsClick: () => void;
+  allowIssuePO: boolean;
   onDispatchClick: () => void;
   onDOClick: () => void;
 }) {
@@ -7276,7 +7287,8 @@ function ActionsMenu({
                 relevant one shows. */}
             {active && (
               <>
-                {(pipelineStatus === "needs_setup" || pipelineStatus === "proceed") && (
+                {allowIssuePO &&
+                  (pipelineStatus === "needs_setup" || pipelineStatus === "proceed") && (
                   <MenuItem
                     icon={<PackagePlus className="w-4 h-4" />}
                     label="Issue PO"
@@ -7580,4 +7592,3 @@ function PrintDoButton({
     </button>
   );
 }
-

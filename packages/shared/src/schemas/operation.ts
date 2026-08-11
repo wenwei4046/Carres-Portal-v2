@@ -471,15 +471,6 @@ export const transferReadyInputSchema = z.object({
 export type TransferReadyInput = z.infer<typeof transferReadyInputSchema>;
 
 /**
- * `issuePosForOrderInput` — POST /api/operation/orders/:id/issue-pos.
- * Maps to `operation_issue_pos_for_order(order_id)` RPC. Body is empty (the
- * order id is the path param). `.strict()` rejects any extra body keys so
- * the action route stays a clean trigger.
- */
-export const issuePosForOrderInput = z.object({}).strict();
-export type IssuePosForOrderInput = z.infer<typeof issuePosForOrderInput>;
-
-/**
  * `recheckStockInput` — POST /api/operation/orders/:id/recheck-stock.
  * Re-runs `operation_pick_warehouse` + `operation_calc_shortages` for an
  * `in_production` order in case stock landed via transfer between

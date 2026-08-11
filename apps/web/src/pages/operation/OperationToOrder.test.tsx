@@ -709,7 +709,7 @@ describe("ordered rows — the receipt stays on the sheet", () => {
 describe("Issue — the grid is the receipt, the bar is the report", () => {
   it("blocks unknown cost until a transaction cost is entered and marks it hand-entered", async () => {
     const payload = structuredClone(TO_ORDER);
-    payload.proposals[0].rows[0].builds[0].lines[0].cost = null;
+    (payload.proposals[0].rows[0].builds[0].lines[0] as { cost: number | null }).cost = null;
     apiFetch.mockImplementation((path: string, init?: RequestInit) => {
       if (path === "/api/operation/purchase/to-order") return Promise.resolve(payload);
       return route(path, init?.body ? JSON.parse(String(init.body)) : undefined);

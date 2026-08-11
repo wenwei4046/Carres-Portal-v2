@@ -68,7 +68,7 @@ export type WarehouseKind     = "own" | "operation_partner";
 //                         same SKU (operation_recent_po_cost RPC, T27).
 //   - 'system_suggested'  heuristic suggestion (e.g. 110% of prev_po).
 //   - 'auto_issued'       sentinel for system-issued PO lines from
-//                         operation_issue_pos_for_order when no historical cost
+//                         historical auto-issue paths when no cost was recorded
 //                         existed (migration 0057 — T42 codex C1 fix). When a
 //                         recent received-PO cost IS found, the auto-issue RPC
 //                         persists 'prev_po' instead. 'auto_issued' rows always

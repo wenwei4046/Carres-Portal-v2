@@ -340,7 +340,8 @@ door. Scoped and normal browsers post the same document arrangement; the server 
 the full plan, validates it again, and atomically calls `purchasing_issue_pos_batch`. That RPC
 delegates PO construction to the existing `_operation_create_po_inner` helper and retains the
 existing thread claim, supplier grouping, destination and ETA arithmetic. Old Orders remains
-on its unchanged legacy `operation_create_pos_batch` door until its separate removal card.
+readable and operational for its remaining responsibilities, but has no Issue PO control,
+review, route or executable order-level PO creation RPC.
 
 The browser route is `/operation/to-order?so={SO number}`. It mounts the same
 `OperationToOrder` component as the existing `/operation?tab=purchase` entrance; the latter
@@ -378,7 +379,10 @@ here. Card 2 governs the Issue boundary itself:
 Migration `0337_governed_batch_purchase_issue` adds nullable legacy-compatible
 `purchase_order_lines.commercial_treatment` and `commercial_reason` plus the governed
 commercial constraint and RPC. Governed Issue always writes `normal` or `free_of_charge`;
-`NULL` remains only for historical rows and legacy creation paths while Old Orders is live.
+`NULL` remains only for historical rows and unrelated legacy creation paths. Migration
+`0338_old_orders_cannot_issue_purchase_orders` removes browser-role execution from the
+historical `operation_issue_pos_for_order(uuid)` function without deleting legacy history;
+`purchasing_issue_pos_batch(jsonb)` remains executable by authenticated Purchasing users.
 - **`Order By` never reaches the screen.** Each row carries it only to know its time bucket;
   the operator sees the CUSTOMER's date.
 - **Issue = zero popups, zero toasts.** Rows update in place; a partial failure stays with
