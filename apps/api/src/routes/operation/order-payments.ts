@@ -7,6 +7,9 @@ import {
   requestStorageWaiverInput,
   decideStorageWaiverInput,
   recordStorageExtensionInput,
+  refundRequestInputSchema,
+  refundDecideInputSchema,
+  refundMarkPaidInputSchema,
   deliveryReasonLabel,
   docNumber,
   storageHold,
@@ -138,6 +141,107 @@ orderPaymentsRouter.delete("/:id/payments/:pid", async (c) => {
     return c.json(m.body, m.status);
   }
   return c.json({ ok: true });
+});
+
+// ── Refunds (SO V2 CARD 7, 0345) — bilateral money's second direction ────────
+// requested → approved | rejected (PRINCIPAL only, the waiver-decide law) →
+// paid. An approved, unpaid refund means Carres still owes the customer; the
+// payout never touches orders.paid (money IN against goods) — it is its own
+// record, and Card 8's derived completion reads it.
+
+const REFUND_ID = z.string().uuid();
+const REFUND_COLS =
+  "id, order_id, amount, reason, status, requested_by, requested_at, decided_by, decided_at, decide_note, paid_at, paid_by, paid_method, paid_reference";
+
+// GET /:id/refunds — the order's refund obligations, newest first.
+orderPaymentsRouter.get("/:id/refunds", async (c) => {
+  const auth = c.var.auth;
+  requireOperationOrPrincipal(auth.role);
+  const idCheck = ORDER_ID.safeParse(c.req.param("id"));
+  if (!idCheck.success) throw new HTTPException(404, { message: "Order not found" });
+
+  const sb = userClient(c.env, auth.jwt);
+  const { data, error } = await sb
+    .from("order_refunds")
+    .select(REFUND_COLS)
+    .eq("order_id", idCheck.data)
+    .order("requested_at", { ascending: false });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ refunds: data ?? [] });
+});
+
+// POST /:id/refunds — request one (operation/principal; amount + reason).
+orderPaymentsRouter.post("/:id/refunds", async (c) => {
+  const auth = c.var.auth;
+  requireOperationOrPrincipal(auth.role);
+  const idCheck = ORDER_ID.safeParse(c.req.param("id"));
+  if (!idCheck.success) throw new HTTPException(404, { message: "Order not found" });
+
+  const parsed = await parseJsonBody(c, refundRequestInputSchema);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+
+  const sb = userClient(c.env, auth.jwt);
+  const { data, error } = await sb.rpc("refund_request", {
+    p_order_id: idCheck.data,
+    p_amount: parsed.data.amount,
+    p_reason: parsed.data.reason,
+  });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ refund: data }, 201);
+});
+
+// POST /:id/refunds/:rid/decide — THE PRINCIPAL ONLY.
+orderPaymentsRouter.post("/:id/refunds/:rid/decide", async (c) => {
+  const auth = c.var.auth;
+  if (auth.role !== "principal") {
+    throw new HTTPException(403, { message: "Only a manager can decide a refund" });
+  }
+  const ridCheck = REFUND_ID.safeParse(c.req.param("rid"));
+  if (!ridCheck.success) throw new HTTPException(404, { message: "Refund not found" });
+
+  const parsed = await parseJsonBody(c, refundDecideInputSchema);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+
+  const sb = userClient(c.env, auth.jwt);
+  const { data, error } = await sb.rpc("refund_decide", {
+    p_refund_id: ridCheck.data,
+    p_decision: parsed.data.decision,
+    p_note: parsed.data.note ?? null,
+  });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ refund: data });
+});
+
+// POST /:id/refunds/:rid/paid — record the payout (approved → paid).
+orderPaymentsRouter.post("/:id/refunds/:rid/paid", async (c) => {
+  const auth = c.var.auth;
+  requireOperationOrPrincipal(auth.role);
+  const ridCheck = REFUND_ID.safeParse(c.req.param("rid"));
+  if (!ridCheck.success) throw new HTTPException(404, { message: "Refund not found" });
+
+  const parsed = await parseJsonBody(c, refundMarkPaidInputSchema);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+
+  const sb = userClient(c.env, auth.jwt);
+  const { data, error } = await sb.rpc("refund_mark_paid", {
+    p_refund_id: ridCheck.data,
+    p_method: parsed.data.method,
+    p_reference: parsed.data.reference ?? null,
+  });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ refund: data });
 });
 
 // ── Storage collection + waiver (collect-before-delivery gate, 0184) ─────────
