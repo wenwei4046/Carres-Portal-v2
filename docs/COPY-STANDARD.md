@@ -40,34 +40,55 @@ Two hard beliefs behind the rules:
 | 9 | Zero jargon — **unless the team already says it** | requisition · expedite · MRP · `GRN` as a VERB | order · call · plan · check in · `GRN` as the DOCUMENT (see the document/act split) |
 | 10 | Cut a sentence if possible | `Please note that this order...` | `This order is 1 day late. Issue PO now.` |
 
-## The three "who / what / when" questions
+## Action copy / work clarity law — owner ruling 2026-08-11
 
-Before writing any string, answer:
+When a surface represents something a human must handle, follow up, confirm, call, chase or do,
+the operator must understand all four parts at first read:
 
-1. **Who** reads this? (new operator · manager · customer)
-2. **What** do they do next?
-3. **Which** specific name / number / date do they need?
+```
+WHO      responsible named person or team/station
+ACTION   concrete verb and measurable outcome
+OBJECT   named counterparty, document, order, goods or other business object
+WHEN     actual working weekday + date from the action's authoritative calendar
+```
 
-If any answer is missing, the sentence is not written yet.
+Use the actual person or team when responsibility is known, the governed action verb, and the
+specific object the operator can recognise. `WHEN` follows `ACTION-FLOW-STANDARD.md` Law 2A: use
+the applicable Carres working calendar, exclude its public holidays/non-working days, and move a
+due date only according to that authoritative calendar. A governed action surface that requires a
+due day prints weekday + date; `Today`, `Tomorrow` or `T−2` alone is not enough.
+
+**Banned as substitutes for clear work:** `Follow up` · `Waiting` · `Need action` · vague
+`Chase`. These may describe neither a measurable act nor its object/date. A waiting condition is a
+fact, not an action, until a human must do something.
+
+This law does **not** turn every truth into work. Registers and module surfaces continue to show
+owned facts in factual language. Apply WHO + ACTION + OBJECT + WHEN only when the item is genuinely
+actionable. My Work, Team Work and every other action-bearing UI use this same formulation; they do
+not invent a shorter status-only dialect.
 
 ---
 
 ## Row action-line template
 
-Every list row ends with a plain-English sentence telling the reader the next
-action. **Length ≤ 10 words.** Shape:
+Every actionable list row ends with a plain-English sentence telling the reader the next action.
+The owner and due weekday/date may be adjacent governed fields when repeating them inside the
+sentence would harm scanning, but the row as a whole must expose all four parts. **Action sentence
+length ≤ 10 words.** Shape:
 
-    [Verb] + [Object with a name] + [When or why]
+    [Responsible person/team] + [Verb] + [concrete object/name] + [working weekday/date]
 
 Examples (all pass):
 
-    ✔ Issue PO to Ohana today.                 (5 words)
-    ✔ Remind Nice Future — PO-86 due Fri.      (7 words)
-    ✔ Call Ohana — confirm PO-88 ready date.   (7 words)
-    ✔ Check in from Ohana (3 items).           (6 words)
+    ✔ Yu Jun · Issue PO-86 to Ohana · Wed 12 Aug.
+    ✔ Khor Yee · Check in PO-2041 goods · Thu 13 Aug.
+    ✔ Shasha · Call AL about SO-1318 · Fri 14 Aug.
 
 Anti-patterns (all fail):
 
+    ✘ Follow up.                               (no owner · object · date)
+    ✘ Waiting.                                 (a fact presented as work)
+    ✘ Need action.                             (no action at all)
     ✘ Process order.                           (no name · no timing · abstract verb)
     ✘ You should follow up with the factory... (passive · no name · too long)
     ✘ Handle this.                             (all three failures)

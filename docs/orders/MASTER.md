@@ -800,7 +800,7 @@ mounted and 401-gated on production after deploy.
 # ✅ UNIFIED WORK ENGINE — SO V2 CARD 9, SHIPPED 2026-08-11
 
 **The question this card installed:** Work reads module facts and produces
-**WHO + ACTION + ACTUAL WORKING DAY** — and every rule that enters the
+**WHO + ACTION + OBJECT + WHEN (ACTUAL WORKING WEEKDAY/DATE)** — and every rule that enters the
 engine names its five parts or does not enter.
 
 **THE TRACE:** the per-module engines already exist and stay the owners of
@@ -858,7 +858,7 @@ DB change — nothing to deploy; Card 10 wires the surface.
 # ✅ MY WORK / TEAM WORK — SO V2 CARD 10, SHIPPED 2026-08-11
 
 **The question this card installed:** one operator opens the portal and sees
-exactly what to do — **WHO + ACTION + actual working day** — and a manager
+exactly what to do — **WHO + ACTION + OBJECT + WHEN (actual working weekday/date)** — and a manager
 sees the same set with responsibility visible.
 
 **Built under the Production UI Execution Law** (owner ruling 2026-08-11,
@@ -954,7 +954,8 @@ ISSUE TRACKER = ACCOUNTABILITY + MEMORY + LEARNING
 ```
 
 - Sales Order, PO, Receiving, Unit, Delivery, Money and Loan preserve what is true.
-- Work translates authoritative facts into **WHO + ACTION + actual working day**. It owns no
+- Work translates authoritative facts into **WHO + ACTION + OBJECT + WHEN (actual working
+  weekday/date)**. It owns no
   duplicate transaction form or free-standing completion status.
 - Issue Tracker records the incident, accountability, financial consequence, recovery and
   learning. It never substitutes for operational transaction truth.
@@ -1098,7 +1099,7 @@ Work reads module facts and produces one open work set. Every system rule must d
 completion fact, it does not enter the engine.
 
 ```
-WHO + ACTION + ACTUAL WORKING DAY
+WHO + ACTION + OBJECT + WHEN (ACTUAL WORKING WEEKDAY/DATE)
 ```
 
 Show a named person when the roster/PIC determines one; use a shared station such as Warehouse
