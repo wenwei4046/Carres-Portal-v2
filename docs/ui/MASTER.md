@@ -400,6 +400,15 @@ permanent band. Left = truthful selected count + Clear. Right = only actions val
 selection. A one-record action disappears for multi-selection rather than pretending to apply to
 many. Normal and selection states preserve the table's position and width.
 
+**REGISTER EXPORT AND OVERFLOW ROUTING — APPROVED / LOCKED (Loo, 2026-08-11).** A Register uses
+one visible `Export ▾` control for its supported current-view outputs: Excel · PDF · Print. Output
+formats do not scatter across `…` or become separate permanent normal-state buttons. When rows are
+selected, the same Toolbar space exposes only outputs valid for that exact selection and prints the
+truthful count. `…` owns infrequent page actions in normal state and infrequent selection actions
+in selection state; it never duplicates Export, Columns, a destination or a row-only action. A
+useful but infrequent action may move into `…` instead of occupying permanent Toolbar width; this
+is progressive disclosure, not capability removal.
+
 **TOOLBAR SHAPE LANGUAGE — APPROVED / LOCKED.** A control that changes/chooses/configures a view
 uses the governed 6px `rounded-control`: View dropdown · Search · Export dropdown · Columns ·
 overflow. A visible verb that immediately performs an action uses the UI Kit pill button: New ·
