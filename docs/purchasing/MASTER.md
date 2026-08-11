@@ -335,9 +335,12 @@ open-PO allocation, and only then scopes the response. It returns issuable rows,
 demand, existing engine blocks, open-PO cover and the complete issued-PO history needed to
 explain an empty scope. The unscoped response keeps its ordinary 14-day Ordered window.
 
-`POST /api/operation/purchase/to-order/issue` is unchanged. The scoped browser still posts
-only the document arrangement; the server recomputes the full plan and applies the same
-validation and atomic `operation_create_pos_batch` write.
+`POST /api/operation/purchase/to-order/issue` is the single governed Batch Purchase Issue
+door. Scoped and normal browsers post the same document arrangement; the server recomputes
+the full plan, validates it again, and atomically calls `purchasing_issue_pos_batch`. That RPC
+delegates PO construction to the existing `_operation_create_po_inner` helper and retains the
+existing thread claim, supplier grouping, destination and ETA arithmetic. Old Orders remains
+on its unchanged legacy `operation_create_pos_batch` door until its separate removal card.
 
 The browser route is `/operation/to-order?so={SO number}`. It mounts the same
 `OperationToOrder` component as the existing `/operation?tab=purchase` entrance; the latter
@@ -356,8 +359,26 @@ and population scoping only. It may not change eligibility, selection, supplier 
 document construction, validation, atomicity, destination or ETA arithmetic. With no explicit
 PO-day filter it shows the whole Sales Order; clearing `so` restores normal Batch Purchase and
 preserves the other URL filters. Blocked and unresolved demand is explained, never repaired
-here. Supplier fallback, zero cost, factory pickup partner and no-confirmed-delivery-date
-remediation belong to the separate parity card.
+here. Card 2 governs the Issue boundary itself:
+
+- A Customer Order without a confirmed delivery date remains visible but is blocked.
+- The SKU supplier master is authoritative. Missing or mismatched supplier truth blocks only
+  the affected demand and any document containing it. There is no emergency override yet.
+- `NULL` cost is unknown and blocks the affected document. A positive Catalog reference cost
+  may seed the PO transaction cost; a hand-entered positive transaction cost belongs only to
+  that PO and is audited. `0` is accepted only as explicit `free_of_charge`, with a mandatory
+  reason and audit. Neither path silently updates Catalog.
+- Every `factory_pickup` Issue document requires one existing procurement partner. This is a
+  document fact, not a demand blocker or line fact. The current partner table has no lifecycle
+  state, so Card 2 validates existence only and invents no active/inactive law.
+- Validation is server-side inside one transaction. The RPC serializes PO-number allocation,
+  rejects stale Catalog-seeded cost with `40001`, retains the existing demand-thread conflict
+  claim, and rolls the whole batch back when any document fails.
+
+Migration `0337_governed_batch_purchase_issue` adds nullable legacy-compatible
+`purchase_order_lines.commercial_treatment` and `commercial_reason` plus the governed
+commercial constraint and RPC. Governed Issue always writes `normal` or `free_of_charge`;
+`NULL` remains only for historical rows and legacy creation paths while Old Orders is live.
 - **`Order By` never reaches the screen.** Each row carries it only to know its time bucket;
   the operator sees the CUSTOMER's date.
 - **Issue = zero popups, zero toasts.** Rows update in place; a partial failure stays with
