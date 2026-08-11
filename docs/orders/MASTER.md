@@ -797,6 +797,64 @@ mounted and 401-gated on production after deploy.
 
 ---
 
+# ✅ UNIFIED WORK ENGINE — SO V2 CARD 9, SHIPPED 2026-08-11
+
+**The question this card installed:** Work reads module facts and produces
+**WHO + ACTION + ACTUAL WORKING DAY** — and every rule that enters the
+engine names its five parts or does not enter.
+
+**THE TRACE:** the per-module engines already exist and stay the owners of
+WHAT is open (`order-actions` two-layer engine · the purchasing calls ·
+`poCurrentActionOf` · `claimNextMove`) — V1's best idea, kept whole. The
+signal mapping (`orderActionSignalsOf`) lives web-side as ONE mapping;
+re-deriving it server-side would be a second signal mapping that drifts, so
+Card 9 composes rather than re-derives.
+
+**What shipped — shared code only** (`packages/shared/src/work-engine.ts`):
+
+```
+WORK_RULES         the FIVE-PART registry: Trigger · Owner · Action · Due
+                   rule · Completion fact, as typed data. Tests enforce:
+                   every key the order engine can raise has an entry; every
+                   completion fact names a store or arithmetic (never a
+                   tick); cross-module owners are DUTY-derived words
+                   (PO-duty · GRN-duty offset−1 · claim = opening month's
+                   holder), never a stored assignee.
+workItemsForOrder  composes the engine's Layer-1 output into work items:
+                   owner = the PIC (§2.2 — the PIC owns every action, so an
+                   item carries no owner field of its own) · due through the
+                   ONE shipped clock per key (assign/chase/deliver/photo →
+                   delivery-queue with the Card 3 leads · delay clocks →
+                   order-action-due, office week · collect AND
+                   issue_delivery_order → the Card 4 T−1 clock, one
+                   arithmetic two consumers) · `Thu 6 Aug` weekday+date
+                   labels (never a bare Today) · workingDaysLate over the
+                   ORIGINAL due, which never moves. Purchasing-owned clocks
+                   (issue_po · confirm_ready_date) are NOT respelt — their
+                   dues live on their own surfaces, pinned by test.
+No Done button     structural: items exist only while their engine's facts
+                   hold them open. Human follow-ups stay `ops_tasks` —
+                   explicitly created, labelled human, explicitly
+                   completable, OUTSIDE this registry.
+```
+
+**Evidence:** ten shared tests — the five-part enforcement, PIC ownership,
+weekday+date spelling, late-keeps-original-due (with the working-day count),
+the shared T−1 arithmetic, no-anchor-never-late, and the
+no-respelt-purchasing-clock pin. shared 2273 · api/web tsc clean. No API or
+DB change — nothing to deploy; Card 10 wires the surface.
+
+**Known boundaries, reported not hidden:**
+- The composed feed covers the ORDER track today. The purchasing / receiving
+  / claims items are REGISTERED (five parts, completion facts) and render on
+  their own surfaces; they join the one composed feed when their server
+  feeds are wired — that is Card 10's surface work, and the registry is the
+  contract it renders.
+- The working calendar is still `myHolidaySet()` until the Settings company
+  calendar lands (purchasing MASTER §10) — every clock takes it by injection.
+
+---
+
 # SALES ORDER V2 — CURRENT APPROVED TARGET AND BUILD CHECKPOINT
 
 > **OWNER RULING, 2026-08-11. This is current target truth under the MASTER OVERWRITE LAW.**
@@ -816,8 +874,8 @@ mounted and 401-gated on production after deploy.
 | **6** | Loan Mattress / Loan Sofa Obligations | **COMPLETE** — no migration (Card 2 built the doors; Card 6 made the lane use them); production verified 2026-08-11; record above |
 | **7** | Change / Cancel / Refund Lineage | **COMPLETE** — migration `0345` (the refund record), production verified 2026-08-11 (eight rolled-back probes); the rest of the lineage was measured already true; record above |
 | **8** | Derived Completion — No Action Required | **COMPLETE** — code only (no migration): `resolveOrderCompletion` + `GET /:id/completion`, 2026-08-11; record above |
-| **9** | Unified Work Engine | **NOT BUILT — NEXT CARD** |
-| **10** | My Work / Team Work | **NOT BUILT** |
+| **9** | Unified Work Engine | **COMPLETE** — shared code only: the five-part WORK_RULES registry + workItemsForOrder composition, 2026-08-11; record above |
+| **10** | My Work / Team Work | **NOT BUILT — NEXT CARD** |
 
 Build truth before work. **Cards 2–10 are approved business rules, not permission to describe
 their screens, schema, RPCs or production state as implemented.** Each card first traces the
@@ -971,7 +1029,7 @@ Goods clear
 `No Action Required` is the derived whole-SO result. If any track remains open, show that truth and
 let Work derive the next action. Sales Orders lists truth; it does not become the work queue.
 
-## Card 9 · Unified Work Engine — approved target, not built
+## Card 9 · Unified Work Engine — approved and built
 
 Work reads module facts and produces one open work set. Every system rule must define exactly:
 **Trigger · Owner · Action · Due rule · Completion fact**. If it cannot name an authoritative
@@ -1036,21 +1094,22 @@ Payment remain the authority for what operationally happened.
 
 1. Read root `CLAUDE.md` / `AGENTS.md` for the Constitution and MASTER OVERWRITE LAW.
 2. Read [`../ERP-ARCHITECTURE.md`](../ERP-ARCHITECTURE.md) for cross-module ownership.
-3. Read this section and the Card 1–8 shipped records immediately above it.
-4. Read only what Card 9 touches: §2 of this file (the two-layer action engine — V2's Work
-   engine grows FROM it, `docs/ACTION-FLOW-STANDARD.md` is its law) · the shipped clocks it
-   must consume, never respell (`collection-clock` · `delivery-queue` + leads · the two
-   delay clocks in `order-action-due`) · the completion facts each track already owns
-   (`resolveOrderCompletion`'s inputs) · the PIC/roster rules in §2.2 · the working calendar
-   (`myHolidaySet()` until the Settings calendar lands, purchasing MASTER §10).
+3. Read this section and the Card 1–9 shipped records immediately above it.
+4. Read only what Card 10 touches: the Card 9 engine (`work-engine.ts` — the registry is the
+   contract the surface renders) · §2.2 OWNER SCOPE (a non-manager defaults to My Orders — the
+   IDENTICAL starting-view law applies to My Work) · the Sales Orders Register / Stage A record
+   (the approved destination architecture any new surface must follow) · `docs/UI-KIT.md` and
+   `COPY-STANDARD.md` before ANY word or component reaches a screen.
 5. Re-measure current code and production before quoting implementation state. Preserve unrelated
    dirty work. Do not reopen the approved business flow merely from preference; raise only a real
    repo/production contradiction or implementation impossibility.
-6. Build **Card 9 — Unified Work Engine** next. Every rule entering the engine must name
-   **Trigger · Owner · Action · Due rule · Completion fact** — no fact, no entry; no Done
-   button; weekday + date words, never bare `Today`; late work keeps its original due date.
-   Human follow-ups stay a separate, labelled thing (`ops_tasks` exists — trace it).
-   Stop after Card 9 proof and update this status table. **Do not start Card 10 automatically.**
+6. Build **Card 10 — My Work / Team Work** next: TWO FILTERS over the ONE open work set (never
+   two datasets, never another dashboard); rows grouped by actual working date stating owner ·
+   verb · counterparty/amount · SO/PO/Unit context; opening a row goes to the owning module's
+   existing workspace, never a copied form. ⚠️ Card 10 is the programme's first OPERATOR-FACING
+   SURFACE: unlike Cards 2–9 it needs the owner's layout approval before build (the LAYOUT
+   ITERATION LOOP — real page, small steps, localhost review, nothing merged until "Layout
+   Approved"). Stop after Card 10 proof and update this status table.
 
 ---
 
