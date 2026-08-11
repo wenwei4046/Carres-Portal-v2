@@ -49,10 +49,14 @@ export const DELIVERY_REASONS = [
   // payment
   { key: "waiting_balance_payment", label: "Waiting balance payment", category: "payment", responsibility: "customer" },
   { key: "waiting_storage_fee", label: "Waiting storage fee", category: "payment", responsibility: "customer" },
+  // customer — at the door (SO V2 Card 5, 0344: the delivery-attempt exception
+  // reads THIS library; a second word list is the defect it exists to prevent)
+  { key: "customer_rejected_goods", label: "Customer rejected the goods", category: "customer", responsibility: "customer" },
   // logistic
   { key: "driver_unavailable", label: "Driver unavailable", category: "logistic", responsibility: "carres" },
   { key: "vehicle_breakdown", label: "Vehicle breakdown", category: "logistic", responsibility: "carres" },
   { key: "logistic_capacity_full", label: "Logistic capacity full", category: "logistic", responsibility: "carres" },
+  { key: "delivery_failed", label: "Delivery failed", category: "logistic", responsibility: "carres" },
   // site
   { key: "condo_approval_required", label: "Condo approval required", category: "site", responsibility: "external" },
   { key: "lift_booking_required", label: "Lift booking required", category: "site", responsibility: "external" },

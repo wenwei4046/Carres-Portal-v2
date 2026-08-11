@@ -9,6 +9,7 @@ import {
   attachDeliveryPhotoInput,
   type DeliveryPhoto,
   bookingConfirmGate,
+  deliveryAttemptRecordInputSchema,
   deliveryOrderIssueGate,
   docNumber,
   orderActionDone,
@@ -681,6 +682,86 @@ orderControlRouter.post("/:id/delay-decision", async (c) => {
  * instead of minting a second one — a delivery order that changed its number
  * between two prints would be two documents for one trip.
  */
+/**
+ * CARD 5 (0344) — record a PARTIAL or FAILED delivery attempt. A full success
+ * walks the existing gated delivery door, which mints its own attempt. The
+ * RPC is the one writer: attempt + exception (Reason Library key + where the
+ * goods are) + the unit moves (deliver = reserved-to-this-SO → sold; return =
+ * release or the customer-return inspection hold) in one transaction. The
+ * order STATUS is untouched — partial stays Scheduled; the Work engine
+ * derives what happens next from the facts.
+ */
+orderControlRouter.post("/:id/delivery-attempt", async (c) => {
+  const auth = c.var.auth;
+  requireOperationOrPrincipal(auth.role);
+
+  const idCheck = ORDER_ID.safeParse(c.req.param("id"));
+  if (!idCheck.success) throw new HTTPException(404, { message: "Order not found" });
+
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    throw new HTTPException(400, { message: "Body must be valid JSON" });
+  }
+  const parsed = deliveryAttemptRecordInputSchema.safeParse(body);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    const path = issue && issue.path.length > 0 ? issue.path.join(".") : "<root>";
+    return c.json(
+      {
+        error: "invalid_input",
+        code: "invalid_param",
+        message: `Invalid delivery-attempt input at ${path}: ${issue?.message ?? "validation failed"}`,
+      },
+      422,
+    );
+  }
+
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("delivery_attempt_record", {
+    p_order_id: idCheck.data,
+    p_result: parsed.data.result,
+    p_reason_key: parsed.data.reasonKey,
+    p_where_goods: parsed.data.whereGoods,
+    p_note: parsed.data.note ?? null,
+    p_delivered_item_ids: parsed.data.deliveredItemIds,
+    p_returned: parsed.data.returned.map((r) => ({
+      item_id: r.itemId,
+      action: r.action,
+      note: r.note ?? null,
+    })),
+  });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json(data, 201);
+});
+
+// CARD 5 — the attempt history for one order, oldest first, with unit outcomes.
+orderControlRouter.get("/:id/delivery-attempts", async (c) => {
+  const auth = c.var.auth;
+  requireOperationOrPrincipal(auth.role);
+
+  const idCheck = ORDER_ID.safeParse(c.req.param("id"));
+  if (!idCheck.success) throw new HTTPException(404, { message: "Order not found" });
+
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from("delivery_attempts")
+    .select(
+      "id, order_id, attempt_no, result, reason_key, where_goods, note, do_number, logistics_name, scheduled_date, recorded_by, recorded_at, delivery_attempt_units(item_id, outcome)",
+    )
+    .eq("order_id", idCheck.data)
+    .order("attempt_no", { ascending: true });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ attempts: data ?? [] });
+});
+
 orderControlRouter.post("/:id/delivery-order", async (c) => {
   const auth = c.var.auth;
   requireOperationOrPrincipal(auth.role);

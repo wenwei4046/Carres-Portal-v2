@@ -8,10 +8,14 @@ import {
 } from "./delivery-reasons";
 
 describe("DELIVERY_REASONS (T4 Reason Library v1)", () => {
-  it("carries the 12 ratified v1 reasons with unique keys", () => {
-    expect(DELIVERY_REASONS).toHaveLength(12);
-    expect(new Set(DELIVERY_REASONS.map((r) => r.key)).size).toBe(12);
-    expect(DELIVERY_REASON_KEYS).toHaveLength(12);
+  it("carries the 12 ratified v1 reasons + Card 5's two at-the-door reasons, unique keys", () => {
+    // v1's 12 (T4) + `customer_rejected_goods` + `delivery_failed`
+    // (SO V2 Card 5, 0344 — the delivery-attempt exception reads this library).
+    expect(DELIVERY_REASONS).toHaveLength(14);
+    expect(new Set(DELIVERY_REASONS.map((r) => r.key)).size).toBe(14);
+    expect(DELIVERY_REASON_KEYS).toHaveLength(14);
+    expect(DELIVERY_REASON_KEYS).toContain("customer_rejected_goods");
+    expect(DELIVERY_REASON_KEYS).toContain("delivery_failed");
   });
 
   it("responsibility follows the category by law", () => {
