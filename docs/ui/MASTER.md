@@ -351,7 +351,18 @@ global-navigation capability: it finds permitted modules/destinations and exact 
 offers recent destinations, and only navigates; it never performs workflow. The header contains
 no breadcrumb, `Backend` label, duplicate title, KPI, tab, scope/view, current-Register Search,
 filter, export, Columns, selection state or page-specific action. New/create, Scan Order,
-SO Settings and every other page-owned action belong to the next Work Toolbar layer.
+Export and every other page-owned action belong to the next Work Toolbar layer. Module Settings
+never becomes a page-owned action; the global Settings utility owns its one door.
+
+**GLOBAL SETTINGS ENTRY — APPROVED / LOCKED (Loo, 2026-08-11).** The governed Settings gear in
+the Page Header's right utility cluster is the ERP's one Settings entry on every page. Clicking it
+opens a compact permission-filtered launcher, not an editing form. Its first item is `{Current
+module} Settings` when that module owns settings and the user may access them; its second item is
+`All System Settings`. Either choice navigates into the one full-page Settings Workspace at the
+relevant section. Business values, permissions and workflow options are edited only in that
+auditable Workspace, never inside the launcher. Module tabs, portal navigation, Work Toolbars and
+`…` must not repeat a Settings destination. Current-view presentation such as Columns, personal
+Saved Views and governed Register layout remains on the owning Register and is not System Settings.
 
 **REGISTER TOAST PLACEMENT — APPROVED / LOCKED (Loo, 2026-08-11).** Toasts use the proven 2990
 behaviour translated into Carres components: one fixed overlay tray at the viewport's bottom-right,

@@ -2927,14 +2927,14 @@ excluded them merely because they were not already implemented.
   duplicate handling, operator review and the final write boundary. A reference product proves
   the door, not Carres business rules or visual styling.
 - **`Sales Order Settings` is required — APPROVED / LOCKED naming and placement.** `SO
-  Maintenance` is retired. The short top-action label is `SO Settings`; the page title is `Sales
-  Order Settings`, parallel to `Purchasing Settings` and distinct from portal-wide `System
-  Settings`. It owns Sales Order-controlled option pools, Order Entry fields, payment-method
-  choices and Register display/column configuration; it is never an edit door into historical
-  Sales Orders. It is planned after Card 10 and remains a separate destination/surface, not a
-  Sales Orders tab. On the Sales Orders Register it is a permanently visible top action,
-  following the approved 2990 action placement translated into Carres naming, tokens and UI Kit
-  components; it is not hidden in `…`.
+  Maintenance` is retired. The Settings section title is `Sales Order Settings`, parallel to
+  `Purchasing Settings` and distinct from the overall `System Settings` Workspace. It owns Sales
+  Order-controlled option pools, Order Entry fields and payment-method choices; current-user
+  Register Columns and Saved Views stay on the Register. It is never an edit door into historical
+  Sales Orders. It is planned after Card 10 and is reached only through the global Page Header
+  Settings gear: the permission-filtered launcher offers `Sales Order Settings` for the current
+  module and `All System Settings`. It is not a Sales Orders tab, portal-navigation item, Work
+  Toolbar button or `…` item.
 - **Register `Edit` opens the full Sales Order Workspace — APPROVED / LOCKED.** It never edits
   inside the grid and never opens a small generic modal. The row context menu's `Edit` navigates
   to that Sales Order's owned full-page Workspace in edit intent. The Workspace header keeps the
@@ -3032,7 +3032,7 @@ specialisation of UI MASTER's 45px Register Work Toolbar law:
 
 ```
 NORMAL      View: All orders ▾ · Search SO/customer/phone · Export ▾ · Columns ·
-            + New Sales Order · SO Settings · …
+            + New Sales Order · …
 ONE         1 selected · Clear                         View Flow · Export Excel (1) · Export PDF (1)
 MANY        N selected · Clear                                      Export Excel (N) · Export PDF (N)
 ```
@@ -3045,9 +3045,8 @@ Excel/PDF actions are immediate pill buttons. `…` contains low-frequency page/
 only and is not a dumping ground for daily work. Normal-state `…` owns `Scan Order`; selected-state
 `…` may expose only actions valid for that exact selection. `New Sales Order` remains the only
 permanently visible primary action. View/Search/Export/Columns structure, same-height selection
-replacement and action-vs-control shape language are reusable Register Template law. The final
-durable location of module Settings is a separate unresolved cross-module decision and is not
-authored by this Export/overflow ruling.
+replacement and action-vs-control shape language are reusable Register Template law. Settings is
+absent because the global Page Header gear owns the ERP's single Settings entry.
 
 At the measured narrow target, the Toolbar must show every normal-state control without clipping,
 shrinking frozen typography or moving the toolbar itself into horizontal scroll. The wide DataGrid

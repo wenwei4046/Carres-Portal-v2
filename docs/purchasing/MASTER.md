@@ -74,6 +74,13 @@ views of one record or one work surface, so they must not be placed in a shared 
 Purchasing navigation exposes each destination individually through the governed portal
 navigation. A page may not recreate the old `PurchasingTabs` strip as a second navigation.
 
+**PURCHASING SETTINGS ENTRY — APPROVED / LOCKED (Loo, 2026-08-11).** The old Purchasing
+`Settings` tab/word is retired with the tab strip. The Page Header's global Settings gear is the
+one entry: on a Purchasing destination its permission-filtered launcher offers `Purchasing
+Settings` and `All System Settings`, both opening the relevant section of the one full-page
+Settings Workspace. Purchasing navigation, page Toolbars and `…` do not repeat the door. The
+existing manager gate and audit requirements remain authoritative.
+
 **SALES ORDERS IS NOT A PURCHASING TAB** (Loo, 2026-08-06 — his refinement of
 the same day's ruling). Purchasing READS the sales orders; it does not carry
 them. The two answer different questions and the difference is the whole
