@@ -278,6 +278,14 @@ or fill a second header. Therefore the default Register stack has no tab row: De
 Header → page Work Toolbar when required → Work Surface. Any exception is a new page-scoped
 design decision and must demonstrate that it passes every admission condition above.
 
+**REGISTER REFERENCE DIVISION — APPROVED / LOCKED.** Carres does not copy one product's whole
+page. Register headers follow the compact, width-spending Linear pattern: portal navigation
+owns destination switching; the content header stays one 44px identity row and uses horizontal
+room instead of adding title, breadcrumb, KPI or tab bands. Register listing behaviour and
+readability follow the governed 2990 reference: its listing engine, controls, column powers,
+row disclosure and table hierarchy are the reference. GitHub is evidence for tab admission,
+not the Carres Register shell. Carres business ownership remains authoritative over all three.
+
 # §6.6 · SALES ORDERS REFERENCE STRUCTURE — ruled by Loo 2026-08-10
 
 **Stage A is owner-accepted and CLOSED.** Sales Orders is the first production reference
