@@ -51,10 +51,12 @@ are filters over the register, never a second work mode.
 ## §0.1 · APPROVED REGISTER DEFAULT — owner ruling 2026-08-11
 
 ```
-Expand · Ordered · Customer Delivery · SO No · Customer ·
+Select · Expand · Ordered · Customer Delivery · SO No · Customer ·
 Matt · Bed · Sofa · Acc · Total
 ```
 
+- The selection checkbox is permanent, with select-all in the header. It is part of the Sales
+  Order register baseline, not an optional mode.
 - `Matt` · `Bed` · `Sofa` · `Acc` are permanent factual quantity columns because Logistics must
   see the physical load without opening each order. They sum ordered quantity, not line count;
   zero renders as `—`.
@@ -63,6 +65,9 @@ Matt · Bed · Sofa · Acc · Total
   `Total` but may never be silently classified as `Acc`.
 - Item description · SKU · category · per-line quantity belong in row expansion. There is no
   permanent `Items` summary column.
+- The disclosure control expands read-only order detail in place. Editing never turns the
+  expanded register row into a form: View and Edit open the Sales Order's separate full-page
+  workspace, and PDF opens the actual generated Sales Order document.
 - `Ordered` · `Customer Delivery` · `SO No` · `Customer` are the frozen leading facts. The
   remaining columns scroll when needed.
 - Widths are content-aware within governed minima/maxima; there is no drag-resize. Text receives

@@ -291,11 +291,11 @@ If the chat is told **“Register Template — continue from repo governance”*
 5. Present the smallest missing decision for Jess's approval. Do not restart with a portal-wide
    survey, broad A/B/C layouts, a new status model, or implementation.
 
-**Current unresolved Register-template surface:** selection contract · filter/overflow contract ·
-responsive behaviour. Default-column hierarchy remains page-owned and is recorded in the target
-module MASTER; automatic width allocation and truncation/hover behaviour are ruled in §4 and
-§6.4. The target module MASTER may narrow this list; it may not silently broaden the session
-beyond the single decision surface declared at entry.
+**Current unresolved Register-template surface:** reusable filter/overflow contract · responsive
+behaviour. Default-column hierarchy and whether selection is permanent remain page-owned and are
+recorded in the target module MASTER; automatic width allocation and truncation/hover behaviour
+are ruled in §4 and §6.4. The target module MASTER may narrow this list; it may not silently
+broaden the session beyond the single decision surface declared at entry.
 
 ---
 
