@@ -2500,3 +2500,6 @@ export * from "./sales-order-allocation";
 // CARD 4 — the collection clock: T−3 · T−2 · T−1 (final deadline) on working
 // days before the delivery, one arithmetic for every surface that presses.
 export * from "./collection-clock";
+// CARD 5 — delivery attempts: every vehicle run leaves a record; a failure is
+// ONE exception (Reason Library + where the goods are), units move with reality.
+export * from "./schemas/delivery-attempt";

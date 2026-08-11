@@ -511,6 +511,104 @@ P7 direct INSERT as authenticated: 42501                           PASS
 
 ---
 
+# ✅ DELIVERY ATTEMPT + DELIVERY EXCEPTION — SO V2 CARD 5, SHIPPED 2026-08-11
+
+**The question this card installed:** every vehicle run for an order leaves a
+record; a non-completed run is ONE Delivery Exception; the Unit moves with
+reality; bed-delivered-while-sofa-remains is partial fulfilment, never a
+whole-order delivered word.
+
+**THE TRACE FOUND THE FIRST GENUINE ENGINE GAP of this programme:** no attempt
+store, no exception store, and the one success door
+(`operation_attach_do_and_deliver`) flips the WHOLE order delivered — a failed
+run left nothing but a rebooking, and a partial delivery had no truthful
+record at all.
+
+**The model, and why §6.2 ("the trip is a derived view") survives untouched:**
+an ATTEMPT is what the portal OBSERVED happen on one run FOR ONE ORDER — a
+fact about the order's delivery, never about the van. No trip record exists;
+the §6.2 upgrade clause stays untriggered.
+
+**What shipped (migration 0344):**
+
+```
+delivery_attempts        append-only (trigger-refused UPDATE/DELETE, no direct
++ delivery_attempt_units writes — RPC only, read internal). One row per run:
+                         result delivered · partial · failed; a non-success
+                         MUST carry reason_key + where_goods (CHECK).
+delivery_attempt_record  the partial/failed door. The exception's reason is
+                         the T4 REASON LIBRARY key (never a second word list —
+                         the library gained `customer_rejected_goods` and
+                         `delivery_failed`); where_goods ∈ returned_to_warehouse
+                         · still_with_logistics · with_customer. Delivered
+                         units flip to sold ONLY from `reserved to THIS SO`
+                         (the Card 2 law, enforced again here); returned units
+                         walk Card 2's own doors IN THE SAME TRANSACTION —
+                         ops_stock_release → Available, or the customer_return
+                         inspection hold → Hold. The ORDER STATUS is untouched:
+                         partial stays Scheduled (the 5-stage lock).
+success door             `operation_attach_do_and_deliver` now captures the
+                         unit ids it sells and mints its own 'delivered'
+                         attempt + unit rows — every trip leaves an attempt,
+                         the success too. 0341's reservation-honouring pick is
+                         preserved verbatim (sanity-asserted).
+API                      POST /api/operation/orders/:id/delivery-attempt ·
+                         GET /:id/delivery-attempts (history with unit
+                         outcomes). No UI in this card — a truth card; the
+                         Work engine (Card 9) and the delivery surfaces render
+                         it, and any on-screen words need COPY-STANDARD
+                         entries first.
+```
+
+**The four exception questions, answered by OWNERSHIP not by prose:**
+
+```
+1  What happened?              result + reason_key (+ note)
+2  Where are the goods now?    where_goods + the unit doors the same
+                               transaction walked
+3  What does Carres still owe? DERIVED — Card 1 commitment − Card 2 allocation
+                               (GET /:id/allocation). Never stored as prose.
+4  Who does what next?         the Work engine's (Card 9), derived from these
+                               facts. An attempt stores facts, not to-dos.
+```
+
+**Production evidence — run 2026-08-11, not described.** 0344 applied (one
+type defect — `ops_assigned_logistic` is a uuid — caught by the probe itself,
+fixed in the repo file and the live bodies before any commit); seven probes as
+the real operation user in one aborted transaction — attempts 0 rows and the
+register (91 free · 43 incoming · 1 other) identical after:
+
+```
+P1 failed attempt: exception recorded; one unit released → free, one
+   → on_hold customer_return, in the same transaction               PASS
+P2 the exception does NOT touch the order status                    PASS
+P3 partial attempt: named reserved unit → sold to THIS order,
+   attempt_no increments                                            PASS
+P4 delivering a unit not reserved to this SO refused                PASS
+P5 an exception without where_goods refused                         PASS
+P6 history is append-only (UPDATE refused by trigger)               PASS
+P7 direct INSERT as authenticated refused (42501)                   PASS
+```
+
+**Known boundaries, reported not hidden:**
+- The Issue Tracker may record the same incident for accountability and
+  learning; it cannot replace the attempt, the unit movement or the remaining
+  obligation — the three-system law, applied.
+- An `out_for_delivery` unit status was considered and NOT minted: the run is
+  same-day, the attempt row is the observation, and a tenth status would touch
+  every `('free','reserved')` filter in the portal for a state nothing reads
+  overnight. If a multi-day in-transit reality appears, that is one status and
+  one guard extension.
+- A partial success still leaves `orders.status` untouched; Card 8's derived
+  completion is where "everything delivered" becomes a whole-order answer.
+  The success door's whole-order flip remains correct for the full-success
+  path it gates.
+- Attempts have no void lane — a wrong attempt is corrected by the next one
+  (Receiving's Amend/Void pattern is the upgrade path if the business needs
+  it; silently editable history cannot be un-shipped).
+
+---
+
 # SALES ORDER V2 — CURRENT APPROVED TARGET AND BUILD CHECKPOINT
 
 > **OWNER RULING, 2026-08-11. This is current target truth under the MASTER OVERWRITE LAW.**
@@ -526,8 +624,8 @@ P7 direct INSERT as authenticated: 42501                           PASS
 | **2** | Unit / Stock Allocation Truth | **COMPLETE** — migration `0341`, production verified 2026-08-11 (nine rolled-back probes); exact implementation record above. The spine (unit birth at PO · receiving flips · governed draw) was measured ALREADY LIVE; the card closed the four violations of the approved law |
 | **3** | Early Logistics Assignment + Customer Booking | **COMPLETE** — migration `0342`, production verified 2026-08-11; record above. The flow was measured already unblocked; the card moved the ruled call window to 3 working days and closed the two-surface lateness drift |
 | **4** | Money Truth + Collection Gate | **COMPLETE** — migration `0343`, production verified 2026-08-11 (seven rolled-back probes); record above. The gates and the one calculation were measured already live; the card converged the write (one payment writer, void as a stamp) and shipped the T−3/T−2/T−1 collection clock |
-| **5** | Delivery Attempt + Delivery Exception | **NOT BUILT — NEXT CARD** |
-| **6** | Loan Mattress / Loan Sofa Obligations | **NOT BUILT** |
+| **5** | Delivery Attempt + Delivery Exception | **COMPLETE** — migration `0344`, production verified 2026-08-11 (seven rolled-back probes); record above. The first genuine engine gap of the programme: attempt + exception stores built, units move through Card 2's doors in the same transaction |
+| **6** | Loan Mattress / Loan Sofa Obligations | **NOT BUILT — NEXT CARD** |
 | **7** | Change / Cancel / Refund Lineage | **NOT BUILT** |
 | **8** | Derived Completion — No Action Required | **NOT BUILT** |
 | **9** | Unified Work Engine | **NOT BUILT** |
@@ -624,7 +722,7 @@ an unpaid delivered order remains open. The current split among `orders.paid`, `
 `ops_order_control.balance`, `paid_amount` and `payment_status` must converge on one authoritative
 write and calculation before any reader or gate claims completion.
 
-## Card 5 · Delivery Attempt + Delivery Exception — approved target, not built
+## Card 5 · Delivery Attempt + Delivery Exception — approved and built
 
 Every vehicle trip is a Delivery Attempt with a result. Success records the specific obligation
 and Unit delivered. A non-completed attempt records one Delivery Exception and must answer:
@@ -750,19 +848,20 @@ Payment remain the authority for what operationally happened.
 
 1. Read root `CLAUDE.md` / `AGENTS.md` for the Constitution and MASTER OVERWRITE LAW.
 2. Read [`../ERP-ARCHITECTURE.md`](../ERP-ARCHITECTURE.md) for cross-module ownership.
-3. Read this section and the Card 1 · 2 · 3 · 4 shipped records immediately above it.
-4. Read only what Card 5 touches: §7 of this file (the delivery actions and exceptions),
-   [`../delivery/MASTER.md`](../delivery/MASTER.md), the Card 2 record (a failed delivery moves
-   the UNIT: Returning → Warehouse → Inspection → Available / Hold — the inspection doors are
-   0341's), and the live delivery doors (`operation_attach_do_and_deliver` ·
-   `ops_order_control.delivery_trips` / `delivery_photos` · the drawer's delivery acts).
+3. Read this section and the Card 1–5 shipped records immediately above it.
+4. Read only what Card 6 touches: the existing LOAN lane end to end —
+   `ops_loans` (0217 generalised it), `order-control.ts`'s loan endpoints (reserve
+   `LOAN SO-{n}` · return · return-to-supplier, the direct writes Card 2 reported), the
+   drawer's loan panel, and the Card 2 + Card 5 records (a recovered Carres loan unit walks
+   Warehouse → Inspection → Available/Hold through 0341's doors).
 5. Re-measure current code and production before quoting implementation state. Preserve unrelated
    dirty work. Do not reopen the approved business flow merely from preference; raise only a real
    repo/production contradiction or implementation impossibility.
-6. Build **Card 5 — Delivery Attempt + Delivery Exception** next. Trace every existing delivery
-   recording door before implementation; every vehicle trip becomes an Attempt with a result, a
-   failure records ONE Exception answering the four questions, and the Unit moves with reality.
-   Stop after Card 5 proof and update this status table. **Do not start Card 6 automatically.**
+6. Build **Card 6 — Loan Mattress / Loan Sofa Obligations** next. Trace the whole loan lane
+   before implementation: a loan is an independent obligation that outlives the real delivery;
+   Carres-stock loans and supplier loans are distinct; customer recovery and supplier return are
+   separate facts. Stop after Card 6 proof and update this status table.
+   **Do not start Card 7 automatically.**
 
 ---
 
