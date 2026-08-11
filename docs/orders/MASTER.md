@@ -2969,11 +2969,13 @@ excluded them merely because they were not already implemented.
   top action; the card must define the accepted source, extraction/validation, duplicate
   handling, operator review and the final write boundary. A reference product proves the door,
   not Carres business rules or visual styling.
-- **SO Maintenance is required and follows the same ownership principle as Purchasing
-  Settings.** It is a configuration destination for Sales Order-controlled option pools and
-  display/configuration facts, not an edit door into historical orders. It is planned after
-  Card 10 and is reachable from the Sales Orders top actions; the maintenance page itself is a
-  separate destination/surface, not a Sales Orders tab.
+- **`Sales Order Settings` is required — APPROVED / LOCKED naming.** `SO Maintenance` is retired.
+  The short top-action label is `SO Settings`; the page title is `Sales Order Settings`, parallel
+  to `Purchasing Settings` and distinct from portal-wide `System Settings`. It owns Sales
+  Order-controlled option pools, Order Entry fields, payment-method choices and Register
+  display/column configuration; it is never an edit door into historical Sales Orders. It is
+  planned after Card 10, reachable from the Sales Orders top actions and remains a separate
+  destination/surface, not a Sales Orders tab.
 - **Register `Edit` opens the full Sales Order Workspace — APPROVED / LOCKED.** It never edits
   inside the grid and never opens a small generic modal. The row context menu's `Edit` navigates
   to that Sales Order's owned full-page Workspace in edit intent. The Workspace header keeps the

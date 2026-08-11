@@ -321,7 +321,7 @@ global-navigation capability: it finds permitted modules/destinations and exact 
 offers recent destinations, and only navigates; it never performs workflow. The header contains
 no breadcrumb, `Backend` label, duplicate title, KPI, tab, scope/view, current-Register Search,
 filter, export, Columns, selection state or page-specific action. New/create, Scan Order,
-SO Maintenance and every other page-owned action belong to the next Work Toolbar layer. Toasts
+SO Settings and every other page-owned action belong to the next Work Toolbar layer. Toasts
 anchor below the header's right utility cluster as overlays and do not add header height.
 
 **REFERENCE PRODUCTS NEVER AUTHOR CARRES VISUAL TOKENS — APPROVED / LOCKED.** Linear, 2990,
