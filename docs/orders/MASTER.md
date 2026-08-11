@@ -740,6 +740,63 @@ P8 direct INSERT as authenticated refused (42501)              PASS
 
 ---
 
+# ✅ DERIVED COMPLETION — SO V2 CARD 8, SHIPPED 2026-08-11
+
+**The question this card installed:** when is a Sales Order truly finished?
+**Derived, never stored, never pressed:**
+
+```
+Goods clear + Money clear in BOTH directions + Loan clear (incl. supplier
+return) = No Action Required
+```
+
+**Delivered ≠ Complete. Cancelled ≠ Complete.** Both are properties of the
+arithmetic, pinned by tests — not of any column. No `completed` status was
+minted anywhere; `Delivered` stays a physical fulfilment fact.
+
+**What shipped — code only, no migration** (the four tracks were already
+owned by Cards 1–7; Card 8 composes them):
+
+```
+resolveOrderCompletion   packages/shared/src/sales-order-completion.ts —
+                         the ONE arithmetic (Law D). Reads:
+                         GOODS      committed − sold (Card 1 − Card 2); a
+                                    reserved-but-undelivered unit keeps it
+                                    open; a cancelled order owes no goods but
+                                    a unit still reserved to it is unfinished
+                         MONEY IN   orderMoney.outstanding — survives
+                                    delivery; UNKNOWN never blocks (the
+                                    gates' own rule)
+                         MONEY OUT  order_refunds — requested OR
+                                    approved-unpaid keeps the SO open
+                         LOAN       un-recovered loans AND supplier borrows
+                                    not yet returned — two separate facts
+                         Several open tracks are ALL reported — one never
+                         hides another (the Law-1 shape, applied here).
+GET /:id/completion      composes the four authoritative reads server-side:
+                         commitment bundle → allocation → orderMoney (with
+                         storageHold) → refunds → loans. The one legacy word
+                         it may read is status='cancelled' — a CONTRACT fact
+                         (GATE 7 freezes it), not a fulfilment summary.
+```
+
+**Evidence:** nine shared tests pin the arithmetic — the two ≠-Complete laws,
+both loan halves, rejected/paid refunds not holding, unknown money never
+blocking, multi-track reporting. api 2171 · shared 2263 · tsc clean; endpoint
+mounted and 401-gated on production after deploy.
+
+**Known boundaries, reported not hidden:**
+- "Every refund / replacement / collection / other explicit commitment
+  clear" — replacement obligations have no store of their own yet; a
+  replacement today IS a goods obligation (the commitment still owes the
+  line), so the goods track carries it. A distinct replacement record would
+  arrive with the Service/claim execution lanes, not here.
+- Sales Orders LISTS truth; it does not become the work queue — surfacing
+  `No Action Required` and the open-track badges is Card 9/10's rendering,
+  and any on-screen words need COPY-STANDARD entries first.
+
+---
+
 # SALES ORDER V2 — CURRENT APPROVED TARGET AND BUILD CHECKPOINT
 
 > **OWNER RULING, 2026-08-11. This is current target truth under the MASTER OVERWRITE LAW.**
@@ -758,8 +815,8 @@ P8 direct INSERT as authenticated refused (42501)              PASS
 | **5** | Delivery Attempt + Delivery Exception | **COMPLETE** — migration `0344`, production verified 2026-08-11 (seven rolled-back probes); record above. The first genuine engine gap of the programme: attempt + exception stores built, units move through Card 2's doors in the same transaction |
 | **6** | Loan Mattress / Loan Sofa Obligations | **COMPLETE** — no migration (Card 2 built the doors; Card 6 made the lane use them); production verified 2026-08-11; record above |
 | **7** | Change / Cancel / Refund Lineage | **COMPLETE** — migration `0345` (the refund record), production verified 2026-08-11 (eight rolled-back probes); the rest of the lineage was measured already true; record above |
-| **8** | Derived Completion — No Action Required | **NOT BUILT — NEXT CARD** |
-| **9** | Unified Work Engine | **NOT BUILT** |
+| **8** | Derived Completion — No Action Required | **COMPLETE** — code only (no migration): `resolveOrderCompletion` + `GET /:id/completion`, 2026-08-11; record above |
+| **9** | Unified Work Engine | **NOT BUILT — NEXT CARD** |
 | **10** | My Work / Team Work | **NOT BUILT** |
 
 Build truth before work. **Cards 2–10 are approved business rules, not permission to describe
@@ -898,7 +955,7 @@ not mean the SO is clear: an approved but unpaid refund means **Carres still owe
 Structured actor, reason, approval and server time survive; Issue Tracker may hold the story but
 is never required to make transaction lineage true.
 
-## Card 8 · Derived Completion — approved target, not built
+## Card 8 · Derived Completion — approved and built
 
 Do not create or press a new `completed` status. Derive completion:
 
@@ -979,19 +1036,21 @@ Payment remain the authority for what operationally happened.
 
 1. Read root `CLAUDE.md` / `AGENTS.md` for the Constitution and MASTER OVERWRITE LAW.
 2. Read [`../ERP-ARCHITECTURE.md`](../ERP-ARCHITECTURE.md) for cross-module ownership.
-3. Read this section and the Card 1–7 shipped records immediately above it.
-4. Read only what Card 8 touches — the four tracks its derivation reads, each already owned:
-   **Goods** = Card 1's commitment − Card 2's allocation (`resolveUnitAllocation` /
-   `GET /:id/allocation`) · **Money in** = `orderMoney` (orders.paid + storage) · **Money out**
-   = `order_refunds` open rows (0345) · **Loan** = `ops_sofa_loans` open rows, including the
-   supplier-return half. Card 8 derives; it may not mint a status column or press one.
+3. Read this section and the Card 1–8 shipped records immediately above it.
+4. Read only what Card 9 touches: §2 of this file (the two-layer action engine — V2's Work
+   engine grows FROM it, `docs/ACTION-FLOW-STANDARD.md` is its law) · the shipped clocks it
+   must consume, never respell (`collection-clock` · `delivery-queue` + leads · the two
+   delay clocks in `order-action-due`) · the completion facts each track already owns
+   (`resolveOrderCompletion`'s inputs) · the PIC/roster rules in §2.2 · the working calendar
+   (`myHolidaySet()` until the Settings calendar lands, purchasing MASTER §10).
 5. Re-measure current code and production before quoting implementation state. Preserve unrelated
    dirty work. Do not reopen the approved business flow merely from preference; raise only a real
    repo/production contradiction or implementation impossibility.
-6. Build **Card 8 — Derived Completion (No Action Required)** next: ONE shared arithmetic
-   composing the four tracks, `Delivered ≠ Complete`, `Cancelled ≠ Complete`, no new stored
-   status anywhere. Stop after Card 8 proof and update this status table.
-   **Do not start Card 9 automatically.**
+6. Build **Card 9 — Unified Work Engine** next. Every rule entering the engine must name
+   **Trigger · Owner · Action · Due rule · Completion fact** — no fact, no entry; no Done
+   button; weekday + date words, never bare `Today`; late work keeps its original due date.
+   Human follow-ups stay a separate, labelled thing (`ops_tasks` exists — trace it).
+   Stop after Card 9 proof and update this status table. **Do not start Card 10 automatically.**
 
 ---
 
