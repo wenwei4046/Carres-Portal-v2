@@ -36,25 +36,39 @@
 
 # §0 · THE CHARTER — FROZEN 2026-08-08 (Loo). Phase 1 of the Golden Template.
 
-> **Sales Order is the operational home of the customer order: find any order, see what needs
-> attention, understand the whole journey — while EXECUTION stays with the module that owns it.**
+> **Sales Order is the truth/register home of the customer order: find any order and compare
+> what was ordered, for whom and for when — while work and execution stay with their owning
+> modules.**
 
-**IT IS NOT A PURE WORK QUEUE AND NOT A PURE REGISTER.** Loo rejected the narrower purpose
-*"which orders need me today"* on the ground that a customer phones and the operator must find
-that order and see what is happening to it. **Both must hold.**
+**Sales Order is the truth/register surface, not a work queue.** Its job is to let an authorised
+operator find any order and compare stable facts about what the customer ordered. Work belongs
+on the owning module's work surface; this register does not invent an overall status, current
+stage or `Current` pointer for the Sales Order.
+
+**DATE SCOPE:** `All` means every non-cancelled order, never a month window. Narrowing controls
+are filters over the register, never a second work mode.
+
+## §0.1 · APPROVED REGISTER DEFAULT — owner ruling 2026-08-11
 
 ```
-1  What needs my attention?        今天先处理什么
-2  What is happening with this?    这张单现在发生什么
+Expand · Ordered · Customer Delivery · SO No · Customer ·
+Matt · Bed · Sofa · Acc · Total
 ```
 
-**ONE PAGE, TWO USES — and the two frozen scope rulings already decide how they coexist:**
-```
-DATE SCOPE   `All` = every non-cancelled order, never a month window   → the REGISTER is the scope
-OWNER SCOPE  a non-manager defaults to My Orders                       → the WORK is the default filter
-                                                                          A STARTING VIEW, never a wall
-= the page is already "my work, inside the whole register". There is no mode switch to design.
-```
+- `Matt` · `Bed` · `Sofa` · `Acc` are permanent factual quantity columns because Logistics must
+  see the physical load without opening each order. They sum ordered quantity, not line count;
+  zero renders as `—`.
+- `Total` is the total PHYSICAL quantity Logistics must handle. Delivery fees, Service,
+  Guarantee and other non-physical lines do not count. An uncategorised physical line counts in
+  `Total` but may never be silently classified as `Acc`.
+- Item description · SKU · category · per-line quantity belong in row expansion. There is no
+  permanent `Items` summary column.
+- `Ordered` · `Customer Delivery` · `SO No` · `Customer` are the frozen leading facts. The
+  remaining columns scroll when needed.
+- Widths are content-aware within governed minima/maxima; there is no drag-resize. Text receives
+  available slack, truncates only at its maximum, reveals the complete value on hover, and the
+  non-frozen region scrolls horizontally rather than crushing readable columns. `Columns` uses
+  the same contract for optional factual columns; reload restores the shared default layout.
 
 ### WHAT SALES ORDER OWNS
 ```

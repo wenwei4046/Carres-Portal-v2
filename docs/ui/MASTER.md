@@ -138,9 +138,13 @@ DetailShell · DialogFrame · FieldFrame · GridToolbar · SectionHeader
   word came from, and it **formats nothing** — money and dates keep their own one home.
 - **`DetailShell` has NO `state` prop and never may have.** Seven L4 constraints are types
   checked by `tsc`, not by the runner.
-- **A list table never scrolls sideways by growing.** A column RESIZE takes width from its RIGHT
-  NEIGHBOUR, never from the table — AutoCount lets a column grow and hands the operator a
-  horizontal scrollbar.
+- **A Register does not offer drag-resize.** Its columns are content-aware: each has a governed
+  minimum and maximum, text columns receive available slack, and no column may be squeezed below
+  its readable minimum merely to avoid overflow. When the governed widths exceed the viewport,
+  the non-frozen region scrolls horizontally. A reload restores the shared default layout.
+- **Register truncation is conditional, never the sizing mechanism.** A cell truncates only after
+  its column reaches the governed maximum; hovering that truncated cell reveals the complete
+  value. Columns added through `Columns` use the same allocation and overflow rules.
 - **Grid layout is NOT remembered across a reload.** There is no `storageKey` anywhere: a
   per-user store of UI shape is refused by the guard rule, and moving that store into the kit
   would satisfy the guard while breaking the law it serves. **A reload is the reset.**
@@ -235,6 +239,10 @@ rows …                          ┌──────────────�
    word: Sales Order may REQUEST what four other modules must execute.**
 ⑩ DELETE: the Refresh button (auto) · the Back button (it is a close, not a navigation) ·
    the page header's spare height.
+⑪ REGISTER WIDTH CONTRACT — no drag-resize. Freeze the page's approved identity/date columns;
+   allocate widths from content within governed minima/maxima; give text columns the remaining
+   slack; truncate only at the maximum and reveal the full value on hover; when the remaining
+   columns no longer fit, scroll their region horizontally instead of crushing them.
 ```
 
 ### 🔴 THREE CHALLENGES — recorded with the ruling, not after it
@@ -283,10 +291,11 @@ If the chat is told **“Register Template — continue from repo governance”*
 5. Present the smallest missing decision for Jess's approval. Do not restart with a portal-wide
    survey, broad A/B/C layouts, a new status model, or implementation.
 
-**Current unresolved Register-template surface:** exact reusable default-column hierarchy and
-automatic width allocation · truncation/hover/expansion contract · selection contract ·
-filter/overflow contract · responsive behaviour. The target module MASTER may narrow this list;
-it may not silently broaden the session beyond the single decision surface declared at entry.
+**Current unresolved Register-template surface:** selection contract · filter/overflow contract ·
+responsive behaviour. Default-column hierarchy remains page-owned and is recorded in the target
+module MASTER; automatic width allocation and truncation/hover behaviour are ruled in §4 and
+§6.4. The target module MASTER may narrow this list; it may not silently broaden the session
+beyond the single decision surface declared at entry.
 
 ---
 
