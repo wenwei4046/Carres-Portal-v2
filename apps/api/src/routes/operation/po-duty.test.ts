@@ -261,8 +261,33 @@ describe("PUT /api/operation/po-duty", () => {
   });
 });
 
-describe("POST /api/operation/pos — PO duty gate", () => {
-  it("403 po_duty for staff who is NOT the month's holder", async () => {
+/**
+ * ⭐ CARD 4B · SINGLE PO CREATION AUTHORITY (2026-08-11).
+ *
+ * Four tests here drove the PO-duty gate through `POST /api/operation/pos`.
+ * That route is retired and `poDutyGate` went with it — those two create routes
+ * were its only callers.
+ *
+ * The tests are replaced rather than deleted, because the fact they were really
+ * asserting still matters and has MOVED: the duty roster no longer decides who
+ * may create a Purchase Order, because no browser role may create one outside
+ * `purchasing_issue_pos_batch(jsonb)`. The roster's remaining job is the GET/PUT
+ * board above, which is untouched and still covered.
+ */
+describe("the PO duty gate no longer guards a creation route", () => {
+  it("POST /api/operation/pos is gone for the duty holder and everyone else", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(makeSb({}) as any);
+    const holder = await makeJwt("operation", "shasha@carres.com", HOLDER);
+    const other = await makeJwt("operation", "liching@carres.com", OTHER);
+    const manager = await makeJwt("operation", "jess@carres.com", OTHER);
+    for (const jwt of [holder, other, manager]) {
+      expect((await req("/api/operation/pos", "POST", jwt, {})).status).toBe(404);
+      expect((await req("/api/operation/pos/batch", "POST", jwt, {})).status).toBe(404);
+    }
+  });
+
+  it("the duty board itself still answers — this was a targeted retirement", async () => {
     vi.mocked(userClient).mockReturnValue(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       makeSb({
@@ -277,46 +302,7 @@ describe("POST /api/operation/pos — PO duty gate", () => {
       }) as any,
     );
     const jwt = await makeJwt("operation", "liching@carres.com", OTHER);
-    const res = await req("/api/operation/pos", "POST", jwt, {});
-    expect(res.status).toBe(403);
-    expect(await res.json()).toMatchObject({ code: "po_duty" });
-  });
-
-  it("the holder passes the gate (then fails ordinary validation, not 403)", async () => {
-    vi.mocked(userClient).mockReturnValue(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      makeSb({
-        ops_po_duty: {
-          single: [
-            { data: { month: "2026-07", user_id: HOLDER, assigned_by: null }, error: null },
-          ],
-        },
-      }) as any,
-    );
-    const jwt = await makeJwt("operation", "shasha@carres.com", HOLDER);
-    const res = await req("/api/operation/pos", "POST", jwt, {});
-    expect(res.status).toBe(422); // gate passed; body invalid
-  });
-
-  it("managers pass the gate without any duty lookup", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue(makeSb({}) as any);
-    const jwt = await makeJwt("operation", "jess@carres.com", OTHER);
-    const res = await req("/api/operation/pos", "POST", jwt, {});
-    expect(res.status).toBe(422); // straight to body validation
-  });
-
-  it("dormant DB (no duty row) → gate open for everyone", async () => {
-    vi.mocked(userClient).mockReturnValue(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      makeSb({
-        ops_po_duty: {
-          single: [{ data: null, error: { code: "42P01", message: "missing" } }],
-        },
-      }) as any,
-    );
-    const jwt = await makeJwt("operation", "liching@carres.com", OTHER);
-    const res = await req("/api/operation/pos", "POST", jwt, {});
-    expect(res.status).toBe(422); // not 403 — feature dormant never blocks
+    const res = await req("/api/operation/po-duty", "GET", jwt);
+    expect(res.status).toBe(200);
   });
 });

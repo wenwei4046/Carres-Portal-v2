@@ -28,10 +28,11 @@ import PoDetailModal from "../components/PoDetailModal";
  *   - Modals (Receive / AssignPickup / LpInbound / Detail) live here too so
  *     they always open against the active tab's PO list.
  *
- * The page-level "+ New PO" button + CreatePOModal mount live on the parent
- * `TabbedProcurementShell` (restored in T42-C2 after the legacy
- * `operationProcurement.tsx` was removed in T36). Per-tab content keeps only
- * the filter chips + the row-level Receive/Assign/Detail actions.
+ * Card 4B (2026-08-11) removed the page-level "+ New PO" button and the modal
+ * it opened, so neither this tab nor its parent `TabbedProcurementShell`
+ * creates a Purchase Order any more. Per-tab content keeps only the filter
+ * chips + the row-level Receive/Assign/Detail actions — all existing-document
+ * work, all preserved.
  */
 type FilterKey = "all" | "open" | "pickup" | "received";
 

@@ -93,26 +93,24 @@ function stockResponse(
 }
 
 vi.mock("./components/OrderDetailDrawer", () => ({
-  default: ({
-    orderId,
-    onClose,
-    journey,
-    allowIssuePO,
-  }: {
+  // Card 4B (2026-08-11): the stub reports whether the page handed the drawer a
+  // PO-creation capability AT ALL — `"allowIssuePO" in props`, not its value.
+  // Card 3 pinned that flag to `false` here; Card 4B deleted the capability, and
+  // "the key was never passed" is the stronger fact to assert.
+  default: (props: {
     orderId: string;
     onClose: () => void;
     // J3 — serialised onto the stub so a test can prove the list hands the
     // drawer the LADDER's own answer rather than a second derivation.
     journey?: unknown;
-    allowIssuePO?: boolean;
   }) => (
     <div
       data-testid="drawer-stub"
-      data-order-id={orderId}
-      data-journey={journey ? JSON.stringify(journey) : ""}
-      data-allow-issue-po={String(allowIssuePO)}
+      data-order-id={props.orderId}
+      data-journey={props.journey ? JSON.stringify(props.journey) : ""}
+      data-po-capability-passed={String("allowIssuePO" in props)}
     >
-      <button onClick={onClose}>close</button>
+      <button onClick={props.onClose}>close</button>
     </div>
   ),
 }));
@@ -3274,8 +3272,9 @@ describe("Actions column · +N and the delivering FACT (C3)", () => {
       expect(
         journey.openActions.filter((action: { key: string }) => action.key !== "issue_po"),
       ).toHaveLength(claimed);
+      // Card 4B — no PO-creation capability is handed over at all.
       expect(screen.getByTestId("drawer-stub")).toHaveAttribute(
-        "data-allow-issue-po",
+        "data-po-capability-passed",
         "false",
       );
       fireEvent.click(screen.getByText("close"));

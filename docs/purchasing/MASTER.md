@@ -129,6 +129,90 @@ po_supplier_promises 6  —  4 arrivals across 3 POs · 1 ready date · 1 balanc
 
 # §2 · What crosses every tab
 
+## 2.0 · ⭐ ONE PO CREATION AUTHORITY — Card 4B, proven on production 2026-08-11
+
+```
+purchasing_issue_pos_batch(jsonb)
+        is the ONLY externally reachable authority that can create a
+        Purchase Order. Nothing else may. Not a page, not a route,
+        not an RPC, not a table.
+```
+
+**The chain, and the only shape it has:**
+
+```
+Batch Purchase  →  POST /api/operation/purchase/to-order/issue
+                →  purchasing_issue_pos_batch(jsonb)      ← the authority
+                →  _operation_create_po_inner(...)        ← a helper, never a door
+                →  purchase_orders · purchase_order_lines
+```
+
+**`_operation_create_po_inner` is an implementation detail and is spelled as one.**
+The governed RPC reaches it because that RPC is a `postgres`-owned SECURITY
+DEFINER and therefore executes as `postgres`; the browser cannot reach it at all.
+Its PO construction logic is NEVER duplicated — one writer, one arithmetic.
+
+**What was closed, and how (migration `0339`).** The Card 4 audit found four more
+reachable authorities. All four are shut, and **every one was re-tested by actually
+attempting the write as the `authenticated` operation user, not by reading a grant:**
+
+| Authority | Before | Now | Proof |
+|---|---|---|---|
+| `operation_create_po(...)` | EXECUTE to PUBLIC · anon · authenticated | revoked | `42501` |
+| `operation_create_pos_batch(jsonb)` | EXECUTE to PUBLIC · anon · authenticated | revoked | `42501` |
+| `_operation_create_po_inner(...)` | EXECUTE to PUBLIC · anon · authenticated | revoked | `42501` |
+| `purchase_orders` direct INSERT | granted + `po_operation_insert` policy | grant revoked, policy dropped | `42501` |
+| `purchase_order_lines` direct INSERT | granted + `po_lines_operation_insert` policy | grant revoked, policy dropped | `42501` |
+
+**Nothing was dropped except the two INSERT policies.** Both legacy functions keep
+their definitions — they are the construction history of every PO on file, and the
+governed RPC shares their helper.
+
+**The UI doors that are gone, and stay gone:** Purchase Orders' `+ New PO` and the
+`CreatePOModal` it opened (deleted) · the order drawer's `Issue PO` and
+`Raise PO for shortages`, on Delivery and everywhere else the drawer mounts ·
+Old Orders' door (Card 3). **`POST /api/operation/pos` and `POST /api/operation/pos/batch`
+return 404, not 403** — a compatibility write door is the hidden authority this
+card exists to remove.
+
+**`purchasing_split_line_destination(uuid,int,uuid)` deliberately keeps its grant.**
+It inserts a LINE into a document that already exists and cannot mint a
+`purchase_orders` row, so it is existing-PO workflow, not creation.
+
+**⛔ THE STANDING RULE FOR EVERY LATER CARD.** A new PO creation door does not get
+built next to this one. If a flow needs a Purchase Order, it produces a
+`purchase_demand` and Batch Purchase issues it. *"This case is special"* is the
+sentence that produced the four authorities Card 4B had to close.
+
+## 2.0.1 · 🔴 GAP — Emergency has no governed continuation. NOT SOLVED HERE.
+
+**Recorded under Card 4B §7, deliberately unsolved: it needs a business decision.**
+
+Urgent restock (card K3, migration 0290, `UrgentRestockPanel` under the monthly
+Stock plan) runs:
+
+```
+somebody raises an ask  →  the COO approves it  →  … →  someone ticks "I ordered it"
+```
+
+**The "…" was `+ New PO`.** The approved ask created no `purchase_demands` row and
+never reached Batch Purchase; a human read the list and raised the PO on the legacy
+modal. That modal is deleted and those authorities are revoked, so **an approved
+emergency now has no governed way to become a Purchase Order.** `I ordered it` is
+still a self-declared tick and will now be ticked against work done elsewhere, or
+not at all.
+
+**What must NOT be done about it** (each was considered and each is forbidden by
+the card that found the gap): keep a legacy authority alive for Emergency · bypass
+the governed boundary · auto-convert approved emergency asks into `purchase_demands`
+· mint a new emergency exception.
+
+**What the decision actually is, for whoever cards it:** does an approved emergency
+ask become a `purchase_demand` — and if so, who owns the supplier, quantity, cost and
+destination that Batch Purchase will demand of it, given K3's own ruling that an
+emergency deliberately carries NO suggested quantity? That is a business question,
+not an engineering one.
+
 ## 2.1 · The shell
 
 ONE white 44px header row (`PurchasingTabs.tsx`). **Pages draw no header of their own** — no

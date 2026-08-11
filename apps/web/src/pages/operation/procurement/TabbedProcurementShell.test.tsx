@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import TabbedProcurementShell from "./TabbedProcurementShell";
@@ -41,17 +41,9 @@ vi.mock("@/lib/queries", async () => {
         floorConfig: { id: 1, freeUpToFloor: 2, perFloorPerItem: 50 },
       },
     }),
-    // CreatePOModal-only hooks — defaults are benign empty states so the
-    // modal renders without crashing when the "+ New PO" test opens it.
+    // Card 4B — the CreatePOModal-only stubs went with the modal. Only
+    // `useDeliveryPartners` stays: the child tabs read it too.
     useDeliveryPartners: () => ({ data: { partners: [] } }),
-    useCreatePoMutation: () => ({
-      mutateAsync: vi.fn().mockResolvedValue({}),
-      isPending: false,
-    }),
-    useCreatePosBatch: () => ({
-      mutateAsync: vi.fn().mockResolvedValue({ poIds: [] }),
-      isPending: false,
-    }),
     useAwaitingStockShortage: () => ({
       data: undefined,
       isFetching: false,
@@ -81,13 +73,15 @@ function LocationProbe() {
   );
 }
 
-function renderShell(initialPath: string) {
+function renderShell(initialPath: string, state?: unknown) {
   const qc = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
   return render(
     <QueryClientProvider client={qc}>
-      <MemoryRouter initialEntries={[initialPath]}>
+      <MemoryRouter
+        initialEntries={[state === undefined ? initialPath : { pathname: initialPath, state }]}
+      >
         <Routes>
           <Route
             path="/operation/procurement"
@@ -170,18 +164,34 @@ describe("TabbedProcurementShell", () => {
     );
   });
 
-  it("'+ New PO' button opens CreatePOModal (T42-C2 restore)", () => {
-    // The shell-level button replaces the entry point that lived on the
-    // deleted operationProcurement.tsx. Default click → empty prefill, so
-    // the modal title is "New purchase order" (no order/bundle suffix).
+  /**
+   * ⭐ CARD 4B · SINGLE PO CREATION AUTHORITY (2026-08-11).
+   *
+   * T42-C2 restored a "+ New PO" button here and this suite guarded that it
+   * opened `CreatePOModal`. That test is SUPERSEDED by its inverse: the button
+   * is gone, the modal is deleted, and the page creates nothing.
+   *
+   * The `location.state.prefill` inbox is checked too — it was the OTHER way in,
+   * the one `OrderDetailDrawer` used, and a door that opens from a navigation
+   * payload is easier to leave behind than a visible button.
+   */
+  it("has no + New PO button, and no modal to open", () => {
     renderShell("/operation/procurement/nice-future");
+    expect(screen.queryByTestId("new-po-button")).not.toBeInTheDocument();
+    expect(screen.queryByText(/New PO/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/New purchase order/)).not.toBeInTheDocument();
-    fireEvent.click(screen.getByTestId("new-po-button"));
-    // Modal is mounted: header + the lines table the modal scaffolds on
-    // first paint both render. We don't drive submit — that's covered by
-    // CreatePOModal's own suite — only the open path that codex flagged as
-    // unreachable.
-    expect(screen.getByText(/New purchase order/)).toBeInTheDocument();
-    expect(screen.getByTestId("po-lines-table")).toBeInTheDocument();
+    expect(screen.queryByTestId("po-lines-table")).not.toBeInTheDocument();
+  });
+
+  it("a navigation prefill can no longer open a creation surface", () => {
+    renderShell("/operation/procurement/nice-future", {
+      prefill: { so: 1234, lines: [{ sku: "mattress:x", qty: 2 }] },
+    });
+    expect(screen.queryByText(/New purchase order/)).not.toBeInTheDocument();
+    expect(screen.queryByTestId("po-lines-table")).not.toBeInTheDocument();
+    // The page itself still works — this is a removal, not a breakage.
+    expect(
+      screen.getByTestId("procurement-tab-content-nice-future"),
+    ).toBeInTheDocument();
   });
 });

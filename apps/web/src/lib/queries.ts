@@ -133,9 +133,6 @@ import {
   type ReselectPartnerInput,
   type CreateOrderInput,
   type RawCreateOrderInput,
-  type CreatePoInput,
-  type CreatePosBatchInput,
-  type CreatePosBatchResponse,
   type DealerSelf,
   type BankStatementCreateInput,
   type FinanceInvoiceIssueInput,
@@ -6030,30 +6027,20 @@ export function useRecheckStockMutation(
   });
 }
 
-/** Manual create-PO from procurement page. */
-export function useCreatePoMutation(
-  opts?: Partial<
-    UseMutationOptions<operationPoMutationResponse, ApiError, CreatePoInput>
-  >,
-) {
-  const qc = useQueryClient();
-  return useMutation<operationPoMutationResponse, ApiError, CreatePoInput>({
-    mutationFn: (input) =>
-      apiFetch<operationPoMutationResponse>("/api/operation/pos", {
-        method: "POST",
-        body: JSON.stringify(input),
-      }),
-    ...opts,
-    onSuccess: async (...args) => {
-      await qc.invalidateQueries({ queryKey: ["operation", "pos"] });
-      await qc.invalidateQueries({ queryKey: qk.operation.dashboard(), exact: true });
-      // If the PO is tied to a SO (single or via so_refs), the in_production
-      // drawer for those orders should refresh. Bust the orders sub-tree too.
-      await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
-      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
-    },
-  });
-}
+/* ⭐ CARD 4B · SINGLE PO CREATION AUTHORITY (2026-08-11).
+ *
+ * `useCreatePoMutation` and `useCreatePosBatch` were deleted from this file.
+ * They posted to `POST /api/operation/pos` and `POST /api/operation/pos/batch`,
+ * which called `operation_create_po` / `operation_create_pos_batch` — two of the
+ * four extra PO creation authorities the Card 4 audit found reachable from the
+ * browser. Both routes are retired and both RPCs are revoked from every browser
+ * role (migration 0339).
+ *
+ * `purchasing_issue_pos_batch(jsonb)` is now the ONLY authority that may create
+ * a Purchase Order. Its one caller is Batch Purchase's
+ * `POST /api/operation/purchase/to-order/issue`.
+ * There is deliberately no replacement hook: a hook is a door, and this card
+ * exists to leave exactly one. */
 
 /**
  * Chase-event log (Jess 2026-07-23) — Purchase cockpit's ② Chase button now
@@ -6147,50 +6134,6 @@ export function useRecordBalanceDateMutation(
     onSuccess: async (...args) => {
       await qc.invalidateQueries({ queryKey: qk.operation.pos() });
       await qc.invalidateQueries({ queryKey: qk.operation.purchaseToday() });
-      await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
-      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
-    },
-  });
-}
-
-/**
- * C5.2 — Batch create POs in one atomic RPC call.
- *
- * The CreatePOModal now picks a warehouse per supplier-group (Q4=A, blank
- * required). When the SKU set spans 2+ suppliers, we collapse the N parallel
- * useCreatePoMutation calls into a single useCreatePosBatch call so the PG
- * transaction either commits all rows or none — no half-issued batches if
- * (say) the 3rd supplier validation fails.
- *
- * Cache invalidation matches useCreatePoMutation (pos / dashboard / warehouse
- * / orders sub-trees) so the procurement list, KPI strip, in_production
- * drawers, and the warehouse stock view all refresh after the batch lands.
- *
- * de8bf4e pattern: spread `...opts` BEFORE `onSuccess` so caller-supplied
- * onSuccess runs LAST (after our cache busting completes), matching every
- * other Phase 4 mutation hook.
- */
-export function useCreatePosBatch(
-  opts?: Partial<
-    UseMutationOptions<CreatePosBatchResponse, ApiError, CreatePosBatchInput>
-  >,
-) {
-  const qc = useQueryClient();
-  return useMutation<CreatePosBatchResponse, ApiError, CreatePosBatchInput>({
-    mutationFn: (input) =>
-      apiFetch<CreatePosBatchResponse>("/api/operation/pos/batch", {
-        method: "POST",
-        body: JSON.stringify(input),
-      }),
-    ...opts,
-    onSuccess: async (...args) => {
-      await qc.invalidateQueries({ queryKey: ["operation", "pos"] });
-      await qc.invalidateQueries({ queryKey: qk.operation.dashboard(), exact: true });
-      await qc.invalidateQueries({ queryKey: qk.operation.warehouse(), exact: true });
-      // T42-pass3-C2 — stock-touching mutations must also bust the stock-alerts
-      // cache; otherwise the dashboard tile + CreatePOModal "Suggest from
-      // alerts" stay stale for up to 30s after qty/reserved change.
-      await qc.invalidateQueries({ queryKey: qk.operation.stockAlerts() });
       await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },

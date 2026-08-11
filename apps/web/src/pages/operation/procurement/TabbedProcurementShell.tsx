@@ -1,9 +1,5 @@
-import { useEffect, useState } from "react";
-import { Navigate, NavLink, useLocation, useNavigate, useParams } from "react-router-dom";
+import { Navigate, NavLink, useParams } from "react-router-dom";
 import { PROCUREMENT_TAB_SLUGS, type ProcurementTabSlug } from "@carres/shared";
-import CreatePOModal, {
-  type CreatePoPrefill,
-} from "../components/CreatePOModal";
 import PurchasingTabs from "../PurchasingTabs";
 import OhanaBedFrameTab from "./OhanaBedFrameTab";
 import OhanaSofaTab from "./OhanaSofaTab";
@@ -56,35 +52,25 @@ function isValidSlug(slug: string | undefined): slug is ProcurementTabSlug {
   );
 }
 
+/**
+ * ⭐ CARD 4B · SINGLE PO CREATION AUTHORITY (2026-08-11).
+ *
+ * This shell used to be a Purchase Order CREATION surface: a `+ New PO` button
+ * (T42-C2) mounting `CreatePOModal`, plus a `location.state.prefill` inbox that
+ * let `OrderDetailDrawer` push an order's shortages straight into that modal.
+ * Both are gone, and `CreatePOModal` is deleted with them.
+ *
+ * `purchasing_issue_pos_batch(jsonb)` is now the ONLY authority that may create
+ * a Purchase Order, and Batch Purchase is the only door that calls it. This page
+ * keeps every one of its EXISTING-document responsibilities — the three channel
+ * tabs and everything inside them — and creates nothing.
+ *
+ * The prefill inbox is deliberately NOT replaced with a Batch Purchase deep
+ * link: Card 4B forbids substituting another PO creation shortcut.
+ */
 export default function TabbedProcurementShell() {
   const params = useParams<{ slug?: string }>();
   const rawSlug = params.slug;
-  const location = useLocation();
-  const navigate = useNavigate();
-
-  // T42-C2 — restore the "+ New PO" entry point that lived on the deleted
-  // operationProcurement.tsx (T36). The shell is now the only mount point for
-  // the procurement section, so the create-PO button + CreatePOModal mount
-  // belong here. Stockpile mode (no `so` / `soRefs` prefill) is the default;
-  // the user can still tick the in-modal stockpile toggle or use the
-  // "Suggest from alerts" / auto-fill buttons inside the modal.
-  const [createPrefill, setCreatePrefill] = useState<CreatePoPrefill | null>(
-    null,
-  );
-
-  // 2026-05-10 (Loo) — accept a CreatePOModal prefill via React Router
-  // location.state. Used by OrderDetailDrawer's "+ Issue POs" navigate-to-
-  // procurement flow so the order's shortages (sku + qty + attrs) feed
-  // straight into the modal. Once consumed we replace the history entry to
-  // strip the state — back/forward navigation must NOT reopen the modal.
-  useEffect(() => {
-    const state = location.state as { prefill?: CreatePoPrefill } | null;
-    if (state?.prefill) {
-      setCreatePrefill(state.prefill);
-      navigate(location.pathname, { replace: true });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.pathname]);
 
   // Invalid or missing slug → redirect to the default tab. `replace` keeps
   // history clean (a typo doesn't pollute the back stack).
@@ -114,10 +100,10 @@ export default function TabbedProcurementShell() {
           This page draws no header of its own. */}
       <PurchasingTabs />
 
-      {/* Channel tab strip — the page's toolbar row. "+ New PO" (the page's
-          action) lives HERE, not in the header: header = whole-portal only. */}
+      {/* Channel tab strip. Card 4B removed the "+ New PO" button that used to
+          sit at the right of this row; the strip is now navigation only. */}
       <div
-        className="shrink-0 px-9 border-b border-base-200 bg-white flex items-center justify-between gap-4"
+        className="shrink-0 px-9 border-b border-base-200 bg-white flex items-center gap-4"
         role="tablist"
         aria-label="Procurement channel"
         data-testid="procurement-tab-strip"
@@ -144,14 +130,6 @@ export default function TabbedProcurementShell() {
             </NavLink>
           ))}
         </div>
-        <button
-          type="button"
-          className="btn-hero text-meta whitespace-nowrap"
-          onClick={() => setCreatePrefill({})}
-          data-testid="new-po-button"
-        >
-          + New PO
-        </button>
       </div>
 
       {/* Active tab body — the ONLY scroll area. Child mounts on slug change
@@ -159,19 +137,6 @@ export default function TabbedProcurementShell() {
       <div className="flex-1 min-h-0 overflow-y-auto pb-14">
         <ActiveTab />
       </div>
-
-      {/* T42-C2 — CreatePOModal mount. Empty prefill (`{}`) opens the modal
-          in its default mode: user can tick stockpile, paste lines manually,
-          or hit "Suggest from alerts" / "Auto-fill from awaiting stock"
-          inside the modal. Order-pinned prefill flows still flow through
-          their own callers (e.g. the awaiting-stock dialog on the dashboard)
-          — this is the manual-entry / stockpile entry point. */}
-      {createPrefill !== null && (
-        <CreatePOModal
-          prefill={createPrefill}
-          onClose={() => setCreatePrefill(null)}
-        />
-      )}
     </div>
   );
 }

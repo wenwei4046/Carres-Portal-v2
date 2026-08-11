@@ -222,8 +222,6 @@ interface Props {
   orderId: string;
   onClose: () => void;
   nav?: DrawerNav;
-  /** Disable the Purchase Order write door on read-only legacy surfaces. */
-  allowIssuePO?: boolean;
   /** J3 — the ladder's OWN answer for this order, computed by the Orders list
    *  (see `journeySignalsFor`). Optional: absent means the order was not in the
    *  loaded list, and the journey strip renders nothing rather than run a
@@ -322,10 +320,8 @@ export default function OrderDetailDrawer({
   onClose,
   nav,
   journey,
-  allowIssuePO = true,
 }: Props) {
   const { data, isLoading, isError, error, refetch } = useOperationOrder(orderId);
-  const navigate = useNavigate();
 
   const [showDispatch, setShowDispatch] = useState(false);
   const [showDO, setShowDO] = useState(false);
@@ -368,65 +364,18 @@ export default function OrderDetailDrawer({
     showServiceNote,
   ]);
 
-  // 2026-05-10 (Loo) — "+ Issue POs" jumps to /operation/procurement with a
-  // CreatePOModal prefill instead of calling the auto-issue RPC. The auto-
-  // issue path crashed when orders.warehouse_id was NULL (auto-skip leaves it
-  // empty when buffer stock is insufficient), and Loo's instinct is right:
-  // the procurement modal already has a per-supplier warehouse picker + COGS
-  // editor + cascade picker, so reusing it is cleaner than building a parallel
-  // dialog.
+  // ⭐ CARD 4B · SINGLE PO CREATION AUTHORITY (2026-08-11).
   //
-  // Per-(sku, attrs) shortage walk mirrors the server-side
-  // /awaiting-stock-shortage aggregation: take order_lines as-is (preserves
-  // attrs), subtract available stock pool by sku in declaration order, only
-  // include lines where shortage > 0.
-  function gotoProcurementWithPrefill() {
-    if (!data) return;
-    const totalsBySku: Record<string, number> = {};
-    for (const b of data.stockBalances) {
-      totalsBySku[b.sku] =
-        (totalsBySku[b.sku] ?? 0) +
-        Math.max(0, Number(b.qty) - Number(b.reserved));
-    }
-    const remainingBySku = { ...totalsBySku };
-    const prefillLines: { sku: string; qty: number; attrs?: Record<string, unknown> | null }[] = [];
-    for (const ol of data.lines) {
-      const remaining = remainingBySku[ol.sku] ?? 0;
-      const consumed = Math.min(remaining, ol.qty);
-      remainingBySku[ol.sku] = remaining - consumed;
-      if (consumed < ol.qty) {
-        prefillLines.push({
-          sku: ol.sku,
-          qty: ol.qty - consumed,
-          attrs: ol.attrs ?? null,
-        });
-      }
-    }
-    if (prefillLines.length === 0) {
-      toast.info("No shortages — every line is covered by current stock");
-      return;
-    }
-    // Land on the tab matching the first shortage line's category so the
-    // modal opens in a context that feels right. The modal itself groups by
-    // supplier so multi-category orders still split correctly on submit.
-    const firstCat = prefillLines[0]?.sku.split(":")[0] ?? "";
-    const slug =
-      firstCat === "sofa"
-        ? "hookka-sofa"
-        : firstCat === "bedframe"
-          ? "hookka-bedframe"
-          : "nice-future";
-    navigate(`/operation/procurement/${slug}`, {
-      state: {
-        prefill: {
-          so: data.order.so,
-          lines: prefillLines,
-          note: `From order #${data.order.so} · ${prefillLines.length} short line${prefillLines.length === 1 ? "" : "s"}`,
-        },
-      },
-    });
-    onClose();
-  }
+  // `gotoProcurementWithPrefill` lived here. It walked this order's shortages
+  // and jumped to /operation/procurement carrying a `CreatePOModal` prefill, so
+  // the drawer was a Purchase Order creation door in everything but name — the
+  // modal it opened called `operation_create_po` / `operation_create_pos_batch`,
+  // both now out of the browser's reach (migration 0339).
+  //
+  // It is REMOVED, not rerouted. Card 4B forbids replacing it with another PO
+  // creation shortcut, so there is deliberately no "open Batch Purchase for this
+  // order" button here either. Shortages become `purchase_demands` and are
+  // issued by Batch Purchase through `purchasing_issue_pos_batch(jsonb)`.
 
   return (
     <div
@@ -452,8 +401,6 @@ export default function OrderDetailDrawer({
               onClose={onClose}
               onDispatchClick={() => setShowDispatch(true)}
               onDOClick={() => setShowDO(true)}
-              onIssuePOsClick={gotoProcurementWithPrefill}
-              allowIssuePO={allowIssuePO}
               onAbandonClick={() => setShowAbandon(true)}
               onConfirmProceedClick={() => setShowConfirmProceed(true)}
               onTransferReadyClick={() => setShowTransferReady(true)}
@@ -608,8 +555,6 @@ interface DrawerBodyProps {
   onServiceNoteClick: () => void;
   onDispatchClick: () => void;
   onDOClick: () => void;
-  onIssuePOsClick: () => void;
-  allowIssuePO: boolean;
   onAbandonClick: () => void;
   onConfirmProceedClick: () => void;
   onTransferReadyClick: () => void;
@@ -1346,8 +1291,6 @@ function DrawerBody({
   onClose,
   onDispatchClick,
   onDOClick,
-  onIssuePOsClick,
-  allowIssuePO,
   onAbandonClick,
   onConfirmProceedClick,
   onTransferReadyClick,
@@ -2689,8 +2632,6 @@ function DrawerBody({
           onConfirmProceedClick={onConfirmProceedClick}
           onTopUpClick={onTopUpClick}
           onAbandonClick={onAbandonClick}
-          onIssuePOsClick={onIssuePOsClick}
-          allowIssuePO={allowIssuePO}
           onDispatchClick={onDispatchClick}
           onDOClick={onDOClick}
         />
@@ -2991,14 +2932,12 @@ function DrawerBody({
             }
             actions={
               <PanelMenu
+                /* CARD 4B (2026-08-11) — `Raise PO for shortages` is GONE.
+                   It pushed this order's shortages into CreatePOModal, which
+                   called the legacy ungoverned create RPCs. Shortages reach
+                   Purchasing as purchase_demands and are issued by Batch
+                   Purchase; nothing here creates a Purchase Order. */
                 items={[
-                  ...(allowIssuePO
-                    ? [{
-                        label: "Raise PO for shortages",
-                        icon: <PackagePlus size={14} />,
-                        onClick: () => onIssuePOsClick(),
-                      }]
-                    : []),
                   {
                     label: recheckStock.isPending
                       ? "Rechecking…"
@@ -7231,8 +7170,6 @@ function ActionsMenu({
   onConfirmProceedClick,
   onTopUpClick,
   onAbandonClick,
-  onIssuePOsClick,
-  allowIssuePO,
   onDispatchClick,
   onDOClick,
 }: {
@@ -7246,8 +7183,6 @@ function ActionsMenu({
   onConfirmProceedClick: () => void;
   onTopUpClick: () => void;
   onAbandonClick: () => void;
-  onIssuePOsClick: () => void;
-  allowIssuePO: boolean;
   onDispatchClick: () => void;
   onDOClick: () => void;
 }) {
@@ -7287,17 +7222,13 @@ function ActionsMenu({
                 relevant one shows. */}
             {active && (
               <>
-                {allowIssuePO &&
-                  (pipelineStatus === "needs_setup" || pipelineStatus === "proceed") && (
-                  <MenuItem
-                    icon={<PackagePlus className="w-4 h-4" />}
-                    label="Issue PO"
-                    onClick={() => {
-                      close();
-                      onIssuePOsClick();
-                    }}
-                  />
-                )}
+                {/* CARD 4B (2026-08-11) — the `Issue PO` item is GONE, and it is
+                    NOT replaced by another PO creation shortcut. It jumped to
+                    /operation/procurement carrying a CreatePOModal prefill, and
+                    that modal called the legacy ungoverned create RPCs.
+                    `purchasing_issue_pos_batch(jsonb)` is the only authority
+                    that may create a Purchase Order, and Batch Purchase is the
+                    only door that calls it. */}
                 {pipelineStatus === "ready" && (
                   <MenuItem
                     icon={<Truck className="w-4 h-4" />}
