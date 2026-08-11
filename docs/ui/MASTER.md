@@ -300,6 +300,13 @@ uses the governed Carres `NavRow` treatment: `rounded-control`; `blue-3` selecti
 straight 2px `blue-9` line inset on the left; slate hover for inactive rows. It is not a bordered
 card, not a module tab, not a foreign reference colour and not a newly invented rail variant.
 
+**PORTAL NAVIGATION ACTIVE COLOUR — APPROVED / LOCKED.** The flame repoint applies to active
+navigation too: the current destination uses the governed blue selection treatment, never a
+red/flame active line or red rounded selection block. Flame remains the Carres brand mark;
+red remains late work / alert under the token law. A navigation item is selection, so its
+active line and wash are `blue-9` / `blue-3`. The rollout remains a separate implementation
+card; new designs and mockups show the approved destination, not the legacy red state.
+
 **REGISTER TABLE DENSITY LAW — APPROVED / LOCKED.** The readable 2990 parent-list geometry is
 the Register baseline: rendered 36px table header; rendered 38px single-line parent row; 11px
 body type on 16px line-height; approximately 8px vertical cell breathing room above and below,
