@@ -2957,7 +2957,7 @@ excluded them merely because they were not already implemented.
   proves every completed leg. The governed route is Customer Order / what was bought → supply
   decision (new goods through Purchasing OR suitable existing Warehouse stock, system offers and
   human decides) → PO and Unit ID when buying → Receiving → Warehouse location → Delivery planning
-  from stock ETA + capacity + customer preference → Money due → actual Delivery attempt → optional
+  from stock ETA + capacity + customer preference → Money due → actual Delivery result → optional
   Loan and Issue branches → No Action Required only when all obligations clear. The map is a
   directed graph, not a false single timeline: supply is a branch; Money and Delivery may proceed
   in parallel; Loan and Issue are conditional.
@@ -2980,6 +2980,14 @@ excluded them merely because they were not already implemented.
   clearly separate `Other orders for this customer` lane and never merge people on name alone.
   AutoCount's Document Flow and 2990's Relationship Map are behavioural references only; Carres
   ownership, evidence and visual tokens remain authoritative.
+
+  **`Delivery` is the APPROVED / LOCKED customer-facing map label (Loo, 2026-08-11).** The map
+  never exposes the engine term `Delivery Attempt` or the proposed label `Delivery Visit`.
+  Each real run is shown inside the `Delivery` node by its DO number and date, followed by the
+  plain result `Scheduled` · `Delivered` · `Not Delivered`. A not-delivered run also shows its
+  reason and the next scheduled delivery when one exists; every earlier run remains visible.
+  Generating a DO or booking a date never proves delivery. The append-only internal
+  `delivery_attempts` / exception model remains authoritative and is not renamed by this UI law.
 
 **SALES ORDERS WORK TOOLBAR — APPROVED / LOCKED (Loo, 2026-08-11).** This is the Sales Orders
 specialisation of UI MASTER's 45px Register Work Toolbar law:
