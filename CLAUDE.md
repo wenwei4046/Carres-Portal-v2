@@ -58,8 +58,9 @@ Old queues and checkpoints live in `docs/archive/` — **no chat reads them.**
 ```
 Build  →  Reality  →  Architecture review  →  If approved  →  Overwrite MASTER
 ```
-**Documentation is not the source of truth. The repository is.** Business rules freeze before
-implementation; **UI layout does not freeze before operators have used it.** A design that is
+**Approved business truth lives in the governing MASTER; code is evidence of the current
+implementation, not authority to silently overturn that approved target.** Business rules freeze
+before implementation; **UI layout does not freeze before operators have used it.** A design that is
 worse in practice is CHANGED, not defended — *"we decided that before"* is not a reason.
 **Reality outranks documentation.** If observation and the document disagree, measure again,
 then update the document. Never defend an outdated document.
@@ -106,6 +107,32 @@ not a new guideline  →  fold the rule into this Constitution
 ---
 
 ## 4 · Golden development flow
+
+### ERP WORK START LAW
+
+Before planning, changing code, or declaring the state of any ERP module:
+
+1. Read [`docs/ERP-ARCHITECTURE.md`](docs/ERP-ARCHITECTURE.md) to understand the whole Carres
+   journey, ownership boundaries and cross-module handoffs.
+2. Read the target module's `MASTER.md` in full.
+3. Read every cross-module MASTER section explicitly referenced by the target module or the Card.
+4. State separately: **APPROVED TARGET · BUILT / VERIFIED · NEXT CARD · referenced dependencies**.
+   Never describe an approved target as built, or current code as the intended destination.
+5. Inspect current code, migrations and production only after the governing target is known.
+   They prove what exists now and reveal the gap; they do not veto an approved business ruling.
+6. Do not reopen approved business design from preference or because legacy code differs. Raise it
+   only when primary repository/production evidence proves a genuine contradiction, implementation
+   impossibility, or new business evidence that requires the owner's decision.
+7. Never invent a missing rule. Mark it **UNKNOWN**, exhaust code/docs/data evidence, then ask the
+   owner one business question if the answer still changes the result.
+8. After an approved implementation is production-verified, **overwrite** the module MASTER's
+   build table and current implementation record in the same change. Do not append a competing
+   checkpoint. One MASTER contains one current target and one current built state.
+
+**Concise restart contract.** If a new chat is told only *“Sales Order — continue next Card”*, it
+must read this Constitution → ERP Architecture → Orders MASTER → the built/verified table and next
+Card → referenced module sections → current implementation. It then builds only that next Card,
+proves it, overwrites built state, and stops before the following Card.
 
 ```
 0  Say which kind of chat you are.  PLAN writes no code.  BUILD ships one thing.

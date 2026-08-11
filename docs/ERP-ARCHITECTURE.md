@@ -60,6 +60,113 @@ live once in [`orders/MASTER.md`](orders/MASTER.md), immediately after the Card 
 record. Architecture owns this boundary; the Orders MASTER owns the build sequence and business
 flow.
 
+## §0.2 · The end-to-end Carres journey — approved target 2026-08-11
+
+This is the route one customer promise takes through the ERP. Each arrow is a handoff between
+authoritative records, not permission for one module to copy another module's truth.
+
+```
+CUSTOMER
+  ↓
+SALES ORDER — what did the customer commit to buy, and what does Carres still owe?
+  ├─ new buy needed ─────────────→ PURCHASING / PO
+  │                                  ↓ PO placed
+  │                                  ├─ Unit ID is born
+  │                                  └─ assign logistics immediately
+  └─ compatible stock may exist ─→ READY STOCK OFFER
+                                     ↓ system offers; human decides allocation
+                              UNIT TRUTH
+                    identity · PO lineage · reservation · location · condition
+                                     ↓
+                                  RECEIVING
+                    confirms arrival, discrepancy and physical handoff
+                                     ↓
+                                  WAREHOUSE
+                    locates, inspects, holds, releases and preserves the Unit
+                                     ↓
+                         DELIVERY COORDINATION
+       Stock ETA + logistics capacity + customer preference inform early booking
+       assigned logistics, Stock ETA and confirmed customer appointment remain distinct
+                                     ↓
+                                MONEY / DO GATE
+          collect as delivery becomes credible · T−1 unpaid holds DO and delivery
+                                     ↓
+                              DELIVERY ATTEMPT
+                      success ─────────┴───────── failure
+                         ↓                         ↓
+              specific Unit fulfils       Delivery Exception records
+              specific obligation         what happened + Unit location
+                                           + remaining obligation + next action
+                         └──────────────┬──────────┘
+                                        ↓
+                         REMAINING OBLIGATIONS
+              loan recovery? · supplier-loan return? · money collection?
+              refund payable? · replacement? · any other explicit commitment?
+                                        ↓ all clear
+                              NO ACTION REQUIRED
+                                   (derived)
+```
+
+The Sales Order owns the customer promise and its governed lineage. Purchasing owns the PO and
+supplier promise. A Unit ID is born at PO placement and follows the same physical item through
+Receiving, Warehouse, allocation, Delivery, rejection, return, inspection and reuse. Ready Stock
+is an offer from the authoritative Unit register; **the system never silently allocates or
+reallocates a Unit—human judgment makes that decision.**
+
+PO placement starts logistics coordination immediately; stock need not be physically ready first.
+Operations and logistics plan from Stock ETA and real carrier capacity, then confirm the customer
+date and slot as a separate promise. As delivery becomes credible, Money owns collection truth;
+the Sales Order owns the unpaid hold. At the final T−1 working-day gate, unpaid means no DO and no
+delivery unless a separately governed release exists.
+
+Every vehicle visit is a Delivery Attempt. Success binds a specific Unit to a specific fulfilled
+obligation. Failure creates a Delivery Exception without changing the customer's original
+commitment and moves the Unit according to physical reality. Completion is never inferred from a
+single `delivered` or `cancelled` word. It is derived only when goods, money in both directions,
+loan recovery (including supplier return), refunds, replacements and every other explicit
+commitment are clear.
+
+The detailed approved Sales Order Cards 1–10 and their build state live only in
+[`orders/MASTER.md`](orders/MASTER.md). This architecture records the journey and boundaries so
+other module MASTERs link to one governing flow instead of restating it.
+
+## §0.3 · Work views and Issue Tracker boundary — approved target 2026-08-11
+
+The unified Work Engine reads authoritative module facts and derives:
+
+```
+WHO + ACTION + ACTUAL WORKING DAY
+             ↓
+       MY WORK / TEAM WORK
+```
+
+`My Work` and `Team Work` are filters over the same open work set. Work points back to the owning
+module's action door; it does not copy the transaction, invent a second status, or close system
+work with a generic Done button. The owning module's completion fact closes the action.
+
+Issue Tracker owns the durable incident record, not the operational transaction. Its identities
+must remain distinct:
+
+| Identity | Meaning |
+|---|---|
+| **Incident** | What went wrong and which operational records prove it |
+| **Fault Owner** | Who or which party caused it |
+| **Action Owner** | Who must resolve it now |
+| **Service Provider** | Who performed the extra work |
+| **Cost Bearer** | Who should ultimately pay |
+
+It tracks **cost incurred · payable service cost · recoverable amount · recovered amount ·
+resolution · learning / SOP**, with dates and links to the originating SO, PO, Unit, Delivery,
+Payment or Service record. Payable and recoverable money are separate transactions and are never
+netted away. The data must support accountability and export by supplier, logistics provider,
+internal team, specific staff member, fault/action/cost/service owner and issue type. Repeated
+incidents become management-meeting evidence, training and SOP improvement.
+
+Transaction modules remain the operational authority: SO says what was promised; PO what was
+bought; Receiving what arrived; Unit where the item is; Delivery what attempt occurred; Money
+what was paid, owed or refundable. Issue Tracker preserves accountability, memory, cost recovery
+and learning; it never replaces any of those records or becomes a prerequisite for their truth.
+
 ---
 
 # §1 · The four ownership laws
