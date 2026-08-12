@@ -1165,12 +1165,18 @@ Payment remain the authority for what operationally happened.
    the contract) · ③ the deferred items each card's own record names (supplier labelling
    surface · loan-claim atomicity · the proceeded-cancel approval lane · refunds on the desk ·
    the Settings working calendar).
-5. **Do not invent Card 11 or later. Do not stop planning either.** For any Sales Orders/Register
-   Plan/Design restart, apply `../ui/MASTER.md` §1.2 automatically: mine 2990's relevant Sales Order
-   functions (including `SO Maintenance`) and other useful scoped references; map each to the current
-   Carres equivalent/owner; check Settings, scan, copy, register/context actions and cross-module
-   dependencies as applicable; then maintain an explicitly **PROPOSED**, unnumbered roadmap and
-   dependency order until Jess approves formal governance. Jess does not supply the research list.
+5. **Do not invent Card 11 or later. Do not stop planning either.** A fresh Sales Orders/Register
+   Plan/Design chat does not resume from the last local question. Apply the Constitution's
+   OWNER-APPROVED OBJECT / DOMAIN ARCHITECTURE COMPLETENESS LAW and `../ui/MASTER.md` §1.2
+   automatically: cover the whole relevant Sales Order lifecycle; object-level function-mine
+   2990 (including `SO Maintenance`), AutoCount and useful mature/international ERP references;
+   maintain one reference-to-Carres capability matrix; and trace consequences through PO/Supplier,
+   Receiving, Stock/Unit, Delivery/DO, Payment/Finance, Claims, Issue Tracker, Work, permissions,
+   audit and versioned customer documents. Maintain an explicitly **PROPOSED**, unnumbered roadmap
+   and dependency order. Call a decision **NEXT** only after the pass explains why it is next.
+   Approved Sales Order truth is baseline, never a question for Jess to approve again. Jess does
+   not supply the research list. This Plan restart licenses no Sales Order/Register/UI/application
+   code; continuous build remains governed separately.
 6. Re-measure current code and production before quoting implementation state. Preserve unrelated
    dirty work. Do not reopen the approved business flow merely from preference; raise only a real
    repo/production contradiction or implementation impossibility.

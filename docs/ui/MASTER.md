@@ -80,7 +80,7 @@ may and should identify and recommend a materially useful missing capability. Th
 must explain its operator value, check Carres business architecture and locked constraints, and
 remain a proposal until Jess approves it. Reference products inform; they are never copied blindly.
 
-**OWNER-APPROVED PLAN OWNERSHIP / COMPLETENESS + RESTART CONTRACT — APPROVED / LOCKED (Jess,
+**OWNER-APPROVED OBJECT / DOMAIN ARCHITECTURE COMPLETENESS + RESTART CONTRACT — APPROVED / LOCKED (Jess,
 2026-08-12).** Jess owns business decisions and final approval. The Plan chat owns the mission
 boundary, completeness of research, dependency discovery, sequencing and the proposed plan. Jess is
 not expected to know or enumerate what must be studied next, when planning is complete, what can
@@ -91,7 +91,9 @@ build or what comes next. A new or restarted Plan/Design chat therefore automati
 2. establishes current Carres capability, repository/task evidence and the locked constraints;
 3. identifies unruled presentation, missing capabilities, dependencies, cross-module/future
    consequences, terminology/IA conflicts, duplicate destinations and scalability risks;
-4. mines relevant governed reference products for the declared unresolved surface;
+4. applies the Constitution's object/domain lifecycle and ERP consequence pass before naming a
+   local UI question as the next unresolved decision, then mines the relevant reference object's
+   backend/workflow/capability surface rather than only screenshots or the feature Jess named;
 5. continuously maintains **CURRENT MISSION · SETTLED / LOCKED · GENUINELY UNRESOLVED ·
    IMPLEMENTATION WORK · RECOMMENDED NEXT STEP**;
 6. maintains the proposed backlog/roadmap and dependency order;
@@ -104,6 +106,11 @@ It must not infer either “keep this exact UI” from an existing capability or
 from repository absence. It must not ask Jess what to inspect next when repository/task evidence
 can decide. It must surface important unresolved matters Jess did not ask about and ask her only
 for genuine business decisions or final approval.
+
+This object/domain pass does not replace UI preflight. UI Dictionary/IA comes first; Carres
+semantics and ownership outrank external references; and actionable copy remains **WHO + ACTION +
+OBJECT + actual working day/date**. The pass is a completeness check, not permission to build every
+capability or to write UI/application code in Plan mode.
 
 **OFFICIAL CARD NUMBERS ARE GOVERNANCE; PLANNING IS THE CHAT'S JOB.** The planner never invents an
 official Card number or status. It still maintains a clearly labelled **PROPOSED ROADMAP / BACKLOG /

@@ -144,14 +144,16 @@ copied blindly.
   names both preserved business/capability truth and any explicitly locked placement/presentation;
   its unresolved list includes presentation that the MASTER has not ruled and useful missing
   capabilities whose value is not yet decided. Repository absence is evidence of a gap, not a veto.
-- **OWNER-APPROVED PLAN OWNERSHIP / COMPLETENESS LAW (Jess, 2026-08-12).** Jess owns business
+- **OWNER-APPROVED OBJECT / DOMAIN ARCHITECTURE COMPLETENESS LAW (Jess, 2026-08-12).** A mission
+  concerning a business object/domain — Sales Order, Purchase Order, Receiving, Claim, Payment,
+  Delivery, Warehouse Unit or equivalent — is not a local page/question. Jess owns business
   decisions and final approval. The Plan chat owns the mission boundary, research completeness,
   dependency discovery, cross-module consequences, gap detection, sequencing and the proposed plan.
-  Jess is not the research checklist or the project manager: do not ask what to inspect next, when
-  planning is complete, what can build or what comes next when repository/task evidence can answer
-  it. Proactively find missing capabilities, ownership or terminology/IA conflicts, scalability
-  risks and the next unresolved decision surfaces, then perform a completeness pass before claiming
-  the plan or design is complete.
+  Jess is not expected to know which questions, reference capabilities, downstream consequences or
+  international patterns require investigation. Do not ask what to inspect next, when planning is
+  complete, what can build or what comes next when evidence can answer it. Proactively surface
+  material issues Jess did not ask about, explain why they matter, and complete the relevant
+  object/domain pass before calling anything the next unresolved decision or the mission complete.
 - **Every new or restarted Plan/Design chat is the Carres UI architect, not merely a repository
   checker.** Jess is the business owner and final decision-maker; she is not expected to enumerate
   every UI or ERP implication. Before presenting any UI proposal, mockup or layout recommendation,
@@ -171,14 +173,22 @@ copied blindly.
 - At entry, state separately: **WHAT IS ALREADY APPROVED · WHAT IS GENUINELY UNRESOLVED · WHAT
   SINGLE DECISION SURFACE THIS SESSION IS SOLVING.** Establish the locked constraints first;
   only then research the unresolved surface and propose.
-- For a genuinely **UNRESOLVED** design decision, proactively research only that declared surface.
+- For a genuinely **UNRESOLVED** object/domain mission, first map its complete **relevant**
+  lifecycle: creation/source · identity/numbering · Register/view/detail · edit · revision/
+  amendment/versioning · approval/permissions · documents/PDF and historical documents · copy/
+  duplicate · cancel/void · Settings/Maintenance/master data · scan/import · search/filter/columns ·
+  selection/bulk/context actions · history/audit · exceptions · upstream source · concurrency/
+  rollback · lifecycle completion · reporting/export · downstream consequences · anything else
+  revealed by Carres/reference evidence. This is a completeness checklist, not an order to build
+  every capability. Only after this pass may the chat narrow to the genuinely next decision.
+- Reference research is **object-level function mining, not screenshot-level research**. Inspect
+  the relevant backend/workflow/capability surface, not only visual layout or the feature Jess named.
   Use the relevant governed references — including Linear, Shopify, AutoCount, 2990, current
   Carres UI and appropriate mature/international ERP patterns when useful — and exclude unrelated
-  history and pages. **Reference research is function mining, not a visual glance:** systematically
-  inventory the relevant capabilities, interactions, workflows, settings/maintenance, navigation,
-  details, preview/edit/print/export, search/filter/columns, scan/copy, bulk/context actions and
-  other applicable functions before Jess has to name them one by one. For 2990 `SO Maintenance`,
-  proactively determine Carres' equivalent Settings/maintenance destination and owner.
+  objects/history. For Sales Orders, systematically mine 2990 plus relevant AutoCount and mature
+  international ERP patterns before Jess has to name Amendment, Settings, Copy, PO consequence or
+  another missing function one by one. Carres semantics/ownership come first; references provide
+  proven reusable ideas, never foreign business truth.
 - Produce a **REFERENCE-TO-CARRES CAPABILITY MATRIX** for the unresolved surface:
   `REFERENCE CAPABILITY | CARRES CURRENT EQUIVALENT/OWNER | KEEP/ADAPT/RELOCATE/BUILD/REJECT |
   WHY | DEPENDENCY/CONFLICT`. “Copy” means reuse a proven principle/function/interaction where it
@@ -201,6 +211,14 @@ copied blindly.
   materially useful · missing-capability/gap analysis · cross-module/future consequences ·
   dependencies · proposed sequencing. Then ask Jess only for genuine owner decisions. A fresh or
   restarted Plan/Design chat performs this automatically; Jess never has to spoon-feed these checks.
+- **ERP CONSEQUENCE GATE.** Apply the analogous cross-module check to every object decision. A Sales
+  Order Amendment, for example, must trace existing PO/supplier commitment · Receiving · reserved
+  or physical Unit/Stock · Delivery/DO commitment · Payment/deposit/refund/commercial truth ·
+  current and historical customer-facing PDF · Work · permissions · audit/history · Finance ·
+  Claims · Issue Tracker and every other affected owner. Consequences do not transfer write
+  ownership. Before asking Jess a local question, concisely state current mission · object coverage
+  completed · important gaps · cross-module consequences · reference evidence · why this is
+  genuinely the next owner decision. Synthesise; do not dump repetitive research.
 
 ### MISSION / CARD / CHAT BOUNDARY LAW — APPROVED / LOCKED, owner ruling 2026-08-12
 
