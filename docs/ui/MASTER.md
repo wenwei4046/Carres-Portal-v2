@@ -140,6 +140,36 @@ and stop the proposal; never silently choose one. Preflight protects locked trut
 unruled presentation or repository absence into a veto. **Governance protects truth; it does not
 freeze innovation.**
 
+**EIGHT-LENS DESIGN REVIEW — APPROVED / LOCKED (Loo, 2026-08-11).** The preflight is not only
+a visual compliance check. Before every UI recommendation, the decision surface is reviewed
+through all eight lenses below; none may be skipped because the current repository lacks the
+answer:
+
+1. **UI Dictionary** — one meaning has one Carres word. Check Settings / Maintenance / Manage /
+   Edit and every action against the governed vocabulary; retire overlapping concepts.
+2. **Information Architecture** — name the true owning module and the correct home: Navigation ·
+   Page · Settings · Toolbar · Row action · Workspace. Do not create a second door unless the
+   second door is an explicitly justified shortcut to the same owned action.
+3. **Cross-module Consistency** — state what is reusable Register Template law and what is a
+   page-owned exception. Test whether Purchase Orders, Receiving, Claims and Payments could
+   inherit the rule coherently; never force them to inherit Sales Orders business content.
+4. **Component / Interaction Language** — justify Tabs · pills · filters · dropdown · button ·
+   overflow by their governed jobs. A component seen in a reference is not permission to copy it.
+5. **Capability Gap** — proactively identify mature, materially useful missing capabilities that
+   improve the operator journey and bring them to Jess; do not wait for the owner to discover
+   them. Research and define a Carres-owned boundary before recommending BUILD.
+6. **Future Consequence** — project the decision across the ERP: prevent Maintenance/Settings
+   duplication, uncontrolled header growth, duplicate entry points and module-by-module drift.
+7. **Reference Translation** — learn principle and interaction from Linear · Shopify · AutoCount ·
+   2990, then translate them into Carres architecture. Never copy their terminology, information
+   architecture or visual treatment as authority.
+8. **Recommendation** — conclude with one or more explicit dispositions: **KEEP · IMPROVE ·
+   RELOCATE · RETIRE · BUILD**, each with the business and architecture reason. Reporting only
+   what the repository currently has is incomplete design work.
+
+A mockup or recommendation that has not passed these eight lenses is **INVALID**, even when its
+tokens and spacing are correct.
+
 For a genuinely **UNRESOLVED** UI decision, proactively research only that declared surface. Use
 the relevant governed references — including Linear, Shopify, AutoCount, 2990, current Carres UI
 and appropriate mature/international ERP patterns when useful — and exclude unrelated history and
@@ -283,8 +313,8 @@ DetailShell · DialogFrame · FieldFrame · GridToolbar · SectionHeader
 - **Kit `DataTable` layout is NOT remembered across a reload.** Sales Orders uses the existing
   `register/DataGrid` engine instead; Loo explicitly ruled that Stage A preserves that engine's
   browser layout persistence. This is a page-scoped exception, not a new kit default.
-- **The 40px row law remains the kit `DataTable` default.** Sales Orders reference rows are the
-  approved page-scoped 33px exception in §6.5. The expanded cell is allowed to be tall and wrap.
+- **The 40px row law remains the kit `DataTable` default.** Sales Orders reference rows use the
+  approved page-scoped 38px exception in §6.5. The expanded cell is allowed to be tall and wrap.
 - **40px is the international default, measured 2026-08-07 — not merely our own habit.**
   AG Grid's Quartz theme ships **42px**; the two denser references anyone cites are a Windows
   desktop control (AutoCount ~17px) and another repo (2990s 28px), neither a web-grid standard.
@@ -432,6 +462,91 @@ readability follow the governed 2990 reference: its listing engine, controls, co
 row disclosure and table hierarchy are the reference. GitHub is evidence for tab admission,
 not the Carres Register shell. Carres business ownership remains authoritative over all three.
 
+**REGISTER PAGE HEADER — APPROVED / LOCKED (Loo, 2026-08-11).** Every Register begins with one
+rendered 44px Page Header. Left = the current destination's governed icon + one short identity
+title, for example `Sales Orders`. Right = genuine global utilities only: `Jump to…` with its
+keyboard hint · Notifications · Help · System Settings. `Jump to…` is an approved missing
+global-navigation capability: it finds permitted modules/destinations and exact document numbers,
+offers recent destinations, and only navigates; it never performs workflow. The header contains
+no breadcrumb, `Backend` label, duplicate title, KPI, tab, scope/view, current-Register Search,
+filter, export, Columns, selection state or page-specific action. New/create, Scan Order,
+Export and every other page-owned action belong to the next Work Toolbar layer. Module Settings
+never becomes a page-owned action; the global Settings utility owns its one door.
+
+**GLOBAL SETTINGS ENTRY — APPROVED / LOCKED (Loo, 2026-08-11).** The governed Settings gear in
+the Page Header's right utility cluster is the ERP's one Settings entry on every page. Clicking it
+opens a compact permission-filtered launcher, not an editing form. Its first item is `{Current
+module} Settings` when that module owns settings and the user may access them; its second item is
+`All System Settings`. Either choice navigates into the one full-page Settings Workspace at the
+relevant section. Business values, permissions and workflow options are edited only in that
+auditable Workspace, never inside the launcher. Module tabs, portal navigation, Work Toolbars and
+`…` must not repeat a Settings destination. Current-view presentation such as Columns, personal
+Saved Views and governed Register layout remains on the owning Register and is not System Settings.
+
+**REGISTER TOAST PLACEMENT — APPROVED / LOCKED (Loo, 2026-08-11).** Toasts use the proven 2990
+behaviour translated into Carres components: one fixed overlay tray at the viewport's bottom-right,
+stacking additional messages upward. A toast never occupies document flow and never moves, resizes
+or adds height to the Page Header, Work Toolbar, Register table or status footer. It uses the
+governed Carres Toast component, frozen semantic colours and governed icons — never 2990 visual
+tokens. Each message provides its truthful semantic state, compact text, close door and a slim
+remaining-time indicator; ordinary success/information feedback auto-dismisses after five seconds,
+while accessibility live announcement follows the message severity. Persistent business blockers
+remain an in-page message near the affected work surface, and field validation remains inline
+beside its field; neither is misrepresented as an ephemeral Toast.
+
+**`JUMP TO…` INTERACTION — APPROVED / LOCKED (Loo, 2026-08-11).** `Jump to…` is the one global
+navigate-only command surface across the ERP; modules must not grow their own competing jump
+search. The Page Header trigger shows its keyboard hint and opens from click or `⌘K`. Desktop uses
+one centred overlay; small screens use the same surface full-screen. Opening with no query shows at
+most five permitted recent destinations followed by permitted destinations. Typing searches only:
+
+1. governed module / destination names; and
+2. exact or partial governed document numbers such as SO · PO · GRN · INV.
+
+Document results show the document number, its type and the smallest useful identifying party
+(customer or supplier) without exposing unauthorised data. Results are permission-filtered before
+display. `↑` / `↓` moves the active result, `Enter` navigates and `Esc` closes. No result renders
+the plain empty state `No results`; it never offers a create action. Selecting a result only opens
+its owning destination/document and never approves, receives, pays, edits or performs any other
+workflow.
+
+Register Search remains page-owned and searches that Register's governed fields. `Jump to…` does
+not replace it and does not search arbitrary table-cell contents, customer phone, product text or
+every ERP field. Expanding beyond destination + document-number + recents requires a governed
+cross-module search index and a new architecture decision; individual modules may not expand the
+global result contract locally.
+
+**REGISTER WORK TOOLBAR / SECOND HEADER — APPROVED / LOCKED (Loo, 2026-08-11).** Immediately
+below the Page Header, a Register may own one rendered 45px Work Toolbar; it is one row and never
+scrolls horizontally. Normal state spends the left side on the current View control and current-
+Register Search, and the right side on page-owned Export/display controls, frequent actions, one
+primary create action and a low-frequency overflow when needed. `View: {current view}` is explicit;
+scope capabilities such as All orders / Not delivered are saved/reusable Views, never a permanent
+row of pills. Header-column filters remain the direct per-column filter door; the Toolbar does not
+add a duplicate generic Filters button. `Reset layout` remains inside Columns.
+
+Selecting rows **replaces** the normal Toolbar within the same 45px height; it never adds a third
+permanent band. Left = truthful selected count + Clear. Right = only actions valid for that exact
+selection. A one-record action disappears for multi-selection rather than pretending to apply to
+many. Normal and selection states preserve the table's position and width.
+
+**REGISTER EXPORT AND OVERFLOW ROUTING — APPROVED / LOCKED (Loo, 2026-08-11).** A Register uses
+one visible `Export ▾` control for its supported current-view outputs: Excel · PDF · Print. Output
+formats do not scatter across `…` or become separate permanent normal-state buttons. When rows are
+selected, the same Toolbar space exposes only outputs valid for that exact selection and prints the
+truthful count. `…` owns infrequent page actions in normal state and infrequent selection actions
+in selection state; it never duplicates Export, Columns, a destination or a row-only action. A
+useful but infrequent action may move into `…` instead of occupying permanent Toolbar width; this
+is progressive disclosure, not capability removal.
+
+**TOOLBAR SHAPE LANGUAGE — APPROVED / LOCKED.** A control that changes/chooses/configures a view
+uses the governed 6px `rounded-control`: View dropdown · Search · Export dropdown · Columns ·
+overflow. A visible verb that immediately performs an action uses the UI Kit pill button: New ·
+Scan · Clear · View Flow · explicit Export Excel/PDF selection actions. Mixing the two shapes is
+required when both interaction kinds coexist; arbitrary per-button shape variation is invalid.
+There is at most one primary blue action in a Toolbar state. Page-owned controls vary by module;
+the 45px one-row structure, state replacement and shape semantics are Register Template law.
+
 **REFERENCE PRODUCTS NEVER AUTHOR CARRES VISUAL TOKENS — APPROVED / LOCKED.** Linear, 2990,
 GitHub, Shopify, AutoCount and every other reference may supply a proven structure, behaviour
 or trade-off; they never supply Carres colour, typography, radius, elevation, icon treatment or
@@ -460,10 +575,10 @@ table header using `text-label` (11px / 14px); rendered 38px single-line parent 
 row's checkbox included in the measured height. Expanded content takes its
 natural governed child-row height and is not forced into 38px. Carres gains visible rows by
 removing tall page chrome, breadcrumbs, KPI bands and redundant headings — never by squeezing
-the parent row below this readable baseline. Footer existence, contents and height remain a
-separate decision from row density.
+the parent row below this readable baseline. Footer geometry and contents are governed separately
+below and do not alter row density.
 
-**REGISTER STATUS FOOTER — APPROVED / LOCKED.** Every Register table ends in one compact,
+**REGISTER STATUS FOOTER — APPROVED / LOCKED (Loo, 2026-08-11).** Every Register table ends in one rendered 32px,
 always-present status footer fixed to the table frame; it never scrolls with the rows. The
 footer keeps the operator oriented without spending a full data-row height. In its resting
 state it states the current listing's total summary. When rows are selected it immediately
@@ -476,8 +591,15 @@ layout or duplicated filter controls may enter it. **Every actionable control st
 table** in the page Work Toolbar, selection bar or the relevant top popover; `Reset layout`
 belongs to Columns and never to the footer. Each Register MASTER owns its truthful summary
 vocabulary and arithmetic; the global template may not invent a KPI, status or unit.
-The exact compact height and the page-by-page summary mapping remain the next unresolved
-footer decision.
+
+The table frame has an 8px outer gap above and an 8px outer gap below. The bottom gap is page
+breathing room outside the frame; the 32px footer remains inside it and never touches the browser
+edge. Available vertical space is filled with consecutive complete parent rows. There is no
+designed blank data region while more results exist; genuine empty space is allowed only when the
+complete current result set is shorter than the viewport. When another full governed row does not
+fit, show one fewer complete row rather than compressing the locked 38px parent-row height. This
+compact chrome must allow a Register to show more complete rows than the 2990 reference at the same
+viewport height without copying its visual treatment.
 
 # §6.6 · SALES ORDERS REFERENCE STRUCTURE — ruled by Loo 2026-08-10
 
@@ -488,24 +610,25 @@ surface.
 
 ```
 DestinationHeader  44px  Sales Orders identity + genuine global utilities only
-Work Toolbar       45px  scope · one Search · Filters · Export · Columns · New Sales Order
-Work Surface             one DataGrid; loading · empty · error remain inside it
+Work Toolbar       45px  View · one Search · Export · Columns · actions · overflow
+Work Surface             one DataGrid + fixed status footer; loading · empty · error remain inside it
 ```
 
 **Proven in authenticated production at 1920 · 1440 · 1130:** one destination identity · one
 Work Toolbar · one general Search · no duplicate destination tab/title · no outer-page scroll ·
 DataGrid-owned genuine-wide horizontal overflow · 1130 without another toolbar band · Search ·
-Filters · Export · Columns · persistence · expansion all survive the migration.
+column filters · Export · Columns · persistence · expansion all survive the migration.
 
-**The Sales Orders reference appearance is deliberately page-scoped:** 10px bold uppercase
-header in a rendered 31px row; 11px single-line parent cells in rendered 33px rows; 8px
-horizontal cell padding; rendered 22px footer; flat zero-radius grid; faint structural
-dividers; no zebra. This is not a global 32px law and does not alter kit/DataTable defaults.
+**The Sales Orders reference appearance follows the current Register Template:** 36px table
+header · 38px single-line parent rows · 32px fixed status footer · 8px outer frame gaps · flat
+zero-radius grid · faint structural dividers · no zebra. Frozen Carres typography tokens and
+the Register density law above own the text; older page-scoped 31/33/22px measurements no longer
+author this destination.
 
 **Preserved engine powers:** server Search · typed column filters · Columns · Excel Export ·
 resize · reorder · browser layout persistence under the existing Sales Orders storage key ·
-expanded order lines. The Work Toolbar's Filters control is a second door into the same
-per-column filter state, not a second filter engine.
+expanded order lines. Each column header remains the direct filter door; the Work Toolbar does
+not duplicate it with a generic Filters control.
 
 **1130 ruling:** Stage A must attempt one toolbar row and show a measured failure if it does
 not fit. It may not invent a responsive law. The 2026-08-10 production-like measurement fit
