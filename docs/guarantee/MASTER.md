@@ -144,6 +144,7 @@ config table plus one partial-index probe per inserted line.
 | **Customer block** (ops drawer + POS order detail) | `GuaranteeCoverStrip` — silent when there is no guarantee, so the ~190 pre-guarantee orders look untouched. |
 | **Operation → Guarantees** | The claim desk. A **Guarantee ID** column leads the table; one search box resolves the ID first (live OR retired), then SO / name / customer id / phone. Status filter + the one-shot **Claim** action. |
 | **Service Cases** | A claim can carry `claim_case_id`; the existing `warranty_claim` case type is where the follow-up work lives. |
+| **Sales Orders Register** | **APPROVED optional `Guarantee` column** (Loo, 2026-08-11), selected and persisted through the Register's governed `Columns` control rather than added to the locked default columns. It summarises only entitlements actually sold on that SO. Pending cover shows `{years}y · Starts on delivery`; active/expired cover shows the derived lifecycle word and the real `starts_on–expires_on` range; no cover shows `—`; multiple unit-level entitlements show a count and open their owned detail. Filters: With guarantee · Without guarantee · Starts on delivery · Active · Expired · Claimed. Expiry is derived on every read, so the Register changes to `Expired` without a manual status update or nightly job. |
 
 ## 7. Security
 

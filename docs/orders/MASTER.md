@@ -116,14 +116,14 @@ business engine or the route cutover.
 
 ```
 DestinationHeader  44px  one Sales Orders identity; no duplicate tab/title
-Work Toolbar       45px  Not delivered / All orders · Search · Filters · Export ·
-                          Columns · New Sales Order; one governed row
-Work Surface             DataGrid owns both scroll axes; route wrapper does not scroll
+Work Toolbar       45px  View · Search · Export · Columns · Scan · New · overflow;
+                          selection replaces this same governed row
+Work Surface             DataGrid owns both scroll axes + one fixed status footer
 ```
 
-The DataGrid reference appearance is local to Sales Orders: rendered 31px header, 10px bold
-uppercase header type, rendered 33px single-line parent rows, 11px cell type, 8px horizontal
-cell padding, rendered 22px footer, flat grid, faint dividers and no zebra. It preserves
+The DataGrid follows the current Register Template: rendered 36px header, 38px single-line parent
+rows, 32px fixed status footer and 8px outer frame gaps, with frozen Carres typography, a flat
+grid, faint dividers and no zebra. It preserves
 server Search, typed column filters, Columns, Excel Export, resize, reorder, the existing
 browser layout key and expanded order lines.
 
@@ -2246,72 +2246,28 @@ chevron. Nothing is remembered across a remount (§0.4).
 > card**, so it is recorded rather than taken; it is one word (`key={i}`) whenever a card owns
 > that file.
 
-### ✅ S2.3 · SHIPPED 2026-08-08 — the footer total, and it counts the LIST, not the window
+### SALES ORDERS STATUS FOOTER — APPROVED / LOCKED (Loo, 2026-08-11)
 
-**The strip states the money this view is owed** — one spanned sentence pinned under the last
-row the way the head is pinned over the first:
-
-```
-Total · RM 1,234,567.00 outstanding · 12 not priced
-```
-
-**THE CARD WAS RIGHT THAT 2990 HAS NOTHING TO COPY, and the source change needed no approval.**
-Re-verified: `tfoot` · `totalRow` · `footerTotal` · `sumRow` return two hits in 1,551 lines and
-both are `totalRows`, a GROUP's row count. So this is **Carres' own kit** (`DataTable.totals`,
-D0.5d power 4) **and To Order's live usage of it** (T1, 2026-08-06) — the spanned-`cells` shape,
-because *"a total that reads as a sentence rather than a digit marooned under one column"* is
-exactly this table's problem: **Orders has no money column** for a per-column aggregate to land
-under.
-
-### ⛔ THE DEFECT THIS CAPABILITY INVITES, AND THE ONE THING THAT HAD TO BE DESIGNED AROUND
-
-**The kit hands `totals.cells(rows)` exactly what it RENDERED, and this page renders a 30-row
-window.** Summing that argument prints the total of thirty orders under a footer band that says
-`30 of 65` one line below — **and the number climbs as the operator scrolls.**
-
-**The argument is therefore deliberately unused**; the sum closes over `visible`, the whole
-filtered list. **This is the same defect S2.1 had to design around for the sort, arriving
-through a different door** — and it is the second time on this card that the kit's convenience
-argument was the wrong set of rows.
-
-**Proved by a NEGATIVE CONTROL, not by assertion.** With the implementation switched to sum the
-callback's argument, the test reports `RM 3,000.00` where the truth is `RM 3,500.00` — 30 rows
-of a 35-row list. Restored, it reads 3,500.
-
-### WHAT IT STATES, AND EACH HALF IS A DECISION
-
-- **The money, not the count.** The footer band already prints `{total} orders` two lines down,
-  and §3's frozen rule is that nothing on this list says the same thing twice. **Nothing on
-  screen states the money for the CURRENT view** — the `Owing` rail row carries a total, but
-  that is one fixed queue over every order, not what these filters left. Money is also what a
-  footer totals in the tool the team already uses.
-- **What it could NOT price, out loud.** `orderMoney` answers `unknown` when an order has
-  neither priced lines nor a keyed balance, and §4's rule is ***"not priced", never RM 0***. A
-  sum that silently skipped those would be a smaller number wearing a complete number's
-  clothes. The caveat renders only when there is one.
-- **`fmtMoney` spells the figure**, asserted by identity — never a hand-rolled `RM ${n}` that
-  would pass every other test and diverge the day the shared format changes.
-- **It does not draw over an empty view.** The kit already withholds it while loading or empty:
-  a totals strip over no rows states a total of nothing.
-
-**MEASURED IN CHROMIUM AT FOUR WIDTHS**, on the longest sentence the strip can ever hold (a
-seven-figure sum plus the caveat, 320px):
+Sales Orders uses the Register Template's one rendered 32px fixed status footer inside the table
+frame. It combines orientation and the page-owned business summary in one sentence; there is no
+second count strip. Its three states are:
 
 ```
-table width          1022      890      850      700
-td content box      963.2    836.9    798.6    655.0
-sentence                320      320      320      320   ← one line at every width
-spare                +643     +517     +479     +335
+RESTING    75 orders · RM 48,101.50 outstanding · 12 not priced
+FILTERED   2 of 75 orders · RM 1,680.00 outstanding · 0 not priced
+SELECTED   2 selected orders · RM 480.00 selected outstanding · 0 not priced
 ```
 
-`colspan` **9**, the foot's cells sum to the table width to the pixel at every width, the row is
-**40px** — the head's own height — and it is `position: sticky`. **No wrap, no horizontal
-scroll.**
+The figures are shapes, not fixture values. Resting and filtered money closes over the whole
+current filtered list, never the virtualised/rendered window, so scrolling cannot change the
+answer. Selected money closes over the selected Sales Orders. `orderMoney` unknown remains
+`not priced`, never RM 0; the caveat stays explicit even when its count is zero. `fmtMoney`
+remains the single currency formatter.
 
-> 🟡 **REPORTED — the strip costs 40px of PERMANENT height**, so §3's measured *"16 fully
-> visible rows"* at 1440×900 becomes 15. That is the honest price of an always-on total, and
-> AutoCount pays it too. Recorded here so the next card that counts visible rows starts from 15
-> rather than re-deriving 16 from a stale line.
+The footer is one line and does not wrap or own horizontal scroll. The table frame preserves the
+Register Template's 8px bottom gap outside the footer. Rows remain consecutive while more results
+exist; genuine empty data space appears only when the complete result set is shorter than the
+viewport. The footer never contains Reset layout or any action.
 
 ### ✅ S2.2 · SHIPPED 2026-08-08 — the header ▼, on the four columns where it is a DOOR and not a second home
 
@@ -2962,6 +2918,174 @@ carrier's working days and capacity are not a fact about this customer's order.
 ---
 
 # §11 · Approved Evolution — decided, deliberately not implemented
+
+## Sales Orders post–Card 10 capabilities — APPROVED / LOCKED (Loo, 2026-08-11)
+
+The owner explicitly reopened the Sales Orders header/action surface after reviewing the
+2990 reference. The absence of a capability in the current repository is not a reason to
+refuse it: governance prevents an agent from inventing product scope; it does not prevent the
+owner from approving useful new scope. These decisions supersede any earlier proposal that
+excluded them merely because they were not already implemented.
+
+- **Scan Order is approved as a new capability after Card 10.** It receives its own scoped
+  product/build card before implementation. Because Carres uses it infrequently, the Sales Orders
+  Register exposes `Scan Order` inside the page-owned `…` overflow rather than as a permanently
+  visible Toolbar action. The card must define the accepted source, extraction/validation,
+  duplicate handling, operator review and the final write boundary. A reference product proves
+  the door, not Carres business rules or visual styling.
+- **`Sales Order Settings` is required — APPROVED / LOCKED naming and placement.** `SO
+  Maintenance` is retired. The Settings section title is `Sales Order Settings`, parallel to
+  `Purchasing Settings` and distinct from the overall `System Settings` Workspace. It owns Sales
+  Order-controlled option pools, Order Entry fields and payment-method choices; current-user
+  Register Columns and Saved Views stay on the Register. It is never an edit door into historical
+  Sales Orders. It is planned after Card 10 and is reached only through the global Page Header
+  Settings gear: the permission-filtered launcher offers `Sales Order Settings` for the current
+  module and `All System Settings`. It is not a Sales Orders tab, portal-navigation item, Work
+  Toolbar button or `…` item.
+- **Register `Edit` opens the full Sales Order Workspace — APPROVED / LOCKED.** It never edits
+  inside the grid and never opens a small generic modal. The row context menu's `Edit` navigates
+  to that Sales Order's owned full-page Workspace in edit intent. The Workspace header keeps the
+  durable History · Order Journey/Relationship Map · Print PDF controls alongside the governed
+  edit/cancel actions. A change that remains above the existing contractual floors may use the
+  governed revision Save door; a change blocked by production commitment, receiving, invoice,
+  delivered or cancelled floors never silently overwrites the order and must follow the owned
+  amendment/request lane when that lane is available. **PO existence alone is not the Carres
+  edit gate** and 2990's wording does not replace Card 1's authority. Register → Workspace is the
+  adopted behaviour; Carres revision causes, gates and evidence remain authoritative.
+- **Selected-order PDF export is approved.** Selecting one or more rows reveals a contextual
+  selection action bar above the table containing the truthful selected count, `Clear` and
+  `Export PDF (N)`. It uses the existing governed Sales Order PDF renderer/output per order;
+  the implementation card must define multi-order download packaging and failure reporting.
+  It is a view/document action and therefore remains within the Register boundary.
+- **The contextual bar follows the 2990 interaction pattern, not its appearance.** Carres
+  frozen tokens/components govern colour, typography, radius and spacing. It occupies or
+  replaces governed toolbar space where possible; it must not create a permanent empty band.
+- **`View Flow` capability is approved; its complete route layout is still UNRESOLVED.** It is one
+  map, not separate duplicate Document and Journey maps. From a Sales Order it lets every
+  authorised reader understand where the customer's order has reached, what obligation is next
+  and which real document / Unit ID proves every completed leg. `Order Journey` is not a second
+  capability or second map.
+
+  **BUSINESS-RULE GATE — owner stop point, 2026-08-11.** The map must not be frozen or implemented
+  until the per-line goods-source and fulfilment-route decision table is complete. At minimum it
+  must cover Ready Stock · purchase into a Carres receiving location · supplier / AL direct to
+  customer · route not yet assigned · mixed routes across one SO · route change · return. This is
+  the next unresolved View Flow decision surface. UI composition does not author these routes.
+
+  Purchasing's existing two-path law is authoritative: a purchased line either enters a Carres
+  receiving location, where the governed Receiving record proves physical arrival, or it never
+  touches a Carres floor, where Operation explicitly confirms fulfilment. Direct-to-customer and
+  customer self-collection belong to that second path. **Warehouse is never the default route.**
+  A direct line must not manufacture a Warehouse node, bin, GRN or received quantity. An
+  unassigned route is shown truthfully as unassigned; it is never guessed.
+
+  The Sales Order is the anchor. The map renders only evidence that exists for the selected line's
+  actual route: real SO · PO · Unit ID · Receiving/GRN evidence when applicable · actual Carres
+  location when recorded · DO · Invoice · receipt/payment evidence · Loan · Case numbers, their
+  owning module, governing dates and truthful lifecycle evidence. Bin/location data may appear
+  only when its owning system actually records it. Demonstration names, warehouse locations, bins,
+  people, dates and statuses are never promoted into product truth.
+
+  Unit identity is shown once per real Unit and then repeated only where needed to prove that the
+  same physical item moved through later evidence; a repeated Unit ID is not a new Unit. The exact
+  Unit-creation event remains governed by Card 2 and the owning engine, not inferred by the map.
+  A Loan is an independent conditional obligation: while outstanding it blocks No Action Required;
+  after return it remains as completed evidence with the actual return date, receiver and recorded
+  condition. Loan is not nested inside Delivery merely because return may follow delivery.
+
+  The eventual map is a directed graph, not a false single timeline: goods source is a branch;
+  Money and Delivery may proceed in parallel; Loan and Issue are conditional. `No Action Required`
+  is derived only when every applicable obligation is clear.
+
+  **Generated is never presented as Sent or received by the customer.** Completed/current-frontier/
+  blocked/future/not-required presentation is derived from the owning modules' existing completion
+  facts; it never mints a Sales Order `status` or `Current` field. Every document number opens its
+  owner; the map summarises and links but never executes another module's work.
+
+  The primary discoverable entry is the contextual selection bar immediately above the table:
+  selecting exactly one row replaces the normal toolbar in that same height with
+  `1 selected · Clear · View Flow · Export Excel · Export PDF`. Right-click → `View Flow` is a
+  desktop shortcut to the same map, not the only door. The order Workspace Documents area is the
+  third durable door. Multiple-row selection hides `View Flow` because one map has one Sales Order
+  anchor. It is not a Page Header action, tab or default table column. Until Carres owns a canonical
+  customer entity, the map may use the selected order's normalised customer phone only for a
+  clearly separate `Other orders for this customer` lane and never merge people on name alone.
+  AutoCount's Document Flow and 2990's Relationship Map are behavioural references only; Carres
+  ownership, evidence and visual tokens remain authoritative.
+
+  **`Delivery` is the APPROVED / LOCKED customer-facing map label (Loo, 2026-08-11).** The map
+  never exposes the engine term `Delivery Attempt` or the proposed label `Delivery Visit`.
+  Each real run is shown inside the `Delivery` node by its DO number and date, followed by the
+  plain result `Scheduled` · `Delivered` · `Not Delivered`. A not-delivered run also shows its
+  reason and the next scheduled delivery when one exists; every earlier run remains visible.
+  Generating a DO or booking a date never proves delivery. The append-only internal
+  `delivery_attempts` / exception model remains authoritative and is not renamed by this UI law.
+
+  **Guarantee is an APPROVED optional Sales Orders Register column (Loo, 2026-08-11).** It is
+  available through `Columns`, participates in the existing saved column layout and keeps the
+  locked default eleven-column order unchanged. It summarises the guarantees actually purchased
+  on that Sales Order; it never invents cover from the currently available offer catalogue.
+  No purchase renders `—`; sold but not delivered renders `{years}y · Starts on delivery`;
+  delivered cover renders its derived lifecycle word plus `starts_on–expires_on`; an expired
+  entitlement therefore changes automatically to `Expired` on read and keeps both dates visible.
+  Multiple entitlements render a truthful count in the compact parent row, with their individual
+  covered lines, Guarantee IDs and dates available through the owned detail/Order Journey surface.
+  The column filter supports With guarantee · Without guarantee · Starts on delivery · Active ·
+  Expired · Claimed. Selecting the cell opens the order's owned Guarantee detail; Guarantee remains
+  line/unit-level truth even though the Register cell is an order-level summary.
+
+**SALES ORDERS WORK TOOLBAR — APPROVED / LOCKED (Loo, 2026-08-11).** This is the Sales Orders
+specialisation of UI MASTER's 45px Register Work Toolbar law:
+
+```
+NORMAL      View: All orders ▾ · Search SO/customer/phone · Export ▾ · Columns ·
+            + New Sales Order · …
+ONE         1 selected · Clear                         View Flow · Export Excel (1) · Export PDF (1)
+MANY        N selected · Clear                                      Export Excel (N) · Export PDF (N)
+```
+
+The View dropdown owns All orders · Not delivered · My orders · personal/team Saved Views ·
+Save current view. This preserves the scope capabilities without permanent scope pills. Every
+column keeps its direct header filter, so the duplicate generic Filters button is retired. The
+normal Export dropdown contains current-view Excel · PDF · Print outputs; explicit selected
+Excel/PDF actions are immediate pill buttons. `…` contains low-frequency page/selection actions
+only and is not a dumping ground for daily work. Normal-state `…` owns `Scan Order`; selected-state
+`…` may expose only actions valid for that exact selection. `New Sales Order` remains the only
+permanently visible primary action. View/Search/Export/Columns structure, same-height selection
+replacement and action-vs-control shape language are reusable Register Template law. Settings is
+absent because the global Page Header gear owns the ERP's single Settings entry.
+
+At the measured narrow target, the Toolbar must show every normal-state control without clipping,
+shrinking frozen typography or moving the toolbar itself into horizontal scroll. The wide DataGrid
+continues to own its own horizontal overflow independently.
+
+**SALES ORDERS ROW CONTEXT MENU — APPROVED / LOCKED (Loo, 2026-08-11).** The desktop
+right-click menu follows the approved 2990 Sales Orders action set and order exactly:
+
+```
+Edit
+View
+Preview
+Print
+────────
+Issue Delivery Order
+Copy to new Sales Order
+────────
+Cancel SO
+```
+
+This is a Sales Orders module exception, not a Register Template requirement for every module.
+The menu copies the reference action inventory and ordering; Carres frozen tokens, typography,
+spacing, hover/current treatment, permissions and confirmation components still govern its visual
+and interaction treatment. Each item routes to the Carres-owned capability rather than executing
+foreign business rules inside the grid: `Edit` opens the full Sales Order Workspace in edit intent;
+`View` opens the owned read view; `Preview` opens the governed document preview; `Print` uses the
+governed Sales Order document output; `Issue Delivery Order` hands off to the Delivery-owned issue
+flow; `Copy to new Sales Order` starts a new draft from the governed copy boundary; and `Cancel SO`
+uses the owned cancellation gate and destructive confirmation. The implementation cards must
+define the unresolved permission, eligibility, copy-boundary and cancellation rules before those
+new capabilities can write business data. Right-click is a desktop shortcut: it does not remove
+the normal discoverable doors already governed for Edit, output or View Flow.
 
 | What | Why it is not built |
 |---|---|
