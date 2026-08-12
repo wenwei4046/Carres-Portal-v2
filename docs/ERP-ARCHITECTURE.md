@@ -65,7 +65,7 @@ flow.
 
 ---
 
-# §1 · The four ownership laws
+# §1 · The five ownership laws
 
 ### Law A · One record, one owner
 A business record has exactly ONE module that creates, changes and closes it. That module owns
@@ -87,7 +87,24 @@ If two surfaces must agree on a number, they call ONE function. **Not two implem
 currently agree** — that is the arrangement under which a third, wrong one grows unnoticed.
 Proven three times in V1: the money rule, the storage rule, and the category (still unfixed).
 
-> **The test that decides all four, and it is the one V1 needed and did not have:**
+### Law E · An object decision carries every ERP consequence
+A decision about one business object is never only a decision about its page. Before Plan/Design
+may call the architecture complete or identify the next owner decision, it maps the object's
+relevant lifecycle and checks every affected record owner. The planner owns finding those
+consequences; Jess owns the business ruling and final approval.
+
+For example, changing a Customer Order may affect an existing Purchase Order/supplier promise,
+Receiving expectations, Stock/Unit reservation, Delivery/DO commitment, Payment/deposit and
+commercial truth, customer-facing document versions, Work, Finance, Claims, Issue Tracker,
+permissions and audit evidence. Apply the analogous test to Purchase Order, Receiving, Claim,
+Payment, Delivery, Warehouse Unit and every other domain. **A consequence does not transfer
+ownership:** the source module reads or links to the owner; it never gains a second writer.
+
+`CLAUDE.md`'s **OWNER-APPROVED OBJECT / DOMAIN ARCHITECTURE COMPLETENESS LAW** governs the full
+lifecycle checklist, object-level reference capability matrix, evidence/output discipline and
+Plan/Design restart. This blueprint supplies the ownership map that pass must use.
+
+> **The ownership test used by all five laws, and the one V1 needed and did not have:**
 > ```
 > Does this screen CREATE, CHANGE or CLOSE the record?
 >     YES → this module owns it. It owns the completion evidence too.
