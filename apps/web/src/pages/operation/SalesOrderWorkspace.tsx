@@ -26,12 +26,20 @@
 // design-standard: not-a-list-page — this is a DOCUMENT workspace. Its
 // tables are the order's own line block: fixed rows, no sort, no selection.
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Pencil, Plus, Printer, Trash2, X } from "lucide-react";
+import { ArrowLeft, Pencil, Plus, Printer, Route as RouteIcon, Trash2, X } from "lucide-react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import * as pdfjs from "pdfjs-dist";
 import { toast } from "sonner";
-import { orderMoney } from "@carres/shared";
+import {
+  deliveryReasonLabel,
+  orderMoney,
+  poReceivingProgress,
+  receivingRecordNo,
+  resolveSalesOrderRoute,
+  warehouseReceiptStatusLabel,
+  type SalesOrderRoute as SalesOrderRouteModel,
+} from "@carres/shared";
 import Button from "@/components/kit/Button";
 import Checkbox from "@/components/kit/Checkbox";
 import DatePicker from "@/components/kit/DatePicker";
@@ -52,6 +60,7 @@ import {
   useOrderCorrectionWork,
   useOutlets,
   useSalesOrderRevisions,
+  useSalesOrderRouteFacts,
   useSalespersons,
   useSaveSalesOrderRevision,
   type SalesOrderRevisionRow,
@@ -62,6 +71,7 @@ import CorrectionWorkList from "./CorrectionWorkList";
 import SalesOrderAmendment from "./SalesOrderAmendment";
 import SalesOrderAttribution from "./SalesOrderAttribution";
 import SalesOrderLedger from "./SalesOrderLedger";
+import SalesOrderRoute from "./SalesOrderRoute";
 import SalesOrderTabs from "./SalesOrderTabs";
 import { lineName } from "./sales-order-facts";
 
@@ -396,6 +406,7 @@ export default function SalesOrderWorkspace() {
   const [params, setParams] = useSearchParams();
   const isNew = location.pathname.endsWith("/so/new");
   const wantsEdit = params.get("edit") === "1";
+  const showRoute = params.get("route") === "1" && !isNew;
   const [viewRev, setViewRev] = useState<number | null>(null);
   const [amendmentSeed, setAmendmentSeed] = useState<AmendmentProposal | null>(null);
 
@@ -405,6 +416,11 @@ export default function SalesOrderWorkspace() {
    * workspace SHOWS it and cannot close it — the module that raised the work
    * does not tick it off. */
   const correctionWorkQ = useOrderCorrectionWork(isNew ? null : (orderId ?? null));
+  const routeFactsQ = useSalesOrderRouteFacts(
+    isNew ? null : (orderId ?? null),
+    showRoute,
+    (detailQ.data?.pos ?? []).map((po) => po.id),
+  );
   const baseQ = useQuery({
     queryKey: ["orders", "sales-order-data", orderId ?? "new"],
     queryFn: () =>
@@ -486,6 +502,14 @@ export default function SalesOrderWorkspace() {
   const currentRev = revisions.length > 0 ? revisions[revisions.length - 1]!.revision : null;
   const viewedRevision: SalesOrderRevisionRow | null =
     viewRev != null ? (revisions.find((r) => r.revision === viewRev) ?? null) : null;
+
+  /* Revision links in Order Route are durable URLs, not local-only buttons. */
+  useEffect(() => {
+    const raw = params.get("revision");
+    if (!raw) return;
+    const revision = Number(raw);
+    if (Number.isInteger(revision) && revision > 0) setViewRev(revision);
+  }, [params]);
 
   /* ── ONE template-data value per mode; the draft path debounces 300ms. ── */
   const base = baseQ.data ?? null;
@@ -655,6 +679,114 @@ export default function SalesOrderWorkspace() {
     });
   }, [editing, mode, draft.lines, base, viewedRevision, detailQ.data, order]);
 
+  const orderRoute: SalesOrderRouteModel | null = useMemo(() => {
+    const detail = detailQ.data;
+    const facts = routeFactsQ.data;
+    if (!orderId || !detail?.order || !facts) return null;
+    return resolveSalesOrderRoute({
+      order: {
+        id: orderId,
+        so: detail.order.so,
+        placedAt: detail.order.placed_at,
+        deliveryDate: detail.order.delivery_date,
+        doNumber: detail.order.do_number,
+        dispatchedAt: detail.order.dispatched_at,
+        deliveredAt: detail.order.delivered_at,
+        invoiceNo: detail.order.invoice_no,
+      },
+      revisions: revisions.map((revision) => revision.revision),
+      lineLabels: Object.fromEntries(detail.lines.map((line) => [line.sku, line.label?.trim() || line.sku])),
+      allocation: facts.allocation,
+      purchaseOrders: detail.pos.map((po) => ({
+        id: po.id,
+        currentFact: poReceivingProgress(po.lines.map((line) => ({
+          qty: line.qty,
+          received_qty: line.received_qty,
+        }))).label,
+        etaDate: po.eta_date,
+        /* A file path proves a file exists but is not its document number. */
+        supplierDoNumber: null,
+        lines: po.lines.map((line) => ({
+          sku: line.sku,
+          qty: Number(line.qty),
+          receivedQty: Number(line.received_qty),
+        })),
+      })),
+      receivingRecords: facts.receiving.map((record) => ({
+        id: record.id,
+        recordNo: receivingRecordNo({
+          id: record.id,
+          goods_received_at: record.goods_received_at ?? undefined,
+          submitted_at: record.submitted_at,
+        }),
+        poId: record.po_id,
+        supplierDoNumber: record.do_number,
+        status: warehouseReceiptStatusLabel(record.status),
+        receivedAt: record.goods_received_at,
+      })),
+      delivery: {
+        booking: facts.brief.appointment
+          ? {
+              date: facts.brief.appointment.dateIso,
+              slot: facts.brief.appointment.slot,
+              partnerName: facts.brief.appointment.carrier.partnerName,
+            }
+          : null,
+        attempts: facts.attempts.map((attempt) => ({
+          id: attempt.id,
+          attemptNo: attempt.attempt_no,
+          result: attempt.result,
+          reason: attempt.reason_key ? deliveryReasonLabel(attempt.reason_key) : attempt.note,
+          doNumber: attempt.do_number,
+          scheduledDate: attempt.scheduled_date,
+          recordedAt: attempt.recorded_at,
+        })),
+      },
+      money: {
+        known: money.known,
+        total: money.total,
+        paid: money.paid,
+        outstanding: money.outstanding,
+      },
+      refunds: facts.refunds.map((refund) => ({
+        id: refund.id,
+        amount: Number(refund.amount),
+        status: refund.status,
+        requestedAt: refund.requested_at,
+      })),
+      loans: facts.loans.map((loan) => ({
+        id: loan.id,
+        label: loan.borrowed_label ?? loan.item_sku ?? loan.category ?? "Loan item",
+        status: loan.status,
+        source: loan.source,
+        loanNoteNo: loan.loan_note_no,
+        loanedAt: loan.loaned_at,
+        returnedAt: loan.returned_at,
+        returnedToSupplierAt: loan.returned_to_supplier_at,
+      })),
+      cases: facts.cases.map((item) => ({
+        id: item.id,
+        caseNo: item.caseNo,
+        closed: item.statusIsClosed,
+        openedAt: item.openedAt,
+      })),
+      claims: facts.claims.map((item) => ({
+        id: item.id,
+        claimNo: item.claim_no,
+        poId: item.po_id,
+        status: item.status,
+        reportedAt: item.reported_at,
+      })),
+      work: (correctionWorkQ.data?.work ?? []).map((item) => ({
+        id: item.id,
+        module: item.module,
+        title: item.consequence,
+        state: item.state,
+        createdAt: item.raised_at,
+      })),
+    });
+  }, [orderId, detailQ.data, routeFactsQ.data, revisions, money, correctionWorkQ.data]);
+
   /* The real parties, with no placeholder — the attribution form supplies its
    * own "Keep …" and "Not recorded" entries, and two placeholders in one list
    * is how a picker ends up offering "Not recorded" twice. */
@@ -681,7 +813,38 @@ export default function SalesOrderWorkspace() {
 
   const headerRight = (
     <span className="flex items-center gap-2">
-      {mode === "view" && (
+      {showRoute ? (
+        <Button
+          size="sm"
+          variant="neutral"
+          onClick={() => {
+            setParams((prev) => {
+              const next = new URLSearchParams(prev);
+              next.delete("route");
+              return next;
+            }, { replace: true });
+          }}
+          data-testid="workspace-back-to-order"
+        >
+          <ArrowLeft size={14} /> Back to order
+        </Button>
+      ) : mode === "view" && !isNew ? (
+        <Button
+          size="sm"
+          variant="neutral"
+          onClick={() => {
+            setParams((prev) => {
+              const next = new URLSearchParams(prev);
+              next.set("route", "1");
+              return next;
+            }, { replace: true });
+          }}
+          data-testid="workspace-order-route"
+        >
+          <RouteIcon size={14} /> Order Route
+        </Button>
+      ) : null}
+      {mode === "view" && !showRoute && (
         <Button size="sm" variant="neutral" onClick={enterEdit} data-testid="workspace-edit">
           <Pencil size={14} /> Edit
         </Button>
@@ -706,7 +869,14 @@ export default function SalesOrderWorkspace() {
         <Button
           size="sm"
           variant="neutral"
-          onClick={() => setViewRev(null)}
+          onClick={() => {
+            setViewRev(null);
+            setParams((prev) => {
+              const next = new URLSearchParams(prev);
+              next.delete("revision");
+              return next;
+            }, { replace: true });
+          }}
           data-testid="workspace-back-to-current"
         >
           Back to current
@@ -738,6 +908,27 @@ export default function SalesOrderWorkspace() {
         right={headerRight}
       />
 
+      {showRoute ? (
+        <div className="min-h-0 flex-1 overflow-auto bg-kit-slate-3 px-4 py-4">
+          {routeFactsQ.isLoading || detailQ.isLoading || revisionsQ.isLoading ? (
+            <Loading label="Opening the order route" />
+          ) : routeFactsQ.isError || detailQ.isError || revisionsQ.isError ? (
+            <div className="rounded-card border border-kit-slate-5 bg-white">
+              <EmptyState
+                title="This order route could not be opened"
+                detail={(routeFactsQ.error as Error | undefined)?.message ?? (detailQ.error as Error | undefined)?.message ?? (revisionsQ.error as Error | undefined)?.message}
+                action={<Button variant="neutral" onClick={() => void routeFactsQ.refetch()}>Try again</Button>}
+              />
+            </div>
+          ) : orderRoute ? (
+            <SalesOrderRoute route={orderRoute} />
+          ) : (
+            <div className="rounded-card border border-kit-slate-5 bg-white">
+              <EmptyState title="No route facts were found for this sales order" />
+            </div>
+          )}
+        </div>
+      ) : (
       <div className="flex min-h-0 flex-1">
         {/* ── LEFT 55% — the seven sections ─────────────────────────────── */}
         <div className="min-h-0 w-[55%] shrink-0 overflow-auto border-r border-kit-slate-5 bg-kit-slate-3 px-4 py-4">
@@ -1103,6 +1294,7 @@ export default function SalesOrderWorkspace() {
           ) : null}
         </div>
       </div>
+      )}
     </div>
   );
 }
