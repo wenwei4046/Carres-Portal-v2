@@ -345,8 +345,9 @@ DetailShell · DialogFrame · FieldFrame · GridToolbar · SectionHeader
 # §5 · The right rail
 
 ### MISSION
-Four widgets on the right of **every** main panel — **Calendar · Team · Tasks · Activity** —
-so a COO can supervise and every operator knows what everyone is doing without asking.
+Four quick-peek surfaces on the right of the ERP shell — **Team · Calendar · My Work · Activity** —
+answer **who · when · what I must do · what just happened** without leaving the current object.
+They are not duplicate modules and never become a second home for business truth.
 
 ### WHAT IS ON SCREEN TODAY
 `apps/web/src/pages/operation/components/rail/` — `CalendarPanel` · `TeamPanel` · `KeepPanel` ·
@@ -356,9 +357,24 @@ line.***
 ### FROZEN RULES
 - **No widget is an island.** Widgets interlink with each other AND with the LEFT panel; an
   action anywhere cascades to the relevant widgets.
-- **The rail is 200px and it is navigation**, never a second place to act.
+- **The rail is quick peek, not navigation truth and not a second place to act.** A row may
+  deep-link to the authoritative object/action. The owning module remains the writer.
+- **`My Work` in the rail is a preview of the formal `Work` destination.** The full destination
+  owns the `My Work · Team Work` views over one work set; the rail may not create another work set.
+- **Team** previews availability/coverage and open/overdue workload; People/HR remains the owner.
+- **Activity** previews recent append-only events and links to their objects; it does not replace
+  an object's History or a module audit surface.
 - **The calendar's day comes from the BOOKING, through the one shared rule** — never from the
   promised date, or two surfaces put one order on two days.
+
+### ERP SHELL V1 — OWNER RULING 2026-08-13
+
+- The left navigation is grouped by responsibility using the destination grammar in
+  `../ERP-ARCHITECTURE.md` §2.1. It is not one flat list.
+- `Work` is a formal destination with `My Work` and `Team Work`; the Quick Rail is only its peek.
+- There is one central `Settings` destination with module deep-links. Module shortcuts enter that
+  destination and do not manufacture `Sales Settings`, `SO Maintenance` or similar sidebar homes.
+- `Old Orders` is temporary cutover infrastructure and must retire; it is not ERP Shell V1.
 
 # §6 · The measured debt
 
