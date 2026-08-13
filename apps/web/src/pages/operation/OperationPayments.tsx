@@ -388,7 +388,7 @@ export default function OperationPayments() {
   const [view, setView] = useState<"owing" | "all">("owing");
   const [facetOpen, setFacetOpen] = useState(true);
   const [queueFilter, setQueueFilter] = useState<Set<QueueKey>>(new Set());
-  const [payFilter, setPayFilter] = useState<Set<string>>(new Set());
+  const [payFilter, setPayFilter] = useState<Set<MoneyState>>(new Set());
   const [regionFilter, setRegionFilter] = useState<Set<string>>(new Set());
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [collectFor, setCollectFor] = useState<Row | null>(null);
@@ -550,7 +550,7 @@ export default function OperationPayments() {
   }, [baseRows]);
 
   const payEntries = useMemo(() => {
-    const m = new Map<string, number>();
+    const m = new Map<MoneyState, number>();
     for (const r of baseRows) m.set(r.moneyState, (m.get(r.moneyState) ?? 0) + 1);
     const keys = [...m.keys()].sort((a, b) => {
       const ia = PAY_ORDER.indexOf(a);
