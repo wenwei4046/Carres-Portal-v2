@@ -215,13 +215,18 @@ official Card numbers.
 
 ## Ready implementation slices — unnumbered
 
-1. **BUILD IN DELIVERY — Sales Orders Register + Document Actions** — implemented locally from
-   merged PR #750: ruled seven-column default, bounded surface, governed widths/overflow, grouped
-   goods disclosure, direct SO/PO/DO document lineage, normal/selected states, preserved Search /
-   typed filters / Columns / Export, and context View / Edit / Preview / Print. Existing Orders and
-   Purchasing relations supply the read model; no schema migration or new writer was needed.
-   Type checks, design guards and the 82-test Orders API suite pass. Production verification remains
-   required before this slice becomes CLOSED or the Detail/Edit slice starts.
+1. **CLOSED / PRODUCTION-VERIFIED 2026-08-13 — Sales Orders Register + Document Actions** — PR
+   #751 merged as `60ba6324`; no schema migration or new writer. Web bundle
+   `index-C7_GK70Y.js` was deployed to both governed Pages projects (`carres-portal` `fdbb7496`;
+   `carres-pos` `db39d1c6`) and all four canonicals converged on that exact asset. Production Worker
+   version `5c669747-8a6b-4998-9643-fcc39604c69d` serves the API change at 100%. Authenticated
+   production verification on `erp.carresofficial.com/operation/orders` proved the exact default
+   order **SO No / Ordered / Customer Delivery / Customer / Delivery Location / PO No / DO No**,
+   `Columns 7/38`, bounded bordered surface, preserved Search / typed filters / Columns / Export,
+   inline goods-only grouped disclosure (`Other Goods`, SKU/model/size/quantity), direct SO document
+   navigation, and the 2990-style right-click actions **View / Edit / Preview PDF / Print PDF / Copy
+   SO No**. No overall Current/status or Register work-queue behavior is present. Type checks, design
+   guards and the 82-test Orders API suite passed before merge.
 2. **READY FOR CARD — Sales Order Detail + Authoritative Edit Contract** — Current/Order truth,
    Sales Portal/POS field parity, safe correction boundary, permission enforcement and actual PDF.
 3. **READY FOR CARD — Amendment / Approval / Revision / History** — routed request, impact preview,
