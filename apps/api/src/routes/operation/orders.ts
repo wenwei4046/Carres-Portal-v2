@@ -216,7 +216,7 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
       // `invoiced_at`, `payment_method` and `installment_months`. Nothing here
       // is another module's record, nothing is computed. Purely additive: the
       // old control table selects none of these and is unaffected.
-      "id, so, status, operation_stage, warehouse_id, customer_name, customer_phone, customer_address, customer_email, customer_billing, customer_emergency, customer_address_line1, customer_address_line2, customer_address_city, customer_address_state, customer_address_postcode, building_type:entry_data->fields->>building_type, delivery_floor, delivery_has_lift, channel, placed_at, delivery_date, delivery_date_tbd, proceed_date, source_system, source_ref, ops_assigned_logistic, delivery_partner_id, request_for_delivery_at, partner_accepted_at, partner_rejected_at, partner_rejected_reason, do_number, invoice_no, invoiced_at, payment_method, installment_months, dispatched_at, delivered_at, outlet_id, salesperson_id, dealer_id, paid, dealers(name), outlets(name), salespersons(name), delivery_partners!orders_delivery_partner_id_fkey(id, name), order_lines(sku, qty, unit_price, source_po), order_addons(qty, unit_price), order_supplier_threads(id, supplier_id, category, operation_stage, po_id, delivery_partner_id, delivery_partners(id, name), confirm_delivery_date, request_for_delivery_at, partner_accepted_at, partner_rejected_at), order_annotations(content, tag, created_at), ops_order_control(customer_request, action_for_logistic, carres_remark, warehouse_remark, logistic_eta, balance, payment_status, storage_from, storage_fee_override, storage_fee_msbf, storage_fee_sof, storage_paid, storage_collected_at, storage_waiver_status, called_customer, line_etas, line_stock_status, assigned_staff, booking_stage, confirmed_date, confirmed_time_slot, delivery_photos, booking_groups, delay_decision, delay_decision_eta, delay_decision_at, delay_detected_at, delay_detected_eta)",
+      "id, so, status, operation_stage, warehouse_id, customer_name, customer_phone, customer_address, customer_email, customer_billing, customer_emergency, customer_address_line1, customer_address_line2, customer_address_city, customer_address_state, customer_address_postcode, building_type:entry_data->fields->>building_type, delivery_floor, delivery_has_lift, channel, placed_at, delivery_date, delivery_date_tbd, proceed_date, source_system, source_ref, ops_assigned_logistic, delivery_partner_id, request_for_delivery_at, partner_accepted_at, partner_rejected_at, partner_rejected_reason, do_number, invoice_no, invoiced_at, payment_method, installment_months, dispatched_at, delivered_at, outlet_id, salesperson_id, dealer_id, paid, dealers(name), outlets(name), salespersons(name), delivery_partners!orders_delivery_partner_id_fkey(id, name), order_lines(sku, qty, unit_price, attrs, source_po), order_addons(addon_key, qty, unit_price), order_supplier_threads(id, supplier_id, category, operation_stage, po_id, delivery_partner_id, delivery_partners(id, name), confirm_delivery_date, request_for_delivery_at, partner_accepted_at, partner_rejected_at), order_annotations(content, tag, created_at), ops_order_control(customer_request, action_for_logistic, carres_remark, warehouse_remark, logistic_eta, balance, payment_status, storage_from, storage_fee_override, storage_fee_msbf, storage_fee_sof, storage_paid, storage_collected_at, storage_waiver_status, called_customer, line_etas, line_stock_status, assigned_staff, booking_stage, confirmed_date, confirmed_time_slot, delivery_photos, booking_groups, delay_decision, delay_decision_eta, delay_decision_at, delay_detected_at, delay_detected_eta)",
     )
     // Pipeline v2 (C3): include `status='place'` rows so the FE kanban can
     // render the "Placed" column. proceed_order + delivered preserved as
@@ -318,6 +318,7 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
     ),
   ];
   const poSkusBySo = new Map<number, Set<string>>();
+  const poNumbersBySo = new Map<number, Set<string>>();
   if (soNumbers.length > 0) {
     const inList = soNumbers.join(",");
     const { data: pos, error: e_pos } = await sb
@@ -359,6 +360,9 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
         if (typeof po.so === "number") served.add(po.so);
         for (const r of po.so_refs ?? []) served.add(r);
         for (const so of served) {
+          const numbers = poNumbersBySo.get(so) ?? new Set<string>();
+          numbers.add(po.id);
+          poNumbersBySo.set(so, numbers);
           const set = poSkusBySo.get(so) ?? new Set<string>();
           for (const s of skus) set.add(s);
           poSkusBySo.set(so, set);
@@ -371,6 +375,7 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
     orders: orders.map((o: { so?: number | null }) => ({
       ...o,
       po_skus: [...(poSkusBySo.get(o.so ?? -1) ?? [])],
+      po_numbers: [...(poNumbersBySo.get(o.so ?? -1) ?? [])],
     })),
   });
 });

@@ -74,6 +74,7 @@
    register baseline off frozen callers and does not create a global 32px law. */
 .rootReference {
   --fs-12: 11px;
+  border: 1px solid var(--line);
 }
 .rootReference .toolbar {
   box-sizing: border-box;

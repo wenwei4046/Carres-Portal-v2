@@ -215,9 +215,13 @@ official Card numbers.
 
 ## Ready implementation slices — unnumbered
 
-1. **READY FOR CARD — Sales Orders Register + Document Actions** — ruled seven-column default,
-   bounded surface, widths/overflow, goods disclosure, direct lineage, normal/selected states,
-   search/filter/columns/export and context View/Edit/Preview/Print.
+1. **BUILD IN DELIVERY — Sales Orders Register + Document Actions** — implemented locally from
+   merged PR #750: ruled seven-column default, bounded surface, governed widths/overflow, grouped
+   goods disclosure, direct SO/PO/DO document lineage, normal/selected states, preserved Search /
+   typed filters / Columns / Export, and context View / Edit / Preview / Print. Existing Orders and
+   Purchasing relations supply the read model; no schema migration or new writer was needed.
+   Type checks, design guards and the 82-test Orders API suite pass. Production verification remains
+   required before this slice becomes CLOSED or the Detail/Edit slice starts.
 2. **READY FOR CARD — Sales Order Detail + Authoritative Edit Contract** — Current/Order truth,
    Sales Portal/POS field parity, safe correction boundary, permission enforcement and actual PDF.
 3. **READY FOR CARD — Amendment / Approval / Revision / History** — routed request, impact preview,

@@ -33,7 +33,6 @@ import { fmtDate } from "@/lib/fmt-date";
 import type { operationOrderListRow } from "@/lib/queries";
 import {
   digits,
-  isDelivered,
   itemsSummary,
   moneyOfOrder,
   outstandingState,
@@ -57,6 +56,9 @@ export interface RegisterRow {
   items: string;
   promised: string | null;
   ordered: string;
+  customerDelivery: string | null;
+  deliveryLocation: string;
+  poNumbers: string[];
   total: MoneyState;
   paid: MoneyState;
   balance: MoneyState;
@@ -76,6 +78,9 @@ export function buildRegisterRow(o: operationOrderListRow): RegisterRow {
     items: itemsSummary(o),
     promised: o.delivery_date_tbd ? null : (o.delivery_date ?? null),
     ordered: o.placed_at,
+    customerDelivery: o.delivery_date_tbd ? null : (o.delivery_date ?? null),
+    deliveryLocation: o.customer_address ?? NOT_GIVEN,
+    poNumbers: o.po_numbers ?? [],
     total: valueState(money),
     /* `paid` is never "unpriced" and never "settled": a payment either
      * happened or it did not, and the truthful cell for "it did not" is
@@ -91,22 +96,6 @@ export function buildRegisterRow(o: operationOrderListRow): RegisterRow {
 export function moneyText(state: MoneyState): string {
   if (state.kind === "amount") return String(state.value);
   return state.kind === "settled" ? "Paid in full" : "No price yet";
-}
-
-/**
- * `Current` — 2990's lifecycle pointer, SHIPPED AS DERIVED (BUILD-QUEUE §
- * "Current"): *which formal document or stage has this order reached?*
- * `invoice_no ?? do_number ?? the live stage`, and **never a document number
- * that does not exist**. From what the list wire can PROVE today: an invoice,
- * a DO, Delivered, or an issued PO on one of the order's supplier threads.
- * Nothing proven yet → the engine's own empty standard (an em-dash).
- */
-export function currentOf(o: operationOrderListRow): string {
-  if (o.invoice_no) return `INV ${o.invoice_no}`;
-  if (o.do_number) return `DO ${o.do_number}`;
-  if (isDelivered(o)) return "Delivered";
-  if ((o.order_supplier_threads ?? []).some((t) => t.po_id)) return "PO issued";
-  return "";
 }
 
 /** Stage 1's eight chooser groups, in the order the card states them. */
@@ -129,7 +118,7 @@ export interface RegisterField {
   align?: "right";
   numeric?: boolean;
   group: FieldGroup;
-  /** On the register by default. Exactly nine are, and they are Stage 1's nine. */
+  /** On the register by default. Exactly seven are, in the owner-ruled order. */
   on?: true;
   /** The ONE string: printed, filtered, sorted and exported. */
   text: (r: RegisterRow) => string;
@@ -156,20 +145,32 @@ const amountOf = (s: MoneyState): number => (s.kind === "amount" ? s.value : 0);
  * widen the sheet an operator did not ask to widen.
  */
 export const REGISTER_FIELDS: readonly RegisterField[] = [
-  /* ── The nine defaults, in Stage 1's order ─────────────────────────────── */
+  /* The seven owner-ruled defaults, in their governed order. */
   { key: "so", label: "SO No", width: "85px", group: "Document", on: true,
     text: (r) => `SO-${r.so}`, sortBy: (r) => r.so },
+  { key: "ordered", label: "Ordered", width: "113px", group: "Dates", on: true,
+    text: (r) => fmtDate(r.ordered), sortBy: (r) => r.ordered,
+    kind: "date", iso: (r) => r.ordered },
+  { key: "customer_delivery", label: "Customer Delivery", width: "148px", group: "Dates", on: true,
+    text: (r) => date(r.customerDelivery, NO_DATE_YET), sortBy: (r) => r.customerDelivery ?? "",
+    kind: "date", iso: (r) => r.customerDelivery },
   { key: "customer", label: "Customer", width: "190px", group: "Customer", on: true,
     text: (r) => r.customer, sortBy: (r) => r.customer },
-  { key: "items", label: "Items", width: "300px", group: "Items", on: true,
+  { key: "delivery_location", label: "Delivery Location", width: "280px", group: "Customer", on: true,
+    text: (r) => r.deliveryLocation },
+  { key: "po_number", label: "PO No", width: "170px", group: "Document", on: true,
+    text: (r) => r.poNumbers.join(" · ") || NOT_RECORDED },
+  { key: "do_number", label: "DO No", width: "150px", group: "Document", on: true,
+    text: (r) => r.o.do_number || NOT_RECORDED },
+  { key: "items", label: "Items", width: "300px", group: "Items",
     text: (r) => r.items },
   { key: "total", label: "Total", width: "109px", align: "right", numeric: true,
-    group: "Money", on: true, text: (r) => moneyText(r.total),
+    group: "Money", text: (r) => moneyText(r.total),
     sortBy: (r) => (r.total.kind === "amount" ? r.total.value : -1),
     kind: "number", num: (r) => (r.total.kind === "amount" ? r.total.value : null),
     footerSum: (r) => amountOf(r.total) },
   { key: "balance", label: "Balance", width: "109px", align: "right", numeric: true,
-    group: "Money", on: true, text: (r) => moneyText(r.balance),
+    group: "Money", text: (r) => moneyText(r.balance),
     sortBy: (r) => (r.balance.kind === "amount" ? r.balance.value : -1),
     kind: "number",
     /* `Paid in full` IS zero balance — a min/max of 0 must catch it. An
@@ -180,27 +181,17 @@ export const REGISTER_FIELDS: readonly RegisterField[] = [
       : r.balance.kind === "settled" ? 0
       : null,
     footerSum: (r) => amountOf(r.balance) },
-  { key: "promised", label: "Promised", width: "113px", group: "Dates", on: true,
+  { key: "promised", label: "Promised", width: "113px", group: "Dates",
     text: (r) => date(r.promised, NO_DATE_YET), sortBy: (r) => r.promised ?? "",
     kind: "date", iso: (r) => r.promised },
-  { key: "ordered", label: "Ordered", width: "113px", group: "Dates", on: true,
-    text: (r) => fmtDate(r.ordered), sortBy: (r) => r.ordered,
-    kind: "date", iso: (r) => r.ordered },
-  { key: "dealer", label: "Dealer", width: "160px", group: "Source", on: true,
+  { key: "dealer", label: "Dealer", width: "160px", group: "Source",
     text: (r) => r.o.dealers?.name || NOT_RECORDED },
-  { key: "showroom", label: "Showroom", width: "126px", group: "Source", on: true,
+  { key: "showroom", label: "Showroom", width: "126px", group: "Source",
     text: (r) => r.o.outlets?.name || NOT_RECORDED },
 
   /* ── DOCUMENT — the papers this order produced, and its references ──────── */
   { key: "source_ref", label: "Customer reference", width: "160px", group: "Document",
     text: (r) => (r.o.source_ref ?? []).filter(Boolean).join(" · ") || NOT_RECORDED },
-  /* FIX 2 (architect, Stage 1 FIX-LIST): `Current` is a document/lifecycle
-   * pointer, so it lives under DOCUMENT — between Customer reference and
-   * DO No, exactly the group's reading order. Semantics unchanged. */
-  { key: "current", label: "Current", width: "140px", group: "Document",
-    text: (r) => currentOf(r.o) },
-  { key: "do_number", label: "DO No", width: "120px", group: "Document",
-    text: (r) => r.o.do_number || NOT_RECORDED },
   { key: "invoice_no", label: "Invoice No", width: "130px", group: "Document",
     text: (r) => r.o.invoice_no || NOT_RECORDED },
 

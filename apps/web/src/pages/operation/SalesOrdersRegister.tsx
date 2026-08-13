@@ -54,8 +54,8 @@ import Select from "@/components/kit/Select";
 import Money from "@/components/Money";
 import { apiFetch, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { renderSalesOrderPdf } from "@/lib/pdf/render";
-import type { SalesOrderTemplateData } from "@/lib/pdf/types";
+import { renderDoPdf, renderSalesOrderPdf } from "@/lib/pdf/render";
+import type { DoTemplateData, SalesOrderTemplateData } from "@/lib/pdf/types";
 import { useOperationOrders } from "@/lib/queries";
 import DestinationHeader from "./DestinationHeader";
 import { isDelivered, isRental, lineName, type MoneyState } from "./sales-order-facts";
@@ -89,7 +89,11 @@ function moneyExport(state: MoneyState): string | number {
  *     lists the printed text, export writes the raw figure, and the engine's
  *     footer sums them over the FILTERED list.
  */
-function toGridColumn(f: RegisterField, role: string | null): DataGridColumn<RegisterRow> {
+function toGridColumn(
+  f: RegisterField,
+  role: string | null,
+  navigate: ReturnType<typeof useNavigate>,
+): DataGridColumn<RegisterRow> {
   const base: DataGridColumn<RegisterRow> = {
     key: f.key,
     label: f.label,
@@ -127,8 +131,67 @@ function toGridColumn(f: RegisterField, role: string | null): DataGridColumn<Reg
       : {}),
   };
   if (f.key === "so") {
-    /* Doc codes get 2990's type-to-find list. */
-    return { ...base, filterType: "numbering" };
+    return {
+      ...base,
+      filterType: "numbering",
+      accessor: (r) => (
+        <button
+          type="button"
+          className="font-medium text-blue-700 underline-offset-2 hover:underline"
+          onClick={(event) => {
+            event.stopPropagation();
+            navigate(`/operation/orders/so/${r.id}`);
+          }}
+        >
+          SO-{r.so}
+        </button>
+      ),
+    };
+  }
+  if (f.key === "po_number") {
+    return {
+      ...base,
+      accessor: (r) =>
+        r.poNumbers.length === 0 ? (
+          f.text(r)
+        ) : (
+          <span className="inline-flex gap-1.5">
+            {r.poNumbers.map((po) => (
+              <button
+                key={po}
+                type="button"
+                className="font-medium text-blue-700 underline-offset-2 hover:underline"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  navigate(`/operation/procurement?po=${encodeURIComponent(po)}`);
+                }}
+              >
+                {po}
+              </button>
+            ))}
+          </span>
+        ),
+    };
+  }
+  if (f.key === "do_number") {
+    return {
+      ...base,
+      accessor: (r) =>
+        r.o.do_number ? (
+          <button
+            type="button"
+            className="font-medium text-blue-700 underline-offset-2 hover:underline"
+            onClick={(event) => {
+              event.stopPropagation();
+              void openDeliveryOrderPdf(r.id, r.o.do_number!);
+            }}
+          >
+            {r.o.do_number}
+          </button>
+        ) : (
+          f.text(r)
+        ),
+    };
   }
   if (f.key === "customer") {
     return {
@@ -186,40 +249,46 @@ function ExpandedLines({ row }: { row: RegisterRow }) {
   if (lines.length === 0 && addons.length === 0) {
     return <div className="px-10 py-2 text-meta text-base-500">No items on this order</div>;
   }
-  const money = (n: number) => (n > 0 ? <Money value={n} /> : "No price yet");
+  const categoryOf = (line: (typeof lines)[number]) => {
+    const fromAttrs = typeof line.attrs?.category === "string" ? line.attrs.category : "";
+    const fromSku = line.sku.includes(":") ? line.sku.split(":", 1)[0] : "";
+    const category = fromAttrs || fromSku || "Other goods";
+    return category.replace(/[_-]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  };
+  const configOf = (line: (typeof lines)[number]) =>
+    Object.entries(line.attrs ?? {})
+      .filter(([key, value]) => key !== "category" && value != null && value !== "")
+      .map(([key, value]) => `${key.replace(/[_-]+/g, " ")}: ${String(value)}`)
+      .join(" · ");
+  const grouped = new Map<string, typeof lines>();
+  for (const line of lines) grouped.set(categoryOf(line), [...(grouped.get(categoryOf(line)) ?? []), line]);
   return (
-    <table className="text-body my-1 ml-10" data-testid="row-expansion">
-      <thead>
-        <tr className="text-label text-base-500">
-          <th className="py-1 pr-6 text-left font-medium">Item</th>
-          <th className="py-1 pr-6 text-right font-medium">Qty</th>
-          <th className="py-1 pr-6 text-right font-medium">Unit price</th>
-          <th className="py-1 pr-6 text-right font-medium">Total</th>
-        </tr>
-      </thead>
-      <tbody>
-        {lines.map((l, i) => (
-          <tr key={`l-${i}`}>
-            <td className="py-0.5 pr-6">{lineName(l)}</td>
-            <td className="py-0.5 pr-6 text-right tabular-nums">{l.qty}</td>
-            <td className="py-0.5 pr-6 text-right">{money(Number(l.unit_price ?? 0))}</td>
-            <td className="py-0.5 pr-6 text-right">
-              {money(Number(l.unit_price ?? 0) * Number(l.qty ?? 0))}
-            </td>
-          </tr>
-        ))}
-        {addons.map((a, i) => (
-          <tr key={`a-${i}`}>
-            <td className="py-0.5 pr-6">Add-on</td>
-            <td className="py-0.5 pr-6 text-right tabular-nums">{a.qty}</td>
-            <td className="py-0.5 pr-6 text-right">{money(Number(a.unit_price ?? 0))}</td>
-            <td className="py-0.5 pr-6 text-right">
-              {money(Number(a.unit_price ?? 0) * Number(a.qty ?? 0))}
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+    <div className="ml-10 space-y-2 py-2 pr-6 text-body" data-testid="row-expansion">
+      {[...grouped.entries()].map(([category, categoryLines]) => (
+        <section key={category}>
+          <h3 className="text-label font-semibold text-base-500">{category}</h3>
+          {categoryLines.map((line, index) => (
+            <div key={`${line.sku}-${index}`} className="grid grid-cols-[150px_minmax(240px,1fr)_60px] gap-3 py-0.5">
+              <span className="font-mono text-meta">{line.sku}</span>
+              <span>{lineName(line)}{configOf(line) ? ` · ${configOf(line)}` : ""}</span>
+              <span className="text-right tabular-nums">Qty {line.qty}</span>
+            </div>
+          ))}
+        </section>
+      ))}
+      {addons.length > 0 ? (
+        <section>
+          <h3 className="text-label font-semibold text-base-500">Add-ons</h3>
+          {addons.map((addon, index) => (
+            <div key={index} className="grid grid-cols-[150px_minmax(240px,1fr)_60px] gap-3 py-0.5">
+              <span className="font-mono text-meta">{addon.addon_key ?? "Add-on"}</span>
+              <span>{addon.addon_key?.replace(/[_-]+/g, " ") ?? "Add-on"}</span>
+              <span className="text-right tabular-nums">Qty {addon.qty}</span>
+            </div>
+          ))}
+        </section>
+      ) : null}
+    </div>
   );
 }
 
@@ -241,6 +310,21 @@ async function openSalesOrderPdf(orderId: string, so: number): Promise<void> {
   } catch (e) {
     const msg = e instanceof ApiError ? e.message : String(e);
     toast.error(`Sales Order SO-${so} PDF failed: ${msg}`);
+  }
+}
+
+async function openDeliveryOrderPdf(orderId: string, doNumber: string): Promise<void> {
+  try {
+    const data = await apiFetch<DoTemplateData>(
+      `/api/operation/orders/${orderId}/print-do-data`,
+    );
+    const blob = await renderDoPdf(data);
+    const url = URL.createObjectURL(blob);
+    window.open(url, "_blank");
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  } catch (error) {
+    const message = error instanceof ApiError ? error.message : String(error);
+    toast.error(`Delivery Order ${doNumber} PDF failed: ${message}`);
   }
 }
 
@@ -281,10 +365,11 @@ export default function SalesOrdersRegister() {
      Memoized per role so the engine's memo actually hits; the layout store is
      per-role so one machine's Finance login does not restyle Operations'. */
   const columns = useMemo(
-    () => REGISTER_FIELDS.map((f) => toGridColumn(f, role)),
-    [role],
+    () => REGISTER_FIELDS.map((f) => toGridColumn(f, role, navigate)),
+    [navigate, role],
   );
-  const storageKey = `carres.salesOrders.register.v1.${role ?? "anon"}`;
+  /* v2 intentionally resets the superseded nine-column Stage A layout. */
+  const storageKey = `carres.salesOrders.register.v2.${role ?? "anon"}`;
 
   /* ── SELECTION — the REGISTER LAW's clause: ticks feed Export and nothing
      else. Header checkbox = select all visible / clear (the engine says which). */
@@ -315,8 +400,9 @@ export default function SalesOrdersRegister() {
      verbatim). Every item is view-oriented; none writes. */
   const contextMenu = useCallback(
     (r: RegisterRow): DataGridContextMenuItem[] => [
-      { label: "Open", onClick: () => openWorkspace(r) },
+      { label: "View", onClick: () => openWorkspace(r) },
       { label: "Edit", onClick: () => openWorkspace(r, true) },
+      { label: "Preview PDF", onClick: () => void openSalesOrderPdf(r.id, r.so) },
       { label: "Print PDF", onClick: () => void openSalesOrderPdf(r.id, r.so) },
       {
         label: "Copy SO No",
@@ -340,7 +426,7 @@ export default function SalesOrdersRegister() {
     <div className="flex h-full min-h-0 flex-col">
       <DestinationHeader />
 
-      <div className="flex min-h-0 flex-1 flex-col" data-testid="register-column">
+      <div className="flex min-h-0 flex-1 flex-col p-3 pt-4" data-testid="register-column">
         {isError ? (
           <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 bg-white">
             <p className="text-body text-base-700">The register could not be loaded</p>

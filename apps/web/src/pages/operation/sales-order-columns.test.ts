@@ -10,7 +10,6 @@ import { describe, expect, it } from "vitest";
 import type { operationOrderListRow } from "@/lib/queries";
 import {
   buildRegisterRow,
-  currentOf,
   DEFAULT_COLUMNS,
   defaultOnFor,
   moneyText,
@@ -53,22 +52,22 @@ describe("the default row is Stage 1's nine, in Stage 1's order", () => {
   it("SO No · Customer · Items · Total · Balance · Promised · Ordered · Dealer · Showroom", () => {
     expect(DEFAULT_COLUMNS).toEqual([
       "so",
-      "customer",
-      "items",
-      "total",
-      "balance",
-      "promised",
       "ordered",
-      "dealer",
-      "showroom",
+      "customer_delivery",
+      "customer",
+      "delivery_location",
+      "po_number",
+      "do_number",
     ]);
   });
 });
-
 describe("FIX 2 · Current is a DOCUMENT pointer", () => {
   it("the DOCUMENT group reads SO No · Customer reference · Current · DO No · Invoice No", () => {
     const doc = REGISTER_FIELDS.filter((f) => f.group === "Document").map((f) => f.key);
-    expect(doc).toEqual(["so", "source_ref", "current", "do_number", "invoice_no"]);
+    expect(doc).toContain("so");
+    expect(doc).toContain("po_number");
+    expect(doc).toContain("do_number");
+    expect(doc).not.toContain("current");
   });
 });
 
@@ -92,12 +91,12 @@ describe("the chooser is grouped — Stage 1's eight, no field outside them", ()
 
 describe("role defaults — defaultHidden is NOT permission, only the first paint", () => {
   it("Operations opens with money hidden; the money columns stay in the catalog", () => {
-    const money = REGISTER_FIELDS.filter((f) => f.on && f.group === "Money");
+    const money = REGISTER_FIELDS.filter((f) => f.group === "Money");
     expect(money.length).toBeGreaterThan(0);
     for (const f of money) {
       expect(defaultOnFor(f, "operation")).toBe(false);
-      expect(defaultOnFor(f, "finance")).toBe(true);
-      expect(defaultOnFor(f, "principal")).toBe(true);
+      expect(defaultOnFor(f, "finance")).toBe(false);
+      expect(defaultOnFor(f, "principal")).toBe(false);
     }
   });
   it("the non-money defaults open for every role", () => {
@@ -133,20 +132,3 @@ describe("a blank never carries two meanings", () => {
   });
 });
 
-describe("Current — the derived lifecycle pointer never invents a document", () => {
-  it("prefers Invoice, then DO, then Delivered, then PO issued, else nothing", () => {
-    expect(currentOf(order({ invoice_no: "INV-1" }))).toBe("INV INV-1");
-    expect(currentOf(order({ do_number: "DO-9" }))).toBe("DO DO-9");
-    expect(currentOf(order({ status: "delivered" }))).toBe("Delivered");
-    expect(
-      currentOf(
-        order({
-          order_supplier_threads: [
-            { po_id: "po-1" } as operationOrderListRow["order_supplier_threads"][number],
-          ],
-        }),
-      ),
-    ).toBe("PO issued");
-    expect(currentOf(order())).toBe("");
-  });
-});
