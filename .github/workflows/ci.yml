@@ -16,7 +16,7 @@ jobs:
       - uses: pnpm/action-setup@v4
         with: { run_install: false }
       - uses: actions/setup-node@v4
-        with: { node-version: 20, cache: pnpm }
+        with: { node-version: 22, cache: pnpm }
       - run: pnpm install --frozen-lockfile
       - name: Validate migration law (never applies migrations)
         run: pnpm ci:migrations
