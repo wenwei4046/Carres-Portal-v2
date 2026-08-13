@@ -316,6 +316,11 @@ file, while Receiving is the closed page.
 **Engineer-Owned Delivery.** After approval, engineering owns delivery until production is
 verified: implementation · testing · self-review · fixing what it finds · merge · deploy ·
 production verification. **Never return routine engineering as an approval request.**
+**Code owns tests; `main` owns deployment.** GitHub CI must pass before merge; a merge to `main`
+deploys both Git-connected Pages projects and the production Worker, then proves every canonical
+surface reports that exact SHA. Never ask Jess to run routine fetch, push, build, Wrangler or
+deployment commands. Manual intervention is limited to first-time credential setup, the governed
+approval/apply path for production migrations, and rollback or emergency response.
 The four reasons to interrupt: a new business rule · an approved UI/workflow/word must change ·
 production data must be modified irreversibly · long-term architecture must change.
 
