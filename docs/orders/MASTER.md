@@ -187,8 +187,8 @@ Shopify-style transaction/version discipline add no unresolved business rule.
 | Search/filter/sort/Columns/export | Built server search, typed column filters, chooser, XLSX, resize/reorder/layout memory | 2990 exposes search, per-column filters, 42-column chooser and Excel | **KEEP / ADAPT** | Govern widths/default order; optional columns may overflow; remove `Current` as a candidate overall pointer if it implies status |
 | Inline goods expansion | Built one line-item disclosure | 2990 expands nested goods | **ADAPT** | Category-grouped compact goods; no nested register/header or cross-module status |
 | Context actions + bulk | Built right-click `Open · Edit · Print PDF · Copy SO No`; bulk Export only | 2990 proves right-click document action pattern | **KEEP / ADAPT** | Rename/open semantics to explicit View/Preview where needed; add no execution acts; preserve selection only for truthful export |
-| View / Preview | Built workspace presents saved truth and the actual PDF; explicit Edit changes context | 2990 detail is read-only until Edit | **KEEP / ADAPT** | Merged on main in PR #754; production verification and direct SO/PO/DO lineage completeness are not recorded |
-| Edit / field contract | Built UI and API restrict Edit to safe customer/contact/address/access/proceed-date corrections; items and promised delivery remain read-only | 2990 has a comprehensive backend form | **KEEP / IMPROVE** | Merged on main in PR #754; prove production, complete authoritative Sales Portal/POS contract parity and explicit role matrix |
+| View / Preview | Built workspace presents saved truth and the actual PDF; explicit Edit changes context | 2990 detail is read-only until Edit | **KEEP / ADAPT** | PR #754 production-verified 2026-08-13; direct SO/PO/DO lineage completeness remains in the later dependency scopes |
+| Edit / field contract | Built UI and API restrict Edit to safe customer/contact/address/access/proceed-date corrections; items and promised delivery remain read-only | 2990 has a comprehensive backend form | **KEEP / IMPROVE** | PR #754 production-verified 2026-08-13; authoritative Sales Portal/POS parity and the complete role matrix continue through Amendment/Approval |
 | Amendment request + approval | Request/apply foundations and stale detection exist; current UI places amendment beside items | 2990 has separate Amendments and amend fields | **ADAPT / BUILD** | Sales ownership, operation routing, management approve/reject/direct amend, structured Before/After/reason; impact preview across all owners |
 | Revisions | Revision snapshots and historical rendering/PDF exist; current UI combines `History / Revision`; Rev 1 may be minted only on first save | 2990 exposes Revisions and current document identity | **ADAPT / BUILD** | Backstop original Rev 1 at transaction birth; only approved applied amendment mints next Rev; separate complete-version view |
 | History / audit | Order history and revision events render together; actor/cause coverage is partial | 2990 has History | **ADAPT / BUILD** | Separate append-only event view; actor/time/reason/Before/After and permission decisions |
@@ -227,13 +227,16 @@ official Card numbers.
    navigation, and the 2990-style right-click actions **View / Edit / Preview PDF / Print PDF / Copy
    SO No**. No overall Current/status or Register work-queue behavior is present. Type checks, design
    guards and the 82-test Orders API suite passed before merge.
-2. **BUILT / MERGED; PRODUCTION VERIFICATION NOT RECORDED — Sales Order Detail + Authoritative Edit
-   Contract** — PR #754 merged to `main` as `3bdc7ada`. Current/Order truth and the owner-approved PDF
-   share one workspace. Operation directly corrects safe customer, contact, address, access and
-   proceed-date facts only; items and the promised delivery date stay read-only and travel through
-   Amendment. UI and API enforce the same boundary. This is not `CLOSED / PRODUCTION-VERIFIED` until
-   authenticated production evidence proves view, explicit Edit, allowed saves, forbidden
-   contractual saves and current PDF/Print.
+2. **CLOSED / PRODUCTION-VERIFIED 2026-08-13 — Sales Order Detail + Authoritative Edit Contract** —
+   PR #754 merged to `main` as `3bdc7ada`. Authenticated production verification on SO-1318 proved
+   the saved Current/Order truth, explicit Edit context, one-page current PDF with no render error
+   and the enabled Print PDF control. A safe phone correction saved as immutable Rev 5; restoring
+   the fixture's original value saved as immutable Rev 6. Items and promised delivery stayed
+   read-only in Edit. The first forged promised-date API probe exposed a stale Worker, so main was
+   deployed as Worker version `53442e20-7024-4b69-81bf-f1ba68b06bbd`; the repeated authenticated
+   probe then failed at the API boundary with 422 `invalid_param` before the revision RPC. The
+   `/health` check returned 200 `{"ok":true}`. The complete 2,186-test API suite and API typecheck
+   passed at the merged source before deployment. No Register or settled business decision changed.
 3. **READY FOR CARD — Amendment / Approval / Revision / History** — routed request, impact preview,
    management decision, original Rev 1, complete versions, separate event history, stale protection,
    rollback-as-new-revision and historical PDFs.
