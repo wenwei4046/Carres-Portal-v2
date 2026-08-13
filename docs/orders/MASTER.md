@@ -227,8 +227,11 @@ official Card numbers.
    navigation, and the 2990-style right-click actions **View / Edit / Preview PDF / Print PDF / Copy
    SO No**. No overall Current/status or Register work-queue behavior is present. Type checks, design
    guards and the 82-test Orders API suite passed before merge.
-2. **READY FOR CARD — Sales Order Detail + Authoritative Edit Contract** — Current/Order truth,
-   Sales Portal/POS field parity, safe correction boundary, permission enforcement and actual PDF.
+2. **BUILD IN DELIVERY — Sales Order Detail + Authoritative Edit Contract** — Current/Order truth
+   and the owner-approved PDF already share the production workspace. This slice is reconciling the
+   edit boundary to the authoritative Sales Portal/POS contract: Operation directly corrects safe
+   customer, address, access and proceed-date facts only; items and the promised delivery date stay
+   read-only and travel through Amendment. The same boundary is enforced by the API, not only by UI.
 3. **READY FOR CARD — Amendment / Approval / Revision / History** — routed request, impact preview,
    management decision, original Rev 1, complete versions, separate event history, stale protection,
    rollback-as-new-revision and historical PDFs.
