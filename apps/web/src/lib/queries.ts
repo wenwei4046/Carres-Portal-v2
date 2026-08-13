@@ -2808,6 +2808,7 @@ export interface operationOrderListRow {
     sku: string;
     qty: number;
     unit_price?: number | string | null;
+    attrs?: Record<string, unknown> | null;
     source_po?: string | null;
     /** STAGE 1 — `Model · Variant`, resolved server-side by the SAME helper
      *  the detail route uses (Law D), so a product is never named two ways.
@@ -2825,7 +2826,7 @@ export interface operationOrderListRow {
    *  order's value is then UNKNOWN, and unknown holds nothing — which is
    *  exactly what shipped before this card. */
   paid?: number | string | null;
-  order_addons?: { qty: number; unit_price?: number | string | null }[];
+  order_addons?: { addon_key?: string | null; qty: number; unit_price?: number | string | null }[];
   /**
    * D1 (2026-08-06) — the SKUs a real PURCHASE ORDER covers for this order,
    * linked the drawer's own way (`purchase_orders.so` or `so_refs[]`).
@@ -2840,6 +2841,8 @@ export interface operationOrderListRow {
    * then falls back to exactly the pre-D1 answer instead of accusing.
    */
   po_skus?: string[];
+  /** Purchase-order identities linked by purchase_orders.so / so_refs. */
+  po_numbers?: string[];
   delivery_partner_id: string | null;
   /** Migration 0147 (item h, 2026-05-23) — order-level LP request/accept/reject
    *  state. Set by `operation_confirm_proceed_request_v3` when Operation

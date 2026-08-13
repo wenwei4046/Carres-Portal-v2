@@ -151,7 +151,9 @@ describe("GET /api/operation/orders", () => {
         }),
         env,
       );
-      return (await res.json()) as { orders: { so: number; po_skus: string[] }[] };
+      return (await res.json()) as {
+        orders: { so: number; po_skus: string[]; po_numbers: string[] }[];
+      };
     }
 
     it("a PO linked through so_refs[] puts its SKUs on the order", async () => {
@@ -162,6 +164,7 @@ describe("GET /api/operation/orders", () => {
       );
       const body = await get();
       expect(body.orders[0]?.po_skus).toEqual(["mattress:MAT-1"]);
+      expect(body.orders[0]?.po_numbers).toEqual(["PO-2049"]);
     });
 
     it("a PO linked through its own so also counts", async () => {
@@ -185,6 +188,8 @@ describe("GET /api/operation/orders", () => {
       const body = await get();
       expect(body.orders[0]?.po_skus).toEqual(["mattress:MAT-1"]);
       expect(body.orders[1]?.po_skus).toEqual(["mattress:MAT-1"]);
+      expect(body.orders[0]?.po_numbers).toEqual(["PO-9"]);
+      expect(body.orders[1]?.po_numbers).toEqual(["PO-9"]);
     });
 
     it("an order NO purchase order names gets an empty list, never another order's SKUs", async () => {
@@ -198,6 +203,7 @@ describe("GET /api/operation/orders", () => {
       );
       const body = await get();
       expect(body.orders[1]?.po_skus).toEqual([]);
+      expect(body.orders[1]?.po_numbers).toEqual([]);
     });
 
     it("a PO with no lines contributes nothing", async () => {
