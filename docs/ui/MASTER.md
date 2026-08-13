@@ -647,6 +647,43 @@ is not started. It does not block continuation of the ERP UI migration unless me
 production scale or performance proves otherwise. The Sales Order Workspace and Old Orders
 execution surface are unchanged.
 
+## §6.6 · SALES ORDERS REGISTER CLOSEOUT — owner ruling 2026-08-13
+
+This page-scoped ruling overwrites the conflicting Sales Orders composition/defaults in §6.4–6.5;
+those sections remain the measured Stage A implementation record and generic research evidence.
+
+```
+compact destination header / work toolbar
+
+breathing gap
+
+┌─ light bordered Register ──────────────────────────────────────────────┐
+│ ▸ | SO No | Ordered | Customer Delivery | Customer | Delivery         │
+│   | Location | PO No | DO No                                          │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+- Sales Orders is a truth Register, not Work and not a dashboard. No KPI-card preamble, no
+  borderless Linear-style continuous slab, and no giant card around the page.
+- The seven business columns above are the governed default and exact order. `▸` is chrome.
+  There is no overall `Current`/status column. Content sets predetermined usable widths; staff do
+  not resize to repair the default. Optional columns may cause grid-owned horizontal overflow and
+  may not squeeze the default set.
+- Expansion is goods-only: compact indented category groups, with SKU, description/configuration
+  and quantity. It is not another filterable table and carries no repeated category or unruled
+  operational/PO state.
+- Keep the proven Search, typed filters, Columns, Export and right-click document interaction.
+  Selection may scope Export; it may not introduce register-owned execution. Direct SO/PO/DO
+  numbers are links to their owner. Only explicit `Edit` opens the formal edit context; View,
+  Preview and Print remain non-edit.
+- The detail object presents Current/Order truth, Revisions, History, the actual PDF/document and
+  Order Route. Revisions (complete versions) and History (events) are separate. Order Route is a
+  read-only, fact-derived, multi-position route/obligation map — never a manual checklist or
+  single overall status.
+- `docs/orders/MASTER.md` §0.1 owns the business/field/amendment/permission rules. Sales Portal/POS
+  remains the master form contract; UI composition may not create a second commercial form or an
+  operational action door.
+
 # §7 · Approved Evolution
 
 | What | Why it is not built |
