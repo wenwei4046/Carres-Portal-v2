@@ -199,7 +199,7 @@ Shopify-style transaction/version discipline add no unresolved business rule.
 | Settings / Maintenance | Sales-order maintenance API/config exists; official UI ownership is incomplete | 2990 exposes SO Maintenance and global Settings | **RELOCATE / BUILD** | Portal Settings owns system configuration; Catalog/Sales own their facts; no record maintenance editor that bypasses amendment law |
 | Permissions | RLS/API roles exist; direct-edit/amendment/cancel matrix is incomplete | 2990 Super Admin surface does not prove Carres roles | **BUILD** | Explicit view, safe-correct, request, approve/reject, direct-amend, cancel, PDF/export permissions; enforce server-side |
 | Numbering + lineage | SO identity, DO fields and PO relations exist; register lacks ruled PO/DO lineage columns | 2990 shows Current SO and related document modules | **ADAPT / BUILD** | Same SO across revisions; direct SO/PO/DO links; define multi-PO/multi-DO compact cell + overflow interaction without inventing one Current |
-| Order Route | No approved capability is built; some component truths exist in old journey/control views | 2990 Relationship Map is evidence for lineage, not specification | **BUILD** | Read model over Orders, Purchasing, Receiving, Stock/Unit, Delivery, Money, Loan, Claims/Issue Tracker and Work; multiple simultaneous positions |
+| Order Route | Built as the governed read-only fact-derived map with durable entry and owner links | 2990 Relationship Map is evidence for lineage, not specification | **KEEP** | PR #762 production-verified 2026-08-13; Orders remains a reader and gains no cross-module writer or overall status |
 | PO / supplier consequences | Purchasing owns issue/cancel and promises; SO amendment foundations do not yet resolve every commitment | 2990 co-locates procurement modules but ownership differs | **RELOCATE / BUILD** | Impact rows link to PO/supplier owner; no silent PO rewrite |
 | Unit / warehouse + Receiving | Unit allocation truth is built; Receiving owns receipt ledger | Mature ERP keeps serial/unit and receipt history immutable | **KEEP / BUILD** | Amendment impact must preserve/release/reallocate through governed owners; received facts are never rewritten |
 | Delivery | Delivery owns carrier/trip/DO/proof; booking promise remains with order | 2990 shows read-only DO status and Delivery Planning | **KEEP / ADAPT** | Route and amendment show consequences/link; Delivery remains writer; split DO/positions supported |
@@ -247,8 +247,17 @@ official Card numbers.
    exposed its `so` linkage during that probe; the function was corrected in production and the
    immutable repo correction is migration 0349 (PR #761). Exact main `f17f85ff` converged on both
    Pages projects, both custom domains and Worker version `5bca7fff-693a-40db-8396-ccf43fc38e6e`.
-4. **READY FOR CARD — Order Route** — read-only multi-position lineage/obligation read model and
-   owner links across Goods, Delivery, Money, Loan and Other Commitments.
+4. **CLOSED / PRODUCTION-VERIFIED 2026-08-13 — Order Route** — exact source commit `519a3fa2`
+   passed the 7,250-test repository gate and PR #762 CI, then merged without alteration as parent of
+   `55642ea4`. Automatic deployment run #710 converged that exact merged-main SHA across both
+   governed Pages projects (`carres-portal` deployment `1f3cd3a7`; `carres-pos` deployment
+   `38d66340`), both canonical domains and Worker version
+   `95d15d76-5517-4f02-a52e-bb46b7d17553`. Authenticated production verification on SO-1318
+   proved the durable `?route=1` entry survives reload; live document/Revision lineage; the
+   goods-position read; all five **Goods / Delivery / Money / Loan / Other
+   Commitments** lanes; and real owner handoffs, including the selected-order Delivery link. It is
+   fact-derived and read-only: no manual checklist, giant overall status or foreign writer was
+   introduced.
 5. **READY FOR CARD — Copy / Cancel / Intake / Maintenance Closeout** — copy to a new SO, governed
    transaction cancellation, Scan/import relocation and Settings/Maintenance ownership. This slice
    follows the edit/amendment permission model; it must not create bypass doors.
