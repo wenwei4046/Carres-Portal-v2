@@ -128,9 +128,9 @@ begin
   else
     v_proposed := v_current;
   end if;
-  select count(*) into v_po from purchase_orders where dl = v_o.dl;
+  select count(*) into v_po from purchase_orders where so = v_o.so;
   select count(*) into v_receiving from po_receipts r
-    join purchase_orders p on p.id = r.po_id where p.dl = v_o.dl;
+    join purchase_orders p on p.id = r.po_id where p.so = v_o.so;
   select count(*) into v_units from ops_stock_items
     where reserved_ref = 'SO-' || v_o.so::text or sold_order_id = v_a.order_id;
   select count(*) into v_delivery from delivery_attempts where order_id = v_a.order_id;
