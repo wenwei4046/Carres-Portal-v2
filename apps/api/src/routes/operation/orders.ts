@@ -59,6 +59,15 @@ import type { AppEnv } from "../../types";
  */
 const operationOrdersRouter = new Hono<AppEnv>();
 
+/** Management owns the commercial decision; operation may route the request
+ * but cannot approve its own proposal. The database repeats this gate. */
+const requirePrincipal: MiddlewareHandler<AppEnv> = async (c, next) => {
+  if (c.var.auth?.role !== "principal") {
+    throw new HTTPException(403, { message: "Principal only" });
+  }
+  await next();
+};
+
 /**
  * Pipeline v2 error mapping. Wraps the generic `mapPgError` to expose the
  * 22023 detail code (`wrong_stage` / `warehouse_required`) and, for P0001
@@ -1367,6 +1376,7 @@ const amendmentSubmitInput = z.object({
         .array(
           z
             .object({
+              id: z.string().uuid().optional(),
               sku: z.string().trim().min(1),
               qty: z.number().int().min(1),
               unit_price: z.number().min(0),
@@ -1379,7 +1389,7 @@ const amendmentSubmitInput = z.object({
       installment_months: z.number().int().min(0).nullable().optional(),
     })
     .strict(),
-  reason: z.string().trim().max(500).optional(),
+  reason: z.string().trim().min(1, "An amendment says why").max(500),
 });
 
 operationOrdersRouter.get("/:id/amendment", requireOperation, async (c) => {
@@ -1430,6 +1440,61 @@ operationOrdersRouter.post("/amendment/:amendmentId/apply", requireOperation, as
    * shape of the answer. */
   return c.json(data);
 });
+
+// The preview reads every affected owner but writes none of them. It is the
+// evidence management reads before deciding, and is recomputed on each read.
+operationOrdersRouter.get("/amendment/:amendmentId/impact", requireOperation, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("sales_order_amendment_impact", {
+    p_amendment_id: c.req.param("amendmentId"),
+  });
+  if (error) {
+    const m = mapPipelineV2Error(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json(data);
+});
+
+const amendmentDecisionInput = z
+  .object({
+    decision: z.enum(["approve", "reject"]),
+    note: z.string().trim().max(2000).optional(),
+  })
+  .superRefine((v, ctx) => {
+    if (v.decision === "reject" && !v.note) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["note"], message: "A rejection says why" });
+    }
+  });
+
+operationOrdersRouter.post(
+  "/amendment/:amendmentId/decide",
+  requirePrincipal,
+  async (c) => {
+    const raw = await c.req.json().catch(() => ({}));
+    const parsed = amendmentDecisionInput.safeParse(raw);
+    if (!parsed.success) {
+      return c.json(
+        {
+          error: "invalid_input",
+          code: "invalid_param",
+          message: parsed.error.issues[0]?.message ?? "invalid input",
+        },
+        422,
+      );
+    }
+    const sb = userClient(c.env, c.var.auth.jwt);
+    const { data, error } = await sb.rpc("sales_order_decide_amendment", {
+      p_amendment_id: c.req.param("amendmentId"),
+      p_decision: parsed.data.decision,
+      p_note: parsed.data.note ?? null,
+    });
+    if (error) {
+      const m = mapPipelineV2Error(error);
+      return c.json(m.body, m.status);
+    }
+    return c.json(data);
+  },
+);
 
 // GET /reference/dealers — id + name for the create form's dealer picker.
 // RLS-scoped read (internal roles read dealers — the same embed the list

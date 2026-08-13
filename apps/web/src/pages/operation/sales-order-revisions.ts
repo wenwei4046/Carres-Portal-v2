@@ -8,7 +8,7 @@ import { fmtDate } from "@/lib/fmt-date";
 import type { SalesOrderSnapshot, SalesOrderSnapshotLine } from "@/lib/queries";
 
 /** The header keys a revision can move, with the words the reader sees. */
-const HEADER_LABELS: ReadonlyArray<[key: string, label: string, isDate?: boolean]> = [
+const HEADER_LABELS: ReadonlyArray<[key: string, label: string, isDate?: boolean, suffix?: string]> = [
   ["customer_name", "Customer"],
   ["customer_phone", "Phone"],
   ["customer_email", "Email"],
@@ -25,6 +25,7 @@ const HEADER_LABELS: ReadonlyArray<[key: string, label: string, isDate?: boolean
   ["proceed_date", "Proceed date", true],
   ["delivery_floor", "Floor"],
   ["delivery_has_lift", "Lift"],
+  ["installment_months", "Instalment plan", false, " months"],
   ["salesperson_name", "Salesperson"],
   ["outlet_name", "Showroom"],
 ];
@@ -52,12 +53,14 @@ export function describeRevisionChanges(
   if (!prev) return ["Original — the agreement as first recorded"];
   const out: string[] = [];
 
-  for (const [key, label, isDate] of HEADER_LABELS) {
+  for (const [key, label, isDate, suffix] of HEADER_LABELS) {
     const a = prev.header?.[key];
     const b = next.header?.[key];
     if ((a ?? null) === (b ?? null)) continue;
     /* ids move together with their names; the name row already speaks. */
-    out.push(`${label}: ${word(a, isDate)} → ${word(b, isDate)}`);
+    const before = word(a, isDate);
+    const after = word(b, isDate);
+    out.push(`${label}: ${before}${before === "—" ? "" : (suffix ?? "")} → ${after}${after === "—" ? "" : (suffix ?? "")}`);
   }
 
   const prevById = new Map((prev.lines ?? []).map((l) => [l.id ?? l.sku, l]));
