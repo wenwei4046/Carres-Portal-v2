@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "node scripts/v4-guard.mjs && tsc --noEmit -p tsconfig.app.json && vite build",
+    "build": "node scripts/v4-guard.mjs && tsc --noEmit -p tsconfig.app.json && vite build && node ../../scripts/write-deploy-proof.mjs",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.app.json",
     "check:v4": "node scripts/v4-guard.mjs",

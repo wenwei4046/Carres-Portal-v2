@@ -110,12 +110,41 @@ Draft  →  review business impact  →  commit the exact file  →  merge-ready
 
 ## 6 · Deployment
 
+**Authoritative automation (2026-08-13):** `.github/workflows/ci.yml` owns PR checks and
+`.github/workflows/deploy-production.yml` owns the post-merge proof. `carres-portal` and
+`carres-pos` remain connected to Git in Cloudflare and each builds `main`; GitHub Actions does
+not upload Pages a second time. The web build writes `/__carres_deploy.json` from
+`CF_PAGES_COMMIT_SHA`. The same workflow deploys the Worker with `DEPLOY_SHA`, then polls both
+Pages projects, both custom web domains and `/health` until all report the exact merged SHA.
+No convergence means a visible failed production workflow.
+
+**One-time owner setup (never paste values into chat or commit them):**
+
+1. In Cloudflare, create a scoped API token for account `e2494242a0fd563cacee5a301cf95dd3`
+   with Workers Scripts edit permission (and Workers Routes edit only if Cloudflare requires it
+   for the existing custom domain). Do not use the Global API Key.
+2. In GitHub → repository Settings → Environments, create `production`. Add environment secrets
+   `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` (the account id above). An environment
+   reviewer is optional for ordinary deploys; credentials must not require browser OAuth.
+3. In Cloudflare Pages, verify **both** projects are Git-connected to this repository, production
+   branch `main`, build command `pnpm --filter @carres/web build`, output `apps/web/dist`, and the
+   existing production `VITE_*` variables are present. Disable any other Pages deploy workflow.
+4. In GitHub branch protection for `main`, require the `CI / verify` status and at least one PR
+   review; prohibit direct pushes. The first pipeline PR proves the status name before making it
+   required.
+
+Worker runtime secrets remain in Cloudflare and are not copied to GitHub; Wrangler preserves them
+when publishing a new version. The GitHub token only publishes code/configuration.
+
 ```
 merge to main  →  build from the MAIN TIP  →  deploy BOTH Pages projects
                →  poll all four canonical URLs until they converge  →  verify
 ```
 
 - **Never deploy production from a feature branch.**
+- **Never ask Jess for routine terminal delivery.** Engineering pushes the branch/PR; CI tests it;
+  merge deploys it. Jess intervenes only for initial credentials, unsafe migration approval, or
+  rollback/emergency.
 - **An api diff is measured against the LIVE WORKER'S SOURCE COMMIT**, read from
   `wrangler deployments list` — **never from a document.** A card that changes no `apps/api`
   file can still owe a Worker deploy because another lane's api half merged meanwhile.
@@ -140,6 +169,14 @@ wrangler secret put SUPABASE_URL / SUPABASE_ANON_KEY / SUPABASE_SERVICE_ROLE_KEY
 Local dev reads `.dev.vars` (gitignored). Cron is scheduled in UTC — 09:00 MYT = `0 1 * * *`,
 17:00 MYT = `0 9 * * *`; **every cron carries a comment with its MYT time.**
 SPA fallback lives in `apps/web/public/_redirects`: `/*  /index.html  200`.
+
+### Supabase production gate
+
+CI validates migration filenames and rejects edits/deletes of any committed migration. It never
+links to Supabase and never applies SQL. The governed migration flow in §5 remains authoritative:
+owner approval before the file lands, production assertions plus a negative control in a rolled-
+back transaction, exact-file apply, tracker/source reconciliation, then dependent-code deploy.
+Destructive or uncertain SQL therefore cannot ride an ordinary merge-to-main deployment.
 
 ---
 

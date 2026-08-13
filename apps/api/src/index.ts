@@ -138,7 +138,7 @@ app.onError((err, c) => {
   return c.json({ error: "server_error", message }, status as 400 | 401 | 403 | 404 | 422 | 500);
 });
 
-app.get("/health", (c) => c.json({ ok: true }));
+app.get("/health", (c) => c.json({ ok: true, commit: c.env.DEPLOY_SHA ?? "local" }));
 
 // Stripe webhook — OUTSIDE the auth'd /api group (Stripe signs the request;
 // there is no Supabase JWT). Signature verification is the trust boundary.
