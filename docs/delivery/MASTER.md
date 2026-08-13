@@ -51,7 +51,10 @@ RIGHT    the picked order's delivery facts, READ-ONLY
 ```
 
 ### API + DATA
-**None of its own.** It reads the Orders feed and `ops_order_control`. Shared engines:
+**None of its own** — except **one READ**, `GET /api/operation/orders/:id/booking-brief`
+(Card 3), which owns no record and writes nothing: it composes Card 1's commitment, Card 2's
+allocation and the overlay's dates into the facts the T−3 customer call needs. It reads the
+Orders feed and `ops_order_control`. Shared engines:
 `packages/shared/src/delivery-queue.ts` · `delivery-board.ts` · `delivery-calendar.ts` ·
 `delivery-groups.ts` · `delivery-order.ts` · `delivery-reasons.ts` · `delivery-fee.ts`.
 
@@ -62,13 +65,37 @@ RIGHT    the picked order's delivery facts, READ-ONLY
 ### FROZEN RULES
 - **The page writes nothing.** A second confirm button would mean a second set of gates to
   keep in step with the server's. The detail pane states FACTS; `Open order` opens the drawer.
-- **Scope is the LADDER, not a status column.** It imports the same `nextActionOf` the Orders
-  list uses, so the two pages structurally cannot name an order differently — and a
-  money-held order is absent here without any rule saying so.
+- **Scope is the ENGINE'S DELIVERY TRACK, not a status column and not the Orders row's
+  headline** *(re-ruled by SO V2 Card 3, owner ruling 2026-08-13 — this rule previously read
+  "the same `nextActionOf` the Orders list uses")*. The page imports the same two-layer engine
+  and takes **Layer 1 filtered to `track === "delivery"`**, so the two pages still structurally
+  cannot name a step differently — they simply answer two different questions, which is what §3
+  below has always said this page is for.
+  - **Why it moved.** `nextActionOf` is Layer 2: the ONE action that leads a row across all
+    three tracks. `ACTION-FLOW-STANDARD` Law 4 ranks goods work above delivery preparation, so
+    every order whose goods were not yet in had a goods headline and never reached this board —
+    hiding `Assign logistics` and the customer booking call from the operator whose whole job
+    they are. Measured 2026-08-13: 51 live orders with logistics assigned, **zero** customer
+    appointments ever confirmed. **Law 4 is unchanged** — it governs the Sales Order ROW, and
+    it was never the rule for who is delivery WORK.
+  - **A money-held order is still absent without any rule saying so**: its delivery track is
+    silent by `deliveryHeldOnMoney`, so the PayHold law survives by construction, not by a
+    filter written here.
+  - **`Assign logistics` waits on the fulfilment route, never on the goods.** An open
+    `Issue PO` means neither a ready-stock route nor a purchase order exists, so there is
+    nothing to plan capacity around and the step stays off the board. Card 3's Rule 1 forbids
+    waiting for the goods to be READY, not for them to be BOUGHT.
 - **Queue-less orders are still built**, because the calendar shows every booked truck and
-  clicking a held one must not open a blank.
+  clicking a held one must not open a blank. **They keep the ORDER's headline** (`nextActionOf`),
+  so a held order reads `Collect RM … 🔒` here exactly as it does on the Orders list.
 - **No word is invented here.** The queue labels come from the shared constant; inventing
   `Assign logistics` locally would be the same action spelt twice with its own menu item.
+- **The detail pane carries the booking brief** (Card 3): the promised deadline, the expected
+  arrival, and what is / is not expected in — served by `GET /:id/booking-brief`, computed by
+  `packages/shared/src/booking-brief.ts`, and **rendered whether or not the goods are in**.
+  The pane computes none of it and still writes nothing.
+- **A confirmed booking names the company it was AGREED WITH** (`confirmed_partner_id`, 0346),
+  never the one assigned right now. When they differ the pane says so and names the fix.
 
 ---
 

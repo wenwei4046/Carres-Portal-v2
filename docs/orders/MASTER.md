@@ -366,65 +366,164 @@ from `incoming` at Receiving; the claimless inspection hold enters only from
 
 ---
 
-# ✅ EARLY LOGISTICS ASSIGNMENT + CUSTOMER BOOKING — SO V2 CARD 3, SHIPPED 2026-08-11
+# ✅ EARLY LOGISTICS ASSIGNMENT + CUSTOMER BOOKING — SO V2 CARD 3, SHIPPED 2026-08-13
 
-**The question this card installed:** logistics are assigned the moment the
-PO is placed, the Stock ETA is watched as its own fact, and the customer's
-booking call opens **three actual working days** before delivery on the
-working calendar with public holidays.
+> **This record OVERWRITES the 2026-08-11 Card 3 entry (MASTER OVERWRITE LAW).**
+> That entry shipped migration `0342` (the call window 1 → 3 working days) and the
+> Delivery page's un-passed `queueLeads` fix — **both remain true and are kept
+> below.** It then declared the approved flow "already unblocked" on the strength
+> of the ENGINE permitting early assignment. The 2026-08-13 ruling restated Card 3
+> in full, and re-tracing it against production found that reading was wrong where
+> it mattered: the engine permitted the work, and the operator's own workspace
+> never showed it. Git is the history; this section is the one current truth.
 
-**THE TRACE CAME FIRST, AND THE APPROVED FLOW WAS ALREADY UNBLOCKED:**
+**The question this card installed:** logistics is assigned as soon as the
+fulfilment route is known, the customer conversation happens **three actual
+working days** before the promised deadline **whether or not the goods are in**,
+and the operator holding the phone has the four facts in front of them.
+
+## The measured gap — the reason the earlier reading was wrong
 
 ```
-Assign logistics    opens from order birth with NO stock gate — the engine's
-                    delivery track "runs whether or not the goods are in"
-                    (order-actions.ts deliveryAction). Nothing anywhere blocks
-                    early assignment; the drawer and the bulk bar both assign
-                    on an order still in production.
-Three facts         stored independently, none inferred from another:
-                    assigned logistics (orders.delivery_partners /
-                    ops_assigned_logistic) · Stock ETA
-                    (ops_order_control.line_etas, the delay radar's input) ·
-                    customer-confirmed date + slot (0277's two-stage booking,
-                    server-gated, evidence-carrying).
-Booking call        opens the moment a company is assigned — before goods
-                    arrive. Its window has been a SETTING since 0303
-                    (logistics_call_working_days).
-Calendars           both due call sites already inject myHolidaySet() on the
-                    Mon–Sat delivery week.
+Production, 2026-08-13:   86 live orders
+                          51 with a logistics company assigned
+                           0 customer appointments EVER confirmed
 ```
 
-**What the card changed — one ruled number and one measured drift:**
+**Early assignment was happening. The booking conversation was not, and had
+never once been recorded.**
 
-- **Migration 0342**: `logistics_call_working_days` **1 → 3** (the owner's
-  *"three actual working days before delivery"*), recorded through the same
-  ledger + audit sentence the Settings door writes. The seed in
-  `delivery-queue.ts` moved with it.
-- 🔴→✅ **The Delivery page computed `queueLeads` from the setting and never
-  passed it** (`OperationDelivery.tsx` due/overdue calls) — so it called the
-  chase step late on the hard-coded seed while the Orders list read the
-  setting. Two surfaces, one step, two lateness answers — invisible only
-  while the setting equalled the seed, and Card 3's 3 would have exposed it
-  on day one. Fixed; both pages now read the setting.
+The Delivery board scoped its rows with `nextActionOf` — **Layer 2**, the ONE
+action that LEADS a row across all three tracks. `ACTION-FLOW-STANDARD` Law 4
+ranks goods work (`issue_po` 31 · `confirm_ready_date` 30) ABOVE delivery
+preparation (`assign_logistics` 40 · `confirm_delivery_date` 41). So for every
+order whose goods were not yet in, the headline was a goods action and **the
+order was invisible on the logistics operator's own page** — which put two of
+the ruling's permanent rules out of reach in practice:
 
-**Deliberately NOT changed, with the falsifier named:**
-- The **display ranking** (Law 4) still puts an open goods call above
-  `Assign logistics`, so the delivery QUEUE tile carries an order only once
-  its goods track is quiet — the assign ACTION itself is open from birth and
-  visible in the drawer list and the row's `+N`. If the owner wants early
-  assignment to LEAD the row over goods work, that is a display-priority
-  re-ruling of ACTION-FLOW-STANDARD Law 4 — one sentence, not this card.
-- The assign step's **late backstop** stays `promised date − 3 working days`;
-  "assign immediately" is the flow (nothing gates it), not a new deadline
-  anchored to PO-placement day, which would mark every order late on day two.
-  If the owner means it as a deadline, the anchor is one line in
-  `delivery-queue.ts`.
+```
+Rule 1  "Assign Logistics early ... do NOT wait until stock is physically ready"
+Rule 2  "Customer contact happens at T−3 ... regardless of stock readiness.
+         Got stock or no stock, Logistics still starts the conversation."
+```
 
-**Production evidence:** 0342 applied — live `logistics_call_working_days`
-= 3, ledger row recorded, audit sentence written. Tests: shared 2245 ·
-api 2171 · web OperationDelivery 16 · web tsc clean. Seed + Merdeka holiday
-tests re-pinned to the 3-day window; a leads-override test proves the setting
-drives the window, not the seed.
+**The 2026-08-11 entry named this and deferred it as "a display-priority
+re-ruling of Law 4".** That was the wrong diagnosis, and naming it is the
+point of this overwrite: Law 4 governs **which action leads a SALES ORDER
+ROW**. It was never the right rule for **which orders are delivery work** —
+and this module's own MASTER §3 already says so: *"the Orders list sorts by
+risk to the PROMISE; this page sorts by risk to the TRUCK."* Membership was
+still being decided by the other page's lens. **Nothing about Law 4 changed,
+and no word on any screen changed.**
+
+## What shipped
+
+```
+MEMBERSHIP        the Delivery board reads the DELIVERY TRACK of the same
+                  Layer-1 output (`openActionsOf(...).find(track==='delivery')`)
+                  instead of the cross-track headline. One engine, one signal
+                  mapping, one set of words — the Orders list runs the identical
+                  call, so the two pages still cannot name a step differently.
+                  · PayHold survives BY CONSTRUCTION: a money-held order's
+                    delivery track is silent (`deliveryHeldOnMoney`), so it
+                    leaves the board without a rule saying so — exactly as before.
+                  · Queue-less rows still build and still carry the ORDER's
+                    headline, so a held order reads `Collect RM … 🔒` here
+                    exactly as it does on the Orders list.
+                  · The assign step still waits on the ruling's OWN trigger —
+                    *"Ready Stock route known OR Purchase Order placed"*. An
+                    open `Issue PO` is neither, so goods nobody has bought stay
+                    off the board. Rule 1 forbids waiting for goods to be READY,
+                    not for them to be BOUGHT.
+
+THE BRIEF         `resolveBookingBrief` (packages/shared/src/booking-brief.ts ·
+                  GET /api/operation/orders/:id/booking-brief) — the ONE
+                  arithmetic for the T−3 call, composed from the authoritative
+                  owners and never re-derived: Card 1 commitment → Card 2
+                  allocation → the overlay's booking + supplier dates → the
+                  partner roster → `logistics_call_working_days` through the
+                  SAME `deliveryQueueLeads` helper both other surfaces read.
+                  It answers the ruling's own list — customer promised deadline ·
+                  latest expected arrival · expected delivery scope · what IS
+                  and IS NOT expected in — and it renders with an EMPTY
+                  warehouse, which is the whole of Rule 3: *"Stock ETA informs
+                  the conversation; it does not decide whether it happens."*
+
+THE APPOINTMENT   migration `0346` · `ops_order_control.confirmed_partner_id`.
+NAMES ITS         Three of the four facts the ruling requires of an appointment
+CARRIER           were already stored — `confirmed_date` + `confirmed_time_slot`
+                  (0277) and `booking_groups` (0282). The CARRIER was not stored
+                  at all: every reader took whichever company sat on
+                  `orders.ops_assigned_logistic` right now, so a reassignment
+                  silently rewrote which company the customer's agreed day
+                  belonged to, and the trips archived in `delivery_trips` named
+                  no carrier even in principle. Now stamped ONCE at confirmation
+                  (FK to delivery_partners, CHECK-enforced whenever the stage is
+                  `confirmed`), archived with the superseded trip, logged to the
+                  order timeline BY NAME, and never re-read. The confirm door
+                  refuses with no assignment (`booking_no_logistics`) — not a new
+                  gate on the conversation (the engine already opens the call
+                  only once logistics is assigned), but a refusal to record an
+                  appointment that cannot say who is driving.
+                  · DRIFT IS SHOWN, NOT SWALLOWED: when the assigned company and
+                    the agreed company differ, the pane names both and names the
+                    fix, per the delivery-rule word law.
+
+KEPT FROM 0342    `logistics_call_working_days` = 3 (the owner's "three actual
+                  working days"), its ledger row and audit sentence, and the
+                  Delivery page's fixed `queueLeads` pass-through. Both still
+                  true; neither is re-done.
+
+WORDS             COPY-STANDARD gained "The booking-call words" — `Before you
+                  call` · `Call by {date}` · `Not in yet` · `Everything is on
+                  hand` · `Expected arrival` (and the rule that **`Stock ETA`
+                  may not reach the screen** — `ETA` is an abbreviation).
+                  NO `Appointment` noun was minted: the screen already spells
+                  that fact `{logistics} · confirmed {date} · {slot}`, and a
+                  second noun for one fact is the synonym rule 8 forbids.
+```
+
+**Production evidence — run 2026-08-13, not described.** `0346` applied; six
+probes as the real operation user in one aborted transaction — the register
+identical after (86 control rows · 0 confirmed · 0 carrier stamps · 51 assigned ·
+0 carrier timeline rows), and the probe order's original logistics company
+untouched:
+
+```
+P1 a confirmed booking with NO carrier refused by the CHECK          PASS
+P2 with a carrier it is accepted and the carrier is stored           PASS
+P3 reassigning logistics left the customer-agreed carrier alone      PASS
+P4 the timeline records the carrier change by NAME                   PASS
+P5 the FK refuses a carrier that is not a delivery_partners row      PASS
+P6 below `confirmed` there is no appointment to attribute            PASS
+```
+
+Tests: shared **2291** · api **2183** · web `OperationDelivery` **21** (five new,
+one per rule) · shared/api/web `tsc` clean · web build clean.
+
+**Known boundaries, reported not hidden:**
+- **The brief is rendered on the Delivery workspace only.** The Sales Order
+  Workspace and the Work feed (Cards 9/10) read the same endpoint when their
+  surfaces call for it; the registry is the contract, and no second arithmetic
+  may be written for them.
+- **`assign_logistics` still has no early DEADLINE** — its backstop stays
+  `promised date − 3 working days`. Assignment is now VISIBLE from the moment
+  the route is known, which is what Rule 1 asks for; anchoring a deadline on
+  PO-placement day would mark every order late on day two. If the owner means
+  it as a deadline, the anchor is one line in `delivery-queue.ts`.
+- **The board still cannot show `issue_delivery_order`** — it is a delivery-track
+  action with no queue of its own (the four queues are fixed), so an order
+  waiting only on the document is queue-less. It reaches the pane through the
+  calendar. A fifth queue is a business decision, not a defect.
+- **Capacity is still only WARNED, never reserved.** The ruling's *"expose /
+  reserve future delivery capacity"* is served today by the carrier's own
+  `daily_capacity` warning and the calendar's per-carrier day counts
+  (Delivery MASTER §4/§5). A HELD slot — capacity consumed before the customer
+  says yes — would be a new record, and §6.2 (the trip is a derived view)
+  is the ruling it would have to reopen. Not this card.
+- Pre-existing and untouched: the design guard reports 98 grey hovers against a
+  baseline of 96. Verified identical in the committed tree and this working tree
+  (120 occurrences both), so the two are earlier debt on `main`, not this card's.
 
 ---
 
@@ -930,7 +1029,7 @@ production; their verdicts land as ordinary re-rulings on the next commit.
 |---|---|---|
 | **1** | Customer Obligation Truth | **COMPLETE** — `dae94301`, migration `0340`, production verified 2026-08-11; exact implementation record immediately above |
 | **2** | Unit / Stock Allocation Truth | **COMPLETE** — migration `0341`, production verified 2026-08-11 (nine rolled-back probes); exact implementation record above. The spine (unit birth at PO · receiving flips · governed draw) was measured ALREADY LIVE; the card closed the four violations of the approved law |
-| **3** | Early Logistics Assignment + Customer Booking | **COMPLETE** — migration `0342`, production verified 2026-08-11; record above. The flow was measured already unblocked; the card moved the ruled call window to 3 working days and closed the two-surface lateness drift |
+| **3** | Early Logistics Assignment + Customer Booking | **COMPLETE** — migrations `0342` + `0346`, production verified 2026-08-13 (six rolled-back probes); record above, which OVERWRITES the 2026-08-11 entry. 0342's ruled call window and lateness fix stand; the re-trace found the workspace hiding both early assignment and the T−3 call whenever the goods were not in, and built the booking brief the call needs |
 | **4** | Money Truth + Collection Gate | **COMPLETE** — migration `0343`, production verified 2026-08-11 (seven rolled-back probes); record above. The gates and the one calculation were measured already live; the card converged the write (one payment writer, void as a stamp) and shipped the T−3/T−2/T−1 collection clock |
 | **5** | Delivery Attempt + Delivery Exception | **COMPLETE** — migration `0344`, production verified 2026-08-11 (seven rolled-back probes); record above. The first genuine engine gap of the programme: attempt + exception stores built, units move through Card 2's doors in the same transaction |
 | **6** | Loan Mattress / Loan Sofa Obligations | **COMPLETE** — no migration (Card 2 built the doors; Card 6 made the lane use them); production verified 2026-08-11; record above |
