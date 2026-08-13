@@ -80,32 +80,18 @@ may and should identify and recommend a materially useful missing capability. Th
 must explain its operator value, check Carres business architecture and locked constraints, and
 remain a proposal until Jess approves it. Reference products inform; they are never copied blindly.
 
-**OWNER-APPROVED OBJECT / DOMAIN ARCHITECTURE COMPLETENESS + RESTART CONTRACT — APPROVED / LOCKED (Jess,
-2026-08-12).** Jess owns business decisions and final approval. The Plan chat owns the mission
-boundary, completeness of research, dependency discovery, sequencing and the proposed plan. Jess is
-not expected to know or enumerate what must be studied next, when planning is complete, what can
-build or what comes next. A new or restarted Plan/Design chat therefore automatically:
+**ERP PLAN CHAT START PROTOCOL + UI EXTENSION — APPROVED / LOCKED (Jess, 2026-08-13).** Every new
+or restarted Plan/Design chat first completes the Constitution's four-step **ERP PLAN CHAT START
+PROTOCOL**, including its authority read, four-way resolution pass, whole-domain audit and owner
+decision gate. This MASTER does not duplicate that global law. For a UI surface, the required
+whole-domain audit additionally includes this MASTER's UI Dictionary/IA preflight, eight-lens
+review, reference-to-Carres capability matrix and completion gate below.
 
-1. preserves approved business/capability truth and only placement/presentation explicitly locked
-   by an authoritative MASTER;
-2. establishes current Carres capability, repository/task evidence and the locked constraints;
-3. identifies unruled presentation, missing capabilities, dependencies, cross-module/future
-   consequences, terminology/IA conflicts, duplicate destinations and scalability risks;
-4. applies the Constitution's object/domain lifecycle and ERP consequence pass before naming a
-   local UI question as the next unresolved decision, then mines the relevant reference object's
-   backend/workflow/capability surface rather than only screenshots or the feature Jess named;
-5. continuously maintains **CURRENT MISSION · SETTLED / LOCKED · GENUINELY UNRESOLVED ·
-   IMPLEMENTATION WORK · RECOMMENDED NEXT STEP**;
-6. maintains the proposed backlog/roadmap and dependency order;
-7. performs the completion gate below before recommending implementation or declaring the surface
-   complete; and
-8. proactively manages the `READY FOR CARD`, `PLAN MISSION COMPLETE` and `START A NEW CHAT`
-   boundaries below.
-
-It must not infer either “keep this exact UI” from an existing capability or “do not propose it”
-from repository absence. It must not ask Jess what to inspect next when repository/task evidence
-can decide. It must surface important unresolved matters Jess did not ask about and ask her only
-for genuine business decisions or final approval.
+The chat must not infer either “keep this exact UI” from an existing capability or “do not propose
+it” from repository absence. It continuously maintains **CURRENT MISSION · RESOLVED FROM AUTHORITY ·
+APPROVED TARGET / NOT BUILT · BUILT / VERIFIED · REAL GAP / CONTRADICTION · RECOMMENDED NEXT STEP**.
+It surfaces important unresolved matters Jess did not ask about, but asks her only for a genuine
+business decision that passes the Constitution's owner decision gate.
 
 This object/domain pass does not replace UI preflight. UI Dictionary/IA comes first; Carres
 semantics and ownership outrank external references; and actionable copy remains **WHO + ACTION +
@@ -113,11 +99,11 @@ OBJECT + actual working day/date**. The pass is a completeness check, not permis
 capability or to write UI/application code in Plan mode.
 
 **OFFICIAL CARD NUMBERS ARE GOVERNANCE; PLANNING IS THE CHAT'S JOB.** The planner never invents an
-official Card number or status. It still maintains a clearly labelled **PROPOSED ROADMAP / BACKLOG /
-DEPENDENCY ORDER** for approved and discovered remaining work, including what can build directly,
-what first needs Plan/Design, what already has an engine and what has a real gap. A proposed,
-unnumbered build slice may be sequenced and declared ready; official numbering/status appears only
-after governance/owner approval.
+official Card number or status. After the Constitution's whole-domain pass is sufficiently complete,
+it maintains a clearly labelled **PROPOSED ROADMAP / BACKLOG / DEPENDENCY ORDER** for approved and
+discovered remaining work, including what can build directly, what first needs Plan/Design, what
+already has an engine and what has a real gap. A proposed, unnumbered build slice may then be
+sequenced and declared ready; official numbering/status appears only after governance/owner approval.
 
 **UI ARCHITECT RESPONSIBILITY + DICTIONARY / IA PREFLIGHT — APPROVED / LOCKED (Jess,
 2026-08-11).** A new or restarted Plan/Design chat is not merely repository police or a visual
@@ -242,7 +228,9 @@ law. Continuous production-build governance remains §1.1 and is not part of thi
 a coherent implementation scope is ready, what comes next, or whether a fresh chat is advisable.
 The maintained mission state above and these transitions are part of every Plan/Design restart:
 
-1. **`READY FOR CARD — <scope>`.** State this proactively when a coherent capability or
+1. **`READY FOR CARD — <scope>`.** Never state or invent this, Phase 1 or implementation sequencing
+   before the Constitution's whole-domain pass and this MASTER's applicable completion gate are
+   sufficiently complete. Then state it proactively only when a coherent capability or
    implementation slice has sufficient approved business truth, UI/interaction truth where
    relevant, ownership, dependencies and an acceptance boundary, and no unresolved owner decision
    blocks safe build. Recommend the dependency/build order. Do not invent an official Card number
