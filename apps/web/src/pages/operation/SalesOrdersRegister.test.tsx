@@ -9,7 +9,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { operationOrderListRow } from "@/lib/queries";
 import SalesOrdersRegister from "./SalesOrdersRegister";
@@ -74,9 +74,15 @@ function mount() {
     <QueryClientProvider client={qc}>
       <MemoryRouter initialEntries={["/operation/orders"]}>
         <SalesOrdersRegister />
+        <LocationProbe />
       </MemoryRouter>
     </QueryClientProvider>,
   );
+}
+
+function LocationProbe() {
+  const location = useLocation();
+  return <output data-testid="location">{`${location.pathname}${location.search}`}</output>;
 }
 
 beforeEach(() => {
@@ -165,5 +171,16 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     expect(screen.getByTestId("sales-orders-grid")).toBeInTheDocument();
     expect(screen.getByTestId("work-toolbar")).toBeInTheDocument();
     expect(screen.getByTestId("grid-scroll")).toBeInTheDocument();
+  });
+});
+
+describe("Copy to new Sales Order", () => {
+  it("opens the authoritative create workspace with the source order as a draft seed", () => {
+    mount();
+    fireEvent.contextMenu(screen.getByTestId("grid-parent-row"));
+    fireEvent.click(screen.getByRole("button", { name: "Copy to new Sales Order" }));
+    expect(screen.getByTestId("location")).toHaveTextContent(
+      "/operation/orders/so/new?copyFrom=00000000-0000-0000-0000-00000000cafe",
+    );
   });
 });
