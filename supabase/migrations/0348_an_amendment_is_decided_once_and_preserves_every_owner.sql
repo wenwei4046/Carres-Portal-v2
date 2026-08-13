@@ -21,6 +21,8 @@ alter table public.sales_order_amendments
   check (status in ('draft','submitted','issued','accepted','applied','rejected','withdrawn'));
 
 alter table public.sales_order_amendments
+  drop constraint if exists sales_order_amendments_decision_complete;
+alter table public.sales_order_amendments
   add constraint sales_order_amendments_decision_complete check (
     (status in ('applied','rejected') and decided_by is not null and decided_at is not null
       and nullif(btrim(coalesce(decision_note,'')), '') is not null)
