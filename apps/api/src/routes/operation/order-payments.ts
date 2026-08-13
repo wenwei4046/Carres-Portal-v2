@@ -92,19 +92,14 @@ orderPaymentsRouter.post("/:id/payments", async (c) => {
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
 
   const sb = userClient(c.env, auth.jwt);
-  const receiptNo = await nextReceiptNo(sb, orderId, parsed.data.paidOn);
-
-  const { data, error } = await sb.rpc("payment_record", {
-    p_order_id: orderId,
-    p_amount: parsed.data.amount,
-    p_paid_on: parsed.data.paidOn,
-    p_method: parsed.data.method,
-    p_kind: parsed.data.kind,
-    p_reference: parsed.data.reference ?? null,
-    p_note: parsed.data.note ?? null,
-    p_receipt_url: parsed.data.receiptUrl ?? null,
-    p_receipt_no: receiptNo,
-    p_counts_toward_paid: true,
+  const { data, error } = await recordPayment(sb, orderId, {
+    amount: parsed.data.amount,
+    paidOn: parsed.data.paidOn,
+    method: parsed.data.method,
+    kind: parsed.data.kind,
+    reference: parsed.data.reference,
+    note: parsed.data.note,
+    receiptUrl: parsed.data.receiptUrl,
   });
   if (error) {
     const m = mapPgError(error);
@@ -265,21 +260,17 @@ orderPaymentsRouter.post("/:id/storage/collect", async (c) => {
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
 
   const sb = userClient(c.env, auth.jwt);
-  const receiptNo = await nextReceiptNo(sb, orderId, parsed.data.paidOn);
 
   // CARD 4 (0343): the ledger row AND the gate stamp are one transaction inside
   // the one writer — the two-write race this route used to carry is gone.
-  const { data, error: payErr } = await sb.rpc("payment_record", {
-    p_order_id: orderId,
-    p_amount: parsed.data.amount,
-    p_paid_on: parsed.data.paidOn,
-    p_method: parsed.data.method,
-    p_kind: "storage",
-    p_reference: parsed.data.reference ?? null,
-    p_note: parsed.data.note ?? null,
-    p_receipt_url: parsed.data.receiptUrl ?? null,
-    p_receipt_no: receiptNo,
-    p_counts_toward_paid: true,
+  const { data, error: payErr } = await recordPayment(sb, orderId, {
+    amount: parsed.data.amount,
+    paidOn: parsed.data.paidOn,
+    method: parsed.data.method,
+    kind: "storage",
+    reference: parsed.data.reference,
+    note: parsed.data.note,
+    receiptUrl: parsed.data.receiptUrl,
   });
   if (payErr) {
     const m = mapPgError(payErr);
@@ -588,18 +579,67 @@ async function nextReceiptNo(
   sb: any,
   orderId: string,
   paidOnIso: string,
+  bump = 0,
 ): Promise<string> {
   const { count } = await sb
     .from("order_payments")
     .select("id", { count: "exact", head: true })
     .eq("order_id", orderId);
-  const seq = (typeof count === "number" ? count : 0) + 1;
+  const seq = (typeof count === "number" ? count : 0) + 1 + bump;
   return docNumber({
     prefix: "RC",
     date: paidOnIso,
     seed: `${orderId}:${seq}`,
     digits: 4,
   });
+}
+
+/**
+ * Record one payment through the ONE writer, minting its receipt number and
+ * RETRYING if that number is already taken (0347).
+ *
+ * `nextReceiptNo` seeds on `count + 1`, so two payments recorded into one order
+ * in the same instant read the same count and mint the SAME number. Nothing
+ * stopped that being stored until 0347's unique index — and an index without a
+ * retry just converts a silent duplicate into a 500 at the till. The retry
+ * bumps the sequence and asks again; three attempts is far past any real
+ * collision on a desk where one operator records one payment at a time.
+ */
+async function recordPayment(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  sb: any,
+  orderId: string,
+  args: {
+    amount: number;
+    paidOn: string;
+    method: string;
+    kind: "payment" | "deposit" | "storage";
+    reference?: string | null;
+    note?: string | null;
+    receiptUrl?: string | null;
+  },
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+): Promise<{ data: any; error: any }> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let last: { data: any; error: any } = { data: null, error: null };
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const receiptNo = await nextReceiptNo(sb, orderId, args.paidOn, attempt);
+    last = await sb.rpc("payment_record", {
+      p_order_id: orderId,
+      p_amount: args.amount,
+      p_paid_on: args.paidOn,
+      p_method: args.method,
+      p_kind: args.kind,
+      p_reference: args.reference ?? null,
+      p_note: args.note ?? null,
+      p_receipt_url: args.receiptUrl ?? null,
+      p_receipt_no: receiptNo,
+      p_counts_toward_paid: true,
+    });
+    // 23505 = the receipt number is taken. Anything else is the caller's answer.
+    if (!last.error || last.error.code !== "23505") return last;
+  }
+  return last;
 }
 
 export default orderPaymentsRouter;

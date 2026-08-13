@@ -116,6 +116,32 @@ export interface OrderPaymentRow {
   note: string | null;
   recorded_by: string | null;
   created_at: string;
+  /** 0343 — did this row bump `orders.paid`? False on a HISTORY MIRROR of a
+   *  deposit the create door already put inside `orders.paid`, and on every
+   *  storage collection (storage is not goods money). Void reverses exactly
+   *  this. */
+  counted_in_paid?: boolean;
+  /** 0343 — a void is a STAMP, never a delete. Set = this row is NOT money. */
+  voided_at?: string | null;
+  voided_by?: string | null;
+  void_reason?: string | null;
+}
+
+/**
+ * **The one "is this a valid payment?" predicate** (CARD 4 closing slice,
+ * 2026-08-13 — Law D).
+ *
+ * 0343 turned VOID from a DELETE into a STAMP, which is right: money history is
+ * never erased. But every reader of this ledger was written when a void deleted
+ * the row, so four of them counted and PRINTED a reversed payment — the SO
+ * PDF's `PAYMENTS RECEIVED` block, the drawer's storage-collected sum and its
+ * receipt list, and the collections desk. The ledger held zero rows, so none of
+ * it was visible; all four would have gone wrong on the first void.
+ *
+ * Every reader asks THIS question, and no reader spells `voided_at` itself.
+ */
+export function isLivePayment(p: { voided_at?: string | null }): boolean {
+  return p.voided_at == null;
 }
 
 export interface PaymentSummary {
@@ -133,14 +159,19 @@ export interface PaymentSummary {
  * counts only `payment`/`deposit` (storage is a separate fee, tracked in
  * `storageCollected`). Outstanding floors at 0 — an overpayment reads 0, never
  * negative. Bill ≤ 0 (AutoCount orders often carry no price) → outstanding 0.
+ *
+ * **A VOIDED ROW IS NOT MONEY** (0347): it stays in the array because it stays
+ * in the history, and it contributes nothing to any figure. This is the ONE
+ * place the ledger is added up, so it is the one place that has to know.
  */
 export function summarizePayments(
-  payments: ReadonlyArray<{ amount: number; kind: PaymentKind }>,
+  payments: ReadonlyArray<{ amount: number; kind: PaymentKind; voided_at?: string | null }>,
   bill: number,
 ): PaymentSummary {
   const byKind: Record<PaymentKind, number> = { payment: 0, deposit: 0, storage: 0 };
   let paid = 0;
   for (const p of payments) {
+    if (!isLivePayment(p)) continue;
     const amt = Number(p.amount) || 0;
     byKind[p.kind] = (byKind[p.kind] ?? 0) + amt;
     paid += amt;
