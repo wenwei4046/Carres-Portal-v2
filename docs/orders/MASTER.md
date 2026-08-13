@@ -193,7 +193,7 @@ Shopify-style transaction/version discipline add no unresolved business rule.
 | Revisions | Revision snapshots and historical rendering/PDF exist; current UI combines `History / Revision`; Rev 1 may be minted only on first save | 2990 exposes Revisions and current document identity | **ADAPT / BUILD** | Backstop original Rev 1 at transaction birth; only approved applied amendment mints next Rev; separate complete-version view |
 | History / audit | Order history and revision events render together; actor/cause coverage is partial | 2990 has History | **ADAPT / BUILD** | Separate append-only event view; actor/time/reason/Before/After and permission decisions |
 | Actual PDF + Print | One live renderer and historical snapshot rendering exist; Print opens same blob | 2990 has Print PDF | **KEEP / ADAPT** | Archive/address stable current + per-Revision document truth; follow `SO-PDF-STANDARD.md` |
-| Copy to new SO | Only `Copy SO No` exists | Mature document systems copy into a new draft/transaction, never duplicate identity | **BUILD** | Copy permitted commercial fields into the authoritative create form; new SO number; exclude history, payments, PO/DO/unit links and execution facts |
+| Copy to new SO | Built as a governed seed of the authoritative create form; the register keeps `Copy SO No` as a separate clipboard act | Mature document systems copy into a new draft/transaction, never duplicate identity | **KEEP** | PR #764 production-verified 2026-08-13 (SO-1303 → SO-1320 · Rev 1); money, promised/proceed dates, history, payments and PO/DO/unit links are excluded by construction |
 | Cancel SO | Legacy cancel RPC exists; current official register omits it | 2990 detail exposes Cancel SO | **ADAPT / BUILD** | Cancel only for cancelled customer transaction; permission, reason, refund/release/PO/delivery/Work impact and immutable audit |
 | Scan / import | AutoCount import remains on frozen Old Orders; official register has no Scan | 2990 exposes Scan Order | **RELOCATE / BUILD** | One governed import entrance outside the truth register toolbar unless proven daily-register work; validate/preview/dedupe/errors; imported SO enters same contract |
 | Settings / Maintenance | Sales-order maintenance API/config exists; official UI ownership is incomplete | 2990 exposes SO Maintenance and global Settings | **RELOCATE / BUILD** | Portal Settings owns system configuration; Catalog/Sales own their facts; no record maintenance editor that bypasses amendment law |
@@ -258,12 +258,31 @@ official Card numbers.
    Commitments** lanes; and real owner handoffs, including the selected-order Delivery link. It is
    fact-derived and read-only: no manual checklist, giant overall status or foreign writer was
    introduced.
-5. **READY FOR CARD — Copy / Cancel / Intake / Maintenance Closeout** — copy to a new SO, governed
-   transaction cancellation, Scan/import relocation and Settings/Maintenance ownership. This slice
+5. **CLOSED / PRODUCTION-VERIFIED 2026-08-13 — Copy to new Sales Order** — exact source commit
+   `f6a51d59` passed PR #764 CI, then merged without alteration as parent of `6c43c5c6`. The
+   `Deploy production` run repeated the authoritative gate (`ci:migrations` · lint · typecheck ·
+   the 7,250-test suite · build) on that exact merged SHA, deployed both governed Pages projects
+   and the production Worker (Version ID `53b74bc3-7cdd-42fc-a220-c162a157a0b8`), and
+   `verify-production.mjs` proved all five canonical surfaces — both Pages projects, both custom
+   domains and the API Worker — report `6c43c5c6`. No schema migration and no new writer: copy
+   seeds the existing authoritative create form, which already owns the birth door.
+   Authenticated production verification on `erp.carresofficial.com` opened the register row
+   context menu on **SO-1303** and used `Copy to new Sales Order`. The draft opened as
+   `New Sales Order` carrying the badge `Copied from SO-1303 · review before creating`, with
+   customer, contact, address, dealer/showroom/salesperson and the goods lines (RM 2,499) copied.
+   **The copy boundary held on every excluded fact:** the source's `paid` RM 1,250 rendered as
+   `Paid RM 0`, and its fixed `2026-08-30` promised delivery and `2026-08-09` proceed date both
+   rendered empty — a copy inherits goods and counterparty, never money, never a promise, never
+   execution. Completing the draft minted **SO-1320 · Rev 1** as a NEW identity with
+   `paid = 0.00`, `delivery_date = null`, `delivery_date_tbd = true`, `proceed_date = null`, zero
+   payments and zero PO/DO/unit links, while **SO-1303 was left unchanged**. Identity is never
+   duplicated; a copy is a new transaction.
+6. **READY FOR CARD — Cancel / Intake / Maintenance Closeout** — governed transaction
+   cancellation, Scan/import relocation and Settings/Maintenance ownership. This slice
    follows the edit/amendment permission model; it must not create bypass doors.
 
 **Recommended build sequence:** Register + document actions → authoritative Detail/Edit → Amendment/
-Revision/History → Order Route → Copy/Cancel/Intake/Maintenance closeout. The first two establish the
+Revision/History → Order Route → Copy → Cancel/Intake/Maintenance closeout. The first two establish the
 single field and navigation contract; the amendment slice establishes immutable version truth before
 route and cancellation consume it.
 
