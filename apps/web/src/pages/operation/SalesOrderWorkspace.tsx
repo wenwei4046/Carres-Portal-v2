@@ -74,6 +74,7 @@ import SalesOrderLedger from "./SalesOrderLedger";
 import SalesOrderRoute from "./SalesOrderRoute";
 import SalesOrderTabs from "./SalesOrderTabs";
 import { lineName } from "./sales-order-facts";
+import { copySalesOrderDraft } from "./sales-order-copy";
 
 /* pdf.js worker ships inside the package — nothing fetched from a CDN. */
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
@@ -407,10 +408,11 @@ export default function SalesOrderWorkspace() {
   const isNew = location.pathname.endsWith("/so/new");
   const wantsEdit = params.get("edit") === "1";
   const showRoute = params.get("route") === "1" && !isNew;
+  const copyFrom = isNew ? params.get("copyFrom") : null;
   const [viewRev, setViewRev] = useState<number | null>(null);
   const [amendmentSeed, setAmendmentSeed] = useState<AmendmentProposal | null>(null);
 
-  const detailQ = useOperationOrder(isNew ? null : (orderId ?? null));
+  const detailQ = useOperationOrder(isNew ? copyFrom : (orderId ?? null));
   const revisionsQ = useSalesOrderRevisions(isNew ? null : (orderId ?? null));
   /* 3.4 · what this sales order's changes have raised for other modules. The
    * workspace SHOWS it and cannot close it — the module that raised the work
@@ -451,6 +453,49 @@ export default function SalesOrderWorkspace() {
   const detailLines = detailQ.data?.lines ?? [];
   useEffect(() => {
     if (isNew) {
+      if (copyFrom) {
+        const seed = `copy:${copyFrom}`;
+        if (!order || draftSeed === seed) return;
+        const copied = copySalesOrderDraft({
+          order: {
+            id: order.id,
+            so: order.so,
+            customer_name: order.customer_name,
+            customer_phone: order.customer_phone,
+            customer_email: (order as { customer_email?: string | null }).customer_email,
+            customer_address: order.customer_address,
+            customer_address_line1:
+              (order as { customer_address_line1?: string | null }).customer_address_line1,
+            customer_address_line2:
+              (order as { customer_address_line2?: string | null }).customer_address_line2,
+            customer_address_city:
+              (order as { customer_address_city?: string | null }).customer_address_city,
+            customer_address_state:
+              (order as { customer_address_state?: string | null }).customer_address_state,
+            customer_address_postcode:
+              (order as { customer_address_postcode?: string | null }).customer_address_postcode,
+            customer_emergency: order.customer_emergency,
+            customer_billing: order.customer_billing,
+            dealer_id: order.dealer_id,
+            outlet_id: order.outlet_id,
+            salesperson_id: order.salesperson_id,
+            delivery_floor: (order as { delivery_floor?: number }).delivery_floor,
+            delivery_has_lift: (order as { delivery_has_lift?: boolean }).delivery_has_lift,
+          },
+          lines: detailLines.map((line) => ({
+            id: line.id,
+            sku: line.sku,
+            qty: line.qty,
+            unit_price: line.unit_price,
+          })),
+        });
+        setDraft({
+          ...copied,
+          lines: copied.lines.map((line) => ({ ...line, key: nextKey() })),
+        });
+        setDraftSeed(seed);
+        return;
+      }
       if (draftSeed !== "new") {
         setDraft({ ...EMPTY_DRAFT, lines: [{ key: nextKey(), sku: "", qty: 1, unit_price: 0 }] });
         setDraftSeed("new");
@@ -494,7 +539,7 @@ export default function SalesOrderWorkspace() {
     });
     setDraftSeed(seed);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isNew, wantsEdit, order, orderId, draftSeed]);
+  }, [isNew, wantsEdit, order, orderId, copyFrom, detailLines, draftSeed]);
 
   const mode: Mode = isNew ? "create" : viewRev != null ? "oldrev" : wantsEdit ? "edit" : "view";
 
@@ -932,11 +977,11 @@ export default function SalesOrderWorkspace() {
       <div className="flex min-h-0 flex-1">
         {/* ── LEFT 55% — the seven sections ─────────────────────────────── */}
         <div className="min-h-0 w-[55%] shrink-0 overflow-auto border-r border-kit-slate-5 bg-kit-slate-3 px-4 py-4">
-          {!isNew && detailQ.isLoading && <Loading label="Opening the sales order" />}
-          {!isNew && !detailQ.isLoading && detailQ.isError && (
+          {(!isNew || copyFrom) && detailQ.isLoading && <Loading label={copyFrom ? "Preparing the copied draft" : "Opening the sales order"} />}
+          {(!isNew || copyFrom) && !detailQ.isLoading && detailQ.isError && (
             <div className="rounded-card border border-kit-slate-5 bg-white">
               <EmptyState
-                title="This sales order could not be opened"
+                title={copyFrom ? "This Sales Order could not be copied" : "This sales order could not be opened"}
                 detail={(detailQ.error as Error | undefined)?.message}
                 action={
                   <Button variant="neutral" onClick={() => void detailQ.refetch()}>
@@ -947,7 +992,7 @@ export default function SalesOrderWorkspace() {
             </div>
           )}
 
-          {(isNew || order) && (
+          {(isNew && !copyFrom || order) && (
             <div className="flex flex-col gap-3" data-testid="sales-order-workspace">
               {/* Title strip */}
               <div className="rounded-card border border-kit-slate-5 bg-white px-4 py-3">
@@ -962,6 +1007,10 @@ export default function SalesOrderWorkspace() {
                   ) : mode === "edit" ? (
                     <span className="rounded-pill bg-kit-blue-9 px-2 py-0.5 text-label font-semibold text-white">
                       Safe correction — customer and delivery facts only
+                    </span>
+                  ) : mode === "create" && copyFrom && order ? (
+                    <span className="rounded-pill bg-kit-blue-3 px-2 py-0.5 text-label font-semibold text-kit-blue-11">
+                      Copied from SO-{order.so} · review before creating
                     </span>
                   ) : null}
                 </div>

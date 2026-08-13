@@ -396,8 +396,8 @@ export default function SalesOrdersRegister() {
   );
   const onRowDoubleClick = useCallback((r: RegisterRow) => openWorkspace(r), [openWorkspace]);
 
-  /* Right-click: Open · Edit · Print PDF · Copy SO No — nothing else (STAGE 1,
-     verbatim). Every item is view-oriented; none writes. */
+  /* Right-click document actions. Copy opens the authoritative create form as
+     a draft; the register still writes nothing. */
   const contextMenu = useCallback(
     (r: RegisterRow): DataGridContextMenuItem[] => [
       { label: "View", onClick: () => openWorkspace(r) },
@@ -405,16 +405,11 @@ export default function SalesOrdersRegister() {
       { label: "Preview PDF", onClick: () => void openSalesOrderPdf(r.id, r.so) },
       { label: "Print PDF", onClick: () => void openSalesOrderPdf(r.id, r.so) },
       {
-        label: "Copy SO No",
-        onClick: () => {
-          void navigator.clipboard
-            .writeText(`SO-${r.so}`)
-            .then(() => toast.success(`SO-${r.so} copied`))
-            .catch(() => toast.error("Could not copy"));
-        },
+        label: "Copy to new Sales Order",
+        onClick: () => navigate(`/operation/orders/so/new?copyFrom=${r.id}`),
       },
     ],
-    [openWorkspace],
+    [navigate, openWorkspace],
   );
 
   const expandable = useMemo(
