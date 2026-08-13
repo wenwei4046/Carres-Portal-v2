@@ -52,6 +52,8 @@ import {
   type ReturnToSupplierInput,
   type SofaLoanDto,
   type SofaLoansResponse,
+  type SalesOrderAllocation,
+  type DeliveryAttemptRow,
   type AutocountImportInput,
   type AutocountImportResponse,
   type SpecialAddonDto,
@@ -436,6 +438,10 @@ export const qk = {
      *  it too. */
     orderBookingBrief: (id: string) =>
       ["operation", "orders", id, "booking-brief"] as const,
+    /** Order Route is one read-only projection over facts owned by several
+     * modules. The cache key stays under the order so every existing order
+     * invalidation refreshes the projection without creating a new owner. */
+    orderRoute: (id: string) => ["operation", "orders", id, "route"] as const,
     partners:  () => ["operation", "partners"] as const,
     suppliers: () => ["operation", "suppliers"] as const,
     pos:       (filters?: operationPoFilters) =>
@@ -4301,6 +4307,96 @@ export function useSalesOrderRevisions(
         `/api/operation/orders/${orderId}/revisions`,
       ),
     enabled: !!orderId,
+    ...opts,
+  });
+}
+
+export interface SalesOrderRouteRefund {
+  id: string;
+  amount: number | string;
+  status: "requested" | "approved" | "rejected" | "paid";
+  requested_at: string | null;
+}
+
+export interface SalesOrderRouteCase {
+  id: string;
+  caseNo: string;
+  statusIsClosed: boolean;
+  openedAt: string | null;
+}
+
+export interface SalesOrderRouteReceivingSession {
+  id: string;
+  po_id: string;
+  do_number: string | null;
+  status: string;
+  goods_received_at: string | null;
+  submitted_at: string;
+}
+
+export interface SalesOrderRouteClaim {
+  id: string;
+  claim_no: string;
+  po_id: string;
+  status: string;
+  reported_at: string | null;
+}
+
+export interface SalesOrderRouteFactsResponse {
+  allocation: SalesOrderAllocation;
+  brief: BookingBrief;
+  attempts: DeliveryAttemptRow[];
+  loans: SofaLoanDto[];
+  refunds: SalesOrderRouteRefund[];
+  cases: SalesOrderRouteCase[];
+  receiving: SalesOrderRouteReceivingSession[];
+  claims: SalesOrderRouteClaim[];
+}
+
+/**
+ * The Order Route's read fan-in. Every request goes to the existing owning
+ * door; this hook neither derives nor writes an owner fact. It fires only when
+ * the route is open, keeping the normal document workspace unchanged.
+ */
+export function useSalesOrderRouteFacts(
+  orderId: string | null,
+  open: boolean,
+  poIds: readonly string[] = [],
+  opts?: Partial<UseQueryOptions<SalesOrderRouteFactsResponse>>,
+) {
+  const poKey = [...poIds].sort().join(",");
+  return useQuery({
+    queryKey: orderId ? ([...qk.operation.orderRoute(orderId), poKey] as const) : (["operation", "orders", "null", "route"] as const),
+    queryFn: async () => {
+      const id = encodeURIComponent(orderId ?? "");
+      const receivingPromise = Promise.all(poIds.map((poId) =>
+        apiFetch<{ sessions: SalesOrderRouteReceivingSession[] }>(
+          `/api/operation/pos/${encodeURIComponent(poId)}/receiving`,
+        ),
+      ));
+      const [allocation, booking, attempts, loans, refunds, cases, claims] = await Promise.all([
+        apiFetch<{ allocation: SalesOrderAllocation }>(`/api/operation/orders/${id}/allocation`),
+        apiFetch<{ brief: BookingBrief }>(`/api/operation/orders/${id}/booking-brief`),
+        apiFetch<{ attempts: DeliveryAttemptRow[] }>(`/api/operation/orders/${id}/delivery-attempts`),
+        apiFetch<SofaLoansResponse>(`/api/operation/orders/${id}/loans`),
+        apiFetch<{ refunds: SalesOrderRouteRefund[] }>(`/api/operation/orders/${id}/refunds`),
+        apiFetch<{ items: SalesOrderRouteCase[] }>(`/api/ops/service-cases?orderId=${id}`),
+        apiFetch<{ claims: SalesOrderRouteClaim[] }>("/api/operation/supplier-claims?status=all"),
+      ]);
+      const receiving = await receivingPromise;
+      return {
+        allocation: allocation.allocation,
+        brief: booking.brief,
+        attempts: attempts.attempts,
+        loans: loans.loans,
+        refunds: refunds.refunds,
+        cases: cases.items,
+        receiving: receiving.flatMap((result) => result.sessions),
+        claims: claims.claims.filter((claim) => poIds.includes(claim.po_id)),
+      };
+    },
+    enabled: !!orderId && open,
+    staleTime: 10_000,
     ...opts,
   });
 }

@@ -1,6 +1,21 @@
 export const SHARED_VERSION = "0.0.0" as const;
 
 export {
+  resolveSalesOrderRoute,
+  type RouteDeliveryAttempt,
+  type RouteLoan,
+  type RoutePurchaseOrder,
+  type SalesOrderRoute,
+  type SalesOrderRouteDocument,
+  type SalesOrderRouteFact,
+  type SalesOrderRouteFactState,
+  type SalesOrderRouteGroup,
+  type SalesOrderRouteInput,
+  type SalesOrderRouteLane,
+  type SalesOrderRouteLaneKey,
+} from "./sales-order-route";
+
+export {
   MAX_DELIVERY_FLOOR,
   EARLIEST_SELL_GATED_CATEGORIES,
   maxLeadDaysFor,
