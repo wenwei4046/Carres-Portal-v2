@@ -1961,7 +1961,6 @@ describe("POST /api/operation/orders/:id/save", () => {
 });
 
 describe("Sales Order amendment decision lane", () => {
-  const ORDER_ID = "00000000-0000-0000-0000-000000000b01";
   const AMENDMENT_ID = "00000000-0000-0000-0000-000000000a01";
 
   it("returns the owner impact preview without writing another module", async () => {
