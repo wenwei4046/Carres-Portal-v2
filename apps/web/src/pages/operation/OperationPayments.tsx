@@ -101,6 +101,9 @@ interface RawCtrl {
 interface RawLedgerEntry {
   amount: number | string;
   kind: PaymentKind;
+  /** 0343 — a void is a stamp, not a delete. Set means the money was reversed,
+   *  and `summarizePayments` must skip the row. */
+  voided_at: string | null;
 }
 interface RawLine {
   sku: string;
@@ -427,6 +430,10 @@ export default function OperationPayments() {
       const ledger = (r.order_payments ?? []).map((p) => ({
         amount: Number(p.amount) || 0,
         kind: p.kind,
+        // Voided rows are still present (0343 stamps, never deletes). Without
+        // this the desk counts a reversed storage collection as collected and
+        // reports RM 0 storage owing on an order that owes it again.
+        voidedAt: p.voided_at,
       }));
       const sum = summarizePayments(ledger, balance ?? 0);
       const storageCollected = ctrl?.storage_collected_at != null;

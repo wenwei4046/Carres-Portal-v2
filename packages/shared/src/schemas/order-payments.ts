@@ -116,6 +116,16 @@ export interface OrderPaymentRow {
   note: string | null;
   recorded_by: string | null;
   created_at: string;
+  // 0343 — the void trio. The route has returned these since Card 4
+  // (`PAYMENT_COLS`) but the type never declared them, so every consumer was
+  // blind to a reversal it was already being handed.
+  /** Set = this payment was reversed. The row is kept as history, never deleted. */
+  voided_at: string | null;
+  voided_by: string | null;
+  void_reason: string | null;
+  /** True = this row bumped `orders.paid`. False = a history mirror of money the
+   *  raw-create door already put there. See §4 of 0343. */
+  counted_in_paid: boolean;
 }
 
 export interface PaymentSummary {
@@ -133,14 +143,27 @@ export interface PaymentSummary {
  * counts only `payment`/`deposit` (storage is a separate fee, tracked in
  * `storageCollected`). Outstanding floors at 0 — an overpayment reads 0, never
  * negative. Bill ≤ 0 (AutoCount orders often carry no price) → outstanding 0.
+ *
+ * A VOIDED row is skipped. Before 0343 a void DELETED the row, so summing
+ * everything was correct; 0343 made void a STAMP (`voided_at`) that reverses the
+ * `orders.paid` bump and leaves the row in place as history. Summing it would
+ * count money that has been given back. Callers must therefore pass `voidedAt`
+ * through — a caller that maps it away silently re-opens this hole, which is
+ * why it is part of the input type rather than filtered by each caller.
  */
 export function summarizePayments(
-  payments: ReadonlyArray<{ amount: number; kind: PaymentKind }>,
+  payments: ReadonlyArray<{
+    amount: number;
+    kind: PaymentKind;
+    /** `order_payments.voided_at` — set means the money was reversed (0343). */
+    voidedAt?: string | null;
+  }>,
   bill: number,
 ): PaymentSummary {
   const byKind: Record<PaymentKind, number> = { payment: 0, deposit: 0, storage: 0 };
   let paid = 0;
   for (const p of payments) {
+    if (p.voidedAt) continue;
     const amt = Number(p.amount) || 0;
     byKind[p.kind] = (byKind[p.kind] ?? 0) + amt;
     paid += amt;
