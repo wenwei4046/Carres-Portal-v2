@@ -280,6 +280,7 @@ import {
   type SetPositionDutyInput,
   type HrCreateTeamAccountInput,
   type HrCreateShowroomStaffInput,
+  type BookingBrief,
   type SupplierClaimMove,
   type WarehouseIncomingResponse,
   type WarehouseReceiptLine,
@@ -429,6 +430,12 @@ export const qk = {
      *  order. Nested under the order id so a blunt ["operation","orders"]
      *  invalidation after any order mutation refreshes it too. */
     orderPayments: (id: string) => ["operation", "orders", id, "payments"] as const,
+    /** CARD 3 — what Operations puts on the T−3 customer call: the promised
+     *  deadline, the latest Stock ETA, the expected scope and what is / is not
+     *  expected in. Nested under the order id so any order mutation refreshes
+     *  it too. */
+    orderBookingBrief: (id: string) =>
+      ["operation", "orders", id, "booking-brief"] as const,
     partners:  () => ["operation", "partners"] as const,
     suppliers: () => ["operation", "suppliers"] as const,
     pos:       (filters?: operationPoFilters) =>
@@ -4944,6 +4951,31 @@ export function useStockAlerts(
 /** Cross-warehouse stock snapshot — the Stock On-Hand source of truth, reused by
  *  the Orders control table so its Stock column matches that page's free-balance
  *  figures. 30s stale mirrors the other operation stock surfaces. */
+/**
+ * CARD 3 — the booking brief for ONE order.
+ *
+ * The server composes it from the authoritative reads (Card 1 commitment →
+ * Card 2 allocation → the overlay's booking + supplier dates → the partner
+ * roster → the `logistics_call_working_days` setting), so nothing on this side
+ * re-derives a call window or a shortfall. Disabled without an id — the delivery
+ * pane asks only for the order the operator has picked.
+ */
+export function useOrderBookingBrief(
+  orderId: string | null | undefined,
+  opts?: Partial<UseQueryOptions<{ brief: BookingBrief }>>,
+) {
+  return useQuery({
+    queryKey: qk.operation.orderBookingBrief(orderId ?? ""),
+    queryFn: () =>
+      apiFetch<{ brief: BookingBrief }>(
+        `/api/operation/orders/${orderId}/booking-brief`,
+      ),
+    enabled: !!orderId,
+    staleTime: 30_000,
+    ...opts,
+  });
+}
+
 export function useOperationStock(
   opts?: Partial<UseQueryOptions<operationStockResponse>>,
 ) {

@@ -2506,6 +2506,10 @@ export * from "./sales-order-commitment";
 // CARD 2 — unit/stock allocation truth: the one arithmetic for "which real
 // Units are reserved/sold to this SO, and what is still unallocated".
 export * from "./sales-order-allocation";
+// CARD 3 — the booking brief: what Operations puts on the T−3 customer call
+// (promised deadline · latest Stock ETA · expected scope · what is / is not
+// expected in), and the three separate truths kept apart.
+export * from "./booking-brief";
 // CARD 4 — the collection clock: T−3 · T−2 · T−1 (final deadline) on working
 // days before the delivery, one arithmetic for every surface that presses.
 export * from "./collection-clock";

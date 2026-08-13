@@ -18,6 +18,7 @@ import {
   DELIVERY_RANGE_KEYS,
   myHolidaySet,
   orderActionLine,
+  orderActionQueue,
   orderDeliveryGroups,
   partnerBookingWarnings,
   partnerDeliveryRules,
@@ -32,6 +33,7 @@ import {
   useDeliveryPartners,
   useOperationOrders,
   useOperationStock,
+  useOrderBookingBrief,
   usePurchasingSettings,
   type operationOrderListRow,
 } from "@/lib/queries";
@@ -53,6 +55,7 @@ import {
   logisticStateOf,
   moneyOf,
   nextActionOf,
+  openActionsOf,
   stageOf,
   stockReadiness,
   todayIso,
@@ -196,23 +199,86 @@ export default function OperationDelivery() {
   const today = todayIso();
 
   /**
-   * Every order, read through the ladder ONCE.
+   * Every order, read through the SAME engine ONCE.
    *
    * `queue` is the whole scoping rule: an order is delivery WORK exactly when
-   * the ladder says the next thing to do is one of the four delivery actions. A
-   * money-held order (🔒 Confirm delivery) carries no queue and never reaches
-   * the board — you do not arrange a delivery you are not allowed to make (the
-   * PayHold law, decided in T7 and simply obeyed here).
+   * the engine has an open action on the DELIVERY TRACK. A money-held order
+   * carries no delivery action at all (`deliveryHeldOnMoney` returns the track
+   * silent) and so never reaches the board — you do not arrange a delivery you
+   * are not allowed to make (the PayHold law, decided in T7, and it still falls
+   * out by construction rather than by a rule written here).
+   *
+   * ⭐ CARD 3 (owner ruling 2026-08-13) — WHY THIS READS THE TRACK AND NOT THE
+   * HEADLINE, and it is the defect the card was raised to close.
+   *
+   * This page used to scope itself with `nextActionOf` — Layer 2, the ONE action
+   * that leads the row across all three tracks. But Law 4 ranks goods work
+   * (`Issue PO` 31 · `Call {supplier} — confirm ready date` 30) ABOVE delivery
+   * preparation (`Assign logistics` 40 · `Call {logistics} — confirm delivery
+   * date` 41). So for every order whose goods were not yet in, the headline was
+   * a goods action and the order was INVISIBLE on the logistics operator's own
+   * page — which made two of the ruling's permanent rules unreachable in
+   * practice:
+   *
+   *   Rule 1  "Assign Logistics early ... do NOT wait until stock is
+   *            physically ready"
+   *   Rule 2  "Customer contact happens at T−3 ... regardless of stock
+   *            readiness. Got stock or no stock, Logistics still starts the
+   *            conversation."
+   *
+   * Measured on production 2026-08-13: 86 live orders · 51 with logistics
+   * assigned · ZERO customer appointments ever confirmed. The engine permitted
+   * the early work all along; the workspace never showed it.
+   *
+   * This is NOT a re-ranking of Law 4 — the Orders row still leads with the
+   * same headline it always did, and no word changes. It is the same Layer 1
+   * output read through this page's own lens, which is what §3 of the Delivery
+   * MASTER already says this page is for: *"the Orders list sorts by risk to
+   * the PROMISE; this page sorts by risk to the TRUCK."* Membership was still
+   * being decided by the other page's lens.
    *
    * Queue-less orders are still BUILT, because the calendar shows every booked
    * truck — including the money-held ones — and clicking one must open a detail
-   * pane that says what the Orders list says about it, not a blank.
+   * pane that says what the Orders list says about it, not a blank. Those rows
+   * keep the ORDER's headline (`nextActionOf`), so a held order still reads
+   * `Collect RM 1,500.00 🔒` here exactly as it does there.
    */
   const rows = useMemo(() => {
     const out: DeliveryRow[] = [];
     for (const o of orders) {
-      const next = nextActionOf(o, stockReadiness(o, availableBySku), o.order_lines ?? []);
-      const def = deliveryQueueForLabel(next.label);
+      const stock = stockReadiness(o, availableBySku);
+      const lines = o.order_lines ?? [];
+      // Layer 1, filtered to this page's track. One engine, one mapping, one
+      // set of words — the Orders list runs the identical call.
+      const open = openActionsOf(o, stock, lines);
+      const onTrack = open.find((a) => a.track === "delivery");
+      // The ruling's own trigger for assignment: *"Ready Stock route known OR
+      // Purchase Order placed → ASSIGN LOGISTICS EARLY."* An open `Issue PO` is
+      // exactly the state where NEITHER is true — nobody has bought these goods
+      // and no shelf covers them — so there is no route to plan capacity around
+      // yet. Rule 1 forbids waiting for the goods to be READY; it does not ask
+      // anyone to pick a truck for goods nobody has ordered.
+      //
+      // The moment the PO exists the assign step joins the board, goods or no
+      // goods — and every LATER delivery step joins unconditionally, because by
+      // then logistics is assigned and Rule 2 governs: *"Customer contact
+      // happens at T−3 ... regardless of stock readiness. Got stock or no
+      // stock, Logistics still starts the conversation."*
+      const routeUnknown = open.some((a) => a.key === "issue_po");
+      const onBoard =
+        onTrack && !(onTrack.key === "assign_logistics" && routeUnknown)
+          ? onTrack
+          : null;
+      const headline = nextActionOf(o, stock, lines);
+      const next = onBoard
+        ? {
+            key: onBoard.key,
+            label: orderActionQueue(onBoard.key),
+            tone: onBoard.tone,
+            locked: onBoard.locked,
+          }
+        : headline;
+      const def = onBoard ? deliveryQueueForLabel(next.label) : null;
       const anchor = def ? deliveryStepAnchor(o, def.key) : null;
       const state = logisticStateOf(o, partnerNameById);
       const money = moneyOf(o);
@@ -945,6 +1011,11 @@ function DeliveryDetail({
   onOpenOrder: () => void;
 }) {
   const o = row.order;
+  // CARD 3 — the facts Operations puts on the T−3 call, composed server-side
+  // from Card 1's commitment and Card 2's allocation. Fetched only for the
+  // order the operator has actually picked.
+  const briefQ = useOrderBookingBrief(o.id);
+  const brief = briefQ.data?.brief ?? null;
   const ovl = orderControlOf(o);
   const booking = bookingDayOf({
     stage: ovl?.booking_stage ?? null,
@@ -1019,12 +1090,89 @@ function DeliveryDetail({
         </div>
       </div>
 
+      {/* ⭐ CARD 3 — BEFORE YOU CALL (owner ruling 2026-08-13).
+          The approved journey puts the customer conversation THREE working days
+          before the promised deadline "regardless of stock readiness", and says
+          in the same breath what Operations must hand Logistics for it: the
+          customer promised deadline · the latest expected arrival · the expected
+          delivery scope · what IS and IS NOT expected in.
+
+          Until this card those four facts lived in four different reads and were
+          never assembled for the person holding the phone. This panel is that
+          assembly and nothing else — it computes NOTHING (the server's one
+          arithmetic does), and it writes NOTHING (`Open order` remains this
+          page's only door out, exactly as §2 froze).
+
+          It renders whether or not the goods are in. That is the point: an empty
+          warehouse is a fact the customer needs on the call, not a reason to
+          skip it. */}
+      {brief && (
+        <div className="px-4 py-3 border-b border-base-100">
+          <div className="flex items-baseline gap-2 mb-1.5">
+            <div className="text-label uppercase tracking-[0.05em] text-base-500">
+              Before you call
+            </div>
+            {brief.contactWindow !== "done" && brief.contactDueIso && (
+              <span
+                className={`ml-auto text-meta tabular-nums ${
+                  brief.contactOverdue
+                    ? "text-danger font-semibold"
+                    : brief.contactWindow === "open"
+                      ? "text-warning font-semibold"
+                      : "text-base-500"
+                }`}
+              >
+                {brief.contactOverdue
+                  ? `Late — was due ${fmtDate(brief.contactDueIso)}`
+                  : `Call by ${fmtDate(brief.contactDueIso)}`}
+              </span>
+            )}
+          </div>
+
+          <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-meta">
+            <dt className="text-base-500">Promised to the customer</dt>
+            <dd className="text-base-800 tabular-nums">
+              {brief.promisedDateIso ? fmtDate(brief.promisedDateIso) : "No date yet"}
+            </dd>
+
+            <dt className="text-base-500">Expected arrival</dt>
+            <dd className="text-base-800 tabular-nums">
+              {brief.stockEtaIso
+                ? fmtDate(brief.stockEtaIso)
+                : brief.goodsNotIn.length > 0
+                  ? "The factory has not given a date"
+                  : "Everything is on hand"}
+            </dd>
+
+            {brief.goodsNotIn.length > 0 && (
+              <>
+                <dt className="text-warning">Not in yet</dt>
+                <dd className="text-base-800">
+                  {brief.goodsNotIn
+                    .map((l) => `${l.sku} ×${l.shortQty}`)
+                    .join(" · ")}
+                </dd>
+              </>
+            )}
+          </dl>
+        </div>
+      )}
+
       {/* The booking, as a FACT (T1's vocabulary): confirmed is the only green. */}
       <div className="px-4 py-3 border-b border-base-100">
         <div className="text-label uppercase tracking-[0.05em] text-base-500 mb-1.5">Delivery date</div>
         {booking.kind === "confirmed" && booking.date ? (
           <div className="text-body text-success font-semibold">
-            {row.logisticsName?.trim() || NO_LOGISTICS_LABEL} · confirmed {fmtDate(booking.date)}
+            {/* CARD 3 (0346) — a confirmed booking names the company it was
+                AGREED WITH, never the one assigned right now. Reading the
+                current assignment here is the collapse the ruling forbids:
+                reassigning logistics would silently restate what the customer
+                said yes to. `brief.carrierDrift` below is how the two truths
+                part company on screen instead of in silence. */}
+            {brief?.appointment?.carrier.partnerName?.trim() ||
+              row.logisticsName?.trim() ||
+              NO_LOGISTICS_LABEL}{" "}
+            · confirmed {fmtDate(booking.date)}
             {booking.slot ? ` · ${shortSlot(booking.slot)}` : ""}
           </div>
         ) : booking.kind === "provisional" && booking.date ? (
@@ -1040,6 +1188,19 @@ function DeliveryDetail({
         {row.promisedIso && (
           <div className="text-meta text-base-500 mt-1 tabular-nums">
             Promised to the customer: {fmtDate(row.promisedIso)}
+          </div>
+        )}
+        {/* CARD 3 — the two truths parted company. The customer agreed this day
+            with one company and a different one is assigned now, so somebody has
+            to either put the original company back or call the customer again.
+            The sentence names both, and it names the fix (COPY rule: a warning
+            that only states a fact tells a new hire nothing). */}
+        {brief?.carrierDrift && (
+          <div className="text-meta text-warning mt-1">
+            Assigned to {brief.assignedLogistics?.partnerName ?? NO_LOGISTICS_LABEL} since the
+            customer agreed this day with{" "}
+            {brief.appointment?.carrier.partnerName ?? NO_LOGISTICS_LABEL} — put the original
+            company back, or call the customer to agree the day again.
           </div>
         )}
       </div>

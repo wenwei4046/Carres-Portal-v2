@@ -73,7 +73,7 @@ const ORDER_ID = z.string().uuid();
 /** The full overlay column list — ONE copy for GET / PUT / booking-confirm so
  *  the three responses can never drift apart. */
 const CONTROL_COLUMNS =
-  "order_id, stock_location, stock_eta, delivery_time_slot, customer_request, action_for_logistic, carres_remark, warehouse_remark, payment_status, balance, balance_due_date, storage_from, storage_to, storage_fee_override, storage_fee_msbf, storage_fee_sof, logistic_eta, paid_amount, storage_paid, storage_collected_at, storage_waiver_status, storage_waiver_reason, storage_waiver_requested_by, storage_waiver_decided_by, storage_waiver_decided_at, extension_original_date, extension_new_date, extension_reason, extension_note, extension_acknowledged_at, extended_at, extended_by, extension_count, contact_by_days, contact_by_task_at, line_locations, line_legs, line_etas, line_stock_status, line_received, called_customer, customer_confirmed, last_chased_at, assigned_staff, assigned_by, assigned_at, booking_stage, confirmed_date, confirmed_time_slot, customer_confirmed_at, customer_confirmed_by, delivery_photos, booking_groups, delivery_trips, delay_decision, delay_decision_eta, delay_decision_at, delay_decision_by, delay_decision_note, delay_detected_at, delay_detected_eta, updated_at, updated_by";
+  "order_id, stock_location, stock_eta, delivery_time_slot, customer_request, action_for_logistic, carres_remark, warehouse_remark, payment_status, balance, balance_due_date, storage_from, storage_to, storage_fee_override, storage_fee_msbf, storage_fee_sof, logistic_eta, paid_amount, storage_paid, storage_collected_at, storage_waiver_status, storage_waiver_reason, storage_waiver_requested_by, storage_waiver_decided_by, storage_waiver_decided_at, extension_original_date, extension_new_date, extension_reason, extension_note, extension_acknowledged_at, extended_at, extended_by, extension_count, contact_by_days, contact_by_task_at, line_locations, line_legs, line_etas, line_stock_status, line_received, called_customer, customer_confirmed, last_chased_at, assigned_staff, assigned_by, assigned_at, booking_stage, confirmed_date, confirmed_time_slot, confirmed_partner_id, customer_confirmed_at, customer_confirmed_by, delivery_photos, booking_groups, delivery_trips, delay_decision, delay_decision_eta, delay_decision_at, delay_decision_by, delay_decision_note, delay_detected_at, delay_detected_eta, updated_at, updated_by";
 
 function requireOperationOrPrincipal(
   role: string,
@@ -93,7 +93,16 @@ function requireOperationOrPrincipal(
  * live order.
  */
 interface BookingContext {
-  order: { id: string; so: number; paid: number | string | null; do_number: string | null };
+  order: {
+    id: string;
+    so: number;
+    paid: number | string | null;
+    do_number: string | null;
+    /** CARD 3 (0346) — the company currently assigned to carry this order. The
+     *  appointment stamps it at confirmation; it is never re-read afterwards. */
+    ops_assigned_logistic?: string | null;
+    delivery_partner_id?: string | null;
+  };
   control: Record<string, unknown> | null;
   lines: { sku: string; qty: number; unit_price: number | null }[];
   gate: BookingGateResult;
@@ -114,7 +123,9 @@ async function loadBookingContext(
   // the delivery order's own completion signal.
   const { data: order, error: orderErr } = await sb
     .from("orders")
-    .select("id, so, paid, do_number")
+    // CARD 3 (0346): the assignment rides this select so the confirm door can
+    // stamp the carrier the customer's appointment is agreed WITH.
+    .select("id, so, paid, do_number, ops_assigned_logistic, delivery_partner_id")
     .eq("id", orderId)
     .maybeSingle();
   if (orderErr) {
@@ -135,7 +146,7 @@ async function loadBookingContext(
       .select(
         // C9 — the storage columns ride this select because an uncollected
         // storage fee holds a delivery exactly as an unpaid balance does.
-        "line_received, balance, booking_stage, booking_groups, confirmed_date, confirmed_time_slot, customer_confirmed_at, customer_confirmed_by, delivery_trips, storage_from, storage_fee_override, storage_fee_msbf, storage_fee_sof, storage_collected_at, storage_waiver_status",
+        "line_received, balance, booking_stage, booking_groups, confirmed_date, confirmed_time_slot, confirmed_partner_id, customer_confirmed_at, customer_confirmed_by, delivery_trips, storage_from, storage_fee_override, storage_fee_msbf, storage_fee_sof, storage_collected_at, storage_waiver_status",
       )
       .eq("order_id", orderId)
       .maybeSingle(),
@@ -419,6 +430,36 @@ orderControlRouter.post("/:id/booking/confirm", async (c) => {
   // business gate.
   const gateWarnings = bookingGateWarnings(gate);
 
+  // CARD 3 (owner ruling 2026-08-13, migration 0346) — AN APPOINTMENT NAMES THE
+  // CARRIER IT WAS MADE WITH.
+  //
+  // The ruling keeps Assigned Logistics and the Confirmed Customer Appointment
+  // as two truths, which only works if the appointment stores its own carrier:
+  // reading the current assignment at render time makes a later reassignment
+  // silently rewrite the company the customer's agreed day belongs to. So the
+  // company is stamped HERE, once, and never re-read.
+  //
+  // Refusing with no assignment is not a new gate on the conversation — the
+  // action engine already opens the booking call only once logistics is
+  // assigned (`deliveryAction`: `if (!s.hasLogistics) return assign_logistics`),
+  // and Rule 1 says assignment happens EARLY, long before this door. What is
+  // refused is recording an appointment that cannot name who is driving.
+  const assignedPartnerId =
+    (loaded.ctx.order.ops_assigned_logistic ?? null) ||
+    (loaded.ctx.order.delivery_partner_id ?? null);
+  if (!assignedPartnerId) {
+    return c.json(
+      {
+        error: "booking_no_logistics",
+        code: "booking_no_logistics",
+        message:
+          "Assign a logistics company before confirming the delivery date — " +
+          "a booking has to name who is delivering it",
+      },
+      422,
+    );
+  }
+
   // The trip's scope. NULL means "the whole order" — so a trip that happens to
   // carry every group is stored as NULL, keeping the common case identical to
   // pre-T8 rows and out of the split UI.
@@ -427,6 +468,7 @@ orderControlRouter.post("/:id/booking/confirm", async (c) => {
     booking_groups?: string[] | null;
     confirmed_date?: string | null;
     confirmed_time_slot?: string | null;
+    confirmed_partner_id?: string | null;
     customer_confirmed_at?: string | null;
     customer_confirmed_by?: string | null;
     delivery_trips?: unknown;
@@ -451,6 +493,10 @@ orderControlRouter.post("/:id/booking/confirm", async (c) => {
             groups: prevScope,
             date: prev?.confirmed_date ?? null,
             slot: prev?.confirmed_time_slot ?? null,
+            // CARD 3 (0346) — the archived trip keeps the carrier it was agreed
+            // with too. Without it the history cannot answer "who was that day
+            // agreed with?" even in principle.
+            partner_id: prev?.confirmed_partner_id ?? null,
             at: prev?.customer_confirmed_at ?? null,
             by: prev?.customer_confirmed_by ?? null,
           },
@@ -465,6 +511,7 @@ orderControlRouter.post("/:id/booking/confirm", async (c) => {
         booking_stage: "confirmed",
         confirmed_date: confirmedDate,
         confirmed_time_slot: confirmedTimeSlot,
+        confirmed_partner_id: assignedPartnerId,
         customer_confirmed_at: new Date().toISOString(),
         customer_confirmed_by: auth.id,
         booking_groups: scope,

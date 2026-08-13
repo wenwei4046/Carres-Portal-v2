@@ -1128,6 +1128,33 @@ the column carries no header word, and each dot is labelled by its own small ico
 delivery · money) from the portal icon set, never emoji (UI-KIT). The actions column IS
 headed, and its word is **`Actions`** — plural, because an order can have several.
 
+**The booking-call words (SO V2 Card 3, owner ruling 2026-08-13).** The approved journey
+opens the customer conversation **three working days before the Customer Promised Deadline,
+regardless of stock readiness**, and names what Operations hands Logistics for it. These are
+the words that panel may use, and no others:
+
+| Word | What it names | Why not the alternatives |
+|---|---|---|
+| **`Before you call`** | the panel heading — the facts to have in hand before the phone rings | It is the only heading that says WHEN it is for. `Call brief` · `Pre-call` · `Summary` are jargon (rule 9) and none of them tells a new hire the panel is about a call that has not happened yet |
+| **`Call by {date}`** | the day the conversation is due, from `logistics_call_working_days` | `Due {date}` alone does not say *do what*. The late spelling is the portal's existing **`Late — was due {date}`**, unchanged, so this step reads like every other late step |
+| **`Not in yet`** | committed goods the register does not hold — the ruling's *"what is / is not expected in"* | `Waiting` alone is already banned; `Outstanding` is the money word; `Short` is warehouse jargon |
+| **`Everything is on hand`** | the whole commitment is allocated, so no arrival is pending | States the fact positively so the row is not a blank. `On hand` is the Stock word law's own word, reused rather than re-coined |
+| **`Expected arrival`** | the latest supplier ready date among the lines still short | The portal's existing column word (`Check Expected Arrival`). **`Stock ETA` may not reach the screen** — `ETA` is an abbreviation, and rule 9 bans those even when the ruling itself uses one internally |
+| **`The factory has not given a date`** | lines are short and no supplier date is on file | An empty cell would read as "nothing is coming". This states the real gap, and it is the same fact `Check Expected Arrival` exists to close |
+
+**A confirmed booking names the company it was AGREED WITH, never the one assigned now**
+(migration 0346). When they differ the pane says so, and it says so with the fix, because
+the delivery-rule word law above applies here too — a warning that only states a fact tells
+a new hire nothing about the next second:
+
+> `Assigned to {now} since the customer agreed this day with {then} — put the original
+> company back, or call the customer to agree the day again.`
+
+**No `Appointment` noun.** The ruling calls the fact a *confirmed delivery appointment*, but
+the screen already has one word for it — the booking, spelt **`{logistics} · confirmed
+{date} · {slot}`** (T1). A second noun for one fact is exactly the synonym rule 8 forbids, so
+the ruling's phrase stays in the documents and the screen keeps the word it has.
+
 **The Stock word law (K0, Jess 2026-07-27):** one warehouse, three questions —
 `On hand` (what's here now) · `Ready stock` (how much to keep — a PLAN about
 the same goods, never a second pool) · `In & out` (when things moved).

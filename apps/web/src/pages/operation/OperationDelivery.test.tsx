@@ -31,6 +31,7 @@ let listState: {
 };
 let partnersState: { data: DeliveryPartnersListResponse | undefined };
 let stockState: { data: operationStockResponse | undefined };
+let briefState: { data: unknown };
 
 vi.mock("@/lib/queries", async () => {
   const actual = await vi.importActual<typeof import("@/lib/queries")>("@/lib/queries");
@@ -39,6 +40,10 @@ vi.mock("@/lib/queries", async () => {
     useOperationOrders: () => listState,
     useDeliveryPartners: () => partnersState,
     useOperationStock: () => stockState,
+    // CARD 3 — the detail pane's booking brief is a server read; the page only
+    // renders it. Its arithmetic is pinned in packages/shared/booking-brief.test
+    // and its composition in apps/api booking-brief.test.
+    useOrderBookingBrief: () => briefState,
   };
 });
 
@@ -116,6 +121,7 @@ beforeEach(() => {
   listState = { data: { orders: [] }, isLoading: false, refetch: vi.fn() };
   partnersState = { data: { partners: [] } };
   stockState = { data: undefined };
+  briefState = { data: undefined };
   vi.useFakeTimers();
   vi.setSystemTime(new Date(`${TODAY}T09:00:00`));
 });
@@ -174,6 +180,163 @@ describe("OperationDelivery — the board holds delivery work, and only that", (
     };
     wrap(<OperationDelivery />);
     expect(screen.queryAllByTestId("delivery-row")).toHaveLength(0);
+  });
+
+  // ── CARD 3 · early logistics + the T−3 call (owner ruling 2026-08-13) ─────
+  //
+  // The board used to be scoped by `nextActionOf` — the ONE action that LEADS
+  // the row across all three tracks. Law 4 ranks goods work above delivery
+  // preparation, so every order whose goods were not yet in was invisible on
+  // the logistics operator's own page. That made two permanent rules
+  // unreachable in practice, and production showed it: 51 orders with
+  // logistics assigned, ZERO customer appointments ever confirmed.
+  //
+  // Membership now reads the DELIVERY TRACK of the same Layer-1 output. These
+  // three tests are the rules, one each.
+
+  /** PO placed, goods still at the factory (`in_production` ⇒ awaiting). */
+  const inProduction = (partial: Partial<operationOrderListRow> & { id: string; so: number }) =>
+    makeRow({ operation_stage: "in_production", ...partial });
+
+  it("CARD 3 Rule 1 — an order still in production reaches the assign queue", () => {
+    listState.data = { orders: [inProduction({ id: "c3a", so: 1301 })] };
+    wrap(<OperationDelivery />);
+    const rows = screen.getAllByTestId("delivery-row");
+    expect(rows).toHaveLength(1);
+    expect(within(rows[0]).getByText("SO-1301")).toBeTruthy();
+    // "Assign logistics" — not the goods action that leads the Orders row.
+    expect(within(rows[0]).getByText(DELIVERY_QUEUES[0].label)).toBeTruthy();
+  });
+
+  it("CARD 3 Rule 2 — the booking call opens with the goods still coming", () => {
+    listState.data = {
+      orders: [
+        inProduction({
+          id: "c3b",
+          so: 1302,
+          delivery_partner_id: "p-nets",
+          delivery_partners: { id: "p-nets", name: "NETS Logistics" },
+        }),
+      ],
+    };
+    wrap(<OperationDelivery />);
+    const rows = screen.getAllByTestId("delivery-row");
+    expect(rows).toHaveLength(1);
+    // The SECOND step — "got stock or no stock, Logistics still starts the
+    // conversation". The row prints the party-named line (C1), so the assertion
+    // is on that; the queue word itself carries no party.
+    expect(within(rows[0]).getByText(/confirm delivery date/i)).toBeTruthy();
+  });
+
+  it("CARD 3 — but goods nobody has ordered still have no route to plan", () => {
+    // The ruling's own trigger is "Ready Stock route known OR Purchase Order
+    // placed". An open `Issue PO` is neither, so the assign step waits — Rule 1
+    // forbids waiting for the goods to be READY, not for them to be BOUGHT.
+    listState.data = {
+      orders: [
+        makeRow({
+          id: "c3c",
+          so: 1303,
+          operation_stage: "placed",
+          status: "place",
+          order_lines: [{ sku: "mattress:MAT-1", qty: 1 }],
+        }),
+      ],
+    };
+    wrap(<OperationDelivery />);
+    expect(screen.queryAllByTestId("delivery-row")).toHaveLength(0);
+  });
+
+  it("CARD 3 — the detail pane hands Logistics the facts for the call", () => {
+    listState.data = { orders: [inProduction({ id: "c3d", so: 1304 })] };
+    briefState.data = {
+      brief: {
+        orderId: "c3d",
+        soRef: "SO-1304",
+        promisedDateIso: "2026-08-05",
+        promisedIsTbd: false,
+        stockEtaIso: "2026-08-12",
+        expectedScope: ["bed"],
+        expectedScopeLabel: "Bed set",
+        lines: [],
+        goodsIn: [],
+        goodsNotIn: [
+          { sku: "mattress:MAT-1", committedQty: 2, allocatedQty: 0, shortQty: 2, expectedInIso: "2026-08-12", isIn: false, group: "bed" },
+        ],
+        assignedLogistics: null,
+        appointment: null,
+        carrierDrift: false,
+        contactDueIso: "2026-07-31",
+        contactWindow: "upcoming",
+        contactOverdue: false,
+      },
+    };
+    wrap(<OperationDelivery />);
+    fireEvent.click(screen.getAllByTestId("delivery-row")[0]);
+    const pane = screen.getByTestId("delivery-detail");
+    expect(within(pane).getByText("Before you call")).toBeTruthy();
+    // The promised deadline, the expected arrival and what is NOT in — the
+    // three facts the ruling says Operations provides, present while the
+    // warehouse is empty.
+    expect(within(pane).getByText(/Call by/)).toBeTruthy();
+    expect(within(pane).getByText("Not in yet")).toBeTruthy();
+    expect(within(pane).getByText(/mattress:MAT-1 ×2/)).toBeTruthy();
+  });
+
+  it("CARD 3 — a reassignment after the customer agreed is SHOWN, not swallowed", () => {
+    listState.data = {
+      orders: [
+        makeRow({
+          id: "c3e",
+          so: 1305,
+          delivery_partner_id: "p-houzs",
+          delivery_partners: { id: "p-houzs", name: "HOUZS" },
+          // A booked day that has come and gone with no delivery — the broken
+          // commitment, so the order is on the board and its pane is reachable.
+          ops_order_control: {
+            booking_stage: "confirmed",
+            confirmed_date: "2026-07-20",
+            confirmed_time_slot: "Morning (9am–12pm)",
+          },
+        }),
+      ],
+    };
+    briefState.data = {
+      brief: {
+        orderId: "c3e",
+        soRef: "SO-1305",
+        promisedDateIso: "2026-08-05",
+        promisedIsTbd: false,
+        stockEtaIso: null,
+        expectedScope: [],
+        expectedScopeLabel: "",
+        lines: [],
+        goodsIn: [],
+        goodsNotIn: [],
+        assignedLogistics: { partnerId: "p-houzs", partnerName: "HOUZS" },
+        appointment: {
+          dateIso: "2026-07-20",
+          slot: "Morning (9am–12pm)",
+          carrier: { partnerId: "p-nets", partnerName: "NETS Logistics" },
+          scope: [],
+          scopeLabel: "",
+          confirmedAt: null,
+        },
+        carrierDrift: true,
+        contactDueIso: "2026-07-31",
+        contactWindow: "done",
+        contactOverdue: false,
+      },
+    };
+    wrap(<OperationDelivery />);
+    fireEvent.click(screen.getAllByTestId("delivery-row")[0]);
+    const pane = screen.getByTestId("delivery-detail");
+    // The confirmed line names the company the customer AGREED WITH…
+    expect(within(pane).getByText(/NETS Logistics · confirmed/)).toBeTruthy();
+    // …and the drift is stated with its fix, never swallowed.
+    expect(
+      within(pane).getByText(/Assigned to HOUZS since the customer agreed this day with/),
+    ).toBeTruthy();
   });
 
   it("counts each queue in the facet rail, with its own late tail", () => {

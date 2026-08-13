@@ -10,7 +10,10 @@ import {
   ListOperationOrdersQuery,
   recheckStockInput,
   reselectPartnerInput,
+  deliveryQueueLeads,
+  myHolidaySet,
   orderMoney,
+  resolveBookingBrief,
   resolveCurrentCustomerCommitment,
   resolveOrderCompletion,
   resolveUnitAllocation,
@@ -862,6 +865,181 @@ operationOrdersRouter.get("/:id/completion", requireOperation, async (c) => {
   });
 
   return c.json({ completion });
+});
+
+// GET /:id/booking-brief — CARD 3's one authoritative read: everything
+// Operations puts in front of Logistics for the T−3 customer call, and the
+// three separate truths kept apart.
+//
+// The ruling's own list, and the reason this endpoint exists at all: the call
+// opens THREE working days before the Customer Promised Deadline **regardless
+// of stock readiness**, and the operator making it needs the promised
+// deadline, the latest Stock ETA, the expected delivery scope and what IS and
+// IS NOT expected in — four facts that until now lived in four different reads
+// and were never assembled for the person holding the phone.
+//
+// Composed from the authoritative owners, never re-derived: Card 1's
+// commitment (what was sold) → Card 2's allocation (what is physically here)
+// → the overlay's booking + supplier dates → the delivery partner roster →
+// the `logistics_call_working_days` SETTING through the same
+// `deliveryQueueLeads` helper the Orders list and the Delivery board read, so
+// no third surface can invent its own call window (Law D).
+operationOrdersRouter.get("/:id/booking-brief", requireOperation, async (c) => {
+  const id = c.req.param("id");
+  const sb = userClient(c.env, c.var.auth.jwt);
+
+  const { data: bundle, error: bundleErr } = await sb.rpc(
+    "sales_order_commitment_bundle",
+    { p_order_id: id },
+  );
+  if (bundleErr) {
+    const m = mapPgError(bundleErr);
+    return c.json(m.body, m.status);
+  }
+  const commitment = resolveCurrentCustomerCommitment(
+    bundle as unknown as CommitmentBundle,
+  );
+
+  const { data: ord, error: ordErr } = await sb
+    .from("orders")
+    .select(
+      "id, so, delivery_date, delivery_date_tbd, ops_assigned_logistic, delivery_partner_id, ops_order_control(booking_stage, confirmed_date, confirmed_time_slot, confirmed_partner_id, booking_groups, customer_confirmed_at, stock_eta, line_etas)",
+    )
+    .eq("id", id)
+    .maybeSingle();
+  if (ordErr) {
+    const m = mapPgError(ordErr);
+    return c.json(m.body, m.status);
+  }
+  if (!ord) return c.json({ error: "Order not found" }, 404);
+  const soRef = `SO-${ord.so}`;
+  const ctrl = (
+    Array.isArray(ord.ops_order_control)
+      ? (ord.ops_order_control[0] ?? null)
+      : (ord.ops_order_control as Record<string, unknown> | null)
+  ) as {
+    booking_stage?: string | null;
+    confirmed_date?: string | null;
+    confirmed_time_slot?: string | null;
+    confirmed_partner_id?: string | null;
+    booking_groups?: string[] | null;
+    customer_confirmed_at?: string | null;
+    stock_eta?: string | null;
+    line_etas?: Record<string, string> | null;
+  } | null;
+
+  // The assignment is the order's; the appointment's carrier is the overlay's
+  // own stamp (0346). They are looked up together and reported separately —
+  // the whole point of Rule 4.
+  const assignedId =
+    (ord.ops_assigned_logistic as string | null) ??
+    (ord.delivery_partner_id as string | null) ??
+    null;
+  const confirmedPartnerId = ctrl?.confirmed_partner_id ?? null;
+  const partnerIds = [assignedId, confirmedPartnerId].filter(
+    (v): v is string => !!v,
+  );
+
+  const [unitsRes, partnersRes, settingsRes] = await Promise.all([
+    sb
+      .from("ops_stock_items")
+      .select(
+        "id, unit_code, sku, status, condition, warehouse_id, po_no, qty, date_in, sold_at",
+      )
+      .or(
+        `and(status.eq.reserved,reserved_ref.eq.${soRef}),and(status.eq.sold,sold_order_id.eq.${id})`,
+      ),
+    partnerIds.length > 0
+      ? sb.from("delivery_partners").select("id, name").in("id", partnerIds)
+      : Promise.resolve({ data: [], error: null }),
+    sb
+      .from("purchasing_settings")
+      .select("logistics_call_working_days")
+      .maybeSingle(),
+  ]);
+  for (const r of [unitsRes, partnersRes, settingsRes]) {
+    if (r.error) {
+      const m = mapPgError(r.error);
+      return c.json(m.body, m.status);
+    }
+  }
+
+  const units: AllocationUnit[] = ((unitsRes.data ?? []) as Array<{
+    id: string; unit_code: string | null; sku: string; status: string;
+    condition: string; warehouse_id: string | null; po_no: string | null;
+    qty: number | null; date_in: string | null; sold_at: string | null;
+  }>).map((r) => ({
+    id: r.id,
+    unitCode: r.unit_code,
+    sku: r.sku,
+    status: r.status as AllocationUnit["status"],
+    condition: r.condition,
+    warehouseId: r.warehouse_id,
+    poNo: r.po_no,
+    qty: r.qty ?? 1,
+    dateIn: r.date_in,
+    soldAt: r.sold_at,
+  }));
+
+  const nameById = new Map(
+    ((partnersRes.data ?? []) as Array<{ id: string; name: string | null }>).map(
+      (p) => [p.id, p.name ?? null],
+    ),
+  );
+
+  const allocation = resolveUnitAllocation({
+    orderId: id,
+    soRef,
+    commitmentLines: commitment.lines.map((l) => ({
+      sku: l.sku,
+      qty: Number(l.qty) || 0,
+    })),
+    units,
+  });
+
+  // Mon–Sat delivery week + the Malaysian public holidays, the same calendar
+  // every other delivery clock in the portal counts on.
+  const opts = { holidays: myHolidaySet(), offDays: [0] };
+  const callDays = (
+    settingsRes.data as { logistics_call_working_days?: number } | null
+  )?.logistics_call_working_days;
+  const leads =
+    typeof callDays === "number"
+      ? deliveryQueueLeads({ logisticsCallWorkingDays: callDays })
+      : undefined;
+
+  const brief = resolveBookingBrief(
+    {
+      orderId: id,
+      soRef,
+      promisedDateIso: (ord.delivery_date as string | null) ?? null,
+      promisedIsTbd: !!ord.delivery_date_tbd,
+      lineEtas: ctrl?.line_etas ?? null,
+      orderStockEtaIso: ctrl?.stock_eta ?? null,
+      allocation,
+      assignedLogistics: assignedId
+        ? { partnerId: assignedId, partnerName: nameById.get(assignedId) ?? null }
+        : null,
+      booking: {
+        stage: ctrl?.booking_stage ?? null,
+        confirmedDateIso: ctrl?.confirmed_date ?? null,
+        slot: ctrl?.confirmed_time_slot ?? null,
+        carrier: confirmedPartnerId
+          ? {
+              partnerId: confirmedPartnerId,
+              partnerName: nameById.get(confirmedPartnerId) ?? null,
+            }
+          : null,
+        scope: ctrl?.booking_groups ?? null,
+        confirmedAt: ctrl?.customer_confirmed_at ?? null,
+      },
+    },
+    new Date().toISOString().slice(0, 10),
+    opts,
+    leads,
+  );
+
+  return c.json({ brief });
 });
 
 // POST /:id/save — the ONE edit door. CARD 1: a save that moves the
