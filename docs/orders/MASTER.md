@@ -449,7 +449,7 @@ THE BRIEF         `resolveBookingBrief` (packages/shared/src/booking-brief.ts ·
                   warehouse, which is the whole of Rule 3: *"Stock ETA informs
                   the conversation; it does not decide whether it happens."*
 
-THE APPOINTMENT   migration `0346` · `ops_order_control.confirmed_partner_id`.
+THE APPOINTMENT   migration `0347` · `ops_order_control.confirmed_partner_id`.
 NAMES ITS         Three of the four facts the ruling requires of an appointment
 CARRIER           were already stored — `confirmed_date` + `confirmed_time_slot`
                   (0277) and `booking_groups` (0282). The CARRIER was not stored
@@ -483,7 +483,7 @@ WORDS             COPY-STANDARD gained "The booking-call words" — `Before you
                   second noun for one fact is the synonym rule 8 forbids.
 ```
 
-**Production evidence — run 2026-08-13, not described.** `0346` applied; six
+**Production evidence — run 2026-08-13, not described.** `0347` applied; six
 probes as the real operation user in one aborted transaction — the register
 identical after (86 control rows · 0 confirmed · 0 carrier stamps · 51 assigned ·
 0 carrier timeline rows), and the probe order's original logistics company
@@ -604,7 +604,81 @@ P6 storage kind: gate stamps, orders.paid untouched                PASS
 P7 direct INSERT as authenticated: 42501                           PASS
 ```
 
+## CARD 4 · THE CLOSING SLICE — SHIPPED 2026-08-13 (migration 0347)
+
+**Card 4 was re-audited top to toe against production before anything was
+written**, and it found the defect its own 0343 had planted: **turning VOID
+from a DELETE into a STAMP was right — money history is never erased — but
+every READER of that ledger was written when a void deleted the row.** Four
+of them counted and printed a reversed payment:
+
+```
+SO document       `PAYMENTS RECEIVED` listed voided rows — on the page the
+                  CUSTOMER reads
+Order drawer      the storage-collected sum, the receipt list, `Print receipt`
+                  and the history row all treated a voided payment as money
+Collections desk  the storage sum, through summarizePayments
+```
+
+**The ledger holds 0 rows on production, so nothing was wrong on screen — all
+of it would have gone wrong on the first void.** Fixed by ONE predicate,
+`isLivePayment` (Law D): no reader spells `voided_at` for itself, and
+`summarizePayments` — the one roll-up — skips a voided row. The drawer keeps
+the row visible, struck through and labelled `Voided`, with no receipt to
+print and no second void to attempt.
+
+**Two more competing money truths closed in the same slice:**
+
+```
+payment_status  the desk read a HAND-TYPED word for its facet, its row pill
+                and its "still to collect" predicate — a second money truth
+                beside the arithmetic. Measured: ONE row of 88 carries the
+                column, so the facet said `Unset` for 87 orders while 25 had
+                money in. Now DERIVED (Overdue · Unpaid · Partial · Paid ·
+                No price yet) from orderMoney + the collection clock; the
+                dropdown is gone, the column keeps its data and loses its
+                authority. `Follow Up` retired — never a money fact.
+receipt number  `count + 1` seeding mints the SAME number for two payments
+                recorded in one instant, and nothing stopped it being stored.
+                Now a partial unique index + a 3-attempt retry in the route
+                (an index without a retry is a 500 at the till).
+```
+
+**And money now leaves a trace on its own order**: `payment.received` /
+`payment.voided` (declared in the taxonomy 2026-07-10, never written by
+anyone) are stamped inside the same transaction as the money, carrying the
+amount, the kind, the receipt number and the void reason. The timeline prints
+the figure — `RM 3,500.00 · RC-130826-4821` — because a bare "Payment
+received" on a row whose whole purpose is the amount is the vague wording the
+standard bans.
+
+**Production evidence — run 2026-08-13, not described.** 0347 applied; nine
+probes as the real operation/principal users in two aborted transactions —
+`order_payments` 0 rows, Σ `orders.paid` RM 55,350.00 and 0 `payment.*`
+activity rows, identical before and after:
+
+```
+P1 record as operation: orders.paid +123.45                        PASS
+P2 payment.received written to the ORDER activity with its figure  PASS
+P3 duplicate receipt number refused by the index (23505)           PASS
+P4 storage kind: gate stamps, orders.paid untouched                PASS
+P5 operation cannot void (42501)                                   PASS
+P6 principal void: orders.paid reverts EXACTLY                     PASS
+P7 the voided row survives, stamped with who and why               PASS
+P8 payment.voided on the order activity, with amount + reason      PASS
+P9 voiding the only storage collection closes the gate again       PASS
+```
+
+Tests: shared 2276 · api 2174 · web +9 (the derived money state, the money
+timeline line, the drawer's four void readers). The two
+`OperationPurchaseOrders` failures under the full web run are a pre-existing
+parallel-load timeout — that file passes alone and touches no money code.
+
 **Known boundaries, reported not hidden:**
+- **`online` prints as "Online" on the SO document and "e-wallet" in the
+  drawer** — one payment method, two words. Left alone deliberately: picking
+  the winner is a COPY-STANDARD ruling, not an engineering call, so the
+  activity line omits the method rather than minting a third spelling.
 - **Money is bilateral; the REFUND record arrives with Card 7** (change /
   cancel / refund lineage) — "an approved but unpaid refund means Carres still
   owes the customer" needs the lineage that card owns; minting a refund store
@@ -1041,8 +1115,8 @@ production; their verdicts land as ordinary re-rulings on the next commit.
 |---|---|---|
 | **1** | Customer Obligation Truth | **COMPLETE** — `dae94301`, migration `0340`, production verified 2026-08-11; exact implementation record immediately above |
 | **2** | Unit / Stock Allocation Truth | **COMPLETE** — migration `0341`, production verified 2026-08-11 (nine rolled-back probes); exact implementation record above. The spine (unit birth at PO · receiving flips · governed draw) was measured ALREADY LIVE; the card closed the four violations of the approved law |
-| **3** | Early Logistics Assignment + Customer Booking | **COMPLETE** — migrations `0342` + `0346`, production verified 2026-08-13 (six rolled-back probes); record above, which OVERWRITES the 2026-08-11 entry. 0342's ruled call window and lateness fix stand; the re-trace found the workspace hiding both early assignment and the T−3 call whenever the goods were not in, and built the booking brief the call needs |
-| **4** | Money Truth + Collection Gate | **COMPLETE** — migration `0343`, production verified 2026-08-11 (seven rolled-back probes); record above. The gates and the one calculation were measured already live; the card converged the write (one payment writer, void as a stamp) and shipped the T−3/T−2/T−1 collection clock |
+| **3** | Early Logistics Assignment + Customer Booking | **COMPLETE** — migrations `0342` + `0347`, production verified 2026-08-13 (six rolled-back probes); record above, which OVERWRITES the 2026-08-11 entry. 0342's ruled call window and lateness fix stand; the re-trace found the workspace hiding both early assignment and the T−3 call whenever the goods were not in, and built the booking brief the call needs |
+| **4** | Money Truth + Collection Gate | **COMPLETE** — migrations `0343` + `0347`, production verified 2026-08-11 and re-verified 2026-08-13 (seven + nine rolled-back probes); record above. The gates and the one calculation were measured already live; the card converged the write (one payment writer, void as a stamp) and shipped the T−3/T−2/T−1 collection clock. **The 2026-08-13 closing slice taught every reader that a voided row is not money, retired the hand-keyed `payment_status` from the collections desk, made a receipt number unique, and gave money a trace on its own order** |
 | **5** | Delivery Attempt + Delivery Exception | **COMPLETE** — migration `0344`, production verified 2026-08-11 (seven rolled-back probes); record above. The first genuine engine gap of the programme: attempt + exception stores built, units move through Card 2's doors in the same transaction |
 | **6** | Loan Mattress / Loan Sofa Obligations | **COMPLETE** — no migration (Card 2 built the doors; Card 6 made the lane use them); production verified 2026-08-11; record above |
 | **7** | Change / Cancel / Refund Lineage | **COMPLETE** — migration `0345` (the refund record), production verified 2026-08-11 (eight rolled-back probes); the rest of the lineage was measured already true; record above |
@@ -2903,20 +2977,48 @@ outstanding = Σ order lines + add-ons + chargeable storage fee − orders.paid
 row pill, the drawer strip and the collections desk. Before it existed, three surfaces asked
 three different questions and each pointed at a column nobody wrote.
 
-**Three facts a chat will get wrong unless it reads them here** (measured live):
+**Four facts a chat will get wrong unless it reads them here** (measured live 2026-08-13):
 
-- **The payment ledger is empty but NOT unwritten.** Two doors write `order_payments`, and the
-  raw-create door writes the SAME deposit into BOTH `orders.paid` and the ledger. **Adding them
-  reads a half-paid order as paid in full**, so the ledger must never enter an outstanding
-  calculation.
+- **THERE IS ONE PAYMENT WRITER, and the ledger is not it.** `payment_record` (0343) writes the
+  `order_payments` row AND moves `orders.paid` in one transaction; the direct write door is
+  closed (`authenticated` has no INSERT/UPDATE/DELETE). **`orders.paid` stays the money truth
+  and the ledger is never summed into an outstanding** — the raw-create deposit is recorded as a
+  MIRROR row (`counted_in_paid = false`) because the create RPC already put it inside
+  `orders.paid`, and adding them would read a half-paid order as settled.
+- **A VOID IS A STAMP, NEVER A DELETE** (0343), so **a voided row is not money** (0347). Every
+  reader asks the ONE predicate, `isLivePayment` — the SO document's payments block, the
+  drawer's storage sum, its receipt list and the collections desk. A second spelling of
+  `voided_at` is how four readers drift apart.
 - **`ops_order_control.balance` means what the customer STILL OWES** (0165), not the total.
   Anything that subtracts payments from it subtracts twice.
 - **An order whose value is UNKNOWN never holds anything.** A number nobody knows may not stand
   between a customer and their goods — **unknown warns, never blocks.**
 
+**`ops_order_control.payment_status` and `paid_amount` have NO authority over money.** They keep
+their columns (1 row and 0 rows live); the collections desk derives its `Overdue · Unpaid ·
+Partial · Paid · No price yet` from the one arithmetic and the collection clock, and its
+hand-keyed dropdown is retired (0347). A money state a human can type is a money state that can
+contradict the figure.
+
+### THE COLLECTION CLOCK — one arithmetic, T−3 · T−2 · T−1
+`packages/shared/src/collection-clock.ts`. The final deadline is **1 working day before the
+delivery** on the Mon–Sat delivery week with Malaysian public holidays, anchored on the
+**customer's confirmed day, else the promised date**; no anchor → no clock, because a step that
+cannot be late is not urgent. `t3` and `t2` are attention, **`t1` is the deadline** — logistics
+ask for the DO the evening before and the DO door refuses while money holds, so a balance
+uncollected at T−1 is a delivery about to slip. Two consumers, one module: the collections desk
+and the Work engine's `collect` / `issue_delivery_order` dues.
+
 ### `Collect RM {amount} from {customer}`
 Trigger: outstanding > RM 0 · completion: outstanding = RM 0 ·
 **survives delivery** — a delivered order that still owes keeps this action and its red dot.
+
+### MONEY LEAVES A TRACE ON THE ORDER
+`payment_record` and `payment_void` write `payment.received` / `payment.voided` into the order's
+own activity in the same transaction as the money (0347), each carrying its amount, kind,
+receipt number and — on a void — its reason. The two event types were declared in the taxonomy on
+2026-07-10 and had never had a writer, so `orders.paid` could move with nothing on the order
+saying who moved it.
 
 ### THE GATES — different from display order
 

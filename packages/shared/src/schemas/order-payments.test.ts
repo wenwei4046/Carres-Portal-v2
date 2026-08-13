@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   recordPaymentInputSchema,
   collectStorageInput,
+  isLivePayment,
   summarizePayments,
   type PaymentKind,
 } from "./order-payments";
@@ -70,5 +71,30 @@ describe("summarizePayments", () => {
 
   it("bill ≤ 0 (AutoCount no-price order) → outstanding 0", () => {
     expect(summarizePayments([p(1000, "payment")], 0).outstanding).toBe(0);
+  });
+
+  // CARD 4 closing slice (0347). A void has been a STAMP since 0343 — the row
+  // survives so the history survives — and every reader of this ledger was
+  // written when a void DELETED the row.
+  it("a VOIDED row is not money — it counts toward nothing", () => {
+    const s = summarizePayments(
+      [
+        p(1000, "deposit"),
+        { amount: 1500, kind: "payment", voided_at: "2026-08-13T02:00:00Z" },
+        { amount: 150, kind: "storage", voided_at: "2026-08-13T02:00:00Z" },
+        p(200, "storage"),
+      ],
+      5000,
+    );
+    expect(s.paid).toBe(1200); // 1000 + 200, the two voided rows excluded
+    expect(s.byKind).toEqual({ payment: 0, deposit: 1000, storage: 200 });
+    expect(s.outstanding).toBe(4000); // 5000 − 1000 (the voided payment is gone)
+    expect(s.storageCollected).toBe(200);
+  });
+
+  it("isLivePayment is the ONE predicate every reader asks", () => {
+    expect(isLivePayment({})).toBe(true);
+    expect(isLivePayment({ voided_at: null })).toBe(true);
+    expect(isLivePayment({ voided_at: "2026-08-13T02:00:00Z" })).toBe(false);
   });
 });

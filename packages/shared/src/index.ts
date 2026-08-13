@@ -1400,6 +1400,9 @@ export {
   recordPaymentInputSchema,
   collectStorageInput,
   summarizePayments,
+  // CARD 4 closing slice (0347) — the ONE "is this a valid payment?" predicate.
+  // A voided row stays in the history and counts toward nothing.
+  isLivePayment,
   // CARD 7 (0345) — the refund lifecycle: an approved, unpaid refund means
   // Carres still owes the customer.
   refundRequestInputSchema,

@@ -126,10 +126,17 @@ function buildSb(
   // Simulates a Supabase PostgREST chain that records .eq() filters and
   // returns rows on .order() (list) or .maybeSingle() (single row).
   const eqs: Array<[string, unknown]> = [];
+  const iss: Array<[string, string, unknown]> = [];
   function chainFor(table: string) {
     const chain = {
       eq(col: string, val: unknown) {
         eqs.push([col, val]);
+        return chain;
+      },
+      /** 0347 — the ledger read filters `voided_at is null`; recorded so a
+       *  test can prove a reversed payment never reaches a customer document. */
+      is(col: string, val: unknown) {
+        iss.push([table, col, val]);
         return chain;
       },
       in: async () => ({ data: rowsFor.byTable?.[table] ?? [], error: null }),
@@ -146,6 +153,7 @@ function buildSb(
     {
       from: (table: string) => ({ select: () => chainFor(table) }),
       _eqs: eqs,
+      _iss: iss,
     },
     storage,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1053,6 +1061,24 @@ describe("GET /api/orders/:id/sales-order-data", () => {
       { label: "Deposit · Bank transfer", reference: "R-1", amount: 500, date: "2026-07-01", collected_by: null },
       { label: "Cash", reference: "RC-9", amount: 250, date: "2026-07-08", collected_by: null },
     ]);
+  });
+
+  // CARD 4 closing slice (0347). 0343 turned a void into a STAMP so money
+  // history is never erased — and this query, written when a void DELETED the
+  // row, would otherwise print a reversed payment on the document the CUSTOMER
+  // reads. The filter is asserted on the query, not on the mock's rows,
+  // because the mock cannot apply a PostgREST filter for us.
+  it("asks the ledger for LIVE payments only — a voided row never prints", async () => {
+    const sb = buildSb({ one: makeJoinedRow() });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("operation", null);
+    await app.fetch(
+      new Request(`http://t/api/orders/${ORDER_ID}/sales-order-data`, {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(sb._iss).toContainEqual(["order_payments", "voided_at", null]);
   });
 
   it("returns earned voucher codes (fail-soft to [] when the table is unreadable)", async () => {

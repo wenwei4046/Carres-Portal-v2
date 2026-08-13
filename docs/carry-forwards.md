@@ -388,7 +388,18 @@ primitive fixes it in the same move.
   than widening its own diff to three unrelated route-test repairs. It looks small — the fix
   is the mock chain, not the routes.
 
-- `migration-0346-numbered-twice-and-one-is-unpushed` — **🔴 Two different migrations are both
+- `migration-0346-numbered-twice-and-one-is-unpushed` — ✅ **CLOSED 2026-08-13 by the Card 4
+  lane, exactly as instructed below.** The unpushed file was mine: it is now in the repository
+  as `supabase/migrations/0347_a_voided_payment_is_not_money.sql`, with a header stating that
+  it was APPLIED as `0346` (tracker row `20260813034523`) and why it is numbered `0347` here.
+  Card 3's committed 0346 was not touched. The repository now holds one 0346 and one 0347, so
+  no future `ls` can take a taken number and no chat can skip a migration that was never
+  checked in. **The tracker row still reads `0346_a_voided_payment_is_not_money`** — a name is
+  not a number, and rewriting an applied row to make a document tidier is not a thing this
+  repository does. The original finding is kept below, because the lesson (two lanes, one
+  minute, one number) outlives the fix.
+
+  **The finding as Card 3 recorded it — 🔴 Two different migrations are both
   numbered 0346 in production, and one of them is not in this repository.** Measured on the
   live tracker 2026-08-13 immediately after the Card 3 deploy:
 

@@ -26,7 +26,10 @@ modules it imports; **not read line by line.***
 
 ```
 QUEUES     Collect · Waiting stock · Stock late · Storage running
-ROW        the order, the party, the figure, and when it was last spoken to
+FACET      the MONEY state — Overdue · Unpaid · Partial · Paid · No price yet,
+           DERIVED, never keyed (0347)
+ROW        the order, the party, the figure, the balance-due date, and when it
+           was last spoken to
 EXPAND     record a payment (mints a receipt number) · history ·
            promise-to-pay · Receipt PDF · Invoice PDF
 CHASE      a WhatsApp popover with a pre-call brief
@@ -35,7 +38,9 @@ CHASE      a WhatsApp popover with a pre-call brief
 ### API + DATA
 Reads the Orders feed and `ops_order_control`. Money truth: **`orders.paid`**.
 One shared rule: `packages/shared/src/order-money.ts`. Money spelling:
-`packages/shared/src/money-format.ts`.
+`packages/shared/src/money-format.ts`. The collection clock (T−3 · T−2 · T−1):
+`packages/shared/src/collection-clock.ts`. Ledger validity:
+`isLivePayment` — the ONE predicate.
 
 ---
 
@@ -52,9 +57,32 @@ One shared rule: `packages/shared/src/order-money.ts`. Money spelling:
   RM 1,250.50.
 - **`null` and zero are different answers.** An unpriced order names no figure; an order owing
   nothing says `RM 0.00`.
-- **The promise-to-pay reuses `balance_due_date`.** No new column.
+- **ONE PAYMENT WRITER** — `payment_record` (0343). The ledger row and the `orders.paid` move
+  are one transaction, so the figure every gate reads moves the moment the desk records the
+  money. The direct PostgREST write door is closed; a raw-create deposit is recorded as a
+  MIRROR (`counted_in_paid = false`) because it is already inside `orders.paid`.
+- **A VOID IS A STAMP** — principal only, never a delete, and it reverses exactly the
+  contribution the record made. **A voided row is therefore not money** (0347): every reader
+  asks `isLivePayment`, and `summarizePayments` — the ONE roll-up — skips it. The row stays on
+  screen, struck through and labelled `Voided`, with no receipt to print.
+- **THE MONEY STATE IS DERIVED, NEVER KEYED** (0347). `Overdue · Unpaid · Partial · Paid ·
+  No price yet` come from `orderMoney` and the collection clock. The hand-typed
+  `payment_status` dropdown is retired: measured on production, ONE row of 88 carried the
+  column while 25 orders had money in, and a typed `Paid` on an order owing RM 5,000 was one
+  click from lying to the desk. The column keeps its data and loses its authority.
+- **The collection clock is ONE arithmetic** — due = delivery − 1 working day (Mon–Sat + MY
+  holidays), anchored on the customer's confirmed day, else the promised date, silent with no
+  anchor. `t3`/`t2` are attention; **`t1` is the deadline**, because logistics ask for the DO
+  the evening before and the DO door refuses while money holds. The Work engine consumes the
+  same module — two consumers, never two clocks.
+- **The promise-to-pay reuses `balance_due_date`.** No new column. It is the CUSTOMER's word;
+  the clock above is the BUSINESS deadline. Both print, and they are not the same fact.
 - **Recording a payment mints a receipt number** from the portal's own
-  `PREFIX-DDMMYY-NNNN` scheme, seeded on the order id, so a reprint matches the original.
+  `PREFIX-DDMMYY-NNNN` scheme (`RC-…`), seeded on `{orderId}:{seq}` so a reprint matches the
+  original. **It is unique in the database** (0347) and the route retries on collision — the
+  seed is `count + 1`, so two payments recorded in one instant would otherwise mint one number.
+- **Money leaves a trace on the ORDER** — `payment.received` / `payment.voided` in the order's
+  own activity, written inside the same transaction as the money, carrying the figure.
 - **`Chase` is a banned word portal-wide.** The action is `Call {customer} — …`; the stored
   column `last_chased_at` is spelt on screen as **`Message copied {when}`**, and the send path
   copies the message on BOTH branches so the sentence is true of what the portal actually
@@ -66,7 +94,6 @@ One shared rule: `packages/shared/src/order-money.ts`. Money spelling:
 
 | What | Why it is not built |
 |---|---|
-| **`order_payments` gaining a real reader** — *re-measured 2026-08-06: still **0 rows**, and the Orders audit found the DRAWER fetches this ledger for its own `Collected` figure while the shared money rule refuses to read it, so the drawer and the row can disagree* | The Record-payment button writes a ledger nothing reads, so it moves nothing. **The fix is one audited RPC that writes `orders.paid` too — never by summing the ledger**, because the raw-create door writes the same deposit into BOTH and adding them reads a half-paid order as settled. |
 | **The storage-waiver lever on this desk** | Approved; the manager decision and its two named outcomes already exist on the order. |
 | **A collection-velocity figure** | Approved as a review number. Blocked by the same rule the stock review follows: **a figure withholds itself until the records can back it.** |
 | **Bulk remind** | Approved, and it must obey the portal's message law: ONE message per counterparty, never one per order. |

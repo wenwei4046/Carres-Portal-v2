@@ -4115,12 +4115,18 @@ ordersRouter.get("/:id/sales-order-data", async (c) => {
   // "PAYMENTS RECEIVED" rows — the order_payments ledger when readable
   // (internal-only RLS: dealers silently get 0 rows), else ONE row from the
   // at-sale capture on orders (paid + payment_method + approval_code).
+  //
+  // 0347 — A VOIDED ROW IS NOT MONEY RECEIVED, and this is a document the
+  // CUSTOMER reads. 0343 made a void a stamp instead of a delete, and this
+  // query predates it: without the filter a reversed payment prints as
+  // received on the Sales Order.
   let payments: SalesOrderData["payments"] = [];
   try {
     const { data: payRows } = await sb
       .from("order_payments")
       .select("amount, paid_on, method, kind, reference, receipt_no, recorded_by")
       .eq("order_id", id)
+      .is("voided_at", null)
       .order("paid_on", { ascending: true });
     // Golden SO (STAGE 2) — COLLECTED BY prints the recorder's name. Resolved
     // fail-soft from app_users; an unreadable/missing row prints "—".
