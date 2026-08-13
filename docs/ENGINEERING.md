@@ -112,10 +112,10 @@ Draft  →  review business impact  →  commit the exact file  →  merge-ready
 
 **Authoritative automation (2026-08-13):** `.github/workflows/ci.yml` owns PR checks and
 `.github/workflows/deploy-production.yml` owns the post-merge proof. `carres-portal` and
-`carres-pos` remain connected to Git in Cloudflare and each builds `main`; GitHub Actions does
-not upload Pages a second time. The web build writes `/__carres_deploy.json` from
-`CF_PAGES_COMMIT_SHA`. The same workflow deploys the Worker with `DEPLOY_SHA`, then polls both
-Pages projects, both custom web domains and `/health` until all report the exact merged SHA.
+`carres-pos` are direct-upload Pages projects, so GitHub Actions builds the exact `main` SHA once
+and uploads that same artifact to both. The web build writes `/__carres_deploy.json` from
+`GITHUB_SHA`. The same workflow deploys the Worker with `DEPLOY_SHA`, then polls both Pages
+projects, both custom web domains and `/health` until all report the exact merged SHA.
 No convergence means a visible failed production workflow.
 
 **One-time owner setup (never paste values into chat or commit them):**
@@ -124,11 +124,12 @@ No convergence means a visible failed production workflow.
    with Workers Scripts edit permission (and Workers Routes edit only if Cloudflare requires it
    for the existing custom domain). Do not use the Global API Key.
 2. In GitHub → repository Settings → Environments, create `production`. Add environment secrets
-   `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` (the account id above). An environment
+   `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` (the account id above). The token also needs
+   Cloudflare Pages edit permission because the projects are direct-upload projects. An environment
    reviewer is optional for ordinary deploys; credentials must not require browser OAuth.
-3. In Cloudflare Pages, verify **both** projects are Git-connected to this repository, production
-   branch `main`, build command `pnpm --filter @carres/web build`, output `apps/web/dist`, and the
-   existing production `VITE_*` variables are present. Disable any other Pages deploy workflow.
+3. In Cloudflare Pages, verify **both** direct-upload projects retain their existing custom domains.
+   GitHub Actions supplies the already-built `apps/web/dist` artifact; no Cloudflare build command
+   or duplicate Pages deployment workflow should exist.
 4. In GitHub branch protection for `main`, require the `CI / verify` status and at least one PR
    review; prohibit direct pushes. The first pipeline PR proves the status name before making it
    required.
