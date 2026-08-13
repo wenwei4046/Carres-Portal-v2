@@ -36,24 +36,24 @@
 
 # §0 · THE CHARTER — FROZEN 2026-08-08 (Loo). Phase 1 of the Golden Template.
 
-> **Sales Order is the operational home of the customer order: find any order, see what needs
-> attention, understand the whole journey — while EXECUTION stays with the module that owns it.**
+> **Sales Order is the truth/register home of the customer order: find any order and understand
+> the whole transaction — while EXECUTION and Work stay with the module that owns them.**
 
-**IT IS NOT A PURE WORK QUEUE AND NOT A PURE REGISTER.** Loo rejected the narrower purpose
-*"which orders need me today"* on the ground that a customer phones and the operator must find
-that order and see what is happening to it. **Both must hold.**
+**IT IS A REGISTER, NOT A WORK QUEUE.** When a customer phones, an authorised operator must be
+able to find the transaction and see its current truths. Prioritised work belongs to Work and
+the owning execution module; it may link back to the SO but may not turn the register into a
+second queue.
 
 ```
-1  What needs my attention?        今天先处理什么
-2  What is happening with this?    这张单现在发生什么
+1  Which customer transaction is this?
+2  What is true about it and what documents/facts follow from it?
 ```
 
-**ONE PAGE, TWO USES — and the two frozen scope rulings already decide how they coexist:**
+**ONE REGISTER, ONE PURPOSE:**
 ```
-DATE SCOPE   `All` = every non-cancelled order, never a month window   → the REGISTER is the scope
-OWNER SCOPE  a non-manager defaults to My Orders                       → the WORK is the default filter
-                                                                          A STARTING VIEW, never a wall
-= the page is already "my work, inside the whole register". There is no mode switch to design.
+DATE SCOPE   `All` = every non-cancelled order, never a month window
+OWNER SCOPE  an authorised operator may find every order; owner may remain a filter
+= filters narrow truth; they do not redefine the page as My Work.
 ```
 
 ### WHAT SALES ORDER OWNS
@@ -61,7 +61,7 @@ OWNER SCOPE  a non-manager defaults to My Orders                       → the W
 ✓ the customer order's identity          ✓ the customer
 ✓ WHAT WAS ORDERED (order_lines)         ✓ the customer's promise / required date
 ✓ PIC / ownership                        ✓ the order's history
-✓ overall risk / issue VISIBILITY        ✓ the cross-module journey SUMMARY
+✓ cross-module fact visibility           ✓ document and fulfilment lineage
 ```
 
 ### WHAT IT DOES NOT OWN — it may only READ · SUMMARISE · LINK
@@ -108,6 +108,134 @@ Nothing survives merely because it is already there.**
 
 ---
 
+# §0.1 · SALES ORDER UI / OBJECT CLOSEOUT — OWNER RULING 2026-08-13
+
+This section is the approved target and overwrites any older UI wording that conflicts with it.
+The measured implementation record below remains evidence of what is built, not permission to
+keep a superseded target.
+
+## Register
+
+- The default business columns are exactly, in order:
+  `SO No | Ordered | Customer Delivery | Customer | Delivery Location | PO No | DO No`.
+  The small `▸` is UI chrome, not a business column. There is no invented overall `Current` or
+  combined status column.
+- The page has a compact destination header/work toolbar, then a breathing gap, then one light,
+  clearly bordered Register. It is neither a borderless continuous slab nor a giant dashboard
+  card. KPI cards do not precede it.
+- Default widths are governed and usable without staff resizing. Optional columns may widen the
+  sheet and create horizontal scroll; default columns are never squeezed unnaturally to make an
+  added column fit.
+- `▸` expands goods only: compact, indented groups with category section headers, then SKU +
+  description/configuration + quantity. It has no second register header/filter row, does not
+  repeat category on every line, and carries no PO or operational status unless separately ruled.
+- Search, typed filters, sort, Columns and Export remain useful register capabilities. Selection
+  may scope Export; it does not license workflow bulk actions on a truth register.
+- Document numbers navigate directly to their authoritative object where the relationship exists:
+  SO → SO, PO → PO, DO → DO.
+- The approved row interaction is a 2990-style right-click context menu. Preserve useful document
+  capabilities. `Edit` is the explicit action that leaves the Register for the formal edit
+  context; View/Preview/Print do not edit. Do not add `Issue PO`, `Issue DO` or other operational
+  acts whose owner is Purchasing, Delivery, Money, Stock, Receiving, Claims or Work.
+
+## Detail, edit, amendment and document truth
+
+- Sales Portal/POS is the authoritative source for Sales Order form fields and commercial truth.
+  The backend detail/edit context reuses that complete contract; it does not invent a second,
+  simplified commercial form because 2990 has one.
+- Operation may directly correct safe contact and operational facts. A harmless contact correction
+  is not the same as a destination or other change that alters a customer commitment.
+- Sales owns customer/commercial amendments. Operation may submit/route a customer change request.
+  Management may approve/reject or directly amend when authorised. Every applied change carries a
+  structured reason, Before/After, actor and time.
+- The same customer transaction keeps the same SO number. Cancel only when that transaction is
+  cancelled. A placed PO does not force cancel/reorder; it changes a simple edit into a governed
+  Amendment with explicit downstream impact handling. `Staff correction`, `Customer change` and
+  `Fulfilment replacement` are different causes and may not be collapsed.
+- Rev 1 is permanently the original SO. A pending or rejected amendment is not a Revision. Every
+  approved, applied amendment creates Rev 2/3/4… and preserves the complete historical version and
+  its PDF/document truth. **Revisions are complete versions; History is an event ledger. They are
+  separate views and concepts.**
+- Amendment impact is computed before approval across supplier/PO commitments, Unit/warehouse
+  allocation, Receiving, payment/commercial difference, delivery commitment, Work, permissions and
+  audit. Existing downstream documents and facts are never silently rewritten. Concurrent/stale
+  proposals must fail safely and be re-evaluated against the current Revision; rollback is a new
+  governed change, never deletion or in-place history editing.
+- Detail supports `Current`/`Order` truth, `Revisions`, `History`, actual PDF/document access and
+  `Order Route`. `Current` here means the complete current SO version, not an overall lifecycle
+  status.
+
+## Order Route
+
+`Order Route` is a read-only route map/checklist derived only from authoritative facts. It is not a
+manual checklist and not another overall status. It shows clickable document lineage and the
+goods/fulfilment route, current position(s), and obligation checks across **Goods · Delivery · Money
+· Loan · Other Commitments**. Split fulfilment may show simultaneous positions — for example, a
+Bed delivered while a Sofa remains at supplier — so there is no forced single “You are here”. Each
+fact links to its owning object/surface; Sales Order does not gain the writer.
+
+## Object/domain completeness sweep — 2026-08-13
+
+Evidence inspected: current Carres register/workspace/API/schema and migration surface; live 2990
+Sales Orders register and SO detail; the Carres architecture, UI/copy/action/PDF authorities. 2990
+is evidence only. AutoCount-style grid power already exists in Carres; Linear-style slab layout and
+Shopify-style transaction/version discipline add no unresolved business rule.
+
+| CAPABILITY | CARRES CURRENT / OWNER | 2990 / REFERENCE EVIDENCE | VERDICT | DEPENDENCY / GAP |
+|---|---|---|---|---|
+| Register normal + selected | Built DataGrid; Orders owns truth; selection scopes Export | 2990 has checkbox rows, dense grid and totals | **ADAPT** | Replace default target with ruled seven columns and bounded surface; keep selected state non-operational |
+| Search/filter/sort/Columns/export | Built server search, typed column filters, chooser, XLSX, resize/reorder/layout memory | 2990 exposes search, per-column filters, 42-column chooser and Excel | **KEEP / ADAPT** | Govern widths/default order; optional columns may overflow; remove `Current` as a candidate overall pointer if it implies status |
+| Inline goods expansion | Built one line-item disclosure | 2990 expands nested goods | **ADAPT** | Category-grouped compact goods; no nested register/header or cross-module status |
+| Context actions + bulk | Built right-click `Open · Edit · Print PDF · Copy SO No`; bulk Export only | 2990 proves right-click document action pattern | **KEEP / ADAPT** | Rename/open semantics to explicit View/Preview where needed; add no execution acts; preserve selection only for truthful export |
+| View / Preview | Workspace view exists but is also a split editor/PDF surface | 2990 detail is read-only until Edit | **ADAPT** | Formal non-edit context; direct SO/PO/DO lineage links |
+| Edit / field contract | Workspace edits a partial backend form; office create schema explicitly mirrors a backend subset | 2990 has a comprehensive backend form | **RELOCATE / BUILD** | Reuse Sales Portal/POS authoritative field contract; operation-only safe corrections need a classified allowlist |
+| Amendment request + approval | Request/apply foundations and stale detection exist; current UI places amendment beside items | 2990 has separate Amendments and amend fields | **ADAPT / BUILD** | Sales ownership, operation routing, management approve/reject/direct amend, structured Before/After/reason; impact preview across all owners |
+| Revisions | Revision snapshots and historical rendering/PDF exist; current UI combines `History / Revision`; Rev 1 may be minted only on first save | 2990 exposes Revisions and current document identity | **ADAPT / BUILD** | Backstop original Rev 1 at transaction birth; only approved applied amendment mints next Rev; separate complete-version view |
+| History / audit | Order history and revision events render together; actor/cause coverage is partial | 2990 has History | **ADAPT / BUILD** | Separate append-only event view; actor/time/reason/Before/After and permission decisions |
+| Actual PDF + Print | One live renderer and historical snapshot rendering exist; Print opens same blob | 2990 has Print PDF | **KEEP / ADAPT** | Archive/address stable current + per-Revision document truth; follow `SO-PDF-STANDARD.md` |
+| Copy to new SO | Only `Copy SO No` exists | Mature document systems copy into a new draft/transaction, never duplicate identity | **BUILD** | Copy permitted commercial fields into the authoritative create form; new SO number; exclude history, payments, PO/DO/unit links and execution facts |
+| Cancel SO | Legacy cancel RPC exists; current official register omits it | 2990 detail exposes Cancel SO | **ADAPT / BUILD** | Cancel only for cancelled customer transaction; permission, reason, refund/release/PO/delivery/Work impact and immutable audit |
+| Scan / import | AutoCount import remains on frozen Old Orders; official register has no Scan | 2990 exposes Scan Order | **RELOCATE / BUILD** | One governed import entrance outside the truth register toolbar unless proven daily-register work; validate/preview/dedupe/errors; imported SO enters same contract |
+| Settings / Maintenance | Sales-order maintenance API/config exists; official UI ownership is incomplete | 2990 exposes SO Maintenance and global Settings | **RELOCATE / BUILD** | Portal Settings owns system configuration; Catalog/Sales own their facts; no record maintenance editor that bypasses amendment law |
+| Permissions | RLS/API roles exist; direct-edit/amendment/cancel matrix is incomplete | 2990 Super Admin surface does not prove Carres roles | **BUILD** | Explicit view, safe-correct, request, approve/reject, direct-amend, cancel, PDF/export permissions; enforce server-side |
+| Numbering + lineage | SO identity, DO fields and PO relations exist; register lacks ruled PO/DO lineage columns | 2990 shows Current SO and related document modules | **ADAPT / BUILD** | Same SO across revisions; direct SO/PO/DO links; define multi-PO/multi-DO compact cell + overflow interaction without inventing one Current |
+| Order Route | No approved capability is built; some component truths exist in old journey/control views | 2990 Relationship Map is evidence for lineage, not specification | **BUILD** | Read model over Orders, Purchasing, Receiving, Stock/Unit, Delivery, Money, Loan, Claims/Issue Tracker and Work; multiple simultaneous positions |
+| PO / supplier consequences | Purchasing owns issue/cancel and promises; SO amendment foundations do not yet resolve every commitment | 2990 co-locates procurement modules but ownership differs | **RELOCATE / BUILD** | Impact rows link to PO/supplier owner; no silent PO rewrite |
+| Unit / warehouse + Receiving | Unit allocation truth is built; Receiving owns receipt ledger | Mature ERP keeps serial/unit and receipt history immutable | **KEEP / BUILD** | Amendment impact must preserve/release/reallocate through governed owners; received facts are never rewritten |
+| Delivery | Delivery owns carrier/trip/DO/proof; booking promise remains with order | 2990 shows read-only DO status and Delivery Planning | **KEEP / ADAPT** | Route and amendment show consequences/link; Delivery remains writer; split DO/positions supported |
+| Money / Loan / other commitments | Payment and loan surfaces own their obligations; unified current truth is not complete | 2990 detail shows payments/balance | **KEEP / BUILD** | Amendment computes price/payment/refund/loan delta; no silent financial rewrite; surface other open commitments |
+| Claims / Issue Tracker / Work | Claims and Work are separate owners; old Orders page contains duplicated journey/work signals | Reference suites route exceptions to owner queues | **RELOCATE / BUILD** | Route shows linked facts; amendment/cancel raises owner work; register never becomes queue |
+| Concurrency / rollback | Amendment stale detection exists; revision writes lock rows; end-to-end policy incomplete | Mature versioned documents use optimistic concurrency and compensating revisions | **ADAPT / BUILD** | Revision token/hash on edit/apply; stale conflict UX; rollback by new approved Revision, never delete |
+| Reporting / export | Register XLSX exists | 2990 exports Excel and KPI totals | **KEEP / ADAPT** | Export selected/filtered truth with stable column semantics; cross-module operational reports belong to Reports/owners, not SO KPI cards |
+
+**Genuine owner decisions:** none remain in this sweep. The owner has already settled register
+purpose, amendment ownership, revision identity, cancellation meaning and Order Route semantics.
+Open items are dependency and implementation decisions, so engineering proceeds without inventing
+official Card numbers.
+
+## Ready implementation slices — unnumbered
+
+1. **READY FOR CARD — Sales Orders Register + Document Actions** — ruled seven-column default,
+   bounded surface, widths/overflow, goods disclosure, direct lineage, normal/selected states,
+   search/filter/columns/export and context View/Edit/Preview/Print.
+2. **READY FOR CARD — Sales Order Detail + Authoritative Edit Contract** — Current/Order truth,
+   Sales Portal/POS field parity, safe correction boundary, permission enforcement and actual PDF.
+3. **READY FOR CARD — Amendment / Approval / Revision / History** — routed request, impact preview,
+   management decision, original Rev 1, complete versions, separate event history, stale protection,
+   rollback-as-new-revision and historical PDFs.
+4. **READY FOR CARD — Order Route** — read-only multi-position lineage/obligation read model and
+   owner links across Goods, Delivery, Money, Loan and Other Commitments.
+5. **READY FOR CARD — Copy / Cancel / Intake / Maintenance Closeout** — copy to a new SO, governed
+   transaction cancellation, Scan/import relocation and Settings/Maintenance ownership. This slice
+   follows the edit/amendment permission model; it must not create bypass doors.
+
+**Recommended build sequence:** Register + document actions → authoritative Detail/Edit → Amendment/
+Revision/History → Order Route → Copy/Cancel/Intake/Maintenance closeout. The first two establish the
+single field and navigation contract; the amendment slice establishes immutable version truth before
+route and cancellation consume it.
+
+---
+
 # ✅ SALES ORDERS REFERENCE IMPLEMENTATION — STAGE A CLOSED 2026-08-10
 
 The official Sales Orders destination now follows the approved UI Constitution. This card
@@ -140,7 +268,7 @@ acknowledged DataGrid engine debt; it does not block the ERP UI migration unless
 production scale or performance proves otherwise. Sales Order Workspace, Old Orders execution,
 Delivery, Payments and Purchasing are unchanged.
 
-## §0.1 · TWO DOORS — the production cutover, owner ruling 2026-08-10
+## §0.2 · TWO DOORS — the production cutover, owner ruling 2026-08-10
 
 **The Orders module has TWO routes, and neither may serve the other's page.**
 Ruled in [`docs/SALES-ORDER-CUTOVER.md`](../SALES-ORDER-CUTOVER.md), which is the
@@ -829,7 +957,7 @@ All · Placed · Proceed · To book · Customer confirmed · Delivered
 
 ### WHAT IS ON SCREEN TODAY
 `apps/web/src/pages/operation/OperationOrdersControl.tsx`, **5,152 lines** ·
-route **`/operation/old-orders`** since the cutover (§0.1) — it was `/operation/orders`
+route **`/operation/old-orders`** since the cutover (§0.2) — it was `/operation/orders`
 when this was measured · ***measured 2026-08-06 — every line of logic read end to end;
 the JSX read structurally.*** It merges three legacy surfaces — the 6-column kanban, the
 AutoCount triage Inbox and the flat read-only feed — into one table.
