@@ -501,6 +501,18 @@ P6 below `confirmed` there is no appointment to attribute            PASS
 Tests: shared **2291** · api **2183** · web `OperationDelivery` **21** (five new,
 one per rule) · shared/api/web `tsc` clean · web build clean.
 
+**Deploy — verified live, not assumed.** main `2c2beb4f` · API Worker version
+`d82b059f-19f9-4b55-af5e-20cab71dbdc5` · `/health` 200 `{"ok":true}` ·
+`GET /:id/booking-brief` mounted and **401** unauthenticated (as is
+`POST /:id/booking/confirm`). Web bundle `index-CuV1kkhk.js` deployed to
+**both** Pages projects and confirmed serving on all four production hosts —
+`pos.carresofficial.com` · `erp.carresofficial.com` · `carres-portal.pages.dev` ·
+`carres-pos.pages.dev`. *(`carres-portal` alone leaves the POS domain on the old
+bundle — checked, caught and fixed during this deploy rather than reported as
+done.)* The live bundle was then grepped for the card's own strings: `Before you
+call` · `Not in yet` · `Everything is on hand` · `booking-brief` · the drift
+sentence — all present.
+
 **Known boundaries, reported not hidden:**
 - **The brief is rendered on the Delivery workspace only.** The Sales Order
   Workspace and the Work feed (Cards 9/10) read the same endpoint when their
