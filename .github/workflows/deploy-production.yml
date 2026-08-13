@@ -44,6 +44,15 @@ jobs:
           pnpm typecheck
           pnpm test
           pnpm build
+      - name: Deploy both Pages projects from this SHA
+        working-directory: apps/api
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          DEPLOY_SHA: ${{ steps.source.outputs.sha }}
+        run: |
+          pnpm exec wrangler pages deploy ../web/dist --project-name carres-portal --branch main --commit-hash "${DEPLOY_SHA}" --commit-message "main ${DEPLOY_SHA}" --commit-dirty=false
+          pnpm exec wrangler pages deploy ../web/dist --project-name carres-pos --branch main --commit-hash "${DEPLOY_SHA}" --commit-message "main ${DEPLOY_SHA}" --commit-dirty=false
       - name: Deploy API Worker from this SHA
         working-directory: apps/api
         env:
@@ -51,7 +60,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           DEPLOY_SHA: ${{ steps.source.outputs.sha }}
         run: pnpm exec wrangler deploy --env production --var "PUBLIC_WEB_URL:https://pos.carresofficial.com" --var "DEPLOY_SHA:${DEPLOY_SHA}" --message "main ${DEPLOY_SHA}"
-      - name: Wait for both Git-connected Pages projects and Worker
+      - name: Wait for both Pages projects and Worker
         env:
           EXPECTED_SHA: ${{ steps.source.outputs.sha }}
         run: pnpm ci:smoke
