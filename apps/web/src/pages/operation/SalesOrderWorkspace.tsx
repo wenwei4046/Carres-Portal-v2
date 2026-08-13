@@ -56,13 +56,13 @@ import {
   useSaveSalesOrderRevision,
   type SalesOrderRevisionRow,
   type SalesOrderSnapshot,
+  type AmendmentProposal,
 } from "@/lib/queries";
-import { COMMITMENT_CHANGE_WORDS } from "@carres/shared";
 import CorrectionWorkList from "./CorrectionWorkList";
 import SalesOrderAmendment from "./SalesOrderAmendment";
 import SalesOrderAttribution from "./SalesOrderAttribution";
+import SalesOrderLedger from "./SalesOrderLedger";
 import SalesOrderTabs from "./SalesOrderTabs";
-import { describeRevisionChanges } from "./sales-order-revisions";
 import { lineName } from "./sales-order-facts";
 
 /* pdf.js worker ships inside the package — nothing fetched from a CDN. */
@@ -397,6 +397,7 @@ export default function SalesOrderWorkspace() {
   const isNew = location.pathname.endsWith("/so/new");
   const wantsEdit = params.get("edit") === "1";
   const [viewRev, setViewRev] = useState<number | null>(null);
+  const [amendmentSeed, setAmendmentSeed] = useState<AmendmentProposal | null>(null);
 
   const detailQ = useOperationOrder(isNew ? null : (orderId ?? null));
   const revisionsQ = useSalesOrderRevisions(isNew ? null : (orderId ?? null));
@@ -1009,10 +1010,15 @@ export default function SalesOrderWorkspace() {
                     <SalesOrderAmendment
                       orderId={orderId}
                       currentLines={(detailQ.data?.lines ?? []).map((l) => ({
+                        id: l.id,
                         sku: l.sku,
                         qty: l.qty,
                         unit_price: Number(l.unit_price),
                       }))}
+                      currentDeliveryDate={order?.delivery_date ?? null}
+                      currentDeliveryDateTbd={order?.delivery_date_tbd ?? false}
+                      currentInstallmentMonths={(order as { installment_months?: number | null } | undefined)?.installment_months ?? null}
+                      proposalSeed={amendmentSeed}
                     />
                   </div>
                 )}
@@ -1045,90 +1051,33 @@ export default function SalesOrderWorkspace() {
                 </Section>
               )}
 
-              {/* ⑧ HISTORY / REVISION */}
+              {/* ⑧ REVISIONS / HISTORY — complete versions and event ledger
+                  are separate concepts and separate views. */}
               {!isNew && (
-                <Section title="History / Revision">
-                  {revisions.length === 0 ? (
-                    <p className="text-body text-base-500">
-                      No revisions yet — the first Save mints Rev 1 (the original) and Rev 2
-                    </p>
-                  ) : (
-                    <div className="flex flex-col gap-2" data-testid="revision-list">
-                      <div className="flex flex-wrap gap-1.5">
-                        {revisions.map((r) => {
-                          const isCurrent = r.revision === currentRev;
-                          const isViewed = mode === "oldrev" ? viewRev === r.revision : isCurrent;
-                          return (
-                            <button
-                              key={r.revision}
-                              type="button"
-                              data-testid={`rev-${r.revision}`}
-                              onClick={() => setViewRev(isCurrent ? null : r.revision)}
-                              className={[
-                                "rounded-pill border px-2.5 py-0.5 text-meta font-medium transition-colors",
-                                isViewed
-                                  ? "border-base-900 bg-base-900 text-white"
-                                  : "border-base-200 bg-white text-base-700 hover:border-base-400",
-                              ].join(" ")}
-                            >
-                              Rev {r.revision}
-                              {isCurrent ? " · current" : ""}
-                            </button>
-                          );
-                        })}
-                      </div>
-                      <ul className="flex flex-col gap-1.5">
-                        {[...revisions].reverse().map((r, idx, arr) => {
-                          const prev = arr[idx + 1] ?? null;
-                          const changes = describeRevisionChanges(prev?.snapshot ?? null, r.snapshot);
-                          return (
-                            <li key={r.revision} className="text-body">
-                              <span className="text-meta font-semibold text-base-700">
-                                Rev {r.revision}
-                              </span>
-                              <span className="text-meta text-base-500">
-                                {" "}· {fmtDate(r.created_at, { time: true })}
-                              </span>
-                              {/* CARD 1 — who asked. Rev 1 and pre-0340 rows carry no cause. */}
-                              {r.change_type && (
-                                <span
-                                  className="ml-1.5 rounded-pill border border-base-200 bg-base-50 px-1.5 py-px text-label text-base-700"
-                                  data-testid={`rev-${r.revision}-cause`}
-                                >
-                                  {COMMITMENT_CHANGE_WORDS[r.change_type]}
-                                </span>
-                              )}
-                              {r.note && (
-                                <span className="ml-1.5 text-meta text-base-500">“{r.note}”</span>
-                              )}
-                              <ul className="mt-0.5 flex flex-col gap-0.5 pl-3">
-                                {changes.map((chg, i) => (
-                                  <li key={i} className="text-meta text-base-700">
-                                    {chg}
-                                  </li>
-                                ))}
-                              </ul>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    </div>
-                  )}
-                  {(detailQ.data?.history ?? []).length > 0 && (
-                    <div className="mt-3 border-t border-kit-slate-5 pt-2">
-                      <div className="text-label text-base-500">History</div>
-                      <ul className="mt-1.5 flex flex-col gap-1.5" data-testid="doc-history">
-                        {(detailQ.data?.history ?? []).map((h, i) => (
-                          <li key={i} className="flex gap-3 text-body">
-                            <span className="shrink-0 text-meta text-base-500 tabular-nums">
-                              {fmtDate(h.occurred_at, { time: true })}
-                            </span>
-                            <span className="min-w-0 break-words">{h.text}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
+                <Section title="Order record">
+                  <SalesOrderLedger
+                    revisions={revisions}
+                    history={detailQ.data?.history ?? []}
+                    currentRevision={currentRev}
+                    viewedRevision={mode === "oldrev" ? viewRev : null}
+                    onViewRevision={setViewRev}
+                    onProposeRevision={(revision) => {
+                      const header = revision.snapshot.header ?? {};
+                      const currentLineIds = new Map((detailQ.data?.lines ?? []).map((line) => [line.sku, line.id]));
+                      setAmendmentSeed({
+                        lines: (revision.snapshot.lines ?? []).map((line) => ({
+                          ...(currentLineIds.get(line.sku) ? { id: currentLineIds.get(line.sku) } : {}),
+                          sku: line.sku,
+                          qty: Number(line.qty),
+                          unit_price: Number(line.unit_price),
+                        })),
+                        delivery_date: header.delivery_date == null ? null : String(header.delivery_date),
+                        delivery_date_tbd: Boolean(header.delivery_date_tbd),
+                        installment_months: header.installment_months == null ? null : Number(header.installment_months),
+                      });
+                      setViewRev(null);
+                    }}
+                  />
                 </Section>
               )}
             </div>

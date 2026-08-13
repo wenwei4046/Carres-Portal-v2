@@ -4613,10 +4613,65 @@ export function useSalesOrderAmendment(
 }
 
 export interface AmendmentProposal {
-  lines?: Array<{ sku: string; qty: number; unit_price: number }>;
+  lines?: Array<{ id?: string; sku: string; qty: number; unit_price: number }>;
   delivery_date?: string | null;
   delivery_date_tbd?: boolean;
   installment_months?: number | null;
+}
+
+export interface AmendmentImpactFinding {
+  owner: string;
+  kind: string;
+  count: number;
+  amount?: number;
+  blocks: boolean;
+  href: string;
+}
+
+export interface SalesOrderAmendmentImpact {
+  amendment_id: string;
+  stale: boolean;
+  commercial_delta: number;
+  findings: AmendmentImpactFinding[];
+}
+
+export function useSalesOrderAmendmentImpact(amendmentId: string | null) {
+  return useQuery({
+    queryKey: ["operation", "sales-order-amendment", amendmentId, "impact"],
+    queryFn: () =>
+      apiFetch<SalesOrderAmendmentImpact>(
+        `/api/operation/orders/amendment/${amendmentId}/impact`,
+      ),
+    enabled: !!amendmentId,
+  });
+}
+
+export function useDecideSalesOrderAmendment(
+  orderId: string,
+  opts?: Partial<
+    UseMutationOptions<
+      { id: string; status: "applied" | "rejected"; revision?: number },
+      ApiError,
+      { amendmentId: string; decision: "approve" | "reject"; note: string }
+    >
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ amendmentId, decision, note }) =>
+      apiFetch<{ id: string; status: "applied" | "rejected"; revision?: number }>(
+        `/api/operation/orders/amendment/${amendmentId}/decide`,
+        { method: "POST", body: JSON.stringify({ decision, note }) },
+      ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: [...qk.operation.order(orderId)] }),
+        qc.invalidateQueries({ queryKey: ["operation", "sales-order-amendment"] }),
+      ]);
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
 }
 
 export function useSubmitSalesOrderAmendment(
@@ -4625,7 +4680,7 @@ export function useSubmitSalesOrderAmendment(
     UseMutationOptions<
       { id: string; base_revision: number; base_contractual_hash: string },
       ApiError,
-      { proposed: AmendmentProposal; reason?: string }
+      { proposed: AmendmentProposal; reason: string }
     >
   >,
 ) {
@@ -4633,7 +4688,7 @@ export function useSubmitSalesOrderAmendment(
   return useMutation<
     { id: string; base_revision: number; base_contractual_hash: string },
     ApiError,
-    { proposed: AmendmentProposal; reason?: string }
+    { proposed: AmendmentProposal; reason: string }
   >({
     mutationFn: (input) =>
       apiFetch<{ id: string; base_revision: number; base_contractual_hash: string }>(

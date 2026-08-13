@@ -924,6 +924,24 @@ Information Architecture and live in [`ERP-ARCHITECTURE.md`](ERP-ARCHITECTURE.md
 | Complete immutable versions of one SO | **Revisions** | History · Amendments |
 | Append-only events on one SO | **History** | Revisions · Activity (for this object view) |
 | Fact-derived document/fulfilment/obligation map | **Order Route** | Relationship Map · Journey · Workflow · Checklist · Status |
+
+### The Sales Order amendment words
+
+| Meaning | Use exactly |
+|---|---|
+| Open the governed customer-change form | **Propose a change to the customer** |
+| Persist the proposal without changing the order | **Record the proposal** |
+| A submitted proposal awaiting its authorised decision | **Waiting for management** |
+| Impact heading before a decision | **Before approval** |
+| Decision field | **Management decision reason** |
+| Negative decision | **Reject** |
+| Positive decision that atomically creates the next revision | **Approve and apply** |
+| Re-propose a complete historical version as a new governed change | **Propose this version again** |
+| Stale proposal state/action | **Out of date — propose again** |
+| Contract term field | **Instalment months** |
+| Unknown promised date | **Delivery date to be confirmed** |
+| Empty immutable-version view | **No revisions recorded** |
+| Empty event-ledger view | **No history recorded** |
 | The drawer panel listing who to ring, one row per outside party | **Calls** | Chase Now · Actions · Follow-ups · Contacts — `Actions` is the ROW's open-action list and one word may not head two blocks (Jess 2026-07-28, PR #487); the panel's own empty state has read `0 calls to make · everything on track.` since C1, so the title is that sentence's noun, not a new word |
 
 ## The Purchase Order lifecycle words — CANONICAL HOME (Loo, 2026-07-29 · frozen by P6)

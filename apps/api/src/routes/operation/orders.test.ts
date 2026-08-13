@@ -1960,6 +1960,93 @@ describe("POST /api/operation/orders/:id/save", () => {
   });
 });
 
+describe("Sales Order amendment decision lane", () => {
+  const ORDER_ID = "00000000-0000-0000-0000-000000000b01";
+  const AMENDMENT_ID = "00000000-0000-0000-0000-000000000a01";
+
+  it("returns the owner impact preview without writing another module", async () => {
+    const impact = {
+      amendment_id: AMENDMENT_ID,
+      stale: false,
+      findings: [{ owner: "Purchasing", kind: "purchase_order", count: 1, blocks: false }],
+    };
+    const rpc = vi.fn().mockResolvedValue({ data: impact, error: null });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/amendment/${AMENDMENT_ID}/impact`, {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual(impact);
+    expect(rpc).toHaveBeenCalledWith("sales_order_amendment_impact", {
+      p_amendment_id: AMENDMENT_ID,
+    });
+  });
+
+  it("approves through one atomic decision RPC", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: { id: AMENDMENT_ID, status: "applied", revision: 5 },
+      error: null,
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("principal");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/amendment/${AMENDMENT_ID}/decide`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ decision: "approve", note: "Customer confirmed in writing" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ id: AMENDMENT_ID, status: "applied", revision: 5 });
+    expect(rpc).toHaveBeenCalledWith("sales_order_decide_amendment", {
+      p_amendment_id: AMENDMENT_ID,
+      p_decision: "approve",
+      p_note: "Customer confirmed in writing",
+    });
+  });
+
+  it("requires a reason when management rejects", async () => {
+    const rpc = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("principal");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/amendment/${AMENDMENT_ID}/decide`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ decision: "reject" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("does not expose the decision door to operation", async () => {
+    const rpc = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/amendment/${AMENDMENT_ID}/decide`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ decision: "approve", note: "Customer confirmed" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+});
+
 describe("POST /api/operation/orders (create)", () => {
   it("calls sales_order_create; a missing dealer is refused before the database", async () => {
     const rpc = vi.fn().mockResolvedValue({
