@@ -1455,6 +1455,24 @@ operationOrdersRouter.get("/amendment/:amendmentId/impact", requireOperation, as
   return c.json(data);
 });
 
+/* The read management sees BEFORE it cancels: what this Sales Order still
+ * holds open for Purchasing, Receiving, Stock, Delivery, Money, Loan and Other
+ * Commitments, plus the truthful cancellable/refusal answer. It writes nothing
+ * and it forms no second opinion — `cancellable` restates cancel_order's one
+ * existing rule. The ACT itself stays on the single existing door,
+ * `POST /api/orders/:id/cancel`; this slice adds no second writer. */
+operationOrdersRouter.get("/:id/cancel-impact", requireOperation, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("sales_order_cancel_impact", {
+    p_order_id: c.req.param("id"),
+  });
+  if (error) {
+    const m = mapPipelineV2Error(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json(data);
+});
+
 const amendmentDecisionInput = z
   .object({
     decision: z.enum(["approve", "reject"]),

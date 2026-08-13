@@ -4731,6 +4731,29 @@ export interface SalesOrderAmendmentImpact {
   findings: AmendmentImpactFinding[];
 }
 
+/** What cancelling this Sales Order would raise, per owner — the same seven
+ *  owners and the same finding shape the amendment preview uses, so one
+ *  vocabulary covers both governed changes. Read-only. */
+export interface SalesOrderCancelImpact {
+  order_id: string;
+  so: number;
+  status: string;
+  cancellable: boolean;
+  refusal: string | null;
+  goods_total: number;
+  paid: number;
+  findings: AmendmentImpactFinding[];
+}
+
+export function useSalesOrderCancelImpact(orderId: string | null, enabled = true) {
+  return useQuery({
+    queryKey: ["operation", "sales-order", orderId, "cancel-impact"],
+    queryFn: () =>
+      apiFetch<SalesOrderCancelImpact>(`/api/operation/orders/${orderId}/cancel-impact`),
+    enabled: !!orderId && enabled,
+  });
+}
+
 export function useSalesOrderAmendmentImpact(amendmentId: string | null) {
   return useQuery({
     queryKey: ["operation", "sales-order-amendment", amendmentId, "impact"],

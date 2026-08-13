@@ -57,6 +57,7 @@ import { useAuth } from "@/lib/auth";
 import { renderDoPdf, renderSalesOrderPdf } from "@/lib/pdf/render";
 import type { DoTemplateData, SalesOrderTemplateData } from "@/lib/pdf/types";
 import { useOperationOrders } from "@/lib/queries";
+import CancelSalesOrderDialog from "./CancelSalesOrderDialog";
 import DestinationHeader from "./DestinationHeader";
 import { isDelivered, isRental, lineName, type MoneyState } from "./sales-order-facts";
 import {
@@ -339,6 +340,10 @@ export default function SalesOrdersRegister() {
      filters the rows it holds for instant feedback; `keepPreviousData` in the
      query hook keeps the list on screen while the server answers. */
   const [serverSearch, setServerSearch] = useState("");
+  /* The register still writes nothing itself. `Cancel SO` opens the ONE
+     governed cancellation door and that door owns the act — the row is only
+     naming which Sales Order the dialog is about. */
+  const [cancelTarget, setCancelTarget] = useState<{ id: string; so: number } | null>(null);
 
   const { data, isLoading, isError, error, refetch } = useOperationOrders(
     serverSearch ? { search: serverSearch } : {},
@@ -408,6 +413,14 @@ export default function SalesOrdersRegister() {
         label: "Copy to new Sales Order",
         onClick: () => navigate(`/operation/orders/so/new?copyFrom=${r.id}`),
       },
+      /* The MASTER's locked menu ends with the one destructive entry, alone
+         below a divider so it is never reached by a slipped click. */
+      { divider: true },
+      {
+        label: "Cancel SO",
+        danger: true,
+        onClick: () => setCancelTarget({ id: r.id, so: r.so }),
+      },
     ],
     [navigate, openWorkspace],
   );
@@ -420,6 +433,21 @@ export default function SalesOrdersRegister() {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <DestinationHeader />
+
+      {cancelTarget && (
+        <CancelSalesOrderDialog
+          orderId={cancelTarget.id}
+          so={cancelTarget.so}
+          open
+          onOpenChange={(next) => {
+            if (!next) setCancelTarget(null);
+          }}
+          onCancelled={() => {
+            setCancelTarget(null);
+            void refetch();
+          }}
+        />
+      )}
 
       <div className="flex min-h-0 flex-1 flex-col p-3 pt-4" data-testid="register-column">
         {isError ? (

@@ -1986,6 +1986,36 @@ describe("Sales Order amendment decision lane", () => {
     });
   });
 
+  it("previews what cancelling would raise, and writes nothing", async () => {
+    const ORDER_ID = "00000000-0000-0000-0000-0000000000c1";
+    const impact = {
+      order_id: ORDER_ID,
+      so: 1303,
+      status: "place",
+      cancellable: true,
+      refusal: null,
+      goods_total: 2499,
+      paid: 1250,
+      findings: [{ owner: "Purchasing", kind: "purchase_order", count: 1, blocks: false }],
+    };
+    const rpc = vi.fn().mockResolvedValue({ data: impact, error: null });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/${ORDER_ID}/cancel-impact`, {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual(impact);
+    /* ONE call, and it is the read. The preview never reaches a writer — the
+     * act stays on the single existing cancel door. */
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(rpc).toHaveBeenCalledWith("sales_order_cancel_impact", { p_order_id: ORDER_ID });
+  });
+
   it("approves through one atomic decision RPC", async () => {
     const rpc = vi.fn().mockResolvedValue({
       data: { id: AMENDMENT_ID, status: "applied", revision: 5 },
