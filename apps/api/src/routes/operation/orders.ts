@@ -612,8 +612,6 @@ const revisionHeaderInput = z
     customer_address_postcode: z.string().nullable().optional(),
     customer_emergency: z.string().nullable().optional(),
     customer_billing: z.string().nullable().optional(),
-    delivery_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
-    delivery_date_tbd: z.boolean().optional(),
     proceed_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
     delivery_floor: z.number().int().min(0).optional(),
     delivery_has_lift: z.boolean().optional(),
@@ -1055,22 +1053,11 @@ operationOrdersRouter.get("/:id/booking-brief", requireOperation, async (c) => {
 // cause and defaults to staff_correction. The RPC also refuses an empty or
 // no-op save, refuses on any floor BLOCK, and refuses removing/re-SKUing a
 // line in production.
-const saveChangeInput = z
-  .object({
-    type: z.enum(["staff_correction", "customer_change"]),
-    note: z.string().trim().max(2000).optional(),
-  })
-  .strict();
-
 const saveRevisionInput = z
   .object({
-    header: revisionHeaderInput.optional(),
-    lines: z.array(revisionLineInput).min(1).optional(),
-    change: saveChangeInput.optional(),
+    header: revisionHeaderInput,
   })
-  .refine((v) => v.header !== undefined || v.lines !== undefined, {
-    message: "Nothing to save",
-  });
+  .strict();
 
 operationOrdersRouter.post("/:id/save", requireOperation, async (c) => {
   const id = c.req.param("id");
@@ -1089,11 +1076,11 @@ operationOrdersRouter.post("/:id/save", requireOperation, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
   const { data, error } = await sb.rpc("sales_order_save_revision", {
     p_order_id: id,
-    p_header: parsed.data.header ?? {},
-    p_lines: parsed.data.lines ?? null,
-    p_change: parsed.data.change
-      ? { change_type: parsed.data.change.type, note: parsed.data.change.note ?? null }
-      : null,
+    p_header: parsed.data.header,
+    // Detail/Edit is the safe-correction door. Contractual lines and the
+    // promised date travel only through the governed Amendment lane.
+    p_lines: null,
+    p_change: null,
   });
   if (error) {
     const m = mapPipelineV2Error(error);
@@ -1109,6 +1096,8 @@ const createOrderInput = z.object({
   header: revisionHeaderInput
     .extend({
       customer_name: z.string().trim().min(1, "Customer name is required"),
+      delivery_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+      delivery_date_tbd: z.boolean().optional(),
       dealer_id: z.string().uuid({ message: "A dealer is required" }),
       // orders_salesperson_required (0296) — every portal-written order
       // names who sold it; only the AutoCount archive importer is exempt.

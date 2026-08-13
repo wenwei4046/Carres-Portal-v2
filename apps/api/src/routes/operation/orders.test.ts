@@ -1845,9 +1845,9 @@ describe("POST /api/operation/orders/:id/revert-dispatch", () => {
 describe("POST /api/operation/orders/:id/save", () => {
   const ORDER_ID = "00000000-0000-0000-0000-000000000b01";
 
-  it("calls sales_order_save_revision with header + lines, writes nothing directly", async () => {
+  it("saves only safe correction fields and writes nothing directly", async () => {
     const rpc = vi.fn().mockResolvedValue({
-      data: { revision: 2, changed: ["delivery_date", "items"] },
+      data: { revision: 2, changed: ["customer_phone", "proceed_date"] },
       error: null,
     });
     const from = vi.fn();
@@ -1859,8 +1859,7 @@ describe("POST /api/operation/orders/:id/save", () => {
         method: "POST",
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
         body: JSON.stringify({
-          header: { delivery_date: "2026-09-05" },
-          lines: [{ sku: "B1201S-K", qty: 2, unit_price: 2499 }],
+          header: { customer_phone: "012-3456789", proceed_date: "2026-09-05" },
         }),
       }),
       env,
@@ -1868,8 +1867,8 @@ describe("POST /api/operation/orders/:id/save", () => {
     expect(res.status).toBe(201);
     expect(rpc).toHaveBeenCalledWith("sales_order_save_revision", {
       p_order_id: ORDER_ID,
-      p_header: { delivery_date: "2026-09-05" },
-      p_lines: [{ sku: "B1201S-K", qty: 2, unit_price: 2499 }],
+      p_header: { customer_phone: "012-3456789", proceed_date: "2026-09-05" },
+      p_lines: null,
       p_change: null,
     });
     /* NOTHING was written directly — the RPC owns every write. */
@@ -1882,35 +1881,7 @@ describe("POST /api/operation/orders/:id/save", () => {
     ]);
   });
 
-  it("CARD 1 — forwards the cause: change.type/note → p_change", async () => {
-    const rpc = vi.fn().mockResolvedValue({
-      data: { revision: 3, changed: ["items"], change_type: "customer_change" },
-      error: null,
-    });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ rpc } as any);
-    const jwt = await makeJwt("operation");
-    const res = await app.fetch(
-      new Request(`http://t/api/operation/orders/${ORDER_ID}/save`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          lines: [{ sku: "MODEL-B", qty: 1, unit_price: 2799 }],
-          change: { type: "customer_change", note: "Customer phoned - wants Model B" },
-        }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(201);
-    expect(rpc).toHaveBeenCalledWith("sales_order_save_revision", {
-      p_order_id: ORDER_ID,
-      p_header: {},
-      p_lines: [{ sku: "MODEL-B", qty: 1, unit_price: 2799 }],
-      p_change: { change_type: "customer_change", note: "Customer phoned - wants Model B" },
-    });
-  });
-
-  it("CARD 1 — refuses an unknown change type without calling the database", async () => {
+  it("refuses contractual items at the API boundary", async () => {
     const rpc = vi.fn();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue({ rpc } as any);
@@ -1920,8 +1891,27 @@ describe("POST /api/operation/orders/:id/save", () => {
         method: "POST",
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
         body: JSON.stringify({
+          header: { customer_phone: "012-3456789" },
           lines: [{ sku: "MODEL-B", qty: 1, unit_price: 2799 }],
-          change: { type: "fulfilment_replacement" },
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("refuses the promised date at the API boundary", async () => {
+    const rpc = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/${ORDER_ID}/save`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          header: { delivery_date: "2026-09-05" },
         }),
       }),
       env,
@@ -1959,7 +1949,7 @@ describe("POST /api/operation/orders/:id/save", () => {
       new Request(`http://t/api/operation/orders/${ORDER_ID}/save`, {
         method: "POST",
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ header: { delivery_date: "2026-09-05" } }),
+        body: JSON.stringify({ header: { customer_phone: "012-3456789" } }),
       }),
       env,
     );

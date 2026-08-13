@@ -1,6 +1,6 @@
 /**
- * SalesOrderWorkspace — STAGE 2 (BUILD-QUEUE): EDIT / CREATE + THE REVISION
- * ENGINE, on the frozen skeleton.
+ * SalesOrderWorkspace — the governed Sales Order detail and safe-correction
+ * workspace. Commercial changes leave through Amendment, never this form.
  *
  * ─────────────────────────────────────────────────────────────────────────────
  * ⭐ ONE LAYOUT, FOUR STATES, NO FIFTH (the card's own drawing)
@@ -20,10 +20,8 @@
  * those bytes (VIEWER ONLY — never a second renderer) and Print opens the
  * SAME blob. The previous blob URL is revoked on every render.
  *
- * EVERY WRITE MINTS A REVISION (0327): Save calls ONE RPC that whitelists the
- * header, diffs the lines and mints Rev N+1 — Rev 1 = the original, minted
- * from the pre-edit state. Stage 2 has NO approval UI: every change is
- * Class B. No downstream module is written, at all.
+ * Every safe correction calls one RPC and mints Rev N+1. Items and the
+ * promised delivery date stay read-only here; they are contractual facts.
  */
 // design-standard: not-a-list-page — this is a DOCUMENT workspace. Its
 // tables are the order's own line block: fixed rows, no sort, no selection.
@@ -60,7 +58,6 @@ import {
   type SalesOrderSnapshot,
 } from "@/lib/queries";
 import { COMMITMENT_CHANGE_WORDS } from "@carres/shared";
-import { Modal, ModalActions } from "./components/Modal";
 import CorrectionWorkList from "./CorrectionWorkList";
 import SalesOrderAmendment from "./SalesOrderAmendment";
 import SalesOrderAttribution from "./SalesOrderAttribution";
@@ -530,7 +527,7 @@ export default function SalesOrderWorkspace() {
     onError: (e) => toast.error(e.message),
   });
 
-  const draftHeaderPayload = (): Record<string, unknown> => ({
+  const safeCorrectionPayload = (): Record<string, unknown> => ({
     customer_name: draft.customer_name.trim(),
     customer_phone: draft.customer_phone.trim() || null,
     customer_email: draft.customer_email.trim() || null,
@@ -542,11 +539,15 @@ export default function SalesOrderWorkspace() {
     customer_address_postcode: draft.customer_address_postcode.trim() || null,
     customer_emergency: draft.customer_emergency.trim() || null,
     customer_billing: draft.customer_billing.trim() || null,
-    delivery_date: draft.delivery_date,
-    delivery_date_tbd: draft.delivery_date_tbd,
     proceed_date: draft.proceed_date,
     delivery_floor: draft.delivery_floor,
     delivery_has_lift: draft.delivery_has_lift,
+  });
+
+  const createHeaderPayload = (): Record<string, unknown> => ({
+    ...safeCorrectionPayload(),
+    delivery_date: draft.delivery_date,
+    delivery_date_tbd: draft.delivery_date_tbd,
   });
 
   const draftLinesPayload = () =>
@@ -570,60 +571,10 @@ export default function SalesOrderWorkspace() {
     return null;
   };
 
-  /* ── CARD 1 · a contractual save states its cause. ────────────────────────
-   * A save that moves the ITEMS or the PROMISED DATE must say who asked:
-   * Staff correction (the record was wrong — the customer's agreement never
-   * changed) or Customer change (the customer asked for something
-   * different). The RPC (0340) refuses a contractual save without it; this
-   * chooser is the structured entrance. Contact/address-only fixes pass
-   * straight through — the server records them as staff corrections. */
-  const [changeAsk, setChangeAsk] = useState<null | {
-    header: Record<string, unknown>;
-    lines: ReturnType<typeof draftLinesPayload>;
-  }>(null);
-  const [changeType, setChangeType] = useState<"staff_correction" | "customer_change" | null>(
-    null,
-  );
-  const [changeNote, setChangeNote] = useState("");
-
-  const contractualChanged = (): boolean => {
-    if (!order) return false;
-    if ((draft.delivery_date ?? null) !== (order.delivery_date ?? null)) return true;
-    if (Boolean(draft.delivery_date_tbd) !== Boolean(order.delivery_date_tbd)) return true;
-    const next = draftLinesPayload();
-    const prev = detailLines;
-    if (next.length !== prev.length) return true;
-    const prevById = new Map(prev.map((l) => [l.id, l]));
-    for (const l of next) {
-      if (!l.id) return true; // an added line
-      const p = prevById.get(l.id);
-      if (!p) return true;
-      if (p.sku !== l.sku || Number(p.qty) !== Number(l.qty)) return true;
-      if (Number(p.unit_price) !== Number(l.unit_price)) return true;
-    }
-    return false;
-  };
-
   const onSave = () => {
     const err = validateDraft(false);
     if (err) return void toast.error(err);
-    const payload = { header: draftHeaderPayload(), lines: draftLinesPayload() };
-    if (contractualChanged()) {
-      setChangeType(null);
-      setChangeNote("");
-      setChangeAsk(payload);
-      return;
-    }
-    saveMut.mutate(payload);
-  };
-
-  const onConfirmChange = () => {
-    if (!changeAsk || !changeType) return;
-    saveMut.mutate({
-      ...changeAsk,
-      change: { type: changeType, ...(changeNote.trim() ? { note: changeNote.trim() } : {}) },
-    });
-    setChangeAsk(null);
+    saveMut.mutate({ header: safeCorrectionPayload() });
   };
   const onCreate = () => {
     const err = validateDraft(true);
@@ -631,7 +582,7 @@ export default function SalesOrderWorkspace() {
     /* A BIRTH names the parties — only the EDIT door lost them to 0329. */
     createMut.mutate({
       header: {
-        ...draftHeaderPayload(),
+        ...createHeaderPayload(),
         dealer_id: draft.dealer_id,
         salesperson_id: draft.salesperson_id,
         outlet_id: draft.outlet_id,
@@ -786,70 +737,6 @@ export default function SalesOrderWorkspace() {
         right={headerRight}
       />
 
-      {/* CARD 1 — the structured entrance: a contractual save states its cause. */}
-      {changeAsk && (
-        <Modal title="Who asked for this change?" onClose={() => setChangeAsk(null)}>
-          <div className="flex flex-col gap-2" data-testid="change-type-chooser">
-            <p className="text-body text-base-700">
-              This save changes the items or the promised date. The record must say who asked.
-            </p>
-            <label className="flex items-start gap-2 rounded-card border border-kit-slate-5 bg-white px-3 py-2">
-              <input
-                type="radio"
-                name="change-type"
-                className="mt-1"
-                checked={changeType === "staff_correction"}
-                onChange={() => setChangeType("staff_correction")}
-                data-testid="change-type-staff"
-              />
-              <span>
-                <span className="text-body font-semibold text-base-900">
-                  {COMMITMENT_CHANGE_WORDS.staff_correction}
-                </span>
-                <span className="block text-meta text-base-500">
-                  The record was wrong — the customer's agreement never changed.
-                </span>
-              </span>
-            </label>
-            <label className="flex items-start gap-2 rounded-card border border-kit-slate-5 bg-white px-3 py-2">
-              <input
-                type="radio"
-                name="change-type"
-                className="mt-1"
-                checked={changeType === "customer_change"}
-                onChange={() => setChangeType("customer_change")}
-                data-testid="change-type-customer"
-              />
-              <span>
-                <span className="text-body font-semibold text-base-900">
-                  {COMMITMENT_CHANGE_WORDS.customer_change}
-                </span>
-                <span className="block text-meta text-base-500">
-                  The customer asked for something different.
-                </span>
-              </span>
-            </label>
-            <label className="mt-1 flex flex-col gap-1">
-              <span className="text-label text-base-500">Note (optional)</span>
-              <textarea
-                className="min-h-[64px] rounded-[6px] border border-base-200 bg-white px-2 py-1 text-body outline-none focus:border-primary"
-                value={changeNote}
-                maxLength={2000}
-                onChange={(e) => setChangeNote(e.target.value)}
-                data-testid="change-note"
-              />
-            </label>
-            <ModalActions
-              onCancel={() => setChangeAsk(null)}
-              onPrimary={onConfirmChange}
-              primary="Save"
-              primaryDisabled={!changeType}
-              primaryPending={saveMut.isPending}
-            />
-          </div>
-        </Modal>
-      )}
-
       <div className="flex min-h-0 flex-1">
         {/* ── LEFT 55% — the seven sections ─────────────────────────────── */}
         <div className="min-h-0 w-[55%] shrink-0 overflow-auto border-r border-kit-slate-5 bg-kit-slate-3 px-4 py-4">
@@ -882,7 +769,7 @@ export default function SalesOrderWorkspace() {
                     </span>
                   ) : mode === "edit" ? (
                     <span className="rounded-pill bg-kit-blue-9 px-2 py-0.5 text-label font-semibold text-white">
-                      Editing — nothing is saved until Save
+                      Safe correction — customer and delivery facts only
                     </span>
                   ) : null}
                 </div>
@@ -993,7 +880,7 @@ export default function SalesOrderWorkspace() {
 
               {/* ③ DATES */}
               <Section title="Dates">
-                {editing ? (
+                {mode === "create" ? (
                   <div className="grid grid-cols-3 gap-3">
                     <Fact label="Ordered" value={isNew ? "Today" : fmtDate(order?.placed_at ?? null)} />
                     <div>
@@ -1016,7 +903,15 @@ export default function SalesOrderWorkspace() {
                   <div className="grid grid-cols-3 gap-x-5 gap-y-3">
                     <Fact label="Ordered" value={fmtDate((displayHeader(mode, viewedRevision, order, "placed_at") || order?.placed_at) ?? null)} />
                     <Fact label="Promised delivery" value={promisedWord(mode, viewedRevision, order)} />
-                    <Fact label="Proceed date" value={fmtDate(displayHeader(mode, viewedRevision, order, "proceed_date")) || "Not recorded"} />
+                    {mode === "edit" ? (
+                      <div>
+                        <div className="text-label text-base-500 mb-1">Proceed date</div>
+                        <DatePicker id="ws-proceed" value={draft.proceed_date}
+                          onChange={(iso) => setField("proceed_date", iso)} />
+                      </div>
+                    ) : (
+                      <Fact label="Proceed date" value={fmtDate(displayHeader(mode, viewedRevision, order, "proceed_date")) || "Not recorded"} />
+                    )}
                   </div>
                 )}
               </Section>
@@ -1044,7 +939,7 @@ export default function SalesOrderWorkspace() {
 
               {/* ⑤ ITEMS */}
               <Section title="Items">
-                {editing ? (
+                {mode === "create" ? (
                   <div className="flex flex-col gap-2">
                     {draft.lines.map((l) => (
                       <div key={l.key} className="grid grid-cols-[1fr_84px_120px_32px] items-end gap-2">
