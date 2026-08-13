@@ -5,8 +5,8 @@
 > can skip — and that is why it stays short. **200–300 lines. If it grows past that, something
 > in it is not constitutional and belongs in a module MASTER.**
 >
-> **You read this file and ONE module MASTER. That is all.** Open a law file only when you
-> need a specific answer from it.
+> **BUILD starts with this file and ONE module MASTER.** ERP/module Plan/Design instead follows
+> the §4 **ERP PLAN CHAT START PROTOCOL** authority chain before proposing or asking.
 
 ---
 
@@ -51,8 +51,9 @@ study, measure, challenge, then improve the rule. A better product beats an olde
 evidence beats older documentation.
 
 ### Law 1 · One Project Constitution, one MASTER per module
-`CLAUDE.md` + `docs/<module>/MASTER.md`. **Two files to start work. Never eight.**
-Old queues and checkpoints live in `docs/archive/` — **no chat reads them.**
+`CLAUDE.md` + `docs/<module>/MASTER.md`. BUILD starts with those two files; Plan/Design reads the
+governing chain required by the §4 start protocol. This does not license indiscriminate document
+loading. Old queues and checkpoints live in `docs/archive/` — **no chat reads them as authority.**
 
 ### Law 2 · Build first. Freeze after validation. Then overwrite the MASTER
 ```
@@ -109,7 +110,7 @@ not a new guideline  →  fold the rule into this Constitution
 
 ```
 0  Say which kind of chat you are.  PLAN writes no code.  BUILD ships one thing.
-1  Read this file + the module MASTER.  Nothing else first.
+1  BUILD: read this file + the module MASTER.  PLAN/DESIGN: complete the start protocol below.
 2  Measure.  Every proposal runs the DECISION GATE below — no exception.
 3  Challenge (Law 4).  Problems get 🔴/🟡 and a fix, never a complaint alone.
 4  Ask ONE decision at a time — one evidence-based Carres recommendation, with its trade-off and
@@ -138,42 +139,64 @@ Carres business architecture and every locked constraint, and obtain Jess's appr
 it as truth. Linear, Shopify, AutoCount, 2990 and mature ERP patterns inform the proposal; none is
 copied blindly.
 
-- **APPROVED / LOCKED decisions are not re-researched, reopened or offered for re-approval.**
-  Continue from the authoritative MASTER's recorded answer, at the boundary it actually locks.
-- **Every new or restarted Plan/Design chat applies the separation above.** Its approved baseline
-  names both preserved business/capability truth and any explicitly locked placement/presentation;
-  its unresolved list includes presentation that the MASTER has not ruled and useful missing
-  capabilities whose value is not yet decided. Repository absence is evidence of a gap, not a veto.
-- **OWNER-APPROVED OBJECT / DOMAIN ARCHITECTURE COMPLETENESS LAW (Jess, 2026-08-12).** A mission
-  concerning a business object/domain — Sales Order, Purchase Order, Receiving, Claim, Payment,
-  Delivery, Warehouse Unit or equivalent — is not a local page/question. Jess owns business
-  decisions and final approval. The Plan chat owns the mission boundary, research completeness,
-  dependency discovery, cross-module consequences, gap detection, sequencing and the proposed plan.
-  Jess is not expected to know which questions, reference capabilities, downstream consequences or
-  international patterns require investigation. Do not ask what to inspect next, when planning is
-  complete, what can build or what comes next when evidence can answer it. Proactively surface
-  material issues Jess did not ask about, explain why they matter, and complete the relevant
-  object/domain pass before calling anything the next unresolved decision or the mission complete.
-- **Every new or restarted Plan/Design chat is the Carres UI architect, not merely a repository
-  checker.** Jess is the business owner and final decision-maker; she is not expected to enumerate
-  every UI or ERP implication. Before presenting any UI proposal, mockup or layout recommendation,
-  the chat performs the **UI DICTIONARY / IA PREFLIGHT**: read the authoritative UI dictionary and
-  copy vocabulary, ERP navigation and information architecture, module ownership, UI MASTER,
-  current/frozen design-token authority, cross-module patterns and the target module MASTER. For
-  every proposed button, tab, menu, destination, page, action, Settings or Maintenance entry,
-  identify the existing Carres term, owner and destination **before** proposing it; detect duplicate
-  destinations or terms, inconsistent interaction language, scalability problems, useful missing
-  capabilities and consequences for the modules that will inherit the pattern. Extract and validate
-  a brief **LOCKED CONSTRAINTS** checklist for the decision surface. A conflict with APPROVED /
-  LOCKED truth makes the proposal **INVALID** and it is corrected before Jess sees it. The checklist
-  preserves useful capability truth without promoting an unruled placement, presentation or
-  repository omission into a constraint. Plan ahead and surface material issues Jess did not ask
-  about; governance protects truth, it does not outsource architectural judgment or freeze
-  innovation.
-- At entry, state separately: **WHAT IS ALREADY APPROVED · WHAT IS GENUINELY UNRESOLVED · WHAT
-  SINGLE DECISION SURFACE THIS SESSION IS SOLVING.** Establish the locked constraints first;
-  only then research the unresolved surface and propose.
-- For a genuinely **UNRESOLVED** object/domain mission, first map its complete **relevant**
+#### ERP PLAN CHAT START PROTOCOL — APPROVED / LOCKED, owner ruling 2026-08-13
+
+Every new or restarted ERP/module Plan/Design chat completes this sequence **before proposing a
+local design, Phase 1, Card or owner question**:
+
+1. **AUTHORITY READ.** Read in order: this Constitution → `docs/ERP-ARCHITECTURE.md` → target
+   module MASTER → relevant upstream/downstream MASTERs. When UI is involved, also read the UI
+   MASTER plus governed dictionary/copy, navigation/IA and token authority. Read the current human
+   ERP Blueprint where applicable. Read current implementation as measured evidence only; missing
+   or different code never overrules an approved target.
+2. **RESOLUTION PASS.** Explicitly classify the domain facts as:
+   - **`RESOLVED FROM AUTHORITY`** — approved/locked repo or Blueprint truth; never re-ask or
+     re-approve it.
+   - **`APPROVED TARGET / NOT BUILT`** — the approved operating model awaits implementation; code
+     absence does not make it unresolved.
+   - **`BUILT / VERIFIED`** — measured current implementation evidence.
+   - **`REAL GAP / CONTRADICTION`** — the authority chain genuinely has no answer, or two current
+     authoritative sources conflict.
+   A missing implementation is not an owner decision. A planner preference is not an owner
+   decision. Example: if Blueprint/Money authority already permits planning/booking in parallel and
+   makes T−1 with RM0 the hard Delivery release gate, Delivery records it as **`RESOLVED FROM
+   AUTHORITY`**; it may not ask Jess whether an outstanding balance should block release.
+3. **WHOLE-DOMAIN AUDIT FIRST.** Complete the target domain capability and lifecycle pass, including
+   cross-module consequences, dependencies, gaps and relevant mature/reference capability research,
+   before asking small/local questions or proposing Phase 1/Card/UI. Do not postpone understanding
+   part of the domain by calling it a later phase. Whole-domain planning does not require whole-domain
+   building: once the architecture is understood, implementation may be sliced by dependency.
+   Completeness and proactive research are the planner's responsibility; Jess does not supply the
+   reference systems, capability checklist or next question.
+4. **OWNER DECISION GATE.** Ask Jess only after the whole-domain audit and only when the question
+   displays all applicable evidence below:
+   ```
+   AUTHORITY SEARCHED             exact authoritative documents and sections checked
+   WHY NOT ALREADY RESOLVED       the genuine absence or conflict
+   TWO OR MORE REAL OPERATING OPTIONS   when alternatives exist; never cosmetic implementation choices
+   RECOMMENDATION                 evidence-based Carres recommendation
+   OPERATIONAL CONSEQUENCE        change to operation, ownership, customer, supplier, logistics or finance
+   ```
+   If the gate cannot be filled, **do not ask Jess**. Resolve it from authority or ordinary
+   engineering/design judgment. An owner decision is a real unresolved choice that changes how
+   Carres operates, not a request to reconfirm truth.
+
+**PLAN AUTHORITY BOUNDARY.** An internal clean start means establishing clean ERP target truth; it
+does **not** authorize external cutover. Plan/Design may not contact, email or message external
+parties; invite suppliers/carriers; create production partner accounts; deploy; disable current
+external channels; cut over Google Sheet/portal/manual integrations; or change live operations.
+Each external integration/cutover or live action requires separate, explicit owner authorization
+for that action.
+
+**OWNER-APPROVED OBJECT / DOMAIN ARCHITECTURE COMPLETENESS LAW (Jess, 2026-08-12).** A mission
+concerning a business object/domain — Sales Order, Purchase Order, Receiving, Claim, Payment,
+Delivery, Warehouse Unit or equivalent — is not a local page/question. Jess owns genuine business
+decisions and final approval. The Plan chat owns the mission boundary, research completeness,
+dependency discovery, cross-module consequences, gap detection, sequencing and the proposed plan.
+Proactively surface material issues Jess did not ask about and complete the relevant object/domain
+pass before calling anything the next unresolved decision or the mission complete.
+
+- For the **`REAL GAP / CONTRADICTION`** portion of an object/domain mission, map its complete relevant
   lifecycle: creation/source · identity/numbering · Register/view/detail · edit · revision/
   amendment/versioning · approval/permissions · documents/PDF and historical documents · copy/
   duplicate · cancel/void · Settings/Maintenance/master data · scan/import · search/filter/columns ·
@@ -204,7 +227,8 @@ copied blindly.
   BUILD**, explain why, and name the cross-module consequence.
 - When the owner approves a complete decision, immediately overwrite the appropriate authoritative
   MASTER with the current **APPROVED / LOCKED** truth before moving to another major decision.
-  PLAN mode forbids application implementation, not governing-document updates.
+  PLAN mode forbids application implementation, not governing-document updates. A proposal or draft
+  remains explicitly **PROPOSAL / NOT LAW** and is never written as approved truth.
 - **PLAN COMPLETION GATE.** Before recommending implementation or declaring the surface complete,
   show coverage of: current Carres capabilities · locked governance · UI dictionary/IA/module
   ownership · relevant reference-product function mining · mature/international benchmark where
@@ -223,11 +247,14 @@ copied blindly.
 ### MISSION / CARD / CHAT BOUNDARY LAW — APPROVED / LOCKED, owner ruling 2026-08-12
 
 **PLAN CHAT OWNS THE MISSION BOUNDARY.** Throughout Plan/Design work the planner continuously
-maintains and can state: **CURRENT MISSION · SETTLED / LOCKED · GENUINELY UNRESOLVED ·
-IMPLEMENTATION WORK · RECOMMENDED NEXT STEP.** Jess must not have to ask when planning is complete,
-when a coherent build scope is ready, what follows it, or whether a fresh chat is advisable.
+maintains and can state: **CURRENT MISSION · RESOLVED FROM AUTHORITY · APPROVED TARGET / NOT BUILT ·
+BUILT / VERIFIED · REAL GAP / CONTRADICTION · RECOMMENDED NEXT STEP.** Jess must not have to ask
+when planning is complete, when a coherent build scope is ready, what follows it, or whether a fresh
+chat is advisable.
 
-- **`READY FOR CARD — <scope>`.** State this proactively when a coherent capability or build slice
+- **`READY FOR CARD — <scope>`.** Never state or invent this, Phase 1 or implementation sequencing
+  before the ERP PLAN CHAT START PROTOCOL's whole-domain pass and applicable completion gate are
+  sufficiently complete. Then state it proactively only when a coherent capability or build slice
   has sufficient approved business truth, UI/interaction truth where relevant, ownership,
   dependencies and an acceptance boundary, with no unresolved owner decision blocking safe build.
   Recommend its dependency/build order. The scope may remain proposed and unnumbered; never invent
@@ -244,13 +271,18 @@ when a coherent build scope is ready, what follows it, or whether a fresh chat i
   confusion risk. Conversation length alone is not a reason while one coherent mission remains
   active and its decisions are safely persisted in the repository. Give the exact concise restart
   prompt and state whether the next chat is **PLAN / DESIGN** or **CONTINUOUS BUILD**, with the
-  reason.
+  reason. The standard Plan restart contract is:
+  **`<Module> Module Completion — PLAN. Follow ERP PLAN CHAT START PROTOCOL; produce RESOLVED FROM
+  AUTHORITY + whole-domain audit before OWNER DECISIONS.`** The repository carries the protocol;
+  do not recreate it in a giant handoff prompt.
 
 Approved decisions are persisted immediately under the law below; chat length is never the memory
 mechanism. A fresh Plan/Design chat automatically owns these boundaries. **CONTINUOUS BUILD remains
 separate:** after a governed/approved Card or build slice is handed over, it follows the existing
 production vertical-slice law. PLAN mode blocks application implementation, not required governing-
 document updates.
+
+### PLAN DECISION PERSISTENCE LAW — APPROVED / LOCKED
 
 **A DECISION THAT STAYS IN THE CHAT IS A DECISION THAT DIES.** The moment the owner agrees to
 something, it is written to its file and committed **before the conversation moves on** — not
