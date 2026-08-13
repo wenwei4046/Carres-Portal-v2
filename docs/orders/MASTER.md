@@ -237,9 +237,16 @@ official Card numbers.
    probe then failed at the API boundary with 422 `invalid_param` before the revision RPC. The
    `/health` check returned 200 `{"ok":true}`. The complete 2,186-test API suite and API typecheck
    passed at the merged source before deployment. No Register or settled business decision changed.
-3. **READY FOR CARD — Amendment / Approval / Revision / History** — routed request, impact preview,
-   management decision, original Rev 1, complete versions, separate event history, stale protection,
-   rollback-as-new-revision and historical PDFs.
+3. **CLOSED / PRODUCTION-VERIFIED 2026-08-13 — Amendment / Approval / Revision / History** —
+   PR #756 merged the routed proposal, read-only owner impact, principal approve/reject, stale
+   refusal, atomic apply, complete immutable versions, separate event History, historical PDFs and
+   rollback-as-new-proposal; PR #758 closed the strict CI finding. Migration 0348 was applied and
+   its RPCs/constraint/audit column probed. Production verification on SO-1318 submitted a proposal
+   from Rev 6, computed impact across every owner, rejected it under an active principal identity,
+   preserved Rev 6 and showed both the submission and rejection in History. The live PO schema
+   exposed its `so` linkage during that probe; the function was corrected in production and the
+   immutable repo correction is migration 0349 (PR #761). Exact main `f17f85ff` converged on both
+   Pages projects, both custom domains and Worker version `5bca7fff-693a-40db-8396-ccf43fc38e6e`.
 4. **READY FOR CARD — Order Route** — read-only multi-position lineage/obligation read model and
    owner links across Goods, Delivery, Money, Loan and Other Commitments.
 5. **READY FOR CARD — Copy / Cancel / Intake / Maintenance Closeout** — copy to a new SO, governed
