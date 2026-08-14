@@ -42,6 +42,8 @@ describe("SalesOrderRoute", () => {
     expect(screen.queryByText("Document lineage")).toBeNull();
     expect(screen.queryByText("Current goods positions")).toBeNull();
     expect(screen.queryByText(/You are here/i)).toBeNull();
+    expect(screen.getByText("1 unit · Expected Tue, 18 Aug 26")).toBeInTheDocument();
+    expect(screen.queryByText(/2026-08-18/)).toBeNull();
   });
 
   it("marks an unresolved goods position as CURRENT when no later stage exists", () => {

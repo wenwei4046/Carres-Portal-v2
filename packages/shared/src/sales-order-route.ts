@@ -275,7 +275,7 @@ function deliveryLane(input: SalesOrderRouteInput): { lane: SalesOrderRouteLane;
     const booking = input.delivery.booking;
     attempts.push(fact(
       "delivery:booking",
-      attempts.length > 0 ? "Next delivery · Scheduled" : "Delivery · Scheduled",
+      `${booking.partnerName?.trim() || "Logistics Partner"} · Confirmed`,
       "current",
       "Delivery",
       deliveryHref,
@@ -286,11 +286,11 @@ function deliveryLane(input: SalesOrderRouteInput): { lane: SalesOrderRouteLane;
   if (attempts.length === 0) {
     attempts.push(fact(
       "delivery:unassigned",
-      "Delivery not yet scheduled",
+      "Promised this day, no date yet",
       "attention",
       "Delivery",
       deliveryHref,
-      input.order.deliveryDate ? `Customer promised ${input.order.deliveryDate}` : null,
+      input.order.deliveryDate ? `Customer Delivery · ${input.order.deliveryDate}` : null,
     ));
   }
   const clear = input.delivery.attempts.some((attempt) => attempt.result === "delivered") || !!input.order.deliveredAt;

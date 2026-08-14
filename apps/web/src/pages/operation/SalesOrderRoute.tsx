@@ -1,6 +1,7 @@
 import { AlertTriangle, ArrowRight, ArrowUpRight, Check, CircleDot } from "lucide-react";
 import { Link } from "react-router-dom";
 import type { SalesOrderRoute as Route, SalesOrderRouteFact } from "@carres/shared";
+import { fmtDate } from "@/lib/fmt-date";
 
 const stateStyle = {
   complete: "bg-kit-green-3 text-kit-green-11",
@@ -15,12 +16,13 @@ function StateIcon({ fact }: { fact: SalesOrderRouteFact }) {
 }
 
 function FactStep({ fact, currentLabel = false }: { fact: SalesOrderRouteFact; currentLabel?: boolean }) {
+  const detail = fact.detail?.replace(/\b\d{4}-\d{2}-\d{2}\b/g, (date) => fmtDate(date)) ?? null;
   const body = (
     <>
       <StateIcon fact={fact} />
       <span className="min-w-0">
         <span className="block text-body font-medium text-kit-slate-12">{fact.title}</span>
-        {fact.detail && <span className="block text-meta text-kit-slate-9">{fact.detail}</span>}
+        {detail && <span className="block text-meta text-kit-slate-9">{detail}</span>}
         {currentLabel && <span className="mt-1 inline-block text-label font-semibold tracking-wide text-kit-blue-11">CURRENT</span>}
       </span>
     </>
