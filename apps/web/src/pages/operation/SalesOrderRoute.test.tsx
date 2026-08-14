@@ -44,6 +44,58 @@ describe("SalesOrderRoute", () => {
     expect(screen.queryByText(/You are here/i)).toBeNull();
   });
 
+  it("marks an unresolved goods position as CURRENT when no later stage exists", () => {
+    const waitingRoute: Route = {
+      ...route,
+      lanes: route.lanes.map((lane) => lane.key === "goods" ? {
+        ...lane,
+        groups: [{
+          id: "bed",
+          title: "Bed · 1",
+          facts: [{
+            id: "unassigned",
+            title: "Route not yet assigned · 1",
+            detail: null,
+            state: "attention",
+            owner: "Purchasing",
+            href: "/operation?tab=purchase",
+            occurredAt: null,
+          }],
+        }],
+      } : lane),
+    };
+
+    render(<MemoryRouter><SalesOrderRoute route={waitingRoute} /></MemoryRouter>);
+    const goods = screen.getByTestId("goods-routes");
+    expect(within(goods).getByText("CURRENT")).toBeInTheDocument();
+  });
+
+  it("marks the terminal delivered fact as CURRENT when the route has no explicit current fact", () => {
+    const deliveredRoute: Route = {
+      ...route,
+      lanes: route.lanes.map((lane) => lane.key === "goods" ? {
+        ...lane,
+        groups: [{
+          id: "bed",
+          title: "Bed · 1",
+          facts: [{
+            id: "delivered",
+            title: "Delivered · Unit id-bed00001",
+            detail: "DO-9001",
+            state: "complete",
+            owner: "Delivery",
+            href: "/operation?tab=delivery",
+            occurredAt: "2026-08-14",
+          }],
+        }],
+      } : lane),
+    };
+
+    render(<MemoryRouter><SalesOrderRoute route={deliveredRoute} /></MemoryRouter>);
+    const goods = screen.getByTestId("goods-routes");
+    expect(within(goods).getByText("CURRENT")).toBeInTheDocument();
+  });
+
   it("links documents and facts to their owning surfaces", () => {
     render(<MemoryRouter><SalesOrderRoute route={route} /></MemoryRouter>);
     expect(screen.getByRole("link", { name: /PO-8002/ })).toHaveAttribute("href", "/operation/procurement?po=PO-8002");

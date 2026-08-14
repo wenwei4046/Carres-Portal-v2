@@ -10,7 +10,8 @@ const attribution = readFileSync(join(here, "SalesOrderAttribution.tsx"), "utf8"
 
 describe("Sales Order object template contract", () => {
   it("keeps one object identity and the exact four-item object navigation", () => {
-    expect(header).toContain("Back to Sales Orders");
+    expect(header).toContain('aria-label="Sales Orders"');
+    expect(header).not.toContain("Back to Sales Orders");
     expect(workspace).toContain('const OBJECT_VIEWS = ["Order", "Revisions", "History", "Order Route"]');
     expect(header).not.toContain('word="Sales Order"');
     expect(workspace).not.toContain("Back to register");

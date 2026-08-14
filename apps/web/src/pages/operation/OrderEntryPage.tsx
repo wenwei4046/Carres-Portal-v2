@@ -107,6 +107,7 @@ export default function OrderEntryPage({ embedded = false }: { embedded?: boolea
 
   const [draft, setDraft] = useState<Draft | null>(null);
   const [editingMethod, setEditingMethod] = useState<number | null>(null);
+  const [addingMethod, setAddingMethod] = useState(false);
   const [editingFields, setEditingFields] = useState(false);
   const [newMethodName, setNewMethodName] = useState("");
   const [newFieldNames, setNewFieldNames] = useState<Record<OrderEntryTab, string>>({
@@ -220,6 +221,7 @@ export default function OrderEntryPage({ embedded = false }: { embedded?: boolea
       ],
     });
     setEditingMethod(draft.methods.length);
+    setAddingMethod(false);
     setNewMethodName("");
   }
 
@@ -520,7 +522,7 @@ export default function OrderEntryPage({ embedded = false }: { embedded?: boolea
                         onChange={(e) => updateFollowUp(i, j, { label: e.target.value })}
                         maxLength={60}
                         placeholder="Required information label"
-                        aria-label={`${m.key} follow-up ${fu.key} label`}
+                        aria-label={`${m.key} required information ${fu.key} label`}
                         className={`${INPUT_CLS} max-w-[160px]`}
                       />
                       <textarea
@@ -528,7 +530,7 @@ export default function OrderEntryPage({ embedded = false }: { embedded?: boolea
                         onChange={(e) => updateFollowUp(i, j, { options: e.target.value.split("\n") })}
                         rows={3}
                         placeholder="One option per line"
-                        aria-label={`${m.key} follow-up ${fu.key} options`}
+                        aria-label={`${m.key} required information ${fu.key} options`}
                         className={`${INPUT_CLS} flex-1 min-w-[200px] font-mono`}
                       />
                       <label className="flex items-center gap-1.5 text-meta text-base-700 cursor-pointer mt-2">
@@ -536,14 +538,14 @@ export default function OrderEntryPage({ embedded = false }: { embedded?: boolea
                           type="checkbox"
                           checked={fu.required}
                           onChange={(e) => updateFollowUp(i, j, { required: e.target.checked })}
-                          aria-label={`${m.key} follow-up ${fu.key} required`}
+                        aria-label={`${m.key} required information ${fu.key} required`}
                         />
                         Required
                       </label>
                       <button
                         type="button"
                         onClick={() => removeFollowUp(i, j)}
-                        aria-label={`Remove follow-up ${fu.label || fu.key}`}
+                        aria-label={`Remove required information ${fu.label || fu.key}`}
                         className="text-base-400 hover:text-danger mt-2"
                       >
                         <X className="w-3.5 h-3.5" />
@@ -585,7 +587,7 @@ export default function OrderEntryPage({ embedded = false }: { embedded?: boolea
               </span>
             </div>
           </div>
-          <div className="flex items-center gap-2 mb-6">
+          {addingMethod ? <div className="flex items-center gap-2 mb-6">
             <input
               value={newMethodName}
               onChange={(e) => setNewMethodName(e.target.value)}
@@ -606,7 +608,8 @@ export default function OrderEntryPage({ embedded = false }: { embedded?: boolea
             >
               <Plus className="w-3.5 h-3.5" /> Add method
             </button>
-          </div>
+            <button type="button" className="btn-ghost text-meta" onClick={() => { setNewMethodName(""); setAddingMethod(false); }}>Cancel</button>
+          </div> : <button type="button" className="btn-secondary text-meta mb-6" onClick={() => setAddingMethod(true)}>Add payment method</button>}
 
           {/* --------------------------------------------------- form fields */}
           <div className="label mb-1.5">Form fields — POS Customer step</div>
