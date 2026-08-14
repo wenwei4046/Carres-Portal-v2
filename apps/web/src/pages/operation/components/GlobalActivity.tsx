@@ -5,7 +5,6 @@ import { useOperationActivity, type GlobalActivityRow } from "@/lib/queries";
 import { useActiveOrder } from "@/lib/active-order";
 import { fmtDate } from "@/lib/fmt-date";
 import {
-  CATEGORY_LABEL,
   CATEGORY_ORDER,
   IconChip,
   describeActivity,
@@ -33,13 +32,6 @@ export default function GlobalActivity() {
     () => rows.map((r) => ({ row: r, ...describeActivity(r) })),
     [rows],
   );
-
-  const counts = useMemo(() => {
-    const m = {} as Record<OrderEventCategory, number>;
-    for (const d of decorated) m[d.category] = (m[d.category] ?? 0) + 1;
-    return m;
-  }, [decorated]);
-  const presentCategories = CATEGORY_ORDER.filter((c) => counts[c] > 0);
 
   const staffNames = useMemo(
     () => [...new Set(rows.map((r) => r.actor_name).filter(Boolean) as string[])].sort(),
@@ -86,31 +78,20 @@ export default function GlobalActivity() {
         />
       </div>
 
-      {/* Category tabs */}
-      <div className="flex flex-wrap items-center gap-1 mb-1.5">
-        <Chip label="All" count={decorated.length} active={cat === "all"} onClick={() => setCat("all")} />
-        {presentCategories.map((c) => (
-          <Chip
-            key={c}
-            label={CATEGORY_LABEL[c]}
-            count={counts[c]}
-            active={cat === c}
-            danger={c === "exception"}
-            onClick={() => setCat(c)}
-          />
-        ))}
+      <div className="grid grid-cols-3 gap-1.5 mb-2">
+        <select aria-label="Type" value={cat} onChange={(event) => setCat(event.target.value as OrderEventCategory | "all")} className="min-w-0 rounded-md border border-base-200 bg-white px-2 py-1.5 text-label text-base-700">
+          <option value="all">Type</option>
+          {CATEGORY_ORDER.map((category) => <option key={category} value={category}>{category.replaceAll("_", " ")}</option>)}
+        </select>
+        <select aria-label="Person" value={staff} onChange={(event) => setStaff(event.target.value)} className="min-w-0 rounded-md border border-base-200 bg-white px-2 py-1.5 text-label text-base-700">
+          <option value="all">Person</option>
+          {staffNames.map((name) => <option key={name} value={name}>{name}</option>)}
+        </select>
+        <select aria-label="Module" defaultValue="all" className="min-w-0 rounded-md border border-base-200 bg-white px-2 py-1.5 text-label text-base-700">
+          <option value="all">Module</option>
+          <option value="sales-orders">Sales Orders</option>
+        </select>
       </div>
-
-      {/* Staff filter */}
-      {staffNames.length > 1 && (
-        <div className="flex flex-wrap items-center gap-1 mb-2">
-          <span className="text-label text-base-400 mr-0.5">Staff</span>
-          <Chip label="Everyone" active={staff === "all"} onClick={() => setStaff("all")} subtle />
-          {staffNames.map((n) => (
-            <Chip key={n} label={n} active={staff === n} onClick={() => setStaff(n)} subtle />
-          ))}
-        </div>
-      )}
 
       {isLoading ? (
         <div className="text-meta text-base-400 py-2">Loading…</div>
@@ -188,45 +169,6 @@ function FeedRow({ d, onOpen }: { d: Decorated; onOpen: (orderId: string | null)
         </div>
       </div>
       {clickable && <ChevronRight size={14} className="text-base-300 self-center shrink-0" />}
-    </button>
-  );
-}
-
-function Chip({
-  label,
-  count,
-  active,
-  danger,
-  subtle,
-  onClick,
-}: {
-  label: string;
-  count?: number;
-  active: boolean;
-  danger?: boolean;
-  subtle?: boolean;
-  onClick: () => void;
-}) {
-  const border = danger ? "#F0997B" : "#DDD8CE";
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="inline-flex items-center gap-1 rounded-full border transition-colors"
-      style={{
-        fontSize: subtle ? "11px" : "11.5px",
-        padding: subtle ? "2px 9px" : "3px 11px",
-        color: active ? "#FFFFFF" : danger ? "#A32D2D" : "#4B5563",
-        background: active ? "#221F20" : "#FFFFFF",
-        borderColor: active ? "#221F20" : border,
-      }}
-    >
-      {label}
-      {count !== undefined && (
-        <span className="tabular-nums" style={{ color: active ? "rgba(255,255,255,0.7)" : "#9CA3AF" }}>
-          {count}
-        </span>
-      )}
     </button>
   );
 }

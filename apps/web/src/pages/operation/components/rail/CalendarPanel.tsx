@@ -9,7 +9,6 @@ import {
   DELIVERY_RANGE_KEYS,
   inRange,
   partnerDeliveryRules,
-  purchasingActionQueue,
   type CarrierDayLoad,
   type DayBooking,
   type DeliveryRangeKey,
@@ -20,7 +19,6 @@ import {
   usePurchaseToday,
   useOperationSuppliers,
   useDeliveryPartners,
-  type operationOrderListRow,
 } from "@/lib/queries";
 import { orderBookingDay } from "@/lib/order-booking";
 import { cjkClassName } from "@/lib/cjk";
@@ -53,33 +51,6 @@ import { fmtDateShort } from "@/lib/fmt-date";
  */
 const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"];
 
-type CalTab = "all" | "send" | "chase" | "receive" | "deliveries";
-// C1 (Jess 2026-07-27): "Chase" is banned. The lens is the Purchase panel's
-// second stage, whose word is `Confirm ready date` — the same one the Orders
-// queue rail uses, so the two never spell one action differently. The tab KEY
-// stays `chase` (internal, and it is in the URL nowhere).
-// R8 (2026-07-28) finished what C1 started on this map, and the DEPLOY GREP is
-// what found it: `send` and `receive` were still the panel's own words while
-// `chase` had already been re-pointed at the dictionary. `Receive` as a verb is
-// banned outright, so the rail beside the To Order tab was saying `Receive`
-// while the tab itself said `Check in`. All three lenses read the mirror now.
-const TAB_LABEL: Record<CalTab, string> = {
-  all: "All",
-  // The lens is the To Order tab's FIRST stage, and its word is `Issue PO`
-  // (`Send PO` is retired, and the verb `Send` with it). The tab KEY stays
-  // `send` — internal, and it is in the URL nowhere.
-  send: purchasingActionQueue("issue_po"),
-  chase: purchasingActionQueue("confirm_ready_date"),
-  receive: purchasingActionQueue("check_in"),
-  deliveries: "Deliveries",
-};
-const TAB_TONE: Record<CalTab, string> = {
-  all: "bg-base-100 text-base-800",
-  send: "bg-error-soft text-danger",
-  chase: "bg-warning-soft text-warning",
-  receive: "bg-success-soft text-success",
-  deliveries: "bg-info-soft text-info",
-};
 
 function ymd(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -127,7 +98,6 @@ export default function CalendarPanel() {
     return m;
   }, [partnersData]);
 
-  const [tab, setTab] = useState<CalTab>("all");
 
   const carrierOf = (o: operationOrderListRow): { id: string | null; name: string | null } => ({
     id: o.delivery_partner_id ?? o.ops_assigned_logistic ?? null,
@@ -165,51 +135,7 @@ export default function CalendarPanel() {
     return m;
   }, [orders]);
 
-  // Promised on this day with NOTHING booked. Not a delivery — never counted as
-  // one — but real work sitting on that date, so the day never reads as empty
-  // when it isn't.
-  const promisedByDay = useMemo(() => {
-    const m = new Map<string, operationOrderListRow[]>();
-    for (const o of orders) {
-      if (o.delivery_date_tbd || !o.delivery_date) continue;
-      // A delivered order's promise is kept — it is not outstanding work.
-      if (o.status === "delivered") continue;
-      if (orderBookingDay(o).kind !== "none") continue;
-      const key = o.delivery_date.slice(0, 10);
-      const arr = m.get(key) ?? [];
-      arr.push(o);
-      m.set(key, arr);
-    }
-    return m;
-  }, [orders]);
-
-  // Bucket procurement activity per stage by its keyed date. Send groups → by
-  // earliestOrderBy; the ready-date lens → by expectedReadyDate; Receive → by etaDate ??
-  // expectedReadyDate. Empty maps when purchase data hasn't loaded yet — the
-  // grid stays functional on the deliveries tab regardless.
-  const sendByDay = useMemo(() => {
-    const m = new Map<string, Array<{ supplierId: string; supplierName: string | null; units: number }>>();
-    for (const g of purchase?.placeGroups ?? []) {
-      if (!g.earliestOrderBy) continue;
-      const key = g.earliestOrderBy.slice(0, 10);
-      const arr = m.get(key) ?? [];
-      arr.push({ supplierId: g.supplierId, supplierName: g.supplierName, units: g.totalUnits });
-      m.set(key, arr);
-    }
-    return m;
-  }, [purchase]);
-  const chaseByDay = useMemo(() => {
-    const m = new Map<string, Array<{ poId: string; supplierId: string; units: number }>>();
-    for (const r of purchase?.chase ?? []) {
-      if (!r.expectedReadyDate) continue;
-      const key = r.expectedReadyDate.slice(0, 10);
-      const arr = m.get(key) ?? [];
-      const units = r.items.reduce((s, it) => s + it.outstanding, 0);
-      arr.push({ poId: r.poId, supplierId: r.supplierId, units });
-      m.set(key, arr);
-    }
-    return m;
-  }, [purchase]);
+  // Receiving is a dated business event. Procurement action queues stay in My Work.
   const receiveByDay = useMemo(() => {
     const m = new Map<string, Array<{ poId: string; supplierId: string; units: number }>>();
     for (const r of purchase?.receive ?? []) {
@@ -224,36 +150,9 @@ export default function CalendarPanel() {
     return m;
   }, [purchase]);
 
-  // Per-tab active count-per-day map + per-tab totals for the header badges.
-  // The deliveries count is BOOKINGS only — a promised date with nothing booked
-  // is not a truck, and painting it as one is exactly the lie T10 removes.
+  // Calendar counts only authoritative dated events, never action queues.
   const activeCount = (key: string): number => {
-    if (tab === "send") return sendByDay.get(key)?.length ?? 0;
-    if (tab === "chase") return chaseByDay.get(key)?.length ?? 0;
-    if (tab === "receive") return receiveByDay.get(key)?.length ?? 0;
-    if (tab === "deliveries") return deliveriesByDay.get(key)?.length ?? 0;
-    // all = sum
-    return (
-      (sendByDay.get(key)?.length ?? 0) +
-      (chaseByDay.get(key)?.length ?? 0) +
-      (receiveByDay.get(key)?.length ?? 0) +
-      (deliveriesByDay.get(key)?.length ?? 0)
-    );
-  };
-  const bookedTotal = useMemo(
-    () => [...deliveriesByDay.values()].reduce((n, arr) => n + arr.length, 0),
-    [deliveriesByDay],
-  );
-  const tabTotals = {
-    all:
-      (purchase?.placeGroups.length ?? 0) +
-      (purchase?.chase.length ?? 0) +
-      (purchase?.receive.length ?? 0) +
-      bookedTotal,
-    send: purchase?.placeGroups.length ?? 0,
-    chase: purchase?.chase.length ?? 0,
-    receive: purchase?.receive.length ?? 0,
-    deliveries: bookedTotal,
+    return (receiveByDay.get(key)?.length ?? 0) + (deliveriesByDay.get(key)?.length ?? 0);
   };
 
   const today = new Date();
@@ -295,39 +194,11 @@ export default function CalendarPanel() {
   // "promised, no date yet" block only exists on a lens that shows deliveries,
   // so it must not make a Send-lens day count as occupied — otherwise the range
   // renders neither the day nor the empty line.
-  const showsDeliveries = tab === "all" || tab === "deliveries";
-  const dayIsEmpty = (d: string) =>
-    activeCount(d) === 0 && (!showsDeliveries || (promisedByDay.get(d)?.length ?? 0) === 0);
+  const dayIsEmpty = (d: string) => activeCount(d) === 0;
   const hasAnything = shownDays.some((d) => !dayIsEmpty(d));
 
   return (
     <div className="flex flex-col h-full">
-      {/* Tab strip — filter the grid + selected-day list to one lens
-          (Jess 2026-07-23 · "tabs to show each title job") */}
-      <div className="flex gap-1 mb-2 overflow-x-auto">
-        {(["all", "send", "chase", "receive", "deliveries"] as CalTab[]).map((t) => {
-          const active = tab === t;
-          const n = tabTotals[t];
-          return (
-            <button
-              key={t}
-              type="button"
-              onClick={() => setTab(t)}
-              className={`shrink-0 flex items-center gap-1 rounded-full px-2 py-1 text-label font-semibold transition-colors ${
-                active
-                  ? TAB_TONE[t]
-                  : "bg-white text-base-500 hover:bg-base-100 border border-base-200"
-              }`}
-            >
-              <span>{TAB_LABEL[t]}</span>
-              {n > 0 && (
-                <span className="tabular-nums font-semibold">{n > 99 ? "99+" : n}</span>
-              )}
-            </button>
-          );
-        })}
-      </div>
-
       {/* T10 range chips — Today / Tomorrow / This week. "This week" is the
           REST of the week, ending Saturday (Sunday is not a delivery day). */}
       <div className="flex gap-1 mb-2" data-testid="calendar-ranges">
@@ -403,19 +274,10 @@ export default function CalendarPanel() {
           const isSel = activeRange
             ? inRange(cell.key, activeRange)
             : cell.key === picked;
-          // Per-tab dot tone matches the tab pill for visual consistency.
           const countTone =
             count === 0
               ? "text-transparent"
-              : tab === "send"
-                ? "bg-error-soft text-danger"
-                : tab === "chase"
-                  ? "bg-warning-soft text-warning"
-                  : tab === "receive"
-                    ? "bg-success-soft text-success"
-                    : tab === "deliveries"
-                      ? "bg-info-soft text-info"
-                      : "bg-base-100 text-base-800";
+              : "bg-base-100 text-base-800";
           return (
             <button
               key={i}
@@ -424,7 +286,7 @@ export default function CalendarPanel() {
                 setPicked(cell.key);
                 setRange(null);
               }}
-              title={count > 0 ? `${count} ${TAB_LABEL[tab].toLowerCase()}` : undefined}
+              title={count > 0 ? `${count} dated event${count === 1 ? "" : "s"}` : undefined}
               className={`aspect-square flex flex-col items-center justify-center gap-0.5 rounded-lg transition-colors ${
                 isSel ? "bg-base-100" : "hover:bg-base-100"
               }`}
@@ -465,9 +327,6 @@ export default function CalendarPanel() {
         )}
         {shownDays.map((day) => {
           const dayDeliveries = deliveriesByDay.get(day) ?? [];
-          const dayPromised = promisedByDay.get(day) ?? [];
-          const daySend = sendByDay.get(day) ?? [];
-          const dayChase = chaseByDay.get(day) ?? [];
           const dayReceive = receiveByDay.get(day) ?? [];
           // On a multi-day range an empty day is noise; on ONE day it is the
           // answer ("nothing that day") and must still be said out loud.
@@ -480,35 +339,13 @@ export default function CalendarPanel() {
                 {word ? `${word} · ${fmtDateShort(day)}` : fmtDateShort(day)}
               </div>
 
-              {(tab === "all" || tab === "send") && (
-                <DaySection
-                  title={TAB_LABEL.send}
-                  tone="text-danger"
-                  empty="No POs to send this day."
-                  items={daySend.map((s) => ({
-                    key: `s-${s.supplierId}`,
-                    main: supplierName(s.supplierId, s.supplierName),
-                    sub: `${s.units} unit${s.units === 1 ? "" : "s"} · send by today`,
-                  }))}
-                />
+              {dayIsEmpty(day) && shownDays.length === 1 && (
+                <div className="text-meta text-base-400 text-center py-3">No dated events this day.</div>
               )}
-              {(tab === "all" || tab === "chase") && (
+              {dayReceive.length > 0 && (
                 <DaySection
-                  title={TAB_LABEL.chase}
-                  tone="text-warning"
-                  empty="No supplier to call about a ready date this day."
-                  items={dayChase.map((r) => ({
-                    key: `c-${r.poId}`,
-                    main: `${r.poId} · ${supplierName(r.supplierId, null)}`,
-                    sub: `${r.units} unit${r.units === 1 ? "" : "s"} · past promised ready`,
-                  }))}
-                />
-              )}
-              {(tab === "all" || tab === "receive") && (
-                <DaySection
-                  title={TAB_LABEL.receive}
+                  title="Receiving"
                   tone="text-success"
-                  empty="Nothing arriving this day."
                   items={dayReceive.map((r) => ({
                     key: `r-${r.poId}`,
                     main: `${r.poId} · ${supplierName(r.supplierId, null)}`,
@@ -516,41 +353,13 @@ export default function CalendarPanel() {
                   }))}
                 />
               )}
-              {showsDeliveries && (
+              {dayDeliveries.length > 0 && (
                 <div className="space-y-1.5">
                   <div className="text-label uppercase tracking-[0.05em] text-info">Deliveries</div>
-                  {dayDeliveries.length === 0 ? (
-                    <div className="text-meta text-base-400 text-center py-3">
-                      No deliveries booked this day.
-                    </div>
-                  ) : (
-                    dayDeliveries.map((d) => <DeliveryRow key={d.orderId} d={d} />)
-                  )}
+                  {dayDeliveries.map((d) => <DeliveryRow key={d.orderId} d={d} />)}
                   {loads.map((l) => (
                     <CarrierLoadRow key={l.partnerId ?? "none"} load={l} />
                   ))}
-                  {dayPromised.length > 0 && (
-                    <div className="pt-1.5 space-y-1.5">
-                      <div className="text-label uppercase tracking-[0.05em] text-warning">Promised this day, no date yet</div>
-                      {dayPromised.map((o) => (
-                        <div
-                          key={o.id}
-                          className="flex gap-2 rounded bg-base-50 px-2 py-1.5"
-                          title="The customer was promised this day but no delivery is booked yet."
-                        >
-                          <span className="w-1 rounded-full bg-warning shrink-0" />
-                          <div className="min-w-0 flex-1">
-                            <div className="font-mono text-meta font-semibold text-base-900">
-                              SO-{o.so}
-                            </div>
-                            <div className="text-label text-base-500 truncate">
-                              Call {o.customer_name?.trim() || "the customer"} — book delivery date
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
                 </div>
               )}
             </div>
@@ -628,26 +437,19 @@ function CarrierLoadRow({ load }: { load: CarrierDayLoad }) {
   );
 }
 
-// Section renderer used by Send/Chase/Receive lists (the delivery lens keeps
-// its own richer layout because it carries carrier + slot + region).
 function DaySection({
   title,
   tone,
-  empty,
   items,
 }: {
   title: string;
   tone: string;
-  empty: string;
   items: Array<{ key: string; main: string; sub: string }>;
 }) {
   return (
     <div className="mb-3">
       <div className={`text-label uppercase tracking-[0.05em] mb-1.5 ${tone}`}>{title}</div>
-      {items.length === 0 ? (
-        <div className="text-meta text-base-400 text-center py-3">{empty}</div>
-      ) : (
-        <div className="space-y-1.5">
+      <div className="space-y-1.5">
           {items.map((it) => (
             <div key={it.key} className="flex gap-2 rounded bg-base-50 hover:bg-base-100 px-2 py-1.5 transition-colors">
               <div className="min-w-0 flex-1">
@@ -658,8 +460,7 @@ function DaySection({
               </div>
             </div>
           ))}
-        </div>
-      )}
+      </div>
     </div>
   );
 }
