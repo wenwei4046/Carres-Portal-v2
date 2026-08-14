@@ -14,6 +14,7 @@ export default function SalesOrderLedger({
   onProposeRevision,
   view: controlledView,
   onViewChange,
+  showViewTabs = true,
 }: {
   revisions: SalesOrderRevisionRow[];
   history: HistoryEvent[];
@@ -23,6 +24,7 @@ export default function SalesOrderLedger({
   onProposeRevision?: (revision: SalesOrderRevisionRow) => void;
   view?: "revisions" | "history";
   onViewChange?: (view: "revisions" | "history") => void;
+  showViewTabs?: boolean;
 }) {
   const [internalView, setInternalView] = useState<"revisions" | "history">("revisions");
   const view = controlledView ?? internalView;
@@ -32,7 +34,7 @@ export default function SalesOrderLedger({
   };
   return (
     <div>
-      <div role="tablist" aria-label="Sales Order record" className="mb-3 flex gap-1">
+      {showViewTabs && <div role="tablist" aria-label="Sales Order record" className="mb-3 flex gap-1">
         {(["revisions", "history"] as const).map((key) => (
           <button
             key={key}
@@ -40,12 +42,12 @@ export default function SalesOrderLedger({
             role="tab"
             aria-selected={view === key}
             onClick={() => changeView(key)}
-            className={`rounded-pill px-3 py-1 text-meta font-medium ${view === key ? "bg-base-900 text-white" : "border border-base-200 bg-white text-base-700"}`}
+            className={`rounded-pill px-3 py-1 text-meta font-medium ${view === key ? "bg-kit-blue-9 text-white" : "border border-base-200 bg-white text-base-700"}`}
           >
             {key === "revisions" ? "Revisions" : "History"}
           </button>
         ))}
-      </div>
+      </div>}
       {view === "revisions" ? (
         revisions.length === 0 ? (
           <p className="text-body text-base-500">No revisions recorded</p>
@@ -57,7 +59,7 @@ export default function SalesOrderLedger({
                 const selected = viewedRevision == null ? current : viewedRevision === r.revision;
                 return (
                   <button key={r.revision} type="button" onClick={() => onViewRevision(current ? null : r.revision)}
-                    className={`rounded-pill border px-2.5 py-0.5 text-meta font-medium ${selected ? "border-base-900 bg-base-900 text-white" : "border-base-200 bg-white text-base-700"}`}>
+                    className={`rounded-pill border px-2.5 py-0.5 text-meta font-medium ${selected ? "border-kit-blue-9 bg-kit-blue-3 text-kit-blue-11" : "border-base-200 bg-white text-base-700"}`}>
                     Rev {r.revision}{current ? " · current" : ""}
                   </button>
                 );

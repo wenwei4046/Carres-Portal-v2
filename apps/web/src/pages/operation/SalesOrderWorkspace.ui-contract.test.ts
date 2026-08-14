@@ -39,7 +39,22 @@ describe("Sales Order object template contract", () => {
   });
 
   it("names the governed ownership request instead of implying direct editing", () => {
+    expect(workspace).toContain('<Section title="Sales ownership">');
+    expect(workspace).not.toContain('<Section title="Source">');
     expect(attribution).toContain("Request ownership change");
     expect(attribution).not.toContain("Change who this order belongs to");
+  });
+
+  it("keeps Customer Delivery read-only, Proceed date on its existing writer, and PDF behind Print", () => {
+    expect(workspace).toContain('<Fact label="Customer Delivery"');
+    expect(workspace.match(/id="ws-promised"/g)).toHaveLength(1);
+    expect(workspace).toContain('id="ws-proceed"');
+    expect(workspace).not.toContain('data-testid="pdf-pane"');
+    expect(workspace).not.toContain('Section title="Order record"');
+  });
+
+  it("uses document-detail goods rather than copying the Register expansion columns", () => {
+    expect(workspace).toContain('data-testid="document-goods"');
+    expect(workspace).not.toContain('Category | Unit ID | SKU | Qty | Item | Deliver To');
   });
 });
