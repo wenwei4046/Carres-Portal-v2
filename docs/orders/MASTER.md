@@ -212,6 +212,22 @@ Order does not gain a writer.
   pre-existing Operations writer; Customer Delivery remains read-only and Delivery's Confirmed
   Delivery Date remains distinct. No new address, access, delivery-date or destination field was
   created. `docs/ui/MASTER.md` §6.6 records the final reusable UI proof.
+- **FINAL OWNER VISUAL CORRECTION — PRODUCTION-VERIFIED / LOCKED 2026-08-14.** Owner review
+  reopened the preceding acceptance record. PR #793 merged as `af61c274d89d01fda0d306b50257cc4c08eba358`;
+  CI run `31800808491` passed the complete gate and deploy run `31801669457` converged the exact
+  SHA on the governed production surfaces. Authenticated acceptance proved: Customer Delivery
+  remains a date fact with exact missing value `No delivery date` and separate two-line guidance;
+  Register location is concise and collapses duplicate city/state; the six-column goods mini-table
+  remains unchanged, with `Carres Klang` shown without quantity for a single destination; Object
+  View and Edit expose the same governed goods truth; Edit is composed as `Edit operational
+  details | Order context`, keeps Customer Delivery read-only and Sales ownership governed; Save
+  and Discard disappear in Revisions, History and Order Route; and Order Route retains its
+  per-goods architecture in operator English. Normal Register states, selection/footer, expansion,
+  row actions, all four Quick Rail views, Object views and medium desktop with Quick Rail open were
+  verified in authenticated production. The Print control remains present and enabled; automated
+  activation of its blob preview was blocked by the acceptance browser security policy, while the
+  governed print handler, focused tests and production build passed. This record supersedes the
+  earlier closure and locks Owner Visual Acceptance without changing business authority.
 
 ## Guided operations and Service Case boundary — CLOSED / PRODUCTION-VERIFIED 2026-08-14
 

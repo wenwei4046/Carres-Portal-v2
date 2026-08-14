@@ -768,6 +768,20 @@ breathing gap
   edit-scope notice. The same Object Route and Edit compositions remained usable with My Work open.
   This supersedes the earlier acceptance note's live PDF-canvas statement and closes the Sales Order
   Visual Acceptance slice without changing settled business truth.
+- **SALES ORDER FINAL OWNER VISUAL CORRECTION — PRODUCTION-VERIFIED / LOCKED (2026-08-14).** Owner
+  review reopened the preceding closure. PR #793 merged as
+  `af61c274d89d01fda0d306b50257cc4c08eba358`; complete CI run `31800808491` passed and production
+  deploy run `31801669457` converged that exact SHA. Authenticated normal and medium-desktop
+  acceptance proved the fact-first missing Customer Delivery presentation, concise locality,
+  unchanged six-column goods mini-table, single-destination quantity suppression, equal Register
+  and Object goods truth, the approved `Edit operational details | Order context` composition,
+  governed Sales ownership, edit controls confined to Order Edit, genuine Revisions/History/Order
+  Route views, and operator-English per-goods routing. Register normal/expanded/selected states,
+  footer, row actions, Team/Calendar/My Work/Activity, Object views and Quick Rail coexistence were
+  checked top-to-toe. Print remained visible and enabled; its blob-preview activation was the only
+  browser-policy-blocked automation step, with the print handler, focused tests and production
+  build passing. This record supersedes the prior closure and is the final reusable Sales Order UI
+  reference without changing the Blueprint or module authority.
 - `docs/orders/MASTER.md` §0.1 owns the business/field/amendment/permission rules. Sales Portal/POS
   remains the master form contract; UI composition may not create a second commercial form or an
   operational action door.
