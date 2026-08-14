@@ -416,6 +416,7 @@ export default function SalesOrderWorkspace() {
   const [amendmentSeed, setAmendmentSeed] = useState<AmendmentProposal | null>(null);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [recordView, setRecordView] = useState<"revisions" | "history">("revisions");
+  const [objectView, setObjectView] = useState<ObjectView>(showRoute ? "Order Route" : "Order");
 
   const detailQ = useOperationOrder(isNew ? copyFrom : (orderId ?? null));
   const revisionsQ = useSalesOrderRevisions(isNew ? null : (orderId ?? null));
@@ -721,6 +722,7 @@ export default function SalesOrderWorkspace() {
   }, [dirty]);
 
   const openObjectView = (view: ObjectView) => {
+    setObjectView(view);
     if (view === "Order Route") {
       setParams((prev) => {
         const next = new URLSearchParams(prev);
@@ -917,16 +919,12 @@ export default function SalesOrderWorkspace() {
           MASTER's Workspace ruling reads. An order already cancelled has
           nothing left to cancel, so the door is absent rather than refusing. */}
       {mode === "view" && !showRoute && order && order.status !== "cancelled" && (
-        <span className="ml-1 border-l border-kit-slate-5 pl-2">
-          <Button
-            size="sm"
-            variant="neutral"
-            onClick={() => setCancelOpen(true)}
-            data-testid="workspace-cancel-so"
-          >
-            <X size={14} /> Cancel SO
-          </Button>
-        </span>
+        <details className="relative">
+          <summary className="btn-ghost cursor-pointer list-none text-meta">More actions</summary>
+          <div className="absolute right-0 top-full z-20 mt-1 w-40 rounded-control border border-kit-slate-5 bg-white p-1 shadow-lg">
+            <button type="button" onClick={() => setCancelOpen(true)} data-testid="workspace-cancel-so" className="w-full rounded-control px-2 py-1.5 text-left text-meta text-danger hover:bg-hovertint">Cancel SO</button>
+          </div>
+        </details>
       )}
       {(mode === "edit" || mode === "create") && (
         <>
@@ -970,7 +968,7 @@ export default function SalesOrderWorkspace() {
         }}
         data-testid="workspace-print"
       >
-        <Printer size={14} /> Print
+        <Printer size={14} /> Print ▾
       </Button>
     </span>
   );
@@ -990,7 +988,7 @@ export default function SalesOrderWorkspace() {
         navigation={!isNew ? (
           <nav aria-label="Sales Order views" className="flex h-full items-stretch gap-1">
             {OBJECT_VIEWS.map((view) => {
-              const active = showRoute ? view === "Order Route" : view === "Order";
+              const active = objectView === view;
               return (
                 <button
                   key={view}

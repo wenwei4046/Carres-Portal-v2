@@ -34,27 +34,30 @@ const route: Route = {
 };
 
 describe("SalesOrderRoute", () => {
-  it("renders five independent lanes and simultaneous positions", () => {
+  it("renders a readable route per goods group and simultaneous positions", () => {
     render(<MemoryRouter><SalesOrderRoute route={route} /></MemoryRouter>);
-    for (const title of ["Goods", "Delivery", "Money", "Loan", "Other Commitments"])
-      expect(screen.getByRole("heading", { level: 2, name: title })).toBeTruthy();
-    expect(screen.getByText("Bed · Delivered")).toBeTruthy();
-    expect(screen.getByText("Sofa · At Carres / In production at supplier")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Goods routes" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Sofa · 2" })).toBeTruthy();
+    expect(screen.getAllByText("CURRENT")).toHaveLength(2);
+    expect(screen.queryByText("Document lineage")).toBeNull();
+    expect(screen.queryByText("Current goods positions")).toBeNull();
     expect(screen.queryByText(/You are here/i)).toBeNull();
   });
 
   it("links documents and facts to their owning surfaces", () => {
     render(<MemoryRouter><SalesOrderRoute route={route} /></MemoryRouter>);
     expect(screen.getByRole("link", { name: /PO-8002/ })).toHaveAttribute("href", "/operation/procurement?po=PO-8002");
-    const goods = screen.getByTestId("route-lane-goods");
-    expect(within(goods).getByRole("link", { name: "Open in Stock" })).toHaveAttribute("href", "/operation?tab=stock-onhand");
-    expect(within(goods).getByRole("link", { name: "Open in Purchasing" })).toHaveAttribute("href", "/operation/procurement?po=PO-8002");
+    const goods = screen.getByTestId("goods-routes");
+    expect(within(goods).getByRole("link", { name: /Open in Stock/ })).toHaveAttribute("href", "/operation?tab=stock-onhand");
+    expect(within(goods).getByRole("link", { name: /PO-8002.*Open in Purchasing/ })).toHaveAttribute("href", "/operation/procurement?po=PO-8002");
   });
 
-  it("never renders an editable checklist or an overall status", () => {
+  it("shows only meaningful obligations in a secondary Still owed checklist", () => {
     render(<MemoryRouter><SalesOrderRoute route={route} /></MemoryRouter>);
     expect(screen.queryByRole("checkbox")).toBeNull();
     expect(screen.queryByText(/^Status$/i)).toBeNull();
-    expect(screen.getByText("Open obligations remain in their owning modules.")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Still owed" })).toBeTruthy();
+    expect(screen.getByText("RM 1,500.00 owed by customer")).toBeTruthy();
+    expect(screen.queryByText("No loan obligation")).toBeNull();
   });
 });

@@ -16,6 +16,12 @@ describe("Sales Order object template contract", () => {
     expect(workspace).not.toContain("Back to register");
   });
 
+  it("keeps output explicit and rare destructive actions out of the primary action row", () => {
+    expect(workspace).toContain("Print ▾");
+    expect(workspace).toContain("More actions");
+    expect(workspace).toContain('setObjectView(view)');
+  });
+
   it("uses quiet edit boundaries and unambiguous edit abandonment copy", () => {
     expect(workspace).toContain(
       "Editing operational details only. Commercial changes require an amendment.",
