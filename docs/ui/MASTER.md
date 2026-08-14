@@ -719,6 +719,22 @@ breathing gap
   Route retained per-goods facts and Still owed. Sales Orders is therefore the production
   reference for the ERP Shell, Register and Object Detail/Edit templates. Shared shell components
   must remain module-neutral; dates, work, activity and mutations remain owned by their modules.
+- **SALES ORDER GOODS EXPANSION — PRODUCTION-VERIFIED / CLOSED (2026-08-14).** PR #782 merged as
+  `40fce19b` and deployed by run `31777783954`; authenticated production verification proved the
+  locked `Category | Unit ID | SKU | Qty | Item | Deliver To` mini-table beneath the unchanged
+  seven-column parent Register. Real evidence: SO-1312 renders Mattress `B1201S-K`, `Not
+  allocated`, and `Carres Klang ×1`; SO-1204 renders Sofa modules with fabric/leg/height facts and
+  Service lines with Unit ID `—` and Deliver To `Not applicable`; SO-1257 renders the corresponding
+  Sofa/Service & Add-ons truth and governed default destination. Purchasing PO-2032 proves real
+  `Carres Klang` plus `AL Sungai Buloh` destination truth. No current production record proves a
+  HOUZS line, a same-SKU quantity split, or an allocated SO Unit ID (Stock reported zero reserved
+  units), so none is fabricated as acceptance evidence. PO-2032 also demonstrates the known
+  consolidated-PO allocation limit: without a structural PO-line→SO-line allocation, Sales Orders
+  must not infer which destination quantity belongs to another SO line. Authenticated acceptance
+  then found internal Sofa-builder coordinates/indexes/build UUIDs leaking into `Item`; PR #783
+  removed those non-operational facts, merged as `30e08be9`, passed CI run `31779002343`, and
+  deployed with exact-SHA proof in run `31779795185`. The final live SO-1204 check retained fabric,
+  leg and Sofa height while proving `X/Y`, rotation, cell index, fabric tier and build UUID absent.
 - `docs/orders/MASTER.md` §0.1 owns the business/field/amendment/permission rules. Sales Portal/POS
   remains the master form contract; UI composition may not create a second commercial form or an
   operational action door.

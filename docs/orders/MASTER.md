@@ -134,6 +134,10 @@ keep a superseded target.
   Warehouse physical location is deliberately absent and must never be substituted for Deliver To.
   A physical goods line with no allocated Stock Unit says `Not allocated`; a Service says
   `Not applicable` rather than pretending a Unit should exist.
+- A consolidated PO does not by itself prove a PO-line-to-SO-line allocation. Where the existing
+  Purchasing relationship cannot identify that allocation structurally, the Register must keep
+  the governed default/readable fallback and must not distribute another Sales Order's quantity
+  or destination by inference. A future allocation key may close this; this UI slice does not.
 - Search, typed filters, sort, Columns and Export remain useful register capabilities. Selection
   may scope Export; it does not license workflow bulk actions on a truth register.
 - Document numbers navigate directly to their authoritative object where the relationship exists:
