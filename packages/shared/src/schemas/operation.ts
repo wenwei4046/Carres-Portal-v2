@@ -488,9 +488,14 @@ export type ReassignPoWarehouseInput = z.infer<typeof reassignPoWarehouseInput>;
  *   yet) and 'confirmed' (post-proceed_order, pre-triage).
  * channel: 'all' (default) | 'dealers' | 'showrooms'.
  * search: free-text matched against customer_name (ILIKE) AND parsed as int for so exact match.
+ *
+ * 'waiting' was missing from this list while being a live DB value since 0028,
+ * so an operator could not filter to the orders a partner had rejected — the
+ * one stage where somebody has to act. 'placed' stays: it is synthetic, and the
+ * route turns it into `status='place'` rather than a stage match.
  */
 export const ListOperationOrdersQuery = z.object({
-  stage: z.enum(['all', 'placed', 'confirmed', 'in_production', 'ready_to_dispatch', 'dispatched', 'delivered']).default('all'),
+  stage: z.enum(['all', 'placed', 'confirmed', 'in_production', 'ready_to_dispatch', 'waiting', 'dispatched', 'delivered']).default('all'),
   channel: z.enum(['all', 'dealers', 'showrooms']).default('all'),
   search: z.string().trim().max(100).optional(),
 }).strict();

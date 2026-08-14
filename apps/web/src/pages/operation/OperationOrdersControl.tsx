@@ -1314,7 +1314,11 @@ export const ORDER_FILTER_COLUMNS: ReadonlySet<string> = new Set([
 
 /** A row with no value in a filtered column still has to be selectable —
  *  Excel's `(Blanks)`, in this portal's words (COPY-STANDARD: never a code). */
-export const F_NO_VALUE = " none";
+// The NUL is written as an ESCAPE, never as a raw byte in this file. A literal
+// one makes the whole 6,000-line file grep as "Binary file ... matches", so
+// every content search silently skips it. The runtime value is identical; the
+// sentinel still cannot collide with real data, which is why it is a NUL.
+export const F_NO_VALUE = "\u0000none";
 
 export type OrderSortValue = string | number;
 
