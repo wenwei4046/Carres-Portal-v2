@@ -82,6 +82,7 @@ import { lineName } from "./sales-order-facts";
 import { lineConfigBits } from "../dealer/new-order/special-addons-picker";
 import { missingDeliveryDateGuidance } from "./sales-order-guidance";
 import { copySalesOrderDraft } from "./sales-order-copy";
+import { objectViewParams } from "./sales-order-object-navigation";
 
 /* pdf.js worker ships inside the package — nothing fetched from a CDN. */
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
@@ -731,30 +732,15 @@ export default function SalesOrderWorkspace() {
   const openObjectView = (view: ObjectView) => {
     if (mode === "edit" && view !== "Order") {
       if (!confirmDiscard()) return;
-      setParams((prev) => {
-        const next = new URLSearchParams(prev);
-        next.delete("edit");
-        if (view === "Order Route") next.set("route", "1");
-        else next.delete("route");
-        return next;
-      }, { replace: true });
       setDraftSeed("");
       setDirty(false);
     }
     setObjectView(view);
-    if (view === "Order Route") {
-      setParams((prev) => {
-        const next = new URLSearchParams(prev);
-        next.set("route", "1");
-        return next;
-      }, { replace: true });
-      return;
-    }
-    setParams((prev) => {
-      const next = new URLSearchParams(prev);
-      next.delete("route");
-      return next;
-    }, { replace: true });
+    setParams(
+      (prev) => objectViewParams(prev, view, mode === "edit"),
+      { replace: true },
+    );
+    if (view === "Order Route") return;
     if (view === "Order") {
       window.setTimeout(() => document.getElementById("sales-order-workspace")?.scrollIntoView(), 0);
     }
