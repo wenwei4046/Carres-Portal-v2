@@ -43,29 +43,68 @@ Two hard beliefs behind the rules:
 ## Action copy / work clarity law — owner ruling 2026-08-11
 
 When a surface represents something a human must handle, follow up, confirm, call, chase or do,
-the operator must understand all four parts at first read:
+the operator must understand all six parts at first read:
 
 ```
-WHO      responsible named person or team/station
-ACTION   concrete verb and measurable outcome
-OBJECT   named counterparty, document, order, goods or other business object
-WHEN     actual working weekday + date from the action's authoritative calendar
+WHO              responsible named person or team/station
+ACTION           concrete verb
+OBJECT           exact document, order, goods, evidence, amount or other business object
+RECIPIENT        party/person/team receiving the act or being contacted
+REQUIRED RESULT  answer, evidence, confirmation or decision that completes it
+WHEN             actual working weekday + date from the action's authoritative calendar
 ```
 
 Use the actual person or team when responsibility is known, the governed action verb, and the
-specific object the operator can recognise. `WHEN` follows `ACTION-FLOW-STANDARD.md` Law 2A: use
+specific object, recipient and required result the operator can recognise. `WHEN` follows
+`ACTION-FLOW-STANDARD.md` Law 2A: use
 the applicable Carres working calendar, exclude its public holidays/non-working days, and move a
 due date only according to that authoritative calendar. A governed action surface that requires a
 due day prints weekday + date; `Today`, `Tomorrow` or `T−2` alone is not enough.
 
 **Banned as substitutes for clear work:** `Follow up` · `Waiting` · `Need action` · vague
-`Chase`. These may describe neither a measurable act nor its object/date. A waiting condition is a
+`Chase`. These may describe neither a measurable act nor its object/recipient/result/date. A waiting condition is a
 fact, not an action, until a human must do something.
 
 This law does **not** turn every truth into work. Registers and module surfaces continue to show
-owned facts in factual language. Apply WHO + ACTION + OBJECT + WHEN only when the item is genuinely
+owned facts in factual language. Apply all six action parts only when the item is genuinely
 actionable. My Work, Team Work and every other action-bearing UI use this same formulation; they do
 not invent a shorter status-only dialect.
+
+### System-led action + Primary School Standard English — owner ruling 2026-08-14
+
+Purchasing, Sales Order, Service Case, Issue Tracker and every future module use one standard: the
+system holds process knowledge; a new employee confirms facts, performs the named action and records
+the result. No screen depends on written-English skill, old WhatsApp history or an experienced
+employee explaining what comes next.
+
+Official fields/documents remain English. Operator instructions use Primary School Standard English:
+one fact or action per sentence, about 12 words maximum, complete dates, and an error always says how
+to fix it. Chinese/Bahasa Malaysia may appear only under optional `What does this mean?` help and do
+not enter the official record.
+
+**A simple verb alone is not simple English; it is missing work.** Every action-bearing surface must
+expose:
+
+```
+WHO + ACTION AND OBJECT + RECIPIENT + REQUIRED RESULT + WHEN
+```
+
+Use the portal-wide two-line shape when the row carries a fact plus action:
+
+```
+LINE 1  OBJECT + FACT / PROBLEM
+LINE 2  OWNER + ACTION AND OBJECT + RECIPIENT + REQUIRED RESULT
+```
+
+The row/action context must also expose actual working weekday/date. `Call` · `Ask` · `Check` ·
+`Choose` · `Upload` · `Add` · `Send` · `Save` · `Follow up` · `Review` · `Handle` · `Resolve`
+alone are banned. If one line cannot fit, use labelled `Owner · Object · Contact · Do · Need`; omit
+nothing.
+
+Normal intake is guided factual questions and governed answers. The system generates the official
+English summary. A blank `What happened?`, `Action taken`, `Root cause`, `Prevention` or `Follow-up
+remark` textarea may be supplementary only; it can never be the main path or determine status,
+accountability or completion.
 
 **External reply evidence — owner ruling 2026-08-14.** For supplier and Logistics communication,
 `Message prepared`, `Message copied`, `WhatsApp opened` and `Sent` never complete a confirmation
@@ -80,20 +119,21 @@ the concrete answer, never a trust-based `Sent` checkbox.
 
 Every actionable list row ends with a plain-English sentence telling the reader the next action.
 The owner and due weekday/date may be adjacent governed fields when repeating them inside the
-sentence would harm scanning, but the row as a whole must expose all four parts. **Action sentence
-length ≤ 10 words.** Shape:
+sentence would harm scanning, but the row as a whole must expose all six parts. Use the shortest
+sentence that remains complete; about 12 words is the target, never a reason to omit recipient or
+required result. Shape:
 
-    [Responsible person/team] + [Verb] + [concrete object/name] + [working weekday/date]
+    [Owner] + [Verb and object] + [recipient] + [required result] + [working weekday/date]
 
 Examples (all pass):
 
-    ✔ Yu Jun · Issue PO-86 to Ohana · Wed 12 Aug.
-    ✔ Khor Yee · Check in PO-2041 goods · Thu 13 Aug.
-    ✔ Shasha · Call AL about SO-1318 · Fri 14 Aug.
+    ✔ Yu Jun · Send PO-86 to Ohana · Ask them to confirm delivery · Wed 12 Aug.
+    ✔ Khor Yee · Check in PO-2041 goods for Purchasing · Record full or partial · Thu 13 Aug.
+    ✔ Shasha · Call AL about SO-1318 · Record the delivery date · Fri 14 Aug.
 
 Anti-patterns (all fail):
 
-    ✘ Follow up.                               (no owner · object · date)
+    ✘ Follow up.                               (no owner · object · recipient · result · date)
     ✘ Waiting.                                 (a fact presented as work)
     ✘ Need action.                             (no action at all)
     ✘ Process order.                           (no name · no timing · abstract verb)
