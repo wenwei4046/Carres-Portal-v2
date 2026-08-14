@@ -46,7 +46,7 @@ export default function SettingsWorkspace() {
         <Routes>
           <Route index element={<Navigate to="sales-orders" replace />} />
           <Route path="sales-orders" element={<SalesOrderSettings />} />
-          <Route path="purchasing" element={<OperationPurchasingSettings />} />
+          <Route path="purchasing" element={<OperationPurchasingSettings embedded />} />
         </Routes>
       </div>
     </div>

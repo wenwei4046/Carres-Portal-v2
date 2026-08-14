@@ -194,9 +194,9 @@ Shopify-style transaction/version discipline add no unresolved business rule.
 | History / audit | Order history and revision events render together; actor/cause coverage is partial | 2990 has History | **ADAPT / BUILD** | Separate append-only event view; actor/time/reason/Before/After and permission decisions |
 | Actual PDF + Print | One live renderer and historical snapshot rendering exist; Print opens same blob | 2990 has Print PDF | **KEEP / ADAPT** | Archive/address stable current + per-Revision document truth; follow `SO-PDF-STANDARD.md` |
 | Copy to new SO | Built as a governed seed of the authoritative create form; the register keeps `Copy SO No` as a separate clipboard act | Mature document systems copy into a new draft/transaction, never duplicate identity | **KEEP** | PR #764 production-verified 2026-08-13 (SO-1303 → SO-1320 · Rev 1); money, promised/proceed dates, history, payments and PO/DO/unit links are excluded by construction |
-| Cancel SO | Legacy cancel RPC exists; current official register omits it | 2990 detail exposes Cancel SO | **ADAPT / BUILD** | Cancel only for cancelled customer transaction; permission, reason, refund/release/PO/delivery/Work impact and immutable audit |
-| Scan / import | AutoCount import remains on frozen Old Orders; official register has no Scan | 2990 exposes Scan Order | **RELOCATE / BUILD** | One governed import entrance outside the truth register toolbar unless proven daily-register work; validate/preview/dedupe/errors; imported SO enters same contract |
-| Settings / Maintenance | Sales-order maintenance API/config exists; official UI ownership is incomplete | 2990 exposes SO Maintenance and global Settings | **RELOCATE / BUILD** | Portal Settings owns system configuration; Catalog/Sales own their facts; no record maintenance editor that bypasses amendment law |
+| Cancel SO | Built as the ONE governed door — register + Workspace both reach the single existing writer; migration 0350 adds the owner-impact read, the required reason and the pre-write impact stamp | 2990 detail exposes Cancel SO | **KEEP** | Production-verified 2026-08-14 (SO-1320 cancelled, SO-1313 refused). Place-only fails safe; the proceeded-cancel approval lane stays Card 7's deferred item |
+| Scan / import | Not built. The AutoCount CSV importer stays on frozen Old Orders and is NOT the answer here — different act, different source, and it retires at go-live (CLAUDE.md §6) | 2990's `ScanOrderModal` + `scan-so.ts` prove the source exactly: a photo/PDF of the **handwritten showroom sale-order slip** | **BUILD — own card** | Source and write boundary now settled (§11 · Sales Order Intake). Depends on Sales Order Settings (the extractor matches ACTIVE option lists) and on a vision credential only the owner can set |
+| Settings / Maintenance | Built as `Sales Order Settings`, a section of the one Settings Workspace reached from the Page Header gear; `SO Maintenance` retired | 2990 exposes SO Maintenance and global Settings | **KEEP** | Owns Order Entry fields, payment methods and the option lists Sales Orders actually controls. Another module's master data is named and linked, never edited here; a source guard holds "never an edit door into historical Sales Orders" |
 | Permissions | RLS/API roles exist; direct-edit/amendment/cancel matrix is incomplete | 2990 Super Admin surface does not prove Carres roles | **BUILD** | Explicit view, safe-correct, request, approve/reject, direct-amend, cancel, PDF/export permissions; enforce server-side |
 | Numbering + lineage | SO identity, DO fields and PO relations exist; register lacks ruled PO/DO lineage columns | 2990 shows Current SO and related document modules | **ADAPT / BUILD** | Same SO across revisions; direct SO/PO/DO links; define multi-PO/multi-DO compact cell + overflow interaction without inventing one Current |
 | Order Route | Built as the governed read-only fact-derived map with durable entry and owner links | 2990 Relationship Map is evidence for lineage, not specification | **KEEP** | PR #762 production-verified 2026-08-13; Orders remains a reader and gains no cross-module writer or overall status |
@@ -277,12 +277,72 @@ official Card numbers.
    `paid = 0.00`, `delivery_date = null`, `delivery_date_tbd = true`, `proceed_date = null`, zero
    payments and zero PO/DO/unit links, while **SO-1303 was left unchanged**. Identity is never
    duplicated; a copy is a new transaction.
-6. **READY FOR CARD — Cancel / Intake / Maintenance Closeout** — governed transaction
-   cancellation, Scan/import relocation and Settings/Maintenance ownership. This slice
-   follows the edit/amendment permission model; it must not create bypass doors.
+6. **CLOSED / PRODUCTION-VERIFIED 2026-08-14 — Cancel SO** — exact source commit `1fbcf2a3` passed
+   PR #767 CI, then merged unaltered as parent of `bea6d0a5`. The `Deploy production` run repeated
+   the authoritative gate on that exact SHA, deployed both governed Pages projects and the
+   production Worker (Version ID `8cdb5b60-81a4-4086-ac77-df3167d4e355`), and
+   `verify-production.mjs` proved all five canonical surfaces report `bea6d0a5`. Migration **0350**
+   was applied and probed before the UI shipped.
+
+   **The act was already governed; what was missing was the DOOR.** Card 7 measured the
+   cancellation lineage true in 2026-08-11, and this slice adds no new writer: the register's
+   `Cancel SO` and the Workspace's `Cancel SO` both reach the one existing
+   `POST /api/orders/:id/cancel`. 0350 adds the READ (`sales_order_cancel_impact`, reporting the
+   SAME seven owners the amendment preview reads) and two rules on the act — **the reason is now
+   REQUIRED**, and the history row carries the actor plus the impact snapshot taken *before* the
+   write. **The place-only guard is unchanged and deliberately so:** a proceeded order fails safe,
+   and the governed proceeded-cancel remains Card 7's named, deferred approval lane.
+
+   **0350 also repaired a measured drift.** The repository's only definition of `cancel_order` was
+   `0011`, which still read the renamed `dl` column and admitted the retired `logistics` role;
+   production had been running a corrected body **no migration in this repository contained**, so a
+   fresh database would have built a broken function. The current governed body is now in the
+   repository.
+
+   **One door, not two.** `CancelOrderDialog` was exported and rendered by NOTHING — the D10
+   pattern — and was the only door that permitted a blank reason. It is deleted rather than kept as
+   a second form for one act (ownership Law C). Both live callers, the POS and raw-entry Stripe
+   pending-order paths, already passed a real sentence, so tightening the schema regressed nothing.
+
+   Authenticated production verification on `erp.carresofficial.com`: the row context menu ends in
+   `Cancel SO`, alone below a divider. On **SO-1320** the dialog refused to act while the reason was
+   blank and enabled only once one was typed; cancelling stamped `status = cancelled`, the reason in
+   both the history text and `metadata.reason`, `by_role = operation`, a non-null `by_user_id`,
+   server time, `metadata.impact` capturing `status = place` and `paid = 0.00` **as at the moment of
+   the decision**, one `audit_log` row, and **every order line kept**. On the proceeded **SO-1313**
+   the same door showed `Only an order still at Placed can be cancelled here.` with **no reason box
+   and no destructive action at all** — the screen fails safe exactly where the database does.
+7. **CLOSED / PRODUCTION-VERIFIED 2026-08-14 — Sales Order Settings** — exact source commit
+   `ea9b344a` passed PR #768 CI, then merged unaltered as parent of `b9b2cf95`. The `Deploy
+   production` run repeated the authoritative gate on that exact SHA, deployed both governed Pages
+   projects and the production Worker (Version ID `4d21f4f0-d315-4f6a-a21b-c782e69bd5d2`), and
+   `verify-production.mjs` proved all five canonical surfaces report `b9b2cf95`. No schema
+   migration: the config rows already existed; what was missing was the owned home.
+
+   Authenticated production verification on `erp.carresofficial.com`: the Page Header gear on Sales
+   Orders now opens the launcher — `Sales Order Settings` first, then `All System Settings` — and
+   the `Coming soon.` placeholder is gone. `Sales Order Settings` opens the one Settings Workspace
+   with its section navigation (`Sales Order Settings` · `Purchasing Settings`) and renders the
+   Order Entry editor live: payment methods (`online` · `credit` with its Bank follow-up ·
+   `installment` · `cash`, plus the system `stripe` row) and the POS Customer-step form fields with
+   their locked spine. The page states *"These settings are shared by everyone, and they never
+   change an order that is already saved."* The `NOT SET HERE` panel names the five lists this page
+   refuses to edit and their owners — **Dealers and showrooms — Stores · Salespeople — HR · Item
+   groups and products — Operation Catalog · Warehouses and locations — Stock · Logistics companies
+   — Delivery** — and register columns/saved views are stated as belonging to the person, on the
+   Register.
+
+   **One 🟡 found in production and fixed in the same closeout:** `Purchasing Settings` rendered
+   inside the Workspace brought the whole Purchasing tab bar with it, so the operator saw two
+   navigations at once. It now takes the same `embedded` flag `OrderEntryPage` does; the standalone
+   Purchasing tab is untouched.
+8. **NOT BUILT — Scan Order / Intake.** The accepted source is now settled by evidence and is
+   recorded under §11; the capability keeps its own card. See *Sales Order Intake* below.
 
 **Recommended build sequence:** Register + document actions → authoritative Detail/Edit → Amendment/
-Revision/History → Order Route → Copy → Cancel/Intake/Maintenance closeout. The first two establish the
+Revision/History → Order Route → Copy → Cancel → Sales Order Settings → Scan Order. Settings precedes
+Scan Order because the extractor may only answer an option field by matching the ACTIVE list a
+settings surface owns. The first two establish the
 single field and navigation contract; the amendment slice establishes immutable version truth before
 route and cancellation consume it.
 
@@ -3332,6 +3392,94 @@ excluded them merely because they were not already implemented.
   visible Toolbar action. The card must define the accepted source, extraction/validation,
   duplicate handling, operator review and the final write boundary. A reference product proves
   the door, not Carres business rules or visual styling.
+- **✅ SALES ORDER SETTINGS — BUILT 2026-08-14.**
+
+  The gear was a `Coming soon.` placeholder — a promise about the product on an operator's screen —
+  and the settings §11 names had no owned home. Now: the one Settings Workspace at
+  `/operation/settings`, a section per module; the gear is the permission-filtered launcher
+  `ui/MASTER.md` rules (current module's settings, then `All System Settings`) and never an editing
+  form; and `Sales Order Settings` is the section Sales Orders owns.
+
+  **It is deliberately SMALLER than the name it replaces, and the reason is the finding.** §11 names
+  three things — Sales Order-controlled option pools · Order Entry fields · payment-method choices —
+  and on the evidence **all three ARE the Order Entry config**. Migration 0174's `config.options`
+  look like the option pools and are not ours: its own header calls them *display/filter aids*, and
+  its `option` columns are `status` (the order state machine, not a pool), `dealer_name` ·
+  `salesperson_name` · `warehouse_name` · `delivery_partner_name` · `item_group` (master data owned
+  by Stores, HR, Stock, Delivery and Catalog) and `payment_method` (owned right here). **Curating
+  another module's master data from the Sales Order settings page would be a second editor for one
+  record** — the defect ownership Law A/C exists to stop. They are not edited here; the page names
+  the owner of each instead.
+
+  Order Entry was RELOCATED, not copied: it was reachable at `/principal?tab=order-entry` and from
+  the POS sidebar, and both now lead to the one Settings Workspace over the same single config row.
+  Register columns and saved views stay on the Register — they belong to the person, not the
+  business. A **source guard** asserts the page reaches no order writer at all, because §11's
+  *"never an edit door into historical Sales Orders"* is a ruling a render test cannot hold: such a
+  mutation would render as an innocuous button.
+
+- **🔨 SALES ORDER INTAKE — the accepted source is SETTLED; the capability keeps its own card.**
+
+  **Owner ruling, 2026-08-13:** do not offer an implementation menu. Read the authoritative MASTER,
+  the current Sales/POS intake path, the existing `Scan Order` intent and the 2990 implementation,
+  then give the evidence-based recommendation — and *"AutoCount CSV is already temporary and must
+  not be promoted into the target architecture merely because it is easiest to build."* This is that
+  answer.
+
+  **FACT — what `Scan Order` was built to solve.** 2990 implements it, and the implementation
+  settles the question the capability matrix left open.
+  `2990s/apps/backend/src/components/ScanOrderModal.tsx:1-19` calls it *"v1 of the handwritten-slip
+  OCR flow"*: the operator drops or snaps photo(s) of a **showroom sale-order slip** (jpeg/png/webp,
+  PDF accepted), extraction reads the handwriting against the live SKU/fabric catalog, the operator
+  reviews and corrects, and `Open in New SO` opens the normal create page prefilled.
+  `2990s/apps/api/src/routes/scan-so.ts:1-6` names the input exactly: *"phone photos of Zanotti /
+  AKEMI-style carbon-copy forms"*. **The accepted source is a photograph or PDF of the handwritten
+  showroom sale-order slip — not an AutoCount export.**
+
+  **FACT — the write boundary is defined, and Carres has already proved it.**
+  `ScanOrderModal.tsx:17-18`: *"The modal NEVER creates the SO itself — everything lands in the
+  normal New SO form where pricing, variants and validation run as usual."* That is byte-for-byte
+  the boundary the Copy slice shipped and production-verified on 2026-08-13. **Intake needs no new
+  write door, no second create path and no new contract.**
+
+  **FACT — Sales Order Settings is a hard dependency, not a nicety.** The extractor does not
+  free-type its answers: `ScanOrderModal.tsx:74-78` — an `OptionMatch` carries *"a
+  so_dropdown_options row VALUE, already validated server-side against the ACTIVE list"*, and the
+  prefilled payment block is *"SO-Maintenance-matched"*. This is why Settings had to come first,
+  and it now has.
+
+  **FACT — the size, measured.** `scan-so.ts` is 1,475 lines and `ScanOrderModal.tsx` 671; the
+  learning store is two tables (`so_scan_samples`, `so_scan_rules`) holding operator-confirmed
+  samples, per-salesperson distilled handwriting rules and a global alias layer. Carres has none of
+  it, and `apps/api/src/types.ts:3-19` carries no AI binding.
+
+  **INFERENCE — the credential is not the blocker it looks like.** Carres already ships a capability
+  whose credential arrives later: `types.ts:13-16` marks `STRIPE_SECRET_KEY` optional and the routes
+  answer `503 stripe_not_configured` until `wrangler secret put` runs. 2990 uses the identical shape
+  for `ANTHROPIC_API_KEY` (`2990s/apps/api/src/env.ts:36-40`, `503 anthropic_key_missing`). Intake
+  can be built and merged the same way and go live the moment the key is set.
+
+  **RECOMMENDATION — NOT LAW, and it carries its falsifier.** Build Intake as `Scan Order`: a
+  photo/PDF of the handwritten showroom slip → extraction → operator review → prefill the
+  authoritative create form. **Give it its own card; do not fold it into a closeout** — §11 already
+  requires *"its own scoped product/build card before implementation"*, and ~2,100 lines of
+  reference implementation plus two tables and a vision integration is exactly the size that ruling
+  exists for. **Relocating the AutoCount CSV importer into the Sales Orders `…` is explicitly NOT
+  recommended:** different act, different source, it retires at go-live, and putting it behind the
+  word `Scan` would teach operators that `Scan` means *import a spreadsheet* — a word
+  `COPY-STANDARD.md` would then have to un-teach.
+
+  **What would overturn this:** evidence that Carres showrooms do not write orders on paper before
+  they reach the portal — a measured intake path in which every Sales Order is typed directly into
+  the POS at the point of sale. If that is how Carres actually runs, `Scan Order` solves a problem
+  Carres does not have and the capability should be retired rather than built.
+
+  **THE REMAINING GAP, stated plainly.** Nothing about the source is unresolved. Two things are, and
+  both are owner-side: ① **does the Carres showroom write a handwritten slip before the order
+  reaches the portal?** The repository holds no evidence either way, and the whole capability rests
+  on it. ② **`ANTHROPIC_API_KEY` as a Cloudflare Worker secret** — only the owner can set it, and no
+  secret may be written in code (CLAUDE.md red line 3).
+
 - **`Sales Order Settings` is required — APPROVED / LOCKED naming and placement.** `SO
   Maintenance` is retired. The Settings section title is `Sales Order Settings`, parallel to
   `Purchasing Settings` and distinct from the overall `System Settings` Workspace. It owns Sales
@@ -3488,6 +3636,8 @@ the normal discoverable doors already governed for Edit, output or View Flow.
 
 | What | Why it is not built |
 |---|---|
+| **`Issue Delivery Order` in the Sales Orders row context menu** | §11's locked menu lists it between `Print` and `Copy to new Sales Order`, and the Cancel slice deliberately did not add it. It is **Delivery's** issue flow, not a Sales Orders capability — the menu item is a handoff, and the handoff belongs to whichever card next touches the Delivery-owned issue door. Adding it from the Sales Orders side would have minted a second entrance to another module's act. |
+| **`Scan Order` in the normal-state `…` overflow** | The `…` overflow and `Scan Order` arrive together with the Intake card. Building the overflow first, with one item that answers `503`, would put an unfinished promise on an operator's screen — the exact defect the Settings gear's `Coming soon.` placeholder was. |
 | **The follow-up action after a FAILED delivery** | `Deliver today` completes on delivered OR a Delivery Exception with its reason, and **nothing yet turns that exception into the next action.** Approved shape: one Exception plus a Reason, then the next action. Belongs to whichever card next touches the delivery day. |
 | **Persistent Facts as a real strip** | RESERVED, not law. It needs the four facts to have ONE home first; on today's drawer they sit in four blocks under a frozen *"ZERO order data here"* ruling. **The first page migrated through `DetailShell` is where they get that home.** |
 | **Gap** | RESERVED, not built. The upgrade trigger is written into the model. |

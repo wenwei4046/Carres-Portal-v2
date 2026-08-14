@@ -67,7 +67,7 @@ export default function CancelSalesOrderDialog({
   const findings = impact?.findings ?? [];
   /* Only the owners actually holding something reach the screen — a row of
      seven zeroes is noise, and an empty consequence list is a real answer. */
-  const open_findings = findings.filter(
+  const openFindings = findings.filter(
     (f) => f.count > 0 || (f.amount != null && Number(f.amount) > 0),
   );
   const canCancel = impact?.cancellable === true;
@@ -119,11 +119,11 @@ export default function CancelSalesOrderDialog({
             </p>
           )}
 
-          {canCancel && open_findings.length > 0 && (
+          {canCancel && openFindings.length > 0 && (
             <div data-testid="cancel-so-impact">
               <div className="text-label text-base-500">This order still holds</div>
               <ul className="mt-1.5 grid gap-1 sm:grid-cols-2">
-                {open_findings.map((finding) => (
+                {openFindings.map((finding) => (
                   <li key={`${finding.owner}-${finding.kind}`} className="text-meta text-base-700">
                     <a className="underline underline-offset-2" href={finding.href}>
                       {finding.owner}
