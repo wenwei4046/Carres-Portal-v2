@@ -30,10 +30,10 @@ export default function SalesOrderTabs({
       <Link
         to="/operation/orders"
         className="inline-flex h-full shrink-0 items-center gap-1.5 px-2 text-body text-base-600 hover:text-base-900"
-        aria-label="Back to Sales Orders"
+        aria-label="Sales Orders"
         onClick={onBack}
       >
-        <ArrowLeft size={14} /> Back to Sales Orders
+        <ArrowLeft size={14} /> Sales Orders
       </Link>
       {navigation}
     </ModuleHeader>
