@@ -16,13 +16,15 @@ describe("SettingsWorkspace navigation", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole("link", { name: "Sales Orders" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Sales Order Settings" })).toHaveAttribute(
       "href",
       "/operation/settings/sales-orders",
     );
-    expect(screen.getByRole("link", { name: "Purchasing" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Purchasing Settings" })).toHaveAttribute(
       "href",
       "/operation/settings/purchasing",
     );
+    expect(screen.getByText("Sales Orders", { selector: "[data-settings-group]" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Sales Order Settings" })).toHaveAttribute("aria-current", "page");
   });
 });

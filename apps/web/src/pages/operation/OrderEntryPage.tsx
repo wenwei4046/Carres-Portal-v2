@@ -16,13 +16,15 @@ import {
 } from "@carres/shared";
 import { useOrderEntryConfig, useUpdateOrderEntryConfig } from "@/lib/queries";
 import { INPUT_CLS } from "./components/Modal";
+import Button from "@/components/kit/Button";
+import Drawer from "@/components/kit/Drawer";
 
 // ===========================================================================
 // Order Entry config page (0219) — the config center for the POS "Open Sales
 // Order" format, reached from the POS sidebar's Maintain section (was a modal
 // inside SO Maintenance until 2026-07-12). Two sections:
 //   1. Payment methods — add/remove/toggle methods, per-method approval-code
-//      toggle + follow-up dropdowns (e.g. the Bank list on Credit/Debit).
+//      toggle + required-information dropdowns (e.g. the Bank list on Credit/Debit).
 //   2. Form fields — the Customer step's 4 tabs: builtin enable/require
 //      toggles (locked fields are display-only) + operator custom fields.
 // Save = full PUT replace (mirrors the 0174 grid-config pattern: the field
@@ -74,7 +76,7 @@ interface Draft {
 
 function initDraft(cfg: OrderEntryConfigDto): Draft {
   // Start from what the POS currently shows: the configured list, else the
-  // code defaults (incl. Cash + the bank follow-up on Credit/Debit).
+  // code defaults (incl. Cash + the required Bank information on Credit/Debit).
   const source = cfg.paymentMethods.length > 0 ? cfg.paymentMethods : DEFAULT_PAYMENT_METHODS;
   const methods = source.map((m) => ({
     ...m,
@@ -225,10 +227,6 @@ export default function OrderEntryPage({ embedded = false }: { embedded?: boolea
     setNewMethodName("");
   }
 
-  function removeMethod(i: number) {
-    setDraft((d) => (d ? { ...d, methods: d.methods.filter((_, idx) => idx !== i) } : d));
-  }
-
   // -------------------------------------------------------------- form fields
 
   function setBuiltin(tab: OrderEntryTab, key: string, patch: Partial<BuiltinToggle>) {
@@ -319,33 +317,33 @@ export default function OrderEntryPage({ embedded = false }: { embedded?: boolea
 
   // --------------------------------------------------------------------- save
 
-  function onSave() {
-    if (!draft) return;
+  function onSave(nextDraft: Draft | null = draft) {
+    if (!nextDraft) return;
 
     // Client-side guards (the server zod re-validates everything).
-    for (const m of draft.methods) {
+    for (const m of nextDraft.methods) {
       if (!m.label.trim()) {
         toast.error(`Payment method "${m.key}" needs a label`);
         return;
       }
       for (const f of m.followUps) {
         if (!f.label.trim()) {
-          toast.error(`A follow-up on "${m.label.trim()}" needs a label`);
+          toast.error(`Required information on "${m.label.trim()}" needs a label`);
           return;
         }
         const opts = cleanOptions(f.options);
         if (opts.length === 0) {
-          toast.error(`Follow-up "${f.label.trim()}" needs at least one option`);
+          toast.error(`Required information "${f.label.trim()}" needs at least one option`);
           return;
         }
         if (opts.length > 60 || opts.some((o) => o.length > 60)) {
-          toast.error(`Follow-up "${f.label.trim()}": max 60 options, 60 characters each`);
+          toast.error(`Required information "${f.label.trim()}": max 60 options, 60 characters each`);
           return;
         }
       }
     }
     for (const tab of ORDER_ENTRY_TABS) {
-      for (const c of draft.tabs[tab].custom) {
+      for (const c of nextDraft.tabs[tab].custom) {
         if (!c.label.trim()) {
           toast.error(`A custom field on the ${TAB_LABELS[tab]} tab needs a label`);
           return;
@@ -364,7 +362,7 @@ export default function OrderEntryPage({ embedded = false }: { embedded?: boolea
       }
     }
 
-    const paymentMethods: PaymentMethodConfig[] = draft.methods.map((m) => ({
+    const paymentMethods: PaymentMethodConfig[] = nextDraft.methods.map((m) => ({
       key: m.key,
       label: m.label.trim(),
       sublabel: m.sublabel.trim(),
@@ -381,7 +379,7 @@ export default function OrderEntryPage({ embedded = false }: { embedded?: boolea
     // Only overrides + customs; locked builtin keys never appear.
     const formFields: FormFieldsConfig = {};
     for (const tab of ORDER_ENTRY_TABS) {
-      const t = draft.tabs[tab];
+      const t = nextDraft.tabs[tab];
       formFields[tab] = {
         builtins: Object.fromEntries(
           Object.entries(t.builtins).map(([k, v]) => [
@@ -413,6 +411,22 @@ export default function OrderEntryPage({ embedded = false }: { embedded?: boolea
 
   function onReset() {
     if (entryConfig) setDraft(initDraft(entryConfig));
+  }
+
+  function closeMethodDrawer() {
+    if (entryConfig) setDraft(initDraft(entryConfig));
+    setEditingMethod(null);
+    setAddingMethod(false);
+    setNewMethodName("");
+  }
+
+  function requiredInformationSummary(method: PaymentMethodConfig): string[] {
+    return method.followUps.map((field) => {
+      const noun = field.label.toLowerCase() === "bank" ? "accepted banks" : `${field.label.toLowerCase()} options`;
+      return field.options.length > 4
+        ? `${field.options.length} ${noun}`
+        : `${field.label}: ${field.options.join(", ")}`;
+    });
   }
 
   // ----------------------------------------------------------------- render
@@ -448,126 +462,24 @@ export default function OrderEntryPage({ embedded = false }: { embedded?: boolea
       {draft && (
         <>
           {/* ------------------------------------------------ payment methods */}
-          <div className="label mb-1.5">Payment methods</div>
-          <div className="border border-base-200 rounded-[4px] divide-y divide-base-100 mb-2">
+          <section className="mb-6 rounded-card border border-base-200 bg-white p-5 shadow-sm" data-testid="payment-methods-panel" data-settings-pattern="2990-maintenance-panel">
+            <header className="mb-4 flex items-start justify-between gap-4">
+              <div><h2 className="text-strong font-display text-base-900">Payment methods</h2><p className="mt-1 text-meta text-base-500">Methods offered at checkout. Open one method to change its fields.</p></div>
+              <Button variant="neutral" size="sm" icon="add" onClick={() => setAddingMethod(true)}>Add payment method</Button>
+            </header>
+          <div className="space-y-2">
             {draft.methods.map((m, i) => (
-              <div key={m.key} className="px-3 py-2.5">
-                {editingMethod !== i ? (
-                  <div className="grid items-start gap-3 sm:grid-cols-[1fr_auto]">
+              <div key={m.key} data-testid={`payment-method-${m.key}`} data-status={m.active ? "active" : "inactive"} className={`grid min-h-16 items-center gap-3 rounded-control border border-base-200 bg-base-50 px-4 py-3 sm:grid-cols-[1fr_auto_auto] ${m.active ? "" : "opacity-55"}`}>
                     <div>
                       <div className="text-body font-medium text-base-900">{m.label}</div>
                       <div className="mt-0.5 text-meta text-base-600">{m.sublabel || "No checkout label"}</div>
-                      <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-meta text-base-600">
-                        <span>{m.active ? "Active" : "Inactive"}</span>
+                      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-meta text-base-500">
                         <span>Approval code required: {m.approvalCodeRequired ? "Yes" : "No"}</span>
-                        {m.followUps.map((field) => <span key={field.key}>{field.label}: {field.options.join(", ")}</span>)}
+                        {requiredInformationSummary(m).map((summary) => <span key={summary}>{summary}</span>)}
                       </div>
                     </div>
-                    <button type="button" className="btn-ghost text-meta" aria-label={`Edit ${m.label}`} onClick={() => setEditingMethod(i)}>Edit →</button>
-                  </div>
-                ) : (
-                <>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <input
-                    value={m.label}
-                    onChange={(e) => updateMethod(i, { label: e.target.value })}
-                    maxLength={40}
-                    aria-label={`${m.key} label`}
-                    className={`${INPUT_CLS} max-w-[170px]`}
-                  />
-                  <input
-                    value={m.sublabel}
-                    onChange={(e) => updateMethod(i, { sublabel: e.target.value })}
-                    maxLength={60}
-                    placeholder="Sublabel"
-                    aria-label={`${m.key} sublabel`}
-                    className={`${INPUT_CLS} max-w-[170px]`}
-                  />
-                  <span className="text-meta text-base-400 font-mono">{m.key}</span>
-                  <label className="flex items-center gap-1.5 text-meta text-base-700 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={m.active}
-                      onChange={(e) => updateMethod(i, { active: e.target.checked })}
-                      aria-label={`${m.key} active`}
-                    />
-                    Active
-                  </label>
-                  <label className="flex items-center gap-1.5 text-meta text-base-700 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={m.approvalCodeRequired}
-                      onChange={(e) => updateMethod(i, { approvalCodeRequired: e.target.checked })}
-                      aria-label={`${m.key} approval code required`}
-                    />
-                    Approval code required
-                  </label>
-                  {!PROTECTED_METHOD_KEYS.has(m.key) && (
-                    <button
-                      type="button"
-                      onClick={() => removeMethod(i)}
-                      aria-label={`Remove ${m.label || m.key}`}
-                      className="ml-auto text-base-400 hover:text-danger"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </div>
-
-                <div className="mt-2 ml-4 pl-3 border-l-2 border-base-100 space-y-2">
-                  {m.followUps.map((fu, j) => (
-                    <div key={fu.key} className="flex items-start gap-2 flex-wrap">
-                      <input
-                        value={fu.label}
-                        onChange={(e) => updateFollowUp(i, j, { label: e.target.value })}
-                        maxLength={60}
-                        placeholder="Required information label"
-                        aria-label={`${m.key} required information ${fu.key} label`}
-                        className={`${INPUT_CLS} max-w-[160px]`}
-                      />
-                      <textarea
-                        value={fu.options.join("\n")}
-                        onChange={(e) => updateFollowUp(i, j, { options: e.target.value.split("\n") })}
-                        rows={3}
-                        placeholder="One option per line"
-                        aria-label={`${m.key} required information ${fu.key} options`}
-                        className={`${INPUT_CLS} flex-1 min-w-[200px] font-mono`}
-                      />
-                      <label className="flex items-center gap-1.5 text-meta text-base-700 cursor-pointer mt-2">
-                        <input
-                          type="checkbox"
-                          checked={fu.required}
-                          onChange={(e) => updateFollowUp(i, j, { required: e.target.checked })}
-                        aria-label={`${m.key} required information ${fu.key} required`}
-                        />
-                        Required
-                      </label>
-                      <button
-                        type="button"
-                        onClick={() => removeFollowUp(i, j)}
-                        aria-label={`Remove required information ${fu.label || fu.key}`}
-                        className="text-base-400 hover:text-danger mt-2"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  ))}
-                  {m.followUps.length < 3 && (
-                    <button
-                      type="button"
-                      onClick={() => addFollowUp(i)}
-                      className="btn-ghost text-meta"
-                    >
-                      Add required information
-                    </button>
-                  )}
-                </div>
-                <div className="mt-3 flex justify-end gap-2 border-t border-base-100 pt-3">
-                  <button type="button" className="btn-ghost text-meta" onClick={() => { if (entryConfig) setDraft(initDraft(entryConfig)); setEditingMethod(null); }}>Cancel</button>
-                  <button type="button" className="btn-primary text-meta" onClick={() => { onSave(); setEditingMethod(null); }}>Save changes</button>
-                </div>
-                </>
-                )}
+                    <span className={`text-meta font-medium ${m.active ? "text-success" : "text-base-500"}`}>{m.active ? "Active" : "Inactive"}</span>
+                    <Button variant="neutral" size="sm" icon="edit" aria-label={`Edit ${m.label}`} onClick={() => setEditingMethod(i)}>Edit</Button>
               </div>
             ))}
             {/* 0230 — Stripe is a SYSTEM method (0224): appended to every
@@ -575,41 +487,21 @@ export default function OrderEntryPage({ embedded = false }: { embedded?: boolea
                 proof, so there is nothing to configure. Shown read-only so this
                 page reflects the FULL method list the POS offers. */}
             <div
-              className="px-3 py-2.5 flex items-center gap-2 opacity-60"
+              className="grid min-h-16 items-center gap-3 rounded-control border border-base-200 bg-base-50 px-4 py-3 opacity-60 sm:grid-cols-[1fr_auto]"
               data-testid="entry-config-stripe-row"
             >
-              <Lock className="w-3 h-3 text-base-400 shrink-0" />
-              <span className="text-body text-base-700">{STRIPE_PAYMENT_METHOD.label}</span>
-              <span className="text-meta text-base-500">{STRIPE_PAYMENT_METHOD.sublabel}</span>
-              <span className="text-meta text-base-400 font-mono">{STRIPE_PAYMENT_METHOD.key}</span>
-              <span className="text-label uppercase tracking-[0.05em] text-base-400 ml-auto">
-                system · always offered at checkout
-              </span>
+              <div><div className="flex items-center gap-2 text-body font-medium text-base-800"><Lock className="h-3.5 w-3.5" />{STRIPE_PAYMENT_METHOD.label}</div><div className="mt-0.5 text-meta text-base-500"><span>{STRIPE_PAYMENT_METHOD.sublabel}</span> · always offered at checkout</div></div>
+              <span className="text-label uppercase tracking-[0.05em] text-base-500">System managed</span>
             </div>
           </div>
-          {addingMethod ? <div className="flex items-center gap-2 mb-6">
-            <input
-              value={newMethodName}
-              onChange={(e) => setNewMethodName(e.target.value)}
-              maxLength={40}
-              placeholder="New method name…"
-              aria-label="New method name"
-              className={`${INPUT_CLS} max-w-[220px]`}
-            />
-            {newMethodName.trim() !== "" && (
-              <span className="text-meta text-base-400 font-mono">
-                {kebabKey(newMethodName) || "—"}
-              </span>
-            )}
-            <button
-              type="button"
-              onClick={addMethod}
-              className="btn-secondary text-meta inline-flex items-center gap-1"
-            >
-              <Plus className="w-3.5 h-3.5" /> Add method
-            </button>
-            <button type="button" className="btn-ghost text-meta" onClick={() => { setNewMethodName(""); setAddingMethod(false); }}>Cancel</button>
-          </div> : <button type="button" className="btn-secondary text-meta mb-6" onClick={() => setAddingMethod(true)}>Add payment method</button>}
+          </section>
+
+          <Drawer open={editingMethod !== null || addingMethod} onOpenChange={(open) => { if (!open) closeMethodDrawer(); }} title={addingMethod ? "Add payment method" : "Edit payment method"} description={addingMethod ? "Create a checkout method for new Sales Orders." : "Change this method without exposing configuration fields on the Settings page."} footer={addingMethod ? <><Button variant="ghost" onClick={closeMethodDrawer}>Cancel</Button><Button variant="primary" icon="add" onClick={addMethod}>Add method</Button></> : <>{editingMethod !== null && !PROTECTED_METHOD_KEYS.has(draft.methods[editingMethod]?.key ?? "") && <Button variant="neutral" icon="delete" onClick={() => { const next = { ...draft, methods: draft.methods.filter((_, idx) => idx !== editingMethod) }; setDraft(next); onSave(next); setEditingMethod(null); }}>Remove method</Button>}<Button variant="ghost" onClick={closeMethodDrawer}>Cancel</Button><Button variant="primary" onClick={() => { onSave(); setEditingMethod(null); }}>Save changes</Button></>}>
+            {addingMethod ? <label className="block"><span className="label mb-1.5 block">Method name</span><input value={newMethodName} onChange={(e) => setNewMethodName(e.target.value)} maxLength={40} placeholder="New method name…" aria-label="New method name" className={INPUT_CLS} />{newMethodName.trim() !== "" && <span className="mt-2 block text-meta text-base-400">Permanent key: <span className="font-mono">{kebabKey(newMethodName) || "—"}</span></span>}</label> : editingMethod !== null ? (() => {
+              const m = draft.methods[editingMethod]; if (!m) return null; const i = editingMethod;
+              return <div className="space-y-5"><div className="grid gap-4 sm:grid-cols-2"><label><span className="label mb-1.5 block">Display name</span><input value={m.label} onChange={(e) => updateMethod(i, { label: e.target.value })} maxLength={40} aria-label={`${m.key} label`} className={INPUT_CLS} /></label><label><span className="label mb-1.5 block">Checkout label</span><input value={m.sublabel} onChange={(e) => updateMethod(i, { sublabel: e.target.value })} maxLength={60} placeholder="Checkout label" aria-label={`${m.key} sublabel`} className={INPUT_CLS} /></label></div><div className="space-y-3 rounded-control border border-base-200 bg-base-50 p-4"><label className="flex items-center gap-2 text-body text-base-700"><input type="checkbox" checked={m.active} onChange={(e) => updateMethod(i, { active: e.target.checked })} aria-label={`${m.key} active`} />Active</label><label className="flex items-center gap-2 text-body text-base-700"><input type="checkbox" checked={m.approvalCodeRequired} onChange={(e) => updateMethod(i, { approvalCodeRequired: e.target.checked })} aria-label={`${m.key} approval code required`} />Approval code required</label></div><section><div className="mb-2 flex items-center justify-between"><div><div className="text-body font-medium text-base-900">Required information</div><p className="text-meta text-base-500">Questions shown after this payment method is selected.</p></div>{m.followUps.length < 3 && <Button variant="neutral" size="sm" icon="add" onClick={() => addFollowUp(i)}>Add required information</Button>}</div><div className="space-y-3">{m.followUps.map((fu, j) => <div key={fu.key} className="rounded-control border border-base-200 p-3"><div className="grid gap-3 sm:grid-cols-[1fr_auto]"><input value={fu.label} onChange={(e) => updateFollowUp(i, j, { label: e.target.value })} maxLength={60} placeholder="Required information label" aria-label={`${m.key} required information ${fu.key} label`} className={INPUT_CLS} /><Button variant="ghost" size="sm" icon="delete" aria-label={`Remove required information ${fu.label || fu.key}`} onClick={() => removeFollowUp(i, j)}>Remove</Button></div><textarea value={fu.options.join("\n")} onChange={(e) => updateFollowUp(i, j, { options: e.target.value.split("\n") })} rows={6} placeholder="One option per line" aria-label={`${m.key} required information ${fu.key} options`} className={`${INPUT_CLS} mt-3 font-mono`} /><label className="mt-3 flex items-center gap-2 text-meta text-base-700"><input type="checkbox" checked={fu.required} onChange={(e) => updateFollowUp(i, j, { required: e.target.checked })} aria-label={`${m.key} required information ${fu.key} required`} />Required</label></div>)}</div></section></div>;
+            })() : null}
+          </Drawer>
 
           {/* --------------------------------------------------- form fields */}
           <div className="label mb-1.5">Form fields — POS Customer step</div>
@@ -768,7 +660,7 @@ export default function OrderEntryPage({ embedded = false }: { embedded?: boolea
             </button>
             <button
               type="button"
-              onClick={onSave}
+              onClick={() => onSave()}
               disabled={saveMut.isPending}
               className="btn-primary text-meta disabled:opacity-40"
             >
