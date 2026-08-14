@@ -1426,12 +1426,12 @@ export default function SalesOrderWorkspace() {
               {!isNew && mode === "view" && order && (
                 <section className="rounded-card border border-kit-slate-5 bg-white p-4 xl:col-span-2" aria-labelledby="sales-order-problems">
                   {missingDateAction && (
-                    <details open className="mb-4 rounded-control border border-kit-amber-6 bg-kit-amber-3 p-3">
+                    <details open className="mb-4 rounded-control border border-kit-slate-5 bg-kit-amber-3 p-3">
                       <summary className="cursor-pointer list-none">
                         <span className="block text-body font-semibold text-kit-amber-11">{missingDateAction.problem}</span>
                         <span className="block text-meta font-normal text-base-600">{missingDateAction.action}</span>
                       </summary>
-                      <dl className="mt-3 grid gap-2 border-t border-kit-amber-6 pt-3 sm:grid-cols-2">
+                      <dl className="mt-3 grid gap-2 border-t border-kit-slate-5 pt-3 sm:grid-cols-2">
                         {[
                           ["Why", missingDateAction.why],
                           ["Who must act", missingDateAction.owner],
