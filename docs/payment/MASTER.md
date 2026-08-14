@@ -133,6 +133,12 @@ forms and writers retire through a governed migration. Nothing here authorises d
 
 ## 5 · Collection clock, contact and Work
 
+Payment uses the portal-wide structured Action contract in `docs/ACTION-FLOW-STANDARD.md`.
+Payment supplies each action's trigger, Payment-specific owner rule, completion fact and due rule;
+the Work Engine resolves the person and roster/buddy cover. Payment never invents a universal
+Sales Order owner and never writes the resolved staff name into the action sentence. Register,
+My Work and Team Work use the same action facts at different display densities.
+
 The one collection clock is `delivery − 1 working day`, Mon–Sat plus Malaysian public holidays,
 anchored on customer-confirmed date, else promised date; no anchor means no clock.
 
