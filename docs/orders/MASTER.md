@@ -213,7 +213,7 @@ Order does not gain a writer.
   Delivery Date remains distinct. No new address, access, delivery-date or destination field was
   created. `docs/ui/MASTER.md` §6.6 records the final reusable UI proof.
 
-## Guided operations and Service Case boundary — built, production verification pending
+## Guided operations and Service Case boundary — CLOSED / PRODUCTION-VERIFIED 2026-08-14
 
 - A missing Customer Delivery date uses the governed two-line action grammar in the Register:
   the exact SO/fact first, then Salesperson (or Sales fallback), customer, concrete confirmation
@@ -228,6 +228,16 @@ Order does not gain a writer.
 - The pre-existing production-verified Register, goods expansion/footer, Object Detail/Edit,
   Revisions, History, Order Route, Print and Quick Rail composition remain unchanged except for
   these governed guidance and Service Case read/door additions.
+- **PRODUCTION PROOF:** PR #790 merged as exact main SHA `dac20ce5`; deploy run `31794862393`
+  repeated the authoritative gate, deployed both Pages projects and the API Worker, then proved
+  all three production surfaces reported that SHA. Authenticated acceptance on SO-1318 passed at
+  1440×900 and 1130×820 with zero console errors: Register seven-column composition, goods
+  expansion, filtered-result goods footer, missing-date two-line action and all seven detail
+  answers, Object View, Operations Edit, Revisions, History, Order Route, seeded canonical
+  `Report a problem` Service Case intake (no second lookup/writer), and Quick Rail open. The
+  Service Case deep-link/list remains the sole Sales Order read-back boundary when a linked case
+  exists. **SALES ORDER VISUAL + GUIDED OPERATIONS COMPLETION — PRODUCTION VERIFIED / MASTER
+  CLOSED.**
 
 ## Object/domain completeness sweep — 2026-08-13
 
