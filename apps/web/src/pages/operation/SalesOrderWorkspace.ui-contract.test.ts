@@ -31,6 +31,7 @@ describe("Sales Order object template contract", () => {
     expect(workspace).not.toContain("Safe correction — customer and delivery facts only");
     expect(workspace).toContain('addEventListener("beforeunload"');
     expect(workspace).toContain("Discard unsaved changes?");
+    expect(workspace).toContain("text-meta text-base-600 xl:col-span-2");
   });
 
   it("does not render a second editable full-address authority", () => {
