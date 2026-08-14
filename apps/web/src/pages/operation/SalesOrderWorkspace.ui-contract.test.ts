@@ -58,4 +58,21 @@ describe("Sales Order object template contract", () => {
     expect(workspace).toContain('data-testid="document-goods"');
     expect(workspace).not.toContain('Category | Unit ID | SKU | Qty | Item | Deliver To');
   });
+
+  it("opens the canonical Service Case intake from one plain problem-reporting door", () => {
+    expect(workspace).toContain("Report a problem");
+    expect(workspace).toContain("Report a customer, product, delivery or installation problem.");
+    expect(workspace).toContain("<ServiceCaseWizard");
+    expect(workspace).toContain("Service Case");
+    expect(workspace).not.toContain("Choose Claim");
+    expect(workspace).not.toContain("Choose Return");
+    expect(workspace).not.toContain("Choose Refund");
+  });
+
+  it("expands a missing-date Current Action into the governed seven answers", () => {
+    expect(workspace).toContain("missingDeliveryDateGuidance");
+    for (const label of ["Why", "Who must act", "Who to contact", "What to ask", "What to use", "What to record", "What happens next"]) {
+      expect(workspace).toContain(label);
+    }
+  });
 });

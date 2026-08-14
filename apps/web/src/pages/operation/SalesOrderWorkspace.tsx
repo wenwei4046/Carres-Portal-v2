@@ -57,6 +57,7 @@ import {
   useCreateSalesOrder,
   useOperationDealersRef,
   useOperationOrder,
+  useOrderServiceCases,
   useOrderCorrectionWork,
   useOutlets,
   useSalesOrderRevisions,
@@ -68,6 +69,7 @@ import {
   type AmendmentProposal,
 } from "@/lib/queries";
 import CancelSalesOrderDialog from "./CancelSalesOrderDialog";
+import ServiceCaseWizard from "./components/ServiceCaseWizard";
 import CorrectionWorkList from "./CorrectionWorkList";
 import SalesOrderAmendment from "./SalesOrderAmendment";
 import SalesOrderAttribution from "./SalesOrderAttribution";
@@ -75,6 +77,7 @@ import SalesOrderLedger from "./SalesOrderLedger";
 import SalesOrderRoute from "./SalesOrderRoute";
 import SalesOrderTabs from "./SalesOrderTabs";
 import { lineName } from "./sales-order-facts";
+import { missingDeliveryDateGuidance } from "./sales-order-guidance";
 import { copySalesOrderDraft } from "./sales-order-copy";
 
 /* pdf.js worker ships inside the package — nothing fetched from a CDN. */
@@ -415,9 +418,13 @@ export default function SalesOrderWorkspace() {
   const [viewRev, setViewRev] = useState<number | null>(null);
   const [amendmentSeed, setAmendmentSeed] = useState<AmendmentProposal | null>(null);
   const [cancelOpen, setCancelOpen] = useState(false);
+  const [problemOpen, setProblemOpen] = useState(false);
   const [objectView, setObjectView] = useState<ObjectView>(showRoute ? "Order Route" : "Order");
 
   const detailQ = useOperationOrder(isNew ? copyFrom : (orderId ?? null));
+  const serviceCasesQ = useOrderServiceCases(isNew ? "" : (orderId ?? ""), {
+    enabled: !isNew && Boolean(orderId),
+  });
   const revisionsQ = useSalesOrderRevisions(isNew ? null : (orderId ?? null));
   /* 3.4 · what this sales order's changes have raised for other modules. The
    * workspace SHOWS it and cannot close it — the module that raised the work
@@ -967,6 +974,14 @@ export default function SalesOrderWorkspace() {
   );
 
   const soWord = isNew ? "New Sales Order" : order ? `SO-${order.so}` : "Sales Order";
+  const missingDateAction = order && !order.delivery_date
+    ? missingDeliveryDateGuidance({
+        so: order.so,
+        customer: order.customer_name,
+        salesperson: order.salespersons?.name,
+        phone: order.customer_phone,
+      })
+    : null;
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -1005,6 +1020,31 @@ export default function SalesOrderWorkspace() {
           open={cancelOpen}
           onOpenChange={setCancelOpen}
           onCancelled={() => void detailQ.refetch()}
+        />
+      )}
+
+      {problemOpen && order && (
+        <ServiceCaseWizard
+          initialOrder={{
+            id: order.id,
+            so: `SO-${order.so}`,
+            refNos: order.source_ref ?? [],
+            customerName: order.customer_name,
+            customerPhone: order.customer_phone,
+            customerAddress: order.customer_address,
+            deliveryDate: order.delivery_date,
+            lines: (detailQ.data?.lines ?? []).filter((line) => line.id).map((line) => ({
+              id: line.id!,
+              sku: line.sku,
+              qty: line.qty,
+              sourcePo: line.source_po ?? null,
+            })),
+          }}
+          onClose={() => setProblemOpen(false)}
+          onSaved={() => {
+            setProblemOpen(false);
+            void serviceCasesQ.refetch();
+          }}
         />
       )}
 
@@ -1093,7 +1133,7 @@ export default function SalesOrderWorkspace() {
                   ) : null}
                 </div>
               )}
-                {!isNew && (order?.source_ref ?? []).length > 0 && (
+              {!isNew && (order?.source_ref ?? []).length > 0 && (
                   <div className="px-1 text-meta text-base-500">
                     Customer reference {(order?.source_ref ?? []).join(" · ")}
                   </div>
@@ -1381,6 +1421,60 @@ export default function SalesOrderWorkspace() {
                     emptyWord=""
                   />
                 </Section>
+              )}
+
+              {!isNew && mode === "view" && order && (
+                <section className="rounded-card border border-kit-slate-5 bg-white p-4 xl:col-span-2" aria-labelledby="sales-order-problems">
+                  {missingDateAction && (
+                    <details open className="mb-4 rounded-control border border-kit-slate-5 bg-kit-amber-3 p-3">
+                      <summary className="cursor-pointer list-none">
+                        <span className="block text-body font-semibold text-kit-amber-11">{missingDateAction.problem}</span>
+                        <span className="block text-meta font-normal text-base-600">{missingDateAction.action}</span>
+                      </summary>
+                      <dl className="mt-3 grid gap-2 border-t border-kit-slate-5 pt-3 sm:grid-cols-2">
+                        {[
+                          ["Why", missingDateAction.why],
+                          ["Who must act", missingDateAction.owner],
+                          ["Who to contact", missingDateAction.contact],
+                          ["What to ask", missingDateAction.ask],
+                          ["What to use", missingDateAction.use],
+                          ["What to record", missingDateAction.record],
+                          ["What happens next", missingDateAction.next],
+                        ].map(([label, value]) => (
+                          <div key={label}>
+                            <dt className="text-label font-semibold text-base-600">{label}</dt>
+                            <dd className="mt-0.5 text-body text-base-900">{value}</dd>
+                          </div>
+                        ))}
+                      </dl>
+                    </details>
+                  )}
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <h2 id="sales-order-problems" className="text-body font-semibold text-base-900">Problems</h2>
+                      <p className="mt-0.5 text-meta text-base-600">Report a customer, product, delivery or installation problem.</p>
+                    </div>
+                    <Button variant="neutral" onClick={() => setProblemOpen(true)}>Report a problem</Button>
+                  </div>
+                  {(serviceCasesQ.data?.items ?? []).length > 0 && (
+                    <div className="mt-3 divide-y divide-kit-slate-5 border-t border-kit-slate-5">
+                      {(serviceCasesQ.data?.items ?? []).map((item) => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => navigate(`/operation/service-cases?case=${encodeURIComponent(item.id)}`)}
+                          className="flex w-full items-center justify-between gap-3 py-2 text-left hover:text-kit-blue-11"
+                        >
+                          <span>
+                            <span className="block text-body font-medium">Service Case {item.caseNo}</span>
+                            <span className="block text-meta text-base-600">{item.statusLabel ?? "Status not recorded"}</span>
+                          </span>
+                          <span className="text-meta text-kit-blue-11">Open case</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </section>
               )}
 
             </div>

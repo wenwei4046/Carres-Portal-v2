@@ -213,6 +213,22 @@ Order does not gain a writer.
   Delivery Date remains distinct. No new address, access, delivery-date or destination field was
   created. `docs/ui/MASTER.md` §6.6 records the final reusable UI proof.
 
+## Guided operations and Service Case boundary — built, production verification pending
+
+- A missing Customer Delivery date uses the governed two-line action grammar in the Register:
+  the exact SO/fact first, then Salesperson (or Sales fallback), customer, concrete confirmation
+  act and required recorded result. The Sales Order detail expands the same derived fact into
+  Why, Who must act, Who to contact, What to ask, What to use, What to record and What happens
+  next. The guidance stores no second action or delivery truth.
+- `Report a problem` is the one Sales Order entrance for a customer, product, delivery or
+  installation problem. It pre-links the current SO/customer/items into the canonical Service
+  Case guided intake and preserves that writer's evidence, permission and follow-up contract.
+  Sales Order only lists linked Service Case number/status and deep-links to Service Cases; it
+  owns no investigation, Claim, Return, Replacement, Collection or Refund workflow.
+- The pre-existing production-verified Register, goods expansion/footer, Object Detail/Edit,
+  Revisions, History, Order Route, Print and Quick Rail composition remain unchanged except for
+  these governed guidance and Service Case read/door additions.
+
 ## Object/domain completeness sweep — 2026-08-13
 
 Evidence inspected: current Carres register/workspace/API/schema and migration surface; live 2990
