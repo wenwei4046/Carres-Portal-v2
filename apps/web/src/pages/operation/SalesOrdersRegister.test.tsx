@@ -197,7 +197,17 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
               qty: 11,
               unit_price: 2499,
               label: "B1201S · King",
-              attrs: { category: "mattress", firmness: "medium", colour: "Sand" },
+              attrs: {
+                category: "mattress",
+                firmness: "medium",
+                colour: "Sand",
+                fabric_code: "CG-012",
+                x: 60,
+                y: 192.5,
+                rot: 0,
+                cell_index: 1,
+                sofa_build_key: "internal-builder-uuid",
+              },
             },
           ],
         }),
@@ -230,8 +240,12 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     expect(row).toHaveTextContent("B1201S · King");
     expect(row).toHaveTextContent("Firmness: medium");
     expect(row).toHaveTextContent("Colour: Sand");
+    expect(row).toHaveTextContent("Fabric code: CG-012");
     expect(row).toHaveTextContent("Carres Klang ×10");
     expect(row).toHaveTextContent("AL Sungai Buloh ×1");
+    expect(row).not.toHaveTextContent("X: 60");
+    expect(row).not.toHaveTextContent("Cell index");
+    expect(row).not.toHaveTextContent("internal-builder-uuid");
     expect(screen.queryByText(/current location/i)).not.toBeInTheDocument();
   });
 
