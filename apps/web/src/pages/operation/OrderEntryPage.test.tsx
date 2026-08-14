@@ -39,10 +39,11 @@ describe("OrderEntryPage", () => {
   it("prefills the 4 default methods (incl. cash) + the Bank follow-up on credit when config is empty", () => {
     render(<OrderEntryPage />);
 
-    expect(screen.getByDisplayValue("Online transfer")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("Credit / Debit")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("Installment")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("Cash")).toBeInTheDocument();
+    for (const method of ["Online transfer", "Credit / Debit", "Installment", "Cash"])
+      expect(screen.getByText(method)).toBeInTheDocument();
+    expect(screen.queryByLabelText("online label")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit Credit / Debit" }));
 
     // Bank follow-up rides on the credit method, options seeded from MY_BANKS.
     expect(screen.getByLabelText("credit follow-up bank label")).toHaveValue("Bank");
@@ -62,13 +63,14 @@ describe("OrderEntryPage", () => {
 
   it("toggling a builtin (race → not required) saves formFields.customer.builtins.race.required === false", () => {
     render(<OrderEntryPage />);
+    fireEvent.click(screen.getByRole("button", { name: "Edit Order Entry fields" }));
 
     const raceRequired = screen.getByLabelText("Race required") as HTMLInputElement;
     expect(raceRequired.checked).toBe(true); // defaultRequired
     fireEvent.click(raceRequired);
     expect(raceRequired.checked).toBe(false);
 
-    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 
     const payload = savedPayload();
     expect(payload.formFields.customer?.builtins.race).toEqual({
@@ -93,7 +95,7 @@ describe("OrderEntryPage", () => {
     // The new method appears in the editor with its permanent key.
     expect(screen.getByLabelText("e-wallet label")).toHaveValue("E-wallet");
 
-    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 
     const payload = savedPayload();
     const added = payload.paymentMethods.find((m) => m.key === "e-wallet");
@@ -113,5 +115,15 @@ describe("OrderEntryPage", () => {
       "cash",
       "e-wallet",
     ]);
+  });
+
+  it("uses focused payment-method editing and truthful required-information terminology", () => {
+    render(<OrderEntryPage />);
+    expect(screen.queryByText(/Add follow-up/i)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Edit Online transfer" }));
+    expect(screen.getByLabelText("online label")).toHaveValue("Online transfer");
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save changes" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add required information" })).toBeInTheDocument();
   });
 });

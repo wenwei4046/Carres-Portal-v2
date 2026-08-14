@@ -18,6 +18,9 @@
 - Reuse Carres UI tokens and shared components; do not copy 2990 visual tokens.
 - Header-column filters remain the sole direct filtering door; outputs remain truthful for filtered and selected states.
 - Update MASTER closure only after authenticated production verification.
+- Use one reusable Object Header grammar across View, Edit, Revisions, History, and Order Route: one owning-register back destination, persistent object identity, governed actions, and applicable object tabs.
+- Keep Order Route read-only and fact-derived; present simultaneous per-goods routes before a compact authoritative obligation checklist, without an invented overall status or manual completion writer.
+- Keep one central Settings Workspace. Default module settings presentation is readable summaries with focused item editing, never raw config structures.
 
 ---
 
@@ -96,7 +99,62 @@
 - [ ] Run focused tests and confirm they pass.
 - [ ] Commit the rail slice.
 
-### Task 5: Gates, release, production proof, and authoritative closure
+### Task 5: Per-goods Order Route presentation
+
+**Files:**
+- Modify: `apps/web/src/pages/operation/SalesOrderWorkspace.ui-contract.test.ts`
+- Modify: `apps/web/src/pages/operation/SalesOrderWorkspace.test.tsx`
+- Modify: `apps/web/src/pages/operation/SalesOrderWorkspace.tsx`
+- Modify only if the existing projection cannot express a truthful item grouping: `packages/shared/src/sales-order-route.ts` and its focused tests.
+
+**Interfaces:**
+- Consumes: the existing production-verified Order Route read projection and owning-module URLs.
+- Produces: one route section per actual goods/category/item scope, truthful stage labels and `CURRENT` position, clickable document identifiers, and a secondary `Still owed` checklist.
+
+- [ ] Add failing contract/render tests that reject dashboard-card lineage and require multiple simultaneous item routes, truthful missing-stage copy, `CURRENT`, owning-object links, and a compact meaningful-only obligation checklist.
+- [ ] Run the focused tests and confirm the current card presentation fails them.
+- [ ] Extract a focused route renderer if needed and recompose the existing projection without changing its fetches, ownership, or writers.
+- [ ] Run the focused route/workspace tests and confirm they pass.
+- [ ] Commit the Order Route presentation slice.
+
+### Task 6: Central Settings and readable Sales Order Settings
+
+**Files:**
+- Modify: `apps/web/src/pages/operation/SettingsWorkspace.tsx`
+- Modify/create focused test: `apps/web/src/pages/operation/SettingsWorkspace.test.tsx`
+- Modify: `apps/web/src/pages/operation/SalesOrderSettings.tsx`
+- Modify: `apps/web/src/pages/operation/SalesOrderSettings.test.tsx`
+- Modify: `apps/web/src/pages/operation/OrderEntryPage.tsx`
+- Modify focused tests beside `OrderEntryPage` only where interaction ownership changes.
+
+**Interfaces:**
+- Consumes: the existing production-verified Sales Order config query/writer, validation, permissions, and real Settings destinations.
+- Produces: permission-filtered central module navigation plus reusable `group -> summary item -> focused Edit -> Save/Cancel/Discard` settings grammar.
+
+- [ ] Add failing tests for real-only central Settings destinations, readable group/summary presentation, one-item focused edit, edit-only Save/Cancel/Discard, and preserved permission/validation behavior.
+- [ ] Add a failing terminology test that rejects `Add follow-up` and requires the exact config meaning established from the data contract.
+- [ ] Verify the config writer semantics, including whether changes affect new orders only, and encode only supportable explanatory copy in the test.
+- [ ] Implement the summary/edit grammar over the existing writer and rename the nested config field action truthfully.
+- [ ] Run focused Settings and Order Entry tests and confirm they pass.
+- [ ] Commit the Settings presentation slice.
+
+### Task 7: Reusable template contracts and authority update
+
+**Files:**
+- Modify: `apps/web/src/pages/operation/SalesOrderWorkspace.ui-contract.test.ts`
+- Modify: `docs/ui/MASTER.md`
+- Modify: `docs/orders/MASTER.md`
+
+**Interfaces:**
+- Consumes: the implemented Object Header and Settings components.
+- Produces: reusable PO/GRN/etc object-header and future-module Settings laws without claiming unbuilt destinations.
+
+- [ ] Add/strengthen source contracts that prevent Sales Order-only hardcoding in the reusable object header and prevent raw default config editing.
+- [ ] Record the owner-approved corrections as current authority while leaving production-closure claims pending.
+- [ ] Run the focused source contracts and documentation consistency checks.
+- [ ] Commit the reusable-template authority slice.
+
+### Task 8: Gates, release, production proof, and authoritative closure
 
 **Files:**
 - Modify after production proof: `docs/ui/MASTER.md`
@@ -109,6 +167,6 @@
 - [ ] Run focused UI tests, full tests, lint, typecheck, build, migration gate, and relevant Playwright checks.
 - [ ] Inspect the final diff against every owner acceptance item and production-contract non-goal.
 - [ ] Push a branch, create the PR, satisfy required CI, merge, and follow the repository deployment path.
-- [ ] Verify authenticated production at desktop size for Register, expansion, output/columns/filter, Object View/Edit/Revisions/History/Order Route, grouped sidebar, and all rail panels.
+- [ ] Verify authenticated production at desktop size for Register, expansion, output/columns/filter, Object View/Edit/Revisions/History/Order Route, per-goods route and `Still owed`, central Settings navigation, Sales Order Settings summary/edit interaction and terminology, grouped sidebar, and all rail panels.
 - [ ] Only after proof, overwrite `docs/ui/MASTER.md` and `docs/orders/MASTER.md` with the verified current truth; repeat PR/CI/merge/deploy if repository policy requires documentation through the same gate.
 - [ ] Run the final production smoke and capture deploy/commit proof.

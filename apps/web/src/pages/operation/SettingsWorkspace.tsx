@@ -17,8 +17,8 @@ import OperationPurchasingSettings from "./OperationPurchasingSettings";
 import SalesOrderSettings from "./SalesOrderSettings";
 
 const SECTIONS = [
-  { slug: "sales-orders", label: "Sales Order Settings" },
-  { slug: "purchasing", label: "Purchasing Settings" },
+  { slug: "sales-orders", label: "Sales Orders" },
+  { slug: "purchasing", label: "Purchasing" },
 ] as const;
 
 export default function SettingsWorkspace() {

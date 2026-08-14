@@ -58,8 +58,8 @@ export default function SalesOrderSettings() {
         <div className="kicker">Sales Orders</div>
         <h1 className="text-page font-display mt-1.5 text-base-900">Sales Order Settings</h1>
         <p className="text-body text-base-600 mt-1">
-          What a Sales Order may be filled in with. These settings are shared by everyone, and
-          they never change an order that is already saved.
+          Configure the options available when creating a Sales Order. Changes apply when the
+          order-entry form is next loaded and never rewrite an order that is already saved.
         </p>
       </div>
 

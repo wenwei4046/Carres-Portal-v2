@@ -51,7 +51,7 @@ describe("it owns exactly the three things §11 named", () => {
 
   it("says plainly that a saved order keeps its own words", () => {
     mount();
-    expect(screen.getByText(/never change an order that is already saved/i)).toBeInTheDocument();
+    expect(screen.getByText(/never rewrite an order that is already saved/i)).toBeInTheDocument();
   });
 });
 
