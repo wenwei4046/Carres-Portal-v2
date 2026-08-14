@@ -1079,7 +1079,7 @@ export default function SalesOrderWorkspace() {
           {(isNew && !copyFrom || order) && (
             <div className="mx-auto grid max-w-6xl grid-cols-1 gap-3 xl:grid-cols-2" data-testid="sales-order-workspace">
               {(mode === "oldrev" || mode === "edit" || (mode === "create" && copyFrom)) && (
-                <div className="px-1 py-1 text-meta text-base-600">
+                <div className="px-1 py-1 text-meta text-base-600 xl:col-span-2">
                   {mode === "oldrev" && viewedRevision ? (
                     <span className="rounded-pill bg-base-900 px-2 py-0.5 text-label font-semibold text-white">
                       Viewing Rev {viewedRevision.revision} · read-only
