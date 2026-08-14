@@ -69,11 +69,27 @@
   flex: none;
 }
 
-/* Sales Orders Reference Implementation · Stage A. Geometry only: the
-   engine and every capability remain shared. This opt-in keeps the serious
-   register baseline off frozen callers and does not create a global 32px law. */
+/* Sales Orders Reference Implementation. Geometry only: the engine and every
+   capability remain shared. REGISTER TABLE DENSITY LAW + REGISTER STATUS
+   FOOTER (docs/ui/MASTER.md) own these numbers — rendered 36px header on
+   text-label (11/14), 38px single-line parent row on text-body (13/18), 32px
+   fixed status footer. The earlier 31/33/22px high-density copy came from
+   2990's AutoCount-style ledger grid, not from 2990's readable listing
+   geometry, and no longer authors this destination.
+
+   The opt-in stays because it names an intent, not because it is shielding
+   other pages. MEASURED 2026-08-14: this stylesheet reaches exactly one screen
+   — DataGrid.module.css is imported only by components/register/DataGrid.tsx,
+   which is imported only by pages/operation/SalesOrdersRegister.tsx. The
+   frozen Purchasing pages (To Order, Purchase Orders, Receiving, Supplier
+   Claim) render components/data-grid/DataGrid.tsx, a different component on
+   Tailwind classes at 40px rows, and never load this file at all. So `.root`
+   is not a shared base with those pages; do not plan a change around that
+   belief without re-measuring the import graph.
+
+   No px font-size literal lives in this scope: the sizes are the `.root`
+   token aliases, never a token redefined to a different value. */
 .rootReference {
-  --fs-12: 11px;
   border: 1px solid var(--line);
 }
 .rootReference .toolbar {
@@ -86,23 +102,31 @@
 }
 .rootReference .th {
   box-sizing: border-box;
-  height: 31px;
+  height: 36px;
   padding: 0 8px;
-  font-size: 10px;
+  font-size: var(--fs-11);
+  line-height: 14px;
   font-weight: 700;
 }
 .rootReference .td {
   box-sizing: border-box;
-  height: 33px;
+  height: 38px;
   padding: 0 8px;
-  font-size: 11px;
-  line-height: 16px;
+  font-size: var(--fs-13);
+  line-height: 18px;
 }
+/* Always present, fixed to the table frame, never scrolls with the rows and
+   never gives its height back when space is tight — hence flex: none. The
+   summary is one unwrapped line, so the footer costs 32px and not a row. */
 .rootReference .statusLine {
   box-sizing: border-box;
-  height: 22px;
-  min-height: 22px;
+  flex: none;
+  height: 32px;
+  min-height: 32px;
   padding: 0 12px;
+  letter-spacing: 0;
+  text-transform: none;
+  white-space: nowrap;
 }
 
 /* ── Toolbar ─────────────────────────────────────────────────────── */
