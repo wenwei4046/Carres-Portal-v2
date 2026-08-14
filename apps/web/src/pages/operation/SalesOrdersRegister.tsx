@@ -270,10 +270,16 @@ function ExpandedLines({ row }: { row: RegisterRow }) {
         <section key={category}>
           <h3 className="text-label font-semibold text-base-500">{category}</h3>
           {categoryLines.map((line, index) => (
-            <div key={`${line.sku}-${index}`} className="grid grid-cols-[150px_minmax(240px,1fr)_60px] gap-3 py-0.5">
-              <span className="font-mono text-meta">{line.sku}</span>
-              <span>{lineName(line)}{configOf(line) ? ` · ${configOf(line)}` : ""}</span>
-              <span className="text-right tabular-nums">Qty {line.qty}</span>
+            <div key={`${line.sku}-${index}`}>
+              <div
+                className="inline-flex w-fit items-baseline gap-1 whitespace-nowrap py-0.5"
+                data-testid={`expanded-good-${line.sku}`}
+              >
+                <span className="font-mono text-meta">{line.sku}</span>
+                <span aria-hidden="true">·</span>
+                <span>{lineName(line)}{configOf(line) ? ` · ${configOf(line)}` : ""}</span>
+                <span className="tabular-nums">×{line.qty}</span>
+              </div>
             </div>
           ))}
         </section>
@@ -282,10 +288,13 @@ function ExpandedLines({ row }: { row: RegisterRow }) {
         <section>
           <h3 className="text-label font-semibold text-base-500">ACCESSORY</h3>
           {addons.map((addon, index) => (
-            <div key={index} className="grid grid-cols-[150px_minmax(240px,1fr)_60px] gap-3 py-0.5">
-              <span className="font-mono text-meta">{addon.addon_key ?? "Add-on"}</span>
-              <span>{addon.addon_key?.replace(/[_-]+/g, " ") ?? "Add-on"}</span>
-              <span className="text-right tabular-nums">Qty {addon.qty}</span>
+            <div key={index}>
+              <div className="inline-flex w-fit items-baseline gap-1 whitespace-nowrap py-0.5">
+                <span className="font-mono text-meta">{addon.addon_key ?? "Add-on"}</span>
+                <span aria-hidden="true">·</span>
+                <span>{addon.addon_key?.replace(/[_-]+/g, " ") ?? "Add-on"}</span>
+                <span className="tabular-nums">×{addon.qty}</span>
+              </div>
             </div>
           ))}
         </section>
