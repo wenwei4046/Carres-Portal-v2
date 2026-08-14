@@ -2260,6 +2260,7 @@ ordersRouter.post("/:id/top-up", (c) =>
       p_note: body.note,
       p_date: body.date,
       p_photo_paths: body.photoPaths,
+      p_idempotency_key: body.idempotencyKey ?? null,
     }),
   }),
 );

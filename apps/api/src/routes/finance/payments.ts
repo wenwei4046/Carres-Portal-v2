@@ -117,6 +117,7 @@ financePaymentsRouter.post("/order-receipt", requireFinance, async (c) => {
     p_amount:    body.data.amount,
     p_method:    body.data.method,
     p_reference: body.data.reference ?? null,
+    p_idempotency_key: body.data.idempotencyKey ?? null,
   });
   if (error) {
     const m = mapPgError(error);

@@ -441,6 +441,7 @@ export const topUpOrderInputSchema = z.object({
   /** Storage paths for receipt photos, validated by the route to live inside
    *  the caller's dealer folder. Up to 4 (proto matches that cap). */
   photoPaths: z.array(z.string()).max(4),
+  idempotencyKey: z.string().uuid().optional(),
 });
 export type TopUpOrderInput = z.infer<typeof topUpOrderInputSchema>;
 

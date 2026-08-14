@@ -918,10 +918,10 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
     if (!order || !canRecord) return;
     setPayErr(null);
     try {
+      const sessionId = newWizardSessionId();
       let photoPaths: string[] = [];
       if (slip) {
         setUploading(true);
-        const sessionId = newWizardSessionId();
         const ext = slip.file.type === "image/png" ? "png" : "jpg";
         photoPaths = [
           await uploadAttachment({
@@ -942,6 +942,7 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
         note: null,
         date: todayMY,
         photoPaths,
+        idempotencyKey: sessionId,
       });
       // Reset the form; the amount re-seeds from the refetched paid.
       setApprovalCode("");

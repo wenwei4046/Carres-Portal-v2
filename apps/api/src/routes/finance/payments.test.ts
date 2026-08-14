@@ -288,6 +288,7 @@ describe("POST /api/finance/payments/order-receipt", () => {
           amount:    1500,
           method:    "duitnow_qr",
           reference: "FPX 1248",
+          idempotencyKey: "00000000-0000-4000-8000-000000000051",
         }),
       }),
       env,
@@ -298,6 +299,7 @@ describe("POST /api/finance/payments/order-receipt", () => {
       p_amount:    1500,
       p_method:    "duitnow_qr",
       p_reference: "FPX 1248",
+      p_idempotency_key: "00000000-0000-4000-8000-000000000051",
     });
   });
 
