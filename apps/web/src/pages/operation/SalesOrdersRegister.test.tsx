@@ -193,6 +193,22 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     expect(screen.getByText("Qty 1")).toBeInTheDocument();
   });
 
+  it("classifies legacy item codes before falling back to Other Goods", () => {
+    listHookState.data = {
+      orders: [
+        order({
+          order_lines: [
+            { sku: "B1201S-K", qty: 1, unit_price: 2499, label: "B1201S · King", attrs: {} },
+          ],
+        }),
+      ],
+    };
+    mount();
+    fireEvent.click(screen.getByRole("button", { name: "Expand row" }));
+    expect(screen.getByRole("heading", { name: "MATTRESS" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "OTHER GOODS" })).not.toBeInTheDocument();
+  });
+
   it("keeps loading inside the work surface instead of adding an outer band", () => {
     listHookState = {
       data: undefined,
