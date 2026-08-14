@@ -702,7 +702,10 @@ function PaymentLedger({
   const { data, isLoading } = useOrderPayments(orderId);
   const payments = data?.payments ?? [];
   const summary = summarizePayments(
-    payments.map((p) => ({ amount: Number(p.amount), kind: p.kind })),
+    // `voided_at` must ride along — a void is a stamp, not a delete (0343), so a
+    // reversed payment is still in this array. `summarizePayments` asks
+    // `isLivePayment` (0347); mapping the field away silently re-opens the hole.
+    payments.map((p) => ({ amount: Number(p.amount), kind: p.kind, voided_at: p.voided_at })),
     bill,
   );
   const hasBill = bill > 0;
@@ -824,15 +827,25 @@ function LedgerRow({
   onVoid: () => void;
   receiptMeta?: { orderCode: string; customerName: string };
 }) {
+  // 0343 — a void is a stamp, not a delete, so a reversed payment stays in this
+  // list. It must LOOK reversed: the amount is struck through and the row is
+  // dimmed, or the ledger reads as if the money is still there while the total
+  // (which skips it) says otherwise.
+  const voided = row.voided_at != null;
   return (
-    <div className="flex items-center gap-2 text-meta">
+    <div className={`flex items-center gap-2 text-meta${voided ? " opacity-55" : ""}`}>
       <span className="text-base-500 tabular-nums w-[68px] shrink-0">{row.paid_on}</span>
-      <span className="font-mono font-semibold text-base-900 w-[78px] shrink-0">
+      <span
+        className={`font-mono font-semibold w-[78px] shrink-0 ${
+          voided ? "text-base-500 line-through" : "text-base-900"
+        }`}
+      >
         {RM(Number(row.amount))}
       </span>
       <span className="text-base-600 capitalize flex-1 truncate">
         {KIND_LABEL[row.kind]} · {row.method}
         {row.receipt_no ? ` · ${row.receipt_no}` : ""}
+        {voided ? " · Voided" : ""}
       </span>
       {receiptMeta && (
         <button
@@ -845,7 +858,9 @@ function LedgerRow({
           <Receipt size={14} strokeWidth={2} />
         </button>
       )}
-      {canVoid && (
+      {/* An already-voided row offers no void button — the RPC answers
+          `already_voided`, so the control could only ever produce an error. */}
+      {canVoid && !voided && (
         <button
           type="button"
           onClick={onVoid}

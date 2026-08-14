@@ -858,7 +858,13 @@ operationOrdersRouter.get("/:id/completion", requireOperation, async (c) => {
     addonSum: addons.reduce((s, a) => s + price(a), 0),
     paid: ord.paid,
     controlBalance: (ctrl?.balance as number | string | null) ?? null,
-    storageOwing: hold.fee,
+    // `owing`, never `fee`. `storageHold` defines `owing = collectedAt ? 0 : fee`
+    // (storage-hold.ts), so once the fee has been COLLECTED the two part company
+    // and `fee` bills money already banked — an order that ever carried a storage
+    // fee could then never read as complete. `order-control.ts` and
+    // `OperationOrdersControl.tsx` both pass `owing`; this is the third reader of
+    // one derived fact and it agrees with them (Law D).
+    storageOwing: hold.owing,
     storageReleased: hold.released,
   });
 
