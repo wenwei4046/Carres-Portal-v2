@@ -217,7 +217,13 @@ function DayPicker({
   );
 }
 
-export default function OperationPurchasingSettings() {
+/** `embedded` renders this as a SECTION of the one Settings Workspace, which
+ *  draws its own section navigation. Without it the page brings the whole
+ *  Purchasing tab bar along and the operator sees two navigations at once.
+ *  The standalone Purchasing tab is untouched. */
+export default function OperationPurchasingSettings({
+  embedded = false,
+}: { embedded?: boolean } = {}) {
   const { data, isLoading, error } = usePurchasingSettings();
   const setNumber = useSetPurchasingNumber();
   const setPoDays = useSetPurchasingPoDays();
@@ -253,7 +259,7 @@ export default function OperationPurchasingSettings() {
   if (isLoading) {
     return (
       <div className="h-full flex flex-col">
-        <PurchasingTabs />
+        {!embedded && <PurchasingTabs />}
         <div className="px-9 py-8 text-body text-base-500">Loading the numbers…</div>
       </div>
     );
@@ -262,7 +268,7 @@ export default function OperationPurchasingSettings() {
   if (error || !data) {
     return (
       <div className="h-full flex flex-col">
-        <PurchasingTabs />
+        {!embedded && <PurchasingTabs />}
         <div className="px-9 py-8">
           <div className="max-w-[560px] rounded-[10px] border border-danger bg-error-soft p-4">
             <div className="text-body font-semibold text-danger mb-1">
@@ -285,7 +291,7 @@ export default function OperationPurchasingSettings() {
 
   return (
     <div className="h-full flex flex-col">
-      <PurchasingTabs />
+      {!embedded && <PurchasingTabs />}
       <div className="px-9 py-8 pb-14 overflow-auto" data-testid="purchasing-settings">
         <div className="text-body text-base-600 mb-[18px] max-w-[720px]">
           The numbers the ordering engine reads. Change one here and the
