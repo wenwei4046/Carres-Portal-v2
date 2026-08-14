@@ -190,7 +190,11 @@ Order does not gain a writer.
   user-facing Settings copy must call them `required information` (or the exact field label), never
   `Follow-up`.
 - These are owner UI acceptance corrections to the existing production slice, not new business
-  rules. Production closure remains pending until the full authenticated acceptance list passes.
+  rules. **CLOSED / PRODUCTION-VERIFIED 2026-08-14:** PR #771 merged as `5fed50d3`; PR #773 fixed
+  the known-goods category fallback and merged as `4934826d`; PR #776 closed the final
+  object-route/Settings presentation mismatches and merged as `30fa407b`. Deploy run `31768870907`
+  converged all governed production surfaces on exact SHA `30fa407b`; the authenticated acceptance
+  list passed at 1440×900. `docs/ui/MASTER.md` §6.6 records the reusable Shell/Register/Object proof.
 
 ## Object/domain completeness sweep — 2026-08-13
 
@@ -240,11 +244,14 @@ official Card numbers.
    version `5c669747-8a6b-4998-9643-fcc39604c69d` serves the API change at 100%. Authenticated
    production verification on `erp.carresofficial.com/operation/orders` proved the exact default
    order **SO No / Ordered / Customer Delivery / Customer / Delivery Location / PO No / DO No**,
-   `Columns 7/38`, bounded bordered surface, preserved Search / typed filters / Columns / Export,
-   inline goods-only grouped disclosure (`Other Goods`, SKU/model/size/quantity), direct SO document
+   bounded bordered surface, preserved Search / typed filters / Columns / Export,
+   inline goods-only grouped disclosure (SKU/model/size/quantity), direct SO document
    navigation, and the 2990-style right-click actions **View / Edit / Preview PDF / Print PDF / Copy
    SO No**. No overall Current/status or Register work-queue behavior is present. Type checks, design
-   guards and the 82-test Orders API suite passed before merge.
+   guards and the 82-test Orders API suite passed before merge. The 2026-08-14 owner touch-up in
+   PR #771 removed the permanent Columns count and made the utility compact; PR #773 maps known
+   legacy goods to their real category before fallback. Authenticated production proof on SO-1319
+   rendered `B1201S-K` under `MATTRESS`, not `OTHER GOODS`.
 2. **CLOSED / PRODUCTION-VERIFIED 2026-08-13 — Sales Order Detail + Authoritative Edit Contract** —
    PR #754 merged to `main` as `3bdc7ada`. Authenticated production verification on SO-1318 proved
    the saved Current/Order truth, explicit Edit context, one-page current PDF with no render error

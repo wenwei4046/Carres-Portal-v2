@@ -619,9 +619,9 @@ viewport height without copying its visual treatment.
 # §6.6 · SALES ORDERS REFERENCE STRUCTURE — ruled by Loo 2026-08-10
 
 **Stage A is owner-accepted and CLOSED.** Sales Orders is the first production reference
-implementation of the approved Carres destination/listing architecture. This ruling is
-page-scoped; it does not reopen Purchase Orders, To Order, Sidebar, Utility Rail or any other
-surface.
+implementation of the approved Carres destination/listing architecture. The 2026-08-14 owner
+touch-up below also governs the shared ERP Shell and Object Header; it does not reopen the
+production-verified Sales Order business engine or another module's ownership.
 
 ```
 DestinationHeader  44px  Sales Orders identity + genuine global utilities only
@@ -701,6 +701,23 @@ breathing gap
   config fields, Save/Cancel controls and database-like keys are not the default view. Future
   Purchasing, Warehouse and Delivery settings inherit the grammar without creating empty pages or
   duplicate top-level settings homes.
+- **ERP SHELL + SALES ORDER UI REFERENCE — PRODUCTION-VERIFIED / LOCKED (2026-08-14).** PR #771
+  merged as `5fed50d3`; the known-goods classification correction followed in PR #773 and merged
+  as `4934826d`; PR #776 closed the final object-route/Settings presentation mismatches and merged
+  as `30fa407b`. Production deploy run `31768870907` converged both Pages projects, both canonical
+  domains and Worker version `64b26128-5122-4082-95a8-bb13291d3186` on exact SHA `30fa407b`.
+  Authenticated desktop verification at 1440×900 proved the seven-column bordered Register,
+  header-owned New Sales Order action, compact Export/Columns utilities, direct header filters,
+  customer-name-only cells and category-grouped expansion (`MATTRESS` for SO-1319, never the stale
+  `OTHER GOODS` fallback for that known item). It also proved the grouped real-destination sidebar
+  with `Old Orders (temporary)` preserved; the independently scrolling 340px Team / Calendar /
+  My Work / Activity rail while the workspace remained usable; and the persistent Sales Order
+  identity/navigation across Order, Revisions, History, Order Route and Edit. Edit exposed Save,
+  Discard, the quiet commercial-boundary explanation, one read-only Address preview and Request
+  ownership change. Order retained the live one-page PDF canvas and compact Print output; Order
+  Route retained per-goods facts and Still owed. Sales Orders is therefore the production
+  reference for the ERP Shell, Register and Object Detail/Edit templates. Shared shell components
+  must remain module-neutral; dates, work, activity and mutations remain owned by their modules.
 - `docs/orders/MASTER.md` §0.1 owns the business/field/amendment/permission rules. Sales Portal/POS
   remains the master form contract; UI composition may not create a second commercial form or an
   operational action door.
