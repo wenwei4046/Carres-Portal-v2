@@ -787,6 +787,24 @@ RIGHT 400px  WORKING HEADER → REFERENCE LAYER → SUPPLIER FOLLOW-UP →
 Tables: `purchase_orders` **24** · `purchase_order_lines` **38** · `po_history` **23** ·
 `po_sends` **3** · `po_revisions` **2** · `po_supplier_promises` **6**
 
+### Deliver To — owner-locked operating rule (2026-08-14)
+
+`Deliver To` is Purchasing's authoritative instruction, at PO level with a PO-line override.
+It is not Warehouse's current physical Unit location and must not be copied onto Sales Orders.
+
+- Default: `Carres Klang` from the governed destination registry.
+- Batch Purchase / before Issue PO: Operations may change Deliver To directly. A SKU quantity
+  may split, for example `Carres Klang ×10 / AL Sungai Buloh ×1`; the split remains lines on the
+  same supplier PO.
+- After Issue PO but before the PO is sent to the supplier: Operations may change it directly;
+  the append-only PO History records the change.
+- After any supplier send: it may still change, but never silently. Preserve the previous
+  instruction, mint/record the changed revision, and require supplier update/recommunication so
+  Activity proves which revision was re-sent. A plain overwrite is not an accepted completion.
+- Every read resolves `coalesce(purchase_order_lines.destination_id,
+  purchase_orders.destination_id)`. The Sales Order expansion is a read-only projection of that
+  Purchasing result; it has no destination writer or duplicate destination column.
+
 **`GET /operation/pos` already ships every promise per PO** (`promises`, read since 0310 for the
 date history), which is why provenance needed **no migration and no new wire field** — the
 answer was already on the page, unread.

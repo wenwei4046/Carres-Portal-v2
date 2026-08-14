@@ -2811,6 +2811,7 @@ export interface operationOrderListRow {
   /** Compact line embed for the 货品 items summary (control table only).
    *  `unit_price` (C5) lets the row compute what the order is worth. */
   order_lines?: {
+    id?: string;
     sku: string;
     qty: number;
     unit_price?: number | string | null;
@@ -2912,6 +2913,27 @@ export interface operationOrderListRow {
    *  single object, or null when no overlay row exists yet. Defensively also
    *  typed as an array in case PostgREST resolves the relation as to-many. */
   ops_order_control?: opsRemarkEmbed | opsRemarkEmbed[] | null;
+}
+
+export interface SalesOrderExpansionResponse {
+  defaultDeliverTo: string | null;
+  lines: Array<{
+    lineId: string;
+    sku: string;
+    unitIds: string[];
+    deliverTo: Array<{ name: string; qty: number }>;
+  }>;
+}
+
+/** Read-only fan-in for the SO register disclosure. Stock owns Unit ID;
+ * Purchasing owns Deliver To. The Sales Order stores neither fact. */
+export function useSalesOrderExpansion(orderId: string | null) {
+  return useQuery({
+    queryKey: ["operation", "orders", orderId, "expansion"],
+    queryFn: () => apiFetch<SalesOrderExpansionResponse>(`/api/operation/orders/${orderId}/expansion`),
+    enabled: Boolean(orderId),
+    staleTime: 30_000,
+  });
 }
 export interface opsRemarkEmbed {
   // Optional (C2): the list no longer renders these remark fields in-row, and

@@ -462,14 +462,14 @@ when C1 reaches it.
 stored, the role word is the honest answer), and its "Confirm Supplier Stock ETA" phrasing
 (our shape puts the party first: `Call Ohana — confirm ready date`).
 
-### Where the goods go — the PO destination words (locked by Loo, 2026-07-29)
+### Deliver To — the Purchasing destination words (owner correction, 2026-08-14)
 
-The concept is already in the vocabulary table below (`where the goods go`, with `Ship-to` ·
-`Destination` · `Drop point` banned). These are the STRINGS.
+`Deliver To` is the short UI label. It names Purchasing's instruction for where the supplier
+must send the goods; it never means a Unit's current physical Warehouse location.
 
 | What | The word |
 |---|---|
-| The field label, on the PO form and the external document | **`Where the goods go`** |
+| The UI field/column label in Batch Purchase, Purchase Order and read-only SO goods expansion | **`Deliver To`** |
 | The three options | **`Carres Klang`** · **`AL Sungai Buloh`** · **`HOUZS`** |
 | Nice Future, which does not deliver | **`NETS collects from Nice Future and delivers to Carres Klang.`** |
 | The optional free-text field beside it | **`Delivery instructions`** |
@@ -929,7 +929,8 @@ Information Architecture and live in [`ERP-ARCHITECTURE.md`](ERP-ARCHITECTURE.md
 | The last day we may send the PO and still be safe | **order-by date** | Raise-by · Trigger date · Reorder date |
 | The days of the week we send POs | **PO days** | Cycle · Review day · Batch day |
 | Days kept back for arranging the delivery | **order-by buffer** | Safety stock days · Slack · Padding |
-| Where the supplier must send the goods | **where the goods go** | Ship-to · Destination · Drop point |
+| Where the supplier must send the goods | **Deliver To** | Where the goods go · Ship-to · Destination · Drop point · Location |
+| Physical identity assigned to one stock unit | **Unit ID** | Serial · Item ID |
 | What is still owed after a short delivery | **balance** | Outstanding qty · Back-order · Shortfall |
 | Goods moved between our own locations | **stock transfer** | Relocation · Internal shipment · Redeployment |
 | An SO edit because the RECORD was wrong — the customer's agreement never changed | **Staff correction** | Amendment · Fix · Data fix · Edit (as a cause word) — the two cause words come from the SO V2 Card 1 spec (owner, 2026-08-11) and are the structured `change_type` on every contractual revision |

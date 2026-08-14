@@ -56,9 +56,10 @@ import { apiFetch, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { renderDoPdf, renderSalesOrderPdf } from "@/lib/pdf/render";
 import type { DoTemplateData, SalesOrderTemplateData } from "@/lib/pdf/types";
-import { useOperationOrders } from "@/lib/queries";
+import { useOperationOrders, useSalesOrderExpansion } from "@/lib/queries";
 import CancelSalesOrderDialog from "./CancelSalesOrderDialog";
 import DestinationHeader from "./DestinationHeader";
+import { lineConfigBits } from "../dealer/new-order/special-addons-picker";
 import { isRental, lineName, type MoneyState } from "./sales-order-facts";
 import {
   buildRegisterRow,
@@ -246,6 +247,7 @@ function toGridColumn(
 function ExpandedLines({ row }: { row: RegisterRow }) {
   const lines = row.o.order_lines ?? [];
   const addons = row.o.order_addons ?? [];
+  const expansion = useSalesOrderExpansion(row.o.id);
   if (lines.length === 0 && addons.length === 0) {
     return <div className="px-10 py-2 text-meta text-base-500">No items on this order</div>;
   }
@@ -257,48 +259,44 @@ function ExpandedLines({ row }: { row: RegisterRow }) {
     const category = fromAttrs || fromSku || classifiedLabel;
     return category.replace(/[_-]+/g, " ").toUpperCase();
   };
-  const configOf = (line: (typeof lines)[number]) =>
-    Object.entries(line.attrs ?? {})
-      .filter(([key, value]) => key !== "category" && value != null && value !== "")
-      .map(([key, value]) => `${key.replace(/[_-]+/g, " ")}: ${String(value)}`)
-      .join(" · ");
-  const grouped = new Map<string, typeof lines>();
-  for (const line of lines) grouped.set(categoryOf(line), [...(grouped.get(categoryOf(line)) ?? []), line]);
+  const configOf = (line: (typeof lines)[number]) => {
+    const attrs = line.attrs ?? {};
+    const facts = lineConfigBits(attrs);
+    const handled = new Set(["category", "remark", "options", "options_total", "color", "gap", "fabric_name", "fabric_surcharge", "leg_height", "leg_surcharge", "special_addons", "specials"]);
+    for (const [key, value] of Object.entries(line.attrs ?? {})) {
+      if (handled.has(key) || value == null || value === "" || typeof value === "object") continue;
+      const label = key === "sofa_spec" ? "Sofa configuration" : key.replace(/[_-]+/g, " ").replace(/^./, (c) => c.toUpperCase());
+      facts.push(`${label}: ${String(value)}`);
+    }
+    return facts;
+  };
+  const factsByLine = new Map((expansion.data?.lines ?? []).map((l) => [l.lineId, l]));
   return (
-    <div className="ml-10 space-y-2 py-2 pr-6 text-body" data-testid="row-expansion">
-      {[...grouped.entries()].map(([category, categoryLines]) => (
-        <section key={category}>
-          <h3 className="text-label font-semibold text-base-500">{category}</h3>
-          {categoryLines.map((line, index) => (
-            <div key={`${line.sku}-${index}`}>
-              <div
-                className="inline-flex w-fit items-baseline gap-1 whitespace-nowrap py-0.5"
-                data-testid={`expanded-good-${line.sku}`}
-              >
-                <span className="font-mono text-meta">{line.sku}</span>
-                <span aria-hidden="true">·</span>
-                <span>{lineName(line)}{configOf(line) ? ` · ${configOf(line)}` : ""}</span>
-                <span className="tabular-nums">×{line.qty}</span>
-              </div>
-            </div>
-          ))}
-        </section>
-      ))}
-      {addons.length > 0 ? (
-        <section>
-          <h3 className="text-label font-semibold text-base-500">ACCESSORY</h3>
-          {addons.map((addon, index) => (
-            <div key={index}>
-              <div className="inline-flex w-fit items-baseline gap-1 whitespace-nowrap py-0.5">
-                <span className="font-mono text-meta">{addon.addon_key ?? "Add-on"}</span>
-                <span aria-hidden="true">·</span>
-                <span>{addon.addon_key?.replace(/[_-]+/g, " ") ?? "Add-on"}</span>
-                <span className="tabular-nums">×{addon.qty}</span>
-              </div>
-            </div>
-          ))}
-        </section>
-      ) : null}
+    <div className="px-10 py-3" data-testid="row-expansion">
+      <div className="overflow-x-auto rounded-control border border-base-200 bg-white">
+        <table className="w-full min-w-[860px] table-fixed text-left text-body" aria-label={`Goods on SO-${row.o.so}`}>
+          <colgroup><col className="w-28" /><col className="w-36" /><col className="w-36" /><col className="w-16" /><col /><col className="w-52" /></colgroup>
+          <thead className="border-b border-base-200 bg-base-50 text-label font-semibold text-base-600">
+            <tr>{["Category", "Unit ID", "SKU", "Qty", "Item", "Deliver To"].map((label) => <th key={label} className="px-3 py-2">{label}</th>)}</tr>
+          </thead>
+          <tbody className="divide-y divide-base-100">
+            {lines.map((line, index) => {
+              const fact = factsByLine.get(line.id ?? "");
+              return <tr key={line.id ?? `${line.sku}-${index}`} data-testid={`expanded-good-${line.sku}`} className="align-top">
+                <td className="px-3 py-2 text-label font-semibold text-base-600">{categoryOf(line)}</td>
+                <td className="px-3 py-2 font-mono text-meta">{fact?.unitIds.length ? fact.unitIds.map((id) => <div key={id}>{id}</div>) : "Not allocated"}</td>
+                <td className="px-3 py-2 font-mono text-meta">{line.sku}</td>
+                <td className="px-3 py-2 tabular-nums">{line.qty}</td>
+                <td className="px-3 py-2"><div className="font-medium text-base-900">{lineName(line)}</div>{configOf(line).length ? <div className="mt-0.5 text-meta text-base-600">{configOf(line).join(" · ")}</div> : null}</td>
+                <td className="px-3 py-2">{fact?.deliverTo.length ? fact.deliverTo.map((d) => <div key={`${d.name}-${d.qty}`}>{d.name} ×{d.qty}</div>) : expansion.isLoading ? "Loading…" : "Not recorded"}</td>
+              </tr>;
+            })}
+            {addons.map((addon, index) => <tr key={`addon-${index}`} className="align-top">
+              <td className="px-3 py-2 text-label font-semibold text-base-600">SERVICE</td><td className="px-3 py-2">—</td><td className="px-3 py-2 font-mono text-meta">{addon.addon_key}</td><td className="px-3 py-2 tabular-nums">{addon.qty}</td><td className="px-3 py-2">{addon.addon_key?.replace(/[_-]+/g, " ") ?? "Add-on"}</td><td className="px-3 py-2">Not applicable</td>
+            </tr>)}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
