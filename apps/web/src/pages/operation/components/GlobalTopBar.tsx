@@ -56,6 +56,7 @@ export default function GlobalTopBar() {
  *  when it actually OWNS settings — an entry that opens an empty page is a
  *  promise about the product, which is the thing the old placeholder did. */
 function moduleSettingsFor(pathname: string): { label: string; href: string } | null {
+  if (pathname.startsWith("/operation/issues")) return { label: "Issue Tracker Settings", href: "/operation/settings/issue-tracker" };
   if (pathname.startsWith("/operation/orders")) {
     return { label: "Sales Order Settings", href: "/operation/settings/sales-orders" };
   }

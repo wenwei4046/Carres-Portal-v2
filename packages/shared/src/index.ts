@@ -1,5 +1,7 @@
 export const SHARED_VERSION = "0.0.0" as const;
 
+export * from "./issue-tracker";
+
 export {
   resolveSalesOrderRoute,
   type RouteDeliveryAttempt,
