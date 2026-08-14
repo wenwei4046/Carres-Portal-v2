@@ -168,11 +168,29 @@ keep a superseded target.
 ## Order Route
 
 `Order Route` is a read-only route map/checklist derived only from authoritative facts. It is not a
-manual checklist and not another overall status. It shows clickable document lineage and the
-goods/fulfilment route, current position(s), and obligation checks across **Goods · Delivery · Money
-· Loan · Other Commitments**. Split fulfilment may show simultaneous positions — for example, a
-Bed delivered while a Sofa remains at supplier — so there is no forced single “You are here”. Each
-fact links to its owning object/surface; Sales Order does not gain the writer.
+manual checklist and not another overall status. Its primary presentation is one readable route per
+actual goods/category/item scope, rendering only applicable facts along `SO → PO → ETA → GRN → Unit
+→ DO → Delivered` and marking the present fact `CURRENT`. Split fulfilment may show simultaneous
+positions — for example, a Bed delivered while a Sofa remains at supplier — so there is no forced
+single “You are here”. Document identifiers link to their owning objects. Missing facts are stated
+truthfully (`PO not issued`, `Waiting Purchasing`) rather than filled with invented stages. A compact
+secondary `Still owed` checklist shows only meaningful Goods, Delivery, Money, Loan and Other
+Commitments obligations; it does not render a dashboard card for every clear/empty state. Sales
+Order does not gain a writer.
+
+## Owner UI acceptance corrections — 2026-08-14
+
+- The Sales Order object uses the shared Object Header: `← Sales Orders`, `SO-number · Customer`,
+  governed actions, then `Order · Revisions · History · Order Route`. The identity and navigation
+  persist in View and Edit; `Order Route` is the fourth view of the same object.
+- The one Settings Workspace remains the sole Settings home. Sales Order Settings uses readable
+  `Order Entry` and `Payment Methods` summaries, then focused per-item Edit with Save/Cancel inside
+  editing context. It preserves the verified config writer, validation and permissions.
+- Payment config `followUps` are checkout questions/required information, not Work/Human Follow-up;
+  user-facing Settings copy must call them `required information` (or the exact field label), never
+  `Follow-up`.
+- These are owner UI acceptance corrections to the existing production slice, not new business
+  rules. Production closure remains pending until the full authenticated acceptance list passes.
 
 ## Object/domain completeness sweep — 2026-08-13
 

@@ -688,6 +688,19 @@ breathing gap
   Order Route. Revisions (complete versions) and History (events) are separate. Order Route is a
   read-only, fact-derived, multi-position route/obligation map — never a manual checklist or
   single overall status.
+- **OBJECT HEADER TEMPLATE — OWNER-APPROVED / LOCKED (2026-08-14).** An ERP object has one owning-
+  Register back destination, one persistent identity (`number · party`), governed actions at the
+  right, and applicable object views directly below/alongside that identity. View and Edit retain
+  the same context. Duplicate singular/plural pseudo-tabs and second `Back to order/register`
+  controls are forbidden. Output actions such as `Print ▾` remain distinct from Edit; rare or
+  destructive actions live in overflow. The grammar is shared by SO, PO, GRN and other governed
+  objects, with only the tabs that apply to that object.
+- **SETTINGS TEMPLATE — OWNER-APPROVED / LOCKED (2026-08-14).** One central Settings Workspace owns
+  permission-filtered module destinations that actually exist. A module settings surface renders
+  plain-language groups, readable summary rows/cards and an explicit focused Edit context; raw
+  config fields, Save/Cancel controls and database-like keys are not the default view. Future
+  Purchasing, Warehouse and Delivery settings inherit the grammar without creating empty pages or
+  duplicate top-level settings homes.
 - `docs/orders/MASTER.md` §0.1 owns the business/field/amendment/permission rules. Sales Portal/POS
   remains the master form contract; UI composition may not create a second commercial form or an
   operational action door.
