@@ -695,6 +695,14 @@ Confirm balance delivery date   per PO LINE, after a short delivery
 **Every promise is kept, never overwritten** — `po_supplier_promises` is append-only and each
 row names what it was made ABOUT, so a factory that slips again re-opens the call by itself.
 
+**Supplier reply evidence — owner ruling 2026-08-14.** A prepared/copied/opened/sent WhatsApp or
+email proves only Carres' outbound communication and never completes `Confirm ready date`, `Confirm
+tomorrow's delivery` or `Confirm balance delivery date`. The call closes only when the supplier's
+actual answer is recorded with its reply screenshot/email, reporter, Operations recorder, channel
+and reported/recorded times. Operations records on the supplier's behalf; no trust-based `Sent`
+checkbox may create a supplier promise. Future messaging/email/Open APIs use the same append-only
+promise authority and evidence contract rather than a second supplier-communication store.
+
 **AND IT IS THE PROVENANCE OF THE ARRIVAL DATE** (Loo, 2026-08-05; built). `purchase_orders`
 holds ONE arrival date and it may have come from either of two mouths — the factory's, or our
 own arithmetic at issue time. **The ledger is what tells them apart**: an arrival is the
