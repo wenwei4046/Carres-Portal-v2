@@ -20,7 +20,7 @@ function FactStep({ fact, currentLabel = false }: { fact: SalesOrderRouteFact; c
       <StateIcon fact={fact} />
       <span className="min-w-0">
         <span className="block text-body font-medium text-kit-slate-12">{fact.title}</span>
-        {fact.detail && <span className="block text-meta text-kit-slate-10">{fact.detail}</span>}
+        {fact.detail && <span className="block text-meta text-kit-slate-9">{fact.detail}</span>}
         {currentLabel && fact.state === "current" && <span className="mt-1 inline-block text-label font-semibold tracking-wide text-kit-blue-11">CURRENT</span>}
       </span>
     </>
@@ -53,7 +53,7 @@ export default function SalesOrderRoute({ route }: { route: Route }) {
               <h3 className="mb-3 text-body font-semibold text-kit-slate-12">{group.title}</h3>
               <div className="flex flex-wrap items-stretch gap-1">
                 {so && <Link to={so.href} className="flex min-w-[145px] items-center gap-2 rounded-control px-2 py-2 text-body font-medium text-kit-blue-11 hover:bg-hovertint">{so.number}</Link>}
-                {group.facts.map((fact) => <div key={fact.id} className="flex items-center"><ArrowRight size={14} className="mx-1 shrink-0 text-kit-slate-8" /><FactStep fact={fact} currentLabel /></div>)}
+                {group.facts.map((fact) => <div key={fact.id} className="flex items-center"><ArrowRight size={14} className="mx-1 shrink-0 text-kit-slate-9" /><FactStep fact={fact} currentLabel /></div>)}
               </div>
             </article>
           ))}
@@ -66,7 +66,7 @@ export default function SalesOrderRoute({ route }: { route: Route }) {
           <div className="divide-y divide-kit-slate-5">
             {obligations.map((lane) => <div key={lane.key} className="grid gap-2 px-4 py-3 md:grid-cols-[150px_1fr]"><div className="text-body font-medium text-kit-slate-11">{lane.title}</div><div className="grid gap-1 md:grid-cols-2">{lane.groups.flatMap((group) => group.facts).map((fact) => <FactStep key={fact.id} fact={fact} />)}</div></div>)}
           </div>
-        ) : <div className="px-4 py-4 text-body text-kit-slate-10">No open obligations.</div>}
+        ) : <div className="px-4 py-4 text-body text-kit-slate-9">No open obligations.</div>}
       </section>
     </div>
   );
