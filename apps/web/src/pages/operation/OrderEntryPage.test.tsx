@@ -36,7 +36,7 @@ function savedPayload(): SetOrderEntryConfigInput {
 }
 
 describe("OrderEntryPage", () => {
-  it("prefills the 4 default methods (incl. cash) + the Bank follow-up on credit when config is empty", () => {
+  it("prefills the 4 default methods (incl. cash) + the required Bank information on credit when config is empty", () => {
     render(<OrderEntryPage />);
 
     for (const method of ["Online transfer", "Credit / Debit", "Installment", "Cash"])
@@ -45,7 +45,7 @@ describe("OrderEntryPage", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Edit Credit / Debit" }));
 
-    // Bank follow-up rides on the credit method, options seeded from MY_BANKS.
+    // Required Bank information rides on the credit method, seeded from MY_BANKS.
     expect(screen.getByLabelText("credit required information bank label")).toHaveValue("Bank");
     const options = screen.getByLabelText("credit required information bank options") as HTMLTextAreaElement;
     expect(options.value).toContain("Maybank");
@@ -124,9 +124,27 @@ describe("OrderEntryPage", () => {
     expect(screen.queryByText(/Add follow-up/i)).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/follow-up/i)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Edit Online transfer" }));
+    expect(screen.getByRole("dialog", { name: "Edit payment method" })).toBeInTheDocument();
     expect(screen.getByLabelText("online label")).toHaveValue("Online transfer");
     expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Save changes" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Add required information" })).toBeInTheDocument();
+  });
+
+  it("renders 2990-style compact rows with status and a shortened long-option summary", () => {
+    render(<OrderEntryPage />);
+    expect(screen.getByTestId("payment-methods-panel")).toHaveAttribute("data-settings-pattern", "2990-maintenance-panel");
+    expect(screen.getByTestId("payment-method-credit")).toHaveAttribute("data-status", "active");
+    expect(screen.getByTestId("payment-method-credit")).toHaveTextContent("15 accepted banks");
+    expect(screen.getByTestId("payment-method-credit")).not.toHaveTextContent("Standard Chartered");
+    expect(screen.getByTestId("entry-config-stripe-row")).toHaveTextContent("System managed");
+  });
+
+  it("opens the add flow in the same focused drawer instead of exposing a raw page input", () => {
+    render(<OrderEntryPage />);
+    expect(screen.queryByLabelText("New method name")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Add payment method" }));
+    expect(screen.getByRole("dialog", { name: "Add payment method" })).toBeInTheDocument();
+    expect(screen.getByLabelText("New method name")).toBeInTheDocument();
   });
 });
