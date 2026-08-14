@@ -78,6 +78,8 @@ import OperationStockOnHand from "./OperationStockOnHand";
 import OperationStockPlan from "./OperationStockPlan";
 // Migration 0140 — Service Notes / Issue Tracker.
 import OperationServiceCases from "./OperationServiceCases";
+import OperationIssueTracker from "./OperationIssueTracker";
+import IssueRelatedPartyReport from "./IssueRelatedPartyReport";
 import OperationGuarantees from "./OperationGuarantees";
 // Gmail-style right rail — Calendar (deliveries/day) · Keep notes · Tasks board.
 import OperationRightRail from "./components/OperationRightRail";
@@ -150,8 +152,9 @@ export default function OperationApp() {
   /* The one Settings Workspace is its own route, not a module tab — the
      Page Header gear is the ERP's single Settings entry (ui/MASTER.md). */
   const isSettingsUrl = location.pathname.startsWith("/operation/settings");
+  const isIssuesUrl = location.pathname.startsWith("/operation/issues");
   const isUrlDriven =
-    isProcurementUrl || isToOrderUrl || isOrdersUrl || isOldOrdersUrl || isSettingsUrl;
+    isProcurementUrl || isToOrderUrl || isOrdersUrl || isOldOrdersUrl || isSettingsUrl || isIssuesUrl;
 
   const [tab, setTab] = useState<string>("dashboard");
   // Sidebar collapse moved into PortalSidebar (Unified Internal Portal,
@@ -189,13 +192,14 @@ export default function OperationApp() {
       || isOrdersUrl
       || isOldOrdersUrl
       || isSettingsUrl
+      || isIssuesUrl
     )
       return;
     setMovementsPrefill((p) => (urlTab === "movements" ? p : undefined));
     setWarehousePrefill((p) => (urlTab === "warehouse" ? p : undefined));
     setTab(urlTab);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [urlTab, isProcurementUrl, isToOrderUrl, isOrdersUrl, isOldOrdersUrl, isSettingsUrl]);
+  }, [urlTab, isProcurementUrl, isToOrderUrl, isOrdersUrl, isOldOrdersUrl, isSettingsUrl, isIssuesUrl]);
 
   // When the URL leaves a URL-driven section (e.g. user navigated via Back
   // to `/operation`), make sure the local tab state has a sensible value so
@@ -348,6 +352,8 @@ export default function OperationApp() {
             {/* The one Settings Workspace. Reached only from the Page Header
                 gear's launcher — never a tab, nav item or Work Toolbar action. */}
             <Route path="settings/*" element={<SettingsWorkspace />} />
+            <Route path="issues" element={<OperationIssueTracker />} />
+            <Route path="issues/reports" element={<IssueRelatedPartyReport />} />
             <Route path="orders/so/new" element={<SalesOrderWorkspace />} />
             <Route path="orders/so/:orderId" element={<SalesOrderWorkspace />} />
             <Route path="orders/:stage" element={<SalesOrdersRegister />} />

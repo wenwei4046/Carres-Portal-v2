@@ -95,6 +95,7 @@ import opsStockEmergencyRouter from "./routes/ops/stock-emergency";
 import snRouter from "./routes/ops/service-notes";
 // Migration 0210 — Service Cases (case parent layer above Service Notes).
 import scRouter from "./routes/ops/service-cases";
+import issuesRouter from "./routes/ops/issues";
 // Migration 0162 — ops cockpit: Keep notes + Tasks board.
 import opsNotesRouter from "./routes/ops/notes";
 import opsTasksRouter from "./routes/ops/tasks";
@@ -248,6 +249,7 @@ api.route("/ops/stock-plan", opsStockPlanRouter);
 api.route("/ops/stock-emergency", opsStockEmergencyRouter);
 api.route("/ops/service-notes", snRouter);
 api.route("/ops/service-cases", scRouter);
+api.route("/ops/issues", issuesRouter);
 api.route("/ops/notes", opsNotesRouter);
 api.route("/ops/tasks", opsTasksRouter);
 api.route("/operation/supplier-claims", supplierClaimsRouter);
