@@ -276,3 +276,18 @@ booking, DO, Delivery Visit/unit-result, photo and carrier-capacity code is meas
 cover only part of it. Legacy Order-owned or compatibility write doors do not regain authority by
 existing in code. Application reconciliation and external cutover require later separately governed
 work; this Plan approval itself changes neither production nor partner operations.
+
+## 12 · Mission closure — 2026-08-14
+
+**PLAN MISSION COMPLETE.** The owner-approved Delivery operating model in this MASTER is final
+authority. No unresolved owner decision or deferred whole-domain blind spot remains in the Plan.
+No Cards or implementation sequence is created by this closure.
+
+The shared ERP UI corrections supporting this operating model were authenticated in production at
+1440×900. Production deployment proof for `carres-portal.pages.dev`, `pos.carresofficial.com`,
+`erp.carresofficial.com` and `api.carresofficial.com` all returned
+`30fa407b68ef32b04f73f8bf174678a720ce8fd6`; that deployed commit contains Delivery authority PR
+#774 (`6fa2cc5adbc8988491498c1ea30f90e7c1873ba5`) as an ancestor. The authenticated check confirmed
+the governed Sales Orders Register and object views, Order Route, Quick Rail, central Settings
+workspace, focused Settings edit grammar and working absolute module navigation. The stale nested
+Settings write-door path was corrected and regression-covered before production acceptance.

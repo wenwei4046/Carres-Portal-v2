@@ -3663,6 +3663,16 @@ the normal discoverable doors already governed for Edit, output or View Flow.
 | **The delivery-appointment task moving to Logistics** | Approved the day the partner portal covers appointments. Today only NETS has a login and that portal has no appointment screen. |
 | **`order_payments` gaining a real reader** | The Record-payment button writes a ledger nothing reads. The fix is one audited RPC that writes `orders.paid` too — **never by summing the ledger**, because the raw-create door double-writes. |
 
+## §11.1 · Production UI acceptance closeout — 2026-08-14
+
+The approved Sales Orders Register, Object Header, Order/Revisions/History/Order Route views and
+central Settings connection were authenticated in production at 1440×900. Search, typed column
+filters, Columns, Export, selection-scoped Export, goods-only expansion, governed Edit/Discard,
+read-only owner links and Quick Rail remained available. The corrected absolute Settings routes
+were verified from Sales Orders through Purchasing. Web and API deployment proofs all returned
+`30fa407b68ef32b04f73f8bf174678a720ce8fd6`. This record supersedes pre-production UI evidence for
+this correction set; it does not create a new business write door.
+
 # §12 · Implementation debt found by the 2026-08-06 audit
 
 **Not architecture. Each one is a build slice, and none of them changes a business rule.**
