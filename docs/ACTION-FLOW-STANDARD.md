@@ -217,8 +217,10 @@ two distances from a commitment, and the order is commitment descending:
 **`Send PO to {supplier}` used to be this rung's first action and is RETIRED** (Loo,
 2026-07-29), **and so is `Prepare PO` with the Draft PO it produced** (Loo, 2026-07-30 — the
 Purchasing clean restart). Raising a purchase order is ONE act: `Issue PO` creates the formal
-PO and nothing is stored before it. **The verb `Send` is retired with the old name and stays
-banned from reuse** — `docs/COPY-STANDARD.md` is the canonical home for both words.
+PO and nothing is stored before it. **`Send PO` stays banned as a substitute for that creation
+act.** `Send` is also banned from every Portal action label: the copy must identify the actual
+channel or governed act, object, named party and required recorded result. The canonical rule is
+in `docs/COPY-STANDARD.md`.
 
 **`Delay planning` sits at the TOP of rung 2, immediately above the call it guards**
 (added 2026-07-28 — C8 found that Law 4 ranked it nowhere at all). It is the decision

@@ -27,6 +27,19 @@ goods-location observations, Delivery Work and append-only history.
 Delivery never creates a second commercial-order, stock, money, Service or Guarantee editor. It
 records what happened and links the owner that must decide a remedy.
 
+### CONDITION-GATED SERVICE COLLECTION
+
+For a Service Case collection whose entitlement depends on item condition, Delivery may arrange
+only after the Case carries approved pre-collection condition evidence. The Logistics Work screen
+then requires a doorstep check before loading: required photos, governed condition answers and
+customer/item match.
+
+- Pass → `Accept collection`; custody transfers only when the item is loaded and acknowledged.
+- Fail → `Do not collect — condition failed`; select factual reason, capture evidence and leave
+  the item with the customer. Operation decides and communicates the policy outcome.
+- Logistics never promises refund/exchange, waives a condition, or debates eligibility.
+- A potentially contaminated item accepted in error is marked for Warehouse quarantine.
+
 ## 2 · Current Carres operating model
 
 - **NETS Logistics is Klang Valley's current default and main Logistics Partner.**

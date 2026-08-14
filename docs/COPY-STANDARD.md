@@ -40,6 +40,115 @@ Two hard beliefs behind the rules:
 | 9 | Zero jargon — **unless the team already says it** | requisition · expedite · MRP · `GRN` as a VERB | order · call · plan · check in · `GRN` as the DOCUMENT (see the document/act split) |
 | 10 | Cut a sentence if possible | `Please note that this order...` | `This order is 1 day late. Issue PO now.` |
 
+## Primary School Standard English — owner ruling 2026-08-14
+
+Every Portal instruction must be understandable the first time a new employee sees it. This is
+professional Plain English: clear, short and consistent. Formal documents keep correct business
+English; complexity is never used to make an instruction sound official.
+
+- Aim for no more than 12 words per sentence.
+- One sentence states one fact or one action.
+- Prefer common governed verbs: `Call`, `Ask`, `Check`, `Choose`, `Save`, `Upload`, `Record` and the
+  business-specific verbs in this standard.
+- Ban vague substitutes such as `Process`, `Handle`, `Proceed accordingly` and `Resolve` without
+  naming the concrete result.
+- Print full dates such as `18 Aug 2026`; actionable work also carries its governed weekday/date.
+- Errors name what is wrong and exactly how to fix it.
+- A button says what pressing it does: verb plus object.
+- Keep necessary business nouns (`Purchase Order`, `Supplier`, `Deliver To`, `Unit ID`, `Invoice`,
+  `Credit Note`, `Claim`, `Consignment`) and provide a simple first-use explanation through Help.
+- The official record is Simple English. Original customer, staff and partner words remain
+  preserved; optional Chinese/Bahasa Malaysia help explains but never creates a second truth.
+
+`Send` is banned from Portal action labels, buttons and Current Action copy. It hides the actor,
+channel, object, recipient and required result. Name the real act instead: `Email PO-2041 to Macio`,
+`Ask Lim for mattress photos`, `Upload delivery note`, or `Record TCF's reply`. `Open WhatsApp`
+names navigation only; opening the channel never proves that the business action is complete.
+
+## Two-Line Action Copy Standard — owner ruling 2026-08-14
+
+An actionable alert, Work row or detail-page current action uses:
+
+```text
+[Object + current fact/problem]
+[Owner/team] · [action + object] · [recipient + required result]
+[Governed working weekday/date]
+[Verb + object button]
+```
+
+- Line 1 names the business object and states what is true; normal register text size and
+  medium/semibold weight.
+- Line 2 always identifies `WHO · ACTION + OBJECT · TO WHOM · WHAT IS NEEDED`; one size smaller
+  and regular weight. Never show a bare verb.
+- The responsible person is named when assigned; otherwise show the governed duty/team.
+- The channel is named when transmission matters: `Email`, `WhatsApp`, `Call` or another governed
+  channel. `Send` remains banned.
+- Each line is one sentence. It should fit one desktop line but may wrap to two narrow-screen
+  lines; never ellipsize the party, amount, document or date needed to act.
+- Red is reserved for overdue, blocking, safety, custody or money risk. Missing routine data is
+  not made red merely to attract attention.
+- The row exposes one primary action. Parallel actions remain visible through the governed `+N`
+  expansion; no copy hides them.
+
+Example:
+
+```text
+Mattress measurement video is missing
+Amy · Ask Lim for the required video · Record their reply.
+Fri 14 Aug
+[Ask customer]
+```
+
+Further governed examples:
+
+```text
+PO-2041 Version 1 has not reached Macio
+Yu Jun · Email PO-2041 Version 1 to Macio · Ask for delivery confirmation.
+
+Delivery note DO-883 is missing
+Warehouse Duty · Upload Macio DO-883 · Link it to PO-2041.
+
+Macio has not replied
+Yu Jun · Call Macio about PO-2041 · Record item availability.
+
+PO-2041 Deliver To has changed
+PO Duty · Email PO-2041 Version 2 to Macio · Ask them to use AL Sungai Buloh.
+
+Unit CU-000128 is damaged
+GRN Duty · Hold CU-000128 · Add photos for Purchasing.
+
+PO-2041 price changed to RM1,250
+Purchasing Manager · Check PO-2041 · Accept or reject RM1,250.
+
+Customer delivery is at risk
+Mei Ling · Tell the Sales Order owner · Record the new date, 25 Aug 2026.
+```
+
+An unassigned record does not hide two actions in one line. Assignment is the current action;
+the business follow-up becomes the next action after assignment:
+
+```text
+PO-2041 has no owner
+PO Duty · Assign a buyer to PO-2041 · Buyer must contact Macio today.
+[Assign buyer]
+```
+
+The two-line form is not forced onto ordinary History facts, completed records, small field
+validation or empty states. Their existing patterns below still govern them.
+
+## Work detail — five answers, not five compulsory boxes
+
+Opening an action must answer these five questions in this order:
+
+1. `What to do` — the single primary act.
+2. `Why` — the trigger/fact that made it necessary.
+3. `Files / details` — only when an artefact or information is required.
+4. `What to ask` — only when an external answer is required.
+5. `What happens next` — the next system consequence or reminder.
+
+Omit a section that does not apply; an empty heading teaches nothing. A complex execution still
+uses the governed maximum-four-step `What to do` block below.
+
 ## Action copy / work clarity law — owner ruling 2026-08-11
 
 When a surface represents something a human must handle, follow up, confirm, call, chase or do,
@@ -1251,9 +1360,8 @@ keys/routes keep their names.
 
 **Aligning Purchase and Orders panels:** the Orders panel uses **Placed**
 for the pre-Proceed state (customer ordered, ETA not confirmed). The
-Purchase panel's ① stage fires AFTER Sales clicks Proceed, so it is called
-**Send**, not "Place" — otherwise a new hire sees "Place" on two panels
-meaning two different things.
+Purchase panel's ① stage fires AFTER Sales clicks Proceed, so it uses the governed
+**Issue PO** action. `Send` is not restored as a stage or action name.
 
 ---
 

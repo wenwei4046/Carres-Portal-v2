@@ -1206,13 +1206,18 @@ resolution list.
 changes when the month rolls over, because the person who spoke to the factory is the person
 who knows the case. **DERIVED from `ops_po_duty`, never an `assigned_to` column.**
 
-**Where a claim can be born:** ONE engine, and the long-term architecture is two entrances
-(Receiving · Service Cases), which is how SAP, Oracle and Dynamics all do it. **TODAY only
-Receiving exists**, and that is a ruling with a stated price: 0299's guard allows
-`incoming → on_hold` and no other entry, so **a fault found a week after receiving has no
-supplier-claim route at all** — it is a service case. **If that changes, the entry rule and the
-refurbish door must be settled in the SAME change**, or the refurbish path hands a held unit
-back to the pool with no claim ever answered.
+**Where a claim is born:** Supplier Claims has no independent intake. Staff use `Report Problem`
+on PO/Receiving or any other source record; the one Service Case authority opens or links the
+Case and creates a Supplier Claim workstream when supplier responsibility is in scope.
+`Purchasing → Supplier Claims` is the Purchasing work view of those workstreams. It is where
+Purchasing asks the supplier, records the answer, obtains external credit/debit-note evidence and
+finishes its work; it never asks Purchasing to rekey the original problem or choose whether a
+Case should exist.
+
+**Implementation gap:** today's receiving path and 0299 transition guard still embody the older
+receiving-only entrance. The Service Case completion build must change the claim entry rule and
+the refurbish door in the same migration, so a held/refurbished unit cannot return to the free
+pool while its claim is unanswered.
 
 ### THE PANEL LOO FROZE, 2026-08-05 — three of six built, 2026-08-06
 
@@ -1455,7 +1460,7 @@ I do*). **The operator's answer was the thing that went missing.**
 | **`Refund` as a claim resolution** | **Approved as a concept, blocked on business meaning** — supplier credit note? cash? AP offset? Hidden until Loo rules it. **Do not guess and do not delete it.** |
 | **`Repaired` · `Disposed` as item outcomes** | Approved. Needs a migration: 0299's transition guard admits exactly three destinations. |
 | **Carres Execution as a real field** | Frozen (five options, §6). Not built. |
-| **A second claim entrance from Service Cases** | Approved as the long-term architecture. **The entry rule and the refurbish door must be settled in the SAME change.** |
+| **One Service Case intake feeding Supplier Claim work** | Approved architecture. Not live: replace the receiving-only claim creation path and settle the entry rule plus refurbish door in the SAME change. |
 | **`DecisionGuideCard`** | Approved as a **portal-wide kit component**, not a Claims feature. One card under the selector, updating live: title → 1–2 sentences → max 3 `Typical examples` → max 3 `What happens next`. **Never a hover tooltip for business guidance** (users do not discover them; mobile cannot hover; staff stop reading after the first week). **Content from a configuration object, never hard-coded in the component.** Next homes: `Deliver To` · `Receiving Method` · `Purpose` · `Delivery Status` · `Payment Result`. |
 | **The September supplier switch** | Approved. Nice Future stops; a subscription-model mattress supplier takes over. |
 | **PO revisions** | **RULED OUT, not deferred.** A sent PO is never edited. |
