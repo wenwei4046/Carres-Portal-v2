@@ -225,8 +225,13 @@ function toGridColumn(
           salesperson: r.o.salespersons?.name,
           phone: r.phone,
         });
+        /* FACT first, then ONE clause that fits the governed 148px whole.
+           Who must act, whose phone to call, what to ask and what to write
+           down ride the hover (`guidance.detail`) and the Sales Order
+           workspace panel — they are not cell-sized facts, and the expand
+           has exactly one job (CLAUDE.md §2: the order's own goods). */
         return (
-          <span className="block min-w-0">
+          <span className="block min-w-0" title={guidance.detail}>
             <span data-attention="warning" className="block truncate font-semibold text-kit-amber-11">
               {guidance.problem}
             </span>
@@ -593,7 +598,11 @@ function RegisterResultSummary({
     : filtered.length === total
       ? `${filtered.length} ${orderWord}`
       : `${filtered.length} of ${total} orders`;
-  const order = ["Mattress", "Bedframe", "Sofa", "Pillow", "M.P", "Topper", "Footrest", "Service", "Other goods"];
+  /* The footer's category words come from `accShort` (the ONE accessory
+     vocabulary); this array only fixes their ORDER. `Mattress protector` is
+     the governed word — `M.P` was the AutoCount sheet's abbreviation and it
+     never belonged on a screen (`COPY-STANDARD.md`). */
+  const order = ["Mattress", "Bedframe", "Sofa", "Pillow", "Mattress protector", "Topper", "Footrest", "Service", "Other goods"];
   const parts = order.filter((label) => (counts.get(label) ?? 0) > 0).map((label) => `${label} ${counts.get(label)}`);
   return <span>{[countWord, ...parts].join(" · ")}</span>;
 }

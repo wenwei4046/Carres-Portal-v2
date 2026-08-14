@@ -24,12 +24,6 @@ import type { OpsReorderRow } from "@carres/shared";
  * has to mean "watched and fine", never "nobody has looked".
  */
 
-const KIND_HINT: Record<string, string> = {
-  Pillow: "Pillow",
-  "M.P": "Protector",
-  Topper: "Topper",
-};
-
 export default function ReorderStockCard() {
   const { data, isLoading, isError } = useReorderStock();
   const [editing, setEditing] = useState<string | null>(null);
@@ -135,7 +129,10 @@ function ReorderRow({
         </div>
         {row.kind ? (
           <div className="text-label text-base-500">
-            {KIND_HINT[row.kind] ?? row.kind}
+            {/* `kind` IS the governed word now (`accShort`), so the old
+                M.P → "Protector" translation table is gone — one word, one
+                place. */}
+            {row.kind}
             {row.leadDays != null ? ` · ${row.leadDays} days to arrive` : ""}
           </div>
         ) : null}

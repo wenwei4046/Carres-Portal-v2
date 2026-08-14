@@ -56,7 +56,11 @@ export type LineClass = CoreCat | "acc" | "unknown";
  */
 const ACCESSORY_TYPES: readonly { name: string; test: RegExp }[] = [
   { name: "Pillow", test: /pillow/ },
-  { name: "M.P", test: /protector|protect|\bm\.?p\b/ },
+  // The NAME is the governed word (`COPY-STANDARD.md`: "mattress protector"),
+  // never the AutoCount import code. `M.P` is the supplier sheet's abbreviation
+  // and it stays on the RIGHT of this line — the TEST reads it, the screen
+  // never prints it.
+  { name: "Mattress protector", test: /protector|protect|\bm\.?p\b/ },
   { name: "Disposal", test: /disposal|dispose/ },
   { name: "Service", test: /floor|lift|stair|transport|delivery|charge|install/ },
   { name: "Topper", test: /topper/ },
@@ -184,8 +188,12 @@ export function stockMatchKey(sku: string): string {
 }
 
 /** Short proper TYPE name for a non-core line — the list shows these instead of
- *  a generic "accessories" (Loo: show Pillow / M.P / Disposal by name). The
- *  drawer shows the full original name; this is the short form. */
+ *  a generic "accessories" (Loo: show Pillow / Mattress protector / Disposal by
+ *  name). The drawer shows the full original name; this is the short form.
+ *
+ *  **What this returns is SCREEN COPY** (the Sales Orders register footer
+ *  prints it verbatim), so every name in `ACCESSORY_TYPES` is a governed word.
+ */
 export function accShort(sku: string): string {
   const named = accessoryType(sku);
   if (named) return named;
@@ -215,7 +223,7 @@ export function lineKind(sku: string): ItemKind {
 
 /**
  * Display sequence rank for an order line (Jess 2026-06-22): always list in the
- * order mattress → bedframe → sofa → pillow → M.P → service / others. Lower
+ * order mattress → bedframe → sofa → pillow → protector → service / others. Lower
  * sorts first; ties keep their original order (Array.sort is stable). Use as
  * `lines.sort((a, b) => lineSortRank(a.sku) - lineSortRank(b.sku))`.
  *
@@ -231,7 +239,7 @@ export function lineSortRank(sku: string): number {
   if (cat === "unknown") return 3;
   const name = accShort(sku);
   if (name === "Pillow") return 4;
-  if (name === "M.P") return 5;
+  if (name === "Mattress protector") return 5;
   if (name === "Disposal" || name === "Service") return 7; // service last
   return 6; // other accessories (Topper / Footrest / …) before service
 }
@@ -241,7 +249,7 @@ export function lineSortRank(sku: string): number {
  *   • core furniture (Mattress / Bedframe / Sofa) → its SUPPLIER name — it's made
  *     to order and sits at the supplier until received. Current core suppliers:
  *     mattress = Nice Future, bedframe + sofa = Ohana ([[supplier-core-mapping]]).
- *   • accessory goods (Pillow / M.P / Topper / Footrest) → "Carres Klang" — kept
+ *   • accessory goods (Pillow / Mattress protector / Topper / Footrest) → "Carres Klang" — kept
  *     as ready warehouse stock.
  *   • service charges (No Lift / Disposal / floor) → null — no physical location.
  * It's only a DEFAULT — the drawer dropdown lets the operator override per line.

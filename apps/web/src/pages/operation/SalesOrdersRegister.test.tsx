@@ -199,7 +199,19 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     mount();
     const exception = screen.getByText("No delivery date");
     expect(exception).toHaveAttribute("data-attention", "warning");
-    expect(screen.getByText("Shasha · Confirm the date with Kimmy · Record the agreed date")).toBeInTheDocument();
+    /* The cell prints ONE clause that fits the governed 148px column whole;
+       who must act, whose phone and what to record ride the hover. */
+    expect(screen.getByText("Confirm delivery date")).toBeInTheDocument();
+    const cell = exception.closest("span[title]");
+    expect(cell).toHaveAttribute(
+      "title",
+      [
+        "Shasha · Kimmy · 019-3478913",
+        "Ask which delivery date the customer agrees to.",
+        "Record the agreed Customer Delivery date.",
+      ].join("\n"),
+    );
+    expect(cell).toHaveTextContent("Confirm delivery date");
     expect(screen.queryByText("No date yet")).not.toBeInTheDocument();
   });
 
@@ -222,7 +234,7 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
           order_lines: [
             { sku: "B1201S-K", qty: 2, unit_price: 2499, label: "B1201S · King" },
             { sku: "Essential Memory Pillow(L)", qty: 4, unit_price: 99, label: "Pillow" },
-            { sku: "Microfiber Waterproof Mattress Protector-K", qty: 3, unit_price: 129, label: "M.P" },
+            { sku: "Microfiber Waterproof Mattress Protector-K", qty: 3, unit_price: 129, label: "Mattress protector" },
           ],
         }),
       ],
@@ -232,7 +244,9 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     expect(footer).toHaveTextContent("1 order");
     expect(footer).toHaveTextContent("Mattress 2");
     expect(footer).toHaveTextContent("Pillow 4");
-    expect(footer).toHaveTextContent("M.P 3");
+    /* The governed word, never the AutoCount sheet's `M.P` abbreviation. */
+    expect(footer).toHaveTextContent("Mattress protector 3");
+    expect(footer).not.toHaveTextContent("M.P");
     expect(footer).not.toHaveTextContent("Reset layout");
     expect(footer).not.toHaveTextContent("rows");
   });

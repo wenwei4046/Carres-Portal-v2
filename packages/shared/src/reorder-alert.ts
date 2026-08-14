@@ -39,7 +39,7 @@ import { lineClass, accShort } from "./line-category";
  * early-warning number. `accShort` already speaks these words on the Orders
  * grid, so the vocabulary is shared rather than re-derived.
  */
-export const IMPORT_ACCESSORY_KINDS = ["Pillow", "M.P", "Topper"] as const;
+export const IMPORT_ACCESSORY_KINDS = ["Pillow", "Mattress protector", "Topper"] as const;
 export type ImportAccessoryKind = (typeof IMPORT_ACCESSORY_KINDS)[number];
 
 /** Default lead for a China container, in calendar days (~2 months). */
@@ -87,7 +87,8 @@ export type ReorderState = "reorder" | "ok" | "unset";
 
 export interface ReorderStockRow {
   sku: string;
-  /** Pillow / M.P / Topper, or null for a non-accessory SKU given a point. */
+  /** Pillow / Mattress protector / Topper, or null for a non-accessory SKU
+   *  given a point. These ARE the words the card prints. */
   kind: ImportAccessoryKind | null;
   /** Free units on the floor — what "current" means. */
   onHand: number;
