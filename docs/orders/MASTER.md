@@ -1292,9 +1292,10 @@ mounted and 401-gated on production after deploy.
 
 # ✅ UNIFIED WORK ENGINE — SO V2 CARD 9, SHIPPED 2026-08-11
 
-**The question this card installed:** Work reads module facts and produces
-**WHO + ACTION + OBJECT + WHEN (ACTUAL WORKING WEEKDAY/DATE)** — and every rule that enters the
-engine names its five parts or does not enter.
+**The question this card installed:** Work reads module facts and produces governed action. The
+current visible standard is **WHO + ACTION/OBJECT + RECIPIENT + REQUIRED RESULT + WHEN (ACTUAL
+WORKING WEEKDAY/DATE)**. Every engine rule still names its trigger, owner, action, due rule and
+completion fact or does not enter; COPY-STANDARD supplies the complete operator-facing sentence.
 
 **THE TRACE:** the per-module engines already exist and stay the owners of
 WHAT is open (`order-actions` two-layer engine · the purchasing calls ·
@@ -1351,7 +1352,8 @@ DB change — nothing to deploy; Card 10 wires the surface.
 # ✅ MY WORK / TEAM WORK — SO V2 CARD 10, SHIPPED 2026-08-11
 
 **The question this card installed:** one operator opens the portal and sees
-exactly what to do — **WHO + ACTION + OBJECT + WHEN (actual working weekday/date)** — and a manager
+exactly what to do — **WHO + ACTION/OBJECT + RECIPIENT + REQUIRED RESULT + WHEN (actual working
+weekday/date)** — and a manager
 sees the same set with responsibility visible.
 
 **Built under the Production UI Execution Law** (owner ruling 2026-08-11,
@@ -1447,8 +1449,8 @@ ISSUE TRACKER = ACCOUNTABILITY + MEMORY + LEARNING
 ```
 
 - Sales Order, PO, Receiving, Unit, Delivery, Money and Loan preserve what is true.
-- Work translates authoritative facts into **WHO + ACTION + OBJECT + WHEN (actual working
-  weekday/date)**. It owns no
+- Work translates authoritative facts into **WHO + ACTION/OBJECT + RECIPIENT + REQUIRED RESULT +
+  WHEN (actual working weekday/date)**. It owns no
   duplicate transaction form or free-standing completion status.
 - Issue Tracker records the incident, accountability, financial consequence, recovery and
   learning. It never substitutes for operational transaction truth.
@@ -1592,7 +1594,7 @@ Work reads module facts and produces one open work set. Every system rule must d
 completion fact, it does not enter the engine.
 
 ```
-WHO + ACTION + OBJECT + WHEN (ACTUAL WORKING WEEKDAY/DATE)
+WHO + ACTION/OBJECT + RECIPIENT + REQUIRED RESULT + WHEN (ACTUAL WORKING WEEKDAY/DATE)
 ```
 
 Show a named person when the roster/PIC determines one; use a shared station such as Warehouse
@@ -1624,6 +1626,10 @@ forms. Team Work makes responsibility visible without reducing people to KPI car
 one operator exactly what to do.
 
 ## Issue Tracker · accountability and cost-recovery boundary — approved target, not built here
+
+> The complete approved Issue Tracker operating model now lives once in
+> [`../issue-tracker/MASTER.md`](../issue-tracker/MASTER.md). This section preserves the Sales Order
+> consequence only and may not become a second Issue Tracker specification.
 
 Issue Tracker preserves **incident + accountability + financial consequence + recovery +
 learning**. Never collapse these identities into one `Owner`:
