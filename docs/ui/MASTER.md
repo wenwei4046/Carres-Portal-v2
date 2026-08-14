@@ -98,12 +98,16 @@ semantics and ownership outrank external references; and actionable copy remains
 OBJECT + actual working day/date**. The pass is a completeness check, not permission to build every
 capability or to write UI/application code in Plan mode.
 
-**OFFICIAL CARD NUMBERS ARE GOVERNANCE; BLUEPRINT PRECEDES IMPLEMENTATION PLANNING.** The planner
+**OFFICIAL CARD NUMBERS ARE GOVERNANCE; BLUEPRINT PRECEDES BUILD HANDOFF.** The planner
 never invents an official Card number or status. The whole-domain audit is evidence, not a roadmap.
 Only after the complete recommended module Blueprint is presented, owner-reviewed/approved and
-persisted to the authoritative module MASTER may the planner derive a **PROPOSED ROADMAP / BACKLOG /
-DEPENDENCY ORDER** and declare proposed unnumbered build slices ready. Official numbering/status
-appears only after governance/owner approval.
+persisted to the authoritative module MASTER may the planner identify dependency-ordered,
+unnumbered **`READY FOR CARD`** handoff scopes. Those scopes carry approved business/UI acceptance
+boundaries, not detailed engineering plans. Official Card authoring, numbering/status, writer
+inventory, migrations, exact tests/TDD steps, task decomposition and CI/deploy probes belong to the
+later BUILD/DELIVERY lane after takeover. PLAN does not create `*Card.md` or `*card.md` files unless
+Jess explicitly commissions Card authoring; that instruction is the BUILD/DELIVERY takeover for
+that deliverable.
 
 **UI ARCHITECT RESPONSIBILITY + DICTIONARY / IA PREFLIGHT — APPROVED / LOCKED (Jess,
 2026-08-11).** A new or restarted Plan/Design chat is not merely repository police or a visual
@@ -230,30 +234,44 @@ and is not part of this Plan gate.
 a coherent implementation scope is ready, what comes next, or whether a fresh chat is advisable.
 The maintained mission state above and these transitions are part of every Plan/Design restart:
 
+0. **PLAN TERMINATES BEFORE CARD AUTHORING.** Its complete lifecycle is Authority → whole-domain
+   audit → proactive reference mining → complete recommended Blueprint → owner review/correction →
+   authoritative MASTER persistence → **`PLAN MISSION COMPLETE`**. It may then name approved,
+   dependency-ordered READY boundaries only. It does not author Card files, select implementation
+   strategy, start code, spawn build tasks or ask Jess to choose engineering execution mechanics.
+
 1. **`READY FOR CARD — <scope>`.** Never state or invent this, Phase 1, roadmap or implementation
    sequencing before the complete recommended module Blueprint has been presented, owner-reviewed/
    approved, persisted to the authoritative module MASTER and declared **`PLAN MISSION COMPLETE`**.
    Then state it proactively only when a coherent capability or
    implementation slice has sufficient approved business truth, UI/interaction truth where
    relevant, ownership, dependencies and an acceptance boundary, and no unresolved owner decision
-   blocks safe build. Recommend the dependency/build order. Do not invent an official Card number
-   merely because the scope is ready. Do not keep solving application implementation detail in Plan
-   mode after this boundary, and do not hand unresolved business/UI truth to build just to move.
+   blocks safe build. Recommend the dependency/build order and acceptance boundary. Do not invent
+   an official Card number or detailed engineering plan merely because the scope is ready. Card
+   authoring belongs to BUILD/DELIVERY after takeover. Do not keep solving application implementation
+   detail in Plan mode, and do not hand unresolved business/UI truth to build just to move.
 2. **`PLAN MISSION COMPLETE`.** State this proactively when the complete Blueprint is owner-reviewed/
    approved and final truth is persisted. Summarise **LOCKED operating model · intentional rejects/
-   deferred items · exact recommended next action.** Derive Cards and dependency/build order only
-   after this state. Do not
-   wait for Jess to ask *“what next?”*
+   deferred items · exact recommended next lane/action.** Identify READY scopes and dependency order
+   only after this state; a later BUILD/DELIVERY chat authors any detailed Cards. Do not wait for Jess
+   to ask *“what next?”*
 3. **`START A NEW CHAT`.** Recommend this when the mission is complete and the next work is a
    materially different planning domain, or unrelated accumulated context creates a real confusion
    risk. Do not recommend it merely because the conversation is long while the same coherent
    mission remains active and decisions are persisted in the repository. Supply the exact concise
-   restart prompt and state **PLAN / DESIGN** or **CONTINUOUS BUILD**, with the reason.
+   restart prompt and state **PLAN / DESIGN** or **CONTINUOUS BUILD**, with the reason. Use the two
+   concise Constitution starters; do not make Jess reconstruct lane law in a giant prompt.
 
 Plan Decision Persistence makes the authoritative MASTER—not chat length—the memory mechanism.
 PLAN mode blocks application implementation but requires governing-document updates for approved
-truth. Once a governed/approved Card or build slice is handed to build mode, §1.1's existing
-continuous-build vertical-slice law applies; Plan/Design does not absorb or replace it.
+truth. Once an approved READY scope is handed to BUILD/DELIVERY mode, §1.1 and the Constitution's
+Engineer-Owned Delivery law apply: engineering chooses its own compliant execution method and owns
+tests → PR/merge → deploy → authenticated production verification → MASTER closure. It never asks
+Jess to choose `Subagent-driven` versus `Inline execution` or other technical mechanics.
+
+**Negative example:** “PLAN creates `Customer Payment Posting Convergence Card.md`, then asks
+`1 Subagent-driven or 2 Inline execution?`” is prohibited. Correct: PLAN persists the approved
+Blueprint, names the READY scope and closes; the later BUILD/DELIVERY lane decides how to execute.
 
 ---
 

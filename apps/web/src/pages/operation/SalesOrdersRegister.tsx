@@ -262,10 +262,22 @@ function ExpandedLines({ row }: { row: RegisterRow }) {
   const configOf = (line: (typeof lines)[number]) => {
     const attrs = line.attrs ?? {};
     const facts = lineConfigBits(attrs);
-    const handled = new Set(["category", "remark", "options", "options_total", "color", "gap", "fabric_name", "fabric_surcharge", "leg_height", "leg_surcharge", "special_addons", "specials"]);
-    for (const [key, value] of Object.entries(line.attrs ?? {})) {
-      if (handled.has(key) || value == null || value === "" || typeof value === "object") continue;
-      const label = key === "sofa_spec" ? "Sofa configuration" : key.replace(/[_-]+/g, " ").replace(/^./, (c) => c.toUpperCase());
+    // The register is an operational identification surface, not a raw attrs
+    // inspector. Keep only governed, human-readable product facts here; sofa
+    // builder coordinates/keys and pricing metadata remain with their owners.
+    const operationalFacts: Record<string, string> = {
+      size: "Size",
+      firmness: "Firmness",
+      colour: "Colour",
+      fabric_code: "Fabric code",
+      seat_height: "Seat height",
+      sofa_height: "Sofa height",
+      configuration: "Configuration",
+      sofa_configuration: "Sofa configuration",
+    };
+    for (const [key, label] of Object.entries(operationalFacts)) {
+      const value = attrs[key];
+      if (value == null || value === "" || typeof value === "object") continue;
       facts.push(`${label}: ${String(value)}`);
     }
     return facts;

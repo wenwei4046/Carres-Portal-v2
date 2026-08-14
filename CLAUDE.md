@@ -109,13 +109,15 @@ not a new guideline  →  fold the rule into this Constitution
 ## 4 · Golden development flow
 
 ```
-0  Say which kind of chat you are.  PLAN writes no code.  BUILD ships one thing.
+0  Declare the lane from the starter + authority: PLAN · BUILD/DELIVERY · REVIEW.
+   PLAN writes governing truth only; BUILD ships; REVIEW inspects and reports unless asked to fix.
 1  BUILD: read this file + the module MASTER.  PLAN/DESIGN: complete the start protocol below.
 2  Measure.  Every proposal runs the DECISION GATE below — no exception.
 3  Challenge (Law 4).  Problems get 🔴/🟡 and a fix, never a complaint alone.
 4  Ask ONE decision at a time — one evidence-based Carres recommendation, with its trade-off and
    falsifier. Alternatives appear only when evidence leaves a genuine business choice.
-5  Approved → build → test → PR → merge → deploy → verify production.  Do not come back.
+5  Approved PLAN truth hands off to BUILD/DELIVERY → build → test → PR → merge → deploy →
+   verify production → MASTER closure.  Do not return routine engineering choices to Jess.
 6  Overwrite the MASTER in the same PR.
 ```
 
@@ -150,6 +152,14 @@ pattern, UI, workflow-completeness or implementation-detail gaps. If authority, 
 architecture/design judgment can resolve something, recommend the answer; owner questions remain
 exception-only and must pass Step 5.
 
+**CHAT ROLE DECLARATION / MODE INHERITANCE.** At entry, infer and state the lane from the user's
+starter, explicit mission and current authoritative checkpoint: **PLAN · BUILD/DELIVERY · REVIEW**.
+`— PLAN` is a hard no-application-code and no-Card-authoring/execution boundary. Implementation
+requires a later BUILD/DELIVERY takeover prompt; planning approval alone does not silently change
+the current chat's lane. A REVIEW chat reports unless Jess explicitly asks it to fix. If wording is
+ambiguous, use the explicit mission and authoritative checkpoint; do not ask Jess about ordinary
+engineering mechanics. Clarify only when acting would risk crossing a business or safety boundary.
+
 1. **AUTHORITY READ.** Read in order: this Constitution → `docs/ERP-ARCHITECTURE.md` → target
    module MASTER → relevant upstream/downstream MASTERs. When UI is involved, also read the UI
    MASTER plus governed dictionary/copy, navigation/IA and token authority. Read the current human
@@ -176,7 +186,8 @@ exception-only and must pass Step 5.
    Completeness and proactive research are the planner's responsibility; Jess does not supply the
    reference systems, capability checklist or next question. The four-way audit is research evidence;
    it is **not** permission to create tasks, Phase 1, `READY FOR CARD`, migrations or build sequencing.
-4. **BLUEPRINT BEFORE CARDS — WHOLE SOLUTION FIRST.** After the audit, proactively mine relevant
+4. **BLUEPRINT BEFORE CARDS — WHOLE SOLUTION FIRST; CARD AUTHORING IS A LATER BUILD LANE.** After
+   the audit, proactively mine relevant
    current/known references top-to-toe (especially 2990 where applicable, plus suitable mature ERP,
    WMS or logistics systems) and synthesize one complete, owner-reviewable **`RECOMMENDED CARRES
    <MODULE> BLUEPRINT`**. For each major capability show the useful chain:
@@ -287,6 +298,16 @@ BUILT / VERIFIED · REAL GAP / CONTRADICTION · RECOMMENDED NEXT STEP.** Jess mu
 when planning is complete, when a coherent build scope is ready, what follows it, or whether a fresh
 chat is advisable.
 
+- **PLAN CHAT TERMINAL BOUNDARY.** The Plan lifecycle is exactly: **Authority → whole-domain audit →
+  proactive reference mining → `RECOMMENDED CARRES <MODULE> BLUEPRINT` → owner review/correction →
+  authoritative MASTER persistence → `PLAN MISSION COMPLETE`**. That terminal state does not turn
+  PLAN into BUILD. PLAN must not author a detailed implementation Card, create a `*Card.md` or
+  `*card.md` file,
+  start implementation, select a coding strategy, spawn build tasks or ask how engineering should
+  execute. Implementation implications stay at business architecture, acceptance boundary and
+  dependency level—not writer inventories, migrations, exact test files, TDD steps, task breakdown,
+  CI/deploy probes or other engineering execution instructions. Jess may explicitly commission Card
+  authoring in that chat; absent that explicit instruction, the lane ends here.
 - **`READY FOR CARD — <scope>`.** Never state or invent this, Phase 1, task/roadmap or implementation
   sequencing before the complete recommended module Blueprint has been presented, owner-reviewed/
   approved and persisted as final truth in the authoritative module MASTER. Only after
@@ -294,17 +315,18 @@ chat is advisable.
   scope proactively only when a coherent capability or build slice
   has sufficient approved business truth, UI/interaction truth where relevant, ownership,
   dependencies and an acceptance boundary, with no unresolved owner decision blocking safe build.
-  Recommend its dependency/build order. The scope may remain proposed and unnumbered; never invent
-  an official Card number or status merely because it is ready. Official Card numbering/status
-  exists only when governed/owner-approved. Do not continue solving application implementation
-  detail in Plan mode after this boundary; do not send unresolved business/UI truth to build merely
-  to keep moving.
+  Recommend its dependency/build order and acceptance/business boundary. The scope remains an
+  unnumbered handoff boundary, not a Card file or engineering plan; never invent an official Card
+  number or status merely because it is ready. Detailed Card authoring belongs to the later
+  **BUILD/DELIVERY lane after takeover**. Do not continue solving application implementation detail
+  in Plan mode; do not send unresolved business/UI truth to build merely to keep moving.
 - **`PLAN MISSION COMPLETE`.** State this proactively when the whole domain is understood, the
   complete Blueprint has been owner-reviewed/approved and final truth is persisted to the owning
   MASTER. Summarise the **LOCKED operating model · intentional rejects/deferred items · exact
-  recommended next action.** Cards and dependency/build order are derived only after this state; build
-  may be phased, but architecture planning understands the whole domain first. Never
-  wait for Jess to ask *“what next?”*
+  recommended next lane/action.** READY scopes and dependency order may be identified only after
+  this state; the BUILD/DELIVERY lane authors any detailed Cards and chooses implementation mechanics.
+  Build may be phased, but architecture planning understands the whole domain first. Never wait for
+  Jess to ask *“what next?”*
 - **`START A NEW CHAT`.** Recommend this only when the current mission is complete and the next work
   is a materially different planning domain, or accumulated unrelated context creates a real
   confusion risk. Conversation length alone is not a reason while one coherent mission remains
@@ -313,14 +335,23 @@ chat is advisable.
   reason. The standard Plan restart contract is:
   **`<Module> Module Completion — PLAN. Follow ERP PLAN CHAT START PROTOCOL; produce authority
   resolution + whole-domain audit, then the complete Recommended Carres <Module> Blueprint for
-  owner review before Cards.`** The repository carries the protocol;
+  owner review. Persist approved truth, identify READY scopes, then stop before Card authoring.`**
+  The repository carries the protocol;
   do not recreate it in a giant handoff prompt.
+
+  The standard Build takeover contract is:
+  **`<Module> — CONTINUOUS BUILD. Read current authoritative MASTER and READY scopes; execute each
+  approved scope as a full production vertical slice autonomously. Do not ask owner for engineering
+  execution choices.`**
 
 Approved decisions are persisted immediately under the law below; chat length is never the memory
 mechanism. A fresh Plan/Design chat automatically owns these boundaries. **CONTINUOUS BUILD remains
-separate:** after a governed/approved Card or build slice is handed over, it follows the existing
-production vertical-slice law. PLAN mode blocks application implementation, not required governing-
-document updates.
+separate:** after an approved READY scope is handed over under a BUILD takeover, it follows the
+existing production vertical-slice law. PLAN mode blocks application implementation, not required
+governing-document updates. **Prohibited example:** a PLAN chat creates `Customer Payment Posting Convergence
+Card.md` and asks “1 Subagent-driven or 2 Inline execution?” Correct behavior: close the approved
+Blueprint into the MASTER, identify the dependency-ordered `READY FOR CARD` scope, declare
+`PLAN MISSION COMPLETE`, and stop. A later BUILD/DELIVERY chat chooses its own compliant method.
 
 ### PLAN DECISION PERSISTENCE LAW — APPROVED / LOCKED
 
@@ -395,6 +426,17 @@ deployment commands. Manual intervention is limited to first-time credential set
 approval/apply path for production migrations, and rollback or emergency response.
 The four reasons to interrupt: a new business rule · an approved UI/workflow/word must change ·
 production data must be modified irreversibly · long-term architecture must change.
+
+**BUILD/DELIVERY DEFAULT AUTONOMY.** A BUILD takeover of an approved `READY FOR CARD` scope owns the
+full vertical slice: inspect current `origin/main` and authority → implement → run targeted tests
+during development → pass the authoritative release gate → push/PR/merge → deploy → authenticated
+production verification → close the owning MASTER. If the mission says continuous build, continue
+to the next approved READY scope without asking *“what next?”* or saying *“waiting for your next
+instruction.”* Never ask Jess to choose subagent-driven vs inline execution, technical-layer order,
+test batching, branch/worktree strategy, migration numbering, PR sequence, CI strategy, deployment
+mechanism or similar engineering mechanics. The implementing agent chooses the safest and most efficient
+repo-compliant method. Ask for owner action only when a credential or governed production approval
+literally requires her; never ask her to push, fetch, run a terminal command or deploy.
 
 ⛔ DECISION GATE — before PROPOSING or freezing any architecture, workflow, business
    rule, information model or shared behaviour:
