@@ -80,10 +80,10 @@ may and should identify and recommend a materially useful missing capability. Th
 must explain its operator value, check Carres business architecture and locked constraints, and
 remain a proposal until Jess approves it. Reference products inform; they are never copied blindly.
 
-**ERP PLAN CHAT START PROTOCOL + UI EXTENSION — APPROVED / LOCKED (Jess, 2026-08-13).** Every new
-or restarted Plan/Design chat first completes the Constitution's four-step **ERP PLAN CHAT START
-PROTOCOL**, including its authority read, four-way resolution pass, whole-domain audit and owner
-decision gate. This MASTER does not duplicate that global law. For a UI surface, the required
+**ERP PLAN CHAT START PROTOCOL + UI EXTENSION — APPROVED / LOCKED (Jess, 2026-08-13 / 2026-08-14).** Every new
+or restarted Plan/Design chat first completes the Constitution's **ERP PLAN CHAT START PROTOCOL**,
+including its authority read, four-way resolution pass, whole-domain audit, complete recommended
+module Blueprint and owner decision gate. This MASTER does not duplicate that global law. For a UI surface, the required
 whole-domain audit additionally includes this MASTER's UI Dictionary/IA preflight, eight-lens
 review, reference-to-Carres capability matrix and completion gate below.
 
@@ -98,12 +98,12 @@ semantics and ownership outrank external references; and actionable copy remains
 OBJECT + actual working day/date**. The pass is a completeness check, not permission to build every
 capability or to write UI/application code in Plan mode.
 
-**OFFICIAL CARD NUMBERS ARE GOVERNANCE; PLANNING IS THE CHAT'S JOB.** The planner never invents an
-official Card number or status. After the Constitution's whole-domain pass is sufficiently complete,
-it maintains a clearly labelled **PROPOSED ROADMAP / BACKLOG / DEPENDENCY ORDER** for approved and
-discovered remaining work, including what can build directly, what first needs Plan/Design, what
-already has an engine and what has a real gap. A proposed, unnumbered build slice may then be
-sequenced and declared ready; official numbering/status appears only after governance/owner approval.
+**OFFICIAL CARD NUMBERS ARE GOVERNANCE; BLUEPRINT PRECEDES IMPLEMENTATION PLANNING.** The planner
+never invents an official Card number or status. The whole-domain audit is evidence, not a roadmap.
+Only after the complete recommended module Blueprint is presented, owner-reviewed/approved and
+persisted to the authoritative module MASTER may the planner derive a **PROPOSED ROADMAP / BACKLOG /
+DEPENDENCY ORDER** and declare proposed unnumbered build slices ready. Official numbering/status
+appears only after governance/owner approval.
 
 **UI ARCHITECT RESPONSIBILITY + DICTIONARY / IA PREFLIGHT — APPROVED / LOCKED (Jess,
 2026-08-11).** A new or restarted Plan/Design chat is not merely repository police or a visual
@@ -216,11 +216,13 @@ means research continues; Jess is not asked to supply the missing checklist.
 | Mature/international benchmark | scoped finding where useful, or why it cannot materially help |
 | Gap analysis | missing, duplicate, misplaced or deliberately rejected capability |
 | Cross-module/future consequences | downstream inheritors, scalability and consistency risks |
-| Dependencies and sequencing | prerequisites plus proposed roadmap/backlog/dependency order |
+| Blueprint synthesis | complete recommended operating model, operator journeys, UI/page/object placement and intentional rejects |
+| Dependencies | prerequisites and constraints; implementation sequencing waits until Blueprint approval and persistence |
 
-Only after this gate does the chat ask Jess for the remaining genuine owner decision. Approved
-complete decisions are persisted immediately under the Constitution's Plan Decision Persistence
-law. Continuous production-build governance remains §1.1 and is not part of this Plan gate.
+Only after this gate does the chat present the complete Blueprint and ask Jess for any remaining
+genuine owner decision or correction. Approved complete truth is persisted immediately under the
+Constitution's Plan Decision Persistence law. Continuous production-build governance remains §1.1
+and is not part of this Plan gate.
 
 ### MISSION / CARD / CHAT BOUNDARIES — APPROVED / LOCKED (Jess, 2026-08-12)
 
@@ -228,17 +230,19 @@ law. Continuous production-build governance remains §1.1 and is not part of thi
 a coherent implementation scope is ready, what comes next, or whether a fresh chat is advisable.
 The maintained mission state above and these transitions are part of every Plan/Design restart:
 
-1. **`READY FOR CARD — <scope>`.** Never state or invent this, Phase 1 or implementation sequencing
-   before the Constitution's whole-domain pass and this MASTER's applicable completion gate are
-   sufficiently complete. Then state it proactively only when a coherent capability or
+1. **`READY FOR CARD — <scope>`.** Never state or invent this, Phase 1, roadmap or implementation
+   sequencing before the complete recommended module Blueprint has been presented, owner-reviewed/
+   approved, persisted to the authoritative module MASTER and declared **`PLAN MISSION COMPLETE`**.
+   Then state it proactively only when a coherent capability or
    implementation slice has sufficient approved business truth, UI/interaction truth where
    relevant, ownership, dependencies and an acceptance boundary, and no unresolved owner decision
    blocks safe build. Recommend the dependency/build order. Do not invent an official Card number
    merely because the scope is ready. Do not keep solving application implementation detail in Plan
    mode after this boundary, and do not hand unresolved business/UI truth to build just to move.
-2. **`PLAN MISSION COMPLETE`.** State this proactively when every decision required for the current
-   mission is resolved. Summarise **LOCKED truth · ready implementation scopes/Cards ·
-   dependency/build order · intentionally deferred items · exact recommended next action.** Do not
+2. **`PLAN MISSION COMPLETE`.** State this proactively when the complete Blueprint is owner-reviewed/
+   approved and final truth is persisted. Summarise **LOCKED operating model · intentional rejects/
+   deferred items · exact recommended next action.** Derive Cards and dependency/build order only
+   after this state. Do not
    wait for Jess to ask *“what next?”*
 3. **`START A NEW CHAT`.** Recommend this when the mission is complete and the next work is a
    materially different planning domain, or unrelated accumulated context creates a real confusion
