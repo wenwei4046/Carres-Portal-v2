@@ -769,14 +769,15 @@ breathing gap
   This supersedes the earlier acceptance note's live PDF-canvas statement and closes the Sales Order
   Visual Acceptance slice without changing settled business truth.
 - **SALES ORDER FINAL OWNER VISUAL CORRECTION — PRODUCTION-VERIFIED / LOCKED (2026-08-14).** Owner
-  review reopened the preceding closure. PR #793 merged as
-  `af61c274d89d01fda0d306b50257cc4c08eba358`; complete CI run `31800808491` passed and production
-  deploy run `31801669457` converged that exact SHA. Authenticated normal and medium-desktop
+  review reopened the preceding closure. The final correction is PR #795, merged as
+  `759d49efaee6c643bd9d8e1840cb991dee2b7015`; complete CI run `31804608716` passed and production
+  deploy run `31805501074` converged that exact SHA. Authenticated normal and medium-desktop
   acceptance proved the fact-first missing Customer Delivery presentation, concise locality,
   unchanged six-column goods mini-table, single-destination quantity suppression, equal Register
   and Object goods truth, the approved `Edit operational details | Order context` composition,
-  governed Sales ownership, edit controls confined to Order Edit, genuine Revisions/History/Order
-  Route views, and operator-English per-goods routing. Register normal/expanded/selected states,
+  governed Sales ownership, edit controls and URL state confined to Order Edit, safe dirty-navigation
+  refusal, genuine Revisions/History/Order Route views, governed Activity event labels, and
+  operator-English per-goods routing with formatted dates. Register normal/expanded/selected states,
   footer, row actions, Team/Calendar/My Work/Activity, Object views and Quick Rail coexistence were
   checked top-to-toe. Print remained visible and enabled; its blob-preview activation was the only
   browser-policy-blocked automation step, with the print handler, focused tests and production

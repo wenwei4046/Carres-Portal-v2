@@ -213,16 +213,20 @@ Order does not gain a writer.
   Delivery Date remains distinct. No new address, access, delivery-date or destination field was
   created. `docs/ui/MASTER.md` §6.6 records the final reusable UI proof.
 - **FINAL OWNER VISUAL CORRECTION — PRODUCTION-VERIFIED / LOCKED 2026-08-14.** Owner review
-  reopened the preceding acceptance record. PR #793 merged as `af61c274d89d01fda0d306b50257cc4c08eba358`;
-  CI run `31800808491` passed the complete gate and deploy run `31801669457` converged the exact
+  reopened the preceding acceptance record. The final correction is PR #795, merged as
+  `759d49efaee6c643bd9d8e1840cb991dee2b7015`; CI run `31804608716` passed the complete gate and
+  deploy run `31805501074` converged the exact
   SHA on the governed production surfaces. Authenticated acceptance proved: Customer Delivery
   remains a date fact with exact missing value `No delivery date` and separate two-line guidance;
   Register location is concise and collapses duplicate city/state; the six-column goods mini-table
   remains unchanged, with `Carres Klang` shown without quantity for a single destination; Object
   View and Edit expose the same governed goods truth; Edit is composed as `Edit operational
   details | Order context`, keeps Customer Delivery read-only and Sales ownership governed; Save
-  and Discard disappear in Revisions, History and Order Route; and Order Route retains its
-  per-goods architecture in operator English. Normal Register states, selection/footer, expansion,
+  and Discard disappear in Revisions, History and Order Route, leaving those views also clears the
+  Order Edit URL state, and dirty navigation is refused safely; Activity translates logistics and
+  stock ETA events into governed operator terms; and Order Route retains its per-goods architecture
+  with confirmed/no-date copy and formatted dates in operator English. Normal Register states,
+  selection/footer, expansion,
   row actions, all four Quick Rail views, Object views and medium desktop with Quick Rail open were
   verified in authenticated production. The Print control remains present and enabled; automated
   activation of its blob preview was blocked by the acceptance browser security policy, while the
