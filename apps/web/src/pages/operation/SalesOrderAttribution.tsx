@@ -273,8 +273,7 @@ export default function SalesOrderAttribution({
       ) : (
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-meta text-base-500">
-            Salesperson, showroom and dealer decide who gets paid — they change by approval, not
-            by editing.
+            Sales ownership changes only after approval.
           </p>
           <Button
             size="sm"

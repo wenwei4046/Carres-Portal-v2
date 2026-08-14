@@ -208,7 +208,7 @@ describe("resolveSalesOrderRoute", () => {
     facts.allocation.totals = { committedQty: 1, reservedQty: 0, soldQty: 0, outstandingQty: 1 };
     facts.purchaseOrders = [];
     let route = resolveSalesOrderRoute(facts);
-    expect(route.lanes[0]!.groups[0]!.facts[0]!.title).toBe("Route not yet assigned · 1");
+    expect(route.lanes[0]!.groups[0]!.facts[0]!.title).toBe("Waiting for Purchasing · 1 item");
     expect(route.noActionRequired).toBe(false);
 
     facts.allocation.lines[0] = {

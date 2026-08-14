@@ -197,10 +197,22 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
       salespersons: { name: "Shasha" },
     })] };
     mount();
-    const exception = screen.getByText("SO-1303 has no Customer Delivery date");
+    const exception = screen.getByText("No delivery date");
     expect(exception).toHaveAttribute("data-attention", "warning");
     expect(screen.getByText("Shasha · Confirm the date with Kimmy · Record the agreed date")).toBeInTheDocument();
     expect(screen.queryByText("No date yet")).not.toBeInTheDocument();
+  });
+
+  it("collapses duplicate city and state into one concise locality", () => {
+    listHookState.data = { orders: [order({
+      customer_address: "12 Long Street, Kuala Lumpur, Kuala Lumpur",
+      customer_address_city: "Kuala Lumpur",
+      customer_address_state: "Kuala Lumpur",
+    })] };
+    mount();
+    expect(screen.getByText("Kuala Lumpur")).toBeInTheDocument();
+    expect(screen.queryByText("Kuala Lumpur, Kuala Lumpur")).not.toBeInTheDocument();
+    expect(screen.queryByText("12 Long Street, Kuala Lumpur, Kuala Lumpur")).not.toBeInTheDocument();
   });
 
   it("summarises filtered ordered quantities by governed category in the fixed footer", () => {
@@ -293,6 +305,21 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     expect(row).not.toHaveTextContent("Cell index");
     expect(row).not.toHaveTextContent("internal-builder-uuid");
     expect(screen.queryByText(/current location/i)).not.toBeInTheDocument();
+  });
+
+  it("omits destination quantity for one route and shows it only for a split", () => {
+    listHookState.data = { orders: [order({ order_lines: [
+      { id: "line-1", sku: "B1201S-K", qty: 1, unit_price: 2499, label: "B1201S · King" },
+    ] })] };
+    expansionHookState.data = { lines: [{
+      lineId: "line-1", sku: "B1201S-K", unitIds: [],
+      deliverTo: [{ name: "Carres Klang", qty: 1 }],
+    }] };
+    mount();
+    fireEvent.click(screen.getByRole("button", { name: "Expand row" }));
+    const row = screen.getByTestId("expanded-good-B1201S-K");
+    expect(row).toHaveTextContent("Carres Klang");
+    expect(row).not.toHaveTextContent("Carres Klang ×1");
   });
 
   it("classifies legacy item codes before falling back to Other Goods", () => {

@@ -32,6 +32,10 @@ describe("Sales Order object template contract", () => {
     expect(workspace).toContain('addEventListener("beforeunload"');
     expect(workspace).toContain("Discard unsaved changes?");
     expect(workspace).toContain("text-meta text-base-600 xl:col-span-2");
+    expect(workspace).toContain('"Edit operational details"');
+    expect(workspace).toContain('"Order context"');
+    expect(workspace).toContain("if (!confirmDiscard()) return");
+    expect(workspace).toContain('next.delete("edit")');
   });
 
   it("does not render a second editable full-address authority", () => {
@@ -40,7 +44,7 @@ describe("Sales Order object template contract", () => {
   });
 
   it("names the governed ownership request instead of implying direct editing", () => {
-    expect(workspace).toContain('<Section title="Sales ownership">');
+    expect(workspace).toContain('"Sales ownership"');
     expect(workspace).not.toContain('<Section title="Source">');
     expect(attribution).toContain("Request ownership change");
     expect(attribution).not.toContain("Change who this order belongs to");
@@ -54,9 +58,11 @@ describe("Sales Order object template contract", () => {
     expect(workspace).not.toContain('Section title="Order record"');
   });
 
-  it("uses document-detail goods rather than copying the Register expansion columns", () => {
+  it("keeps the Object goods truth at least as complete as the Register expansion", () => {
     expect(workspace).toContain('data-testid="document-goods"');
-    expect(workspace).not.toContain('Category | Unit ID | SKU | Qty | Item | Deliver To');
+    for (const label of ["Category", "Unit ID", "SKU", "Qty", "Item", "Deliver To"]) {
+      expect(workspace).toContain(`>${label}</th>`);
+    }
   });
 
   it("opens the canonical Service Case intake from one plain problem-reporting door", () => {
