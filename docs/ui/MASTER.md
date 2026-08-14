@@ -753,6 +753,21 @@ breathing gap
   removed those non-operational facts, merged as `30e08be9`, passed CI run `31779002343`, and
   deployed with exact-SHA proof in run `31779795185`. The final live SO-1204 check retained fabric,
   leg and Sofa height while proving `X/Y`, rotation, cell index, fabric tier and build UUID absent.
+- **SALES ORDER OWNER VISUAL ACCEPTANCE — PRODUCTION-VERIFIED / CLOSED (2026-08-14).** PR #787
+  merged as `b7d68eed`; authenticated production acceptance found one Edit-grid composition defect,
+  fixed by PR #788 and merged as `ebc8fb5d`. Deploy run `31790978222` repeated the authoritative
+  gates and proved exact SHA `ebc8fb5d` in production. At normal desktop width the Register keeps
+  the seven governed columns, page-header New Sales Order action, utility-only grid toolbar,
+  interaction-blue selection, amber missing Customer Delivery, location summaries, the approved
+  six-column goods mini-table and filtered quantity footer with no permanent Reset layout. The
+  persistent Object Header and `Order · Revisions · History · Order Route` navigation were verified
+  across View and Edit. Order is read-first at document width; PDF remains behind Print; Revisions
+  and History are separate views; Order Route shows per-goods `CURRENT` and a secondary Still owed
+  list. Edit keeps Customer Delivery read-only, retains the existing Proceed date writer, maps only
+  existing address/access fields, and aligns Customer with Sales ownership beneath a full-width
+  edit-scope notice. The same Object Route and Edit compositions remained usable with My Work open.
+  This supersedes the earlier acceptance note's live PDF-canvas statement and closes the Sales Order
+  Visual Acceptance slice without changing settled business truth.
 - `docs/orders/MASTER.md` §0.1 owns the business/field/amendment/permission rules. Sales Portal/POS
   remains the master form contract; UI composition may not create a second commercial form or an
   operational action door.

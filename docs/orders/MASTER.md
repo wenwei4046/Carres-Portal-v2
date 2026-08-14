@@ -204,6 +204,14 @@ Order does not gain a writer.
   object-route/Settings presentation mismatches and merged as `30fa407b`. Deploy run `31768870907`
   converged all governed production surfaces on exact SHA `30fa407b`; the authenticated acceptance
   list passed at 1440×900. `docs/ui/MASTER.md` §6.6 records the reusable Shell/Register/Object proof.
+- **FINAL OWNER VISUAL ACCEPTANCE — CLOSED / PRODUCTION-VERIFIED 2026-08-14.** PR #787 merged as
+  `b7d68eed`; its production acceptance exposed only the Edit notice occupying a document column.
+  PR #788 corrected that composition and merged as `ebc8fb5d`; deploy run `31790978222` proved the
+  exact final SHA. Authenticated checks covered the Register and approved goods expansion, Object
+  View/Edit/Revisions/History/Order Route, and coexistence with My Work open. Proceed date uses the
+  pre-existing Operations writer; Customer Delivery remains read-only and Delivery's Confirmed
+  Delivery Date remains distinct. No new address, access, delivery-date or destination field was
+  created. `docs/ui/MASTER.md` §6.6 records the final reusable UI proof.
 
 ## Object/domain completeness sweep — 2026-08-13
 
