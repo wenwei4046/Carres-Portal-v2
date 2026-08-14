@@ -684,9 +684,6 @@ export default function SalesOrderWorkspace() {
   };
 
   const confirmDiscard = () => !dirty || window.confirm("Discard unsaved changes?");
-  const backToRegister = () => {
-    if (confirmDiscard()) navigate("/operation/orders");
-  };
   const enterEdit = () =>
     setParams(
       (prev) => {

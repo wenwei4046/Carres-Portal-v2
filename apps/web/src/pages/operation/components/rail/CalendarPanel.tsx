@@ -19,6 +19,7 @@ import {
   usePurchaseToday,
   useOperationSuppliers,
   useDeliveryPartners,
+  type operationOrderListRow,
 } from "@/lib/queries";
 import { orderBookingDay } from "@/lib/order-booking";
 import { cjkClassName } from "@/lib/cjk";
