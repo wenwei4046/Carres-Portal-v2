@@ -377,6 +377,25 @@ line.***
 - **The calendar's day comes from the BOOKING, through the one shared rule** — never from the
   promised date, or two surfaces put one order on two days.
 
+### WORK OWNER + TWO-LINE ACTION GRAMMAR — OWNER-APPROVED / LOCKED 2026-08-14
+
+- **Action owner is structured identity, not sentence copy.** Show the resolved owner as the
+  governed compact avatar/initial chip. The accessible name and hover label expose the full staff
+  name. Do not prepend or repeat the name inside every action sentence.
+- **My Work** may omit the current user's repeated avatar because the scope already answers who.
+  **Team Work** groups by owner identity and shows each group's `open · overdue` summary; individual
+  rows do not repeat that group identity unless the row is shown outside the group.
+- A Register warning, Current Action or Work row uses two visual lines when both fact and action
+  are needed. **Line 1** is the fact/problem in governed body size and medium/semibold emphasis.
+  **Line 2** is the next action in the governed smaller supporting size, regular weight and quieter
+  but readable colour. It is not metadata and may not fall below the accessible contrast floor.
+- Do not repeat context already supplied by the row: SO number stays in SO No, customer stays in
+  Customer, and owner stays in the avatar/group. At medium desktop, truncate the supporting line
+  with a discoverable full value; never blend both lines into one clipped sentence.
+- Missing optional facts render the governed neutral empty value. A missing required fact that
+  opens work renders the fact/problem plus its action; bare `Not given` or `Not recorded` must not
+  impersonate an actionable warning.
+
 ### ERP SHELL V1 — OWNER RULING 2026-08-13
 
 - The left navigation is grouped by responsibility using the destination grammar in

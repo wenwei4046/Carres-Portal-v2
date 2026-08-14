@@ -104,6 +104,31 @@ ownership:** the source module reads or links to the owner; it never gains a sec
 lifecycle checklist, object-level reference capability matrix, evidence/output discipline and
 Plan/Design restart. This blueprint supplies the ownership map that pass must use.
 
+### Law F · An action has an owner; a business object does not have one universal action owner
+
+**OWNER ENGINE — OWNER-APPROVED / LOCKED 2026-08-14.** A Sales Order, Purchase Order, Delivery,
+Payment or Service Case may carry a stable PIC or accountable owner, but that identity does not
+own every action created from the object. Each open action resolves its own owner from the
+authoritative business rule and current roster:
+
+```
+missing customer commitment       → responsible salesperson
+issue PO / confirm supplier date  → current PO Duty
+receive goods                     → current GRN Duty
+collect customer balance          → Payment ownership rule
+confirm delivery appointment      → Delivery ownership rule
+```
+
+The rule resolves automatically. Staff do not assign routine work order by order. People owns the
+roster, duty and buddy/cover facts; the Work Engine applies them so absence changes who sees today's
+work without changing the underlying business record or rewriting its history. A manager may see or
+filter the resolved owner, but Work never creates a second assignment truth.
+
+Keep these identities separate: object PIC/accountability · action owner · fault owner · cost
+bearer · service provider. A module may summarise another module's action and owner, but the module
+that owns the trigger and completion fact owns the owner rule. `ACTION-FLOW-STANDARD.md` defines the
+shared action contract; `ui/MASTER.md` defines how the resolved owner appears.
+
 > **The ownership test used by all five laws, and the one V1 needed and did not have:**
 > ```
 > Does this screen CREATE, CHANGE or CLOSE the record?
