@@ -705,17 +705,6 @@ breathing gap
   remains the master form contract; UI composition may not create a second commercial form or an
   operational action door.
 
-## §6.7 · PRODUCTION ACCEPTANCE CLOSEOUT — 2026-08-14
-
-Authenticated production acceptance at 1440×900 is complete for the Sales Orders reference UI:
-Register defaults and goods expansion; Object Header and Order/Revisions/History/Order Route views;
-edit/discard grammar; global utilities; Quick Rail; and central Settings readable/edit contexts.
-The Settings module launcher now uses absolute owned routes, so Sales Orders and Purchasing open
-`/operation/settings/sales-orders` and `/operation/settings/purchasing` from either module instead
-of nesting under the current path. All three web deployment proofs and the API health proof returned
-`30fa407b68ef32b04f73f8bf174678a720ce8fd6`. This closes the approved UI correction mission; older
-conflicting page composition or Settings navigation evidence is superseded.
-
 # §7 · Approved Evolution
 
 | What | Why it is not built |
