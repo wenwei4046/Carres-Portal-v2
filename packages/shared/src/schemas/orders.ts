@@ -661,10 +661,19 @@ export type SetOrderDateInput = z.infer<typeof setOrderDateInputSchema>;
  * keys that are present in the payload. The Hono route converts this
  * camelCase shape to the snake_case the `update_order` RPC consumes.
  */
-/** Phase 2C.3 — dealer cancel input. Reason is optional but the UI
- *  encourages it (audit trail value). RPC trims + nulls empty strings. */
+/** THE cancellation input — one door for one act (SO V2 Cancel slice, 0350).
+ *
+ *  **The reason is REQUIRED.** A cancelled customer transaction that cannot
+ *  say why is an audit row that answers nothing, and the MASTER's cancellation
+ *  ruling has always read "permission, reason, ... and immutable audit". The
+ *  RPC raises `reason_required` on a blank one; this stops it at the boundary
+ *  so the caller gets the field back, not a 422 about the database.
+ *
+ *  Nothing live regressed when this tightened: both POS Stripe pending-order
+ *  paths already pass a real sentence. The only door that permitted a blank
+ *  reason was rendered by nothing and is gone. */
 export const cancelOrderInputSchema = z.object({
-  reason: z.string().nullable(),
+  reason: z.string().trim().min(1, "A cancellation says why").max(2000),
 });
 export type CancelOrderInput = z.infer<typeof cancelOrderInputSchema>;
 

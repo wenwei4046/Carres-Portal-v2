@@ -67,6 +67,7 @@ import {
   type SalesOrderSnapshot,
   type AmendmentProposal,
 } from "@/lib/queries";
+import CancelSalesOrderDialog from "./CancelSalesOrderDialog";
 import CorrectionWorkList from "./CorrectionWorkList";
 import SalesOrderAmendment from "./SalesOrderAmendment";
 import SalesOrderAttribution from "./SalesOrderAttribution";
@@ -411,6 +412,7 @@ export default function SalesOrderWorkspace() {
   const copyFrom = isNew ? params.get("copyFrom") : null;
   const [viewRev, setViewRev] = useState<number | null>(null);
   const [amendmentSeed, setAmendmentSeed] = useState<AmendmentProposal | null>(null);
+  const [cancelOpen, setCancelOpen] = useState(false);
 
   const detailQ = useOperationOrder(isNew ? copyFrom : (orderId ?? null));
   const revisionsQ = useSalesOrderRevisions(isNew ? null : (orderId ?? null));
@@ -894,6 +896,19 @@ export default function SalesOrderWorkspace() {
           <Pencil size={14} /> Edit
         </Button>
       )}
+      {/* The governed cancel sits beside the governed edit, exactly as the
+          MASTER's Workspace ruling reads. An order already cancelled has
+          nothing left to cancel, so the door is absent rather than refusing. */}
+      {mode === "view" && !showRoute && order && order.status !== "cancelled" && (
+        <Button
+          size="sm"
+          variant="neutral"
+          onClick={() => setCancelOpen(true)}
+          data-testid="workspace-cancel-so"
+        >
+          <X size={14} /> Cancel SO
+        </Button>
+      )}
       {(mode === "edit" || mode === "create") && (
         <>
           <Button
@@ -952,6 +967,16 @@ export default function SalesOrderWorkspace() {
         docTitle={isNew ? "New Sales Order — Carres" : order ? `SO-${order.so} — Carres` : undefined}
         right={headerRight}
       />
+
+      {order && (
+        <CancelSalesOrderDialog
+          orderId={order.id}
+          so={order.so}
+          open={cancelOpen}
+          onOpenChange={setCancelOpen}
+          onCancelled={() => void detailQ.refetch()}
+        />
+      )}
 
       {showRoute ? (
         <div className="min-h-0 flex-1 overflow-auto bg-kit-slate-3 px-4 py-4">

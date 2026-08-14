@@ -184,3 +184,36 @@ describe("Copy to new Sales Order", () => {
     );
   });
 });
+
+describe("Cancel SO", () => {
+  /* The register writes nothing itself: the menu entry may only OPEN the one
+   * governed cancellation door, and the row it names is the door's subject.
+   * If a future edit ever makes the register cancel directly, the dialog stops
+   * being the single door and this test is the thing that notices. */
+  it("opens the governed cancellation door for the row, and navigates nowhere", () => {
+    mount();
+    fireEvent.contextMenu(screen.getByTestId("grid-parent-row"));
+    fireEvent.click(screen.getByRole("button", { name: "Cancel SO" }));
+    expect(screen.getByText("Cancel SO-1303")).toBeInTheDocument();
+    expect(screen.getByTestId("location")).toHaveTextContent("/operation/orders");
+  });
+
+  it("keeps the destructive entry last, below a divider, so a slipped click cannot reach it", () => {
+    mount();
+    fireEvent.contextMenu(screen.getByTestId("grid-parent-row"));
+    const labels = screen
+      .getAllByRole("button")
+      .map((b) => b.textContent?.trim())
+      .filter((t): t is string =>
+        [
+          "View",
+          "Edit",
+          "Preview PDF",
+          "Print PDF",
+          "Copy to new Sales Order",
+          "Cancel SO",
+        ].includes(t ?? ""),
+      );
+    expect(labels[labels.length - 1]).toBe("Cancel SO");
+  });
+});

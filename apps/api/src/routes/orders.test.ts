@@ -4013,27 +4013,33 @@ describe("POST /api/orders/:id/cancel", () => {
     expect((sb._rpcCalls[0].args as Record<string, unknown>).p_reason).toBe("Customer changed mind");
   });
 
-  it("200 — accepts null reason", async () => {
-    const sb = buildSbForProceed({
-      fetchedRow: makeOrderRow({
-        status: "cancelled",
-        signature_url: `orders-attachments/${DEALER_A}/wiz/signature.png`,
-        terms_accepted: true,
-      }),
-    });
-    vi.mocked(userClient).mockReturnValue(sb);
-    const jwt = await makeJwt("dealer", DEALER_A);
-    const res = await app.fetch(
-      new Request(cancelUrl, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ reason: null }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(200);
-    expect((sb._rpcCalls[0].args as Record<string, unknown>).p_reason).toBeNull();
-  });
+  /* 0350 — A CANCELLATION SAYS WHY. This test used to assert the opposite:
+   * `{ reason: null }` returned 200 and passed a NULL through to the RPC, and
+   * the audit row read the bare words "Order cancelled". A cancelled customer
+   * transaction that cannot say why is a record that answers nothing, so the
+   * reason is now required and the refusal happens at the boundary — the RPC
+   * is never reached, and the caller gets the field back rather than a
+   * database error. */
+  it.each([{ reason: null }, { reason: "" }, { reason: "   " }, {}])(
+    "400 before the RPC — a cancellation says why (%j)",
+    async (body) => {
+      const sb = buildSbForProceed({});
+      vi.mocked(userClient).mockReturnValue(sb);
+      const jwt = await makeJwt("dealer", DEALER_A);
+      const res = await app.fetch(
+        new Request(cancelUrl, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        }),
+        env,
+      );
+      /* 400 is this dispatcher's one shape for a body that never passed the
+       * schema — the same answer every other order mutation gives. */
+      expect(res.status).toBe(400);
+      expect(sb._rpcCalls).toHaveLength(0);
+    },
+  );
 
   it("422 when RPC says wrong_status (already proceeded / cancelled)", async () => {
     const sb = buildSbForProceed({
