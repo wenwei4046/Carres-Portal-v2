@@ -95,6 +95,8 @@ export interface PortalNavItem {
   /** optional per-item narrowing of the group's roles — the item shows only
    *  for these roles. */
   roles?: ReadonlyArray<Role>;
+  /** ERP Shell V1 responsibility heading within a real portal area. */
+  section?: "Workspace" | "Sales" | "Supply Chain" | "Finance" | "Customer Care" | "Master Data" | "Admin";
 }
 
 export interface PortalNavGroup {
@@ -117,7 +119,7 @@ export const PORTAL_NAV: PortalNavGroup[] = [
     roles: ["operation", "principal"],
     defaultTab: "dashboard",
     items: [
-      { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+      { key: "dashboard", label: "Dashboard", icon: LayoutDashboard, section: "Workspace" },
       {
         // SO-5 (Loo, 2026-08-09) — the page is Sales Orders and the door says so.
         // ⭐ PRODUCTION CUTOVER (owner, 2026-08-10) — this door is now the NEW
@@ -129,6 +131,7 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         icon: ClipboardList,
         path: "/operation/orders",
         badge: "orders",
+        section: "Sales",
       },
       // Work (SO V2 CARD 10, owner ruling 2026-08-11) — My Work / Team Work:
       // two filters over the ONE open work set the Card 9 engine composes.
@@ -136,7 +139,7 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       // *what to do today, with the number, the party and the date already
       // worked out*. The page writes nothing; a row opens the owning module's
       // workspace.
-      { key: "work", label: "Work", icon: ListTodo },
+      { key: "work", label: "Work", icon: ListTodo, section: "Workspace" },
       // ⭐ THE TEMPORARY DOOR (SALES-ORDER-CUTOVER, owner 2026-08-10).
       //
       // The old Orders control table is NOT deleted and NOT hidden — it keeps
@@ -154,6 +157,7 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         label: "Old Orders (temporary)",
         icon: History,
         path: "/operation/old-orders",
+        section: "Sales",
       },
       // Purchasing (2026-07-21) — the THREE procurement rails (To Order / the
       // Purchase Order register / Receiving) collapsed into ONE sidebar item.
@@ -177,6 +181,7 @@ export const PORTAL_NAV: PortalNavGroup[] = [
           "tab:claims",
           "path:/operation/procurement",
         ],
+        section: "Supply Chain",
       },
       // Delivery (T11, Jess 2026-07-27) — **the ONE new menu item in the whole
       // build plan**; every other line upgrades an existing door, and its place
@@ -185,7 +190,7 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       // reasons and photos stay behind the order drawer's server-side gates, so
       // this door shows the delivery work and hands over to the same drawer the
       // Orders list opens.
-      { key: "delivery", label: "Delivery", icon: Route },
+      { key: "delivery", label: "Delivery", icon: Route, section: "Supply Chain" },
       // Stock (K0, Jess 2026-07-27) — the two stock doors merged into ONE
       // entry, same shape as the Purchasing merge above: one warehouse, three
       // questions (On hand · Ready stock [joins at K2] · In & out). Click
@@ -199,27 +204,29 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         icon: Boxes,
         tab: "stock-onhand",
         activeFor: ["tab:stock-onhand", "tab:stock-plan", "tab:movements"],
+        section: "Supply Chain",
       },
-      { key: "payments", label: "Payments", icon: Wallet },
+      { key: "payments", label: "Payments", icon: Wallet, section: "Finance" },
       // Rental base (0247-0249, Loo 2026-07-25) — rent-to-own agreements +
       // the deployed-unit asset registry. Dormant until the POS rental lane.
-      { key: "rental", label: "Rental", icon: Repeat },
+      { key: "rental", label: "Rental", icon: Repeat, section: "Customer Care" },
       // Catalog split (Loo 2026-07-25) — Operations carries ONLY the costing
       // door: the 0226 Operation Catalog (SKU Master / Modular / Fabric; the
       // money there is buying cost, isolated from POS selling). The selling
       // Product & Maintenance lives in the Admin area below.
-      { key: "op-catalog", label: "Operation Catalog", icon: Calculator },
-      { key: "suppliers", label: "Suppliers", icon: Truck },
+      { key: "op-catalog", label: "Catalog", icon: Calculator, section: "Master Data" },
+      { key: "suppliers", label: "Suppliers", icon: Truck, section: "Master Data" },
       {
         key: "service-notes",
         label: "Service Cases",
         icon: LifeBuoy,
         badge: "service-notes",
+        section: "Customer Care",
       },
       // Guarantees (0261-0263, Loo 2026-07-26) — the claim desk. Sits right
       // under Service Cases because that is where a claim ends up: look the
       // guarantee up here, then swap the item and open the case.
-      { key: "guarantees", label: "Guarantees", icon: ShieldCheck },
+      { key: "guarantees", label: "Guarantees", icon: ShieldCheck, section: "Customer Care" },
     ],
   },
   {
