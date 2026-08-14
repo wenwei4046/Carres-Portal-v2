@@ -98,7 +98,10 @@ function initDraft(cfg: OrderEntryConfigDto): Draft {
   return { methods, tabs };
 }
 
-export default function OrderEntryPage() {
+/** `embedded` renders the editor as a SECTION of `Sales Order Settings` —
+ *  same form, same config row, no second page header. It is a placement flag
+ *  and nothing else: there is still exactly one Order Entry editor. */
+export default function OrderEntryPage({ embedded = false }: { embedded?: boolean } = {}) {
   const cfgQ = useOrderEntryConfig();
   const saveMut = useUpdateOrderEntryConfig();
 
@@ -410,14 +413,26 @@ export default function OrderEntryPage() {
   // ----------------------------------------------------------------- render
 
   return (
-    <div className="px-9 py-8 pb-14 max-w-[880px]">
+    <div className={embedded ? "" : "px-9 py-8 pb-14 max-w-[880px]"}>
       <div className="mb-6">
-        <div className="kicker">Point of Sale</div>
-        <h1 className="text-page font-display mt-1.5 text-base-900">Order Entry</h1>
-        <p className="text-body text-base-600 mt-1">
-          Configure the POS "Open Sales Order" format: the payment methods offered at
-          checkout and the Customer-step form fields. Saved config is shared for everyone.
-        </p>
+        {embedded ? (
+          <>
+            <div className="label mb-1.5">Order Entry</div>
+            <p className="text-meta text-base-500">
+              What the POS asks when an order is opened, and the payment methods offered at
+              checkout. Shared by everyone.
+            </p>
+          </>
+        ) : (
+          <>
+            <div className="kicker">Point of Sale</div>
+            <h1 className="text-page font-display mt-1.5 text-base-900">Order Entry</h1>
+            <p className="text-body text-base-600 mt-1">
+              Configure the POS "Open Sales Order" format: the payment methods offered at
+              checkout and the Customer-step form fields. Saved config is shared for everyone.
+            </p>
+          </>
+        )}
       </div>
 
       {cfgQ.isLoading && <div className="text-body text-base-500">Loading config…</div>}

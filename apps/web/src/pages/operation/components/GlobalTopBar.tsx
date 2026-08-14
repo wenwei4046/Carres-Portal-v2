@@ -7,13 +7,16 @@
  *                 feed (overdue orders · deliveries with no ETA to chase ·
  *                 escalations for Jess); the badge shows the total count.
  *   HelpCircle · Help — two-item menu (Help · Training/SOP), placeholders.
- *   Settings — button + a "coming soon" placeholder. No settings page built.
+ *   Settings — the ERP's ONE Settings entry. A compact permission-filtered
+ *                 launcher (current module's settings, then All System
+ *                 Settings); both choices navigate into the one Settings
+ *                 Workspace. It is never an editing form.
  *
  * Token classes only (design-standard §2: no raw hex in a new file).
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Bell, GraduationCap, HelpCircle, Settings } from "lucide-react";
 import { useOperationOrders, type operationOrderListRow } from "@/lib/queries";
 import { apiFetch } from "@/lib/api";
@@ -49,11 +52,26 @@ export default function GlobalTopBar() {
   );
 }
 
+/** Which module's settings the launcher offers first. A module appears only
+ *  when it actually OWNS settings — an entry that opens an empty page is a
+ *  promise about the product, which is the thing the old placeholder did. */
+function moduleSettingsFor(pathname: string): { label: string; href: string } | null {
+  if (pathname.startsWith("/operation/orders")) {
+    return { label: "Sales Order Settings", href: "/operation/settings/sales-orders" };
+  }
+  if (pathname.startsWith("/operation/purchasing") || pathname.startsWith("/operation/to-order")) {
+    return { label: "Purchasing Settings", href: "/operation/settings/purchasing" };
+  }
+  return null;
+}
+
 /** The Bell / HelpCircle / Settings cluster (Lucide, no emoji) with popovers —
  *  reusable: sits in the slim bar on most pages, and inline in the Orders
  *  header's right cluster. */
 export function TopBarIcons() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const moduleSettings = moduleSettingsFor(location.pathname);
   const { data } = useOperationOrders({});
   const orders = useMemo(() => data?.orders ?? [], [data]);
   const tasksQ = useQuery<OpsTasksListResponse>({
@@ -212,24 +230,58 @@ export function TopBarIcons() {
         )}
       </div>
 
-      {/* Settings — coming-soon placeholder (no page built). */}
+      {/* Settings — the ERP's ONE Settings entry (docs/ui/MASTER.md GLOBAL
+          SETTINGS ENTRY, APPROVED / LOCKED). A compact launcher, never an
+          editing form: both choices navigate into the one Settings Workspace,
+          where a change to a business value is auditable. It replaces the
+          "Coming soon." placeholder that used to make a promise about the
+          product on an operator's screen. */}
       <div className="relative">
         <button
           type="button"
           onClick={() => setOpen((o) => (o === "settings" ? null : "settings"))}
           aria-label="Settings"
           title="Settings"
-          aria-haspopup="dialog"
+          aria-haspopup="menu"
           aria-expanded={open === "settings"}
           className="p-2 rounded-md text-base-500 hover:text-base-900 hover:bg-hovertint transition-colors"
         >
           <Settings size={18} />
         </button>
         {open === "settings" && (
-          <div className="absolute right-0 top-full mt-1 z-40 w-56 bg-card text-card-foreground border border-base-200 rounded-lg shadow-lg p-4 text-center">
-            <Settings size={22} className="mx-auto text-base-300 mb-2" />
-            <div className="text-body text-base-700 font-semibold mb-0.5">Settings</div>
-            <div className="text-meta text-base-400">Coming soon.</div>
+          <div
+            role="menu"
+            className="absolute right-0 top-full mt-1 z-40 w-56 bg-card text-card-foreground border border-base-200 rounded-lg shadow-lg py-1"
+            data-testid="settings-launcher"
+          >
+            {/* The current module's own settings come FIRST — the operator is
+                already inside that module, so it is the likely destination. */}
+            {moduleSettings && (
+              <button
+                type="button"
+                role="menuitem"
+                className="block w-full text-left px-3 py-1.5 text-body text-base-700 hover:bg-hovertint hover:text-base-900"
+                onClick={() => {
+                  setOpen(null);
+                  navigate(moduleSettings.href);
+                }}
+                data-testid="settings-launcher-module"
+              >
+                {moduleSettings.label}
+              </button>
+            )}
+            <button
+              type="button"
+              role="menuitem"
+              className="block w-full text-left px-3 py-1.5 text-body text-base-700 hover:bg-hovertint hover:text-base-900"
+              onClick={() => {
+                setOpen(null);
+                navigate("/operation/settings");
+              }}
+              data-testid="settings-launcher-all"
+            >
+              All System Settings
+            </button>
           </div>
         )}
       </div>
