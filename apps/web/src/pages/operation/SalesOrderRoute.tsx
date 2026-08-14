@@ -21,13 +21,18 @@ function FactStep({ fact, currentLabel = false }: { fact: SalesOrderRouteFact; c
       <span className="min-w-0">
         <span className="block text-body font-medium text-kit-slate-12">{fact.title}</span>
         {fact.detail && <span className="block text-meta text-kit-slate-9">{fact.detail}</span>}
-        {currentLabel && fact.state === "current" && <span className="mt-1 inline-block text-label font-semibold tracking-wide text-kit-blue-11">CURRENT</span>}
+        {currentLabel && <span className="mt-1 inline-block text-label font-semibold tracking-wide text-kit-blue-11">CURRENT</span>}
       </span>
     </>
   );
   return fact.href ? (
     <Link to={fact.href} aria-label={`${fact.title} · Open in ${fact.owner}`} className="flex min-w-[190px] items-start gap-2 rounded-control px-2 py-2 hover:bg-hovertint">{body}<ArrowUpRight size={12} className="ml-auto mt-1 shrink-0 text-kit-blue-11" /></Link>
   ) : <div className="flex min-w-[190px] items-start gap-2 px-2 py-2">{body}</div>;
+}
+
+function isCurrentPosition(facts: SalesOrderRouteFact[], fact: SalesOrderRouteFact, index: number) {
+  const hasExplicitCurrent = facts.some((candidate) => candidate.state === "current");
+  return hasExplicitCurrent ? fact.state === "current" : index === facts.length - 1;
 }
 
 export default function SalesOrderRoute({ route }: { route: Route }) {
@@ -53,7 +58,7 @@ export default function SalesOrderRoute({ route }: { route: Route }) {
               <h3 className="mb-3 text-body font-semibold text-kit-slate-12">{group.title}</h3>
               <div className="flex flex-wrap items-stretch gap-1">
                 {so && <Link to={so.href} className="flex min-w-[145px] items-center gap-2 rounded-control px-2 py-2 text-body font-medium text-kit-blue-11 hover:bg-hovertint">{so.number}</Link>}
-                {group.facts.map((fact) => <div key={fact.id} className="flex items-center"><ArrowRight size={14} className="mx-1 shrink-0 text-kit-slate-9" /><FactStep fact={fact} currentLabel /></div>)}
+                {group.facts.map((fact, index) => <div key={fact.id} className="flex items-center"><ArrowRight size={14} className="mx-1 shrink-0 text-kit-slate-9" /><FactStep fact={fact} currentLabel={isCurrentPosition(group.facts, fact, index)} /></div>)}
               </div>
             </article>
           ))}

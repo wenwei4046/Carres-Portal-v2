@@ -46,8 +46,8 @@ describe("OrderEntryPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Edit Credit / Debit" }));
 
     // Bank follow-up rides on the credit method, options seeded from MY_BANKS.
-    expect(screen.getByLabelText("credit follow-up bank label")).toHaveValue("Bank");
-    const options = screen.getByLabelText("credit follow-up bank options") as HTMLTextAreaElement;
+    expect(screen.getByLabelText("credit required information bank label")).toHaveValue("Bank");
+    const options = screen.getByLabelText("credit required information bank options") as HTMLTextAreaElement;
     expect(options.value).toContain("Maybank");
     expect(options.value).toContain("CIMB Bank");
 
@@ -85,6 +85,8 @@ describe("OrderEntryPage", () => {
   it("adding a method 'E-wallet' derives the key e-wallet and includes it in the saved paymentMethods", () => {
     render(<OrderEntryPage />);
 
+    expect(screen.queryByLabelText("New method name")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Add payment method" }));
     fireEvent.change(screen.getByLabelText("New method name"), {
       target: { value: "E-wallet" },
     });
@@ -120,6 +122,7 @@ describe("OrderEntryPage", () => {
   it("uses focused payment-method editing and truthful required-information terminology", () => {
     render(<OrderEntryPage />);
     expect(screen.queryByText(/Add follow-up/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/follow-up/i)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Edit Online transfer" }));
     expect(screen.getByLabelText("online label")).toHaveValue("Online transfer");
     expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();

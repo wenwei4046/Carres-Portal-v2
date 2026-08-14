@@ -1,24 +1,26 @@
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import SettingsWorkspace from "./SettingsWorkspace";
 
-vi.mock("./SalesOrderSettings", () => ({ default: () => <div>Sales Order Settings</div> }));
-vi.mock("./OperationPurchasingSettings", () => ({ default: () => <div>Purchasing Settings</div> }));
+vi.mock("./SalesOrderSettings", () => ({ default: () => <div>Sales settings</div> }));
+vi.mock("./OperationPurchasingSettings", () => ({ default: () => <div>Purchasing settings</div> }));
 
 describe("SettingsWorkspace navigation", () => {
-  it("uses central absolute routes instead of nesting the next section under the current one", () => {
+  it("uses canonical central module routes from a nested settings destination", () => {
     render(
       <MemoryRouter initialEntries={["/operation/settings/sales-orders"]}>
-        <SettingsWorkspace />
+        <Routes>
+          <Route path="/operation/settings/*" element={<SettingsWorkspace />} />
+        </Routes>
       </MemoryRouter>,
     );
 
-    expect(screen.getByTestId("settings-section-sales-orders")).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Sales Orders" })).toHaveAttribute(
       "href",
       "/operation/settings/sales-orders",
     );
-    expect(screen.getByTestId("settings-section-purchasing")).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Purchasing" })).toHaveAttribute(
       "href",
       "/operation/settings/purchasing",
     );
