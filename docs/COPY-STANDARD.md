@@ -260,14 +260,18 @@ confirmed, the SYSTEM produces the document and the operator only presses the bu
 nobody authors a delivery order by hand. Card C7 builds it; the number is stamped at
 dispatch today, which is too late to hand to logistics, and C7 moves it.
 
-**Delivery execution words — owner-approved 2026-08-14.** Employee UI never uses `Release` for
-the Delivery Order act; it uses `Issue delivery order`, `Ready to issue delivery order` or
-`Cannot issue delivery order yet`. Employee UI never uses the technical noun `Attempt`; one
-actual customer visit is `Delivery Visit`, its outcome is `Delivery Result`, and prior visits are
-`Delivery History`. Internal schema/code may retain `delivery_attempt`. Use the concrete evidence
-name `Delivery Photo` or `Signed Delivery Order`, never the generic technical label `Evidence`
-when the employee can be told what is required. Delivery schedule groups and due labels use the
-actual weekday + date, never `Today` or `Tomorrow`.
+**Delivery execution words — owner-approved 2026-08-14, final Blueprint wording.** Employee UI
+never uses `Release`; use `Issue Delivery Order`, `Ready to issue delivery order` or `Cannot issue
+delivery order yet`. Employee UI never uses `Attempt` or asks a person to create a `Delivery Visit`.
+The employee action is `Record Delivery Result`, the page/section is `Delivery History`, and one
+entry reads `Delivery on {weekday, date}`. `Delivery Visit` remains the formal system, permission
+and audit object; internal schema/code may retain `delivery_attempt`. Results are `Delivered`,
+`Partially Delivered` and `Failed Delivery`; never `Not Delivered`. `Rescheduled` and `Delivery
+Cancelled` are arrangement states, not actual Delivery Results. Use `Delivery Proof` or the
+concrete proof name (`Delivery Photo`, `Signed Delivery Order`, `Logistics confirmation`) when the
+employee can be told what is required. Delivery schedule groups and due labels use the actual
+weekday + date, never `Today` or `Tomorrow`. Never show generic `Contact Customer` or `Follow Up`;
+name the purpose, such as `Confirm New Delivery Date` or `Confirm Delivery Address`.
 
 ## The delivery group words (T8, locked with Jess 2026-07-27)
 
@@ -912,7 +916,7 @@ Information Architecture and live in [`ERP-ARCHITECTURE.md`](ERP-ARCHITECTURE.md
 | Working out what to do about a delay, before anyone calls the customer | **`Delay planning`** | Recovery · Recovery plan · Exception handling · Escalation |
 | Telling logistics to re-arrange a delayed delivery | **`Call {logistics} — arrange new delivery date`** | Call customer (stock delay) · Inform customer · Reschedule |
 | Call to fix delivery date + slot | **Call {customer} — book delivery date** | Schedule delivery · Chase · Call customer (book delivery) [old T2 spelling] |
-| The delivery company (any page/label) | **Logistics** (with s) · a named one reads `NETS Logistics` | Logistic · Carrier · Partner · Delivery partner |
+| The company responsible for customer contact/transport in Delivery | **Logistics Partner** · a named one reads `NETS Logistics` | Logistic · Carrier · Delivery partner |
 | The goods pool (any page/tab/label) | **Stock** | Inventory · Warehouse (as a menu word) |
 | Stock in/out history (tab/label) | **In & out** | Movements · Movement log (menu) · Ledger |
 | A logistics company's own working rules | **delivery rules** | Partner profile · SLA · Carrier config |
@@ -1159,12 +1163,11 @@ about the next second. Sunday never appears in a logistics company's rules: it i
 for everyone, and a per-partner Sunday line would read as though a phone call
 could buy one.
 
-**The Logistics word law (Jess 2026-07-27).** Jess: "our english bad — logistic & logistics
-we don't see different", so this was decided rather than asked again. **`Logistics`, always
-with the s** — it is the correct English noun and it reads naturally with the company names
-staff already say (`NETS Logistics`). `Carrier`, `Partner` and `Delivery partner` are banned
-UI words (DB table names keep theirs). The rename is free: C1 is already rewriting every one
-of those strings.
+**The Logistics word law (re-ruled by the Delivery Blueprint, owner 2026-08-14).** Use
+**`Logistics Partner`** for the role/category and the actual company name, such as **`NETS
+Logistics`**, for an assignment. `Logistics` always keeps the s. `Logistic`, `Carrier` and
+`Delivery partner` are banned UI words; the standalone generic `Partner` is too ambiguous on a
+Delivery surface. DB/schema names may retain their technical spelling.
 
 **The three-dot column has NO header (Jess 2026-07-27).** The dots are three independent
 facts, not one status. `Status` is wrong and `Checks` reads as "cheques" beside money — so

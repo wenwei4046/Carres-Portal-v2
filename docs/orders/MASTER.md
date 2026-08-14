@@ -3585,11 +3585,14 @@ excluded them merely because they were not already implemented.
   AutoCount's Document Flow and 2990's Relationship Map are behavioural references only; Carres
   ownership, evidence and visual tokens remain authoritative.
 
-  **`Delivery` is the APPROVED / LOCKED customer-facing map label (Loo, 2026-08-11).** The map
-  never exposes the engine term `Delivery Attempt` or the proposed label `Delivery Visit`.
-  Each real run is shown inside the `Delivery` node by its DO number and date, followed by the
-  plain result `Scheduled` · `Delivered` · `Not Delivered`. A not-delivered run also shows its
-  reason and the next scheduled delivery when one exists; every earlier run remains visible.
+  **`Delivery` is the APPROVED / LOCKED customer-facing map label (Loo, 2026-08-11; wording
+  re-ruled by the Delivery Blueprint 2026-08-14).** The map never exposes the engine term
+  `Delivery Attempt` or asks a person to create a `Delivery Visit`; Delivery owns that formal
+  audit object and employee pages use `Delivery History`. Each actual run is shown inside the
+  `Delivery` node by its DO number and date, followed by `Delivered` · `Partially Delivered` ·
+  `Failed Delivery`. A Failed Delivery also shows its reason and the next scheduled delivery when
+  one exists; every earlier run remains visible. A booking that has not actually proceeded is an
+  arrangement (`Scheduled`, `Rescheduled` or `Delivery Cancelled`), not a Delivery Result.
   Generating a DO or booking a date never proves delivery. The append-only internal
   `delivery_attempts` / exception model remains authoritative and is not renamed by this UI law.
 
@@ -3616,7 +3619,7 @@ ONE         1 selected · Clear                         View Flow · Export Exce
 MANY        N selected · Clear                                      Export Excel (N) · Export PDF (N)
 ```
 
-The View dropdown owns All orders · Not delivered · My orders · personal/team Saved Views ·
+The View dropdown owns All orders · Failed delivery · My orders · personal/team Saved Views ·
 Save current view. This preserves the scope capabilities without permanent scope pills. Every
 column keeps its direct header filter, so the duplicate generic Filters button is retired. The
 normal Export dropdown contains current-view Excel · PDF · Print outputs; explicit selected
