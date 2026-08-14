@@ -87,9 +87,7 @@ describe("no live request — one way in, and it is a request", () => {
     draw();
     expect(screen.getByTestId("attribution-open")).toBeTruthy();
     expect(screen.queryByTestId("attribution-request")).toBeNull();
-    /* The sentence is the point: an operator who reads "they change by
-     * approval, not by editing" does not go hunting for a picker in Edit. */
-    expect(screen.getByText(/change by approval, not by editing/i)).toBeTruthy();
+    expect(screen.getByText("Sales ownership changes only after approval.")).toBeTruthy();
   });
 
   it("will not send without a reason, and sends only the field that moved", () => {
