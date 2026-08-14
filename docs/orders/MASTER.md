@@ -236,8 +236,9 @@ Order does not gain a writer.
 ## Guided operations and Service Case boundary — CLOSED / PRODUCTION-VERIFIED 2026-08-14
 
 - A missing Customer Delivery date uses the governed two-line action grammar in the Register:
-  the exact SO/fact first, then Salesperson (or Sales fallback), customer, concrete confirmation
-  act and required recorded result. The Sales Order detail expands the same derived fact into
+  the fact first, then the concrete confirmation act and required recorded result. SO number,
+  customer and resolved salesperson stay in their structural fields/avatar and are not repeated
+  in the action sentence. The Sales Order detail expands the same derived fact into
   Why, Who must act, Who to contact, What to ask, What to use, What to record and What happens
   next. The guidance stores no second action or delivery truth.
 - `Report a problem` is the one Sales Order entrance for a customer, product, delivery or
@@ -1313,8 +1314,10 @@ mounted and 401-gated on production after deploy.
 # ✅ UNIFIED WORK ENGINE — SO V2 CARD 9, SHIPPED 2026-08-11
 
 **The question this card installed:** Work reads module facts and produces
-**WHO + ACTION + OBJECT + WHEN (ACTUAL WORKING WEEKDAY/DATE)** — and every rule that enters the
-engine names its five parts or does not enter.
+**WHO + ACTION + OBJECT + WHEN (ACTUAL WORKING WEEKDAY/DATE)** — and every rule that entered the
+engine named its then-current five parts. The 2026-08-14 Owner Engine ruling now supersedes the
+PIC-for-every-action business assumption; the implementation gap is recorded below rather than
+rewriting this shipped evidence.
 
 **THE TRACE:** the per-module engines already exist and stay the owners of
 WHAT is open (`order-actions` two-layer engine · the purchasing calls ·
@@ -1334,8 +1337,8 @@ WORK_RULES         the FIVE-PART registry: Trigger · Owner · Action · Due
                    (PO-duty · GRN-duty offset−1 · claim = opening month's
                    holder), never a stored assignee.
 workItemsForOrder  composes the engine's Layer-1 output into work items:
-                   owner = the PIC (§2.2 — the PIC owns every action, so an
-                   item carries no owner field of its own) · due through the
+                   owner = the PIC (§2.2's former rule — this is now a measured
+                   implementation gap, not current business authority) · due through the
                    ONE shipped clock per key (assign/chase/deliver/photo →
                    delivery-queue with the Card 3 leads · delay clocks →
                    order-action-due, office week · collect AND
@@ -1787,11 +1790,23 @@ is the action's own outcome and is never ticked**, so an open action can never s
 ticked list. **No checkbox, no tick, no writer** — the state is READ from the same signals the
 ladder just read.
 
-## 2.2 · Ownership — two different things, and NEITHER is stored on an action
+## 2.2 · Ownership — three identities; Action Owner is resolved per action
 
-**Task Owner** = the order's PIC. The PIC owns EVERY action of that order, so an action carries
-no owner field. **Case Owner** = the one person responsible for this customer's case start to
-finish; it never changes and is never repeated on an action.
+**Sales Order PIC** = the person accountable for the order/customer relationship. **Action
+Owner** = the person or duty responsible for one current action, resolved automatically from that
+action's Owner Rule and current roster/cover facts. **Case Owner** = the stable owner of a linked
+Service Case. These identities may coincide, but the system never treats them as one field.
+
+The Sales Order therefore does not have one universal action owner. Missing customer commitment
+work resolves to the responsible salesperson; Purchasing, Receiving, Payment and Delivery work
+resolves through those modules' governed duty/ownership rules. Owner identity is displayed
+structurally and is not repeated inside every action sentence.
+
+**APPROVED TARGET / NOT BUILT — 2026-08-14.** The current shipped order work composition still
+uses the Sales Order PIC for its order-track items and its registry does not yet carry separate
+Owner Rule and Display Owner fields. This documentation ruling does not change ERP code. A later
+BUILD/DELIVERY scope must migrate the registry and Work surfaces, preserve the existing completion
+facts and clocks, and production-verify roster/cover resolution plus the two-line presentation.
 
 **How the PIC is decided** (LIVE, migrations 0232 + 0235;
 `ops_order_control.assigned_staff / assigned_by / assigned_at` + `ops_staff_settings`):

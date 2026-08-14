@@ -121,6 +121,21 @@ Display density changes; the contract does not:
 **Case Owner**, where a module genuinely defines one, remains separate. It is never substituted
 for an action's owner rule and never written into the action sentence.
 
+## Law 2.1 — two-line action copy
+
+Every Register warning, Current Action and Work row uses one shared reading order:
+
+```
+LINE 1  FACT OR PROBLEM
+LINE 2  ACTION + OBJECT + REQUIRED RECIPIENT/RESULT
+```
+
+Line 1 answers **what is wrong?** Line 2 answers **what do I do?** Use Primary School English,
+one action per sentence and the governed dictionary. Do not repeat an SO number, customer name or
+owner name already visible in the row or object context. The owner is structured information,
+shown separately by the UI. Add a recipient only when staff need it to perform the action and it
+is not already unambiguous from context.
+
 ## Law 2A — THREE calendars, and every action names which one it counts on
 
 **Locked by Loo, 2026-07-28. This replaces "working days, one definition for every module",
