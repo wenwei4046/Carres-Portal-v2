@@ -33,6 +33,7 @@ import * as pdfjs from "pdfjs-dist";
 import { toast } from "sonner";
 import {
   deliveryReasonLabel,
+  lineClass,
   orderMoney,
   poReceivingProgress,
   receivingRecordNo,
@@ -61,6 +62,7 @@ import {
   useOrderCorrectionWork,
   useOutlets,
   useSalesOrderRevisions,
+  useSalesOrderExpansion,
   useSalesOrderRouteFacts,
   useSalespersons,
   useSaveSalesOrderRevision,
@@ -77,6 +79,7 @@ import SalesOrderLedger from "./SalesOrderLedger";
 import SalesOrderRoute from "./SalesOrderRoute";
 import SalesOrderTabs from "./SalesOrderTabs";
 import { lineName } from "./sales-order-facts";
+import { lineConfigBits } from "../dealer/new-order/special-addons-picker";
 import { missingDeliveryDateGuidance } from "./sales-order-guidance";
 import { copySalesOrderDraft } from "./sales-order-copy";
 
@@ -426,6 +429,7 @@ export default function SalesOrderWorkspace() {
     enabled: !isNew && Boolean(orderId),
   });
   const revisionsQ = useSalesOrderRevisions(isNew ? null : (orderId ?? null));
+  const goodsTruthQ = useSalesOrderExpansion(isNew ? "" : (orderId ?? ""));
   /* 3.4 · what this sales order's changes have raised for other modules. The
    * workspace SHOWS it and cannot close it — the module that raised the work
    * does not tick it off. */
@@ -725,6 +729,18 @@ export default function SalesOrderWorkspace() {
   }, [dirty]);
 
   const openObjectView = (view: ObjectView) => {
+    if (mode === "edit" && view !== "Order") {
+      if (!confirmDiscard()) return;
+      setParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("edit");
+        if (view === "Order Route") next.set("route", "1");
+        else next.delete("route");
+        return next;
+      }, { replace: true });
+      setDraftSeed("");
+      setDirty(false);
+    }
     setObjectView(view);
     if (view === "Order Route") {
       setParams((prev) => {
@@ -910,7 +926,7 @@ export default function SalesOrderWorkspace() {
 
   const headerRight = (
     <span className="flex items-center gap-2">
-      {mode === "view" && !showRoute && (
+      {mode === "view" && objectView === "Order" && !showRoute && (
         <Button size="sm" variant="neutral" onClick={enterEdit} data-testid="workspace-edit">
           <Pencil size={14} /> Edit
         </Button>
@@ -918,7 +934,7 @@ export default function SalesOrderWorkspace() {
       {/* The governed cancel sits beside the governed edit, exactly as the
           MASTER's Workspace ruling reads. An order already cancelled has
           nothing left to cancel, so the door is absent rather than refusing. */}
-      {mode === "view" && !showRoute && order && order.status !== "cancelled" && (
+      {mode === "view" && objectView === "Order" && !showRoute && order && order.status !== "cancelled" && (
         <details className="relative">
           <summary className="btn-ghost cursor-pointer list-none text-meta">More actions</summary>
           <div className="absolute right-0 top-full z-20 mt-1 w-40 rounded-control border border-kit-slate-5 bg-white p-1 shadow-lg">
@@ -926,7 +942,7 @@ export default function SalesOrderWorkspace() {
           </div>
         </details>
       )}
-      {(mode === "edit" || mode === "create") && (
+      {(mode === "create" || (mode === "edit" && objectView === "Order")) && (
         <>
           <Button size="sm" variant="ghost" onClick={cancelEdit} data-testid="workspace-cancel">
             <X size={14} /> Discard
@@ -1140,9 +1156,10 @@ export default function SalesOrderWorkspace() {
                 )}
 
               {/* ① CUSTOMER */}
-              <Section title="Customer">
+              <Section title={mode === "edit" ? "Edit operational details" : "Customer"}>
                 {editing ? (
                   <div className="grid grid-cols-2 gap-3">
+                    {mode === "edit" && <div className="col-span-2 text-label font-semibold text-base-600">Customer contact and address</div>}
                     <Input id="ws-name" label="Name" required value={draft.customer_name}
                       onChange={(e) => setField("customer_name", e.target.value)} />
                     <Input id="ws-phone" label="Phone" value={draft.customer_phone}
@@ -1199,7 +1216,7 @@ export default function SalesOrderWorkspace() {
                   by request (GATES.md Test 3). The save RPC now REFUSES a
                   header carrying one, so leaving the pickers here would have
                   been a form that cannot save. */}
-              <Section title="Sales ownership">
+              <Section title={mode === "edit" ? "Order context" : "Sales ownership"}>
                 {mode === "create" ? (
                   <div className="grid grid-cols-2 gap-3">
                     <Select id="ws-dealer" label="Dealer"
@@ -1218,6 +1235,7 @@ export default function SalesOrderWorkspace() {
                 ) : (
                   <>
                     <div className="grid grid-cols-3 gap-x-5 gap-y-3">
+                      {mode === "edit" && <div className="col-span-3 text-label font-semibold text-base-600">Sales ownership</div>}
                       <Fact label="Dealer" value={sourceName(mode, viewedRevision, order, "dealer") || "Not recorded"} />
                       <Fact label="Showroom" value={sourceName(mode, viewedRevision, order, "outlet") || "Not recorded"} />
                       <Fact label="Salesperson" value={sourceName(mode, viewedRevision, order, "salesperson") || "Not recorded"} />
@@ -1344,28 +1362,43 @@ export default function SalesOrderWorkspace() {
                   <table className="w-full text-body" data-testid="document-goods">
                     <thead>
                       <tr className="text-label text-base-500">
-                        <th className="py-1 pr-4 text-left font-medium">Item</th>
-                        <th className="py-1 pr-4 text-right font-medium">Qty</th>
-                        <th className="py-1 text-right font-medium">Total</th>
+                        <th className="py-1 pr-3 text-left font-medium">Category</th>
+                        <th className="py-1 pr-3 text-left font-medium">Unit ID</th>
+                        <th className="py-1 pr-3 text-left font-medium">SKU</th>
+                        <th className="py-1 pr-3 text-right font-medium">Qty</th>
+                        <th className="py-1 pr-3 text-left font-medium">Item</th>
+                        <th className="py-1 text-left font-medium">Deliver To</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {itemRows(mode, viewedRevision, detailQ.data?.lines ?? []).map((r, i) => (
+                      {itemRows(mode, viewedRevision, detailQ.data?.lines ?? []).map((r, i) => {
+                        const liveLine = detailQ.data?.lines?.[i];
+                        const truth = (goodsTruthQ.data?.lines ?? []).find((line) => line.lineId === liveLine?.id);
+                        const destinations = truth?.deliverTo ?? [];
+                        return (
                         <tr key={i} className="border-t border-kit-slate-5">
-                          <td className={`py-1.5 pr-4 ${cjkClassName(r.name)}`}>{r.name}</td>
-                          <td className="py-1.5 pr-4 text-right tabular-nums">{r.qty}</td>
-                          <td className="py-1.5 text-right">
-                            {r.total > 0 ? <Money value={r.total} /> : "No price yet"}
+                          <td className="py-1.5 pr-3 text-label font-semibold text-base-600">{liveLine ? categoryWord(liveLine) : "Not recorded"}</td>
+                          <td className="py-1.5 pr-3 font-mono text-meta">{truth?.unitIds.length ? truth.unitIds.join(" · ") : "Not allocated"}</td>
+                          <td className="py-1.5 pr-3 font-mono text-meta">{liveLine?.sku ?? "Not recorded"}</td>
+                          <td className="py-1.5 pr-3 text-right tabular-nums">{r.qty}</td>
+                          <td className={`py-1.5 pr-3 ${cjkClassName(r.name)}`}>
+                            <div>{r.name}</div>
+                            {liveLine && operationalConfig(liveLine).length > 0 && (
+                              <div className="mt-0.5 text-meta text-base-600">{operationalConfig(liveLine).join(" · ")}</div>
+                            )}
                           </td>
+                          <td className="py-1.5">{destinations.length ? destinations.map((d) => destinations.length > 1 ? `${d.name} ×${d.qty}` : d.name).join(" · ") : goodsTruthQ.isLoading ? "Loading…" : "Not recorded"}</td>
                         </tr>
-                      ))}
+                        );
+                      })}
                       {(detailQ.data?.addons ?? []).map((a, i) => (
                         <tr key={`a-${i}`} className="border-t border-kit-slate-5">
-                          <td className="py-1.5 pr-4">{a.addon_key}</td>
-                          <td className="py-1.5 pr-4 text-right tabular-nums">{a.qty}</td>
-                          <td className="py-1.5 text-right">
-                            <Money value={Number(a.unit_price) * Number(a.qty)} />
-                          </td>
+                          <td className="py-1.5 pr-3 text-label font-semibold text-base-600">SERVICE</td>
+                          <td className="py-1.5 pr-3">—</td>
+                          <td className="py-1.5 pr-3 font-mono text-meta">{a.addon_key}</td>
+                          <td className="py-1.5 pr-3 text-right tabular-nums">{a.qty}</td>
+                          <td className="py-1.5 pr-3">{a.addon_key}</td>
+                          <td className="py-1.5">—</td>
                         </tr>
                       ))}
                     </tbody>
@@ -1567,4 +1600,33 @@ function itemRows(
     qty: l.qty,
     total: Number(l.unit_price) * Number(l.qty),
   }));
+}
+
+function categoryWord(line: { sku: string; attrs?: Record<string, unknown> | null }): string {
+  const fromAttrs = typeof line.attrs?.category === "string" ? line.attrs.category : "";
+  const fromSku = line.sku.includes(":") ? line.sku.split(":", 1)[0] : "";
+  const classified = lineClass(line.sku);
+  const fallback = classified === "acc" ? "Accessory" : classified === "unknown" ? "Other goods" : classified;
+  return (fromAttrs || fromSku || fallback).replace(/[_-]+/g, " ").toUpperCase();
+}
+
+function operationalConfig(line: { attrs?: Record<string, unknown> | null }): string[] {
+  const attrs = line.attrs ?? {};
+  const facts = lineConfigBits(attrs);
+  const governed: Record<string, string> = {
+    size: "Size",
+    firmness: "Firmness",
+    colour: "Colour",
+    fabric_code: "Fabric code",
+    seat_height: "Seat height",
+    sofa_height: "Sofa height",
+    configuration: "Configuration",
+    sofa_configuration: "Sofa configuration",
+  };
+  for (const [key, label] of Object.entries(governed)) {
+    const value = attrs[key];
+    if (value == null || value === "" || typeof value === "object") continue;
+    facts.push(`${label}: ${String(value)}`);
+  }
+  return facts;
 }
