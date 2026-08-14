@@ -67,6 +67,13 @@ owned facts in factual language. Apply WHO + ACTION + OBJECT + WHEN only when th
 actionable. My Work, Team Work and every other action-bearing UI use this same formulation; they do
 not invent a shorter status-only dialect.
 
+**External reply evidence — owner ruling 2026-08-14.** For supplier and Logistics communication,
+`Message prepared`, `Message copied`, `WhatsApp opened` and `Sent` never complete a confirmation
+action. They prove only our outbound act. `Confirm` completes only when the outside party's answer
+is recorded with evidence of that answer—normally the reply screenshot/email, reporter, recorder,
+channel and reported/recorded times. Operations may record it on the party's behalf. The UI asks for
+the concrete answer, never a trust-based `Sent` checkbox.
+
 ---
 
 ## Row action-line template
@@ -252,6 +259,15 @@ tail, numbers up front: `5 · 2 late`.
 confirmed, the SYSTEM produces the document and the operator only presses the button —
 nobody authors a delivery order by hand. Card C7 builds it; the number is stamped at
 dispatch today, which is too late to hand to logistics, and C7 moves it.
+
+**Delivery execution words — owner-approved 2026-08-14.** Employee UI never uses `Release` for
+the Delivery Order act; it uses `Issue delivery order`, `Ready to issue delivery order` or
+`Cannot issue delivery order yet`. Employee UI never uses the technical noun `Attempt`; one
+actual customer visit is `Delivery Visit`, its outcome is `Delivery Result`, and prior visits are
+`Delivery History`. Internal schema/code may retain `delivery_attempt`. Use the concrete evidence
+name `Delivery Photo` or `Signed Delivery Order`, never the generic technical label `Evidence`
+when the employee can be told what is required. Delivery schedule groups and due labels use the
+actual weekday + date, never `Today` or `Tomorrow`.
 
 ## The delivery group words (T8, locked with Jess 2026-07-27)
 

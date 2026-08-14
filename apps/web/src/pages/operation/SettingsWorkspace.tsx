@@ -29,7 +29,7 @@ export default function SettingsWorkspace() {
         {SECTIONS.map((s) => (
           <NavLink
             key={s.slug}
-            to={s.slug}
+            to={`/operation/settings/${s.slug}`}
             className={({ isActive }) =>
               `block px-4 py-1.5 text-body ${
                 isActive ? "text-base-900 font-medium" : "text-base-600 hover:text-base-900"
