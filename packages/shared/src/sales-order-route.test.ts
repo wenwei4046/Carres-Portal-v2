@@ -151,7 +151,7 @@ describe("resolveSalesOrderRoute", () => {
 
     expect(lane("delivery").groups[0]!.facts.map((fact) => fact.title)).toEqual([
       "Delivery 1 · Not Delivered",
-      "Next delivery · Scheduled",
+      "Amy Logistics · Confirmed",
     ]);
     expect(lane("delivery").groups[0]!.facts[0]!.detail).toContain("Customer unavailable");
     expect(lane("money").groups.flatMap((group) => group.facts.map((fact) => fact.title))).toEqual([
@@ -207,8 +207,14 @@ describe("resolveSalesOrderRoute", () => {
     }];
     facts.allocation.totals = { committedQty: 1, reservedQty: 0, soldQty: 0, outstandingQty: 1 };
     facts.purchaseOrders = [];
+    facts.delivery.booking = null;
+    facts.delivery.attempts = [];
     let route = resolveSalesOrderRoute(facts);
-    expect(route.lanes[0]!.groups[0]!.facts[0]!.title).toBe("Route not yet assigned · 1");
+    expect(route.lanes[0]!.groups[0]!.facts[0]!.title).toBe("Waiting for Purchasing · 1 item");
+    expect(route.lanes.find((lane) => lane.key === "delivery")!.groups[0]!.facts[0]).toMatchObject({
+      title: "Promised this day, no date yet",
+      detail: "Customer Delivery · 2026-08-20",
+    });
     expect(route.noActionRequired).toBe(false);
 
     facts.allocation.lines[0] = {

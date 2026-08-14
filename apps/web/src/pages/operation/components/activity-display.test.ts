@@ -62,3 +62,25 @@ describe("describeActivity — money events", () => {
     expect(d.body).toBeNull();
   });
 });
+
+describe("describeActivity — governed operator field names", () => {
+  it("translates the internal logistics date field into the UI Dictionary", () => {
+    const d = describeActivity({
+      kind: "activity",
+      action: "order.field_changed",
+      detail: { field: "logistic_eta", from: null, to: "2026-08-21" },
+    });
+
+    expect(d.title).toBe("Logistics' date changed");
+  });
+
+  it("translates the internal stock date field into the governed arrival fact", () => {
+    const d = describeActivity({
+      kind: "activity",
+      action: "order.field_changed",
+      detail: { field: "stock_eta", from: null, to: "2026-08-21" },
+    });
+
+    expect(d.title).toBe("Expected arrival changed");
+  });
+});

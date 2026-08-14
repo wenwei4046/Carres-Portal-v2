@@ -33,6 +33,7 @@ import * as pdfjs from "pdfjs-dist";
 import { toast } from "sonner";
 import {
   deliveryReasonLabel,
+  lineClass,
   orderMoney,
   poReceivingProgress,
   receivingRecordNo,
@@ -57,9 +58,11 @@ import {
   useCreateSalesOrder,
   useOperationDealersRef,
   useOperationOrder,
+  useOrderServiceCases,
   useOrderCorrectionWork,
   useOutlets,
   useSalesOrderRevisions,
+  useSalesOrderExpansion,
   useSalesOrderRouteFacts,
   useSalespersons,
   useSaveSalesOrderRevision,
@@ -68,6 +71,7 @@ import {
   type AmendmentProposal,
 } from "@/lib/queries";
 import CancelSalesOrderDialog from "./CancelSalesOrderDialog";
+import ServiceCaseWizard from "./components/ServiceCaseWizard";
 import CorrectionWorkList from "./CorrectionWorkList";
 import SalesOrderAmendment from "./SalesOrderAmendment";
 import SalesOrderAttribution from "./SalesOrderAttribution";
@@ -75,7 +79,10 @@ import SalesOrderLedger from "./SalesOrderLedger";
 import SalesOrderRoute from "./SalesOrderRoute";
 import SalesOrderTabs from "./SalesOrderTabs";
 import { lineName } from "./sales-order-facts";
+import { lineConfigBits } from "../dealer/new-order/special-addons-picker";
+import { missingDeliveryDateGuidance } from "./sales-order-guidance";
 import { copySalesOrderDraft } from "./sales-order-copy";
+import { objectViewParams } from "./sales-order-object-navigation";
 
 /* pdf.js worker ships inside the package — nothing fetched from a CDN. */
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
@@ -415,11 +422,15 @@ export default function SalesOrderWorkspace() {
   const [viewRev, setViewRev] = useState<number | null>(null);
   const [amendmentSeed, setAmendmentSeed] = useState<AmendmentProposal | null>(null);
   const [cancelOpen, setCancelOpen] = useState(false);
-  const [recordView, setRecordView] = useState<"revisions" | "history">("revisions");
+  const [problemOpen, setProblemOpen] = useState(false);
   const [objectView, setObjectView] = useState<ObjectView>(showRoute ? "Order Route" : "Order");
 
   const detailQ = useOperationOrder(isNew ? copyFrom : (orderId ?? null));
+  const serviceCasesQ = useOrderServiceCases(isNew ? "" : (orderId ?? ""), {
+    enabled: !isNew && Boolean(orderId),
+  });
   const revisionsQ = useSalesOrderRevisions(isNew ? null : (orderId ?? null));
+  const goodsTruthQ = useSalesOrderExpansion(isNew ? "" : (orderId ?? ""));
   /* 3.4 · what this sales order's changes have raised for other modules. The
    * workspace SHOWS it and cannot close it — the module that raised the work
    * does not tick it off. */
@@ -579,7 +590,7 @@ export default function SalesOrderWorkspace() {
     return base;
   }, [mode, viewedRevision, base, debouncedDraftData]);
 
-  const { url: pdfUrl, pdfError, paneRef } = usePdfCanvases(templateData);
+  const { url: pdfUrl } = usePdfCanvases(templateData);
 
   /* ── Writes — ONE page-level Save; every write mints a revision. ── */
   const saveMut = useSaveSalesOrderRevision(orderId ?? "", {
@@ -719,24 +730,18 @@ export default function SalesOrderWorkspace() {
   }, [dirty]);
 
   const openObjectView = (view: ObjectView) => {
-    setObjectView(view);
-    if (view === "Order Route") {
-      setParams((prev) => {
-        const next = new URLSearchParams(prev);
-        next.set("route", "1");
-        return next;
-      }, { replace: true });
-      return;
+    if (mode === "edit" && view !== "Order") {
+      if (!confirmDiscard()) return;
+      setDraftSeed("");
+      setDirty(false);
     }
-    setParams((prev) => {
-      const next = new URLSearchParams(prev);
-      next.delete("route");
-      return next;
-    }, { replace: true });
-    if (view === "Revisions" || view === "History") {
-      setRecordView(view.toLowerCase() as "revisions" | "history");
-      window.setTimeout(() => document.getElementById("sales-order-record")?.scrollIntoView(), 0);
-    } else {
+    setObjectView(view);
+    setParams(
+      (prev) => objectViewParams(prev, view, mode === "edit"),
+      { replace: true },
+    );
+    if (view === "Order Route") return;
+    if (view === "Order") {
       window.setTimeout(() => document.getElementById("sales-order-workspace")?.scrollIntoView(), 0);
     }
   };
@@ -907,7 +912,7 @@ export default function SalesOrderWorkspace() {
 
   const headerRight = (
     <span className="flex items-center gap-2">
-      {mode === "view" && !showRoute && (
+      {mode === "view" && objectView === "Order" && !showRoute && (
         <Button size="sm" variant="neutral" onClick={enterEdit} data-testid="workspace-edit">
           <Pencil size={14} /> Edit
         </Button>
@@ -915,7 +920,7 @@ export default function SalesOrderWorkspace() {
       {/* The governed cancel sits beside the governed edit, exactly as the
           MASTER's Workspace ruling reads. An order already cancelled has
           nothing left to cancel, so the door is absent rather than refusing. */}
-      {mode === "view" && !showRoute && order && order.status !== "cancelled" && (
+      {mode === "view" && objectView === "Order" && !showRoute && order && order.status !== "cancelled" && (
         <details className="relative">
           <summary className="btn-ghost cursor-pointer list-none text-meta">More actions</summary>
           <div className="absolute right-0 top-full z-20 mt-1 w-40 rounded-control border border-kit-slate-5 bg-white p-1 shadow-lg">
@@ -923,8 +928,11 @@ export default function SalesOrderWorkspace() {
           </div>
         </details>
       )}
-      {(mode === "edit" || mode === "create") && (
+      {(mode === "create" || (mode === "edit" && objectView === "Order")) && (
         <>
+          <Button size="sm" variant="ghost" onClick={cancelEdit} data-testid="workspace-cancel">
+            <X size={14} /> Discard
+          </Button>
           <Button
             size="sm"
             variant="primary"
@@ -933,9 +941,6 @@ export default function SalesOrderWorkspace() {
             data-testid="workspace-save"
           >
             {mode === "create" ? "Create order" : "Save"}
-          </Button>
-          <Button size="sm" variant="ghost" onClick={cancelEdit} data-testid="workspace-cancel">
-            <X size={14} /> Discard
           </Button>
         </>
       )}
@@ -971,6 +976,14 @@ export default function SalesOrderWorkspace() {
   );
 
   const soWord = isNew ? "New Sales Order" : order ? `SO-${order.so}` : "Sales Order";
+  const missingDateAction = order && !order.delivery_date
+    ? missingDeliveryDateGuidance({
+        so: order.so,
+        customer: order.customer_name,
+        salesperson: order.salespersons?.name,
+        phone: order.customer_phone,
+      })
+    : null;
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -1012,6 +1025,31 @@ export default function SalesOrderWorkspace() {
         />
       )}
 
+      {problemOpen && order && (
+        <ServiceCaseWizard
+          initialOrder={{
+            id: order.id,
+            so: `SO-${order.so}`,
+            refNos: order.source_ref ?? [],
+            customerName: order.customer_name,
+            customerPhone: order.customer_phone,
+            customerAddress: order.customer_address,
+            deliveryDate: order.delivery_date,
+            lines: (detailQ.data?.lines ?? []).filter((line) => line.id).map((line) => ({
+              id: line.id!,
+              sku: line.sku,
+              qty: line.qty,
+              sourcePo: line.source_po ?? null,
+            })),
+          }}
+          onClose={() => setProblemOpen(false)}
+          onSaved={() => {
+            setProblemOpen(false);
+            void serviceCasesQ.refetch();
+          }}
+        />
+      )}
+
       {showRoute ? (
         <div className="min-h-0 flex-1 overflow-auto bg-kit-slate-3 px-4 py-4">
           {routeFactsQ.isLoading || detailQ.isLoading || revisionsQ.isLoading ? (
@@ -1032,10 +1070,39 @@ export default function SalesOrderWorkspace() {
             </div>
           )}
         </div>
+      ) : objectView === "Revisions" || objectView === "History" ? (
+        <div className="min-h-0 flex-1 overflow-auto bg-kit-slate-3 px-4 py-4">
+          <div className="mx-auto max-w-5xl rounded-card border border-kit-slate-5 bg-white p-5">
+            <h2 className="mb-4 text-title font-semibold text-base-900">{objectView}</h2>
+            <SalesOrderLedger
+              revisions={revisions}
+              history={detailQ.data?.history ?? []}
+              currentRevision={currentRev}
+              viewedRevision={mode === "oldrev" ? viewRev : null}
+              view={objectView.toLowerCase() as "revisions" | "history"}
+              showViewTabs={false}
+              onViewRevision={setViewRev}
+              onProposeRevision={(revision) => {
+                const header = revision.snapshot.header ?? {};
+                const currentLineIds = new Map((detailQ.data?.lines ?? []).map((line) => [line.sku, line.id]));
+                setAmendmentSeed({
+                  lines: (revision.snapshot.lines ?? []).map((line) => ({
+                    ...(currentLineIds.get(line.sku) ? { id: currentLineIds.get(line.sku) } : {}),
+                    sku: line.sku,
+                    qty: Number(line.qty),
+                    unit_price: Number(line.unit_price),
+                  })),
+                  delivery_date: header.delivery_date == null ? null : String(header.delivery_date),
+                  delivery_date_tbd: Boolean(header.delivery_date_tbd),
+                  installment_months: header.installment_months == null ? null : Number(header.installment_months),
+                });
+                setObjectView("Order");
+              }}
+            />
+          </div>
+        </div>
       ) : (
-      <div className="flex min-h-0 flex-1">
-        {/* ── LEFT 55% — the seven sections ─────────────────────────────── */}
-        <div className="min-h-0 w-[55%] shrink-0 overflow-auto border-r border-kit-slate-5 bg-kit-slate-3 px-4 py-4">
+        <div className="min-h-0 flex-1 overflow-auto bg-kit-slate-3 px-4 py-4">
           {(!isNew || copyFrom) && detailQ.isLoading && <Loading label={copyFrom ? "Preparing the copied draft" : "Opening the sales order"} />}
           {(!isNew || copyFrom) && !detailQ.isLoading && detailQ.isError && (
             <div className="rounded-card border border-kit-slate-5 bg-white">
@@ -1052,9 +1119,9 @@ export default function SalesOrderWorkspace() {
           )}
 
           {(isNew && !copyFrom || order) && (
-            <div className="flex flex-col gap-3" data-testid="sales-order-workspace">
+            <div className="mx-auto grid max-w-6xl grid-cols-1 gap-3 xl:grid-cols-2" data-testid="sales-order-workspace">
               {(mode === "oldrev" || mode === "edit" || (mode === "create" && copyFrom)) && (
-                <div className="px-1 py-1 text-meta text-base-600">
+                <div className="px-1 py-1 text-meta text-base-600 xl:col-span-2">
                   {mode === "oldrev" && viewedRevision ? (
                     <span className="rounded-pill bg-base-900 px-2 py-0.5 text-label font-semibold text-white">
                       Viewing Rev {viewedRevision.revision} · read-only
@@ -1068,16 +1135,17 @@ export default function SalesOrderWorkspace() {
                   ) : null}
                 </div>
               )}
-                {!isNew && (order?.source_ref ?? []).length > 0 && (
+              {!isNew && (order?.source_ref ?? []).length > 0 && (
                   <div className="px-1 text-meta text-base-500">
                     Customer reference {(order?.source_ref ?? []).join(" · ")}
                   </div>
                 )}
 
               {/* ① CUSTOMER */}
-              <Section title="Customer">
+              <Section title={mode === "edit" ? "Edit operational details" : "Customer"}>
                 {editing ? (
                   <div className="grid grid-cols-2 gap-3">
+                    {mode === "edit" && <div className="col-span-2 text-label font-semibold text-base-600">Customer contact and address</div>}
                     <Input id="ws-name" label="Name" required value={draft.customer_name}
                       onChange={(e) => setField("customer_name", e.target.value)} />
                     <Input id="ws-phone" label="Phone" value={draft.customer_phone}
@@ -1134,7 +1202,7 @@ export default function SalesOrderWorkspace() {
                   by request (GATES.md Test 3). The save RPC now REFUSES a
                   header carrying one, so leaving the pickers here would have
                   been a form that cannot save. */}
-              <Section title="Source">
+              <Section title={mode === "edit" ? "Order context" : "Sales ownership"}>
                 {mode === "create" ? (
                   <div className="grid grid-cols-2 gap-3">
                     <Select id="ws-dealer" label="Dealer"
@@ -1153,6 +1221,7 @@ export default function SalesOrderWorkspace() {
                 ) : (
                   <>
                     <div className="grid grid-cols-3 gap-x-5 gap-y-3">
+                      {mode === "edit" && <div className="col-span-3 text-label font-semibold text-base-600">Sales ownership</div>}
                       <Fact label="Dealer" value={sourceName(mode, viewedRevision, order, "dealer") || "Not recorded"} />
                       <Fact label="Showroom" value={sourceName(mode, viewedRevision, order, "outlet") || "Not recorded"} />
                       <Fact label="Salesperson" value={sourceName(mode, viewedRevision, order, "salesperson") || "Not recorded"} />
@@ -1186,11 +1255,11 @@ export default function SalesOrderWorkspace() {
                   <div className="grid grid-cols-3 gap-3">
                     <Fact label="Ordered" value={isNew ? "Today" : fmtDate(order?.placed_at ?? null)} />
                     <div>
-                      <div className="text-label text-base-500 mb-1">Promised delivery</div>
+                      <div className="text-label text-base-500 mb-1">Customer Delivery</div>
                       <DatePicker id="ws-promised" value={draft.delivery_date}
                         onChange={(iso) => setField("delivery_date", iso)} />
                       <div className="mt-1.5">
-                        <Checkbox id="ws-tbd" label="No date yet"
+                        <Checkbox id="ws-tbd" label="Delivery date to be confirmed"
                           checked={draft.delivery_date_tbd}
                           onCheckedChange={(v) => setField("delivery_date_tbd", v)} />
                       </div>
@@ -1204,7 +1273,11 @@ export default function SalesOrderWorkspace() {
                 ) : (
                   <div className="grid grid-cols-3 gap-x-5 gap-y-3">
                     <Fact label="Ordered" value={fmtDate((displayHeader(mode, viewedRevision, order, "placed_at") || order?.placed_at) ?? null)} />
-                    <Fact label="Promised delivery" value={promisedWord(mode, viewedRevision, order)} />
+                    <Fact label="Customer Delivery" value={
+                      promisedWord(mode, viewedRevision, order) === "No delivery date" ? (
+                        <span data-attention="warning" className="inline-flex rounded-control bg-kit-amber-3 px-1.5 py-0.5 font-medium text-kit-amber-11">No delivery date</span>
+                      ) : promisedWord(mode, viewedRevision, order)
+                    } />
                     {mode === "edit" ? (
                       <div>
                         <div className="text-label text-base-500 mb-1">Proceed date</div>
@@ -1240,7 +1313,8 @@ export default function SalesOrderWorkspace() {
               </Section>
 
               {/* ⑤ ITEMS */}
-              <Section title="Items">
+              <div className="xl:col-span-2">
+              <Section title="Goods">
                 {mode === "create" ? (
                   <div className="flex flex-col gap-2">
                     {draft.lines.map((l) => (
@@ -1271,31 +1345,46 @@ export default function SalesOrderWorkspace() {
                     </div>
                   </div>
                 ) : (
-                  <table className="w-full text-body" data-testid="doc-items">
+                  <table className="w-full text-body" data-testid="document-goods">
                     <thead>
                       <tr className="text-label text-base-500">
-                        <th className="py-1 pr-4 text-left font-medium">Item</th>
-                        <th className="py-1 pr-4 text-right font-medium">Qty</th>
-                        <th className="py-1 text-right font-medium">Total</th>
+                        <th className="py-1 pr-3 text-left font-medium">Category</th>
+                        <th className="py-1 pr-3 text-left font-medium">Unit ID</th>
+                        <th className="py-1 pr-3 text-left font-medium">SKU</th>
+                        <th className="py-1 pr-3 text-right font-medium">Qty</th>
+                        <th className="py-1 pr-3 text-left font-medium">Item</th>
+                        <th className="py-1 text-left font-medium">Deliver To</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {itemRows(mode, viewedRevision, detailQ.data?.lines ?? []).map((r, i) => (
+                      {itemRows(mode, viewedRevision, detailQ.data?.lines ?? []).map((r, i) => {
+                        const liveLine = detailQ.data?.lines?.[i];
+                        const truth = (goodsTruthQ.data?.lines ?? []).find((line) => line.lineId === liveLine?.id);
+                        const destinations = truth?.deliverTo ?? [];
+                        return (
                         <tr key={i} className="border-t border-kit-slate-5">
-                          <td className={`py-1.5 pr-4 ${cjkClassName(r.name)}`}>{r.name}</td>
-                          <td className="py-1.5 pr-4 text-right tabular-nums">{r.qty}</td>
-                          <td className="py-1.5 text-right">
-                            {r.total > 0 ? <Money value={r.total} /> : "No price yet"}
+                          <td className="py-1.5 pr-3 text-label font-semibold text-base-600">{liveLine ? categoryWord(liveLine) : "Not recorded"}</td>
+                          <td className="py-1.5 pr-3 font-mono text-meta">{truth?.unitIds.length ? truth.unitIds.join(" · ") : "Not allocated"}</td>
+                          <td className="py-1.5 pr-3 font-mono text-meta">{liveLine?.sku ?? "Not recorded"}</td>
+                          <td className="py-1.5 pr-3 text-right tabular-nums">{r.qty}</td>
+                          <td className={`py-1.5 pr-3 ${cjkClassName(r.name)}`}>
+                            <div>{r.name}</div>
+                            {liveLine && operationalConfig(liveLine).length > 0 && (
+                              <div className="mt-0.5 text-meta text-base-600">{operationalConfig(liveLine).join(" · ")}</div>
+                            )}
                           </td>
+                          <td className="py-1.5">{destinations.length ? destinations.map((d) => destinations.length > 1 ? `${d.name} ×${d.qty}` : d.name).join(" · ") : goodsTruthQ.isLoading ? "Loading…" : "Not recorded"}</td>
                         </tr>
-                      ))}
+                        );
+                      })}
                       {(detailQ.data?.addons ?? []).map((a, i) => (
                         <tr key={`a-${i}`} className="border-t border-kit-slate-5">
-                          <td className="py-1.5 pr-4">{a.addon_key}</td>
-                          <td className="py-1.5 pr-4 text-right tabular-nums">{a.qty}</td>
-                          <td className="py-1.5 text-right">
-                            <Money value={Number(a.unit_price) * Number(a.qty)} />
-                          </td>
+                          <td className="py-1.5 pr-3 text-label font-semibold text-base-600">SERVICE</td>
+                          <td className="py-1.5 pr-3">—</td>
+                          <td className="py-1.5 pr-3 font-mono text-meta">{a.addon_key}</td>
+                          <td className="py-1.5 pr-3 text-right tabular-nums">{a.qty}</td>
+                          <td className="py-1.5 pr-3">{a.addon_key}</td>
+                          <td className="py-1.5">—</td>
                         </tr>
                       ))}
                     </tbody>
@@ -1324,9 +1413,10 @@ export default function SalesOrderWorkspace() {
                   </div>
                 )}
               </Section>
+              </div>
 
               {/* ⑥ MONEY */}
-              <Section title="Money">
+              <div className="xl:col-span-2"><Section title="Money">
                 <div className="grid grid-cols-3 gap-x-5">
                   <Fact label="Total" value={money.known && money.total != null ? <Money value={money.total} /> : "No price yet"} />
                   <Fact label="Paid" value={<Money value={money.paid} />} />
@@ -1337,7 +1427,7 @@ export default function SalesOrderWorkspace() {
                     }
                   />
                 </div>
-              </Section>
+              </Section></div>
 
               {/* ⑦ WHAT THIS CHANGE STARTED ELSEWHERE — 3.4.
                   Shown only when there IS work: a section that says "nothing"
@@ -1352,62 +1442,64 @@ export default function SalesOrderWorkspace() {
                 </Section>
               )}
 
-              {/* ⑧ REVISIONS / HISTORY — complete versions and event ledger
-                  are separate concepts and separate views. */}
-              {!isNew && (
-                <div id="sales-order-record">
-                <Section title="Order record">
-                  <SalesOrderLedger
-                    revisions={revisions}
-                    history={detailQ.data?.history ?? []}
-                    currentRevision={currentRev}
-                    viewedRevision={mode === "oldrev" ? viewRev : null}
-                    view={recordView}
-                    onViewChange={setRecordView}
-                    onViewRevision={setViewRev}
-                    onProposeRevision={(revision) => {
-                      const header = revision.snapshot.header ?? {};
-                      const currentLineIds = new Map((detailQ.data?.lines ?? []).map((line) => [line.sku, line.id]));
-                      setAmendmentSeed({
-                        lines: (revision.snapshot.lines ?? []).map((line) => ({
-                          ...(currentLineIds.get(line.sku) ? { id: currentLineIds.get(line.sku) } : {}),
-                          sku: line.sku,
-                          qty: Number(line.qty),
-                          unit_price: Number(line.unit_price),
-                        })),
-                        delivery_date: header.delivery_date == null ? null : String(header.delivery_date),
-                        delivery_date_tbd: Boolean(header.delivery_date_tbd),
-                        installment_months: header.installment_months == null ? null : Number(header.installment_months),
-                      });
-                      setViewRev(null);
-                    }}
-                  />
-                </Section>
-                </div>
+              {!isNew && mode === "view" && order && (
+                <section className="rounded-card border border-kit-slate-5 bg-white p-4 xl:col-span-2" aria-labelledby="sales-order-problems">
+                  {missingDateAction && (
+                    <details open className="mb-4 rounded-control border border-kit-slate-5 bg-kit-amber-3 p-3">
+                      <summary className="cursor-pointer list-none">
+                        <span className="block text-body font-semibold text-kit-amber-11">{missingDateAction.problem}</span>
+                        <span className="block text-meta font-normal text-base-600">{missingDateAction.action}</span>
+                      </summary>
+                      <dl className="mt-3 grid gap-2 border-t border-kit-slate-5 pt-3 sm:grid-cols-2">
+                        {[
+                          ["Why", missingDateAction.why],
+                          ["Who must act", missingDateAction.owner],
+                          ["Who to contact", missingDateAction.contact],
+                          ["What to ask", missingDateAction.ask],
+                          ["What to use", missingDateAction.use],
+                          ["What to record", missingDateAction.record],
+                          ["What happens next", missingDateAction.next],
+                        ].map(([label, value]) => (
+                          <div key={label}>
+                            <dt className="text-label font-semibold text-base-600">{label}</dt>
+                            <dd className="mt-0.5 text-body text-base-900">{value}</dd>
+                          </div>
+                        ))}
+                      </dl>
+                    </details>
+                  )}
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <h2 id="sales-order-problems" className="text-body font-semibold text-base-900">Problems</h2>
+                      <p className="mt-0.5 text-meta text-base-600">Report a customer, product, delivery or installation problem.</p>
+                    </div>
+                    <Button variant="neutral" onClick={() => setProblemOpen(true)}>Report a problem</Button>
+                  </div>
+                  {(serviceCasesQ.data?.items ?? []).length > 0 && (
+                    <div className="mt-3 divide-y divide-kit-slate-5 border-t border-kit-slate-5">
+                      {(serviceCasesQ.data?.items ?? []).map((item) => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => navigate(`/operation/service-cases?case=${encodeURIComponent(item.id)}`)}
+                          className="flex w-full items-center justify-between gap-3 py-2 text-left hover:text-kit-blue-11"
+                        >
+                          <span>
+                            <span className="block text-body font-medium">Service Case {item.caseNo}</span>
+                            <span className="block text-meta text-base-600">{item.statusLabel ?? "Status not recorded"}</span>
+                          </span>
+                          <span className="text-meta text-kit-blue-11">Open case</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </section>
               )}
+
             </div>
           )}
         </div>
 
-        {/* ── RIGHT 45% — the ONE PDF, live ─────────────────────────────── */}
-        <div
-          className="relative min-h-0 min-w-0 flex-1 overflow-auto bg-base-100 py-6"
-          data-testid="pdf-pane"
-        >
-          <div ref={paneRef} data-testid="pdf-canvas-pane" />
-          {pdfError ? (
-            <div className="flex h-full items-center justify-center px-6">
-              <p className="text-body text-base-500">
-                The Sales Order PDF could not be rendered: {pdfError}
-              </p>
-            </div>
-          ) : !pdfUrl ? (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <Loading label="Rendering the sales order" />
-            </div>
-          ) : null}
-        </div>
-      </div>
       )}
     </div>
   );
@@ -1463,9 +1555,9 @@ function promisedWord(mode: Mode, rev: SalesOrderRevisionRow | null, order: Orde
     mode === "oldrev" && rev
       ? Boolean(rev.snapshot.header?.["delivery_date_tbd"])
       : Boolean(bag(order)["delivery_date_tbd"]);
-  if (tbd) return "No date yet";
+  if (tbd) return "No delivery date";
   const d = displayHeader(mode, rev, order, "delivery_date");
-  return d ? fmtDate(d) : "No date yet";
+  return d ? fmtDate(d) : "No delivery date";
 }
 
 function liftWord(mode: Mode, rev: SalesOrderRevisionRow | null, order: Orderish): string {
@@ -1494,4 +1586,33 @@ function itemRows(
     qty: l.qty,
     total: Number(l.unit_price) * Number(l.qty),
   }));
+}
+
+function categoryWord(line: { sku: string; attrs?: Record<string, unknown> | null }): string {
+  const fromAttrs = typeof line.attrs?.category === "string" ? line.attrs.category : "";
+  const fromSku = line.sku.includes(":") ? line.sku.split(":", 1)[0] : "";
+  const classified = lineClass(line.sku);
+  const fallback = classified === "acc" ? "Accessory" : classified === "unknown" ? "Other goods" : classified;
+  return (fromAttrs || fromSku || fallback).replace(/[_-]+/g, " ").toUpperCase();
+}
+
+function operationalConfig(line: { attrs?: Record<string, unknown> | null }): string[] {
+  const attrs = line.attrs ?? {};
+  const facts = lineConfigBits(attrs);
+  const governed: Record<string, string> = {
+    size: "Size",
+    firmness: "Firmness",
+    colour: "Colour",
+    fabric_code: "Fabric code",
+    seat_height: "Seat height",
+    sofa_height: "Sofa height",
+    configuration: "Configuration",
+    sofa_configuration: "Sofa configuration",
+  };
+  for (const [key, label] of Object.entries(governed)) {
+    const value = attrs[key];
+    if (value == null || value === "" || typeof value === "object") continue;
+    facts.push(`${label}: ${String(value)}`);
+  }
+  return facts;
 }

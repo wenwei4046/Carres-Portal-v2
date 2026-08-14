@@ -174,9 +174,67 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     expect(screen.getByRole("button", { name: "Export" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Columns" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "New Sales Order" })).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("sales-orders-destination-header")).getByRole("button", {
+        name: "New Sales Order",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("work-toolbar")).queryByRole("button", {
+        name: "New Sales Order",
+      }),
+    ).not.toBeInTheDocument();
     expect(screen.queryByText("current view")).not.toBeInTheDocument();
     expect(screen.queryByText(/\d+\/\d+/)).not.toBeInTheDocument();
     expect(screen.queryByText("Not delivered")).not.toBeInTheDocument();
+  });
+
+  it("shows a governed missing Customer Delivery exception instead of a passive empty value", () => {
+    listHookState.data = { orders: [order({
+      delivery_date: null,
+      delivery_date_tbd: true,
+      customer_name: "Kimmy",
+      salespersons: { name: "Shasha" },
+    })] };
+    mount();
+    const exception = screen.getByText("No delivery date");
+    expect(exception).toHaveAttribute("data-attention", "warning");
+    expect(screen.getByText("Shasha · Confirm the date with Kimmy · Record the agreed date")).toBeInTheDocument();
+    expect(screen.queryByText("No date yet")).not.toBeInTheDocument();
+  });
+
+  it("collapses duplicate city and state into one concise locality", () => {
+    listHookState.data = { orders: [order({
+      customer_address: "12 Long Street, Kuala Lumpur, Kuala Lumpur",
+      customer_address_city: "Kuala Lumpur",
+      customer_address_state: "Kuala Lumpur",
+    })] };
+    mount();
+    expect(screen.getByText("Kuala Lumpur")).toBeInTheDocument();
+    expect(screen.queryByText("Kuala Lumpur, Kuala Lumpur")).not.toBeInTheDocument();
+    expect(screen.queryByText("12 Long Street, Kuala Lumpur, Kuala Lumpur")).not.toBeInTheDocument();
+  });
+
+  it("summarises filtered ordered quantities by governed category in the fixed footer", () => {
+    listHookState.data = {
+      orders: [
+        order({
+          order_lines: [
+            { sku: "B1201S-K", qty: 2, unit_price: 2499, label: "B1201S · King" },
+            { sku: "Essential Memory Pillow(L)", qty: 4, unit_price: 99, label: "Pillow" },
+            { sku: "Microfiber Waterproof Mattress Protector-K", qty: 3, unit_price: 129, label: "M.P" },
+          ],
+        }),
+      ],
+    };
+    mount();
+    const footer = screen.getByTestId("grid-footer");
+    expect(footer).toHaveTextContent("1 order");
+    expect(footer).toHaveTextContent("Mattress 2");
+    expect(footer).toHaveTextContent("Pillow 4");
+    expect(footer).toHaveTextContent("M.P 3");
+    expect(footer).not.toHaveTextContent("Reset layout");
+    expect(footer).not.toHaveTextContent("rows");
   });
 
   it("shows only the customer name in the default cell while retaining phone search context", () => {
@@ -249,6 +307,21 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     expect(screen.queryByText(/current location/i)).not.toBeInTheDocument();
   });
 
+  it("omits destination quantity for one route and shows it only for a split", () => {
+    listHookState.data = { orders: [order({ order_lines: [
+      { id: "line-1", sku: "B1201S-K", qty: 1, unit_price: 2499, label: "B1201S · King" },
+    ] })] };
+    expansionHookState.data = { lines: [{
+      lineId: "line-1", sku: "B1201S-K", unitIds: [],
+      deliverTo: [{ name: "Carres Klang", qty: 1 }],
+    }] };
+    mount();
+    fireEvent.click(screen.getByRole("button", { name: "Expand row" }));
+    const row = screen.getByTestId("expanded-good-B1201S-K");
+    expect(row).toHaveTextContent("Carres Klang");
+    expect(row).not.toHaveTextContent("Carres Klang ×1");
+  });
+
   it("classifies legacy item codes before falling back to Other Goods", () => {
     listHookState.data = {
       orders: [
@@ -264,6 +337,17 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     expect(screen.getByText("MATTRESS")).toBeInTheDocument();
     expect(screen.getByText("Not allocated")).toBeInTheDocument();
     expect(screen.queryByText("OTHER GOODS")).not.toBeInTheDocument();
+  });
+
+  it("uses a dash for Service Unit ID and routing instead of inventing a non-applicable state", () => {
+    listHookState.data = {
+      orders: [order({ order_lines: [], order_addons: [{ addon_key: "disposal_service", qty: 1, unit_price: 0 }] })],
+    };
+    mount();
+    fireEvent.click(screen.getByRole("button", { name: "Expand row" }));
+    const goods = screen.getByRole("table", { name: "Goods on SO-1303" });
+    expect(goods).not.toHaveTextContent("Not applicable");
+    expect(within(goods).getAllByText("—")).toHaveLength(2);
   });
 
   it("keeps loading inside the work surface instead of adding an outer band", () => {

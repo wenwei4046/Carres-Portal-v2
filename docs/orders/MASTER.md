@@ -134,6 +134,10 @@ keep a superseded target.
   Warehouse physical location is deliberately absent and must never be substituted for Deliver To.
   A physical goods line with no allocated Stock Unit says `Not allocated`; a Service says
   `Not applicable` rather than pretending a Unit should exist.
+- A consolidated PO does not by itself prove a PO-line-to-SO-line allocation. Where the existing
+  Purchasing relationship cannot identify that allocation structurally, the Register must keep
+  the governed default/readable fallback and must not distribute another Sales Order's quantity
+  or destination by inference. A future allocation key may close this; this UI slice does not.
 - Search, typed filters, sort, Columns and Export remain useful register capabilities. Selection
   may scope Export; it does not license workflow bulk actions on a truth register.
 - Document numbers navigate directly to their authoritative object where the relationship exists:
@@ -200,6 +204,56 @@ Order does not gain a writer.
   object-route/Settings presentation mismatches and merged as `30fa407b`. Deploy run `31768870907`
   converged all governed production surfaces on exact SHA `30fa407b`; the authenticated acceptance
   list passed at 1440×900. `docs/ui/MASTER.md` §6.6 records the reusable Shell/Register/Object proof.
+- **FINAL OWNER VISUAL ACCEPTANCE — CLOSED / PRODUCTION-VERIFIED 2026-08-14.** PR #787 merged as
+  `b7d68eed`; its production acceptance exposed only the Edit notice occupying a document column.
+  PR #788 corrected that composition and merged as `ebc8fb5d`; deploy run `31790978222` proved the
+  exact final SHA. Authenticated checks covered the Register and approved goods expansion, Object
+  View/Edit/Revisions/History/Order Route, and coexistence with My Work open. Proceed date uses the
+  pre-existing Operations writer; Customer Delivery remains read-only and Delivery's Confirmed
+  Delivery Date remains distinct. No new address, access, delivery-date or destination field was
+  created. `docs/ui/MASTER.md` §6.6 records the final reusable UI proof.
+- **FINAL OWNER VISUAL CORRECTION — PRODUCTION-VERIFIED / LOCKED 2026-08-14.** Owner review
+  reopened the preceding acceptance record. PR #793 merged as `af61c274d89d01fda0d306b50257cc4c08eba358`;
+  CI run `31800808491` passed the complete gate and deploy run `31801669457` converged the exact
+  SHA on the governed production surfaces. Authenticated acceptance proved: Customer Delivery
+  remains a date fact with exact missing value `No delivery date` and separate two-line guidance;
+  Register location is concise and collapses duplicate city/state; the six-column goods mini-table
+  remains unchanged, with `Carres Klang` shown without quantity for a single destination; Object
+  View and Edit expose the same governed goods truth; Edit is composed as `Edit operational
+  details | Order context`, keeps Customer Delivery read-only and Sales ownership governed; Save
+  and Discard disappear in Revisions, History and Order Route; and Order Route retains its
+  per-goods architecture in operator English. Normal Register states, selection/footer, expansion,
+  row actions, all four Quick Rail views, Object views and medium desktop with Quick Rail open were
+  verified in authenticated production. The Print control remains present and enabled; automated
+  activation of its blob preview was blocked by the acceptance browser security policy, while the
+  governed print handler, focused tests and production build passed. This record supersedes the
+  earlier closure and locks Owner Visual Acceptance without changing business authority.
+
+## Guided operations and Service Case boundary — CLOSED / PRODUCTION-VERIFIED 2026-08-14
+
+- A missing Customer Delivery date uses the governed two-line action grammar in the Register:
+  the exact SO/fact first, then Salesperson (or Sales fallback), customer, concrete confirmation
+  act and required recorded result. The Sales Order detail expands the same derived fact into
+  Why, Who must act, Who to contact, What to ask, What to use, What to record and What happens
+  next. The guidance stores no second action or delivery truth.
+- `Report a problem` is the one Sales Order entrance for a customer, product, delivery or
+  installation problem. It pre-links the current SO/customer/items into the canonical Service
+  Case guided intake and preserves that writer's evidence, permission and follow-up contract.
+  Sales Order only lists linked Service Case number/status and deep-links to Service Cases; it
+  owns no investigation, Claim, Return, Replacement, Collection or Refund workflow.
+- The pre-existing production-verified Register, goods expansion/footer, Object Detail/Edit,
+  Revisions, History, Order Route, Print and Quick Rail composition remain unchanged except for
+  these governed guidance and Service Case read/door additions.
+- **PRODUCTION PROOF:** PR #790 merged as exact main SHA `dac20ce5`; deploy run `31794862393`
+  repeated the authoritative gate, deployed both Pages projects and the API Worker, then proved
+  all three production surfaces reported that SHA. Authenticated acceptance on SO-1318 passed at
+  1440×900 and 1130×820 with zero console errors: Register seven-column composition, goods
+  expansion, filtered-result goods footer, missing-date two-line action and all seven detail
+  answers, Object View, Operations Edit, Revisions, History, Order Route, seeded canonical
+  `Report a problem` Service Case intake (no second lookup/writer), and Quick Rail open. The
+  Service Case deep-link/list remains the sole Sales Order read-back boundary when a linked case
+  exists. **SALES ORDER VISUAL + GUIDED OPERATIONS COMPLETION — PRODUCTION VERIFIED / MASTER
+  CLOSED.**
 
 ## Object/domain completeness sweep — 2026-08-13
 

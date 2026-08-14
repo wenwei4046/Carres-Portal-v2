@@ -213,7 +213,7 @@ function goodsLane(input: SalesOrderRouteInput): { lane: SalesOrderRouteLane; po
         "current",
         "Purchasing",
         `/operation/procurement?po=${encodeURIComponent(po.id)}`,
-        `${qty} unit(s)${po.etaDate ? ` · Expected ${po.etaDate}` : ""}`,
+        `${qty} ${qty === 1 ? "item" : "items"}${po.etaDate ? ` · Expected ${po.etaDate}` : ""}`,
       ));
       if (!words.includes(po.currentFact)) words.push(po.currentFact);
       remaining -= qty;
@@ -223,12 +223,12 @@ function goodsLane(input: SalesOrderRouteInput): { lane: SalesOrderRouteLane; po
     if (remaining > 0) {
       facts.push(fact(
         `unassigned:${line.sku}`,
-        `Route not yet assigned · ${remaining}`,
+        `Waiting for Purchasing · ${remaining} ${remaining === 1 ? "item" : "items"}`,
         "attention",
         "Purchasing",
         "/operation?tab=purchase",
       ));
-      words.push("Route not yet assigned");
+      words.push("Waiting for Purchasing");
       clear = false;
     }
 
@@ -275,7 +275,7 @@ function deliveryLane(input: SalesOrderRouteInput): { lane: SalesOrderRouteLane;
     const booking = input.delivery.booking;
     attempts.push(fact(
       "delivery:booking",
-      attempts.length > 0 ? "Next delivery · Scheduled" : "Delivery · Scheduled",
+      `${booking.partnerName?.trim() || "Logistics Partner"} · Confirmed`,
       "current",
       "Delivery",
       deliveryHref,
@@ -286,11 +286,11 @@ function deliveryLane(input: SalesOrderRouteInput): { lane: SalesOrderRouteLane;
   if (attempts.length === 0) {
     attempts.push(fact(
       "delivery:unassigned",
-      "Delivery not yet scheduled",
+      "Promised this day, no date yet",
       "attention",
       "Delivery",
       deliveryHref,
-      input.order.deliveryDate ? `Customer promised ${input.order.deliveryDate}` : null,
+      input.order.deliveryDate ? `Customer Delivery · ${input.order.deliveryDate}` : null,
     ));
   }
   const clear = input.delivery.attempts.some((attempt) => attempt.result === "delivered") || !!input.order.deliveredAt;

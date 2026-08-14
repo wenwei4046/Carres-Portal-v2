@@ -737,6 +737,51 @@ breathing gap
   Route retained per-goods facts and Still owed. Sales Orders is therefore the production
   reference for the ERP Shell, Register and Object Detail/Edit templates. Shared shell components
   must remain module-neutral; dates, work, activity and mutations remain owned by their modules.
+- **SALES ORDER GOODS EXPANSION — PRODUCTION-VERIFIED / CLOSED (2026-08-14).** PR #782 merged as
+  `40fce19b` and deployed by run `31777783954`; authenticated production verification proved the
+  locked `Category | Unit ID | SKU | Qty | Item | Deliver To` mini-table beneath the unchanged
+  seven-column parent Register. Real evidence: SO-1312 renders Mattress `B1201S-K`, `Not
+  allocated`, and `Carres Klang ×1`; SO-1204 renders Sofa modules with fabric/leg/height facts and
+  Service lines with Unit ID `—` and Deliver To `Not applicable`; SO-1257 renders the corresponding
+  Sofa/Service & Add-ons truth and governed default destination. Purchasing PO-2032 proves real
+  `Carres Klang` plus `AL Sungai Buloh` destination truth. No current production record proves a
+  HOUZS line, a same-SKU quantity split, or an allocated SO Unit ID (Stock reported zero reserved
+  units), so none is fabricated as acceptance evidence. PO-2032 also demonstrates the known
+  consolidated-PO allocation limit: without a structural PO-line→SO-line allocation, Sales Orders
+  must not infer which destination quantity belongs to another SO line. Authenticated acceptance
+  then found internal Sofa-builder coordinates/indexes/build UUIDs leaking into `Item`; PR #783
+  removed those non-operational facts, merged as `30e08be9`, passed CI run `31779002343`, and
+  deployed with exact-SHA proof in run `31779795185`. The final live SO-1204 check retained fabric,
+  leg and Sofa height while proving `X/Y`, rotation, cell index, fabric tier and build UUID absent.
+- **SALES ORDER OWNER VISUAL ACCEPTANCE — PRODUCTION-VERIFIED / CLOSED (2026-08-14).** PR #787
+  merged as `b7d68eed`; authenticated production acceptance found one Edit-grid composition defect,
+  fixed by PR #788 and merged as `ebc8fb5d`. Deploy run `31790978222` repeated the authoritative
+  gates and proved exact SHA `ebc8fb5d` in production. At normal desktop width the Register keeps
+  the seven governed columns, page-header New Sales Order action, utility-only grid toolbar,
+  interaction-blue selection, amber missing Customer Delivery, location summaries, the approved
+  six-column goods mini-table and filtered quantity footer with no permanent Reset layout. The
+  persistent Object Header and `Order · Revisions · History · Order Route` navigation were verified
+  across View and Edit. Order is read-first at document width; PDF remains behind Print; Revisions
+  and History are separate views; Order Route shows per-goods `CURRENT` and a secondary Still owed
+  list. Edit keeps Customer Delivery read-only, retains the existing Proceed date writer, maps only
+  existing address/access fields, and aligns Customer with Sales ownership beneath a full-width
+  edit-scope notice. The same Object Route and Edit compositions remained usable with My Work open.
+  This supersedes the earlier acceptance note's live PDF-canvas statement and closes the Sales Order
+  Visual Acceptance slice without changing settled business truth.
+- **SALES ORDER FINAL OWNER VISUAL CORRECTION — PRODUCTION-VERIFIED / LOCKED (2026-08-14).** Owner
+  review reopened the preceding closure. PR #793 merged as
+  `af61c274d89d01fda0d306b50257cc4c08eba358`; complete CI run `31800808491` passed and production
+  deploy run `31801669457` converged that exact SHA. Authenticated normal and medium-desktop
+  acceptance proved the fact-first missing Customer Delivery presentation, concise locality,
+  unchanged six-column goods mini-table, single-destination quantity suppression, equal Register
+  and Object goods truth, the approved `Edit operational details | Order context` composition,
+  governed Sales ownership, edit controls confined to Order Edit, genuine Revisions/History/Order
+  Route views, and operator-English per-goods routing. Register normal/expanded/selected states,
+  footer, row actions, Team/Calendar/My Work/Activity, Object views and Quick Rail coexistence were
+  checked top-to-toe. Print remained visible and enabled; its blob-preview activation was the only
+  browser-policy-blocked automation step, with the print handler, focused tests and production
+  build passing. This record supersedes the prior closure and is the final reusable Sales Order UI
+  reference without changing the Blueprint or module authority.
 - `docs/orders/MASTER.md` §0.1 owns the business/field/amendment/permission rules. Sales Portal/POS
   remains the master form contract; UI composition may not create a second commercial form or an
   operational action door.

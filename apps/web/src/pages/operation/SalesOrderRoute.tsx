@@ -1,6 +1,7 @@
 import { AlertTriangle, ArrowRight, ArrowUpRight, Check, CircleDot } from "lucide-react";
 import { Link } from "react-router-dom";
 import type { SalesOrderRoute as Route, SalesOrderRouteFact } from "@carres/shared";
+import { fmtDate } from "@/lib/fmt-date";
 
 const stateStyle = {
   complete: "bg-kit-green-3 text-kit-green-11",
@@ -15,12 +16,13 @@ function StateIcon({ fact }: { fact: SalesOrderRouteFact }) {
 }
 
 function FactStep({ fact, currentLabel = false }: { fact: SalesOrderRouteFact; currentLabel?: boolean }) {
+  const detail = fact.detail?.replace(/\b\d{4}-\d{2}-\d{2}\b/g, (date) => fmtDate(date)) ?? null;
   const body = (
     <>
       <StateIcon fact={fact} />
       <span className="min-w-0">
         <span className="block text-body font-medium text-kit-slate-12">{fact.title}</span>
-        {fact.detail && <span className="block text-meta text-kit-slate-9">{fact.detail}</span>}
+        {detail && <span className="block text-meta text-kit-slate-9">{detail}</span>}
         {currentLabel && <span className="mt-1 inline-block text-label font-semibold tracking-wide text-kit-blue-11">CURRENT</span>}
       </span>
     </>
@@ -47,7 +49,7 @@ export default function SalesOrderRoute({ route }: { route: Route }) {
     <div className="mx-auto flex max-w-[1280px] flex-col gap-5" data-testid="sales-order-route">
       <div className="border-b border-kit-slate-6 pb-3">
         <h1 className="text-page text-kit-slate-12">Order Route</h1>
-        <p className="mt-1 text-body text-kit-slate-11">Each goods line keeps its own route. Facts remain read-only and open in the module that owns them.</p>
+        <p className="mt-1 text-body text-kit-slate-11">Each item has its own route. Open a fact in the team that owns it.</p>
       </div>
 
       <section className="rounded-card border border-kit-slate-5 bg-white" data-testid="goods-routes">
@@ -71,7 +73,7 @@ export default function SalesOrderRoute({ route }: { route: Route }) {
           <div className="divide-y divide-kit-slate-5">
             {obligations.map((lane) => <div key={lane.key} className="grid gap-2 px-4 py-3 md:grid-cols-[150px_1fr]"><div className="text-body font-medium text-kit-slate-11">{lane.title}</div><div className="grid gap-1 md:grid-cols-2">{lane.groups.flatMap((group) => group.facts).map((fact) => <FactStep key={fact.id} fact={fact} />)}</div></div>)}
           </div>
-        ) : <div className="px-4 py-4 text-body text-kit-slate-9">No open obligations.</div>}
+        ) : <div className="px-4 py-4 text-body text-kit-slate-9">Nothing is still owed.</div>}
       </section>
     </div>
   );
