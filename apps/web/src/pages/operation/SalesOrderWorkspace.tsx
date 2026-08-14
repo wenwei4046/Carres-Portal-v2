@@ -415,7 +415,6 @@ export default function SalesOrderWorkspace() {
   const [viewRev, setViewRev] = useState<number | null>(null);
   const [amendmentSeed, setAmendmentSeed] = useState<AmendmentProposal | null>(null);
   const [cancelOpen, setCancelOpen] = useState(false);
-  const [recordView, setRecordView] = useState<"revisions" | "history">("revisions");
   const [objectView, setObjectView] = useState<ObjectView>(showRoute ? "Order Route" : "Order");
 
   const detailQ = useOperationOrder(isNew ? copyFrom : (orderId ?? null));
@@ -579,7 +578,7 @@ export default function SalesOrderWorkspace() {
     return base;
   }, [mode, viewedRevision, base, debouncedDraftData]);
 
-  const { url: pdfUrl, pdfError, paneRef } = usePdfCanvases(templateData);
+  const { url: pdfUrl } = usePdfCanvases(templateData);
 
   /* ── Writes — ONE page-level Save; every write mints a revision. ── */
   const saveMut = useSaveSalesOrderRevision(orderId ?? "", {
@@ -733,10 +732,7 @@ export default function SalesOrderWorkspace() {
       next.delete("route");
       return next;
     }, { replace: true });
-    if (view === "Revisions" || view === "History") {
-      setRecordView(view.toLowerCase() as "revisions" | "history");
-      window.setTimeout(() => document.getElementById("sales-order-record")?.scrollIntoView(), 0);
-    } else {
+    if (view === "Order") {
       window.setTimeout(() => document.getElementById("sales-order-workspace")?.scrollIntoView(), 0);
     }
   };
@@ -925,6 +921,9 @@ export default function SalesOrderWorkspace() {
       )}
       {(mode === "edit" || mode === "create") && (
         <>
+          <Button size="sm" variant="ghost" onClick={cancelEdit} data-testid="workspace-cancel">
+            <X size={14} /> Discard
+          </Button>
           <Button
             size="sm"
             variant="primary"
@@ -933,9 +932,6 @@ export default function SalesOrderWorkspace() {
             data-testid="workspace-save"
           >
             {mode === "create" ? "Create order" : "Save"}
-          </Button>
-          <Button size="sm" variant="ghost" onClick={cancelEdit} data-testid="workspace-cancel">
-            <X size={14} /> Discard
           </Button>
         </>
       )}
@@ -1032,10 +1028,39 @@ export default function SalesOrderWorkspace() {
             </div>
           )}
         </div>
+      ) : objectView === "Revisions" || objectView === "History" ? (
+        <div className="min-h-0 flex-1 overflow-auto bg-kit-slate-3 px-4 py-4">
+          <div className="mx-auto max-w-5xl rounded-card border border-kit-slate-5 bg-white p-5">
+            <h2 className="mb-4 text-title font-semibold text-base-900">{objectView}</h2>
+            <SalesOrderLedger
+              revisions={revisions}
+              history={detailQ.data?.history ?? []}
+              currentRevision={currentRev}
+              viewedRevision={mode === "oldrev" ? viewRev : null}
+              view={objectView.toLowerCase() as "revisions" | "history"}
+              showViewTabs={false}
+              onViewRevision={setViewRev}
+              onProposeRevision={(revision) => {
+                const header = revision.snapshot.header ?? {};
+                const currentLineIds = new Map((detailQ.data?.lines ?? []).map((line) => [line.sku, line.id]));
+                setAmendmentSeed({
+                  lines: (revision.snapshot.lines ?? []).map((line) => ({
+                    ...(currentLineIds.get(line.sku) ? { id: currentLineIds.get(line.sku) } : {}),
+                    sku: line.sku,
+                    qty: Number(line.qty),
+                    unit_price: Number(line.unit_price),
+                  })),
+                  delivery_date: header.delivery_date == null ? null : String(header.delivery_date),
+                  delivery_date_tbd: Boolean(header.delivery_date_tbd),
+                  installment_months: header.installment_months == null ? null : Number(header.installment_months),
+                });
+                setObjectView("Order");
+              }}
+            />
+          </div>
+        </div>
       ) : (
-      <div className="flex min-h-0 flex-1">
-        {/* ── LEFT 55% — the seven sections ─────────────────────────────── */}
-        <div className="min-h-0 w-[55%] shrink-0 overflow-auto border-r border-kit-slate-5 bg-kit-slate-3 px-4 py-4">
+        <div className="min-h-0 flex-1 overflow-auto bg-kit-slate-3 px-4 py-4">
           {(!isNew || copyFrom) && detailQ.isLoading && <Loading label={copyFrom ? "Preparing the copied draft" : "Opening the sales order"} />}
           {(!isNew || copyFrom) && !detailQ.isLoading && detailQ.isError && (
             <div className="rounded-card border border-kit-slate-5 bg-white">
@@ -1052,7 +1077,7 @@ export default function SalesOrderWorkspace() {
           )}
 
           {(isNew && !copyFrom || order) && (
-            <div className="flex flex-col gap-3" data-testid="sales-order-workspace">
+            <div className="mx-auto grid max-w-6xl grid-cols-1 gap-3 xl:grid-cols-2" data-testid="sales-order-workspace">
               {(mode === "oldrev" || mode === "edit" || (mode === "create" && copyFrom)) && (
                 <div className="px-1 py-1 text-meta text-base-600">
                   {mode === "oldrev" && viewedRevision ? (
@@ -1134,7 +1159,7 @@ export default function SalesOrderWorkspace() {
                   by request (GATES.md Test 3). The save RPC now REFUSES a
                   header carrying one, so leaving the pickers here would have
                   been a form that cannot save. */}
-              <Section title="Source">
+              <Section title="Sales ownership">
                 {mode === "create" ? (
                   <div className="grid grid-cols-2 gap-3">
                     <Select id="ws-dealer" label="Dealer"
@@ -1186,11 +1211,11 @@ export default function SalesOrderWorkspace() {
                   <div className="grid grid-cols-3 gap-3">
                     <Fact label="Ordered" value={isNew ? "Today" : fmtDate(order?.placed_at ?? null)} />
                     <div>
-                      <div className="text-label text-base-500 mb-1">Promised delivery</div>
+                      <div className="text-label text-base-500 mb-1">Customer Delivery</div>
                       <DatePicker id="ws-promised" value={draft.delivery_date}
                         onChange={(iso) => setField("delivery_date", iso)} />
                       <div className="mt-1.5">
-                        <Checkbox id="ws-tbd" label="No date yet"
+                        <Checkbox id="ws-tbd" label="Delivery date to be confirmed"
                           checked={draft.delivery_date_tbd}
                           onCheckedChange={(v) => setField("delivery_date_tbd", v)} />
                       </div>
@@ -1204,7 +1229,11 @@ export default function SalesOrderWorkspace() {
                 ) : (
                   <div className="grid grid-cols-3 gap-x-5 gap-y-3">
                     <Fact label="Ordered" value={fmtDate((displayHeader(mode, viewedRevision, order, "placed_at") || order?.placed_at) ?? null)} />
-                    <Fact label="Promised delivery" value={promisedWord(mode, viewedRevision, order)} />
+                    <Fact label="Customer Delivery" value={
+                      promisedWord(mode, viewedRevision, order) === "No delivery date" ? (
+                        <span data-attention="warning" className="inline-flex rounded-control bg-kit-amber-3 px-1.5 py-0.5 font-medium text-kit-amber-11">No delivery date</span>
+                      ) : promisedWord(mode, viewedRevision, order)
+                    } />
                     {mode === "edit" ? (
                       <div>
                         <div className="text-label text-base-500 mb-1">Proceed date</div>
@@ -1240,7 +1269,8 @@ export default function SalesOrderWorkspace() {
               </Section>
 
               {/* ⑤ ITEMS */}
-              <Section title="Items">
+              <div className="xl:col-span-2">
+              <Section title="Goods">
                 {mode === "create" ? (
                   <div className="flex flex-col gap-2">
                     {draft.lines.map((l) => (
@@ -1271,7 +1301,7 @@ export default function SalesOrderWorkspace() {
                     </div>
                   </div>
                 ) : (
-                  <table className="w-full text-body" data-testid="doc-items">
+                  <table className="w-full text-body" data-testid="document-goods">
                     <thead>
                       <tr className="text-label text-base-500">
                         <th className="py-1 pr-4 text-left font-medium">Item</th>
@@ -1324,9 +1354,10 @@ export default function SalesOrderWorkspace() {
                   </div>
                 )}
               </Section>
+              </div>
 
               {/* ⑥ MONEY */}
-              <Section title="Money">
+              <div className="xl:col-span-2"><Section title="Money">
                 <div className="grid grid-cols-3 gap-x-5">
                   <Fact label="Total" value={money.known && money.total != null ? <Money value={money.total} /> : "No price yet"} />
                   <Fact label="Paid" value={<Money value={money.paid} />} />
@@ -1337,7 +1368,7 @@ export default function SalesOrderWorkspace() {
                     }
                   />
                 </div>
-              </Section>
+              </Section></div>
 
               {/* ⑦ WHAT THIS CHANGE STARTED ELSEWHERE — 3.4.
                   Shown only when there IS work: a section that says "nothing"
@@ -1352,62 +1383,10 @@ export default function SalesOrderWorkspace() {
                 </Section>
               )}
 
-              {/* ⑧ REVISIONS / HISTORY — complete versions and event ledger
-                  are separate concepts and separate views. */}
-              {!isNew && (
-                <div id="sales-order-record">
-                <Section title="Order record">
-                  <SalesOrderLedger
-                    revisions={revisions}
-                    history={detailQ.data?.history ?? []}
-                    currentRevision={currentRev}
-                    viewedRevision={mode === "oldrev" ? viewRev : null}
-                    view={recordView}
-                    onViewChange={setRecordView}
-                    onViewRevision={setViewRev}
-                    onProposeRevision={(revision) => {
-                      const header = revision.snapshot.header ?? {};
-                      const currentLineIds = new Map((detailQ.data?.lines ?? []).map((line) => [line.sku, line.id]));
-                      setAmendmentSeed({
-                        lines: (revision.snapshot.lines ?? []).map((line) => ({
-                          ...(currentLineIds.get(line.sku) ? { id: currentLineIds.get(line.sku) } : {}),
-                          sku: line.sku,
-                          qty: Number(line.qty),
-                          unit_price: Number(line.unit_price),
-                        })),
-                        delivery_date: header.delivery_date == null ? null : String(header.delivery_date),
-                        delivery_date_tbd: Boolean(header.delivery_date_tbd),
-                        installment_months: header.installment_months == null ? null : Number(header.installment_months),
-                      });
-                      setViewRev(null);
-                    }}
-                  />
-                </Section>
-                </div>
-              )}
             </div>
           )}
         </div>
 
-        {/* ── RIGHT 45% — the ONE PDF, live ─────────────────────────────── */}
-        <div
-          className="relative min-h-0 min-w-0 flex-1 overflow-auto bg-base-100 py-6"
-          data-testid="pdf-pane"
-        >
-          <div ref={paneRef} data-testid="pdf-canvas-pane" />
-          {pdfError ? (
-            <div className="flex h-full items-center justify-center px-6">
-              <p className="text-body text-base-500">
-                The Sales Order PDF could not be rendered: {pdfError}
-              </p>
-            </div>
-          ) : !pdfUrl ? (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <Loading label="Rendering the sales order" />
-            </div>
-          ) : null}
-        </div>
-      </div>
       )}
     </div>
   );
@@ -1463,9 +1442,9 @@ function promisedWord(mode: Mode, rev: SalesOrderRevisionRow | null, order: Orde
     mode === "oldrev" && rev
       ? Boolean(rev.snapshot.header?.["delivery_date_tbd"])
       : Boolean(bag(order)["delivery_date_tbd"]);
-  if (tbd) return "No date yet";
+  if (tbd) return "No delivery date";
   const d = displayHeader(mode, rev, order, "delivery_date");
-  return d ? fmtDate(d) : "No date yet";
+  return d ? fmtDate(d) : "No delivery date";
 }
 
 function liftWord(mode: Mode, rev: SalesOrderRevisionRow | null, order: Orderish): string {

@@ -183,6 +183,9 @@ export type DataGridProps<T> = {
       Filters / Export / Columns. The legacy `toolbar` slot is unchanged. */
   toolbarStart?: ReactNode;
   toolbarEnd?: ReactNode;
+  /** Fixed informational footer. Receives the filtered result and, when
+      present, the selected rows that remain in that result. */
+  statusSummary?: (filteredRows: T[], selectedRows: T[]) => ReactNode;
   /** Additional read-only outputs shown beside the built-in Excel export. */
   outputActions?: Array<{ label: string; onClick: () => void }>;
   /** controlled focus for the "Find" button — bump to focus the search box */
@@ -361,6 +364,7 @@ function DataGridInner<T>({
   toolbar,
   toolbarStart,
   toolbarEnd,
+  statusSummary,
   outputActions,
   focusSearchNonce,
   collapseAllNonce,
@@ -1074,7 +1078,6 @@ function DataGridInner<T>({
     const w = Math.max(60, Math.min(420, Math.round(max * 7.5 + 20)));
     setLayout((l) => ({ ...l, widths: { ...l.widths, [key]: w } }));
   };
-  const resetLayout = () => setLayout(() => DEFAULT_LAYOUT);
 
   /* ── Export to Excel (system-wide via DataGrid) ───────────────────────
      Exports exactly what the operator sees: the post-filter + post-search +
@@ -1335,6 +1338,7 @@ function DataGridInner<T>({
           2990 kept it right — that is the one composition change the laws
           mandate), then the caller's actions, then Export + Columns pinned
           right (LAWS 3 + 4). */}
+      {!(selectable && selectedVisibleRows.length > 0) ? (
       <div className={styles.toolbar} data-testid={isReference ? "work-toolbar" : undefined}>
         {isReference && toolbarStart}
         {!embedded && (
@@ -1509,12 +1513,8 @@ function DataGridInner<T>({
         </div>
         {isReference && toolbarEnd}
       </div>
-
-      {/* RG-2 selection bar (Law 13 — extended once, every register gets it):
-          exists ONLY while ticked rows are visible under the current filters.
-          Its export writes the SELECTED rows; the toolbar's stays the view. */}
-      {selectable && selectedVisibleRows.length > 0 && (
-        <div className={styles.selectionBar} data-testid="selection-bar">
+      ) : (
+        <div className={`${styles.toolbar} ${styles.selectionBar}`} data-testid="selection-bar">
           <span className={styles.selectionCount}>{selectedVisibleRows.length} selected</span>
           <button
             type="button"
@@ -1732,12 +1732,11 @@ function DataGridInner<T>({
           "N of M rows / Reset layout" line reads as heavy chrome. */}
       {!embedded && (
         <div className={styles.statusLine} data-testid={isReference ? "grid-footer" : undefined}>
-          <span>{isLoading ? "Loading…" : `${filteredRows.length} of ${rows.length} rows`}</span>
-          <span>
-            <button className={styles.tbarBtn} onClick={resetLayout} title="Reset column layout">
-              Reset layout
-            </button>
-          </span>
+          {isLoading
+            ? <span>Loading…</span>
+            : statusSummary
+              ? statusSummary(sortedRows, selectedVisibleRows)
+              : <span>{`${filteredRows.length} of ${rows.length} rows`}</span>}
         </div>
       )}
 

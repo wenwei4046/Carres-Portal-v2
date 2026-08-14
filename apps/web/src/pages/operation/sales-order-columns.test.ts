@@ -78,7 +78,7 @@ describe("the chooser is grouped — Stage 1's eight, no field outside them", ()
       expect([
         "Document",
         "Customer",
-        "Source",
+        "Sales ownership",
         "Items",
         "Money",
         "Dates",
@@ -131,4 +131,3 @@ describe("a blank never carries two meanings", () => {
     expect(moneyText(unpriced.balance)).toBe("No price yet");
   });
 });
-

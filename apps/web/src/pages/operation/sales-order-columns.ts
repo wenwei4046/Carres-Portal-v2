@@ -44,7 +44,7 @@ import {
 /** The dictionary's absence words, so no caller spells them. */
 export const NOT_GIVEN = "Not given";
 export const NOT_RECORDED = "Not recorded";
-export const NO_DATE_YET = "No date yet";
+export const NO_DATE_YET = "No delivery date";
 
 /** One register row: the order, plus every fact already resolved to a string. */
 export interface RegisterRow {
@@ -79,7 +79,9 @@ export function buildRegisterRow(o: operationOrderListRow): RegisterRow {
     promised: o.delivery_date_tbd ? null : (o.delivery_date ?? null),
     ordered: o.placed_at,
     customerDelivery: o.delivery_date_tbd ? null : (o.delivery_date ?? null),
-    deliveryLocation: o.customer_address ?? NOT_GIVEN,
+    deliveryLocation: [o.customer_address_city, o.customer_address_state]
+      .filter(Boolean)
+      .join(", ") || NOT_GIVEN,
     poNumbers: o.po_numbers ?? [],
     total: valueState(money),
     /* `paid` is never "unpriced" and never "settled": a payment either
@@ -102,7 +104,7 @@ export function moneyText(state: MoneyState): string {
 export type FieldGroup =
   | "Document"
   | "Customer"
-  | "Source"
+  | "Sales ownership"
   | "Items"
   | "Money"
   | "Dates"
@@ -184,9 +186,9 @@ export const REGISTER_FIELDS: readonly RegisterField[] = [
   { key: "promised", label: "Promised", width: "113px", group: "Dates",
     text: (r) => date(r.promised, NO_DATE_YET), sortBy: (r) => r.promised ?? "",
     kind: "date", iso: (r) => r.promised },
-  { key: "dealer", label: "Dealer", width: "160px", group: "Source",
+  { key: "dealer", label: "Dealer", width: "160px", group: "Sales ownership",
     text: (r) => r.o.dealers?.name || NOT_RECORDED },
-  { key: "showroom", label: "Showroom", width: "126px", group: "Source",
+  { key: "showroom", label: "Showroom", width: "126px", group: "Sales ownership",
     text: (r) => r.o.outlets?.name || NOT_RECORDED },
 
   /* ── DOCUMENT — the papers this order produced, and its references ──────── */
@@ -221,11 +223,11 @@ export const REGISTER_FIELDS: readonly RegisterField[] = [
     text: (r) => r.o.customer_billing || NOT_GIVEN },
 
   /* ── SOURCE — who sold it, through which door ───────────────────────────── */
-  { key: "salesperson", label: "Salesperson", width: "167px", group: "Source",
+  { key: "salesperson", label: "Salesperson", width: "167px", group: "Sales ownership",
     text: (r) => r.o.salespersons?.name || NOT_RECORDED },
-  { key: "channel", label: "Channel", width: "112px", group: "Source",
+  { key: "channel", label: "Channel", width: "112px", group: "Sales ownership",
     text: (r) => r.o.channel || NOT_RECORDED },
-  { key: "source", label: "Source", width: "112px", group: "Source",
+  { key: "source", label: "Order origin", width: "112px", group: "Sales ownership",
     text: (r) => r.o.source_system || NOT_RECORDED },
 
   /* ── MONEY — the rest ───────────────────────────────────────────────────── */

@@ -364,7 +364,7 @@ div:first-child > .columnsMenuGroup {
   gap: var(--space-2);
   padding: 4px var(--space-3);
   border-bottom: 1px solid var(--line);
-  background: rgba(196, 77, 43, 0.06);
+  background: var(--kit-blue-3, #e8f3ff);
 }
 .selectionCount {
   font-family: var(--font-button);
@@ -548,7 +548,7 @@ div:first-child > .columnsMenuGroup {
   background: var(--c-cream);
 }
 .trSelected {
-  background: rgba(196, 77, 43, 0.1) !important;
+  background: var(--kit-blue-3, #e8f3ff) !important;
   font-weight: 600;
 }
 .tr:last-child {

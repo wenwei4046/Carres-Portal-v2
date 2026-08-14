@@ -43,7 +43,7 @@
 // around the one the engine already draws.
 import { useCallback, useMemo, useState } from "react";
 import { Plus } from "lucide-react";
-import { lineClass } from "@carres/shared";
+import { accShort, lineClass, lineKind } from "@carres/shared";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import {
@@ -213,6 +213,16 @@ function toGridColumn(
       exportValue: (r) => (r.phone ? `${r.customer} · ${r.phone}` : r.customer),
     };
   }
+  if (f.key === "customer_delivery") {
+    return {
+      ...base,
+      accessor: (r) => r.customerDelivery ? f.text(r) : (
+        <span data-attention="warning" className="inline-flex items-center gap-1 rounded-control bg-kit-amber-3 px-1.5 py-0.5 font-medium text-kit-amber-11">
+          No delivery date
+        </span>
+      ),
+    };
+  }
   if (f.key === "phone") {
     return { ...base, searchValue: (r) => `${r.phone} ${r.phoneDigits}` };
   }
@@ -304,7 +314,7 @@ function ExpandedLines({ row }: { row: RegisterRow }) {
               </tr>;
             })}
             {addons.map((addon, index) => <tr key={`addon-${index}`} className="align-top">
-              <td className="px-3 py-2 text-label font-semibold text-base-600">SERVICE</td><td className="px-3 py-2">—</td><td className="px-3 py-2 font-mono text-meta">{addon.addon_key}</td><td className="px-3 py-2 tabular-nums">{addon.qty}</td><td className="px-3 py-2">{addon.addon_key?.replace(/[_-]+/g, " ") ?? "Add-on"}</td><td className="px-3 py-2">Not applicable</td>
+              <td className="px-3 py-2 text-label font-semibold text-base-600">SERVICE</td><td className="px-3 py-2">—</td><td className="px-3 py-2 font-mono text-meta">{addon.addon_key}</td><td className="px-3 py-2 tabular-nums">{addon.qty}</td><td className="px-3 py-2">{addon.addon_key?.replace(/[_-]+/g, " ") ?? "Add-on"}</td><td className="px-3 py-2">—</td>
             </tr>)}
           </tbody>
         </table>
@@ -448,7 +458,16 @@ export default function SalesOrdersRegister() {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <DestinationHeader />
+      <DestinationHeader right={
+        <button
+          type="button"
+          data-testid="new-sales-order"
+          onClick={() => navigate("/operation/orders/so/new")}
+          className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-pill bg-kit-blue-9 px-3 text-meta font-semibold text-white hover:opacity-90"
+        >
+          <Plus size={14} strokeWidth={2.25} /> New Sales Order
+        </button>
+      } />
 
       {cancelTarget && (
         <CancelSalesOrderDialog
@@ -495,7 +514,7 @@ export default function SalesOrdersRegister() {
             chooserGroupOrder={[
               "Document",
               "Customer",
-              "Source",
+              "Sales ownership",
               "Items",
               "Money",
               "Dates",
@@ -512,22 +531,54 @@ export default function SalesOrdersRegister() {
               onToggleAll: toggleAll,
             }}
             outputActions={[{ label: "Print", onClick: () => window.print() }]}
-            toolbarEnd={
-              /* STAGE 2 — the office birth door. Everyone who can open this
-                 page (operation / principal) may use it; normal orders are
-                 still born in the Sales Portal. */
-              <button
-                type="button"
-                data-testid="new-sales-order"
-                onClick={() => navigate("/operation/orders/so/new")}
-                className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-control bg-base-900 px-3 text-meta font-semibold text-white hover:bg-base-700"
-              >
-                <Plus size={14} strokeWidth={2.25} /> New Sales Order
-              </button>
-            }
+            statusSummary={(filtered, selectedRows) => (
+              <RegisterResultSummary
+                filtered={filtered}
+                selected={selectedRows}
+                total={rows.length}
+              />
+            )}
           />
         )}
       </div>
     </div>
   );
+}
+
+function RegisterResultSummary({
+  filtered,
+  selected,
+  total,
+}: {
+  filtered: RegisterRow[];
+  selected: RegisterRow[];
+  total: number;
+}) {
+  const scope = selected.length > 0 ? selected : filtered;
+  const counts = new Map<string, number>();
+  for (const row of scope) {
+    for (const line of row.o.order_lines ?? []) {
+      const kind = lineKind(line.sku);
+      const cls = lineClass(line.sku);
+      const label = kind === "service" ? "Service"
+        : cls === "mattress" ? "Mattress"
+        : cls === "bedframe" ? "Bedframe"
+        : cls === "sofa" ? "Sofa"
+        : cls === "unknown" ? "Other goods"
+        : accShort(line.sku);
+      counts.set(label, (counts.get(label) ?? 0) + Number(line.qty || 0));
+    }
+    for (const addon of row.o.order_addons ?? []) {
+      counts.set("Service", (counts.get("Service") ?? 0) + Number(addon.qty || 0));
+    }
+  }
+  const orderWord = scope.length === 1 ? "order" : "orders";
+  const countWord = selected.length > 0
+    ? `${selected.length} selected ${orderWord}`
+    : filtered.length === total
+      ? `${filtered.length} ${orderWord}`
+      : `${filtered.length} of ${total} orders`;
+  const order = ["Mattress", "Bedframe", "Sofa", "Pillow", "M.P", "Topper", "Footrest", "Service", "Other goods"];
+  const parts = order.filter((label) => (counts.get(label) ?? 0) > 0).map((label) => `${label} ${counts.get(label)}`);
+  return <span>{[countWord, ...parts].join(" · ")}</span>;
 }
