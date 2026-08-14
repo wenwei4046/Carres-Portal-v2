@@ -24,10 +24,13 @@ describe("Issue Tracker workspace", () => {
   });
 
   it("starts with simple factual choices and no blank English story box", () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
     mount(); fireEvent.click(screen.getByRole("button", { name: "Record issue" }));
     expect(screen.getByText("What has a problem?")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Item" })).toBeInTheDocument();
     expect(screen.queryByPlaceholderText(/what happened/i)).not.toBeInTheDocument();
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+    expect(consoleError.mock.calls.flat().join(" ")).not.toContain("cannot be given refs");
+    consoleError.mockRestore();
   });
 });
