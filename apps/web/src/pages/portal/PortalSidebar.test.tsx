@@ -45,7 +45,7 @@ describe("PortalSidebar — role visibility", () => {
     expect(screen.getByText("Purchasing")).toBeInTheDocument();
     // 0226 — operation gets the costing Operation Catalog; Product &
     // Maintenance (selling prices) is principal-only.
-    expect(screen.getByText("Operation Catalog")).toBeInTheDocument();
+    expect(screen.getByText("Catalog")).toBeInTheDocument();
     expect(screen.queryByText("Product & Maintenance")).not.toBeInTheDocument();
     expect(screen.queryByText("AR · Receivables")).not.toBeInTheDocument();
     expect(screen.queryByText("Accounts")).not.toBeInTheDocument();
@@ -65,12 +65,12 @@ describe("PortalSidebar — role visibility", () => {
     renderAt("/operation");
     // All three area groups are visible to the boss.
     expect(screen.getByText("Operations")).toBeInTheDocument();
-    expect(screen.getByText("Finance")).toBeInTheDocument();
+    expect(screen.getAllByText("Finance").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("Admin")).toBeInTheDocument();
     // Active area (operation) is expanded → its items render. Catalog split
     // (2026-07-25): Operations carries ONLY the costing Operation Catalog —
     // the selling Product & Maintenance moved to the (collapsed) Admin area.
-    expect(screen.getByText("Operation Catalog")).toBeInTheDocument();
+    expect(screen.getByText("Catalog")).toBeInTheDocument();
     expect(screen.queryByText("Product & Maintenance")).not.toBeInTheDocument();
     // Inactive areas are collapsed → their items are hidden until clicked.
     expect(screen.queryByText("AR · Receivables")).not.toBeInTheDocument();
@@ -149,8 +149,21 @@ describe("PortalSidebar — catalog split into two doors (2026-07-25)", () => {
   it("operation never sees the selling catalog — only the costing Operation Catalog", () => {
     mockRole = "operation";
     renderAt("/operation?tab=op-catalog");
-    expect(screen.getByText("Operation Catalog")).toBeInTheDocument();
+    expect(screen.getByText("Catalog")).toBeInTheDocument();
     expect(screen.queryByText("Product & Maintenance")).not.toBeInTheDocument();
+  });
+});
+
+describe("PortalSidebar — ERP Shell V1 responsibility groups", () => {
+  it("groups real operation destinations without removing temporary Old Orders access", () => {
+    mockRole = "operation";
+    renderAt("/operation/orders");
+    for (const heading of ["Workspace", "Sales", "Supply Chain", "Finance", "Customer Care", "Master Data"]) {
+      expect(screen.getByText(heading)).toBeInTheDocument();
+    }
+    expect(screen.getByText("Catalog")).toBeInTheDocument();
+    expect(screen.queryByText("Operation Catalog")).not.toBeInTheDocument();
+    expect(screen.getByText("Old Orders (temporary)")).toBeInTheDocument();
   });
 });
 

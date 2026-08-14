@@ -1,8 +1,6 @@
-import { AlertTriangle, ArrowUpRight, Check, CircleDot, FileText } from "lucide-react";
+import { AlertTriangle, ArrowRight, ArrowUpRight, Check, CircleDot } from "lucide-react";
 import { Link } from "react-router-dom";
 import type { SalesOrderRoute as Route, SalesOrderRouteFact } from "@carres/shared";
-import Card from "@/components/kit/Card";
-import Panel from "@/components/kit/Panel";
 
 const stateStyle = {
   complete: "bg-kit-green-3 text-kit-green-11",
@@ -12,100 +10,64 @@ const stateStyle = {
 } as const;
 
 function StateIcon({ fact }: { fact: SalesOrderRouteFact }) {
-  const Icon = fact.state === "attention"
-    ? AlertTriangle
-    : fact.state === "current" ? CircleDot : Check;
-  return (
-    <span className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-pill ${stateStyle[fact.state]}`}>
-      <Icon size={12} aria-hidden="true" />
-    </span>
-  );
+  const Icon = fact.state === "attention" ? AlertTriangle : fact.state === "current" ? CircleDot : Check;
+  return <span className={`grid h-5 w-5 shrink-0 place-items-center rounded-pill ${stateStyle[fact.state]}`}><Icon size={12} aria-hidden="true" /></span>;
 }
 
-function FactRow({ fact }: { fact: SalesOrderRouteFact }) {
-  return (
-    <div className="border-t border-kit-slate-5 py-3 first:border-t-0 first:pt-0 last:pb-0">
-      <div className="flex items-start gap-2">
-        <StateIcon fact={fact} />
-        <div className="min-w-0 flex-1">
-          <div className="text-body font-medium text-kit-slate-12">{fact.title}</div>
-          {fact.detail && <div className="mt-0.5 text-meta text-kit-slate-11">{fact.detail}</div>}
-          {fact.occurredAt && <div className="mt-0.5 text-meta text-kit-slate-9">{fact.occurredAt.slice(0, 10)}</div>}
-          {fact.href && (
-            <Link className="mt-1 inline-flex items-center gap-1 text-label font-medium text-kit-blue-11 hover:underline" to={fact.href}>
-              Open in {fact.owner} <ArrowUpRight size={12} aria-hidden="true" />
-            </Link>
-          )}
-        </div>
-      </div>
-    </div>
+function FactStep({ fact, currentLabel = false }: { fact: SalesOrderRouteFact; currentLabel?: boolean }) {
+  const body = (
+    <>
+      <StateIcon fact={fact} />
+      <span className="min-w-0">
+        <span className="block text-body font-medium text-kit-slate-12">{fact.title}</span>
+        {fact.detail && <span className="block text-meta text-kit-slate-9">{fact.detail}</span>}
+        {currentLabel && fact.state === "current" && <span className="mt-1 inline-block text-label font-semibold tracking-wide text-kit-blue-11">CURRENT</span>}
+      </span>
+    </>
   );
+  return fact.href ? (
+    <Link to={fact.href} aria-label={`${fact.title} · Open in ${fact.owner}`} className="flex min-w-[190px] items-start gap-2 rounded-control px-2 py-2 hover:bg-hovertint">{body}<ArrowUpRight size={12} className="ml-auto mt-1 shrink-0 text-kit-blue-11" /></Link>
+  ) : <div className="flex min-w-[190px] items-start gap-2 px-2 py-2">{body}</div>;
 }
 
 export default function SalesOrderRoute({ route }: { route: Route }) {
+  const goods = route.lanes.find((lane) => lane.key === "goods");
+  const obligations = route.lanes
+    .filter((lane) => lane.key !== "goods")
+    .map((lane) => ({ ...lane, groups: lane.groups.map((group) => ({ ...group, facts: group.facts.filter((fact) => fact.state === "attention" || fact.state === "current") })).filter((group) => group.facts.length > 0) }))
+    .filter((lane) => lane.groups.length > 0);
+  const so = route.documents.find((document) => document.kind === "Sales Order");
+
   return (
-    <div className="flex flex-col gap-4" data-testid="sales-order-route">
-      <Card>
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <div className="text-page text-kit-slate-12">Order Route</div>
-            <p className="mt-1 max-w-3xl text-body text-kit-slate-11">
-              Read-only facts from each owning module. One order may be in several goods positions at once.
-            </p>
-          </div>
-          <div className={`rounded-pill px-3 py-1 text-label font-medium ${route.noActionRequired ? "bg-kit-green-3 text-kit-green-11" : "bg-kit-amber-3 text-kit-amber-11"}`}>
-            {route.noActionRequired
-              ? "No Action Required"
-              : "Open obligations remain in their owning modules."}
-          </div>
-        </div>
-      </Card>
-
-      <Panel title="Document lineage">
-        <div className="flex flex-wrap gap-2">
-          {route.documents.map((document) => (
-            <Link
-              key={document.id}
-              to={document.href}
-              className="inline-flex min-w-[150px] items-center gap-2 rounded-control border border-kit-slate-5 px-3 py-2 hover:bg-hovertint"
-            >
-              <FileText size={15} className="shrink-0 text-kit-slate-9" aria-hidden="true" />
-              <span className="min-w-0">
-                <span className="block text-meta text-kit-slate-9">{document.kind}</span>
-                <span className="block truncate text-body font-medium text-kit-slate-12">{document.number}</span>
-                {document.detail && <span className="block truncate text-meta text-kit-slate-11">{document.detail}</span>}
-              </span>
-            </Link>
-          ))}
-        </div>
-      </Panel>
-
-      <Panel title="Current goods positions">
-        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-          {route.currentPositions.map((position) => (
-            <div key={position} className="rounded-control bg-kit-slate-3 px-3 py-2 text-body text-kit-slate-12">
-              {position}
-            </div>
-          ))}
-        </div>
-      </Panel>
-
-      <div className="grid items-start gap-3 lg:grid-cols-2 2xl:grid-cols-5">
-        {route.lanes.map((lane) => (
-          <div key={lane.key} data-testid={`route-lane-${lane.key}`} id={lane.key === "loan" ? "loan" : undefined}>
-            <Panel title={lane.title}>
-              <div className="flex flex-col gap-4">
-                {lane.groups.map((group) => (
-                  <section key={group.id}>
-                    <h3 className="mb-2 text-label font-semibold text-kit-slate-11">{group.title}</h3>
-                    <div>{group.facts.map((item) => <FactRow key={item.id} fact={item} />)}</div>
-                  </section>
-                ))}
-              </div>
-            </Panel>
-          </div>
-        ))}
+    <div className="mx-auto flex max-w-[1280px] flex-col gap-5" data-testid="sales-order-route">
+      <div className="border-b border-kit-slate-6 pb-3">
+        <h1 className="text-page text-kit-slate-12">Order Route</h1>
+        <p className="mt-1 text-body text-kit-slate-11">Each goods line keeps its own route. Facts remain read-only and open in the module that owns them.</p>
       </div>
+
+      <section className="rounded-card border border-kit-slate-5 bg-white" data-testid="goods-routes">
+        <div className="border-b border-kit-slate-5 px-4 py-3"><h2 className="text-strong text-kit-slate-12">Goods routes</h2></div>
+        <div className="divide-y divide-kit-slate-5">
+          {goods?.groups.map((group) => (
+            <article key={group.id} className="px-4 py-4">
+              <h3 className="mb-3 text-body font-semibold text-kit-slate-12">{group.title}</h3>
+              <div className="flex flex-wrap items-stretch gap-1">
+                {so && <Link to={so.href} className="flex min-w-[145px] items-center gap-2 rounded-control px-2 py-2 text-body font-medium text-kit-blue-11 hover:bg-hovertint">{so.number}</Link>}
+                {group.facts.map((fact) => <div key={fact.id} className="flex items-center"><ArrowRight size={14} className="mx-1 shrink-0 text-kit-slate-9" /><FactStep fact={fact} currentLabel /></div>)}
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="rounded-card border border-kit-slate-5 bg-white">
+        <div className="border-b border-kit-slate-5 px-4 py-3"><h2 className="text-strong text-kit-slate-12">Still owed</h2></div>
+        {obligations.length > 0 ? (
+          <div className="divide-y divide-kit-slate-5">
+            {obligations.map((lane) => <div key={lane.key} className="grid gap-2 px-4 py-3 md:grid-cols-[150px_1fr]"><div className="text-body font-medium text-kit-slate-11">{lane.title}</div><div className="grid gap-1 md:grid-cols-2">{lane.groups.flatMap((group) => group.facts).map((fact) => <FactStep key={fact.id} fact={fact} />)}</div></div>)}
+          </div>
+        ) : <div className="px-4 py-4 text-body text-kit-slate-9">No open obligations.</div>}
+      </section>
     </div>
   );
 }

@@ -28,7 +28,7 @@ const TABS: { key: Panel; label: string; icon: LucideIcon; active: string }[] = 
   // Team FIRST (Jess 2026-07-19: "team put at first, after only calendar").
   { key: "team", label: "Team", icon: Users, active: "bg-success-soft text-success" },
   { key: "calendar", label: "Calendar", icon: CalendarDays, active: "bg-info-soft text-info" },
-  { key: "tasks", label: "Follow-ups", icon: Flag, active: "bg-warning-soft text-warning" },
+  { key: "tasks", label: "My Work", icon: Flag, active: "bg-warning-soft text-warning" },
   // Activity = the open order's history timeline (Jess 2026-06-30: moved off the
   // page into the rail, after the flag). Shows only when an order is open.
   { key: "activity", label: "Activity", icon: ScrollText, active: "bg-base-100 text-base-700" },
@@ -65,7 +65,7 @@ export default function OperationRightRail() {
     <div className="flex h-screen sticky top-0">
       {/* Active panel */}
       {active && (
-        <div className="w-[320px] flex flex-col border-l border-base-200 bg-white">
+        <div className="w-[340px] flex flex-col border-l border-base-200 bg-white">
           <div className="flex items-center justify-between px-3.5 h-12 border-b border-base-100 shrink-0">
             <div className="text-strong text-base-900 flex items-center gap-2">
               {(() => {

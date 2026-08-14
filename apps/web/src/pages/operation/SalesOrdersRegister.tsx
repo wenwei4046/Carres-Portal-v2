@@ -50,7 +50,6 @@ import {
   type DataGridColumn,
   type DataGridContextMenuItem,
 } from "@/components/register/DataGrid";
-import Select from "@/components/kit/Select";
 import Money from "@/components/Money";
 import { apiFetch, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -59,7 +58,7 @@ import type { DoTemplateData, SalesOrderTemplateData } from "@/lib/pdf/types";
 import { useOperationOrders } from "@/lib/queries";
 import CancelSalesOrderDialog from "./CancelSalesOrderDialog";
 import DestinationHeader from "./DestinationHeader";
-import { isDelivered, isRental, lineName, type MoneyState } from "./sales-order-facts";
+import { isRental, lineName, type MoneyState } from "./sales-order-facts";
 import {
   buildRegisterRow,
   defaultOnFor,
@@ -203,7 +202,6 @@ function toGridColumn(
           title={r.phone ? `${r.customer} · ${r.phone}` : r.customer}
         >
           {r.customer}
-          {r.phone ? <span className="text-base-500"> · {r.phone}</span> : null}
         </span>
       ),
       /* The digits ride the search so `0162389…` finds the row however the
@@ -254,7 +252,7 @@ function ExpandedLines({ row }: { row: RegisterRow }) {
     const fromAttrs = typeof line.attrs?.category === "string" ? line.attrs.category : "";
     const fromSku = line.sku.includes(":") ? line.sku.split(":", 1)[0] : "";
     const category = fromAttrs || fromSku || "Other goods";
-    return category.replace(/[_-]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+    return category.replace(/[_-]+/g, " ").toUpperCase();
   };
   const configOf = (line: (typeof lines)[number]) =>
     Object.entries(line.attrs ?? {})
@@ -279,7 +277,7 @@ function ExpandedLines({ row }: { row: RegisterRow }) {
       ))}
       {addons.length > 0 ? (
         <section>
-          <h3 className="text-label font-semibold text-base-500">Add-ons</h3>
+          <h3 className="text-label font-semibold text-base-500">ACCESSORY</h3>
           {addons.map((addon, index) => (
             <div key={index} className="grid grid-cols-[150px_minmax(240px,1fr)_60px] gap-3 py-0.5">
               <span className="font-mono text-meta">{addon.addon_key ?? "Add-on"}</span>
@@ -332,7 +330,6 @@ async function openDeliveryOrderPdf(orderId: string, doNumber: string): Promise<
 export default function SalesOrdersRegister() {
   const navigate = useNavigate();
   const role = useAuth((s) => s.role);
-  const [scope, setScope] = useState<"live" | "all">("live");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   /* FIX 1 — SERVER SEARCH. The engine emits its debounced trimmed term and
      the SAME words go to the API (`?search=`), so a match beyond the loaded
@@ -358,11 +355,8 @@ export default function SalesOrdersRegister() {
      WITHIN it. Newest first — the engine applies its own sort on top when a
      header is clicked. */
   const rows = useMemo(
-    () =>
-      all
-        .filter((r) => scope !== "live" || !isDelivered(r.o))
-        .sort((a, b) => b.ordered.localeCompare(a.ordered)),
-    [all, scope],
+    () => [...all].sort((a, b) => b.ordered.localeCompare(a.ordered)),
+    [all],
   );
 
   /* Role decides the FIRST PAINT only (money hidden for Operations, visible
@@ -495,19 +489,7 @@ export default function SalesOrdersRegister() {
               onToggle: toggleRow,
               onToggleAll: toggleAll,
             }}
-            toolbarStart={
-                <span className="w-36 shrink-0">
-                <Select
-                  id="sales-orders-scope"
-                  value={scope}
-                  onValueChange={(v) => setScope(v as "live" | "all")}
-                  options={[
-                    { value: "live", label: "Not delivered" },
-                    { value: "all", label: "All orders" },
-                  ]}
-                />
-                </span>
-            }
+            outputActions={[{ label: "Print", onClick: () => window.print() }]}
             toolbarEnd={
               /* STAGE 2 — the office birth door. Everyone who can open this
                  page (operation / principal) may use it; normal orders are

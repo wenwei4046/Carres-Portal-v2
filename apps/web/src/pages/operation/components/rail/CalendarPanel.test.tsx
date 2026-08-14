@@ -85,22 +85,22 @@ describe("CalendarPanel — the day comes from the BOOKING, never the promise", 
     h.orders = [order({ so: 1204, delivery_date: TODAY, customer_name: "ella" })];
     render(<CalendarPanel />);
     const today = day(TODAY)!;
-    expect(within(today).getByText("No deliveries booked this day.")).toBeTruthy();
+    expect(within(today).getByText("No dated events this day.")).toBeTruthy();
   });
 
-  it("...but says the promise out loud, with the call that fixes it", () => {
+  it("keeps undated booking work out of Calendar", () => {
     h.orders = [order({ so: 1204, delivery_date: TODAY, customer_name: "ella" })];
     render(<CalendarPanel />);
     const today = day(TODAY)!;
-    expect(within(today).getByText("Promised this day, no date yet")).toBeTruthy();
-    expect(within(today).getByText("Call ella — book delivery date")).toBeTruthy();
+    expect(within(today).queryByText("Promised this day, no date yet")).toBeNull();
+    expect(within(today).queryByText("Call ella — book delivery date")).toBeNull();
   });
 
   it("a booking on a DIFFERENT day than the promise lands on the booked day", () => {
     // The exact drift D1 created: promised today, actually booked tomorrow.
     h.orders = [confirmed(TOMORROW, { so: 1207, delivery_date: TODAY })];
     render(<CalendarPanel />);
-    expect(within(day(TODAY)!).getByText("No deliveries booked this day.")).toBeTruthy();
+    expect(within(day(TODAY)!).getByText("No dated events this day.")).toBeTruthy();
     fireEvent.click(screen.getByText("Tomorrow"));
     expect(within(day(TOMORROW)!).getByText("SO-1207")).toBeTruthy();
   });
@@ -166,21 +166,13 @@ describe("CalendarPanel — Today / Tomorrow / This week", () => {
 
   it("one empty day still answers the question", () => {
     render(<CalendarPanel />);
-    expect(within(day(TODAY)!).getByText("No deliveries booked this day.")).toBeTruthy();
+    expect(within(day(TODAY)!).getByText("No dated events this day.")).toBeTruthy();
   });
 
-  it("a promise never occupies a day on a lens that does not show deliveries", () => {
-    // Send lens + a week whose only content is a promise: the days must not all
-    // vanish into a blank panel with no line explaining why.
+  it("a promise never occupies the dated event calendar", () => {
     h.orders = [order({ so: 1204, delivery_date: TODAY })];
     render(<CalendarPanel />);
     fireEvent.click(screen.getByText("This week"));
-    // R8 — the lens reads the dictionary now (`Issue PO` since P7A), not
-    // the panel's own
-    // shorthand. `getByText("Send")` was an exact match and stops matching; and
-    // the word now appears TWICE once the lens is open, because the tab and the
-    // day section are the same action named once. [0] is the tab.
-    fireEvent.click(screen.getAllByText("Issue PO")[0]);
     expect(screen.getAllByText("Nothing on the books for these days.")).toHaveLength(1);
   });
 });

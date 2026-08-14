@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { COMMITMENT_CHANGE_WORDS } from "@carres/shared";
 import type { SalesOrderRevisionRow } from "@/lib/queries";
 import { fmtDate } from "@/lib/fmt-date";
@@ -13,6 +12,8 @@ export default function SalesOrderLedger({
   viewedRevision,
   onViewRevision,
   onProposeRevision,
+  view: controlledView,
+  onViewChange,
 }: {
   revisions: SalesOrderRevisionRow[];
   history: HistoryEvent[];
@@ -20,8 +21,15 @@ export default function SalesOrderLedger({
   viewedRevision: number | null;
   onViewRevision: (revision: number | null) => void;
   onProposeRevision?: (revision: SalesOrderRevisionRow) => void;
+  view?: "revisions" | "history";
+  onViewChange?: (view: "revisions" | "history") => void;
 }) {
-  const [view, setView] = useState<"revisions" | "history">("revisions");
+  const [internalView, setInternalView] = useState<"revisions" | "history">("revisions");
+  const view = controlledView ?? internalView;
+  const changeView = (next: "revisions" | "history") => {
+    setInternalView(next);
+    onViewChange?.(next);
+  };
   return (
     <div>
       <div role="tablist" aria-label="Sales Order record" className="mb-3 flex gap-1">
@@ -31,7 +39,7 @@ export default function SalesOrderLedger({
             type="button"
             role="tab"
             aria-selected={view === key}
-            onClick={() => setView(key)}
+            onClick={() => changeView(key)}
             className={`rounded-pill px-3 py-1 text-meta font-medium ${view === key ? "bg-base-900 text-white" : "border border-base-200 bg-white text-base-700"}`}
           >
             {key === "revisions" ? "Revisions" : "History"}
@@ -93,3 +101,4 @@ export default function SalesOrderLedger({
     </div>
   );
 }
+import { useState } from "react";

@@ -26,7 +26,7 @@
 // design-standard: not-a-list-page — this is a DOCUMENT workspace. Its
 // tables are the order's own line block: fixed rows, no sort, no selection.
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Pencil, Plus, Printer, Route as RouteIcon, Trash2, X } from "lucide-react";
+import { Pencil, Plus, Printer, Trash2, X } from "lucide-react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import * as pdfjs from "pdfjs-dist";
@@ -400,6 +400,8 @@ function Fact({ label, value }: { label: string; value: React.ReactNode }) {
 }
 
 type Mode = "view" | "edit" | "create" | "oldrev";
+const OBJECT_VIEWS = ["Order", "Revisions", "History", "Order Route"] as const;
+type ObjectView = (typeof OBJECT_VIEWS)[number];
 
 export default function SalesOrderWorkspace() {
   const { orderId } = useParams<{ orderId: string }>();
@@ -413,6 +415,8 @@ export default function SalesOrderWorkspace() {
   const [viewRev, setViewRev] = useState<number | null>(null);
   const [amendmentSeed, setAmendmentSeed] = useState<AmendmentProposal | null>(null);
   const [cancelOpen, setCancelOpen] = useState(false);
+  const [recordView, setRecordView] = useState<"revisions" | "history">("revisions");
+  const [objectView, setObjectView] = useState<ObjectView>(showRoute ? "Order Route" : "Order");
 
   const detailQ = useOperationOrder(isNew ? copyFrom : (orderId ?? null));
   const revisionsQ = useSalesOrderRevisions(isNew ? null : (orderId ?? null));
@@ -451,6 +455,7 @@ export default function SalesOrderWorkspace() {
   /* ── The draft — seeded from the order when EDIT opens, empty for CREATE. ── */
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
   const [draftSeed, setDraftSeed] = useState<string>("");
+  const [dirty, setDirty] = useState(false);
   const order = detailQ.data?.order;
   const detailLines = detailQ.data?.lines ?? [];
   useEffect(() => {
@@ -495,11 +500,13 @@ export default function SalesOrderWorkspace() {
           ...copied,
           lines: copied.lines.map((line) => ({ ...line, key: nextKey() })),
         });
+        setDirty(false);
         setDraftSeed(seed);
         return;
       }
       if (draftSeed !== "new") {
         setDraft({ ...EMPTY_DRAFT, lines: [{ key: nextKey(), sku: "", qty: 1, unit_price: 0 }] });
+        setDirty(false);
         setDraftSeed("new");
       }
       return;
@@ -539,6 +546,7 @@ export default function SalesOrderWorkspace() {
         unit_price: Number(l.unit_price),
       })),
     });
+    setDirty(false);
     setDraftSeed(seed);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isNew, wantsEdit, order, orderId, copyFrom, detailLines, draftSeed]);
@@ -663,15 +671,19 @@ export default function SalesOrderWorkspace() {
     });
   };
 
-  const setField = <K extends keyof Draft>(k: K, v: Draft[K]) =>
+  const setField = <K extends keyof Draft>(k: K, v: Draft[K]) => {
+    setDirty(true);
     setDraft((d) => ({ ...d, [k]: v }));
-  const setLine = (key: string, patch: Partial<DraftLine>) =>
+  };
+  const setLine = (key: string, patch: Partial<DraftLine>) => {
+    setDirty(true);
     setDraft((d) => ({
       ...d,
       lines: d.lines.map((l) => (l.key === key ? { ...l, ...patch } : l)),
     }));
+  };
 
-  const backToRegister = () => navigate("/operation/orders");
+  const confirmDiscard = () => !dirty || window.confirm("Discard unsaved changes?");
   const enterEdit = () =>
     setParams(
       (prev) => {
@@ -682,7 +694,8 @@ export default function SalesOrderWorkspace() {
       { replace: true },
     );
   const cancelEdit = () => {
-    if (isNew) return backToRegister();
+    if (!confirmDiscard()) return;
+    if (isNew) return navigate("/operation/orders");
     setParams(
       (prev) => {
         const next = new URLSearchParams(prev);
@@ -692,6 +705,40 @@ export default function SalesOrderWorkspace() {
       { replace: true },
     );
     setDraftSeed("");
+    setDirty(false);
+  };
+
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty]);
+
+  const openObjectView = (view: ObjectView) => {
+    setObjectView(view);
+    if (view === "Order Route") {
+      setParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.set("route", "1");
+        return next;
+      }, { replace: true });
+      return;
+    }
+    setParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete("route");
+      return next;
+    }, { replace: true });
+    if (view === "Revisions" || view === "History") {
+      setRecordView(view.toLowerCase() as "revisions" | "history");
+      window.setTimeout(() => document.getElementById("sales-order-record")?.scrollIntoView(), 0);
+    } else {
+      window.setTimeout(() => document.getElementById("sales-order-workspace")?.scrollIntoView(), 0);
+    }
   };
 
   /* ── The money the left side states (same arithmetic as the register). ── */
@@ -860,37 +907,6 @@ export default function SalesOrderWorkspace() {
 
   const headerRight = (
     <span className="flex items-center gap-2">
-      {showRoute ? (
-        <Button
-          size="sm"
-          variant="neutral"
-          onClick={() => {
-            setParams((prev) => {
-              const next = new URLSearchParams(prev);
-              next.delete("route");
-              return next;
-            }, { replace: true });
-          }}
-          data-testid="workspace-back-to-order"
-        >
-          <ArrowLeft size={14} /> Back to order
-        </Button>
-      ) : mode === "view" && !isNew ? (
-        <Button
-          size="sm"
-          variant="neutral"
-          onClick={() => {
-            setParams((prev) => {
-              const next = new URLSearchParams(prev);
-              next.set("route", "1");
-              return next;
-            }, { replace: true });
-          }}
-          data-testid="workspace-order-route"
-        >
-          <RouteIcon size={14} /> Order Route
-        </Button>
-      ) : null}
       {mode === "view" && !showRoute && (
         <Button size="sm" variant="neutral" onClick={enterEdit} data-testid="workspace-edit">
           <Pencil size={14} /> Edit
@@ -900,14 +916,12 @@ export default function SalesOrderWorkspace() {
           MASTER's Workspace ruling reads. An order already cancelled has
           nothing left to cancel, so the door is absent rather than refusing. */}
       {mode === "view" && !showRoute && order && order.status !== "cancelled" && (
-        <Button
-          size="sm"
-          variant="neutral"
-          onClick={() => setCancelOpen(true)}
-          data-testid="workspace-cancel-so"
-        >
-          <X size={14} /> Cancel SO
-        </Button>
+        <details className="relative">
+          <summary className="btn-ghost cursor-pointer list-none text-meta">More actions</summary>
+          <div className="absolute right-0 top-full z-20 mt-1 w-40 rounded-control border border-kit-slate-5 bg-white p-1 shadow-lg">
+            <button type="button" onClick={() => setCancelOpen(true)} data-testid="workspace-cancel-so" className="w-full rounded-control px-2 py-1.5 text-left text-meta text-danger hover:bg-hovertint">Cancel SO</button>
+          </div>
+        </details>
       )}
       {(mode === "edit" || mode === "create") && (
         <>
@@ -921,7 +935,7 @@ export default function SalesOrderWorkspace() {
             {mode === "create" ? "Create order" : "Save"}
           </Button>
           <Button size="sm" variant="ghost" onClick={cancelEdit} data-testid="workspace-cancel">
-            <X size={14} /> Cancel
+            <X size={14} /> Discard
           </Button>
         </>
       )}
@@ -951,10 +965,7 @@ export default function SalesOrderWorkspace() {
         }}
         data-testid="workspace-print"
       >
-        <Printer size={14} /> Print PDF
-      </Button>
-      <Button size="sm" variant="ghost" onClick={backToRegister} data-testid="doc-back">
-        <ArrowLeft size={14} /> Back to register
+        <Printer size={14} /> Print ▾
       </Button>
     </span>
   );
@@ -964,8 +975,31 @@ export default function SalesOrderWorkspace() {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <SalesOrderTabs
+        identity={soWord}
+        customer={order?.customer_name}
+        onBack={(event) => {
+          if (!confirmDiscard()) event.preventDefault();
+        }}
         docTitle={isNew ? "New Sales Order — Carres" : order ? `SO-${order.so} — Carres` : undefined}
         right={headerRight}
+        navigation={!isNew ? (
+          <nav aria-label="Sales Order views" className="flex h-full items-stretch gap-1">
+            {OBJECT_VIEWS.map((view) => {
+              const active = objectView === view;
+              return (
+                <button
+                  key={view}
+                  type="button"
+                  onClick={() => openObjectView(view)}
+                  aria-current={active ? "page" : undefined}
+                  className={`relative px-3 text-body ${active ? "font-semibold text-base-900 after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:bg-kit-blue-9" : "text-base-600 hover:text-base-900"}`}
+                >
+                  {view}
+                </button>
+              );
+            })}
+          </nav>
+        ) : null}
       />
 
       {order && (
@@ -1019,32 +1053,26 @@ export default function SalesOrderWorkspace() {
 
           {(isNew && !copyFrom || order) && (
             <div className="flex flex-col gap-3" data-testid="sales-order-workspace">
-              {/* Title strip */}
-              <div className="rounded-card border border-kit-slate-5 bg-white px-4 py-3">
-                <div className="flex items-baseline justify-between gap-3">
-                  <div className="text-page text-base-900" data-testid="doc-so">
-                    {soWord}
-                  </div>
+              {(mode === "oldrev" || mode === "edit" || (mode === "create" && copyFrom)) && (
+                <div className="px-1 py-1 text-meta text-base-600">
                   {mode === "oldrev" && viewedRevision ? (
                     <span className="rounded-pill bg-base-900 px-2 py-0.5 text-label font-semibold text-white">
                       Viewing Rev {viewedRevision.revision} · read-only
                     </span>
                   ) : mode === "edit" ? (
-                    <span className="rounded-pill bg-kit-blue-9 px-2 py-0.5 text-label font-semibold text-white">
-                      Safe correction — customer and delivery facts only
-                    </span>
+                    <span>Editing operational details only. Commercial changes require an amendment.</span>
                   ) : mode === "create" && copyFrom && order ? (
                     <span className="rounded-pill bg-kit-blue-3 px-2 py-0.5 text-label font-semibold text-kit-blue-11">
                       Copied from SO-{order.so} · review before creating
                     </span>
                   ) : null}
                 </div>
+              )}
                 {!isNew && (order?.source_ref ?? []).length > 0 && (
-                  <div className="text-meta text-base-500 mt-1">
+                  <div className="px-1 text-meta text-base-500">
                     Customer reference {(order?.source_ref ?? []).join(" · ")}
                   </div>
                 )}
-              </div>
 
               {/* ① CUSTOMER */}
               <Section title="Customer">
@@ -1058,10 +1086,6 @@ export default function SalesOrderWorkspace() {
                       onChange={(e) => setField("customer_email", e.target.value)} />
                     <Input id="ws-emergency" label="Emergency contact" value={draft.customer_emergency}
                       onChange={(e) => setField("customer_emergency", e.target.value)} />
-                    <div className="col-span-2">
-                      <Input id="ws-address" label="Address" value={draft.customer_address}
-                        onChange={(e) => setField("customer_address", e.target.value)} />
-                    </div>
                     <Input id="ws-line1" label="Address line 1" value={draft.customer_address_line1}
                       onChange={(e) => setField("customer_address_line1", e.target.value)} />
                     <Input id="ws-line2" label="Address line 2" value={draft.customer_address_line2}
@@ -1072,6 +1096,18 @@ export default function SalesOrderWorkspace() {
                       onChange={(e) => setField("customer_address_state", e.target.value)} />
                     <Input id="ws-postcode" label="Postcode" value={draft.customer_address_postcode}
                       onChange={(e) => setField("customer_address_postcode", e.target.value)} />
+                    <div className="col-span-2">
+                      <Fact
+                        label="Address preview"
+                        value={[
+                          draft.customer_address_line1,
+                          draft.customer_address_line2,
+                          draft.customer_address_postcode,
+                          draft.customer_address_city,
+                          draft.customer_address_state,
+                        ].filter(Boolean).join(", ") || "Not given"}
+                      />
+                    </div>
                     <Input id="ws-billing" label="Billing address" value={draft.customer_billing}
                       onChange={(e) => setField("customer_billing", e.target.value)} />
                   </div>
@@ -1319,12 +1355,15 @@ export default function SalesOrderWorkspace() {
               {/* ⑧ REVISIONS / HISTORY — complete versions and event ledger
                   are separate concepts and separate views. */}
               {!isNew && (
+                <div id="sales-order-record">
                 <Section title="Order record">
                   <SalesOrderLedger
                     revisions={revisions}
                     history={detailQ.data?.history ?? []}
                     currentRevision={currentRev}
                     viewedRevision={mode === "oldrev" ? viewRev : null}
+                    view={recordView}
+                    onViewChange={setRecordView}
                     onViewRevision={setViewRev}
                     onProposeRevision={(revision) => {
                       const header = revision.snapshot.header ?? {};
@@ -1344,6 +1383,7 @@ export default function SalesOrderWorkspace() {
                     }}
                   />
                 </Section>
+                </div>
               )}
             </div>
           )}

@@ -106,6 +106,8 @@ export default function OrderEntryPage({ embedded = false }: { embedded?: boolea
   const saveMut = useUpdateOrderEntryConfig();
 
   const [draft, setDraft] = useState<Draft | null>(null);
+  const [editingMethod, setEditingMethod] = useState<number | null>(null);
+  const [editingFields, setEditingFields] = useState(false);
   const [newMethodName, setNewMethodName] = useState("");
   const [newFieldNames, setNewFieldNames] = useState<Record<OrderEntryTab, string>>({
     customer: "",
@@ -217,6 +219,7 @@ export default function OrderEntryPage({ embedded = false }: { embedded?: boolea
         },
       ],
     });
+    setEditingMethod(draft.methods.length);
     setNewMethodName("");
   }
 
@@ -447,6 +450,21 @@ export default function OrderEntryPage({ embedded = false }: { embedded?: boolea
           <div className="border border-base-200 rounded-[4px] divide-y divide-base-100 mb-2">
             {draft.methods.map((m, i) => (
               <div key={m.key} className="px-3 py-2.5">
+                {editingMethod !== i ? (
+                  <div className="grid items-start gap-3 sm:grid-cols-[1fr_auto]">
+                    <div>
+                      <div className="text-body font-medium text-base-900">{m.label}</div>
+                      <div className="mt-0.5 text-meta text-base-600">{m.sublabel || "No checkout label"}</div>
+                      <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-meta text-base-600">
+                        <span>{m.active ? "Active" : "Inactive"}</span>
+                        <span>Approval code required: {m.approvalCodeRequired ? "Yes" : "No"}</span>
+                        {m.followUps.map((field) => <span key={field.key}>{field.label}: {field.options.join(", ")}</span>)}
+                      </div>
+                    </div>
+                    <button type="button" className="btn-ghost text-meta" aria-label={`Edit ${m.label}`} onClick={() => setEditingMethod(i)}>Edit →</button>
+                  </div>
+                ) : (
+                <>
                 <div className="flex items-center gap-2 flex-wrap">
                   <input
                     value={m.label}
@@ -501,7 +519,7 @@ export default function OrderEntryPage({ embedded = false }: { embedded?: boolea
                         value={fu.label}
                         onChange={(e) => updateFollowUp(i, j, { label: e.target.value })}
                         maxLength={60}
-                        placeholder="Follow-up label"
+                        placeholder="Required information label"
                         aria-label={`${m.key} follow-up ${fu.key} label`}
                         className={`${INPUT_CLS} max-w-[160px]`}
                       />
@@ -538,10 +556,16 @@ export default function OrderEntryPage({ embedded = false }: { embedded?: boolea
                       onClick={() => addFollowUp(i)}
                       className="btn-ghost text-meta"
                     >
-                      + Add follow-up
+                      Add required information
                     </button>
                   )}
                 </div>
+                <div className="mt-3 flex justify-end gap-2 border-t border-base-100 pt-3">
+                  <button type="button" className="btn-ghost text-meta" onClick={() => { if (entryConfig) setDraft(initDraft(entryConfig)); setEditingMethod(null); }}>Cancel</button>
+                  <button type="button" className="btn-primary text-meta" onClick={() => { onSave(); setEditingMethod(null); }}>Save changes</button>
+                </div>
+                </>
+                )}
               </div>
             ))}
             {/* 0230 — Stripe is a SYSTEM method (0224): appended to every
@@ -586,10 +610,13 @@ export default function OrderEntryPage({ embedded = false }: { embedded?: boolea
 
           {/* --------------------------------------------------- form fields */}
           <div className="label mb-1.5">Form fields — POS Customer step</div>
-          <p className="text-meta text-base-500 mb-3">
-            Locked fields are the structural spine (order identity / date engine) and
-            always show. Custom fields are stored on the order and shown in the detail.
-          </p>
+          {!editingFields ? (
+            <div className="mb-6 grid items-start gap-3 rounded-[4px] border border-base-200 px-3 py-3 sm:grid-cols-[1fr_auto]">
+              <p className="text-meta text-base-600">Customer, address, emergency and target-date fields · {ORDER_ENTRY_TABS.reduce((count, tab) => count + draft.tabs[tab].custom.length, 0)} custom fields</p>
+              <button type="button" aria-label="Edit Order Entry fields" className="btn-ghost text-meta" onClick={() => setEditingFields(true)}>Edit →</button>
+            </div>
+          ) : <>
+          <p className="text-meta text-base-500 mb-3">Locked fields always show. Custom fields are stored on the order and shown in its detail.</p>
 
           {ORDER_ENTRY_TABS.map((tab) => {
             const t = draft.tabs[tab];
@@ -733,8 +760,8 @@ export default function OrderEntryPage({ embedded = false }: { embedded?: boolea
 
           {/* ---------------------------------------------------------- save */}
           <div className="flex justify-end gap-2 mt-2">
-            <button type="button" onClick={onReset} className="btn-ghost text-meta">
-              Reset
+            <button type="button" onClick={() => { onReset(); setEditingFields(false); }} className="btn-ghost text-meta">
+              Cancel
             </button>
             <button
               type="button"
@@ -742,9 +769,10 @@ export default function OrderEntryPage({ embedded = false }: { embedded?: boolea
               disabled={saveMut.isPending}
               className="btn-primary text-meta disabled:opacity-40"
             >
-              {saveMut.isPending ? "Saving…" : "Save"}
+              {saveMut.isPending ? "Saving…" : "Save changes"}
             </button>
           </div>
+          </>}
         </>
       )}
     </div>

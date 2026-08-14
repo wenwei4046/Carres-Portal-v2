@@ -282,7 +282,7 @@ export default function SalesOrderAttribution({
             onClick={() => setFormOpen(true)}
             data-testid="attribution-open"
           >
-            Change who this order belongs to
+            Request ownership change
           </Button>
         </div>
       )}
@@ -293,7 +293,7 @@ export default function SalesOrderAttribution({
           if (!o) resetForm();
           setFormOpen(o);
         }}
-        title="Change who this order belongs to"
+        title="Request ownership change"
         description="This is sent for approval. The sales order does not change until it is applied."
         footer={
           <span className="flex items-center gap-3 pt-1">
