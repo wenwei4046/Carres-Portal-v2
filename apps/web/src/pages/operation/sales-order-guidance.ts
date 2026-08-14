@@ -19,7 +19,7 @@ export function missingDeliveryDateGuidance(input: {
   const owner = input.salesperson?.trim() || "Sales";
   const phone = input.phone?.trim() || "Phone not recorded";
   return {
-    problem: `SO-${input.so} has no Customer Delivery date`,
+    problem: "No delivery date",
     action: `${owner} · Confirm the date with ${input.customer} · Record the agreed date`,
     why: "The customer delivery commitment is not recorded.",
     owner,

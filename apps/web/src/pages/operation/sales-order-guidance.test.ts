@@ -9,7 +9,7 @@ describe("missingDeliveryDateGuidance", () => {
       salesperson: "Shasha",
       phone: "019-3478913",
     })).toEqual({
-      problem: "SO-1303 has no Customer Delivery date",
+      problem: "No delivery date",
       action: "Shasha · Confirm the date with Kimmy · Record the agreed date",
       why: "The customer delivery commitment is not recorded.",
       owner: "Shasha",

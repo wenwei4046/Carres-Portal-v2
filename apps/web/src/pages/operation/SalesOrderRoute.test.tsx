@@ -54,7 +54,7 @@ describe("SalesOrderRoute", () => {
           title: "Bed · 1",
           facts: [{
             id: "unassigned",
-            title: "Route not yet assigned · 1",
+            title: "Waiting for Purchasing · 1 item",
             detail: null,
             state: "attention",
             owner: "Purchasing",

@@ -46,6 +46,15 @@ export const NOT_GIVEN = "Not given";
 export const NOT_RECORDED = "Not recorded";
 export const NO_DATE_YET = "No delivery date";
 
+export function conciseLocality(city?: string | null, state?: string | null): string {
+  const cleanCity = city?.trim() || "";
+  const cleanState = state?.trim() || "";
+  if (cleanCity && cleanState && cleanCity.localeCompare(cleanState, undefined, { sensitivity: "accent" }) === 0) {
+    return cleanCity;
+  }
+  return [cleanCity, cleanState].filter(Boolean).join(", ") || NOT_GIVEN;
+}
+
 /** One register row: the order, plus every fact already resolved to a string. */
 export interface RegisterRow {
   o: operationOrderListRow;
@@ -79,9 +88,7 @@ export function buildRegisterRow(o: operationOrderListRow): RegisterRow {
     promised: o.delivery_date_tbd ? null : (o.delivery_date ?? null),
     ordered: o.placed_at,
     customerDelivery: o.delivery_date_tbd ? null : (o.delivery_date ?? null),
-    deliveryLocation: [o.customer_address_city, o.customer_address_state]
-      .filter(Boolean)
-      .join(", ") || NOT_GIVEN,
+    deliveryLocation: conciseLocality(o.customer_address_city, o.customer_address_state),
     poNumbers: o.po_numbers ?? [],
     total: valueState(money),
     /* `paid` is never "unpriced" and never "settled": a payment either

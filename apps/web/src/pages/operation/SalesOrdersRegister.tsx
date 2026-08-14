@@ -325,7 +325,7 @@ function ExpandedLines({ row }: { row: RegisterRow }) {
                 <td className="px-3 py-2 font-mono text-meta">{line.sku}</td>
                 <td className="px-3 py-2 tabular-nums">{line.qty}</td>
                 <td className="px-3 py-2"><div className="font-medium text-base-900">{lineName(line)}</div>{configOf(line).length ? <div className="mt-0.5 text-meta text-base-600">{configOf(line).join(" · ")}</div> : null}</td>
-                <td className="px-3 py-2">{fact?.deliverTo.length ? fact.deliverTo.map((d) => <div key={`${d.name}-${d.qty}`}>{d.name} ×{d.qty}</div>) : expansion.isLoading ? "Loading…" : "Not recorded"}</td>
+                <td className="px-3 py-2">{fact?.deliverTo.length ? fact.deliverTo.map((d) => <div key={`${d.name}-${d.qty}`}>{fact.deliverTo.length > 1 ? `${d.name} ×${d.qty}` : d.name}</div>) : expansion.isLoading ? "Loading…" : "Not recorded"}</td>
               </tr>;
             })}
             {addons.map((addon, index) => <tr key={`addon-${index}`} className="align-top">
