@@ -204,13 +204,32 @@ Never collapse these identities:
 
 | Identity | Question |
 |---|---|
-| **Fault Owner** | Who or which party caused it? |
+| **Fault Owners** | Which one or more parties caused or contributed to it? |
 | **Action Owner** | Who must solve it now? |
 | **Cost Bearer** | Who should ultimately pay? |
 | **Service Provider** | Who performed the extra work? |
 
+**Fault Owners are one-to-many.** One Issue may name several internal/external parties when the
+evidence proves several contributing failures. Never force one primary party merely to make the
+register tidy. Each Fault Owner entry carries:
+
+- governed party/person/team identity;
+- confirmed fault · contributing fault · not yet confirmed;
+- the exact act/omission attributed to that party;
+- supporting evidence;
+- reviewer and reviewed date;
+- party/staff response;
+- append-only revision history.
+
+Example: Hookka supplied the wrong item; Operations did not check the label; TSDD delivered it.
+These are three separate Fault Owner findings on one incident, not three duplicate Issues.
+
 Each external Fault Owner resolves to one governed Related Party master. `Hookka`, `Supplier-Hookka`
 and spelling variants cannot split the monthly record.
+
+Do not require a blame percentage. Use a percentage only when an authorised commercial agreement
+actually allocates liability. Fault contribution and money liability remain separate: the Issue may
+have three Fault Owners but only one or two Cost Bearers.
 
 The append-only timeline preserves observed fact, evidence, external reply, linked module events,
 staff response, attribution/revision, Work, money links, review, learning, close/reopen/merge/split/
@@ -219,7 +238,7 @@ void. Corrections append what changed and what they supersede.
 Accountability review answers:
 
 - what was observed and what authoritative records prove;
-- who/which party caused it and what evidence supports that finding;
+- which one or more parties caused/contributed and what evidence supports each finding;
 - who performed extra work;
 - what cost arose and who should bear it;
 - whether this repeats another Issue;
@@ -278,6 +297,10 @@ For every supplier, Logistics company, warehouse or other Related Party, the sys
 monthly evidence report. It exists so Carres, Finance and the party use the same facts instead of
 arguing from WhatsApp memory.
 
+An Issue with several Fault Owners appears in every applicable Related Party report, showing only
+that party's attributed act/omission plus the common incident facts. The Issue count is a distinct
+Issue count within each party report. Company-wide totals count the Issue once.
+
 Header:
 
 - Related Party · month · report version/generated date · Carres contact;
@@ -293,7 +316,8 @@ Every Issue row includes:
 5. evidence list;
 6. customer/operational consequence;
 7. action/result;
-8. incurred/recoverable/recovered amounts;
+8. incurred/recoverable/recovered amounts allocated to this party, plus common incident cost for
+   context where permitted;
 9. party response/date;
 10. current required result.
 
@@ -301,11 +325,15 @@ Confirmed, awaiting response and disputed Issues are separate report sections. A
 enters confirmed totals. Disagreement never deletes evidence: preserve Carres finding, evidence
 sent/date, party response/date and final reviewed outcome.
 
+Never duplicate money merely because an Issue has several Fault Owners. Cost incurred is counted
+once at Issue/company level. Recoverable and recovered amounts are assigned to the relevant Cost
+Bearer(s); the sum across party reports must reconcile to the Issue totals.
+
 Staff do not rewrite a monthly narrative. An authorised owner checks the generated report,
 recipient and attachments before sending. The system records exact version, recipient, channel,
 sent date and evidence. External sending remains separately authorised; planning never sends it.
 
-Finance receives the corresponding permissioned view grouped by party Carres paid, Fault Owner,
+Finance receives the corresponding permissioned view grouped by party Carres paid, Fault Owners,
 Cost Bearer, incurred, recoverable, recovered, outstanding recovery, Finance link and missing
 Finance action.
 
@@ -335,7 +363,7 @@ Issue.
 Issue Tracker is a **WORKSPACE** destination beside Work, because it crosses every module. Use the
 governed Register, Object Detail, Work Toolbar, central Settings and Carres UI/copy authority.
 
-Register default columns: Issue No. · Observed · Issue · Linked object · Fault Owner · current
+Register default columns: Issue No. · Observed · Issue · Linked object · Fault Owners · current
 complete action · money consequence · review state.
 
 Saved views: All Issues · Needs triage · Wednesday review · Internal issues · Waiting staff response
@@ -379,4 +407,3 @@ section remarks and follow-up boxes require staff to know the process and write 
 - Issue Tracker owns accountability, costs, Related Party reporting and learning.
 - Retire Service Note as a new standalone master workflow after governed transition; do not delete
   history or force every old SN into a fabricated complete Issue.
-
