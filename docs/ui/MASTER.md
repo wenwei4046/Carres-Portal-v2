@@ -80,44 +80,30 @@ may and should identify and recommend a materially useful missing capability. Th
 must explain its operator value, check Carres business architecture and locked constraints, and
 remain a proposal until Jess approves it. Reference products inform; they are never copied blindly.
 
-**OWNER-APPROVED OBJECT / DOMAIN ARCHITECTURE COMPLETENESS + RESTART CONTRACT — APPROVED / LOCKED (Jess,
-2026-08-12).** Jess owns business decisions and final approval. The Plan chat owns the mission
-boundary, completeness of research, dependency discovery, sequencing and the proposed plan. Jess is
-not expected to know or enumerate what must be studied next, when planning is complete, what can
-build or what comes next. A new or restarted Plan/Design chat therefore automatically:
+**ERP PLAN CHAT START PROTOCOL + UI EXTENSION — APPROVED / LOCKED (Jess, 2026-08-13 / 2026-08-14).** Every new
+or restarted Plan/Design chat first completes the Constitution's **ERP PLAN CHAT START PROTOCOL**,
+including its authority read, four-way resolution pass, whole-domain audit, complete recommended
+module Blueprint and owner decision gate. This MASTER does not duplicate that global law. For a UI surface, the required
+whole-domain audit additionally includes this MASTER's UI Dictionary/IA preflight, eight-lens
+review, reference-to-Carres capability matrix and completion gate below.
 
-1. preserves approved business/capability truth and only placement/presentation explicitly locked
-   by an authoritative MASTER;
-2. establishes current Carres capability, repository/task evidence and the locked constraints;
-3. identifies unruled presentation, missing capabilities, dependencies, cross-module/future
-   consequences, terminology/IA conflicts, duplicate destinations and scalability risks;
-4. applies the Constitution's object/domain lifecycle and ERP consequence pass before naming a
-   local UI question as the next unresolved decision, then mines the relevant reference object's
-   backend/workflow/capability surface rather than only screenshots or the feature Jess named;
-5. continuously maintains **CURRENT MISSION · SETTLED / LOCKED · GENUINELY UNRESOLVED ·
-   IMPLEMENTATION WORK · RECOMMENDED NEXT STEP**;
-6. maintains the proposed backlog/roadmap and dependency order;
-7. performs the completion gate below before recommending implementation or declaring the surface
-   complete; and
-8. proactively manages the `READY FOR CARD`, `PLAN MISSION COMPLETE` and `START A NEW CHAT`
-   boundaries below.
-
-It must not infer either “keep this exact UI” from an existing capability or “do not propose it”
-from repository absence. It must not ask Jess what to inspect next when repository/task evidence
-can decide. It must surface important unresolved matters Jess did not ask about and ask her only
-for genuine business decisions or final approval.
+The chat must not infer either “keep this exact UI” from an existing capability or “do not propose
+it” from repository absence. It continuously maintains **CURRENT MISSION · RESOLVED FROM AUTHORITY ·
+APPROVED TARGET / NOT BUILT · BUILT / VERIFIED · REAL GAP / CONTRADICTION · RECOMMENDED NEXT STEP**.
+It surfaces important unresolved matters Jess did not ask about, but asks her only for a genuine
+business decision that passes the Constitution's owner decision gate.
 
 This object/domain pass does not replace UI preflight. UI Dictionary/IA comes first; Carres
 semantics and ownership outrank external references; and actionable copy remains **WHO + ACTION +
 OBJECT + actual working day/date**. The pass is a completeness check, not permission to build every
 capability or to write UI/application code in Plan mode.
 
-**OFFICIAL CARD NUMBERS ARE GOVERNANCE; PLANNING IS THE CHAT'S JOB.** The planner never invents an
-official Card number or status. It still maintains a clearly labelled **PROPOSED ROADMAP / BACKLOG /
-DEPENDENCY ORDER** for approved and discovered remaining work, including what can build directly,
-what first needs Plan/Design, what already has an engine and what has a real gap. A proposed,
-unnumbered build slice may be sequenced and declared ready; official numbering/status appears only
-after governance/owner approval.
+**OFFICIAL CARD NUMBERS ARE GOVERNANCE; BLUEPRINT PRECEDES IMPLEMENTATION PLANNING.** The planner
+never invents an official Card number or status. The whole-domain audit is evidence, not a roadmap.
+Only after the complete recommended module Blueprint is presented, owner-reviewed/approved and
+persisted to the authoritative module MASTER may the planner derive a **PROPOSED ROADMAP / BACKLOG /
+DEPENDENCY ORDER** and declare proposed unnumbered build slices ready. Official numbering/status
+appears only after governance/owner approval.
 
 **UI ARCHITECT RESPONSIBILITY + DICTIONARY / IA PREFLIGHT — APPROVED / LOCKED (Jess,
 2026-08-11).** A new or restarted Plan/Design chat is not merely repository police or a visual
@@ -230,11 +216,13 @@ means research continues; Jess is not asked to supply the missing checklist.
 | Mature/international benchmark | scoped finding where useful, or why it cannot materially help |
 | Gap analysis | missing, duplicate, misplaced or deliberately rejected capability |
 | Cross-module/future consequences | downstream inheritors, scalability and consistency risks |
-| Dependencies and sequencing | prerequisites plus proposed roadmap/backlog/dependency order |
+| Blueprint synthesis | complete recommended operating model, operator journeys, UI/page/object placement and intentional rejects |
+| Dependencies | prerequisites and constraints; implementation sequencing waits until Blueprint approval and persistence |
 
-Only after this gate does the chat ask Jess for the remaining genuine owner decision. Approved
-complete decisions are persisted immediately under the Constitution's Plan Decision Persistence
-law. Continuous production-build governance remains §1.1 and is not part of this Plan gate.
+Only after this gate does the chat present the complete Blueprint and ask Jess for any remaining
+genuine owner decision or correction. Approved complete truth is persisted immediately under the
+Constitution's Plan Decision Persistence law. Continuous production-build governance remains §1.1
+and is not part of this Plan gate.
 
 ### MISSION / CARD / CHAT BOUNDARIES — APPROVED / LOCKED (Jess, 2026-08-12)
 
@@ -242,15 +230,19 @@ law. Continuous production-build governance remains §1.1 and is not part of thi
 a coherent implementation scope is ready, what comes next, or whether a fresh chat is advisable.
 The maintained mission state above and these transitions are part of every Plan/Design restart:
 
-1. **`READY FOR CARD — <scope>`.** State this proactively when a coherent capability or
+1. **`READY FOR CARD — <scope>`.** Never state or invent this, Phase 1, roadmap or implementation
+   sequencing before the complete recommended module Blueprint has been presented, owner-reviewed/
+   approved, persisted to the authoritative module MASTER and declared **`PLAN MISSION COMPLETE`**.
+   Then state it proactively only when a coherent capability or
    implementation slice has sufficient approved business truth, UI/interaction truth where
    relevant, ownership, dependencies and an acceptance boundary, and no unresolved owner decision
    blocks safe build. Recommend the dependency/build order. Do not invent an official Card number
    merely because the scope is ready. Do not keep solving application implementation detail in Plan
    mode after this boundary, and do not hand unresolved business/UI truth to build just to move.
-2. **`PLAN MISSION COMPLETE`.** State this proactively when every decision required for the current
-   mission is resolved. Summarise **LOCKED truth · ready implementation scopes/Cards ·
-   dependency/build order · intentionally deferred items · exact recommended next action.** Do not
+2. **`PLAN MISSION COMPLETE`.** State this proactively when the complete Blueprint is owner-reviewed/
+   approved and final truth is persisted. Summarise **LOCKED operating model · intentional rejects/
+   deferred items · exact recommended next action.** Derive Cards and dependency/build order only
+   after this state. Do not
    wait for Jess to ask *“what next?”*
 3. **`START A NEW CHAT`.** Recommend this when the mission is complete and the next work is a
    materially different planning domain, or unrelated accumulated context creates a real confusion
@@ -345,8 +337,9 @@ DetailShell · DialogFrame · FieldFrame · GridToolbar · SectionHeader
 # §5 · The right rail
 
 ### MISSION
-Four widgets on the right of **every** main panel — **Calendar · Team · Tasks · Activity** —
-so a COO can supervise and every operator knows what everyone is doing without asking.
+Four quick-peek surfaces on the right of the ERP shell — **Team · Calendar · My Work · Activity** —
+answer **who · when · what I must do · what just happened** without leaving the current object.
+They are not duplicate modules and never become a second home for business truth.
 
 ### WHAT IS ON SCREEN TODAY
 `apps/web/src/pages/operation/components/rail/` — `CalendarPanel` · `TeamPanel` · `KeepPanel` ·
@@ -356,9 +349,24 @@ line.***
 ### FROZEN RULES
 - **No widget is an island.** Widgets interlink with each other AND with the LEFT panel; an
   action anywhere cascades to the relevant widgets.
-- **The rail is 200px and it is navigation**, never a second place to act.
+- **The rail is quick peek, not navigation truth and not a second place to act.** A row may
+  deep-link to the authoritative object/action. The owning module remains the writer.
+- **`My Work` in the rail is a preview of the formal `Work` destination.** The full destination
+  owns the `My Work · Team Work` views over one work set; the rail may not create another work set.
+- **Team** previews availability/coverage and open/overdue workload; People/HR remains the owner.
+- **Activity** previews recent append-only events and links to their objects; it does not replace
+  an object's History or a module audit surface.
 - **The calendar's day comes from the BOOKING, through the one shared rule** — never from the
   promised date, or two surfaces put one order on two days.
+
+### ERP SHELL V1 — OWNER RULING 2026-08-13
+
+- The left navigation is grouped by responsibility using the destination grammar in
+  `../ERP-ARCHITECTURE.md` §2.1. It is not one flat list.
+- `Work` is a formal destination with `My Work` and `Team Work`; the Quick Rail is only its peek.
+- There is one central `Settings` destination with module deep-links. Module shortcuts enter that
+  destination and do not manufacture `Sales Settings`, `SO Maintenance` or similar sidebar homes.
+- `Old Orders` is temporary cutover infrastructure and must retire; it is not ERP Shell V1.
 
 # §6 · The measured debt
 
@@ -646,6 +654,56 @@ horizontal overflow.
 is not started. It does not block continuation of the ERP UI migration unless measured real
 production scale or performance proves otherwise. The Sales Order Workspace and Old Orders
 execution surface are unchanged.
+
+## §6.6 · SALES ORDERS REGISTER CLOSEOUT — owner ruling 2026-08-13
+
+This page-scoped ruling overwrites the conflicting Sales Orders composition/defaults in §6.4–6.5;
+those sections remain the measured Stage A implementation record and generic research evidence.
+
+```
+compact destination header / work toolbar
+
+breathing gap
+
+┌─ light bordered Register ──────────────────────────────────────────────┐
+│ ▸ | SO No | Ordered | Customer Delivery | Customer | Delivery         │
+│   | Location | PO No | DO No                                          │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+- Sales Orders is a truth Register, not Work and not a dashboard. No KPI-card preamble, no
+  borderless Linear-style continuous slab, and no giant card around the page.
+- The seven business columns above are the governed default and exact order. `▸` is chrome.
+  There is no overall `Current`/status column. Content sets predetermined usable widths; staff do
+  not resize to repair the default. Optional columns may cause grid-owned horizontal overflow and
+  may not squeeze the default set.
+- Expansion is goods-only: compact indented category groups, with SKU, description/configuration
+  and quantity. It is not another filterable table and carries no repeated category or unruled
+  operational/PO state.
+- Keep the proven Search, typed filters, Columns, Export and right-click document interaction.
+  Selection may scope Export; it may not introduce register-owned execution. Direct SO/PO/DO
+  numbers are links to their owner. Only explicit `Edit` opens the formal edit context; View,
+  Preview and Print remain non-edit.
+- The detail object presents Current/Order truth, Revisions, History, the actual PDF/document and
+  Order Route. Revisions (complete versions) and History (events) are separate. Order Route is a
+  read-only, fact-derived, multi-position route/obligation map — never a manual checklist or
+  single overall status.
+- **OBJECT HEADER TEMPLATE — OWNER-APPROVED / LOCKED (2026-08-14).** An ERP object has one owning-
+  Register back destination, one persistent identity (`number · party`), governed actions at the
+  right, and applicable object views directly below/alongside that identity. View and Edit retain
+  the same context. Duplicate singular/plural pseudo-tabs and second `Back to order/register`
+  controls are forbidden. Output actions such as `Print ▾` remain distinct from Edit; rare or
+  destructive actions live in overflow. The grammar is shared by SO, PO, GRN and other governed
+  objects, with only the tabs that apply to that object.
+- **SETTINGS TEMPLATE — OWNER-APPROVED / LOCKED (2026-08-14).** One central Settings Workspace owns
+  permission-filtered module destinations that actually exist. A module settings surface renders
+  plain-language groups, readable summary rows/cards and an explicit focused Edit context; raw
+  config fields, Save/Cancel controls and database-like keys are not the default view. Future
+  Purchasing, Warehouse and Delivery settings inherit the grammar without creating empty pages or
+  duplicate top-level settings homes.
+- `docs/orders/MASTER.md` §0.1 owns the business/field/amendment/permission rules. Sales Portal/POS
+  remains the master form contract; UI composition may not create a second commercial form or an
+  operational action door.
 
 # §7 · Approved Evolution
 

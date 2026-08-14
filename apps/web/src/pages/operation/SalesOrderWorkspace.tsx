@@ -1,6 +1,6 @@
 /**
- * SalesOrderWorkspace — STAGE 2 (BUILD-QUEUE): EDIT / CREATE + THE REVISION
- * ENGINE, on the frozen skeleton.
+ * SalesOrderWorkspace — the governed Sales Order detail and safe-correction
+ * workspace. Commercial changes leave through Amendment, never this form.
  *
  * ─────────────────────────────────────────────────────────────────────────────
  * ⭐ ONE LAYOUT, FOUR STATES, NO FIFTH (the card's own drawing)
@@ -20,20 +20,26 @@
  * those bytes (VIEWER ONLY — never a second renderer) and Print opens the
  * SAME blob. The previous blob URL is revoked on every render.
  *
- * EVERY WRITE MINTS A REVISION (0327): Save calls ONE RPC that whitelists the
- * header, diffs the lines and mints Rev N+1 — Rev 1 = the original, minted
- * from the pre-edit state. Stage 2 has NO approval UI: every change is
- * Class B. No downstream module is written, at all.
+ * Every safe correction calls one RPC and mints Rev N+1. Items and the
+ * promised delivery date stay read-only here; they are contractual facts.
  */
 // design-standard: not-a-list-page — this is a DOCUMENT workspace. Its
 // tables are the order's own line block: fixed rows, no sort, no selection.
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Pencil, Plus, Printer, Trash2, X } from "lucide-react";
+import { Pencil, Plus, Printer, Trash2, X } from "lucide-react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import * as pdfjs from "pdfjs-dist";
 import { toast } from "sonner";
-import { orderMoney } from "@carres/shared";
+import {
+  deliveryReasonLabel,
+  orderMoney,
+  poReceivingProgress,
+  receivingRecordNo,
+  resolveSalesOrderRoute,
+  warehouseReceiptStatusLabel,
+  type SalesOrderRoute as SalesOrderRouteModel,
+} from "@carres/shared";
 import Button from "@/components/kit/Button";
 import Checkbox from "@/components/kit/Checkbox";
 import DatePicker from "@/components/kit/DatePicker";
@@ -54,19 +60,22 @@ import {
   useOrderCorrectionWork,
   useOutlets,
   useSalesOrderRevisions,
+  useSalesOrderRouteFacts,
   useSalespersons,
   useSaveSalesOrderRevision,
   type SalesOrderRevisionRow,
   type SalesOrderSnapshot,
+  type AmendmentProposal,
 } from "@/lib/queries";
-import { COMMITMENT_CHANGE_WORDS } from "@carres/shared";
-import { Modal, ModalActions } from "./components/Modal";
+import CancelSalesOrderDialog from "./CancelSalesOrderDialog";
 import CorrectionWorkList from "./CorrectionWorkList";
 import SalesOrderAmendment from "./SalesOrderAmendment";
 import SalesOrderAttribution from "./SalesOrderAttribution";
+import SalesOrderLedger from "./SalesOrderLedger";
+import SalesOrderRoute from "./SalesOrderRoute";
 import SalesOrderTabs from "./SalesOrderTabs";
-import { describeRevisionChanges } from "./sales-order-revisions";
 import { lineName } from "./sales-order-facts";
+import { copySalesOrderDraft } from "./sales-order-copy";
 
 /* pdf.js worker ships inside the package — nothing fetched from a CDN. */
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
@@ -391,6 +400,8 @@ function Fact({ label, value }: { label: string; value: React.ReactNode }) {
 }
 
 type Mode = "view" | "edit" | "create" | "oldrev";
+const OBJECT_VIEWS = ["Order", "Revisions", "History", "Order Route"] as const;
+type ObjectView = (typeof OBJECT_VIEWS)[number];
 
 export default function SalesOrderWorkspace() {
   const { orderId } = useParams<{ orderId: string }>();
@@ -399,14 +410,25 @@ export default function SalesOrderWorkspace() {
   const [params, setParams] = useSearchParams();
   const isNew = location.pathname.endsWith("/so/new");
   const wantsEdit = params.get("edit") === "1";
+  const showRoute = params.get("route") === "1" && !isNew;
+  const copyFrom = isNew ? params.get("copyFrom") : null;
   const [viewRev, setViewRev] = useState<number | null>(null);
+  const [amendmentSeed, setAmendmentSeed] = useState<AmendmentProposal | null>(null);
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [recordView, setRecordView] = useState<"revisions" | "history">("revisions");
+  const [objectView, setObjectView] = useState<ObjectView>(showRoute ? "Order Route" : "Order");
 
-  const detailQ = useOperationOrder(isNew ? null : (orderId ?? null));
+  const detailQ = useOperationOrder(isNew ? copyFrom : (orderId ?? null));
   const revisionsQ = useSalesOrderRevisions(isNew ? null : (orderId ?? null));
   /* 3.4 · what this sales order's changes have raised for other modules. The
    * workspace SHOWS it and cannot close it — the module that raised the work
    * does not tick it off. */
   const correctionWorkQ = useOrderCorrectionWork(isNew ? null : (orderId ?? null));
+  const routeFactsQ = useSalesOrderRouteFacts(
+    isNew ? null : (orderId ?? null),
+    showRoute,
+    (detailQ.data?.pos ?? []).map((po) => po.id),
+  );
   const baseQ = useQuery({
     queryKey: ["orders", "sales-order-data", orderId ?? "new"],
     queryFn: () =>
@@ -433,12 +455,58 @@ export default function SalesOrderWorkspace() {
   /* ── The draft — seeded from the order when EDIT opens, empty for CREATE. ── */
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
   const [draftSeed, setDraftSeed] = useState<string>("");
+  const [dirty, setDirty] = useState(false);
   const order = detailQ.data?.order;
   const detailLines = detailQ.data?.lines ?? [];
   useEffect(() => {
     if (isNew) {
+      if (copyFrom) {
+        const seed = `copy:${copyFrom}`;
+        if (!order || draftSeed === seed) return;
+        const copied = copySalesOrderDraft({
+          order: {
+            id: order.id,
+            so: order.so,
+            customer_name: order.customer_name,
+            customer_phone: order.customer_phone,
+            customer_email: (order as { customer_email?: string | null }).customer_email,
+            customer_address: order.customer_address,
+            customer_address_line1:
+              (order as { customer_address_line1?: string | null }).customer_address_line1,
+            customer_address_line2:
+              (order as { customer_address_line2?: string | null }).customer_address_line2,
+            customer_address_city:
+              (order as { customer_address_city?: string | null }).customer_address_city,
+            customer_address_state:
+              (order as { customer_address_state?: string | null }).customer_address_state,
+            customer_address_postcode:
+              (order as { customer_address_postcode?: string | null }).customer_address_postcode,
+            customer_emergency: order.customer_emergency,
+            customer_billing: order.customer_billing,
+            dealer_id: order.dealer_id,
+            outlet_id: order.outlet_id,
+            salesperson_id: order.salesperson_id,
+            delivery_floor: (order as { delivery_floor?: number }).delivery_floor,
+            delivery_has_lift: (order as { delivery_has_lift?: boolean }).delivery_has_lift,
+          },
+          lines: detailLines.map((line) => ({
+            id: line.id,
+            sku: line.sku,
+            qty: line.qty,
+            unit_price: line.unit_price,
+          })),
+        });
+        setDraft({
+          ...copied,
+          lines: copied.lines.map((line) => ({ ...line, key: nextKey() })),
+        });
+        setDirty(false);
+        setDraftSeed(seed);
+        return;
+      }
       if (draftSeed !== "new") {
         setDraft({ ...EMPTY_DRAFT, lines: [{ key: nextKey(), sku: "", qty: 1, unit_price: 0 }] });
+        setDirty(false);
         setDraftSeed("new");
       }
       return;
@@ -478,9 +546,10 @@ export default function SalesOrderWorkspace() {
         unit_price: Number(l.unit_price),
       })),
     });
+    setDirty(false);
     setDraftSeed(seed);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isNew, wantsEdit, order, orderId, draftSeed]);
+  }, [isNew, wantsEdit, order, orderId, copyFrom, detailLines, draftSeed]);
 
   const mode: Mode = isNew ? "create" : viewRev != null ? "oldrev" : wantsEdit ? "edit" : "view";
 
@@ -488,6 +557,14 @@ export default function SalesOrderWorkspace() {
   const currentRev = revisions.length > 0 ? revisions[revisions.length - 1]!.revision : null;
   const viewedRevision: SalesOrderRevisionRow | null =
     viewRev != null ? (revisions.find((r) => r.revision === viewRev) ?? null) : null;
+
+  /* Revision links in Order Route are durable URLs, not local-only buttons. */
+  useEffect(() => {
+    const raw = params.get("revision");
+    if (!raw) return;
+    const revision = Number(raw);
+    if (Number.isInteger(revision) && revision > 0) setViewRev(revision);
+  }, [params]);
 
   /* ── ONE template-data value per mode; the draft path debounces 300ms. ── */
   const base = baseQ.data ?? null;
@@ -530,7 +607,7 @@ export default function SalesOrderWorkspace() {
     onError: (e) => toast.error(e.message),
   });
 
-  const draftHeaderPayload = (): Record<string, unknown> => ({
+  const safeCorrectionPayload = (): Record<string, unknown> => ({
     customer_name: draft.customer_name.trim(),
     customer_phone: draft.customer_phone.trim() || null,
     customer_email: draft.customer_email.trim() || null,
@@ -542,11 +619,15 @@ export default function SalesOrderWorkspace() {
     customer_address_postcode: draft.customer_address_postcode.trim() || null,
     customer_emergency: draft.customer_emergency.trim() || null,
     customer_billing: draft.customer_billing.trim() || null,
-    delivery_date: draft.delivery_date,
-    delivery_date_tbd: draft.delivery_date_tbd,
     proceed_date: draft.proceed_date,
     delivery_floor: draft.delivery_floor,
     delivery_has_lift: draft.delivery_has_lift,
+  });
+
+  const createHeaderPayload = (): Record<string, unknown> => ({
+    ...safeCorrectionPayload(),
+    delivery_date: draft.delivery_date,
+    delivery_date_tbd: draft.delivery_date_tbd,
   });
 
   const draftLinesPayload = () =>
@@ -570,60 +651,10 @@ export default function SalesOrderWorkspace() {
     return null;
   };
 
-  /* ── CARD 1 · a contractual save states its cause. ────────────────────────
-   * A save that moves the ITEMS or the PROMISED DATE must say who asked:
-   * Staff correction (the record was wrong — the customer's agreement never
-   * changed) or Customer change (the customer asked for something
-   * different). The RPC (0340) refuses a contractual save without it; this
-   * chooser is the structured entrance. Contact/address-only fixes pass
-   * straight through — the server records them as staff corrections. */
-  const [changeAsk, setChangeAsk] = useState<null | {
-    header: Record<string, unknown>;
-    lines: ReturnType<typeof draftLinesPayload>;
-  }>(null);
-  const [changeType, setChangeType] = useState<"staff_correction" | "customer_change" | null>(
-    null,
-  );
-  const [changeNote, setChangeNote] = useState("");
-
-  const contractualChanged = (): boolean => {
-    if (!order) return false;
-    if ((draft.delivery_date ?? null) !== (order.delivery_date ?? null)) return true;
-    if (Boolean(draft.delivery_date_tbd) !== Boolean(order.delivery_date_tbd)) return true;
-    const next = draftLinesPayload();
-    const prev = detailLines;
-    if (next.length !== prev.length) return true;
-    const prevById = new Map(prev.map((l) => [l.id, l]));
-    for (const l of next) {
-      if (!l.id) return true; // an added line
-      const p = prevById.get(l.id);
-      if (!p) return true;
-      if (p.sku !== l.sku || Number(p.qty) !== Number(l.qty)) return true;
-      if (Number(p.unit_price) !== Number(l.unit_price)) return true;
-    }
-    return false;
-  };
-
   const onSave = () => {
     const err = validateDraft(false);
     if (err) return void toast.error(err);
-    const payload = { header: draftHeaderPayload(), lines: draftLinesPayload() };
-    if (contractualChanged()) {
-      setChangeType(null);
-      setChangeNote("");
-      setChangeAsk(payload);
-      return;
-    }
-    saveMut.mutate(payload);
-  };
-
-  const onConfirmChange = () => {
-    if (!changeAsk || !changeType) return;
-    saveMut.mutate({
-      ...changeAsk,
-      change: { type: changeType, ...(changeNote.trim() ? { note: changeNote.trim() } : {}) },
-    });
-    setChangeAsk(null);
+    saveMut.mutate({ header: safeCorrectionPayload() });
   };
   const onCreate = () => {
     const err = validateDraft(true);
@@ -631,7 +662,7 @@ export default function SalesOrderWorkspace() {
     /* A BIRTH names the parties — only the EDIT door lost them to 0329. */
     createMut.mutate({
       header: {
-        ...draftHeaderPayload(),
+        ...createHeaderPayload(),
         dealer_id: draft.dealer_id,
         salesperson_id: draft.salesperson_id,
         outlet_id: draft.outlet_id,
@@ -640,15 +671,19 @@ export default function SalesOrderWorkspace() {
     });
   };
 
-  const setField = <K extends keyof Draft>(k: K, v: Draft[K]) =>
+  const setField = <K extends keyof Draft>(k: K, v: Draft[K]) => {
+    setDirty(true);
     setDraft((d) => ({ ...d, [k]: v }));
-  const setLine = (key: string, patch: Partial<DraftLine>) =>
+  };
+  const setLine = (key: string, patch: Partial<DraftLine>) => {
+    setDirty(true);
     setDraft((d) => ({
       ...d,
       lines: d.lines.map((l) => (l.key === key ? { ...l, ...patch } : l)),
     }));
+  };
 
-  const backToRegister = () => navigate("/operation/orders");
+  const confirmDiscard = () => !dirty || window.confirm("Discard unsaved changes?");
   const enterEdit = () =>
     setParams(
       (prev) => {
@@ -659,7 +694,8 @@ export default function SalesOrderWorkspace() {
       { replace: true },
     );
   const cancelEdit = () => {
-    if (isNew) return backToRegister();
+    if (!confirmDiscard()) return;
+    if (isNew) return navigate("/operation/orders");
     setParams(
       (prev) => {
         const next = new URLSearchParams(prev);
@@ -669,6 +705,40 @@ export default function SalesOrderWorkspace() {
       { replace: true },
     );
     setDraftSeed("");
+    setDirty(false);
+  };
+
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty]);
+
+  const openObjectView = (view: ObjectView) => {
+    setObjectView(view);
+    if (view === "Order Route") {
+      setParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.set("route", "1");
+        return next;
+      }, { replace: true });
+      return;
+    }
+    setParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete("route");
+      return next;
+    }, { replace: true });
+    if (view === "Revisions" || view === "History") {
+      setRecordView(view.toLowerCase() as "revisions" | "history");
+      window.setTimeout(() => document.getElementById("sales-order-record")?.scrollIntoView(), 0);
+    } else {
+      window.setTimeout(() => document.getElementById("sales-order-workspace")?.scrollIntoView(), 0);
+    }
   };
 
   /* ── The money the left side states (same arithmetic as the register). ── */
@@ -703,6 +773,114 @@ export default function SalesOrderWorkspace() {
     });
   }, [editing, mode, draft.lines, base, viewedRevision, detailQ.data, order]);
 
+  const orderRoute: SalesOrderRouteModel | null = useMemo(() => {
+    const detail = detailQ.data;
+    const facts = routeFactsQ.data;
+    if (!orderId || !detail?.order || !facts) return null;
+    return resolveSalesOrderRoute({
+      order: {
+        id: orderId,
+        so: detail.order.so,
+        placedAt: detail.order.placed_at,
+        deliveryDate: detail.order.delivery_date,
+        doNumber: detail.order.do_number,
+        dispatchedAt: detail.order.dispatched_at,
+        deliveredAt: detail.order.delivered_at,
+        invoiceNo: detail.order.invoice_no,
+      },
+      revisions: revisions.map((revision) => revision.revision),
+      lineLabels: Object.fromEntries(detail.lines.map((line) => [line.sku, line.label?.trim() || line.sku])),
+      allocation: facts.allocation,
+      purchaseOrders: detail.pos.map((po) => ({
+        id: po.id,
+        currentFact: poReceivingProgress(po.lines.map((line) => ({
+          qty: line.qty,
+          received_qty: line.received_qty,
+        }))).label,
+        etaDate: po.eta_date,
+        /* A file path proves a file exists but is not its document number. */
+        supplierDoNumber: null,
+        lines: po.lines.map((line) => ({
+          sku: line.sku,
+          qty: Number(line.qty),
+          receivedQty: Number(line.received_qty),
+        })),
+      })),
+      receivingRecords: facts.receiving.map((record) => ({
+        id: record.id,
+        recordNo: receivingRecordNo({
+          id: record.id,
+          goods_received_at: record.goods_received_at ?? undefined,
+          submitted_at: record.submitted_at,
+        }),
+        poId: record.po_id,
+        supplierDoNumber: record.do_number,
+        status: warehouseReceiptStatusLabel(record.status),
+        receivedAt: record.goods_received_at,
+      })),
+      delivery: {
+        booking: facts.brief.appointment
+          ? {
+              date: facts.brief.appointment.dateIso,
+              slot: facts.brief.appointment.slot,
+              partnerName: facts.brief.appointment.carrier.partnerName,
+            }
+          : null,
+        attempts: facts.attempts.map((attempt) => ({
+          id: attempt.id,
+          attemptNo: attempt.attempt_no,
+          result: attempt.result,
+          reason: attempt.reason_key ? deliveryReasonLabel(attempt.reason_key) : attempt.note,
+          doNumber: attempt.do_number,
+          scheduledDate: attempt.scheduled_date,
+          recordedAt: attempt.recorded_at,
+        })),
+      },
+      money: {
+        known: money.known,
+        total: money.total,
+        paid: money.paid,
+        outstanding: money.outstanding,
+      },
+      refunds: facts.refunds.map((refund) => ({
+        id: refund.id,
+        amount: Number(refund.amount),
+        status: refund.status,
+        requestedAt: refund.requested_at,
+      })),
+      loans: facts.loans.map((loan) => ({
+        id: loan.id,
+        label: loan.borrowed_label ?? loan.item_sku ?? loan.category ?? "Loan item",
+        status: loan.status,
+        source: loan.source,
+        loanNoteNo: loan.loan_note_no,
+        loanedAt: loan.loaned_at,
+        returnedAt: loan.returned_at,
+        returnedToSupplierAt: loan.returned_to_supplier_at,
+      })),
+      cases: facts.cases.map((item) => ({
+        id: item.id,
+        caseNo: item.caseNo,
+        closed: item.statusIsClosed,
+        openedAt: item.openedAt,
+      })),
+      claims: facts.claims.map((item) => ({
+        id: item.id,
+        claimNo: item.claim_no,
+        poId: item.po_id,
+        status: item.status,
+        reportedAt: item.reported_at,
+      })),
+      work: (correctionWorkQ.data?.work ?? []).map((item) => ({
+        id: item.id,
+        module: item.module,
+        title: item.consequence,
+        state: item.state,
+        createdAt: item.raised_at,
+      })),
+    });
+  }, [orderId, detailQ.data, routeFactsQ.data, revisions, money, correctionWorkQ.data]);
+
   /* The real parties, with no placeholder — the attribution form supplies its
    * own "Keep …" and "Not recorded" entries, and two placeholders in one list
    * is how a picker ends up offering "Not recorded" twice. */
@@ -729,10 +907,21 @@ export default function SalesOrderWorkspace() {
 
   const headerRight = (
     <span className="flex items-center gap-2">
-      {mode === "view" && (
+      {mode === "view" && !showRoute && (
         <Button size="sm" variant="neutral" onClick={enterEdit} data-testid="workspace-edit">
           <Pencil size={14} /> Edit
         </Button>
+      )}
+      {/* The governed cancel sits beside the governed edit, exactly as the
+          MASTER's Workspace ruling reads. An order already cancelled has
+          nothing left to cancel, so the door is absent rather than refusing. */}
+      {mode === "view" && !showRoute && order && order.status !== "cancelled" && (
+        <details className="relative">
+          <summary className="btn-ghost cursor-pointer list-none text-meta">More actions</summary>
+          <div className="absolute right-0 top-full z-20 mt-1 w-40 rounded-control border border-kit-slate-5 bg-white p-1 shadow-lg">
+            <button type="button" onClick={() => setCancelOpen(true)} data-testid="workspace-cancel-so" className="w-full rounded-control px-2 py-1.5 text-left text-meta text-danger hover:bg-hovertint">Cancel SO</button>
+          </div>
+        </details>
       )}
       {(mode === "edit" || mode === "create") && (
         <>
@@ -746,7 +935,7 @@ export default function SalesOrderWorkspace() {
             {mode === "create" ? "Create order" : "Save"}
           </Button>
           <Button size="sm" variant="ghost" onClick={cancelEdit} data-testid="workspace-cancel">
-            <X size={14} /> Cancel
+            <X size={14} /> Discard
           </Button>
         </>
       )}
@@ -754,7 +943,14 @@ export default function SalesOrderWorkspace() {
         <Button
           size="sm"
           variant="neutral"
-          onClick={() => setViewRev(null)}
+          onClick={() => {
+            setViewRev(null);
+            setParams((prev) => {
+              const next = new URLSearchParams(prev);
+              next.delete("revision");
+              return next;
+            }, { replace: true });
+          }}
           data-testid="workspace-back-to-current"
         >
           Back to current
@@ -769,10 +965,7 @@ export default function SalesOrderWorkspace() {
         }}
         data-testid="workspace-print"
       >
-        <Printer size={14} /> Print PDF
-      </Button>
-      <Button size="sm" variant="ghost" onClick={backToRegister} data-testid="doc-back">
-        <ArrowLeft size={14} /> Back to register
+        <Printer size={14} /> Print ▾
       </Button>
     </span>
   );
@@ -782,82 +975,72 @@ export default function SalesOrderWorkspace() {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <SalesOrderTabs
+        identity={soWord}
+        customer={order?.customer_name}
+        onBack={(event) => {
+          if (!confirmDiscard()) event.preventDefault();
+        }}
         docTitle={isNew ? "New Sales Order — Carres" : order ? `SO-${order.so} — Carres` : undefined}
         right={headerRight}
+        navigation={!isNew ? (
+          <nav aria-label="Sales Order views" className="flex h-full items-stretch gap-1">
+            {OBJECT_VIEWS.map((view) => {
+              const active = objectView === view;
+              return (
+                <button
+                  key={view}
+                  type="button"
+                  onClick={() => openObjectView(view)}
+                  aria-current={active ? "page" : undefined}
+                  className={`relative px-3 text-body ${active ? "font-semibold text-base-900 after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:bg-kit-blue-9" : "text-base-600 hover:text-base-900"}`}
+                >
+                  {view}
+                </button>
+              );
+            })}
+          </nav>
+        ) : null}
       />
 
-      {/* CARD 1 — the structured entrance: a contractual save states its cause. */}
-      {changeAsk && (
-        <Modal title="Who asked for this change?" onClose={() => setChangeAsk(null)}>
-          <div className="flex flex-col gap-2" data-testid="change-type-chooser">
-            <p className="text-body text-base-700">
-              This save changes the items or the promised date. The record must say who asked.
-            </p>
-            <label className="flex items-start gap-2 rounded-card border border-kit-slate-5 bg-white px-3 py-2">
-              <input
-                type="radio"
-                name="change-type"
-                className="mt-1"
-                checked={changeType === "staff_correction"}
-                onChange={() => setChangeType("staff_correction")}
-                data-testid="change-type-staff"
-              />
-              <span>
-                <span className="text-body font-semibold text-base-900">
-                  {COMMITMENT_CHANGE_WORDS.staff_correction}
-                </span>
-                <span className="block text-meta text-base-500">
-                  The record was wrong — the customer's agreement never changed.
-                </span>
-              </span>
-            </label>
-            <label className="flex items-start gap-2 rounded-card border border-kit-slate-5 bg-white px-3 py-2">
-              <input
-                type="radio"
-                name="change-type"
-                className="mt-1"
-                checked={changeType === "customer_change"}
-                onChange={() => setChangeType("customer_change")}
-                data-testid="change-type-customer"
-              />
-              <span>
-                <span className="text-body font-semibold text-base-900">
-                  {COMMITMENT_CHANGE_WORDS.customer_change}
-                </span>
-                <span className="block text-meta text-base-500">
-                  The customer asked for something different.
-                </span>
-              </span>
-            </label>
-            <label className="mt-1 flex flex-col gap-1">
-              <span className="text-label text-base-500">Note (optional)</span>
-              <textarea
-                className="min-h-[64px] rounded-[6px] border border-base-200 bg-white px-2 py-1 text-body outline-none focus:border-primary"
-                value={changeNote}
-                maxLength={2000}
-                onChange={(e) => setChangeNote(e.target.value)}
-                data-testid="change-note"
-              />
-            </label>
-            <ModalActions
-              onCancel={() => setChangeAsk(null)}
-              onPrimary={onConfirmChange}
-              primary="Save"
-              primaryDisabled={!changeType}
-              primaryPending={saveMut.isPending}
-            />
-          </div>
-        </Modal>
+      {order && (
+        <CancelSalesOrderDialog
+          orderId={order.id}
+          so={order.so}
+          open={cancelOpen}
+          onOpenChange={setCancelOpen}
+          onCancelled={() => void detailQ.refetch()}
+        />
       )}
 
+      {showRoute ? (
+        <div className="min-h-0 flex-1 overflow-auto bg-kit-slate-3 px-4 py-4">
+          {routeFactsQ.isLoading || detailQ.isLoading || revisionsQ.isLoading ? (
+            <Loading label="Opening the order route" />
+          ) : routeFactsQ.isError || detailQ.isError || revisionsQ.isError ? (
+            <div className="rounded-card border border-kit-slate-5 bg-white">
+              <EmptyState
+                title="This order route could not be opened"
+                detail={(routeFactsQ.error as Error | undefined)?.message ?? (detailQ.error as Error | undefined)?.message ?? (revisionsQ.error as Error | undefined)?.message}
+                action={<Button variant="neutral" onClick={() => void routeFactsQ.refetch()}>Try again</Button>}
+              />
+            </div>
+          ) : orderRoute ? (
+            <SalesOrderRoute route={orderRoute} />
+          ) : (
+            <div className="rounded-card border border-kit-slate-5 bg-white">
+              <EmptyState title="No route facts were found for this sales order" />
+            </div>
+          )}
+        </div>
+      ) : (
       <div className="flex min-h-0 flex-1">
         {/* ── LEFT 55% — the seven sections ─────────────────────────────── */}
         <div className="min-h-0 w-[55%] shrink-0 overflow-auto border-r border-kit-slate-5 bg-kit-slate-3 px-4 py-4">
-          {!isNew && detailQ.isLoading && <Loading label="Opening the sales order" />}
-          {!isNew && !detailQ.isLoading && detailQ.isError && (
+          {(!isNew || copyFrom) && detailQ.isLoading && <Loading label={copyFrom ? "Preparing the copied draft" : "Opening the sales order"} />}
+          {(!isNew || copyFrom) && !detailQ.isLoading && detailQ.isError && (
             <div className="rounded-card border border-kit-slate-5 bg-white">
               <EmptyState
-                title="This sales order could not be opened"
+                title={copyFrom ? "This Sales Order could not be copied" : "This sales order could not be opened"}
                 detail={(detailQ.error as Error | undefined)?.message}
                 action={
                   <Button variant="neutral" onClick={() => void detailQ.refetch()}>
@@ -868,30 +1051,28 @@ export default function SalesOrderWorkspace() {
             </div>
           )}
 
-          {(isNew || order) && (
+          {(isNew && !copyFrom || order) && (
             <div className="flex flex-col gap-3" data-testid="sales-order-workspace">
-              {/* Title strip */}
-              <div className="rounded-card border border-kit-slate-5 bg-white px-4 py-3">
-                <div className="flex items-baseline justify-between gap-3">
-                  <div className="text-page text-base-900" data-testid="doc-so">
-                    {soWord}
-                  </div>
+              {(mode === "oldrev" || mode === "edit" || (mode === "create" && copyFrom)) && (
+                <div className="px-1 py-1 text-meta text-base-600">
                   {mode === "oldrev" && viewedRevision ? (
                     <span className="rounded-pill bg-base-900 px-2 py-0.5 text-label font-semibold text-white">
                       Viewing Rev {viewedRevision.revision} · read-only
                     </span>
                   ) : mode === "edit" ? (
-                    <span className="rounded-pill bg-kit-blue-9 px-2 py-0.5 text-label font-semibold text-white">
-                      Editing — nothing is saved until Save
+                    <span>Editing operational details only. Commercial changes require an amendment.</span>
+                  ) : mode === "create" && copyFrom && order ? (
+                    <span className="rounded-pill bg-kit-blue-3 px-2 py-0.5 text-label font-semibold text-kit-blue-11">
+                      Copied from SO-{order.so} · review before creating
                     </span>
                   ) : null}
                 </div>
+              )}
                 {!isNew && (order?.source_ref ?? []).length > 0 && (
-                  <div className="text-meta text-base-500 mt-1">
+                  <div className="px-1 text-meta text-base-500">
                     Customer reference {(order?.source_ref ?? []).join(" · ")}
                   </div>
                 )}
-              </div>
 
               {/* ① CUSTOMER */}
               <Section title="Customer">
@@ -905,10 +1086,6 @@ export default function SalesOrderWorkspace() {
                       onChange={(e) => setField("customer_email", e.target.value)} />
                     <Input id="ws-emergency" label="Emergency contact" value={draft.customer_emergency}
                       onChange={(e) => setField("customer_emergency", e.target.value)} />
-                    <div className="col-span-2">
-                      <Input id="ws-address" label="Address" value={draft.customer_address}
-                        onChange={(e) => setField("customer_address", e.target.value)} />
-                    </div>
                     <Input id="ws-line1" label="Address line 1" value={draft.customer_address_line1}
                       onChange={(e) => setField("customer_address_line1", e.target.value)} />
                     <Input id="ws-line2" label="Address line 2" value={draft.customer_address_line2}
@@ -919,6 +1096,18 @@ export default function SalesOrderWorkspace() {
                       onChange={(e) => setField("customer_address_state", e.target.value)} />
                     <Input id="ws-postcode" label="Postcode" value={draft.customer_address_postcode}
                       onChange={(e) => setField("customer_address_postcode", e.target.value)} />
+                    <div className="col-span-2">
+                      <Fact
+                        label="Address preview"
+                        value={[
+                          draft.customer_address_line1,
+                          draft.customer_address_line2,
+                          draft.customer_address_postcode,
+                          draft.customer_address_city,
+                          draft.customer_address_state,
+                        ].filter(Boolean).join(", ") || "Not given"}
+                      />
+                    </div>
                     <Input id="ws-billing" label="Billing address" value={draft.customer_billing}
                       onChange={(e) => setField("customer_billing", e.target.value)} />
                   </div>
@@ -993,7 +1182,7 @@ export default function SalesOrderWorkspace() {
 
               {/* ③ DATES */}
               <Section title="Dates">
-                {editing ? (
+                {mode === "create" ? (
                   <div className="grid grid-cols-3 gap-3">
                     <Fact label="Ordered" value={isNew ? "Today" : fmtDate(order?.placed_at ?? null)} />
                     <div>
@@ -1016,7 +1205,15 @@ export default function SalesOrderWorkspace() {
                   <div className="grid grid-cols-3 gap-x-5 gap-y-3">
                     <Fact label="Ordered" value={fmtDate((displayHeader(mode, viewedRevision, order, "placed_at") || order?.placed_at) ?? null)} />
                     <Fact label="Promised delivery" value={promisedWord(mode, viewedRevision, order)} />
-                    <Fact label="Proceed date" value={fmtDate(displayHeader(mode, viewedRevision, order, "proceed_date")) || "Not recorded"} />
+                    {mode === "edit" ? (
+                      <div>
+                        <div className="text-label text-base-500 mb-1">Proceed date</div>
+                        <DatePicker id="ws-proceed" value={draft.proceed_date}
+                          onChange={(iso) => setField("proceed_date", iso)} />
+                      </div>
+                    ) : (
+                      <Fact label="Proceed date" value={fmtDate(displayHeader(mode, viewedRevision, order, "proceed_date")) || "Not recorded"} />
+                    )}
                   </div>
                 )}
               </Section>
@@ -1044,7 +1241,7 @@ export default function SalesOrderWorkspace() {
 
               {/* ⑤ ITEMS */}
               <Section title="Items">
-                {editing ? (
+                {mode === "create" ? (
                   <div className="flex flex-col gap-2">
                     {draft.lines.map((l) => (
                       <div key={l.key} className="grid grid-cols-[1fr_84px_120px_32px] items-end gap-2">
@@ -1114,10 +1311,15 @@ export default function SalesOrderWorkspace() {
                     <SalesOrderAmendment
                       orderId={orderId}
                       currentLines={(detailQ.data?.lines ?? []).map((l) => ({
+                        id: l.id,
                         sku: l.sku,
                         qty: l.qty,
                         unit_price: Number(l.unit_price),
                       }))}
+                      currentDeliveryDate={order?.delivery_date ?? null}
+                      currentDeliveryDateTbd={order?.delivery_date_tbd ?? false}
+                      currentInstallmentMonths={(order as { installment_months?: number | null } | undefined)?.installment_months ?? null}
+                      proposalSeed={amendmentSeed}
                     />
                   </div>
                 )}
@@ -1150,91 +1352,38 @@ export default function SalesOrderWorkspace() {
                 </Section>
               )}
 
-              {/* ⑧ HISTORY / REVISION */}
+              {/* ⑧ REVISIONS / HISTORY — complete versions and event ledger
+                  are separate concepts and separate views. */}
               {!isNew && (
-                <Section title="History / Revision">
-                  {revisions.length === 0 ? (
-                    <p className="text-body text-base-500">
-                      No revisions yet — the first Save mints Rev 1 (the original) and Rev 2
-                    </p>
-                  ) : (
-                    <div className="flex flex-col gap-2" data-testid="revision-list">
-                      <div className="flex flex-wrap gap-1.5">
-                        {revisions.map((r) => {
-                          const isCurrent = r.revision === currentRev;
-                          const isViewed = mode === "oldrev" ? viewRev === r.revision : isCurrent;
-                          return (
-                            <button
-                              key={r.revision}
-                              type="button"
-                              data-testid={`rev-${r.revision}`}
-                              onClick={() => setViewRev(isCurrent ? null : r.revision)}
-                              className={[
-                                "rounded-pill border px-2.5 py-0.5 text-meta font-medium transition-colors",
-                                isViewed
-                                  ? "border-base-900 bg-base-900 text-white"
-                                  : "border-base-200 bg-white text-base-700 hover:border-base-400",
-                              ].join(" ")}
-                            >
-                              Rev {r.revision}
-                              {isCurrent ? " · current" : ""}
-                            </button>
-                          );
-                        })}
-                      </div>
-                      <ul className="flex flex-col gap-1.5">
-                        {[...revisions].reverse().map((r, idx, arr) => {
-                          const prev = arr[idx + 1] ?? null;
-                          const changes = describeRevisionChanges(prev?.snapshot ?? null, r.snapshot);
-                          return (
-                            <li key={r.revision} className="text-body">
-                              <span className="text-meta font-semibold text-base-700">
-                                Rev {r.revision}
-                              </span>
-                              <span className="text-meta text-base-500">
-                                {" "}· {fmtDate(r.created_at, { time: true })}
-                              </span>
-                              {/* CARD 1 — who asked. Rev 1 and pre-0340 rows carry no cause. */}
-                              {r.change_type && (
-                                <span
-                                  className="ml-1.5 rounded-pill border border-base-200 bg-base-50 px-1.5 py-px text-label text-base-700"
-                                  data-testid={`rev-${r.revision}-cause`}
-                                >
-                                  {COMMITMENT_CHANGE_WORDS[r.change_type]}
-                                </span>
-                              )}
-                              {r.note && (
-                                <span className="ml-1.5 text-meta text-base-500">“{r.note}”</span>
-                              )}
-                              <ul className="mt-0.5 flex flex-col gap-0.5 pl-3">
-                                {changes.map((chg, i) => (
-                                  <li key={i} className="text-meta text-base-700">
-                                    {chg}
-                                  </li>
-                                ))}
-                              </ul>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    </div>
-                  )}
-                  {(detailQ.data?.history ?? []).length > 0 && (
-                    <div className="mt-3 border-t border-kit-slate-5 pt-2">
-                      <div className="text-label text-base-500">History</div>
-                      <ul className="mt-1.5 flex flex-col gap-1.5" data-testid="doc-history">
-                        {(detailQ.data?.history ?? []).map((h, i) => (
-                          <li key={i} className="flex gap-3 text-body">
-                            <span className="shrink-0 text-meta text-base-500 tabular-nums">
-                              {fmtDate(h.occurred_at, { time: true })}
-                            </span>
-                            <span className="min-w-0 break-words">{h.text}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
+                <div id="sales-order-record">
+                <Section title="Order record">
+                  <SalesOrderLedger
+                    revisions={revisions}
+                    history={detailQ.data?.history ?? []}
+                    currentRevision={currentRev}
+                    viewedRevision={mode === "oldrev" ? viewRev : null}
+                    view={recordView}
+                    onViewChange={setRecordView}
+                    onViewRevision={setViewRev}
+                    onProposeRevision={(revision) => {
+                      const header = revision.snapshot.header ?? {};
+                      const currentLineIds = new Map((detailQ.data?.lines ?? []).map((line) => [line.sku, line.id]));
+                      setAmendmentSeed({
+                        lines: (revision.snapshot.lines ?? []).map((line) => ({
+                          ...(currentLineIds.get(line.sku) ? { id: currentLineIds.get(line.sku) } : {}),
+                          sku: line.sku,
+                          qty: Number(line.qty),
+                          unit_price: Number(line.unit_price),
+                        })),
+                        delivery_date: header.delivery_date == null ? null : String(header.delivery_date),
+                        delivery_date_tbd: Boolean(header.delivery_date_tbd),
+                        installment_months: header.installment_months == null ? null : Number(header.installment_months),
+                      });
+                      setViewRev(null);
+                    }}
+                  />
                 </Section>
+                </div>
               )}
             </div>
           )}
@@ -1259,6 +1408,7 @@ export default function SalesOrderWorkspace() {
           ) : null}
         </div>
       </div>
+      )}
     </div>
   );
 }

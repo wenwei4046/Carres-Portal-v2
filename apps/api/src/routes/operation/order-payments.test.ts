@@ -235,6 +235,65 @@ describe("POST /:id/payments", () => {
     // {orderId}:{seq} (seq = 3 here) — deterministic, so a reprint matches.
     expect(rpc.args.p_receipt_no).toMatch(/^RC-260626-\d{4}$/);
   });
+
+  // CARD 4 closing slice (0347). The receipt seed is `count + 1`, so two
+  // payments recorded into one order in the same instant mint the SAME number.
+  // 0347's unique index stops that being stored; without a retry the index
+  // just turns a silent duplicate into a 500 at the till.
+  it("a taken receipt number is retried with the next sequence, not returned as an error", async () => {
+    const returned = {
+      id: PAY_ID, order_id: ORDER_ID, amount: 300, paid_on: "2026-06-26",
+      method: "cash", kind: "payment", recorded_by: "u1", counted_in_paid: true,
+    };
+    const sb = makeSb({ order_payments: { list: { data: null, error: null, count: 2 } } });
+    let call = 0;
+    sb.rpc.mockImplementation((name: string, args: unknown) => {
+      sb.calls.rpc.push({ name, args });
+      call += 1;
+      // The first attempt collides; the second (seq bumped) succeeds.
+      return Promise.resolve(
+        call === 1
+          ? { data: null, error: { code: "23505", message: "duplicate key" } }
+          : { data: { payment: returned, orders_paid: 300 }, error: null },
+      );
+    });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/${ORDER_ID}/payments`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ amount: 300, paidOn: "2026-06-26", method: "cash" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    expect(sb.calls.rpc).toHaveLength(2);
+    const first = sb.calls.rpc[0] as { args: Record<string, unknown> };
+    const second = sb.calls.rpc[1] as { args: Record<string, unknown> };
+    // A DIFFERENT number, still on the locked scheme — never the same one twice.
+    expect(second.args.p_receipt_no).not.toBe(first.args.p_receipt_no);
+    expect(second.args.p_receipt_no).toMatch(/^RC-260626-\d{4}$/);
+  });
+
+  it("gives up after three attempts rather than looping on a real conflict", async () => {
+    const sb = makeSb(
+      { order_payments: { list: { data: null, error: null, count: 0 } } },
+      { data: null, error: { code: "23505", message: "duplicate key" } },
+    );
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/${ORDER_ID}/payments`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ amount: 300, paidOn: "2026-06-26", method: "cash" }),
+      }),
+      env,
+    );
+    expect(res.status).not.toBe(201);
+    expect(sb.calls.rpc).toHaveLength(3);
+  });
 });
 
 // =====================================================================

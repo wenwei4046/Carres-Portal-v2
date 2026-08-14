@@ -10,7 +10,10 @@ import {
   ListOperationOrdersQuery,
   recheckStockInput,
   reselectPartnerInput,
+  deliveryQueueLeads,
+  myHolidaySet,
   orderMoney,
+  resolveBookingBrief,
   resolveCurrentCustomerCommitment,
   resolveOrderCompletion,
   resolveUnitAllocation,
@@ -55,6 +58,15 @@ import type { AppEnv } from "../../types";
  * lib/route-helpers).
  */
 const operationOrdersRouter = new Hono<AppEnv>();
+
+/** Management owns the commercial decision; operation may route the request
+ * but cannot approve its own proposal. The database repeats this gate. */
+const requirePrincipal: MiddlewareHandler<AppEnv> = async (c, next) => {
+  if (c.var.auth?.role !== "principal") {
+    throw new HTTPException(403, { message: "Principal only" });
+  }
+  await next();
+};
 
 /**
  * Pipeline v2 error mapping. Wraps the generic `mapPgError` to expose the
@@ -219,7 +231,7 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
       // `invoiced_at`, `payment_method` and `installment_months`. Nothing here
       // is another module's record, nothing is computed. Purely additive: the
       // old control table selects none of these and is unaffected.
-      "id, so, status, operation_stage, warehouse_id, customer_name, customer_phone, customer_address, customer_email, customer_billing, customer_emergency, customer_address_line1, customer_address_line2, customer_address_city, customer_address_state, customer_address_postcode, building_type:entry_data->fields->>building_type, delivery_floor, delivery_has_lift, channel, placed_at, delivery_date, delivery_date_tbd, proceed_date, source_system, source_ref, ops_assigned_logistic, delivery_partner_id, request_for_delivery_at, partner_accepted_at, partner_rejected_at, partner_rejected_reason, do_number, invoice_no, invoiced_at, payment_method, installment_months, dispatched_at, delivered_at, outlet_id, salesperson_id, dealer_id, paid, dealers(name), outlets(name), salespersons(name), delivery_partners!orders_delivery_partner_id_fkey(id, name), order_lines(sku, qty, unit_price, source_po), order_addons(qty, unit_price), order_supplier_threads(id, supplier_id, category, operation_stage, po_id, delivery_partner_id, delivery_partners(id, name), confirm_delivery_date, request_for_delivery_at, partner_accepted_at, partner_rejected_at), order_annotations(content, tag, created_at), ops_order_control(customer_request, action_for_logistic, carres_remark, warehouse_remark, logistic_eta, balance, payment_status, storage_from, storage_fee_override, storage_fee_msbf, storage_fee_sof, storage_paid, storage_collected_at, storage_waiver_status, called_customer, line_etas, line_stock_status, assigned_staff, booking_stage, confirmed_date, confirmed_time_slot, delivery_photos, booking_groups, delay_decision, delay_decision_eta, delay_decision_at, delay_detected_at, delay_detected_eta)",
+      "id, so, status, operation_stage, warehouse_id, customer_name, customer_phone, customer_address, customer_email, customer_billing, customer_emergency, customer_address_line1, customer_address_line2, customer_address_city, customer_address_state, customer_address_postcode, building_type:entry_data->fields->>building_type, delivery_floor, delivery_has_lift, channel, placed_at, delivery_date, delivery_date_tbd, proceed_date, source_system, source_ref, ops_assigned_logistic, delivery_partner_id, request_for_delivery_at, partner_accepted_at, partner_rejected_at, partner_rejected_reason, do_number, invoice_no, invoiced_at, payment_method, installment_months, dispatched_at, delivered_at, outlet_id, salesperson_id, dealer_id, paid, dealers(name), outlets(name), salespersons(name), delivery_partners!orders_delivery_partner_id_fkey(id, name), order_lines(sku, qty, unit_price, attrs, source_po), order_addons(addon_key, qty, unit_price), order_supplier_threads(id, supplier_id, category, operation_stage, po_id, delivery_partner_id, delivery_partners(id, name), confirm_delivery_date, request_for_delivery_at, partner_accepted_at, partner_rejected_at), order_annotations(content, tag, created_at), ops_order_control(customer_request, action_for_logistic, carres_remark, warehouse_remark, logistic_eta, balance, payment_status, storage_from, storage_fee_override, storage_fee_msbf, storage_fee_sof, storage_paid, storage_collected_at, storage_waiver_status, called_customer, line_etas, line_stock_status, assigned_staff, booking_stage, confirmed_date, confirmed_time_slot, delivery_photos, booking_groups, delay_decision, delay_decision_eta, delay_decision_at, delay_detected_at, delay_detected_eta)",
     )
     // Pipeline v2 (C3): include `status='place'` rows so the FE kanban can
     // render the "Placed" column. proceed_order + delivered preserved as
@@ -321,6 +333,7 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
     ),
   ];
   const poSkusBySo = new Map<number, Set<string>>();
+  const poNumbersBySo = new Map<number, Set<string>>();
   if (soNumbers.length > 0) {
     const inList = soNumbers.join(",");
     const { data: pos, error: e_pos } = await sb
@@ -362,6 +375,9 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
         if (typeof po.so === "number") served.add(po.so);
         for (const r of po.so_refs ?? []) served.add(r);
         for (const so of served) {
+          const numbers = poNumbersBySo.get(so) ?? new Set<string>();
+          numbers.add(po.id);
+          poNumbersBySo.set(so, numbers);
           const set = poSkusBySo.get(so) ?? new Set<string>();
           for (const s of skus) set.add(s);
           poSkusBySo.set(so, set);
@@ -374,6 +390,7 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
     orders: orders.map((o: { so?: number | null }) => ({
       ...o,
       po_skus: [...(poSkusBySo.get(o.so ?? -1) ?? [])],
+      po_numbers: [...(poNumbersBySo.get(o.so ?? -1) ?? [])],
     })),
   });
 });
@@ -604,8 +621,6 @@ const revisionHeaderInput = z
     customer_address_postcode: z.string().nullable().optional(),
     customer_emergency: z.string().nullable().optional(),
     customer_billing: z.string().nullable().optional(),
-    delivery_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
-    delivery_date_tbd: z.boolean().optional(),
     proceed_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
     delivery_floor: z.number().int().min(0).optional(),
     delivery_has_lift: z.boolean().optional(),
@@ -870,6 +885,181 @@ operationOrdersRouter.get("/:id/completion", requireOperation, async (c) => {
   return c.json({ completion });
 });
 
+// GET /:id/booking-brief — CARD 3's one authoritative read: everything
+// Operations puts in front of Logistics for the T−3 customer call, and the
+// three separate truths kept apart.
+//
+// The ruling's own list, and the reason this endpoint exists at all: the call
+// opens THREE working days before the Customer Promised Deadline **regardless
+// of stock readiness**, and the operator making it needs the promised
+// deadline, the latest Stock ETA, the expected delivery scope and what IS and
+// IS NOT expected in — four facts that until now lived in four different reads
+// and were never assembled for the person holding the phone.
+//
+// Composed from the authoritative owners, never re-derived: Card 1's
+// commitment (what was sold) → Card 2's allocation (what is physically here)
+// → the overlay's booking + supplier dates → the delivery partner roster →
+// the `logistics_call_working_days` SETTING through the same
+// `deliveryQueueLeads` helper the Orders list and the Delivery board read, so
+// no third surface can invent its own call window (Law D).
+operationOrdersRouter.get("/:id/booking-brief", requireOperation, async (c) => {
+  const id = c.req.param("id");
+  const sb = userClient(c.env, c.var.auth.jwt);
+
+  const { data: bundle, error: bundleErr } = await sb.rpc(
+    "sales_order_commitment_bundle",
+    { p_order_id: id },
+  );
+  if (bundleErr) {
+    const m = mapPgError(bundleErr);
+    return c.json(m.body, m.status);
+  }
+  const commitment = resolveCurrentCustomerCommitment(
+    bundle as unknown as CommitmentBundle,
+  );
+
+  const { data: ord, error: ordErr } = await sb
+    .from("orders")
+    .select(
+      "id, so, delivery_date, delivery_date_tbd, ops_assigned_logistic, delivery_partner_id, ops_order_control(booking_stage, confirmed_date, confirmed_time_slot, confirmed_partner_id, booking_groups, customer_confirmed_at, stock_eta, line_etas)",
+    )
+    .eq("id", id)
+    .maybeSingle();
+  if (ordErr) {
+    const m = mapPgError(ordErr);
+    return c.json(m.body, m.status);
+  }
+  if (!ord) return c.json({ error: "Order not found" }, 404);
+  const soRef = `SO-${ord.so}`;
+  const ctrl = (
+    Array.isArray(ord.ops_order_control)
+      ? (ord.ops_order_control[0] ?? null)
+      : (ord.ops_order_control as Record<string, unknown> | null)
+  ) as {
+    booking_stage?: string | null;
+    confirmed_date?: string | null;
+    confirmed_time_slot?: string | null;
+    confirmed_partner_id?: string | null;
+    booking_groups?: string[] | null;
+    customer_confirmed_at?: string | null;
+    stock_eta?: string | null;
+    line_etas?: Record<string, string> | null;
+  } | null;
+
+  // The assignment is the order's; the appointment's carrier is the overlay's
+  // own stamp (0346). They are looked up together and reported separately —
+  // the whole point of Rule 4.
+  const assignedId =
+    (ord.ops_assigned_logistic as string | null) ??
+    (ord.delivery_partner_id as string | null) ??
+    null;
+  const confirmedPartnerId = ctrl?.confirmed_partner_id ?? null;
+  const partnerIds = [assignedId, confirmedPartnerId].filter(
+    (v): v is string => !!v,
+  );
+
+  const [unitsRes, partnersRes, settingsRes] = await Promise.all([
+    sb
+      .from("ops_stock_items")
+      .select(
+        "id, unit_code, sku, status, condition, warehouse_id, po_no, qty, date_in, sold_at",
+      )
+      .or(
+        `and(status.eq.reserved,reserved_ref.eq.${soRef}),and(status.eq.sold,sold_order_id.eq.${id})`,
+      ),
+    partnerIds.length > 0
+      ? sb.from("delivery_partners").select("id, name").in("id", partnerIds)
+      : Promise.resolve({ data: [], error: null }),
+    sb
+      .from("purchasing_settings")
+      .select("logistics_call_working_days")
+      .maybeSingle(),
+  ]);
+  for (const r of [unitsRes, partnersRes, settingsRes]) {
+    if (r.error) {
+      const m = mapPgError(r.error);
+      return c.json(m.body, m.status);
+    }
+  }
+
+  const units: AllocationUnit[] = ((unitsRes.data ?? []) as Array<{
+    id: string; unit_code: string | null; sku: string; status: string;
+    condition: string; warehouse_id: string | null; po_no: string | null;
+    qty: number | null; date_in: string | null; sold_at: string | null;
+  }>).map((r) => ({
+    id: r.id,
+    unitCode: r.unit_code,
+    sku: r.sku,
+    status: r.status as AllocationUnit["status"],
+    condition: r.condition,
+    warehouseId: r.warehouse_id,
+    poNo: r.po_no,
+    qty: r.qty ?? 1,
+    dateIn: r.date_in,
+    soldAt: r.sold_at,
+  }));
+
+  const nameById = new Map(
+    ((partnersRes.data ?? []) as Array<{ id: string; name: string | null }>).map(
+      (p) => [p.id, p.name ?? null],
+    ),
+  );
+
+  const allocation = resolveUnitAllocation({
+    orderId: id,
+    soRef,
+    commitmentLines: commitment.lines.map((l) => ({
+      sku: l.sku,
+      qty: Number(l.qty) || 0,
+    })),
+    units,
+  });
+
+  // Mon–Sat delivery week + the Malaysian public holidays, the same calendar
+  // every other delivery clock in the portal counts on.
+  const opts = { holidays: myHolidaySet(), offDays: [0] };
+  const callDays = (
+    settingsRes.data as { logistics_call_working_days?: number } | null
+  )?.logistics_call_working_days;
+  const leads =
+    typeof callDays === "number"
+      ? deliveryQueueLeads({ logisticsCallWorkingDays: callDays })
+      : undefined;
+
+  const brief = resolveBookingBrief(
+    {
+      orderId: id,
+      soRef,
+      promisedDateIso: (ord.delivery_date as string | null) ?? null,
+      promisedIsTbd: !!ord.delivery_date_tbd,
+      lineEtas: ctrl?.line_etas ?? null,
+      orderStockEtaIso: ctrl?.stock_eta ?? null,
+      allocation,
+      assignedLogistics: assignedId
+        ? { partnerId: assignedId, partnerName: nameById.get(assignedId) ?? null }
+        : null,
+      booking: {
+        stage: ctrl?.booking_stage ?? null,
+        confirmedDateIso: ctrl?.confirmed_date ?? null,
+        slot: ctrl?.confirmed_time_slot ?? null,
+        carrier: confirmedPartnerId
+          ? {
+              partnerId: confirmedPartnerId,
+              partnerName: nameById.get(confirmedPartnerId) ?? null,
+            }
+          : null,
+        scope: ctrl?.booking_groups ?? null,
+        confirmedAt: ctrl?.customer_confirmed_at ?? null,
+      },
+    },
+    new Date().toISOString().slice(0, 10),
+    opts,
+    leads,
+  );
+
+  return c.json({ brief });
+});
+
 // POST /:id/save — the ONE edit door. CARD 1: a save that moves the
 // CONTRACTUAL fields (items · promised date) must state its cause —
 // `staff_correction` (the record was wrong) or `customer_change` (the
@@ -878,22 +1068,11 @@ operationOrdersRouter.get("/:id/completion", requireOperation, async (c) => {
 // cause and defaults to staff_correction. The RPC also refuses an empty or
 // no-op save, refuses on any floor BLOCK, and refuses removing/re-SKUing a
 // line in production.
-const saveChangeInput = z
-  .object({
-    type: z.enum(["staff_correction", "customer_change"]),
-    note: z.string().trim().max(2000).optional(),
-  })
-  .strict();
-
 const saveRevisionInput = z
   .object({
-    header: revisionHeaderInput.optional(),
-    lines: z.array(revisionLineInput).min(1).optional(),
-    change: saveChangeInput.optional(),
+    header: revisionHeaderInput,
   })
-  .refine((v) => v.header !== undefined || v.lines !== undefined, {
-    message: "Nothing to save",
-  });
+  .strict();
 
 operationOrdersRouter.post("/:id/save", requireOperation, async (c) => {
   const id = c.req.param("id");
@@ -912,11 +1091,11 @@ operationOrdersRouter.post("/:id/save", requireOperation, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
   const { data, error } = await sb.rpc("sales_order_save_revision", {
     p_order_id: id,
-    p_header: parsed.data.header ?? {},
-    p_lines: parsed.data.lines ?? null,
-    p_change: parsed.data.change
-      ? { change_type: parsed.data.change.type, note: parsed.data.change.note ?? null }
-      : null,
+    p_header: parsed.data.header,
+    // Detail/Edit is the safe-correction door. Contractual lines and the
+    // promised date travel only through the governed Amendment lane.
+    p_lines: null,
+    p_change: null,
   });
   if (error) {
     const m = mapPipelineV2Error(error);
@@ -932,6 +1111,8 @@ const createOrderInput = z.object({
   header: revisionHeaderInput
     .extend({
       customer_name: z.string().trim().min(1, "Customer name is required"),
+      delivery_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+      delivery_date_tbd: z.boolean().optional(),
       dealer_id: z.string().uuid({ message: "A dealer is required" }),
       // orders_salesperson_required (0296) — every portal-written order
       // names who sold it; only the AutoCount archive importer is exempt.
@@ -1201,6 +1382,7 @@ const amendmentSubmitInput = z.object({
         .array(
           z
             .object({
+              id: z.string().uuid().optional(),
               sku: z.string().trim().min(1),
               qty: z.number().int().min(1),
               unit_price: z.number().min(0),
@@ -1213,7 +1395,7 @@ const amendmentSubmitInput = z.object({
       installment_months: z.number().int().min(0).nullable().optional(),
     })
     .strict(),
-  reason: z.string().trim().max(500).optional(),
+  reason: z.string().trim().min(1, "An amendment says why").max(500),
 });
 
 operationOrdersRouter.get("/:id/amendment", requireOperation, async (c) => {
@@ -1264,6 +1446,79 @@ operationOrdersRouter.post("/amendment/:amendmentId/apply", requireOperation, as
    * shape of the answer. */
   return c.json(data);
 });
+
+// The preview reads every affected owner but writes none of them. It is the
+// evidence management reads before deciding, and is recomputed on each read.
+operationOrdersRouter.get("/amendment/:amendmentId/impact", requireOperation, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("sales_order_amendment_impact", {
+    p_amendment_id: c.req.param("amendmentId"),
+  });
+  if (error) {
+    const m = mapPipelineV2Error(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json(data);
+});
+
+/* The read management sees BEFORE it cancels: what this Sales Order still
+ * holds open for Purchasing, Receiving, Stock, Delivery, Money, Loan and Other
+ * Commitments, plus the truthful cancellable/refusal answer. It writes nothing
+ * and it forms no second opinion — `cancellable` restates cancel_order's one
+ * existing rule. The ACT itself stays on the single existing door,
+ * `POST /api/orders/:id/cancel`; this slice adds no second writer. */
+operationOrdersRouter.get("/:id/cancel-impact", requireOperation, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("sales_order_cancel_impact", {
+    p_order_id: c.req.param("id"),
+  });
+  if (error) {
+    const m = mapPipelineV2Error(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json(data);
+});
+
+const amendmentDecisionInput = z
+  .object({
+    decision: z.enum(["approve", "reject"]),
+    note: z.string().trim().max(2000).optional(),
+  })
+  .superRefine((v, ctx) => {
+    if (v.decision === "reject" && !v.note) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["note"], message: "A rejection says why" });
+    }
+  });
+
+operationOrdersRouter.post(
+  "/amendment/:amendmentId/decide",
+  requirePrincipal,
+  async (c) => {
+    const raw = await c.req.json().catch(() => ({}));
+    const parsed = amendmentDecisionInput.safeParse(raw);
+    if (!parsed.success) {
+      return c.json(
+        {
+          error: "invalid_input",
+          code: "invalid_param",
+          message: parsed.error.issues[0]?.message ?? "invalid input",
+        },
+        422,
+      );
+    }
+    const sb = userClient(c.env, c.var.auth.jwt);
+    const { data, error } = await sb.rpc("sales_order_decide_amendment", {
+      p_amendment_id: c.req.param("amendmentId"),
+      p_decision: parsed.data.decision,
+      p_note: parsed.data.note ?? null,
+    });
+    if (error) {
+      const m = mapPipelineV2Error(error);
+      return c.json(m.body, m.status);
+    }
+    return c.json(data);
+  },
+);
 
 // GET /reference/dealers — id + name for the create form's dealer picker.
 // RLS-scoped read (internal roles read dealers — the same embed the list

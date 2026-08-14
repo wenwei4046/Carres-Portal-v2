@@ -9,7 +9,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { operationOrderListRow } from "@/lib/queries";
 import SalesOrdersRegister from "./SalesOrdersRegister";
@@ -74,9 +74,15 @@ function mount() {
     <QueryClientProvider client={qc}>
       <MemoryRouter initialEntries={["/operation/orders"]}>
         <SalesOrdersRegister />
+        <LocationProbe />
       </MemoryRouter>
     </QueryClientProvider>,
   );
+}
+
+function LocationProbe() {
+  const location = useLocation();
+  return <output data-testid="location">{`${location.pathname}${location.search}`}</output>;
 }
 
 beforeEach(() => {
@@ -147,10 +153,60 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     mount();
     expect(screen.getAllByTestId("work-toolbar")).toHaveLength(1);
     expect(screen.getAllByRole("searchbox")).toHaveLength(1);
-    expect(screen.getByRole("button", { name: "Filters" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Export Excel/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Columns/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Filters" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Export" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Columns" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "New Sales Order" })).toBeInTheDocument();
+    expect(screen.queryByText("current view")).not.toBeInTheDocument();
+    expect(screen.queryByText(/\d+\/\d+/)).not.toBeInTheDocument();
+    expect(screen.queryByText("Not delivered")).not.toBeInTheDocument();
+  });
+
+  it("shows only the customer name in the default cell while retaining phone search context", () => {
+    mount();
+    const customer = screen.getByTitle("Kimmy · 019-3478913");
+    expect(customer).toHaveTextContent("Kimmy");
+    expect(customer).not.toHaveTextContent("019-3478913");
+  });
+
+  it("groups expanded goods under their real uppercase category", () => {
+    listHookState.data = {
+      orders: [
+        order({
+          order_lines: [
+            {
+              sku: "B1201S-K",
+              qty: 1,
+              unit_price: 2499,
+              label: "B1201S · King",
+              attrs: { category: "mattress", firmness: "medium" },
+            },
+          ],
+        }),
+      ],
+    };
+    mount();
+    fireEvent.click(screen.getByRole("button", { name: "Expand row" }));
+    expect(screen.getByRole("heading", { name: "MATTRESS" })).toBeInTheDocument();
+    expect(screen.queryByText("Other Goods")).not.toBeInTheDocument();
+    expect(screen.getByText(/firmness: medium/i)).toBeInTheDocument();
+    expect(screen.getByText("Qty 1")).toBeInTheDocument();
+  });
+
+  it("classifies legacy item codes before falling back to Other Goods", () => {
+    listHookState.data = {
+      orders: [
+        order({
+          order_lines: [
+            { sku: "B1201S-K", qty: 1, unit_price: 2499, label: "B1201S · King", attrs: {} },
+          ],
+        }),
+      ],
+    };
+    mount();
+    fireEvent.click(screen.getByRole("button", { name: "Expand row" }));
+    expect(screen.getByRole("heading", { name: "MATTRESS" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "OTHER GOODS" })).not.toBeInTheDocument();
   });
 
   it("keeps loading inside the work surface instead of adding an outer band", () => {
@@ -165,5 +221,49 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     expect(screen.getByTestId("sales-orders-grid")).toBeInTheDocument();
     expect(screen.getByTestId("work-toolbar")).toBeInTheDocument();
     expect(screen.getByTestId("grid-scroll")).toBeInTheDocument();
+  });
+});
+
+describe("Copy to new Sales Order", () => {
+  it("opens the authoritative create workspace with the source order as a draft seed", () => {
+    mount();
+    fireEvent.contextMenu(screen.getByTestId("grid-parent-row"));
+    fireEvent.click(screen.getByRole("button", { name: "Copy to new Sales Order" }));
+    expect(screen.getByTestId("location")).toHaveTextContent(
+      "/operation/orders/so/new?copyFrom=00000000-0000-0000-0000-00000000cafe",
+    );
+  });
+});
+
+describe("Cancel SO", () => {
+  /* The register writes nothing itself: the menu entry may only OPEN the one
+   * governed cancellation door, and the row it names is the door's subject.
+   * If a future edit ever makes the register cancel directly, the dialog stops
+   * being the single door and this test is the thing that notices. */
+  it("opens the governed cancellation door for the row, and navigates nowhere", () => {
+    mount();
+    fireEvent.contextMenu(screen.getByTestId("grid-parent-row"));
+    fireEvent.click(screen.getByRole("button", { name: "Cancel SO" }));
+    expect(screen.getByText("Cancel SO-1303")).toBeInTheDocument();
+    expect(screen.getByTestId("location")).toHaveTextContent("/operation/orders");
+  });
+
+  it("keeps the destructive entry last, below a divider, so a slipped click cannot reach it", () => {
+    mount();
+    fireEvent.contextMenu(screen.getByTestId("grid-parent-row"));
+    const labels = screen
+      .getAllByRole("button")
+      .map((b) => b.textContent?.trim())
+      .filter((t): t is string =>
+        [
+          "View",
+          "Edit",
+          "Preview PDF",
+          "Print PDF",
+          "Copy to new Sales Order",
+          "Cancel SO",
+        ].includes(t ?? ""),
+      );
+    expect(labels[labels.length - 1]).toBe("Cancel SO");
   });
 });

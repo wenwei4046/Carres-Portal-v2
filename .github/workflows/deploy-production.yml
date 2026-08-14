@@ -1,0 +1,68 @@
+name: Deploy production
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      expected_sha:
+        description: Exact main SHA to redeploy (defaults to this workflow SHA)
+        required: false
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: production
+  cancel-in-progress: false
+jobs:
+  deploy:
+    environment: production
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Select exact main commit
+        id: source
+        shell: bash
+        env:
+          REQUESTED_SHA: ${{ inputs.expected_sha }}
+        run: echo "sha=${REQUESTED_SHA:-$GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.source.outputs.sha }}
+          fetch-depth: 0
+      - name: Refuse a non-main source
+        shell: bash
+        run: git merge-base --is-ancestor HEAD origin/main
+      - uses: pnpm/action-setup@v4
+        with: { run_install: false }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - name: Repeat authoritative checks on the deployed SHA
+        run: |
+          pnpm ci:migrations
+          pnpm lint
+          pnpm typecheck
+          pnpm test
+          pnpm build
+      - name: Deploy both Pages projects from this SHA
+        working-directory: apps/api
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          DEPLOY_SHA: ${{ steps.source.outputs.sha }}
+        run: |
+          pnpm exec wrangler pages deploy ../web/dist --project-name carres-portal --branch main --commit-hash "${DEPLOY_SHA}" --commit-message "main ${DEPLOY_SHA}" --commit-dirty=false
+          pnpm exec wrangler pages deploy ../web/dist --project-name carres-pos --branch main --commit-hash "${DEPLOY_SHA}" --commit-message "main ${DEPLOY_SHA}" --commit-dirty=false
+      - name: Deploy API Worker from this SHA
+        working-directory: apps/api
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          DEPLOY_SHA: ${{ steps.source.outputs.sha }}
+        run: pnpm exec wrangler deploy --env production --var "PUBLIC_WEB_URL:https://pos.carresofficial.com" --var "DEPLOY_SHA:${DEPLOY_SHA}" --message "main ${DEPLOY_SHA}"
+      - name: Wait for both Pages projects and Worker
+        env:
+          EXPECTED_SHA: ${{ steps.source.outputs.sha }}
+        run: pnpm ci:smoke
+      - name: Deployment proof
+        run: echo "All production surfaces report ${{ steps.source.outputs.sha }}" >> "$GITHUB_STEP_SUMMARY"

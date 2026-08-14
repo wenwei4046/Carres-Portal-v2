@@ -702,9 +702,10 @@ function PaymentLedger({
   const { data, isLoading } = useOrderPayments(orderId);
   const payments = data?.payments ?? [];
   const summary = summarizePayments(
-    // `voidedAt` must ride along — a void is a stamp, not a delete (0343), so a
-    // reversed payment is still in this array and would otherwise be summed.
-    payments.map((p) => ({ amount: Number(p.amount), kind: p.kind, voidedAt: p.voided_at })),
+    // `voided_at` must ride along — a void is a stamp, not a delete (0343), so a
+    // reversed payment is still in this array. `summarizePayments` asks
+    // `isLivePayment` (0347); mapping the field away silently re-opens the hole.
+    payments.map((p) => ({ amount: Number(p.amount), kind: p.kind, voided_at: p.voided_at })),
     bill,
   );
   const hasBill = bill > 0;

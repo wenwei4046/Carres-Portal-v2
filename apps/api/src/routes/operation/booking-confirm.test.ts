@@ -86,6 +86,8 @@ beforeEach(() => {
 afterAll(() => _setJwksForTesting(null));
 
 const ORDER_ID = "00000000-0000-0000-0000-00000000010a";
+/** CARD 3 (0346) — the logistics company assigned to the order under test. */
+const PARTNER_ID = "00000000-0000-0000-0000-0000000002be";
 const URL = `http://t/api/operation/orders/${ORDER_ID}/booking/confirm`;
 const MATTRESS = "mattress:FirmCare-K";
 
@@ -126,7 +128,9 @@ function happyTables(overrides?: Partial<Record<string, ReturnType<typeof tableM
   };
   return {
     orders: tableMock({
-      data: { id: ORDER_ID, so: 1234, paid: 2500 },
+      // CARD 3 (0346): an appointment names the carrier it was made with, so
+      // the assignment rides this row and the confirm door stamps it.
+      data: { id: ORDER_ID, so: 1234, paid: 2500, ops_assigned_logistic: PARTNER_ID },
       error: null,
     }),
     order_lines: tableMock({
@@ -196,7 +200,7 @@ describe("POST /api/operation/orders/:id/booking/confirm", () => {
     const sb = makeSb(
       happyTables({
         orders: tableMock({
-          data: { id: ORDER_ID, so: 1234, paid: 1000 },
+          data: { id: ORDER_ID, so: 1234, paid: 1000, ops_assigned_logistic: PARTNER_ID },
           error: null,
         }),
       }),
@@ -239,7 +243,7 @@ describe("POST /api/operation/orders/:id/booking/confirm", () => {
     const sb = makeSb(
       happyTables({
         orders: tableMock({
-          data: { id: ORDER_ID, so: 1209, paid: 7248 },
+          data: { id: ORDER_ID, so: 1209, paid: 7248, ops_assigned_logistic: PARTNER_ID },
           error: null,
         }),
         order_lines: tableMock({
@@ -265,7 +269,7 @@ describe("POST /api/operation/orders/:id/booking/confirm", () => {
     const sb = makeSb(
       happyTables({
         orders: tableMock({
-          data: { id: ORDER_ID, so: 1221, paid: 1300 },
+          data: { id: ORDER_ID, so: 1221, paid: 1300, ops_assigned_logistic: PARTNER_ID },
           error: null,
         }),
         order_lines: tableMock({
@@ -297,6 +301,76 @@ describe("POST /api/operation/orders/:id/booking/confirm", () => {
     expect(typeof payload.customer_confirmed_at).toBe("string");
     const body = (await res.json()) as { control: { booking_stage: string } };
     expect(body.control.booking_stage).toBe("confirmed");
+  });
+
+  // ── CARD 3 · an appointment names the carrier it was made with (0346) ─────
+  // Owner ruling 2026-08-13: Assigned Logistics and the Confirmed Customer
+  // Appointment are two of THREE separate truths. That only holds if the
+  // appointment stores its own carrier — otherwise every reader takes whichever
+  // company happens to sit on the order today, and a reassignment silently
+  // rewrites what the customer agreed to.
+
+  it("CARD 3 — the confirmation stamps the carrier the appointment was made with", async () => {
+    const tables = happyTables();
+    const sb = makeSb(tables);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await post(await makeJwt("operation"), OK_BODY);
+    expect(res.status).toBe(200);
+    const payload = tables.ops_order_control.upsert.mock.calls[0][0] as Record<
+      string,
+      unknown
+    >;
+    expect(payload.confirmed_partner_id).toBe(PARTNER_ID);
+  });
+
+  it("CARD 3 — an appointment cannot be recorded with no logistics company", async () => {
+    const sb = makeSb(
+      happyTables({
+        orders: tableMock({
+          data: {
+            id: ORDER_ID,
+            so: 1234,
+            paid: 2500,
+            ops_assigned_logistic: null,
+            delivery_partner_id: null,
+          },
+          error: null,
+        }),
+      }),
+    );
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await post(await makeJwt("operation"), OK_BODY);
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code: string; message: string };
+    expect(body.code).toBe("booking_no_logistics");
+    expect(body.message).toContain("Assign a logistics company");
+  });
+
+  it("CARD 3 — the formal partner is accepted when no ops assignment exists", async () => {
+    const tables = happyTables({
+      orders: tableMock({
+        data: {
+          id: ORDER_ID,
+          so: 1234,
+          paid: 2500,
+          ops_assigned_logistic: null,
+          delivery_partner_id: PARTNER_ID,
+        },
+        error: null,
+      }),
+    });
+    const sb = makeSb(tables);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await post(await makeJwt("operation"), OK_BODY);
+    expect(res.status).toBe(200);
+    const payload = tables.ops_order_control.upsert.mock.calls[0][0] as Record<
+      string,
+      unknown
+    >;
+    expect(payload.confirmed_partner_id).toBe(PARTNER_ID);
   });
 
   // ── T8 · delivery groups (migration 0282) ────────────────────────────────
@@ -464,6 +538,7 @@ describe("POST /api/operation/orders/:id/booking/confirm", () => {
             confirmed_time_slot: "Morning (9am–12pm)",
             customer_confirmed_at: "2026-08-10T02:00:00.000Z",
             customer_confirmed_by: "u1",
+            confirmed_partner_id: PARTNER_ID,
             delivery_trips: [],
           },
           error: null,
@@ -484,11 +559,14 @@ describe("POST /api/operation/orders/:id/booking/confirm", () => {
       unknown
     >;
     expect(payload.booking_groups).toEqual(["sofa"]);
+    // CARD 3 (0346): the archived trip keeps the carrier it was agreed with,
+    // so the history can answer "who was that day agreed with?".
     expect(payload.delivery_trips).toEqual([
       {
         groups: ["bed"],
         date: "2026-08-17",
         slot: "Morning (9am–12pm)",
+        partner_id: PARTNER_ID,
         at: "2026-08-10T02:00:00.000Z",
         by: "u1",
       },

@@ -183,6 +183,8 @@ export type DataGridProps<T> = {
       Filters / Export / Columns. The legacy `toolbar` slot is unchanged. */
   toolbarStart?: ReactNode;
   toolbarEnd?: ReactNode;
+  /** Additional read-only outputs shown beside the built-in Excel export. */
+  outputActions?: Array<{ label: string; onClick: () => void }>;
   /** controlled focus for the "Find" button — bump to focus the search box */
   focusSearchNonce?: number;
   /** bump to collapse every expanded drill-down row ("Collapse all") */
@@ -359,6 +361,7 @@ function DataGridInner<T>({
   toolbar,
   toolbarStart,
   toolbarEnd,
+  outputActions,
   focusSearchNonce,
   collapseAllNonce,
   groupBanner = true,
@@ -413,20 +416,16 @@ function DataGridInner<T>({
      discoverable toolbar button + popover with a per-column checkbox + Reset
      link, matching houzs-erp/src/pages/SalesOrderPage.tsx lines 576-624. */
   const [columnsMenuOpen, setColumnsMenuOpen] = useState(false);
-  const [filtersMenuOpen, setFiltersMenuOpen] = useState(false);
+  const [outputMenuOpen, setOutputMenuOpen] = useState(false);
   /* The Columns popover is fixed-positioned (not absolute) so it escapes the
      grid card's `overflow: hidden`, which otherwise clips the dropdown when the
      card is short (few rows). Anchor it to the toolbar button's live rect. */
   const columnsBtnRef = useRef<HTMLButtonElement>(null);
-  const filtersBtnRef = useRef<HTMLButtonElement>(null);
   /* Ref on the popover panel so the scroll-to-close guard can tell an INSIDE
      scroll (the operator scrolling the column list) from an OUTSIDE scroll
      (the page/grid moving, which should dismiss the detached fixed popover). */
   const columnsMenuRef = useRef<HTMLDivElement>(null);
   const [columnsMenuPos, setColumnsMenuPos] = useState<{ top: number; right: number } | null>(
-    null,
-  );
-  const [filtersMenuPos, setFiltersMenuPos] = useState<{ top: number; left: number } | null>(
     null,
   );
   /* Per-column value filter (Commander 2026-05-29 — "没有 drop-down 菜单让我
@@ -1173,11 +1172,6 @@ function DataGridInner<T>({
   const totalCols = visibleColumns.length;
   const groupedCount = layout.groupBy.length;
   const isReference = appearance === "reference";
-  const activeFilterCount =
-    Object.values(filters).filter((v) => v.length > 0).length +
-    Object.keys(dateFilters).length +
-    Object.keys(numberFilters).length +
-    Object.keys(dateRangeFilters).length;
 
   /* Windowed rendering for large FLAT lists only. Skipped when grouped or
      expandable (variable row heights) or when the list is small — in those
@@ -1357,97 +1351,6 @@ function DataGridInner<T>({
           </div>
         )}
         {isReference ? null : toolbar}
-        {isReference && (
-          <div className={styles.columnsAnchor}>
-            <button
-              ref={filtersBtnRef}
-              type="button"
-              className={`${styles.toolbarPill} ${
-                filtersMenuOpen || activeFilterCount > 0 ? styles.toolbarPillOn : ""
-              }`}
-              onClick={(e) => {
-                e.stopPropagation();
-                setFiltersMenuOpen((open) => {
-                  const next = !open;
-                  if (next && filtersBtnRef.current) {
-                    const r = filtersBtnRef.current.getBoundingClientRect();
-                    setFiltersMenuPos({ top: r.bottom + 4, left: r.left });
-                  }
-                  return next;
-                });
-              }}
-            >
-              <Filter {...ICON} aria-hidden />
-              <span>Filters</span>
-              {activeFilterCount > 0 && (
-                <span className={styles.toolbarPillBadge}>{activeFilterCount}</span>
-              )}
-            </button>
-            {filtersMenuOpen && (
-              <>
-                <div className={styles.columnsMenuBackdrop} onClick={() => setFiltersMenuOpen(false)} />
-                <div
-                  className={styles.columnsMenu}
-                  style={
-                    filtersMenuPos
-                      ? { position: "fixed", top: filtersMenuPos.top, left: filtersMenuPos.left }
-                      : undefined
-                  }
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <header className={styles.columnsMenuHeader}>
-                    <span>Filter a column</span>
-                    {activeFilterCount > 0 && (
-                      <button
-                        type="button"
-                        className={styles.columnsMenuReset}
-                        onClick={() => {
-                          setFilters({});
-                          setDateFilters({});
-                          setNumberFilters({});
-                          setDateRangeFilters({});
-                          setFiltersMenuOpen(false);
-                        }}
-                      >
-                        Clear
-                      </button>
-                    )}
-                  </header>
-                  <div className={styles.columnsMenuBody}>
-                    {visibleColumns
-                      .filter((c) => !c.key.startsWith("__"))
-                      .map((c) => (
-                        <button
-                          key={c.key}
-                          type="button"
-                          className={styles.filterLauncherItem}
-                          onClick={() => {
-                            const r = filtersBtnRef.current?.getBoundingClientRect();
-                            setFiltersMenuOpen(false);
-                            setFilterMenu({
-                              colKey: c.key,
-                              x: r?.left ?? 0,
-                              y: (r?.bottom ?? 0) + 4,
-                            });
-                          }}
-                        >
-                          <span>{c.label}</span>
-                          <span>
-                            {(filters[c.key]?.length ?? 0) > 0 ||
-                            dateFilters[c.key] ||
-                            numberFilters[c.key] ||
-                            dateRangeFilters[c.key]
-                              ? "Active"
-                              : ""}
-                          </span>
-                        </button>
-                      ))}
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-        )}
         {!isReference && <div className={styles.toolbarSpacer} />}
         {/* Clear-all-filters — appears only when ≥1 column filter is active.
             Per-column funnels already highlight; this is the one-click
@@ -1478,18 +1381,48 @@ function DataGridInner<T>({
             filter + sort) across the visible data columns. System-wide: every
             list rendered through DataGrid gets it for free (Wei Siang
             2026-06-19). Wording says the scope out loud (REGISTER LAW 3). */}
-        <button
-          type="button"
-          className={styles.toolbarPill}
-          onClick={() => {
-            void exportRows(sortedRows);
-          }}
-          disabled={sortedRows.length === 0}
-          title={sortedRows.length === 0 ? "No rows to export" : "Export the visible rows to Excel"}
-        >
-          <Download size={14} strokeWidth={1.75} aria-hidden />
-          <span>Export Excel — current view</span>
-        </button>
+        <div className={styles.columnsAnchor}>
+          <button
+            type="button"
+            className={`${styles.toolbarPill} ${outputMenuOpen ? styles.toolbarPillOn : ""}`}
+            onClick={() => setOutputMenuOpen((open) => !open)}
+            disabled={sortedRows.length === 0}
+            aria-haspopup="menu"
+            aria-expanded={outputMenuOpen}
+          >
+            <Download size={14} strokeWidth={1.75} aria-hidden />
+            <span>Export</span>
+          </button>
+          {outputMenuOpen && (
+            <div className={styles.columnsMenu} role="menu">
+              <button
+                type="button"
+                className={styles.filterLauncherItem}
+                role="menuitem"
+                onClick={() => {
+                  setOutputMenuOpen(false);
+                  void exportRows(sortedRows);
+                }}
+              >
+                Export Excel
+              </button>
+              {(outputActions ?? []).map((action) => (
+                <button
+                  key={action.label}
+                  type="button"
+                  className={styles.filterLauncherItem}
+                  role="menuitem"
+                  onClick={() => {
+                    setOutputMenuOpen(false);
+                    action.onClick();
+                  }}
+                >
+                  {action.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         <div className={styles.columnsAnchor}>
           <button
             ref={columnsBtnRef}
@@ -1509,9 +1442,6 @@ function DataGridInner<T>({
           >
             <Columns3 size={14} strokeWidth={1.75} aria-hidden />
             <span>Columns</span>
-            <span className={styles.toolbarPillBadge}>
-              {visibleDataColumnCount}/{columns.length}
-            </span>
           </button>
           {columnsMenuOpen && (
             <>

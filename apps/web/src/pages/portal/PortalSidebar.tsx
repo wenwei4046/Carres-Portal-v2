@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ChevronDown, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { useAuth } from "@/lib/auth";
@@ -20,6 +20,13 @@ import {
 } from "./portal-nav";
 
 const COLLAPSE_KEY = "ops-sidebar-collapsed";
+const SECTION_ORDER = ["Workspace", "Sales", "Supply Chain", "Finance", "Customer Care", "Master Data", "Admin"];
+
+function orderedItems(group: PortalNavGroup, role: Parameters<typeof visibleItems>[1]) {
+  return [...visibleItems(group, role)].sort(
+    (a, b) => SECTION_ORDER.indexOf(a.section ?? "Admin") - SECTION_ORDER.indexOf(b.section ?? "Admin"),
+  );
+}
 
 /**
  * Unified Internal Portal sidebar (2026-06-30, Loo).
@@ -221,7 +228,7 @@ export default function PortalSidebar() {
         {collapsed
           ? // Icon rail — the active area's items only (collapse = more room,
             // not area-switching; expand to jump areas).
-            (activeGroup ? visibleItems(activeGroup, role) : []).map((item) => {
+            (activeGroup ? orderedItems(activeGroup, role) : []).map((item) => {
               const active = isItemActive(activeGroup, item);
               const dot =
                 (item.badge && (badgeCount[item.badge] ?? 0) > 0) ||
@@ -280,16 +287,22 @@ export default function PortalSidebar() {
 
                   {open && (
                     <div className="flex flex-col gap-0.5">
-                      {visibleItems(group, role).map((item) => {
+                      {orderedItems(group, role).map((item, index, items) => {
                         const active = isItemActive(group, item);
                         const baseCls =
                           "relative w-full text-left px-3.5 py-[9px] rounded text-body flex items-center gap-[11px]";
                         const cls = active
                           ? `${baseCls} bg-base-100 text-base-900 font-semibold`
                           : `${baseCls} text-base-600 font-medium hover:bg-hovertint`;
+                        const startsSection = item.section && item.section !== items[index - 1]?.section;
                         return (
+                          <Fragment key={item.key}>
+                          {startsSection && (
+                            <div className="px-3.5 pb-1 pt-3 text-label font-semibold uppercase tracking-[0.14em] text-base-500">
+                              {item.section}
+                            </div>
+                          )}
                           <Link
-                            key={item.key}
                             to={navItemHref(group, item)}
                             onClick={() => fireMarkSeen(item.badge)}
                             className={cls}
@@ -323,6 +336,7 @@ export default function PortalSidebar() {
                               </span>
                             )}
                           </Link>
+                          </Fragment>
                         );
                       })}
                     </div>

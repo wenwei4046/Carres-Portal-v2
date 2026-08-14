@@ -70,8 +70,14 @@ export const DELIVERY_QUEUES: readonly DeliveryQueueDef[] = [
     label: orderActionQueue("assign_logistics"),
     anchor: "delivery_date",
     leadWorkingDays: 3,
+    // CARD 3 (owner ruling 2026-08-13, Rule 1): "Assign Logistics early. The
+    // purpose is capacity planning. Do NOT wait until stock is physically ready
+    // before assigning logistics." The old wording here said "Stock is in
+    // but..." — it described a gate the engine never had (`deliveryAction`
+    // raises this step from order birth) and told the operator the opposite of
+    // the rule. The DEADLINE is unchanged; only the sentence was wrong.
     description:
-      "Stock is in but no logistics company is picked yet — late once the customer's date is under 3 working days away",
+      "No logistics company is picked yet — assign one as soon as the route is known, whether or not the goods are in; late once the customer's date is under 3 working days away",
   },
   {
     key: "chase",

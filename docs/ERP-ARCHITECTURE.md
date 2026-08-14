@@ -147,20 +147,48 @@ object; sometimes it is an accepted ERP operation (`Receiving`); cross-cutting s
 (`To Order`), never a state.**
 
 ```
-Sales
-└── Sales Order
+WORKSPACE
+├── Dashboard
+└── Work
+    ├── My Work
+    └── Team Work
 
-Purchasing
-├── SO Batch Purchase
-├── Manual Purchase
-├── Purchase Order
-├── Receiving
-└── Supplier Claim
+SALES
+├── Sales Orders
+└── Amendments
 
-Portal
+SUPPLY CHAIN
+├── Purchasing
+│   ├── SO Batch Purchase
+│   ├── Manual Purchase
+│   ├── Purchase Orders
+│   ├── Receiving
+│   └── Supplier Claims
+├── Warehouse
+└── Delivery
+
+FINANCE
+└── Payments
+
+CUSTOMER CARE
+├── Rental
+├── Service Cases
+└── Guarantees
+
+MASTER DATA
+├── Catalog
+└── Suppliers
+
+ADMIN
 ├── Reports
 └── Settings
 ```
+
+This is the **ERP Shell V1 destination grammar**, owner-approved 2026-08-13. A module may expose a
+`Settings` shortcut, but it deep-links into the one central Settings destination; it does not create
+a second settings home. `Old Orders` is a temporary cutover door and is not part of permanent IA.
+The right Quick Rail is governed by `ui/MASTER.md`; it never adds duplicate module destinations or
+business truth.
 
 **This is navigation, not workflow.** How the operator moves between these pages — which one
 feeds which — is the module MASTER's, and it changes when the business changes.

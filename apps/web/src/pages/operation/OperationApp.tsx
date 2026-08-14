@@ -32,6 +32,7 @@ import OperationDashboard from "./OperationDashboard";
 import OperationOrdersControl from "./OperationOrdersControl";
 import SalesOrdersRegister from "./SalesOrdersRegister";
 import SalesOrderWorkspace from "./SalesOrderWorkspace";
+import SettingsWorkspace from "./SettingsWorkspace";
 // T11 (2026-07-27) — the Delivery module: the ONE new sidebar item in the
 // build plan. Tab-state driven like Payments / Stock (only orders and
 // procurement are path-driven), so `?tab=delivery` deep-links it.
@@ -146,7 +147,11 @@ export default function OperationApp() {
   // sub-path: `startsWith` would then light BOTH sidebar items at once, and a
   // door that shares the new register's prefix reads as part of it.
   const isOldOrdersUrl = location.pathname.startsWith("/operation/old-orders");
-  const isUrlDriven = isProcurementUrl || isToOrderUrl || isOrdersUrl || isOldOrdersUrl;
+  /* The one Settings Workspace is its own route, not a module tab — the
+     Page Header gear is the ERP's single Settings entry (ui/MASTER.md). */
+  const isSettingsUrl = location.pathname.startsWith("/operation/settings");
+  const isUrlDriven =
+    isProcurementUrl || isToOrderUrl || isOrdersUrl || isOldOrdersUrl || isSettingsUrl;
 
   const [tab, setTab] = useState<string>("dashboard");
   // Sidebar collapse moved into PortalSidebar (Unified Internal Portal,
@@ -177,12 +182,20 @@ export default function OperationApp() {
   // (`?section=promo`) survives the hop to the Admin door.
   const catalogSection = searchParams.get(CATALOG_TAB_PARAM);
   useEffect(() => {
-    if (!urlTab || isProcurementUrl || isToOrderUrl || isOrdersUrl || isOldOrdersUrl) return;
+    if (
+      !urlTab
+      || isProcurementUrl
+      || isToOrderUrl
+      || isOrdersUrl
+      || isOldOrdersUrl
+      || isSettingsUrl
+    )
+      return;
     setMovementsPrefill((p) => (urlTab === "movements" ? p : undefined));
     setWarehousePrefill((p) => (urlTab === "warehouse" ? p : undefined));
     setTab(urlTab);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [urlTab, isProcurementUrl, isToOrderUrl, isOrdersUrl, isOldOrdersUrl]);
+  }, [urlTab, isProcurementUrl, isToOrderUrl, isOrdersUrl, isOldOrdersUrl, isSettingsUrl]);
 
   // When the URL leaves a URL-driven section (e.g. user navigated via Back
   // to `/operation`), make sure the local tab state has a sensible value so
@@ -332,6 +345,9 @@ export default function OperationApp() {
                 Order]); static `new` outranks `:orderId`. Declared before
                 `orders/:stage` in source for the reader; React Router ranks
                 them higher anyway. */}
+            {/* The one Settings Workspace. Reached only from the Page Header
+                gear's launcher — never a tab, nav item or Work Toolbar action. */}
+            <Route path="settings/*" element={<SettingsWorkspace />} />
             <Route path="orders/so/new" element={<SalesOrderWorkspace />} />
             <Route path="orders/so/:orderId" element={<SalesOrderWorkspace />} />
             <Route path="orders/:stage" element={<SalesOrdersRegister />} />

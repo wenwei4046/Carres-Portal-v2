@@ -193,3 +193,51 @@ describe("OrderDetailDrawer — C7, the delivery order", () => {
     expect(body).toContain("renderDoPdf(data)");
   });
 });
+
+/**
+ * SALES ORDER V2 · CARD 4 closing slice (0347) — **a voided payment is not
+ * money.**
+ *
+ * 0343 turned VOID from a DELETE into a STAMP, which is right: money history is
+ * never erased. Every reader in this file was written when a void deleted the
+ * row, so a reversed payment would have been summed into the storage
+ * collection, listed as a document on file, offered as a printable receipt and
+ * shown in the history as if it still stood. The ledger holds zero rows on
+ * production, so nothing was wrong on screen — all of it would have gone wrong
+ * on the first void.
+ *
+ * Source scan, in this file's established method: the branches only exist once
+ * a principal has voided something, which is exactly the state no fixture
+ * mounts.
+ */
+describe("OrderDetailDrawer — a voided payment is not money (CARD 4, 0347)", () => {
+  it("every sum over the ledger asks the ONE predicate", () => {
+    // The storage-collected roll-up feeds `balanceDue`; without the filter a
+    // reversed storage collection makes the order read as owing less.
+    expect(SRC).toContain('p.kind === "storage" && isLivePayment(p)');
+    // …and the predicate comes from shared — no local `voided_at` spelling.
+    expect(SRC).toMatch(/^\s*isLivePayment,\s*$/m);
+    // …and it never reads the column itself: a second spelling of "is this
+    // reversed?" is how the four readers drifted apart in the first place.
+    const spellings = SRC.match(/\.voided_at\b/g) ?? [];
+    expect(spellings, "the drawer must not read `voided_at` directly").toEqual([]);
+  });
+
+  it("a voided receipt is not a document on file", () => {
+    expect(SRC).toContain("payments: ledger.filter(isLivePayment).map((p) => ({");
+  });
+
+  it("`Print receipt` means the latest payment that still stands", () => {
+    expect(SRC).toContain("const latestLivePayment = ledger.find(isLivePayment) ?? null;");
+    // The old form took ledger[0] — the newest row, voided or not.
+    expect(SRC).not.toContain("openReceipt(ledger[0]");
+  });
+
+  it("a voided row reads as reversed and offers neither receipt nor a second void", () => {
+    expect(SRC).toContain("const voided = !isLivePayment(p);");
+    expect(SRC).toContain("{!voided && (");
+    expect(SRC).toContain("{isPrincipal && !voided && (");
+    // It stays visible: the history is the point of keeping the row.
+    expect(SRC).toContain("Voided");
+  });
+});

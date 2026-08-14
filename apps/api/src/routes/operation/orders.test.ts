@@ -151,7 +151,9 @@ describe("GET /api/operation/orders", () => {
         }),
         env,
       );
-      return (await res.json()) as { orders: { so: number; po_skus: string[] }[] };
+      return (await res.json()) as {
+        orders: { so: number; po_skus: string[]; po_numbers: string[] }[];
+      };
     }
 
     it("a PO linked through so_refs[] puts its SKUs on the order", async () => {
@@ -162,6 +164,7 @@ describe("GET /api/operation/orders", () => {
       );
       const body = await get();
       expect(body.orders[0]?.po_skus).toEqual(["mattress:MAT-1"]);
+      expect(body.orders[0]?.po_numbers).toEqual(["PO-2049"]);
     });
 
     it("a PO linked through its own so also counts", async () => {
@@ -185,6 +188,8 @@ describe("GET /api/operation/orders", () => {
       const body = await get();
       expect(body.orders[0]?.po_skus).toEqual(["mattress:MAT-1"]);
       expect(body.orders[1]?.po_skus).toEqual(["mattress:MAT-1"]);
+      expect(body.orders[0]?.po_numbers).toEqual(["PO-9"]);
+      expect(body.orders[1]?.po_numbers).toEqual(["PO-9"]);
     });
 
     it("an order NO purchase order names gets an empty list, never another order's SKUs", async () => {
@@ -198,6 +203,7 @@ describe("GET /api/operation/orders", () => {
       );
       const body = await get();
       expect(body.orders[1]?.po_skus).toEqual([]);
+      expect(body.orders[1]?.po_numbers).toEqual([]);
     });
 
     it("a PO with no lines contributes nothing", async () => {
@@ -1839,9 +1845,9 @@ describe("POST /api/operation/orders/:id/revert-dispatch", () => {
 describe("POST /api/operation/orders/:id/save", () => {
   const ORDER_ID = "00000000-0000-0000-0000-000000000b01";
 
-  it("calls sales_order_save_revision with header + lines, writes nothing directly", async () => {
+  it("saves only safe correction fields and writes nothing directly", async () => {
     const rpc = vi.fn().mockResolvedValue({
-      data: { revision: 2, changed: ["delivery_date", "items"] },
+      data: { revision: 2, changed: ["customer_phone", "proceed_date"] },
       error: null,
     });
     const from = vi.fn();
@@ -1853,8 +1859,7 @@ describe("POST /api/operation/orders/:id/save", () => {
         method: "POST",
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
         body: JSON.stringify({
-          header: { delivery_date: "2026-09-05" },
-          lines: [{ sku: "B1201S-K", qty: 2, unit_price: 2499 }],
+          header: { customer_phone: "012-3456789", proceed_date: "2026-09-05" },
         }),
       }),
       env,
@@ -1862,8 +1867,8 @@ describe("POST /api/operation/orders/:id/save", () => {
     expect(res.status).toBe(201);
     expect(rpc).toHaveBeenCalledWith("sales_order_save_revision", {
       p_order_id: ORDER_ID,
-      p_header: { delivery_date: "2026-09-05" },
-      p_lines: [{ sku: "B1201S-K", qty: 2, unit_price: 2499 }],
+      p_header: { customer_phone: "012-3456789", proceed_date: "2026-09-05" },
+      p_lines: null,
       p_change: null,
     });
     /* NOTHING was written directly — the RPC owns every write. */
@@ -1876,35 +1881,7 @@ describe("POST /api/operation/orders/:id/save", () => {
     ]);
   });
 
-  it("CARD 1 — forwards the cause: change.type/note → p_change", async () => {
-    const rpc = vi.fn().mockResolvedValue({
-      data: { revision: 3, changed: ["items"], change_type: "customer_change" },
-      error: null,
-    });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ rpc } as any);
-    const jwt = await makeJwt("operation");
-    const res = await app.fetch(
-      new Request(`http://t/api/operation/orders/${ORDER_ID}/save`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          lines: [{ sku: "MODEL-B", qty: 1, unit_price: 2799 }],
-          change: { type: "customer_change", note: "Customer phoned - wants Model B" },
-        }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(201);
-    expect(rpc).toHaveBeenCalledWith("sales_order_save_revision", {
-      p_order_id: ORDER_ID,
-      p_header: {},
-      p_lines: [{ sku: "MODEL-B", qty: 1, unit_price: 2799 }],
-      p_change: { change_type: "customer_change", note: "Customer phoned - wants Model B" },
-    });
-  });
-
-  it("CARD 1 — refuses an unknown change type without calling the database", async () => {
+  it("refuses contractual items at the API boundary", async () => {
     const rpc = vi.fn();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue({ rpc } as any);
@@ -1914,8 +1891,27 @@ describe("POST /api/operation/orders/:id/save", () => {
         method: "POST",
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
         body: JSON.stringify({
+          header: { customer_phone: "012-3456789" },
           lines: [{ sku: "MODEL-B", qty: 1, unit_price: 2799 }],
-          change: { type: "fulfilment_replacement" },
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("refuses the promised date at the API boundary", async () => {
+    const rpc = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/${ORDER_ID}/save`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          header: { delivery_date: "2026-09-05" },
         }),
       }),
       env,
@@ -1953,7 +1949,7 @@ describe("POST /api/operation/orders/:id/save", () => {
       new Request(`http://t/api/operation/orders/${ORDER_ID}/save`, {
         method: "POST",
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ header: { delivery_date: "2026-09-05" } }),
+        body: JSON.stringify({ header: { customer_phone: "012-3456789" } }),
       }),
       env,
     );
@@ -1961,6 +1957,122 @@ describe("POST /api/operation/orders/:id/save", () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const body = (await res.json()) as any;
     expect(body.message).toBe("Nothing changed");
+  });
+});
+
+describe("Sales Order amendment decision lane", () => {
+  const AMENDMENT_ID = "00000000-0000-0000-0000-000000000a01";
+
+  it("returns the owner impact preview without writing another module", async () => {
+    const impact = {
+      amendment_id: AMENDMENT_ID,
+      stale: false,
+      findings: [{ owner: "Purchasing", kind: "purchase_order", count: 1, blocks: false }],
+    };
+    const rpc = vi.fn().mockResolvedValue({ data: impact, error: null });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/amendment/${AMENDMENT_ID}/impact`, {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual(impact);
+    expect(rpc).toHaveBeenCalledWith("sales_order_amendment_impact", {
+      p_amendment_id: AMENDMENT_ID,
+    });
+  });
+
+  it("previews what cancelling would raise, and writes nothing", async () => {
+    const ORDER_ID = "00000000-0000-0000-0000-0000000000c1";
+    const impact = {
+      order_id: ORDER_ID,
+      so: 1303,
+      status: "place",
+      cancellable: true,
+      refusal: null,
+      goods_total: 2499,
+      paid: 1250,
+      findings: [{ owner: "Purchasing", kind: "purchase_order", count: 1, blocks: false }],
+    };
+    const rpc = vi.fn().mockResolvedValue({ data: impact, error: null });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/${ORDER_ID}/cancel-impact`, {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual(impact);
+    /* ONE call, and it is the read. The preview never reaches a writer — the
+     * act stays on the single existing cancel door. */
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(rpc).toHaveBeenCalledWith("sales_order_cancel_impact", { p_order_id: ORDER_ID });
+  });
+
+  it("approves through one atomic decision RPC", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: { id: AMENDMENT_ID, status: "applied", revision: 5 },
+      error: null,
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("principal");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/amendment/${AMENDMENT_ID}/decide`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ decision: "approve", note: "Customer confirmed in writing" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ id: AMENDMENT_ID, status: "applied", revision: 5 });
+    expect(rpc).toHaveBeenCalledWith("sales_order_decide_amendment", {
+      p_amendment_id: AMENDMENT_ID,
+      p_decision: "approve",
+      p_note: "Customer confirmed in writing",
+    });
+  });
+
+  it("requires a reason when management rejects", async () => {
+    const rpc = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("principal");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/amendment/${AMENDMENT_ID}/decide`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ decision: "reject" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("does not expose the decision door to operation", async () => {
+    const rpc = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/amendment/${AMENDMENT_ID}/decide`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ decision: "approve", note: "Customer confirmed" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+    expect(rpc).not.toHaveBeenCalled();
   });
 });
 

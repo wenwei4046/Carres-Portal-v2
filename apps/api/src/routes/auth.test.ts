@@ -46,7 +46,7 @@ describe("GET /health", () => {
   it("returns 200 {ok:true} without auth", async () => {
     const res = await app.fetch(new Request("http://t/health"), env);
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ ok: true });
+    expect(await res.json()).toEqual({ ok: true, commit: "local" });
   });
 });
 

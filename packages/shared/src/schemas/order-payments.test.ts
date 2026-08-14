@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   recordPaymentInputSchema,
   collectStorageInput,
+  isLivePayment,
   summarizePayments,
   type PaymentKind,
 } from "./order-payments";
@@ -72,38 +73,28 @@ describe("summarizePayments", () => {
     expect(summarizePayments([p(1000, "payment")], 0).outstanding).toBe(0);
   });
 
-  // 0343 turned void from a DELETE into a STAMP, so a reversed payment is still
-  // in the array the UI hands us. Before this, the ledger reported money the
-  // customer had been given back.
-  describe("voided rows (0343 — a void is a stamp, never a delete)", () => {
-    const voided = (amount: number, kind: PaymentKind) => ({
-      amount,
-      kind,
-      voidedAt: "2026-08-12T02:00:00Z",
-    });
+  // CARD 4 closing slice (0347). A void has been a STAMP since 0343 — the row
+  // survives so the history survives — and every reader of this ledger was
+  // written when a void DELETED the row.
+  it("a VOIDED row is not money — it counts toward nothing", () => {
+    const s = summarizePayments(
+      [
+        p(1000, "deposit"),
+        { amount: 1500, kind: "payment", voided_at: "2026-08-13T02:00:00Z" },
+        { amount: 150, kind: "storage", voided_at: "2026-08-13T02:00:00Z" },
+        p(200, "storage"),
+      ],
+      5000,
+    );
+    expect(s.paid).toBe(1200); // 1000 + 200, the two voided rows excluded
+    expect(s.byKind).toEqual({ payment: 0, deposit: 1000, storage: 200 });
+    expect(s.outstanding).toBe(4000); // 5000 − 1000 (the voided payment is gone)
+    expect(s.storageCollected).toBe(200);
+  });
 
-    it("a voided payment is not counted — the order still owes it", () => {
-      const s = summarizePayments([p(1000, "deposit"), voided(1500, "payment")], 5000);
-      expect(s.paid).toBe(1000);
-      expect(s.byKind.payment).toBe(0);
-      expect(s.outstanding).toBe(4000); // NOT 2500 — the 1500 was reversed
-    });
-
-    it("a voided STORAGE collection un-collects the storage fee", () => {
-      // The desk gates delivery on this figure; a reversed collection that still
-      // reads as collected opens the gate on money nobody has.
-      expect(summarizePayments([voided(150, "storage")], 5000).storageCollected).toBe(0);
-    });
-
-    it("negative control — the SAME rows unvoided are counted in full", () => {
-      const s = summarizePayments([p(1000, "deposit"), p(1500, "payment"), p(150, "storage")], 5000);
-      expect(s.paid).toBe(2650);
-      expect(s.outstanding).toBe(2500);
-      expect(s.storageCollected).toBe(150);
-    });
-
-    it("an absent voidedAt behaves exactly as before (callers not yet updated)", () => {
-      expect(summarizePayments([{ amount: 900, kind: "payment" }], 5000).paid).toBe(900);
-    });
+  it("isLivePayment is the ONE predicate every reader asks", () => {
+    expect(isLivePayment({})).toBe(true);
+    expect(isLivePayment({ voided_at: null })).toBe(true);
+    expect(isLivePayment({ voided_at: "2026-08-13T02:00:00Z" })).toBe(false);
   });
 });

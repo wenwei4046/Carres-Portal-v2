@@ -126,10 +126,17 @@ function buildSb(
   // Simulates a Supabase PostgREST chain that records .eq() filters and
   // returns rows on .order() (list) or .maybeSingle() (single row).
   const eqs: Array<[string, unknown]> = [];
+  const iss: Array<[string, string, unknown]> = [];
   function chainFor(table: string) {
     const chain = {
       eq(col: string, val: unknown) {
         eqs.push([col, val]);
+        return chain;
+      },
+      /** 0347 — the ledger read filters `voided_at is null`; recorded so a
+       *  test can prove a reversed payment never reaches a customer document. */
+      is(col: string, val: unknown) {
+        iss.push([table, col, val]);
         return chain;
       },
       in: async () => ({ data: rowsFor.byTable?.[table] ?? [], error: null }),
@@ -146,6 +153,7 @@ function buildSb(
     {
       from: (table: string) => ({ select: () => chainFor(table) }),
       _eqs: eqs,
+      _iss: iss,
     },
     storage,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1053,6 +1061,24 @@ describe("GET /api/orders/:id/sales-order-data", () => {
       { label: "Deposit · Bank transfer", reference: "R-1", amount: 500, date: "2026-07-01", collected_by: null },
       { label: "Cash", reference: "RC-9", amount: 250, date: "2026-07-08", collected_by: null },
     ]);
+  });
+
+  // CARD 4 closing slice (0347). 0343 turned a void into a STAMP so money
+  // history is never erased — and this query, written when a void DELETED the
+  // row, would otherwise print a reversed payment on the document the CUSTOMER
+  // reads. The filter is asserted on the query, not on the mock's rows,
+  // because the mock cannot apply a PostgREST filter for us.
+  it("asks the ledger for LIVE payments only — a voided row never prints", async () => {
+    const sb = buildSb({ one: makeJoinedRow() });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("operation", null);
+    await app.fetch(
+      new Request(`http://t/api/orders/${ORDER_ID}/sales-order-data`, {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(sb._iss).toContainEqual(["order_payments", "voided_at", null]);
   });
 
   it("returns earned voucher codes (fail-soft to [] when the table is unreadable)", async () => {
@@ -3987,27 +4013,33 @@ describe("POST /api/orders/:id/cancel", () => {
     expect((sb._rpcCalls[0].args as Record<string, unknown>).p_reason).toBe("Customer changed mind");
   });
 
-  it("200 — accepts null reason", async () => {
-    const sb = buildSbForProceed({
-      fetchedRow: makeOrderRow({
-        status: "cancelled",
-        signature_url: `orders-attachments/${DEALER_A}/wiz/signature.png`,
-        terms_accepted: true,
-      }),
-    });
-    vi.mocked(userClient).mockReturnValue(sb);
-    const jwt = await makeJwt("dealer", DEALER_A);
-    const res = await app.fetch(
-      new Request(cancelUrl, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ reason: null }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(200);
-    expect((sb._rpcCalls[0].args as Record<string, unknown>).p_reason).toBeNull();
-  });
+  /* 0350 — A CANCELLATION SAYS WHY. This test used to assert the opposite:
+   * `{ reason: null }` returned 200 and passed a NULL through to the RPC, and
+   * the audit row read the bare words "Order cancelled". A cancelled customer
+   * transaction that cannot say why is a record that answers nothing, so the
+   * reason is now required and the refusal happens at the boundary — the RPC
+   * is never reached, and the caller gets the field back rather than a
+   * database error. */
+  it.each([{ reason: null }, { reason: "" }, { reason: "   " }, {}])(
+    "400 before the RPC — a cancellation says why (%j)",
+    async (body) => {
+      const sb = buildSbForProceed({});
+      vi.mocked(userClient).mockReturnValue(sb);
+      const jwt = await makeJwt("dealer", DEALER_A);
+      const res = await app.fetch(
+        new Request(cancelUrl, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        }),
+        env,
+      );
+      /* 400 is this dispatcher's one shape for a body that never passed the
+       * schema — the same answer every other order mutation gives. */
+      expect(res.status).toBe(400);
+      expect(sb._rpcCalls).toHaveLength(0);
+    },
+  );
 
   it("422 when RPC says wrong_status (already proceeded / cancelled)", async () => {
     const sb = buildSbForProceed({

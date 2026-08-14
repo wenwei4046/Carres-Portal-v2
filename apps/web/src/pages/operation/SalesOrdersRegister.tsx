@@ -43,6 +43,7 @@
 // around the one the engine already draws.
 import { useCallback, useMemo, useState } from "react";
 import { Plus } from "lucide-react";
+import { lineClass } from "@carres/shared";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import {
@@ -50,15 +51,15 @@ import {
   type DataGridColumn,
   type DataGridContextMenuItem,
 } from "@/components/register/DataGrid";
-import Select from "@/components/kit/Select";
 import Money from "@/components/Money";
 import { apiFetch, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { renderSalesOrderPdf } from "@/lib/pdf/render";
-import type { SalesOrderTemplateData } from "@/lib/pdf/types";
+import { renderDoPdf, renderSalesOrderPdf } from "@/lib/pdf/render";
+import type { DoTemplateData, SalesOrderTemplateData } from "@/lib/pdf/types";
 import { useOperationOrders } from "@/lib/queries";
+import CancelSalesOrderDialog from "./CancelSalesOrderDialog";
 import DestinationHeader from "./DestinationHeader";
-import { isDelivered, isRental, lineName, type MoneyState } from "./sales-order-facts";
+import { isRental, lineName, type MoneyState } from "./sales-order-facts";
 import {
   buildRegisterRow,
   defaultOnFor,
@@ -89,7 +90,11 @@ function moneyExport(state: MoneyState): string | number {
  *     lists the printed text, export writes the raw figure, and the engine's
  *     footer sums them over the FILTERED list.
  */
-function toGridColumn(f: RegisterField, role: string | null): DataGridColumn<RegisterRow> {
+function toGridColumn(
+  f: RegisterField,
+  role: string | null,
+  navigate: ReturnType<typeof useNavigate>,
+): DataGridColumn<RegisterRow> {
   const base: DataGridColumn<RegisterRow> = {
     key: f.key,
     label: f.label,
@@ -127,8 +132,67 @@ function toGridColumn(f: RegisterField, role: string | null): DataGridColumn<Reg
       : {}),
   };
   if (f.key === "so") {
-    /* Doc codes get 2990's type-to-find list. */
-    return { ...base, filterType: "numbering" };
+    return {
+      ...base,
+      filterType: "numbering",
+      accessor: (r) => (
+        <button
+          type="button"
+          className="font-medium text-blue-700 underline-offset-2 hover:underline"
+          onClick={(event) => {
+            event.stopPropagation();
+            navigate(`/operation/orders/so/${r.id}`);
+          }}
+        >
+          SO-{r.so}
+        </button>
+      ),
+    };
+  }
+  if (f.key === "po_number") {
+    return {
+      ...base,
+      accessor: (r) =>
+        r.poNumbers.length === 0 ? (
+          f.text(r)
+        ) : (
+          <span className="inline-flex gap-1.5">
+            {r.poNumbers.map((po) => (
+              <button
+                key={po}
+                type="button"
+                className="font-medium text-blue-700 underline-offset-2 hover:underline"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  navigate(`/operation/procurement?po=${encodeURIComponent(po)}`);
+                }}
+              >
+                {po}
+              </button>
+            ))}
+          </span>
+        ),
+    };
+  }
+  if (f.key === "do_number") {
+    return {
+      ...base,
+      accessor: (r) =>
+        r.o.do_number ? (
+          <button
+            type="button"
+            className="font-medium text-blue-700 underline-offset-2 hover:underline"
+            onClick={(event) => {
+              event.stopPropagation();
+              void openDeliveryOrderPdf(r.id, r.o.do_number!);
+            }}
+          >
+            {r.o.do_number}
+          </button>
+        ) : (
+          f.text(r)
+        ),
+    };
   }
   if (f.key === "customer") {
     return {
@@ -139,7 +203,6 @@ function toGridColumn(f: RegisterField, role: string | null): DataGridColumn<Reg
           title={r.phone ? `${r.customer} · ${r.phone}` : r.customer}
         >
           {r.customer}
-          {r.phone ? <span className="text-base-500"> · {r.phone}</span> : null}
         </span>
       ),
       /* The digits ride the search so `0162389…` finds the row however the
@@ -186,40 +249,48 @@ function ExpandedLines({ row }: { row: RegisterRow }) {
   if (lines.length === 0 && addons.length === 0) {
     return <div className="px-10 py-2 text-meta text-base-500">No items on this order</div>;
   }
-  const money = (n: number) => (n > 0 ? <Money value={n} /> : "No price yet");
+  const categoryOf = (line: (typeof lines)[number]) => {
+    const fromAttrs = typeof line.attrs?.category === "string" ? line.attrs.category : "";
+    const fromSku = line.sku.includes(":") ? line.sku.split(":", 1)[0] : "";
+    const classified = lineClass(line.sku);
+    const classifiedLabel = classified === "acc" ? "Accessory" : classified === "unknown" ? "Other goods" : classified;
+    const category = fromAttrs || fromSku || classifiedLabel;
+    return category.replace(/[_-]+/g, " ").toUpperCase();
+  };
+  const configOf = (line: (typeof lines)[number]) =>
+    Object.entries(line.attrs ?? {})
+      .filter(([key, value]) => key !== "category" && value != null && value !== "")
+      .map(([key, value]) => `${key.replace(/[_-]+/g, " ")}: ${String(value)}`)
+      .join(" · ");
+  const grouped = new Map<string, typeof lines>();
+  for (const line of lines) grouped.set(categoryOf(line), [...(grouped.get(categoryOf(line)) ?? []), line]);
   return (
-    <table className="text-body my-1 ml-10" data-testid="row-expansion">
-      <thead>
-        <tr className="text-label text-base-500">
-          <th className="py-1 pr-6 text-left font-medium">Item</th>
-          <th className="py-1 pr-6 text-right font-medium">Qty</th>
-          <th className="py-1 pr-6 text-right font-medium">Unit price</th>
-          <th className="py-1 pr-6 text-right font-medium">Total</th>
-        </tr>
-      </thead>
-      <tbody>
-        {lines.map((l, i) => (
-          <tr key={`l-${i}`}>
-            <td className="py-0.5 pr-6">{lineName(l)}</td>
-            <td className="py-0.5 pr-6 text-right tabular-nums">{l.qty}</td>
-            <td className="py-0.5 pr-6 text-right">{money(Number(l.unit_price ?? 0))}</td>
-            <td className="py-0.5 pr-6 text-right">
-              {money(Number(l.unit_price ?? 0) * Number(l.qty ?? 0))}
-            </td>
-          </tr>
-        ))}
-        {addons.map((a, i) => (
-          <tr key={`a-${i}`}>
-            <td className="py-0.5 pr-6">Add-on</td>
-            <td className="py-0.5 pr-6 text-right tabular-nums">{a.qty}</td>
-            <td className="py-0.5 pr-6 text-right">{money(Number(a.unit_price ?? 0))}</td>
-            <td className="py-0.5 pr-6 text-right">
-              {money(Number(a.unit_price ?? 0) * Number(a.qty ?? 0))}
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+    <div className="ml-10 space-y-2 py-2 pr-6 text-body" data-testid="row-expansion">
+      {[...grouped.entries()].map(([category, categoryLines]) => (
+        <section key={category}>
+          <h3 className="text-label font-semibold text-base-500">{category}</h3>
+          {categoryLines.map((line, index) => (
+            <div key={`${line.sku}-${index}`} className="grid grid-cols-[150px_minmax(240px,1fr)_60px] gap-3 py-0.5">
+              <span className="font-mono text-meta">{line.sku}</span>
+              <span>{lineName(line)}{configOf(line) ? ` · ${configOf(line)}` : ""}</span>
+              <span className="text-right tabular-nums">Qty {line.qty}</span>
+            </div>
+          ))}
+        </section>
+      ))}
+      {addons.length > 0 ? (
+        <section>
+          <h3 className="text-label font-semibold text-base-500">ACCESSORY</h3>
+          {addons.map((addon, index) => (
+            <div key={index} className="grid grid-cols-[150px_minmax(240px,1fr)_60px] gap-3 py-0.5">
+              <span className="font-mono text-meta">{addon.addon_key ?? "Add-on"}</span>
+              <span>{addon.addon_key?.replace(/[_-]+/g, " ") ?? "Add-on"}</span>
+              <span className="text-right tabular-nums">Qty {addon.qty}</span>
+            </div>
+          ))}
+        </section>
+      ) : null}
+    </div>
   );
 }
 
@@ -244,10 +315,24 @@ async function openSalesOrderPdf(orderId: string, so: number): Promise<void> {
   }
 }
 
+async function openDeliveryOrderPdf(orderId: string, doNumber: string): Promise<void> {
+  try {
+    const data = await apiFetch<DoTemplateData>(
+      `/api/operation/orders/${orderId}/print-do-data`,
+    );
+    const blob = await renderDoPdf(data);
+    const url = URL.createObjectURL(blob);
+    window.open(url, "_blank");
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  } catch (error) {
+    const message = error instanceof ApiError ? error.message : String(error);
+    toast.error(`Delivery Order ${doNumber} PDF failed: ${message}`);
+  }
+}
+
 export default function SalesOrdersRegister() {
   const navigate = useNavigate();
   const role = useAuth((s) => s.role);
-  const [scope, setScope] = useState<"live" | "all">("live");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   /* FIX 1 — SERVER SEARCH. The engine emits its debounced trimmed term and
      the SAME words go to the API (`?search=`), so a match beyond the loaded
@@ -255,6 +340,10 @@ export default function SalesOrdersRegister() {
      filters the rows it holds for instant feedback; `keepPreviousData` in the
      query hook keeps the list on screen while the server answers. */
   const [serverSearch, setServerSearch] = useState("");
+  /* The register still writes nothing itself. `Cancel SO` opens the ONE
+     governed cancellation door and that door owns the act — the row is only
+     naming which Sales Order the dialog is about. */
+  const [cancelTarget, setCancelTarget] = useState<{ id: string; so: number } | null>(null);
 
   const { data, isLoading, isError, error, refetch } = useOperationOrders(
     serverSearch ? { search: serverSearch } : {},
@@ -269,11 +358,8 @@ export default function SalesOrdersRegister() {
      WITHIN it. Newest first — the engine applies its own sort on top when a
      header is clicked. */
   const rows = useMemo(
-    () =>
-      all
-        .filter((r) => scope !== "live" || !isDelivered(r.o))
-        .sort((a, b) => b.ordered.localeCompare(a.ordered)),
-    [all, scope],
+    () => [...all].sort((a, b) => b.ordered.localeCompare(a.ordered)),
+    [all],
   );
 
   /* Role decides the FIRST PAINT only (money hidden for Operations, visible
@@ -281,10 +367,11 @@ export default function SalesOrdersRegister() {
      Memoized per role so the engine's memo actually hits; the layout store is
      per-role so one machine's Finance login does not restyle Operations'. */
   const columns = useMemo(
-    () => REGISTER_FIELDS.map((f) => toGridColumn(f, role)),
-    [role],
+    () => REGISTER_FIELDS.map((f) => toGridColumn(f, role, navigate)),
+    [navigate, role],
   );
-  const storageKey = `carres.salesOrders.register.v1.${role ?? "anon"}`;
+  /* v2 intentionally resets the superseded nine-column Stage A layout. */
+  const storageKey = `carres.salesOrders.register.v2.${role ?? "anon"}`;
 
   /* ── SELECTION — the REGISTER LAW's clause: ticks feed Export and nothing
      else. Header checkbox = select all visible / clear (the engine says which). */
@@ -311,24 +398,28 @@ export default function SalesOrdersRegister() {
   );
   const onRowDoubleClick = useCallback((r: RegisterRow) => openWorkspace(r), [openWorkspace]);
 
-  /* Right-click: Open · Edit · Print PDF · Copy SO No — nothing else (STAGE 1,
-     verbatim). Every item is view-oriented; none writes. */
+  /* Right-click document actions. Copy opens the authoritative create form as
+     a draft; the register still writes nothing. */
   const contextMenu = useCallback(
     (r: RegisterRow): DataGridContextMenuItem[] => [
-      { label: "Open", onClick: () => openWorkspace(r) },
+      { label: "View", onClick: () => openWorkspace(r) },
       { label: "Edit", onClick: () => openWorkspace(r, true) },
+      { label: "Preview PDF", onClick: () => void openSalesOrderPdf(r.id, r.so) },
       { label: "Print PDF", onClick: () => void openSalesOrderPdf(r.id, r.so) },
       {
-        label: "Copy SO No",
-        onClick: () => {
-          void navigator.clipboard
-            .writeText(`SO-${r.so}`)
-            .then(() => toast.success(`SO-${r.so} copied`))
-            .catch(() => toast.error("Could not copy"));
-        },
+        label: "Copy to new Sales Order",
+        onClick: () => navigate(`/operation/orders/so/new?copyFrom=${r.id}`),
+      },
+      /* The MASTER's locked menu ends with the one destructive entry, alone
+         below a divider so it is never reached by a slipped click. */
+      { divider: true },
+      {
+        label: "Cancel SO",
+        danger: true,
+        onClick: () => setCancelTarget({ id: r.id, so: r.so }),
       },
     ],
-    [openWorkspace],
+    [navigate, openWorkspace],
   );
 
   const expandable = useMemo(
@@ -340,7 +431,22 @@ export default function SalesOrdersRegister() {
     <div className="flex h-full min-h-0 flex-col">
       <DestinationHeader />
 
-      <div className="flex min-h-0 flex-1 flex-col" data-testid="register-column">
+      {cancelTarget && (
+        <CancelSalesOrderDialog
+          orderId={cancelTarget.id}
+          so={cancelTarget.so}
+          open
+          onOpenChange={(next) => {
+            if (!next) setCancelTarget(null);
+          }}
+          onCancelled={() => {
+            setCancelTarget(null);
+            void refetch();
+          }}
+        />
+      )}
+
+      <div className="flex min-h-0 flex-1 flex-col p-3 pt-4" data-testid="register-column">
         {isError ? (
           <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 bg-white">
             <p className="text-body text-base-700">The register could not be loaded</p>
@@ -386,19 +492,7 @@ export default function SalesOrdersRegister() {
               onToggle: toggleRow,
               onToggleAll: toggleAll,
             }}
-            toolbarStart={
-                <span className="w-36 shrink-0">
-                <Select
-                  id="sales-orders-scope"
-                  value={scope}
-                  onValueChange={(v) => setScope(v as "live" | "all")}
-                  options={[
-                    { value: "live", label: "Not delivered" },
-                    { value: "all", label: "All orders" },
-                  ]}
-                />
-                </span>
-            }
+            outputActions={[{ label: "Print", onClick: () => window.print() }]}
             toolbarEnd={
               /* STAGE 2 — the office birth door. Everyone who can open this
                  page (operation / principal) may use it; normal orders are

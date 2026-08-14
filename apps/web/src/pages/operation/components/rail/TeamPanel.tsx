@@ -1,332 +1,63 @@
-import { useMemo, useState } from "react";
-import { Pencil } from "lucide-react";
-import { toast } from "sonner";
-import {
-  useOperationPoDuty,
-  useOperationStaff,
-  usePurchasingSettings,
-  useUpdatePoDuty,
-} from "@/lib/queries";
-import {
-  monthKeyMYT,
-  nextPoDayMYT,
-  isPoDutyEditor,
-  isOpsManagerRow,
-  isOpsGenericAccount,
-  orderActionQueue,
-} from "@carres/shared";
-import { useAuth } from "@/lib/auth";
-import { fmtDateShort } from "@/lib/fmt-date";
+import { useMemo } from "react";
+import { Link } from "react-router-dom";
+import { ChevronRight } from "lucide-react";
+import { useOperationPoDuty, useOperationStaff } from "@/lib/queries";
 import { avatarColor, personInitials, personLabel } from "@/lib/staff-avatar";
 
-/**
- * TeamPanel — PO DUTY board, design B3-final (Jess 2026-07-19).
- *
- * Hero = WHO + on PO duty + UNTIL <handover date> (PagerDuty pattern — the
- * decision-ready fact, never the month name) with a green now-dot on the
- * avatar and the duty verbs as chips. Succession rows live INSIDE the duty
- * card (roster list law: avatar+name glued left, "from 1 Aug 26" metadata
- * right — mirrors the hero's "until"; no dashes). Below: a two-week mini
- * calendar with Mon/Thu tinted + the next PO day green; the PIC scope as one
- * chip row. ZERO sentences — explanations live in tooltips. Replaced the
- * dead Notes slot (1 note ever, from build day; Jess sign-off).
- */
-const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"];
+type DutyPerson = { userId: string; name: string | null; email: string };
 
-function ymd(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-const MONTH_SHORT = [
-  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-];
-function fmtMonth(month: string): string {
-  const m = Number(month.slice(5, 7));
-  return MONTH_SHORT[m - 1] ?? month;
-}
-
-const VERB_CHIP =
-  "text-label leading-4 border border-base-300 rounded-full px-2 py-0.5 text-base-800 bg-white whitespace-nowrap";
-
-/** Inline holder picker (Jess option A, 2026-07-19): the month's name turns
- *  into a select of plain-staff candidates; picking saves immediately (the
- *  server stamps assigned_by = the manager). Managers only ever see this. */
-function DutySelect({
-  month,
-  currentUserId,
-  candidates,
-  onDone,
-}: {
-  month: string;
-  currentUserId: string;
-  candidates: { user_id: string; name: string | null; email: string }[];
-  onDone: () => void;
-}) {
-  const mut = useUpdatePoDuty({
-    onSuccess: (r) => {
-      toast.success(`PO duty updated — ${fmtMonth(r.month)}`);
-      onDone();
-    },
-    onError: (e) => {
-      toast.error(`PO duty update failed — ${e.message}`);
-      onDone();
-    },
-  });
+function DutyRow({ label, person, status }: { label: string; person: DutyPerson | null; status: string }) {
+  const colors = avatarColor(person?.userId ?? label);
   return (
-    <select
-      autoFocus
-      defaultValue={currentUserId}
-      disabled={mut.isPending}
-      onChange={(e) => {
-        if (e.target.value !== currentUserId)
-          mut.mutate({ month, userId: e.target.value });
-        else onDone();
-      }}
-      onBlur={() => {
-        if (!mut.isPending) onDone();
-      }}
-      className="border border-base-200 rounded-md text-meta px-1.5 py-1 bg-white text-base-900"
-      aria-label={`PO duty holder for ${fmtMonth(month)}`}
-    >
-      {candidates.map((s) => (
-        <option key={s.user_id} value={s.user_id}>
-          {personLabel(s.name, s.email)}
-        </option>
-      ))}
-    </select>
+    <div className="flex items-center gap-2.5 px-3 py-2.5 border-b border-base-100 last:border-b-0">
+      <span className="relative w-8 h-8 rounded-full grid place-items-center text-meta font-semibold shrink-0" style={{ background: colors.bg, color: colors.fg }}>
+        {person ? personInitials(person.name, person.email) : "—"}
+        {person && <span className="absolute right-0 bottom-0 w-2 h-2 rounded-full bg-success ring-2 ring-white" />}
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="text-label uppercase tracking-[0.05em] text-base-500">{label}</div>
+        <div className="text-body font-semibold text-base-900 truncate">
+          {person ? personLabel(person.name, person.email) : "Not assigned"}
+        </div>
+      </div>
+      <span className="text-label text-base-500">{status}</span>
+    </div>
   );
 }
 
+/** ERP-wide duty and coverage snapshot. Work actions live in My Work or their module. */
 export default function TeamPanel() {
   const dutyQ = useOperationPoDuty();
-  const holder = dutyQ.data?.holder ?? null;
-  const currentMonth = dutyQ.data?.month ?? monthKeyMYT();
-  const nextUp = (dutyQ.data?.roster ?? []).filter((r) => r.month > currentMonth);
-
-  // Roster edit = the `po_duty_editor` duty (+principal) — STRICTER than
-  // ops_manager: the shared operation@ login must never rewrite the rotation
-  // (Jess 2026-07-19 "can edit roster only me"). Hover ✎ on the hero / click a
-  // NEXT UP entry → candidate select; everyone else never sees it, the API
-  // 403s anyway.
-  //
-  // HR-P2 (0260): the staff query is no longer gated on `isEditor`, because it
-  // is now also where duties come from — gating it on a value derived FROM it
-  // would deadlock (no fetch → no duties → never an editor → no fetch). The
-  // cockpit page fetches the same query key unconditionally, so in practice
-  // this shares a cached response rather than adding a request.
-  const authRole = useAuth((s) => s.role);
-  const authEmail = useAuth((s) => s.user?.email ?? null);
   const staffQ = useOperationStaff();
-  const myDuties = staffQ.data?.myDuties;
-  const isEditor = isPoDutyEditor(authRole, authEmail, myDuties);
-  const candidates = useMemo(
-    () =>
-      (staffQ.data?.staff ?? []).filter(
-        (s) =>
-          // Per-ROW question: is THIS person a manager? Answered from the row's
-          // own duties, never from the viewer's.
-          !isOpsManagerRow(s.email, s.duties) && !isOpsGenericAccount(s.email),
-      ),
-    [staffQ.data],
-  );
-  const [editingMonth, setEditingMonth] = useState<string | null>(null);
+  const roster = dutyQ.data?.roster ?? [];
+  const currentMonth = dutyQ.data?.month ?? "";
+  const poHolder = dutyQ.data?.holder ?? null;
+  const grnHolder = useMemo(() => {
+    const previous = [...roster].filter((row) => row.month < currentMonth).sort((a, b) => b.month.localeCompare(a.month))[0];
+    return previous ? { userId: previous.userId, name: previous.name, email: previous.email } : null;
+  }, [currentMonth, roster]);
+  const staffCount = (staffQ.data?.staff ?? []).length;
 
-  // Handover date = the last day of the duty month ("until 31 Jul 26").
-  const untilLabel = useMemo(() => {
-    const y = Number(currentMonth.slice(0, 4));
-    const m = Number(currentMonth.slice(5, 7));
-    return fmtDateShort(ymd(new Date(y, m, 0)));
-  }, [currentMonth]);
-
-  // Two-week strip from this week's Sunday; the configured PO days are
-  // marked and the next one is green (matches the title-row chip's date).
-  // P1: the days are a SETTING (Purchasing → Settings), so this panel and the
-  // ordering engine cannot hold different cadences — which they did, for
-  // months, while a constant here still read Mon + Thu.
-  const purchasingSettingsQ = usePurchasingSettings();
-  const poDays = purchasingSettingsQ.data?.poDays ?? [];
-  const nextPoIso = nextPoDayMYT(new Date(), poDays);
-  const nextPoLabel = nextPoIso
-    ? `${new Date(`${nextPoIso}T00:00:00`).toLocaleDateString("en-US", { weekday: "short" })} ${fmtDateShort(nextPoIso)}`
-    : "—";
-  const cells = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const start = new Date(today);
-    start.setDate(start.getDate() - start.getDay());
-    return Array.from({ length: 14 }, (_, i) => {
-      const d = new Date(start);
-      d.setDate(start.getDate() + i);
-      return {
-        key: ymd(d),
-        day: d.getDate(),
-        // Was `d.getDay() === 1 || d.getDay() === 4` — a second Mon+Thu literal
-        // living two lines under the label that named the real cadence.
-        poDay: poDays.includes(d.getDay()),
-        past: d < today,
-      };
-    });
-  }, [poDays]);
-
-  if (!holder) {
-    return (
-      <div className="p-1 text-meta text-base-400" data-testid="team-panel">
-        Duty roster not live yet — it appears once the rotation table is
-        deployed.
-      </div>
-    );
-  }
-
-  const c = avatarColor(holder.userId);
   return (
-    <div className="flex flex-col" data-testid="team-panel">
-      <div className="text-label uppercase tracking-[0.05em] text-base-500 mb-1.5">PO DUTY</div>
-      <div className="rounded-lg border border-base-200 overflow-hidden">
-      <div className="group bg-base-50 p-3">
-        <div className="flex items-center gap-2.5">
-          <span
-            className="relative w-7 h-7 rounded-full flex items-center justify-center text-meta font-semibold leading-none shrink-0"
-            style={{ background: c.bg, color: c.fg }}
-            title="On duty now"
-          >
-            {personInitials(holder.name, holder.email)}
-            <span
-              className="absolute -right-px -bottom-px w-2 h-2 rounded-full bg-success border-2 border-base-50"
-              aria-hidden
-            />
-          </span>
-          {editingMonth === currentMonth ? (
-            <DutySelect
-              month={currentMonth}
-              currentUserId={holder.userId}
-              candidates={candidates}
-              onDone={() => setEditingMonth(null)}
-            />
-          ) : (
-            <span className="min-w-0">
-              <span className="block text-body font-semibold text-base-900 truncate">
-                {personLabel(holder.name, holder.email)}
-              </span>
-              <span className="block text-label text-base-500">
-                on PO duty · until {untilLabel}
-              </span>
-            </span>
-          )}
-          {isEditor && editingMonth !== currentMonth && (
-            <button
-              type="button"
-              onClick={() => setEditingMonth(currentMonth)}
-              title="Change this month's PO duty holder"
-              aria-label="Change this month's PO duty holder"
-              className="ml-auto p-1 rounded text-base-400 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:text-base-800 hover:bg-base-100"
-            >
-              <Pencil size={14} strokeWidth={2} />
-            </button>
-          )}
+    <div className="space-y-4" data-testid="team-panel">
+      <section>
+        <h3 className="text-label uppercase tracking-[0.05em] text-base-500 mb-1.5">Duty coverage</h3>
+        <div className="rounded-lg border border-base-200 bg-white">
+          <DutyRow label="PO Duty" person={poHolder} status="Available" />
+          <DutyRow label="GRN Duty" person={grnHolder} status={grnHolder ? "Cover" : "—"} />
         </div>
-        <div className="flex gap-1.5 mt-2">
-          {/* One duty, one act (`Send PO` is retired): the holder issues every
-              consolidated PO. */}
-          <span className={VERB_CHIP} title="Issues every consolidated PO — the one voice to suppliers">
-            {orderActionQueue("issue_po")}
-          </span>
-          <span className={VERB_CHIP} title="Calls every open PO until the goods land">
-            {orderActionQueue("confirm_ready_date")}
-          </span>
+      </section>
+      <section>
+        <h3 className="text-label uppercase tracking-[0.05em] text-base-500 mb-1.5">Team snapshot</h3>
+        <div className="rounded-lg border border-base-200 bg-base-50 px-3 py-2.5">
+          <div className="text-body font-medium text-base-900">{staffCount} operations staff</div>
+          <div className="text-label text-base-500 mt-0.5">Open and overdue workload is available in Team Work.</div>
         </div>
-      </div>
-      {/* Succession rows INSIDE the duty card (Jess 2026-07-19: "NEXT UP"
-          answered nothing). Roster list law: avatar + name stay GLUED (the
-          person is the subject, left); the date is metadata, right-aligned;
-          "from 1 Aug 26" mirrors the hero's "until 31 Jul 26". No dashes. */}
-      {nextUp.map((r) => {
-        const rc = avatarColor(r.userId);
-        return (
-          <div
-            key={r.month}
-            className="flex items-center gap-2 px-3 h-9 bg-white border-t border-base-100 text-meta text-base-800"
-          >
-            {editingMonth === r.month ? (
-              <DutySelect
-                month={r.month}
-                currentUserId={r.userId}
-                candidates={candidates}
-                onDone={() => setEditingMonth(null)}
-              />
-            ) : (
-              <>
-                <span
-                  className="w-[18px] h-[18px] rounded-full flex items-center justify-center text-label font-semibold leading-none shrink-0"
-                  style={{ background: rc.bg, color: rc.fg }}
-                >
-                  {personInitials(r.name, r.email)}
-                </span>
-                {isEditor ? (
-                  <button
-                    type="button"
-                    onClick={() => setEditingMonth(r.month)}
-                    title={`Change ${fmtMonth(r.month)}'s PO duty holder`}
-                    className="truncate rounded hover:bg-base-50 px-0.5 text-left"
-                  >
-                    {personLabel(r.name, r.email)}
-                  </button>
-                ) : (
-                  <span className="truncate">{personLabel(r.name, r.email)}</span>
-                )}
-              </>
-            )}
-            <span className="ml-auto text-label text-base-500 tabular-nums shrink-0">
-              from {fmtDateShort(`${r.month}-01`)}
-            </span>
-          </div>
-        );
-      })}
-      </div>
-
-      <div className="text-label uppercase tracking-[0.05em] text-base-500 mt-3 mb-1.5">PO DAYS · MON &amp; THU</div>
-      <div className="grid grid-cols-7 gap-0.5 text-center">
-        {WEEKDAYS.map((w, i) => (
-          <span key={`w${i}`} className="text-label text-base-400 py-0.5">
-            {w}
-          </span>
-        ))}
-        {cells.map((d) => (
-          <span
-            key={d.key}
-            className={`text-label tabular-nums py-1 rounded ${
-              d.key === nextPoIso
-                ? "bg-success-soft text-success font-semibold"
-                : d.poDay
-                  ? "bg-base-100 text-base-700 font-semibold"
-                  : d.past
-                    ? "text-base-300"
-                    : "text-base-400"
-            }`}
-            title={d.key === nextPoIso ? "Next PO day" : d.poDay ? "PO day" : undefined}
-          >
-            {d.day}
-          </span>
-        ))}
-      </div>
-      <div className="text-label text-base-400 mt-1">
-        next: <span className="text-success font-semibold">{nextPoLabel}</span>
-      </div>
-
-      <div className="text-label uppercase tracking-[0.05em] text-base-500 mt-3 mb-1.5">EVERYONE — YOUR OWN ORDERS</div>
-      <div className="flex items-center gap-1.5 rounded-lg border border-base-200 bg-white px-2.5 h-9">
-        <span
-          className="text-label leading-4 border border-base-200 rounded-full px-1.5 text-base-500 bg-white"
-          title="Each PIC follows up their own orders — one counterparty, one REF-first message"
-        >
-          PIC
-        </span>
-        <span className={VERB_CHIP} title="Logistics assigned but the customer has not confirmed a date — call about your own REF">
-          {orderActionQueue("confirm_delivery_date")}
-        </span>
-        <span className={VERB_CHIP} title="Your customer still owes money — one message a day, in bulk">
-          Owing
-        </span>
-      </div>
+      </section>
+      <Link to="/operation?tab=work&scope=team" className="flex items-center justify-between rounded-lg border border-base-200 px-3 py-2 text-meta font-medium text-primary hover:bg-base-50">
+        <span>View Team Work →</span>
+        <ChevronRight size={14} />
+      </Link>
     </div>
   );
 }

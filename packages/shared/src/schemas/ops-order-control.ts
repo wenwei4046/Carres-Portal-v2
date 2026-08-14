@@ -266,6 +266,12 @@ export const opsOrderControlSchema = z.object({
    *  written only by the confirm endpoint, never the generic control PUT. */
   confirmed_date: isoDate.nullable().default(null),
   confirmed_time_slot: z.string().nullable().default(null),
+  /** CARD 3 (0346) — the logistics company the CUSTOMER's appointment was
+   *  agreed WITH, stamped once by the confirm endpoint. NEVER re-read from the
+   *  order's current assignment: those are two of the ruling's three separate
+   *  truths, and a later reassignment is a drift the surfaces SHOW rather than
+   *  a silent rewrite of what the customer agreed to. */
+  confirmed_partner_id: z.string().uuid().nullable().default(null),
   /** Confirmation evidence stamp — when recorded + who recorded it. */
   customer_confirmed_at: z.string().nullable().default(null),
   customer_confirmed_by: z.string().uuid().nullable().default(null),

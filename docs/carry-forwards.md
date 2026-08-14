@@ -387,3 +387,40 @@ primitive fixes it in the same move.
   **It is a Purchasing-lane card, not an Orders one**, which is why S2.5 reported it rather
   than widening its own diff to three unrelated route-test repairs. It looks small — the fix
   is the mock chain, not the routes.
+
+- `migration-0346-numbered-twice-and-one-is-unpushed` — ✅ **CLOSED 2026-08-13 by the Card 4
+  lane, exactly as instructed below.** The unpushed file was mine: it is now in the repository
+  as `supabase/migrations/0347_a_voided_payment_is_not_money.sql`, with a header stating that
+  it was APPLIED as `0346` (tracker row `20260813034523`) and why it is numbered `0347` here.
+  Card 3's committed 0346 was not touched. The repository now holds one 0346 and one 0347, so
+  no future `ls` can take a taken number and no chat can skip a migration that was never
+  checked in. **The tracker row still reads `0346_a_voided_payment_is_not_money`** — a name is
+  not a number, and rewriting an applied row to make a document tidier is not a thing this
+  repository does. The original finding is kept below, because the lesson (two lanes, one
+  minute, one number) outlives the fix.
+
+  **The finding as Card 3 recorded it — 🔴 Two different migrations are both
+  numbered 0346 in production, and one of them is not in this repository.** Measured on the
+  live tracker 2026-08-13 immediately after the Card 3 deploy:
+
+  ```
+  20260813034521  an_appointment_names_the_carrier_it_was_made_with   ← Card 3 (this repo)
+  20260813034523  0346_a_voided_payment_is_not_money                  ← NOT in the repository
+  ```
+
+  **Two seconds apart, from two chats.** `origin/main` carries exactly one `034[0-9]` file for
+  0346 — Card 3's. The other was applied straight to production by a parallel lane (the name
+  reads as a Card 4 payment follow-up) and has not been pushed. CLAUDE.md §5.7 is explicit:
+  **an applied migration missing from the repository is a P0.**
+
+  **Card 3 did NOT touch it, and deliberately.** Red line 6 forbids altering a committed
+  migration, and Card 3's 0346 is committed, applied and pushed — renaming it now would break
+  the very rule that keeps the tracker honest. The other lane's file is also not this card's to
+  write: only its author knows what it actually ran.
+
+  **The rule for whoever picks it up** — almost certainly the Card 4 / payments lane, which is
+  the one that ran it: **push the file, and renumber it to `0347`, not `0346`.** Card 3's 0346
+  landed first and is already on `main`, so the second file is the one that moves. The tracker
+  row already applied keeps its own name; what must stop is a repository with two 0346s, which
+  is how a future `ls`-based number gets picked (red line 7) and how the next chat silently
+  skips a migration that was never checked in.

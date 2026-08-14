@@ -67,6 +67,13 @@ owned facts in factual language. Apply WHO + ACTION + OBJECT + WHEN only when th
 actionable. My Work, Team Work and every other action-bearing UI use this same formulation; they do
 not invent a shorter status-only dialect.
 
+**External reply evidence — owner ruling 2026-08-14.** For supplier and Logistics communication,
+`Message prepared`, `Message copied`, `WhatsApp opened` and `Sent` never complete a confirmation
+action. They prove only our outbound act. `Confirm` completes only when the outside party's answer
+is recorded with evidence of that answer—normally the reply screenshot/email, reporter, recorder,
+channel and reported/recorded times. Operations may record it on the party's behalf. The UI asks for
+the concrete answer, never a trust-based `Sent` checkbox.
+
 ---
 
 ## Row action-line template
@@ -252,6 +259,15 @@ tail, numbers up front: `5 · 2 late`.
 confirmed, the SYSTEM produces the document and the operator only presses the button —
 nobody authors a delivery order by hand. Card C7 builds it; the number is stamped at
 dispatch today, which is too late to hand to logistics, and C7 moves it.
+
+**Delivery execution words — owner-approved 2026-08-14.** Employee UI never uses `Release` for
+the Delivery Order act; it uses `Issue delivery order`, `Ready to issue delivery order` or
+`Cannot issue delivery order yet`. Employee UI never uses the technical noun `Attempt`; one
+actual customer visit is `Delivery Visit`, its outcome is `Delivery Result`, and prior visits are
+`Delivery History`. Internal schema/code may retain `delivery_attempt`. Use the concrete evidence
+name `Delivery Photo` or `Signed Delivery Order`, never the generic technical label `Evidence`
+when the employee can be told what is required. Delivery schedule groups and due labels use the
+actual weekday + date, never `Today` or `Tomorrow`.
 
 ## The delivery group words (T8, locked with Jess 2026-07-27)
 
@@ -914,6 +930,34 @@ Information Architecture and live in [`ERP-ARCHITECTURE.md`](ERP-ARCHITECTURE.md
 | Goods moved between our own locations | **stock transfer** | Relocation · Internal shipment · Redeployment |
 | An SO edit because the RECORD was wrong — the customer's agreement never changed | **Staff correction** | Amendment · Fix · Data fix · Edit (as a cause word) — the two cause words come from the SO V2 Card 1 spec (owner, 2026-08-11) and are the structured `change_type` on every contractual revision |
 | An SO edit because the CUSTOMER asked for something different | **Customer change** | Amendment · Change request (that is the pending ASK, not the applied change) · Revision (that is the record it mints) |
+| A fulfilment-side substitution/recovery that does not create a new customer transaction | **Fulfilment replacement** | Customer change · Staff correction · Cancel and reorder |
+| Register date promised/requested for the customer | **Customer Delivery** | Promised · Delivery date (as this register header) · Current |
+| Register destination summary | **Delivery Location** | Address · Location (ambiguous) · Ship-to |
+| Direct customer-order document identity | **SO No** | Doc. No. · Current |
+| Direct purchase-order document lineage | **PO No** | PO Doc No. · Current |
+| Direct delivery-order document lineage | **DO No** | Delivery Order No. · Current |
+| The complete currently-applied SO version | **Current** / **Order** (detail tabs only) | Current status · Overall status |
+| Complete immutable versions of one SO | **Revisions** | History · Amendments |
+| Append-only events on one SO | **History** | Revisions · Activity (for this object view) |
+| Fact-derived document/fulfilment/obligation map | **Order Route** | Relationship Map · Journey · Workflow · Checklist · Status |
+
+### The Sales Order amendment words
+
+| Meaning | Use exactly |
+|---|---|
+| Open the governed customer-change form | **Propose a change to the customer** |
+| Persist the proposal without changing the order | **Record the proposal** |
+| A submitted proposal awaiting its authorised decision | **Waiting for management** |
+| Impact heading before a decision | **Before approval** |
+| Decision field | **Management decision reason** |
+| Negative decision | **Reject** |
+| Positive decision that atomically creates the next revision | **Approve and apply** |
+| Re-propose a complete historical version as a new governed change | **Propose this version again** |
+| Stale proposal state/action | **Out of date — propose again** |
+| Contract term field | **Instalment months** |
+| Unknown promised date | **Delivery date to be confirmed** |
+| Empty immutable-version view | **No revisions recorded** |
+| Empty event-ledger view | **No history recorded** |
 | The drawer panel listing who to ring, one row per outside party | **Calls** | Chase Now · Actions · Follow-ups · Contacts — `Actions` is the ROW's open-action list and one word may not head two blocks (Jess 2026-07-28, PR #487); the panel's own empty state has read `0 calls to make · everything on track.` since C1, so the title is that sentence's noun, not a new word |
 
 ## The Purchase Order lifecycle words — CANONICAL HOME (Loo, 2026-07-29 · frozen by P6)
@@ -1127,6 +1171,33 @@ facts, not one status. `Status` is wrong and `Checks` reads as "cheques" beside 
 the column carries no header word, and each dot is labelled by its own small icon (goods ·
 delivery · money) from the portal icon set, never emoji (UI-KIT). The actions column IS
 headed, and its word is **`Actions`** — plural, because an order can have several.
+
+**The booking-call words (SO V2 Card 3, owner ruling 2026-08-13).** The approved journey
+opens the customer conversation **three working days before the Customer Promised Deadline,
+regardless of stock readiness**, and names what Operations hands Logistics for it. These are
+the words that panel may use, and no others:
+
+| Word | What it names | Why not the alternatives |
+|---|---|---|
+| **`Before you call`** | the panel heading — the facts to have in hand before the phone rings | It is the only heading that says WHEN it is for. `Call brief` · `Pre-call` · `Summary` are jargon (rule 9) and none of them tells a new hire the panel is about a call that has not happened yet |
+| **`Call by {date}`** | the day the conversation is due, from `logistics_call_working_days` | `Due {date}` alone does not say *do what*. The late spelling is the portal's existing **`Late — was due {date}`**, unchanged, so this step reads like every other late step |
+| **`Not in yet`** | committed goods the register does not hold — the ruling's *"what is / is not expected in"* | `Waiting` alone is already banned; `Outstanding` is the money word; `Short` is warehouse jargon |
+| **`Everything is on hand`** | the whole commitment is allocated, so no arrival is pending | States the fact positively so the row is not a blank. `On hand` is the Stock word law's own word, reused rather than re-coined |
+| **`Expected arrival`** | the latest supplier ready date among the lines still short | The portal's existing column word (`Check Expected Arrival`). **`Stock ETA` may not reach the screen** — `ETA` is an abbreviation, and rule 9 bans those even when the ruling itself uses one internally |
+| **`The factory has not given a date`** | lines are short and no supplier date is on file | An empty cell would read as "nothing is coming". This states the real gap, and it is the same fact `Check Expected Arrival` exists to close |
+
+**A confirmed booking names the company it was AGREED WITH, never the one assigned now**
+(migration 0346). When they differ the pane says so, and it says so with the fix, because
+the delivery-rule word law above applies here too — a warning that only states a fact tells
+a new hire nothing about the next second:
+
+> `Assigned to {now} since the customer agreed this day with {then} — put the original
+> company back, or call the customer to agree the day again.`
+
+**No `Appointment` noun.** The ruling calls the fact a *confirmed delivery appointment*, but
+the screen already has one word for it — the booking, spelt **`{logistics} · confirmed
+{date} · {slot}`** (T1). A second noun for one fact is exactly the synonym rule 8 forbids, so
+the ruling's phrase stays in the documents and the screen keeps the word it has.
 
 **The Stock word law (K0, Jess 2026-07-27):** one warehouse, three questions —
 `On hand` (what's here now) · `Ready stock` (how much to keep — a PLAN about

@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import {
   eventTypeForLegacyAction,
+  fmtMoney,
   isOrderEventType,
   orderEventMeta,
   type OrderEventCategory,
@@ -110,7 +111,40 @@ export function describeActivity(row: ActivityLike): {
     : eventTypeForLegacyAction(action);
   if (type) {
     const meta = orderEventMeta(type);
-    const d = (row.detail ?? null) as { field?: string; from?: unknown; to?: unknown } | null;
+    const d = (row.detail ?? null) as {
+      field?: string;
+      from?: unknown;
+      to?: unknown;
+      amount?: unknown;
+      kind?: unknown;
+      method?: unknown;
+      receipt_no?: unknown;
+      reason?: unknown;
+    } | null;
+    // 0347 — money says its FIGURE. `payment.received` / `payment.voided` are
+    // the two declared money events, and the RPC hands the timeline the amount,
+    // the kind, the method and the receipt number, so the line never re-derives
+    // a sentence from an order it cannot see. A bare "Payment received" on a
+    // row whose whole purpose is the amount is the vague wording the standard
+    // bans.
+    if ((type === "payment.received" || type === "payment.voided") && d?.amount != null) {
+      const amount = Number(d.amount);
+      // The METHOD is deliberately absent: the portal spells it two ways today
+      // (`online` prints as "Online" on the SO document and "e-wallet" in the
+      // drawer), and a timeline is not the place to pick a winner. The ledger
+      // row beside it states the method; reported for the copy owner.
+      const bits = [
+        Number.isFinite(amount) ? fmtMoney(amount) : null,
+        d.kind === "deposit" ? "Deposit" : d.kind === "storage" ? "Storage fee" : null,
+        typeof d.receipt_no === "string" ? d.receipt_no : null,
+        typeof d.reason === "string" && d.reason.trim() ? d.reason.trim() : null,
+      ].filter(Boolean) as string[];
+      return {
+        category: meta.category,
+        title: meta.defaultTitle,
+        body: bits.length > 0 ? bits.join(" · ") : null,
+      };
+    }
     if (
       (type === "order.field_changed" || type === "order.date_changed") &&
       d &&

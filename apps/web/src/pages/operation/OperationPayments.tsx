@@ -14,7 +14,6 @@ import {
 import {
   PAYMENT_KINDS,
   PAYMENT_METHODS,
-  PAYMENT_STATUSES,
   collectPillLabel,
   collectionClock,
   computeStorageFee,
@@ -45,6 +44,11 @@ import {
   salutationOf,
 } from "@/lib/wa-templates";
 import ListPageShell, { type ActiveChip } from "@/components/ListPageShell";
+import {
+  MONEY_STATE_ORDER,
+  moneyStateOf,
+  type MoneyState,
+} from "./payments-money-state";
 
 /**
  * OperationPayments — the Master Sheet "Balance" tab, rebuilt 2026-07-19 (Jess)
@@ -101,9 +105,10 @@ interface RawCtrl {
 interface RawLedgerEntry {
   amount: number | string;
   kind: PaymentKind;
-  /** 0343 — a void is a stamp, not a delete. Set means the money was reversed,
-   *  and `summarizePayments` must skip the row. */
-  voided_at: string | null;
+  /** 0347 — a voided row is not money. Optional so a browser on this build
+   *  against an older Worker degrades to the previous behaviour rather than
+   *  crashing; the ledger holds zero rows, so there is nothing to degrade. */
+  voided_at?: string | null;
 }
 interface RawLine {
   sku: string;
@@ -266,14 +271,10 @@ function regionBucket(address: string | null): string {
   return detectState(address) ?? OTHERS_LABEL;
 }
 
-const UNSET_LABEL = "Unset";
-function payBucket(s: string | null): string {
-  const v = (s ?? "").trim();
-  if (v === "") return UNSET_LABEL;
-  if (/^follow up/i.test(v)) return "Follow Up";
-  return v;
-}
-const PAY_ORDER = [UNSET_LABEL, "Paid", "Follow Up", "Partial", "Unpaid"];
+/* The money state is DERIVED, never keyed — `./payments-money-state`, which
+   carries the ruling and the measurement that retired the hand-typed
+   `payment_status` from this desk (CARD 4 closing slice, 0347). */
+const PAY_ORDER = MONEY_STATE_ORDER;
 
 // Payment-status → pill colour folds into the ONE shared orderStatusPill
 // (lib/status-pill.ts) — no separate map (Jess 2026-07-20).
@@ -337,8 +338,6 @@ interface Row {
   hasSof: boolean;
   stock: StockInfo;
   balance: number | null;
-  paymentStatus: string | null;
-  payBucket: string;
   storageFrom: string | null;
   storageOverride: number | null;
   storage: { msbf: number; sof: number; total: number; days: number };
@@ -352,6 +351,8 @@ interface Row {
   owing: number;
   /** delivery held: goods in, not delivered, money owing → the 🔒 on the money pill. */
   held: boolean;
+  /** The DERIVED money state (`moneyStateOf`) — never a keyed column. */
+  moneyState: MoneyState;
   /** CARD 4 — the collection clock: the final deadline (1 working day before
    *  the delivery) and where today stands against it. */
   collectDueIso: string | null;
@@ -359,9 +360,12 @@ interface Row {
   lastChasedAt: string | null;
 }
 
-/** The "owing / storage" view predicate — anything still to collect. */
+/** The "owing / storage" view predicate — anything still to collect, and that
+ *  is the ONE arithmetic's answer. It used to also admit any row whose keyed
+ *  `payment_status` was not the word `Paid`, which put 87 never-keyed orders
+ *  into a collections view on the strength of a blank column. */
 function isOwingRow(r: Row): boolean {
-  return r.owing > 0 || (r.paymentStatus != null && r.paymentStatus.toLowerCase() !== "paid");
+  return r.owing > 0;
 }
 
 /** Does a row belong to a queue? (multi-match — an order can be in several.) */
@@ -384,7 +388,7 @@ export default function OperationPayments() {
   const [view, setView] = useState<"owing" | "all">("owing");
   const [facetOpen, setFacetOpen] = useState(true);
   const [queueFilter, setQueueFilter] = useState<Set<QueueKey>>(new Set());
-  const [payFilter, setPayFilter] = useState<Set<string>>(new Set());
+  const [payFilter, setPayFilter] = useState<Set<MoneyState>>(new Set());
   const [regionFilter, setRegionFilter] = useState<Set<string>>(new Set());
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [collectFor, setCollectFor] = useState<Row | null>(null);
@@ -430,10 +434,7 @@ export default function OperationPayments() {
       const ledger = (r.order_payments ?? []).map((p) => ({
         amount: Number(p.amount) || 0,
         kind: p.kind,
-        // Voided rows are still present (0343 stamps, never deletes). Without
-        // this the desk counts a reversed storage collection as collected and
-        // reports RM 0 storage owing on an order that owes it again.
-        voidedAt: p.voided_at,
+        voided_at: p.voided_at ?? null,
       }));
       const sum = summarizePayments(ledger, balance ?? 0);
       const storageCollected = ctrl?.storage_collected_at != null;
@@ -471,10 +472,15 @@ export default function OperationPayments() {
         today,
         { holidays: myHolidaySet() },
       );
-      const paymentStatus = ctrl?.payment_status ?? null;
       const stock = stockOf(ctrl);
       const delivered = r.status === "delivered";
       const owing = goodsOwing + storageOwing;
+      const moneyState = moneyStateOf({
+        known: money.known,
+        owing,
+        paid: goodsPaid + sum.storageCollected,
+        attention: clock.attention,
+      });
       const held = owing > 0 && stock.state === "ready" && !delivered;
       return {
         id: r.id,
@@ -491,8 +497,7 @@ export default function OperationPayments() {
         hasSof,
         stock,
         balance,
-        paymentStatus,
-        payBucket: payBucket(paymentStatus),
+        moneyState,
         storageFrom,
         storageOverride,
         storage,
@@ -520,7 +525,7 @@ export default function OperationPayments() {
   const visible = useMemo(() => {
     let r = baseRows;
     if (queueFilter.size > 0) r = r.filter((x) => [...queueFilter].some((q) => inQueue(x, q)));
-    if (payFilter.size > 0) r = r.filter((x) => payFilter.has(x.payBucket));
+    if (payFilter.size > 0) r = r.filter((x) => payFilter.has(x.moneyState));
     if (regionFilter.size > 0) r = r.filter((x) => regionFilter.has(x.region));
     // Most owing first.
     return [...r].sort((a, b) => b.owing - a.owing);
@@ -545,8 +550,8 @@ export default function OperationPayments() {
   }, [baseRows]);
 
   const payEntries = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const r of baseRows) m.set(r.payBucket, (m.get(r.payBucket) ?? 0) + 1);
+    const m = new Map<MoneyState, number>();
+    for (const r of baseRows) m.set(r.moneyState, (m.get(r.moneyState) ?? 0) + 1);
     const keys = [...m.keys()].sort((a, b) => {
       const ia = PAY_ORDER.indexOf(a);
       const ib = PAY_ORDER.indexOf(b);
@@ -729,10 +734,10 @@ export default function OperationPayments() {
               </FacetGroup>
 
               <FacetGroup
-                title="PAYMENT STATUS"
+                title="MONEY"
                 total={baseRows.length}
-                collapsed={collapsed.has("PAYMENT STATUS")}
-                onToggle={() => toggleGroup("PAYMENT STATUS")}
+                collapsed={collapsed.has("MONEY")}
+                onToggle={() => toggleGroup("MONEY")}
               >
                 {payEntries.map((e) => (
                   <FacetRow
@@ -853,8 +858,10 @@ function PaymentRow({
           )}
         </div>
         <div className="mt-2 flex items-center gap-2">
-          <span className={`pill ${orderStatusPill(r.paymentStatus ?? "")}`}>{r.paymentStatus ?? "— set —"}</span>
-          <StatusSelect r={r} onSave={onSave} />
+          {/* DERIVED (0347) — the one arithmetic + CARD 4's clock decide this
+              word. There is no dropdown any more: a money state nobody can
+              type is a money state that cannot contradict the figure. */}
+          <span className={`pill ${orderStatusPill(r.moneyState)}`}>{r.moneyState}</span>
         </div>
       </td>
 
@@ -1268,30 +1275,10 @@ function StockCell({ r }: { r: Row }) {
   );
 }
 
-/** Payment status dropdown — compact, sits next to the display pill. */
-function StatusSelect({
-  r,
-  onSave,
-}: {
-  r: Row;
-  onSave: (id: string, patch: UpdateOpsOrderControlInput) => void;
-}) {
-  return (
-    <select
-      value={r.paymentStatus ?? ""}
-      onChange={(e) => onSave(r.id, { payment_status: e.target.value || null })}
-      className="text-label px-1.5 py-1 border border-base-200 rounded bg-white text-base-600"
-      aria-label={`Payment status for SO-${r.so}`}
-    >
-      <option value="">— set —</option>
-      {PAYMENT_STATUSES.map((s) => (
-        <option key={s} value={s}>
-          {s}
-        </option>
-      ))}
-    </select>
-  );
-}
+/* The payment-status dropdown was RETIRED here (0347). The money state is
+   derived by `moneyStateOf` from the one arithmetic and CARD 4's collection
+   clock; `ops_order_control.payment_status` keeps its column and its one live
+   row, and loses its authority over this desk. */
 
 /**
  * The two message tones, as the operator reads them.

@@ -53,4 +53,12 @@ describe("describeRevisionChanges — + added · − removed · old → new", ()
     );
     expect(out).toEqual(["Phone: 019-1 → —"]);
   });
+
+  it("keeps the instalment plan in complete historical versions", () => {
+    const out = describeRevisionChanges(
+      snap({ header: { customer_name: "Kimmy", delivery_date: "2026-08-30", delivery_floor: 1, installment_months: 6 } }),
+      snap({ header: { customer_name: "Kimmy", delivery_date: "2026-08-30", delivery_floor: 1, installment_months: 12 } }),
+    );
+    expect(out).toEqual(["Instalment plan: 6 months → 12 months"]);
+  });
 });

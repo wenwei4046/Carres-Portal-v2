@@ -56,6 +56,7 @@ import {
   normalizeSkuKey,
   DELIVERY_TIME_SLOTS,
   isSundayIso,
+  isLivePayment,
   orderMoney,
   deliveryGroupOf,
   deliveryGroupLabel,
@@ -1741,9 +1742,14 @@ function DrawerBody({
     : storageIncurred
       ? (form.storageOverride ?? (storageFee > 0 ? storageFee : storageAuto.total))
       : 0;
+  // 0347 — a VOIDED row is not money. A void has been a STAMP since 0343 (the
+  // row survives so the history survives), and every sum over this ledger has
+  // to ask the one predicate rather than spell `voided_at` for itself.
   const storageCollected = ledger
-    .filter((p) => p.kind === "storage")
+    .filter((p) => p.kind === "storage" && isLivePayment(p))
     .reduce((s, p) => s + Number(p.amount || 0), 0);
+  /** The newest payment that still stands — what `Print receipt` means. */
+  const latestLivePayment = ledger.find(isLivePayment) ?? null;
   const invoiceTotal = orderTotal + storageCharge;
   const collectedAll = collected + storageCollected;
   const balanceDue = totalSet ? Math.max(0, invoiceTotal - collectedAll) : 0;
@@ -1983,7 +1989,8 @@ function DrawerBody({
     // and the delivery order number (0098). Past it, either one absent is a gap.
     dispatched: stage === "dispatched" || stage === "delivered",
     delivered: deliveredDone,
-    payments: ledger.map((p) => ({
+    // 0347 — a voided payment's receipt is not a document on file.
+    payments: ledger.filter(isLivePayment).map((p) => ({
       id: p.id,
       receiptNo: p.receipt_no,
       // Only a fallback: a receipt row that has no number yet is named by the
@@ -3720,9 +3727,12 @@ function DrawerBody({
                   {
                     label: "Print receipt",
                     icon: <Download size={14} />,
-                    disabled: ledger.length === 0,
+                    // 0347 — "the latest receipt" is the latest LIVE payment;
+                    // a voided row has no receipt to print.
+                    disabled: !latestLivePayment,
                     onClick: () => {
-                      if (ledger[0]) void openReceipt(ledger[0], receiptMetaOf());
+                      if (latestLivePayment)
+                        void openReceipt(latestLivePayment, receiptMetaOf());
                     },
                   },
                   {
@@ -6980,8 +6990,18 @@ function MoneyCard({
             )
           ) : (
             <div className="rounded-[8px] border border-base-200/70 bg-white px-3 divide-y divide-base-100">
-              {ledger.map((p) => (
-                <div key={p.id} className="flex items-center gap-2.5 py-2">
+              {ledger.map((p) => {
+                // 0347 — a void is a STAMP (0343), so the row stays in the
+                // history and must READ as reversed: struck through, no
+                // receipt to print, and no second Void button (the RPC would
+                // refuse it anyway — `already_voided`).
+                const voided = !isLivePayment(p);
+                return (
+                <div
+                  key={p.id}
+                  className={`flex items-center gap-2.5 py-2 ${voided ? "opacity-60" : ""}`}
+                  data-testid={voided ? "payment-voided" : undefined}
+                >
                   {/* Proof thumbnail — the uploaded slip when present. */}
                   <button
                     type="button"
@@ -6997,20 +7017,34 @@ function MoneyCard({
                     <Paperclip size={14} />
                   </button>
                   <div className="min-w-0 flex-1">
-                    <div className="text-body font-semibold text-base-900 truncate">
+                    <div
+                      className={`text-body font-semibold truncate ${
+                        voided ? "text-base-500 line-through" : "text-base-900"
+                      }`}
+                    >
                       {p.note?.trim() ||
                         (p.kind === "deposit"
                           ? "Deposit"
                           : p.kind === "storage"
                             ? "Storage fee"
                             : "Payment")}{" "}
-                      · <Money value={Number(p.amount)} tone="row" className="text-base-900" />
+                      ·{" "}
+                      <Money
+                        value={Number(p.amount)}
+                        tone="row"
+                        className={voided ? "text-base-500" : "text-base-900"}
+                      />
                     </div>
                     <div className="text-meta text-base-500 truncate">
                       {fmtDate(p.paid_on)} · {PAY_METHOD_LABEL[p.method] ?? p.method}
                       {p.reference ? ` · ${p.reference}` : ""}
                     </div>
                   </div>
+                  {voided && (
+                    <span className="pill pill-neutral shrink-0" title={p.void_reason ?? undefined}>
+                      Voided
+                    </span>
+                  )}
                   {p.receipt_url && (
                     <button
                       type="button"
@@ -7020,16 +7054,18 @@ function MoneyCard({
                       View
                     </button>
                   )}
-                  <button
-                    type="button"
-                    onClick={() => void openReceipt(p, receiptMeta)}
-                    title={`Receipt ${p.receipt_no ?? ""}`}
-                    aria-label={`Receipt ${p.receipt_no ?? p.id}`}
-                    className="text-base-500 hover:text-base-800 shrink-0"
-                  >
-                    <FileText size={14} />
-                  </button>
-                  {isPrincipal && (
+                  {!voided && (
+                    <button
+                      type="button"
+                      onClick={() => void openReceipt(p, receiptMeta)}
+                      title={`Receipt ${p.receipt_no ?? ""}`}
+                      aria-label={`Receipt ${p.receipt_no ?? p.id}`}
+                      className="text-base-500 hover:text-base-800 shrink-0"
+                    >
+                      <FileText size={14} />
+                    </button>
+                  )}
+                  {isPrincipal && !voided && (
                     <button
                       type="button"
                       onClick={() => voidPay.mutate(p.id)}
@@ -7042,7 +7078,8 @@ function MoneyCard({
                     </button>
                   )}
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -7088,10 +7125,14 @@ function MoneyCard({
           </Btn>
           <Btn
             icon={Download}
-            disabled={ledger.length === 0}
-            title={ledger.length === 0 ? "No payment yet" : "Open the latest receipt PDF"}
+            /* 0347 — a voided payment has no receipt to open. */
+            disabled={!ledger.some(isLivePayment)}
+            title={
+              ledger.some(isLivePayment) ? "Open the latest receipt PDF" : "No payment yet"
+            }
             onClick={() => {
-              if (ledger[0]) void openReceipt(ledger[0], receiptMeta);
+              const latest = ledger.find(isLivePayment);
+              if (latest) void openReceipt(latest, receiptMeta);
             }}
           >
             Receipt

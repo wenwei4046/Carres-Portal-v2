@@ -52,6 +52,8 @@ import {
   type ReturnToSupplierInput,
   type SofaLoanDto,
   type SofaLoansResponse,
+  type SalesOrderAllocation,
+  type DeliveryAttemptRow,
   type AutocountImportInput,
   type AutocountImportResponse,
   type SpecialAddonDto,
@@ -280,6 +282,7 @@ import {
   type SetPositionDutyInput,
   type HrCreateTeamAccountInput,
   type HrCreateShowroomStaffInput,
+  type BookingBrief,
   type SupplierClaimMove,
   type WarehouseIncomingResponse,
   type WarehouseReceiptLine,
@@ -429,6 +432,16 @@ export const qk = {
      *  order. Nested under the order id so a blunt ["operation","orders"]
      *  invalidation after any order mutation refreshes it too. */
     orderPayments: (id: string) => ["operation", "orders", id, "payments"] as const,
+    /** CARD 3 — what Operations puts on the T−3 customer call: the promised
+     *  deadline, the latest Stock ETA, the expected scope and what is / is not
+     *  expected in. Nested under the order id so any order mutation refreshes
+     *  it too. */
+    orderBookingBrief: (id: string) =>
+      ["operation", "orders", id, "booking-brief"] as const,
+    /** Order Route is one read-only projection over facts owned by several
+     * modules. The cache key stays under the order so every existing order
+     * invalidation refreshes the projection without creating a new owner. */
+    orderRoute: (id: string) => ["operation", "orders", id, "route"] as const,
     partners:  () => ["operation", "partners"] as const,
     suppliers: () => ["operation", "suppliers"] as const,
     pos:       (filters?: operationPoFilters) =>
@@ -2801,6 +2814,7 @@ export interface operationOrderListRow {
     sku: string;
     qty: number;
     unit_price?: number | string | null;
+    attrs?: Record<string, unknown> | null;
     source_po?: string | null;
     /** STAGE 1 — `Model · Variant`, resolved server-side by the SAME helper
      *  the detail route uses (Law D), so a product is never named two ways.
@@ -2818,7 +2832,7 @@ export interface operationOrderListRow {
    *  order's value is then UNKNOWN, and unknown holds nothing — which is
    *  exactly what shipped before this card. */
   paid?: number | string | null;
-  order_addons?: { qty: number; unit_price?: number | string | null }[];
+  order_addons?: { addon_key?: string | null; qty: number; unit_price?: number | string | null }[];
   /**
    * D1 (2026-08-06) — the SKUs a real PURCHASE ORDER covers for this order,
    * linked the drawer's own way (`purchase_orders.so` or `so_refs[]`).
@@ -2833,6 +2847,8 @@ export interface operationOrderListRow {
    * then falls back to exactly the pre-D1 answer instead of accusing.
    */
   po_skus?: string[];
+  /** Purchase-order identities linked by purchase_orders.so / so_refs. */
+  po_numbers?: string[];
   delivery_partner_id: string | null;
   /** Migration 0147 (item h, 2026-05-23) — order-level LP request/accept/reject
    *  state. Set by `operation_confirm_proceed_request_v3` when Operation
@@ -4295,6 +4311,96 @@ export function useSalesOrderRevisions(
   });
 }
 
+export interface SalesOrderRouteRefund {
+  id: string;
+  amount: number | string;
+  status: "requested" | "approved" | "rejected" | "paid";
+  requested_at: string | null;
+}
+
+export interface SalesOrderRouteCase {
+  id: string;
+  caseNo: string;
+  statusIsClosed: boolean;
+  openedAt: string | null;
+}
+
+export interface SalesOrderRouteReceivingSession {
+  id: string;
+  po_id: string;
+  do_number: string | null;
+  status: string;
+  goods_received_at: string | null;
+  submitted_at: string;
+}
+
+export interface SalesOrderRouteClaim {
+  id: string;
+  claim_no: string;
+  po_id: string;
+  status: string;
+  reported_at: string | null;
+}
+
+export interface SalesOrderRouteFactsResponse {
+  allocation: SalesOrderAllocation;
+  brief: BookingBrief;
+  attempts: DeliveryAttemptRow[];
+  loans: SofaLoanDto[];
+  refunds: SalesOrderRouteRefund[];
+  cases: SalesOrderRouteCase[];
+  receiving: SalesOrderRouteReceivingSession[];
+  claims: SalesOrderRouteClaim[];
+}
+
+/**
+ * The Order Route's read fan-in. Every request goes to the existing owning
+ * door; this hook neither derives nor writes an owner fact. It fires only when
+ * the route is open, keeping the normal document workspace unchanged.
+ */
+export function useSalesOrderRouteFacts(
+  orderId: string | null,
+  open: boolean,
+  poIds: readonly string[] = [],
+  opts?: Partial<UseQueryOptions<SalesOrderRouteFactsResponse>>,
+) {
+  const poKey = [...poIds].sort().join(",");
+  return useQuery({
+    queryKey: orderId ? ([...qk.operation.orderRoute(orderId), poKey] as const) : (["operation", "orders", "null", "route"] as const),
+    queryFn: async () => {
+      const id = encodeURIComponent(orderId ?? "");
+      const receivingPromise = Promise.all(poIds.map((poId) =>
+        apiFetch<{ sessions: SalesOrderRouteReceivingSession[] }>(
+          `/api/operation/pos/${encodeURIComponent(poId)}/receiving`,
+        ),
+      ));
+      const [allocation, booking, attempts, loans, refunds, cases, claims] = await Promise.all([
+        apiFetch<{ allocation: SalesOrderAllocation }>(`/api/operation/orders/${id}/allocation`),
+        apiFetch<{ brief: BookingBrief }>(`/api/operation/orders/${id}/booking-brief`),
+        apiFetch<{ attempts: DeliveryAttemptRow[] }>(`/api/operation/orders/${id}/delivery-attempts`),
+        apiFetch<SofaLoansResponse>(`/api/operation/orders/${id}/loans`),
+        apiFetch<{ refunds: SalesOrderRouteRefund[] }>(`/api/operation/orders/${id}/refunds`),
+        apiFetch<{ items: SalesOrderRouteCase[] }>(`/api/ops/service-cases?orderId=${id}`),
+        apiFetch<{ claims: SalesOrderRouteClaim[] }>("/api/operation/supplier-claims?status=all"),
+      ]);
+      const receiving = await receivingPromise;
+      return {
+        allocation: allocation.allocation,
+        brief: booking.brief,
+        attempts: attempts.attempts,
+        loans: loans.loans,
+        refunds: refunds.refunds,
+        cases: cases.items,
+        receiving: receiving.flatMap((result) => result.sessions),
+        claims: claims.claims.filter((claim) => poIds.includes(claim.po_id)),
+      };
+    },
+    enabled: !!orderId && open,
+    staleTime: 10_000,
+    ...opts,
+  });
+}
+
 /* ─── STAGE 3 · card 3.3 — the attribution request lane ─────────────────────
  *
  * Four hooks, and the split between them IS the law: SUBMIT writes a request,
@@ -4603,10 +4709,88 @@ export function useSalesOrderAmendment(
 }
 
 export interface AmendmentProposal {
-  lines?: Array<{ sku: string; qty: number; unit_price: number }>;
+  lines?: Array<{ id?: string; sku: string; qty: number; unit_price: number }>;
   delivery_date?: string | null;
   delivery_date_tbd?: boolean;
   installment_months?: number | null;
+}
+
+export interface AmendmentImpactFinding {
+  owner: string;
+  kind: string;
+  count: number;
+  amount?: number;
+  blocks: boolean;
+  href: string;
+}
+
+export interface SalesOrderAmendmentImpact {
+  amendment_id: string;
+  stale: boolean;
+  commercial_delta: number;
+  findings: AmendmentImpactFinding[];
+}
+
+/** What cancelling this Sales Order would raise, per owner — the same seven
+ *  owners and the same finding shape the amendment preview uses, so one
+ *  vocabulary covers both governed changes. Read-only. */
+export interface SalesOrderCancelImpact {
+  order_id: string;
+  so: number;
+  status: string;
+  cancellable: boolean;
+  refusal: string | null;
+  goods_total: number;
+  paid: number;
+  findings: AmendmentImpactFinding[];
+}
+
+export function useSalesOrderCancelImpact(orderId: string | null, enabled = true) {
+  return useQuery({
+    queryKey: ["operation", "sales-order", orderId, "cancel-impact"],
+    queryFn: () =>
+      apiFetch<SalesOrderCancelImpact>(`/api/operation/orders/${orderId}/cancel-impact`),
+    enabled: !!orderId && enabled,
+  });
+}
+
+export function useSalesOrderAmendmentImpact(amendmentId: string | null) {
+  return useQuery({
+    queryKey: ["operation", "sales-order-amendment", amendmentId, "impact"],
+    queryFn: () =>
+      apiFetch<SalesOrderAmendmentImpact>(
+        `/api/operation/orders/amendment/${amendmentId}/impact`,
+      ),
+    enabled: !!amendmentId,
+  });
+}
+
+export function useDecideSalesOrderAmendment(
+  orderId: string,
+  opts?: Partial<
+    UseMutationOptions<
+      { id: string; status: "applied" | "rejected"; revision?: number },
+      ApiError,
+      { amendmentId: string; decision: "approve" | "reject"; note: string }
+    >
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ amendmentId, decision, note }) =>
+      apiFetch<{ id: string; status: "applied" | "rejected"; revision?: number }>(
+        `/api/operation/orders/amendment/${amendmentId}/decide`,
+        { method: "POST", body: JSON.stringify({ decision, note }) },
+      ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: [...qk.operation.order(orderId)] }),
+        qc.invalidateQueries({ queryKey: ["operation", "sales-order-amendment"] }),
+      ]);
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
 }
 
 export function useSubmitSalesOrderAmendment(
@@ -4615,7 +4799,7 @@ export function useSubmitSalesOrderAmendment(
     UseMutationOptions<
       { id: string; base_revision: number; base_contractual_hash: string },
       ApiError,
-      { proposed: AmendmentProposal; reason?: string }
+      { proposed: AmendmentProposal; reason: string }
     >
   >,
 ) {
@@ -4623,7 +4807,7 @@ export function useSubmitSalesOrderAmendment(
   return useMutation<
     { id: string; base_revision: number; base_contractual_hash: string },
     ApiError,
-    { proposed: AmendmentProposal; reason?: string }
+    { proposed: AmendmentProposal; reason: string }
   >({
     mutationFn: (input) =>
       apiFetch<{ id: string; base_revision: number; base_contractual_hash: string }>(
@@ -4944,6 +5128,31 @@ export function useStockAlerts(
 /** Cross-warehouse stock snapshot — the Stock On-Hand source of truth, reused by
  *  the Orders control table so its Stock column matches that page's free-balance
  *  figures. 30s stale mirrors the other operation stock surfaces. */
+/**
+ * CARD 3 — the booking brief for ONE order.
+ *
+ * The server composes it from the authoritative reads (Card 1 commitment →
+ * Card 2 allocation → the overlay's booking + supplier dates → the partner
+ * roster → the `logistics_call_working_days` setting), so nothing on this side
+ * re-derives a call window or a shortfall. Disabled without an id — the delivery
+ * pane asks only for the order the operator has picked.
+ */
+export function useOrderBookingBrief(
+  orderId: string | null | undefined,
+  opts?: Partial<UseQueryOptions<{ brief: BookingBrief }>>,
+) {
+  return useQuery({
+    queryKey: qk.operation.orderBookingBrief(orderId ?? ""),
+    queryFn: () =>
+      apiFetch<{ brief: BookingBrief }>(
+        `/api/operation/orders/${orderId}/booking-brief`,
+      ),
+    enabled: !!orderId,
+    staleTime: 30_000,
+    ...opts,
+  });
+}
+
 export function useOperationStock(
   opts?: Partial<UseQueryOptions<operationStockResponse>>,
 ) {

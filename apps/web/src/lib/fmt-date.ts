@@ -4,6 +4,31 @@ const MONTHS = [
   "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
 ];
 
+const APP_TIME_ZONE = "Asia/Kuala_Lumpur";
+
+function appDateParts(d: Date) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: APP_TIME_ZONE,
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    year: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(d);
+  const value = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((part) => part.type === type)?.value ?? "";
+  return {
+    dow: value("weekday"),
+    day: value("day"),
+    mon: value("month"),
+    yr: value("year"),
+    hh: value("hour"),
+    mm: value("minute"),
+  };
+}
+
 /**
  * Format an ISO date string as **"Tue, 20 May 26"** — weekday FIRST
  * (Loo, 2026-07-30; supersedes the date-first spelling of 2026-06-12).
@@ -22,20 +47,26 @@ export function fmtDate(
   opts?: { time?: boolean },
 ): string {
   if (!iso) return "—";
-  // Bare dates (YYYY-MM-DD) need a timezone anchor so new Date() doesn't
-  // shift them to the day before in UTC-minus zones.
-  const d = new Date(iso.length === 10 ? `${iso}T00:00:00` : iso);
+  // Bare business dates have no timezone and must keep their written day.
+  // Timestamps are always displayed in Carres' MYT business timezone, never
+  // the browser/runner timezone (GitHub CI is UTC; operators are in Malaysia).
+  const bare = iso.length === 10;
+  const d = new Date(bare ? `${iso}T00:00:00Z` : iso);
   if (isNaN(d.getTime())) return "—";
-  const dow = DAYS[d.getDay()];
-  const day = d.getDate();
-  const mon = MONTHS[d.getMonth()];
-  const yr = String(d.getFullYear()).slice(2);
+  const p = bare
+    ? {
+        dow: DAYS[d.getUTCDay()],
+        day: String(d.getUTCDate()),
+        mon: MONTHS[d.getUTCMonth()],
+        yr: String(d.getUTCFullYear()).slice(2),
+        hh: "00",
+        mm: "00",
+      }
+    : appDateParts(d);
   if (opts?.time) {
-    const hh = String(d.getHours()).padStart(2, "0");
-    const mm = String(d.getMinutes()).padStart(2, "0");
-    return `${dow}, ${day} ${mon} ${yr} ${hh}:${mm}`;
+    return `${p.dow}, ${p.day} ${p.mon} ${p.yr} ${p.hh}:${p.mm}`;
   }
-  return `${dow}, ${day} ${mon} ${yr}`;
+  return `${p.dow}, ${p.day} ${p.mon} ${p.yr}`;
 }
 
 /**
@@ -60,7 +91,12 @@ export function fmtMonth(period: string | null | undefined): string {
  */
 export function fmtDateShort(iso: string | null | undefined): string {
   if (!iso) return "—";
-  const d = new Date(iso.length === 10 ? `${iso}T00:00:00` : iso);
+  const bare = iso.length === 10;
+  const d = new Date(bare ? `${iso}T00:00:00Z` : iso);
   if (isNaN(d.getTime())) return "—";
-  return `${d.getDate()} ${MONTHS[d.getMonth()]} ${String(d.getFullYear()).slice(2)}`;
+  if (bare) {
+    return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${String(d.getUTCFullYear()).slice(2)}`;
+  }
+  const p = appDateParts(d);
+  return `${p.day} ${p.mon} ${p.yr}`;
 }
