@@ -43,6 +43,7 @@
 // around the one the engine already draws.
 import { useCallback, useMemo, useState } from "react";
 import { Plus } from "lucide-react";
+import { lineClass } from "@carres/shared";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import {
@@ -251,7 +252,9 @@ function ExpandedLines({ row }: { row: RegisterRow }) {
   const categoryOf = (line: (typeof lines)[number]) => {
     const fromAttrs = typeof line.attrs?.category === "string" ? line.attrs.category : "";
     const fromSku = line.sku.includes(":") ? line.sku.split(":", 1)[0] : "";
-    const category = fromAttrs || fromSku || "Other goods";
+    const classified = lineClass(line.sku);
+    const classifiedLabel = classified === "acc" ? "Accessory" : classified === "unknown" ? "Other goods" : classified;
+    const category = fromAttrs || fromSku || classifiedLabel;
     return category.replace(/[_-]+/g, " ").toUpperCase();
   };
   const configOf = (line: (typeof lines)[number]) =>
