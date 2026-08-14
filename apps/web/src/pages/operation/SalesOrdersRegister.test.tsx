@@ -190,7 +190,34 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     expect(screen.getByRole("heading", { name: "MATTRESS" })).toBeInTheDocument();
     expect(screen.queryByText("Other Goods")).not.toBeInTheDocument();
     expect(screen.getByText(/firmness: medium/i)).toBeInTheDocument();
-    expect(screen.getByText("Qty 1")).toBeInTheDocument();
+    expect(screen.getByText("×1")).toBeInTheDocument();
+  });
+
+  it("keeps each expanded good in one compact block instead of distributing it across register columns", () => {
+    listHookState.data = {
+      orders: [
+        order({
+          order_lines: [
+            {
+              sku: "B1201S-K",
+              qty: 1,
+              unit_price: 2499,
+              label: "B1201S · King",
+              attrs: { category: "mattress", firmness: "medium" },
+            },
+          ],
+        }),
+      ],
+    };
+    mount();
+    fireEvent.click(screen.getByRole("button", { name: "Expand row" }));
+
+    const block = screen.getByTestId("expanded-good-B1201S-K");
+    expect(block).toHaveTextContent("B1201S-K");
+    expect(block).toHaveTextContent("B1201S · King · firmness: medium");
+    expect(block).toHaveTextContent("×1");
+    expect(block).toHaveClass("inline-flex", "w-fit");
+    expect(block).not.toHaveClass("grid");
   });
 
   it("classifies legacy item codes before falling back to Other Goods", () => {
