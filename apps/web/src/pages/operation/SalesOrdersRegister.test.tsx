@@ -8,7 +8,7 @@
  * here fails: the hook would never see the term.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { operationOrderListRow } from "@/lib/queries";
@@ -22,15 +22,30 @@ let listHookState: {
   refetch: () => void;
 };
 
+let expansionHookState: {
+  data: {
+    lines: Array<{
+      lineId: string;
+      sku: string;
+      unitIds: string[];
+      deliverTo: Array<{ name: string; qty: number }>;
+    }>;
+  } | undefined;
+  isLoading: boolean;
+  isError: boolean;
+};
+
 /* A spy AROUND the hook: the component's calls — and the filters it passes —
  * are the assertion surface. */
 const useOperationOrdersSpy = vi.fn((..._args: unknown[]) => listHookState);
+const useSalesOrderExpansionSpy = vi.fn((..._args: unknown[]) => expansionHookState);
 
 vi.mock("@/lib/queries", async () => {
   const actual = await vi.importActual<typeof import("@/lib/queries")>("@/lib/queries");
   return {
     ...actual,
     useOperationOrders: (...args: unknown[]) => useOperationOrdersSpy(...args),
+    useSalesOrderExpansion: (...args: unknown[]) => useSalesOrderExpansionSpy(...args),
   };
 });
 
@@ -87,6 +102,7 @@ function LocationProbe() {
 
 beforeEach(() => {
   useOperationOrdersSpy.mockClear();
+  useSalesOrderExpansionSpy.mockClear();
   window.localStorage.clear();
   listHookState = {
     data: { orders: [order({})] },
@@ -95,6 +111,7 @@ beforeEach(() => {
     error: null,
     refetch: vi.fn(),
   };
+  expansionHookState = { data: { lines: [] }, isLoading: false, isError: false };
 });
 
 describe("FIX 1 · the register asks the SERVER", () => {
@@ -169,55 +186,53 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     expect(customer).not.toHaveTextContent("019-3478913");
   });
 
-  it("groups expanded goods under their real uppercase category", () => {
+  it("renders the locked six-column goods table with Stock Unit IDs and Purchasing Deliver To", () => {
     listHookState.data = {
       orders: [
         order({
           order_lines: [
             {
+              id: "line-1",
               sku: "B1201S-K",
-              qty: 1,
+              qty: 11,
               unit_price: 2499,
               label: "B1201S · King",
-              attrs: { category: "mattress", firmness: "medium" },
+              attrs: { category: "mattress", firmness: "medium", colour: "Sand" },
             },
           ],
         }),
       ],
     };
-    mount();
-    fireEvent.click(screen.getByRole("button", { name: "Expand row" }));
-    expect(screen.getByRole("heading", { name: "MATTRESS" })).toBeInTheDocument();
-    expect(screen.queryByText("Other Goods")).not.toBeInTheDocument();
-    expect(screen.getByText(/firmness: medium/i)).toBeInTheDocument();
-    expect(screen.getByText("×1")).toBeInTheDocument();
-  });
-
-  it("keeps each expanded good in one compact block instead of distributing it across register columns", () => {
-    listHookState.data = {
-      orders: [
-        order({
-          order_lines: [
-            {
-              sku: "B1201S-K",
-              qty: 1,
-              unit_price: 2499,
-              label: "B1201S · King",
-              attrs: { category: "mattress", firmness: "medium" },
-            },
-          ],
-        }),
-      ],
+    expansionHookState.data = {
+      lines: [{
+        lineId: "line-1",
+        sku: "B1201S-K",
+        unitIds: ["id-001", "id-002"],
+        deliverTo: [
+          { name: "Carres Klang", qty: 10 },
+          { name: "AL Sungai Buloh", qty: 1 },
+        ],
+      }],
     };
     mount();
     fireEvent.click(screen.getByRole("button", { name: "Expand row" }));
-
-    const block = screen.getByTestId("expanded-good-B1201S-K");
-    expect(block).toHaveTextContent("B1201S-K");
-    expect(block).toHaveTextContent("B1201S · King · firmness: medium");
-    expect(block).toHaveTextContent("×1");
-    expect(block).toHaveClass("inline-flex", "w-fit");
-    expect(block).not.toHaveClass("grid");
+    const table = screen.getByRole("table", { name: "Goods on SO-1303" });
+    expect(table).toBeInTheDocument();
+    expect(within(table).getAllByRole("columnheader").map((cell) => cell.textContent)).toEqual([
+      "Category", "Unit ID", "SKU", "Qty", "Item", "Deliver To",
+    ]);
+    const row = screen.getByTestId("expanded-good-B1201S-K");
+    expect(row).toHaveTextContent("MATTRESS");
+    expect(row).toHaveTextContent("id-001");
+    expect(row).toHaveTextContent("id-002");
+    expect(row).toHaveTextContent("B1201S-K");
+    expect(row).toHaveTextContent("11");
+    expect(row).toHaveTextContent("B1201S · King");
+    expect(row).toHaveTextContent("Firmness: medium");
+    expect(row).toHaveTextContent("Colour: Sand");
+    expect(row).toHaveTextContent("Carres Klang ×10");
+    expect(row).toHaveTextContent("AL Sungai Buloh ×1");
+    expect(screen.queryByText(/current location/i)).not.toBeInTheDocument();
   });
 
   it("classifies legacy item codes before falling back to Other Goods", () => {
@@ -225,15 +240,16 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
       orders: [
         order({
           order_lines: [
-            { sku: "B1201S-K", qty: 1, unit_price: 2499, label: "B1201S · King", attrs: {} },
+            { id: "line-1", sku: "B1201S-K", qty: 1, unit_price: 2499, label: "B1201S · King", attrs: {} },
           ],
         }),
       ],
     };
     mount();
     fireEvent.click(screen.getByRole("button", { name: "Expand row" }));
-    expect(screen.getByRole("heading", { name: "MATTRESS" })).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "OTHER GOODS" })).not.toBeInTheDocument();
+    expect(screen.getByText("MATTRESS")).toBeInTheDocument();
+    expect(screen.getByText("Not allocated")).toBeInTheDocument();
+    expect(screen.queryByText("OTHER GOODS")).not.toBeInTheDocument();
   });
 
   it("keeps loading inside the work surface instead of adding an outer band", () => {

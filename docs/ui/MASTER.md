@@ -677,9 +677,10 @@ breathing gap
   There is no overall `Current`/status column. Content sets predetermined usable widths; staff do
   not resize to repair the default. Optional columns may cause grid-owned horizontal overflow and
   may not squeeze the default set.
-- Expansion is goods-only: compact indented category groups, with SKU, description/configuration
-  and quantity. It is not another filterable table and carries no repeated category or unruled
-  operational/PO state.
+- Expansion is goods-only: a small clean, non-filterable table beneath the parent row with the
+  locked columns `Category | Unit ID | SKU | Qty | Item | Deliver To`. It may use its own column
+  tracks; it must retain the parent Register's seven-column structure and horizontal behaviour.
+  Unit ID is Stock truth; Deliver To is read-only Purchasing truth, not Warehouse location.
 - Keep the proven Search, typed filters, Columns, Export and right-click document interaction.
   Selection may scope Export; it may not introduce register-owned execution. Direct SO/PO/DO
   numbers are links to their owner. Only explicit `Edit` opens the formal edit context; View,

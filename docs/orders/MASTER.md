@@ -126,9 +126,14 @@ keep a superseded target.
 - Default widths are governed and usable without staff resizing. Optional columns may widen the
   sheet and create horizontal scroll; default columns are never squeezed unnaturally to make an
   added column fit.
-- `▸` expands goods only: compact, indented groups with category section headers, then SKU +
-  description/configuration + quantity. It has no second register header/filter row, does not
-  repeat category on every line, and carries no PO or operational status unless separately ruled.
+- `▸` expands goods only as one clean read-only mini-table beneath the parent row. Its locked
+  columns are `Category | Unit ID | SKU | Qty | Item | Deliver To`. `Item` consolidates the
+  product/configuration facts Operations uses to identify the exact goods; it does not create
+  one column per product attribute. Unit ID reads Stock's per-unit register. Deliver To reads
+  Purchasing's PO/PO-line result (including quantity splits). Sales Orders stores neither fact.
+  Warehouse physical location is deliberately absent and must never be substituted for Deliver To.
+  A physical goods line with no allocated Stock Unit says `Not allocated`; a Service says
+  `Not applicable` rather than pretending a Unit should exist.
 - Search, typed filters, sort, Columns and Export remain useful register capabilities. Selection
   may scope Export; it does not license workflow bulk actions on a truth register.
 - Document numbers navigate directly to their authoritative object where the relationship exists:
@@ -207,7 +212,7 @@ Shopify-style transaction/version discipline add no unresolved business rule.
 |---|---|---|---|---|
 | Register normal + selected | Built DataGrid; Orders owns truth; selection scopes Export | 2990 has checkbox rows, dense grid and totals | **ADAPT** | Replace default target with ruled seven columns and bounded surface; keep selected state non-operational |
 | Search/filter/sort/Columns/export | Built server search, typed column filters, chooser, XLSX, resize/reorder/layout memory | 2990 exposes search, per-column filters, 42-column chooser and Excel | **KEEP / ADAPT** | Govern widths/default order; optional columns may overflow; remove `Current` as a candidate overall pointer if it implies status |
-| Inline goods expansion | Built one line-item disclosure | 2990 expands nested goods | **ADAPT** | Category-grouped compact goods; no nested register/header or cross-module status |
+| Inline goods expansion | Built one line-item disclosure | 2990 expands nested goods | **ADAPT** | Locked six-column read-only mini-table; Unit ID from Stock, Deliver To from Purchasing; no nested register controls or cross-module status |
 | Context actions + bulk | Built right-click `Open · Edit · Print PDF · Copy SO No`; bulk Export only | 2990 proves right-click document action pattern | **KEEP / ADAPT** | Rename/open semantics to explicit View/Preview where needed; add no execution acts; preserve selection only for truthful export |
 | View / Preview | Built workspace presents saved truth and the actual PDF; explicit Edit changes context | 2990 detail is read-only until Edit | **KEEP / ADAPT** | PR #754 production-verified 2026-08-13; direct SO/PO/DO lineage completeness remains in the later dependency scopes |
 | Edit / field contract | Built UI and API restrict Edit to safe customer/contact/address/access/proceed-date corrections; items and promised delivery remain read-only | 2990 has a comprehensive backend form | **KEEP / IMPROVE** | PR #754 production-verified 2026-08-13; authoritative Sales Portal/POS parity and the complete role matrix continue through Amendment/Approval |

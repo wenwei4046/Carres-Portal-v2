@@ -2171,6 +2171,57 @@ describe("GET /api/operation/orders/:id/commitment", () => {
   });
 });
 
+describe("GET /api/operation/orders/:id/expansion", () => {
+  it("projects Stock Unit IDs and Purchasing line destinations without a Sales Order destination field", async () => {
+    const ORDER_ID = "00000000-0000-0000-0000-000000000a01";
+    const rows: Record<string, unknown> = {
+      orders: { so: 1303 },
+      order_lines: [{ id: "line-1", sku: "B1201S-K", qty: 11 }],
+      order_supplier_threads: [{ order_line_id: "line-1", po_id: "PO-2032" }],
+      purchasing_destinations: [
+        { id: "klang", name: "Carres Klang", is_default: true },
+        { id: "al", name: "AL Sungai Buloh", is_default: false },
+      ],
+      purchase_orders: [{ id: "PO-2032", destination_id: "klang" }],
+      purchase_order_lines: [
+        { po_id: "PO-2032", sku: "B1201S-K", qty: 10, destination_id: null },
+        { po_id: "PO-2032", sku: "B1201S-K", qty: 1, destination_id: "al" },
+      ],
+      ops_stock_items: [
+        { unit_code: "id-001", sku: "B1201S-K" },
+        { unit_code: "id-002", sku: "B1201S-K" },
+      ],
+    };
+    const from = vi.fn((table: string) => {
+      const data = rows[table];
+      const chain: Record<string, unknown> = {};
+      for (const method of ["eq", "in", "or"]) chain[method] = vi.fn(() => chain);
+      chain.maybeSingle = vi.fn().mockResolvedValue({ data, error: null });
+      chain.then = (resolve: (value: unknown) => unknown) => resolve({ data, error: null });
+      return { select: vi.fn(() => chain) };
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ from } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(new Request(`http://t/api/operation/orders/${ORDER_ID}/expansion`, {
+      headers: { Authorization: `Bearer ${jwt}` },
+    }), env);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      defaultDeliverTo: "Carres Klang",
+      lines: [{
+        lineId: "line-1",
+        sku: "B1201S-K",
+        unitIds: ["id-001", "id-002"],
+        deliverTo: [
+          { name: "Carres Klang", qty: 10 },
+          { name: "AL Sungai Buloh", qty: 1 },
+        ],
+      }],
+    });
+  });
+});
+
 describe("GET /api/operation/orders/:id/revisions", () => {
   it("reads the immutable store oldest-first", async () => {
     const order = vi.fn().mockResolvedValue({
