@@ -942,6 +942,7 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
         note: null,
         date: todayMY,
         photoPaths,
+        idempotencyKey: sessionId,
       });
       // Reset the form; the amount re-seeds from the refetched paid.
       setApprovalCode("");

@@ -43,6 +43,7 @@ export const recordPaymentInputSchema = z.object({
    *  the live Worker's older (non-strict) schema strips this key harmlessly —
    *  payments still record, only the slip link waits for the deploy. */
   receiptUrl: z.string().trim().max(300).nullish(),
+  idempotencyKey: z.string().uuid().optional(),
 });
 export type RecordPaymentInput = z.infer<typeof recordPaymentInputSchema>;
 

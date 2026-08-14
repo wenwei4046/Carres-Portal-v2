@@ -52,6 +52,7 @@ export const financeRecordReceiptInput = z.object({
   amount:     z.number().positive().finite(),
   method:     paymentMethodEnum,
   reference:  z.string().min(1).max(255).nullable().optional(),
+  idempotencyKey: z.string().uuid().optional(),
 }).strict();
 export type FinanceRecordReceiptInput = z.infer<typeof financeRecordReceiptInput>;
 

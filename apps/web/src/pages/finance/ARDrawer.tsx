@@ -113,6 +113,7 @@ export default function ARDrawer({
       amount:    amt,
       method:    recMethod,
       reference: recRef || null,
+      idempotencyKey: crypto.randomUUID(),
     });
   }
 
@@ -344,4 +345,3 @@ function Mini({
     </div>
   );
 }
-

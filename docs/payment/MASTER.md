@@ -396,6 +396,11 @@ Payment does not report P&L, COGS, supplier AP or top-SKU profitability.
 - operational collections desk with queue/facets and stock-aware context;
 - shared `orderMoney`, exact formatter and T−3/T−2/T−1 clock;
 - `payment_record`/`payment_void`, direct-ledger write closure and receipt uniqueness;
+- canonical `_customer_payment_post` transaction used by operational/manual Payment, Sales/POS
+  top-up, Finance AR receipt and customer Stripe checkout, with source idempotency, one allocation,
+  one receipt identity and one Order activity event;
+- legacy generic customer-order receipt history migrated into the canonical ledger; new generic
+  `payments` writes for incoming customer-order money are refused;
 - derived money states and void-aware readers;
 - payment history, promise-to-pay, receipt PDF, invoice download and WhatsApp brief;
 - order refund request/decision/paid lifecycle and derived SO completion;
@@ -403,7 +408,6 @@ Payment does not report P&L, COGS, supplier AP or top-SKU profitability.
 
 ### Approved target / not complete
 
-- one canonical posting/allocation service used by every channel;
 - migration/retirement of duplicate customer-money writers/tables/forms;
 - explicit unallocated/overpayment/reallocation/return/chargeback records;
 - immutable bank import batches linked to canonical Payment objects;

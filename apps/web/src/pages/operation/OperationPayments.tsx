@@ -1061,6 +1061,7 @@ function OrderMoneyDetail({
       kind,
       reference: reference.trim() || null,
       note: null,
+      idempotencyKey: crypto.randomUUID(),
     };
     record.mutate(input, {
       onSuccess: () => {

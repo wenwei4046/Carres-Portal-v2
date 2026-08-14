@@ -167,6 +167,7 @@ export default function TopUpDepositModal({ order, total, onClose }: Props) {
         note: note.trim() || null,
         date,
         photoPaths,
+        idempotencyKey: sessionId,
       });
     } catch (err) {
       setUploading(false);
