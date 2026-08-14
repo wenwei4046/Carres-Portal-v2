@@ -153,10 +153,44 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     mount();
     expect(screen.getAllByTestId("work-toolbar")).toHaveLength(1);
     expect(screen.getAllByRole("searchbox")).toHaveLength(1);
-    expect(screen.getByRole("button", { name: "Filters" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Export Excel/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Columns/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Filters" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Export" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Columns" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "New Sales Order" })).toBeInTheDocument();
+    expect(screen.queryByText("current view")).not.toBeInTheDocument();
+    expect(screen.queryByText(/\d+\/\d+/)).not.toBeInTheDocument();
+    expect(screen.queryByText("Not delivered")).not.toBeInTheDocument();
+  });
+
+  it("shows only the customer name in the default cell while retaining phone search context", () => {
+    mount();
+    const customer = screen.getByTitle("Kimmy · 019-3478913");
+    expect(customer).toHaveTextContent("Kimmy");
+    expect(customer).not.toHaveTextContent("019-3478913");
+  });
+
+  it("groups expanded goods under their real uppercase category", () => {
+    listHookState.data = {
+      orders: [
+        order({
+          order_lines: [
+            {
+              sku: "B1201S-K",
+              qty: 1,
+              unit_price: 2499,
+              label: "B1201S · King",
+              attrs: { category: "mattress", firmness: "medium" },
+            },
+          ],
+        }),
+      ],
+    };
+    mount();
+    fireEvent.click(screen.getByRole("button", { name: "Expand row" }));
+    expect(screen.getByRole("heading", { name: "MATTRESS" })).toBeInTheDocument();
+    expect(screen.queryByText("Other Goods")).not.toBeInTheDocument();
+    expect(screen.getByText(/firmness: medium/i)).toBeInTheDocument();
+    expect(screen.getByText("Qty 1")).toBeInTheDocument();
   });
 
   it("keeps loading inside the work surface instead of adding an outer band", () => {
