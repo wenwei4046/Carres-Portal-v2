@@ -65,9 +65,11 @@ const STEP_TITLE: Record<Step, string> = {
 export default function ServiceCaseWizard({
   onClose,
   onSaved,
+  initialOrder,
 }: {
   onClose: () => void;
   onSaved: () => void;
+  initialOrder?: CaseLookupOrder;
 }) {
   const qc = useQueryClient();
   const [step, setStep] = useState<Step>(1);
@@ -81,8 +83,10 @@ export default function ServiceCaseWizard({
   // ── step 2 · the product (and the order link that comes free with it) ──────
   const [lookupTerm, setLookupTerm] = useState("");
   const [lookupMsg, setLookupMsg]   = useState<string | null>(null);
-  const [order, setOrder]           = useState<CaseLookupOrder | null>(null);
-  const [lineId, setLineId]         = useState<string | null>(null);
+  const [order, setOrder]           = useState<CaseLookupOrder | null>(initialOrder ?? null);
+  const [lineId, setLineId]         = useState<string | null>(
+    initialOrder?.lines.length === 1 ? initialOrder.lines[0].id : null,
+  );
   /** Set only on the no-sales-order path, where nothing can derive the family. */
   const [manualCategory, setManualCategory] = useState<CaseProductCategory | null>(null);
   const [manualName, setManualName]         = useState("");
@@ -290,7 +294,7 @@ export default function ServiceCaseWizard({
           {/* ── 2 · which product ────────────────────────────────────────── */}
           {step === 2 && (
             <div className="space-y-4">
-              <div className="rounded border border-base-200 bg-base-50 p-3">
+              {!initialOrder && <div className="rounded border border-base-200 bg-base-50 p-3">
                 <label htmlFor="sc-lookup" className="text-meta uppercase tracking-wider text-base-500">
                   Sales order number or Ref No
                 </label>
@@ -313,7 +317,7 @@ export default function ServiceCaseWizard({
                   </button>
                 </div>
                 {lookupMsg && <p className="mt-1.5 text-meta text-base-600">{lookupMsg}</p>}
-              </div>
+              </div>}
 
               {order && (
                 <div>
@@ -354,7 +358,7 @@ export default function ServiceCaseWizard({
                 </div>
               )}
 
-              {!noOrder && (
+              {!initialOrder && !noOrder && (
                 <button
                   type="button"
                   onClick={() => { setNoOrder(true); setOrder(null); pickLine(null, null); }}

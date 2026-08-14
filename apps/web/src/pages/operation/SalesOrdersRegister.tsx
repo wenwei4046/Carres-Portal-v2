@@ -61,6 +61,7 @@ import CancelSalesOrderDialog from "./CancelSalesOrderDialog";
 import DestinationHeader from "./DestinationHeader";
 import { lineConfigBits } from "../dealer/new-order/special-addons-picker";
 import { isRental, lineName, type MoneyState } from "./sales-order-facts";
+import { missingDeliveryDateGuidance } from "./sales-order-guidance";
 import {
   buildRegisterRow,
   defaultOnFor,
@@ -216,11 +217,25 @@ function toGridColumn(
   if (f.key === "customer_delivery") {
     return {
       ...base,
-      accessor: (r) => r.customerDelivery ? f.text(r) : (
-        <span data-attention="warning" className="inline-flex items-center gap-1 rounded-control bg-kit-amber-3 px-1.5 py-0.5 font-medium text-kit-amber-11">
-          No delivery date
-        </span>
-      ),
+      accessor: (r) => {
+        if (r.customerDelivery) return f.text(r);
+        const guidance = missingDeliveryDateGuidance({
+          so: r.so,
+          customer: r.customer,
+          salesperson: r.o.salespersons?.name,
+          phone: r.phone,
+        });
+        return (
+          <span className="block min-w-0">
+            <span data-attention="warning" className="block truncate font-semibold text-kit-amber-11">
+              {guidance.problem}
+            </span>
+            <span className="block truncate text-meta font-normal text-base-600">
+              {guidance.action}
+            </span>
+          </span>
+        );
+      },
     };
   }
   if (f.key === "phone") {

@@ -190,10 +190,16 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
   });
 
   it("shows a governed missing Customer Delivery exception instead of a passive empty value", () => {
-    listHookState.data = { orders: [order({ delivery_date: null, delivery_date_tbd: true })] };
+    listHookState.data = { orders: [order({
+      delivery_date: null,
+      delivery_date_tbd: true,
+      customer_name: "Kimmy",
+      salespersons: { name: "Shasha" },
+    })] };
     mount();
-    const exception = screen.getByText("No delivery date");
+    const exception = screen.getByText("SO-1303 has no Customer Delivery date");
     expect(exception).toHaveAttribute("data-attention", "warning");
+    expect(screen.getByText("Shasha · Confirm the date with Kimmy · Record the agreed date")).toBeInTheDocument();
     expect(screen.queryByText("No date yet")).not.toBeInTheDocument();
   });
 

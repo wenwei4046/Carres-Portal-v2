@@ -126,6 +126,32 @@ async function fileASofaCase() {
 }
 
 describe("ServiceCaseWizard — a new hire files a case without writing a sentence", () => {
+  it("starts from the linked Sales Order without asking staff to find it again", async () => {
+    render(wrap(
+      <ServiceCaseWizard
+        onClose={() => {}}
+        onSaved={() => {}}
+        initialOrder={{
+          id: "00000000-0000-0000-0000-000000000001",
+          so: "SO-1303",
+          refNos: ["CR1303"],
+          customerName: "Kimmy",
+          customerPhone: "019-3478913",
+          customerAddress: "12 Jalan Klang",
+          deliveryDate: "2026-08-30",
+          lines: [{ id: "00000000-0000-0000-0000-000000000002", sku: "MS1401F-K", qty: 1, sourcePo: null }],
+        }}
+      />,
+    ));
+
+    await click(screen.getByRole("button", { name: "Customer" }));
+
+    expect(screen.getByText(/SO-1303 · Kimmy/)).toBeInTheDocument();
+    expect(screen.getByText("MS1401F-K")).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText(/SO-1147/)).not.toBeInTheDocument();
+    expect(apiFetchMock).not.toHaveBeenCalledWith(expect.stringContaining("/lookup"));
+  });
+
   it("files a complete case from clicks alone", async () => {
     const onSaved = vi.fn();
     render(wrap(<ServiceCaseWizard onClose={() => {}} onSaved={onSaved} />));
