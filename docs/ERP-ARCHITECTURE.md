@@ -50,8 +50,8 @@ ISSUE TRACKER = ACCOUNTABILITY + MEMORY + LEARNING
 ```
 
 Modules own and preserve the transactional facts. Work reads those facts and presents the
-actionable layer as **WHO + ACTION/OBJECT + RECIPIENT + REQUIRED RESULT + WHEN (actual working
-weekday/date)**, using the
+actionable layer as **structured Owner + structured Object + Fact/Problem + Action/Object + required
+Recipient/Result + WHEN (actual working weekday/date)**, using the
 authoritative wording in `COPY-STANDARD.md` and calendar in `ACTION-FLOW-STANDARD.md`; it never
 creates a second operational status or writes another module's completion fact. Truth is not
 forced into action wording: if nobody must do anything, it remains a fact in its owning module.
@@ -158,11 +158,19 @@ is a VIEW of a module, and it says so.
 | **Money In** | *What has the customer paid, and what is still owed?* |
 | **Supplier Claim** | *What does a supplier owe us for an item problem?* |
 | **Service** | *What customer problem needs coordinated follow-up, and is the customer finished?* |
+| **Guarantee / Service Package** | *What item-level entitlement exists, when does it run, and what has it consumed?* |
+| **Rental / Subscription** | *What recurring agreement, asset, money schedule and included service does the customer hold?* |
 | **People** | *Who does the work, and what are they owed?* |
+| **Issue Tracker** | *What went wrong, who contributed, what did it cost, and what must Carres learn?* |
 
-**Ten modules. Two of them do not exist as owners today, and that is the finding:**
-**Catalog** owns a question three other files answer for themselves (D9), and **Receiving**
-owns a record Orders was also writing (D2).
+These are business authorities, not a promise of one navigation door per row. **Catalog still has
+no canonical module MASTER; that is a current authority gap, not permission for another module to
+invent Catalog truth.** Receiving and Supplier Claim remain responsibilities governed inside the
+Purchasing MASTER until an approved re-ruling gives either a separate MASTER.
+
+Workspace is deliberately absent from this ownership table. Dashboard and Work are cross-module
+projections and own no business outcome. Their current complete design is still
+`docs/workspace/BLUEPRINT.md` **PROPOSAL FOR OWNER REVIEW**, not approved module law.
 
 ---
 

@@ -95,8 +95,9 @@ business decision that passes the Constitution's owner decision gate.
 
 This object/domain pass does not replace UI preflight. UI Dictionary/IA comes first; Carres
 semantics and ownership outrank external references; and actionable copy remains **WHO + ACTION +
-OBJECT + actual working day/date**. The pass is a completeness check, not permission to build every
-capability or to write UI/application code in Plan mode.
+OBJECT + actual working day/date**, with WHO and source object rendered as structured context under
+the latest Owner Engine law rather than repeated in sentence text. The pass is a completeness check,
+not permission to build every capability or to write UI/application code in Plan mode.
 
 **OFFICIAL CARD NUMBERS ARE GOVERNANCE; BLUEPRINT PRECEDES BUILD HANDOFF.** The planner
 never invents an official Card number or status. The whole-domain audit is evidence, not a roadmap.

@@ -70,17 +70,20 @@ names navigation only; opening the channel never proves that the business action
 An actionable alert, Work row or detail-page current action uses:
 
 ```text
-[Object + current fact/problem]
-[Owner/team] · [action + object] · [recipient + required result]
+[Current fact/problem]
+[Action + object] · [recipient + required result]
 [Governed working weekday/date]
 [Verb + object button]
 ```
 
-- Line 1 names the business object and states what is true; normal register text size and
-  medium/semibold weight.
-- Line 2 always identifies `WHO · ACTION + OBJECT · TO WHOM · WHAT IS NEEDED`; one size smaller
-  and regular weight. Never show a bare verb.
-- The responsible person is named when assigned; otherwise show the governed duty/team.
+- Line 1 states what is true; the object identity stays in the governed row/card header or object
+  field and is not repeated when that context is already visible. Use normal register text size
+  and medium/semibold weight.
+- Line 2 identifies `ACTION + OBJECT · TO WHOM · WHAT IS NEEDED`; one size smaller and regular
+  weight. Never show a bare verb.
+- Owner is structured identity resolved by the action's Owner Rule. Show it as governed avatar,
+  metadata or Team Work group, never as repeated sentence text. My Work may omit the current
+  user's identity because scope already answers who.
 - The channel is named when transmission matters: `Email`, `WhatsApp`, `Call` or another governed
   channel. `Send` remains banned.
 - Each line is one sentence. It should fit one desktop line but may wrap to two narrow-screen
@@ -94,7 +97,7 @@ Example:
 
 ```text
 Mattress measurement video is missing
-Amy · Ask Lim for the required video · Record their reply.
+Ask Lim for the required video · Record their reply.
 Fri 14 Aug
 [Ask customer]
 ```
@@ -103,34 +106,34 @@ Further governed examples:
 
 ```text
 PO-2041 Version 1 has not reached Macio
-Yu Jun · Email PO-2041 Version 1 to Macio · Ask for delivery confirmation.
+Email PO-2041 Version 1 to Macio · Ask for delivery confirmation.
 
 Delivery note DO-883 is missing
-Warehouse Duty · Upload Macio DO-883 · Link it to PO-2041.
+Upload Macio DO-883 · Link it to PO-2041.
 
 Macio has not replied
-Yu Jun · Call Macio about PO-2041 · Record item availability.
+Call Macio about PO-2041 · Record item availability.
 
 PO-2041 Deliver To has changed
-PO Duty · Email PO-2041 Version 2 to Macio · Ask them to use AL Sungai Buloh.
+Email PO-2041 Version 2 to Macio · Ask them to use AL Sungai Buloh.
 
 Unit CU-000128 is damaged
-GRN Duty · Hold CU-000128 · Add photos for Purchasing.
+Hold CU-000128 · Add photos for Purchasing.
 
 PO-2041 price changed to RM1,250
-Purchasing Manager · Check PO-2041 · Accept or reject RM1,250.
+Check PO-2041 · Accept or reject RM1,250.
 
 Customer delivery is at risk
-Mei Ling · Tell the Sales Order owner · Record the new date, 25 Aug 2026.
+Tell the responsible salesperson · Record the new date, 25 Aug 2026.
 ```
 
-An unassigned record does not hide two actions in one line. Assignment is the current action;
-the business follow-up becomes the next action after assignment:
+An action whose Owner Rule cannot resolve a person does not hide two actions in one line. Repairing
+the roster/duty/cover fact is the current action; the business follow-up becomes the next action:
 
 ```text
-PO-2041 has no owner
-PO Duty · Assign a buyer to PO-2041 · Buyer must contact Macio today.
-[Assign buyer]
+PO Duty has no holder
+Add today's PO Duty holder · The system must route PO-2041.
+[Open duty roster]
 ```
 
 The two-line form is not forced onto ordinary History facts, completed records, small field
@@ -195,20 +198,22 @@ not enter the official record.
 expose:
 
 ```
-WHO + ACTION AND OBJECT + RECIPIENT + REQUIRED RESULT + WHEN
+STRUCTURED OWNER + STRUCTURED OBJECT + ACTION AND OBJECT + RECIPIENT + REQUIRED RESULT + WHEN
 ```
 
 Use the portal-wide two-line shape when the row carries a fact plus action:
 
 ```
-LINE 1  OBJECT + FACT / PROBLEM
-LINE 2  OWNER + ACTION AND OBJECT + RECIPIENT + REQUIRED RESULT
+LINE 1  FACT / PROBLEM
+LINE 2  ACTION AND OBJECT + RECIPIENT + REQUIRED RESULT
 ```
 
-The row/action context must also expose actual working weekday/date. `Call` · `Ask` · `Check` ·
+The governed row/card structure supplies object identity and resolved owner without repeating either
+inside the semantic lines. The row/action context must also expose actual working weekday/date.
+`Call` · `Ask` · `Check` ·
 `Choose` · `Upload` · `Add` · `Send` · `Save` · `Follow up` · `Review` · `Handle` · `Resolve`
-alone are banned. If one line cannot fit, use labelled `Owner · Object · Contact · Do · Need`; omit
-nothing.
+alone are banned. If one line cannot fit, use labelled `Owner · Object · Contact · Do · Need`; keep
+Owner and Object as structured fields and omit nothing.
 
 Normal intake is guided factual questions and governed answers. The system generates the official
 English summary. A blank `What happened?`, `Action taken`, `Root cause`, `Prevention` or `Follow-up

@@ -55,6 +55,33 @@ evidence beats older documentation.
 governing chain required by the §4 start protocol. This does not license indiscriminate document
 loading. Old queues and checkpoints live in `docs/archive/` — **no chat reads them as authority.**
 
+### ERP AUTHORITY MAP — canonical handoff, 2026-08-14
+
+This table is the cold-start directory, not a second copy of module law. `APPROVED` or `LOCKED`
+does not claim the target is built. `BUILD` means approved law plus committed implementation that
+still requires delivery/production proof. A proposal never becomes authority through this table.
+
+| Module / responsibility | Canonical current authority | State | Resume execution at |
+|---|---|---|---|
+| Catalog | No module MASTER yet; boundary in `docs/ERP-ARCHITECTURE.md` | **PROPOSAL / authority gap** | PLAN a complete Catalog Blueprint; do not infer rules from other modules |
+| Sales Orders / Customer Order | `docs/orders/MASTER.md` | **PRODUCTION-VERIFIED / LOCKED** | Approved-target gaps explicitly named in that MASTER; preserve verified register/object truth |
+| Purchasing / Purchase Orders | `docs/purchasing/MASTER.md` | **APPROVED / LOCKED** | Its measured current blocks and Approved Evolution; do not revive old queues |
+| Receiving | `docs/purchasing/MASTER.md` §5 | **APPROVED / LOCKED** | The same MASTER's Receiving gaps and owner boundaries |
+| Supplier Claims | `docs/purchasing/MASTER.md` §6 | **APPROVED / LOCKED** | The Service-Case workstream/entry-rule gap; keep Purchasing as supplier-response owner |
+| Stock / Warehouse | `docs/stock/MASTER.md` | **LOCKED** | Measured Stock implementation and explicit approved gaps in that MASTER |
+| Delivery | `docs/delivery/MASTER.md` | **APPROVED / LOCKED** | The approved top-to-toe target; current implementation may lag |
+| Payment / Money In | `docs/payment/MASTER.md` | **APPROVED / LOCKED** | Its approved-target/not-built convergence work; Payment remains customer money only |
+| Service Cases | `docs/service/MASTER.md` | **APPROVED / LOCKED** | Implement the approved 2026-08-14 Case/playbook rulings; no new business interview |
+| Guarantee / Service Package | `docs/guarantee/MASTER.md` | **APPROVED / LOCKED** | Preserve shipped entitlement baseline; implement the dated policy/playbook rulings |
+| Rental / Subscription | `docs/rental/MASTER.md` | **APPROVED / LOCKED** | Frozen agreement truth plus approved subscription service/visit target |
+| People / HR | `docs/hr/MASTER.md` | **LOCKED** | Measured current implementation and explicit gaps in that MASTER |
+| Issue Tracker | `docs/issue-tracker/MASTER.md` | **BUILD — business law APPROVED / LOCKED** | Verify/deliver the committed Issue Tracker implementation; do not re-plan the operating model |
+| Workspace — Dashboard + Work | No MASTER; `docs/workspace/BLUEPRINT.md` is review material | **PROPOSAL** | Owner review rulings in Blueprint §§15–16; no Cards or implementation before approval |
+| Shared ERP UI | `docs/ui/MASTER.md` | **PRODUCTION-VERIFIED / LOCKED** | Apply the governed templates/tokens and the latest locked owner/action presentation law |
+
+`docs/issue-tracker/MASTER.md` is the one current Issue Tracker path. The former
+`docs/issues/MASTER.md` survives only in Git history and is not a second authority.
+
 ### Law 2 · Build first. Freeze after validation. Then overwrite the MASTER
 ```
 Build  →  Reality  →  Architecture review  →  If approved  →  Overwrite MASTER

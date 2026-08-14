@@ -159,13 +159,14 @@ reason. Automation never accuses a person.
 The system always shows the current fact and one complete next action. The action grammar is:
 
 ```text
-LINE 1  OBJECT + FACT / PROBLEM
-LINE 2  OWNER + ACTION AND OBJECT + RECIPIENT + REQUIRED RESULT
+STRUCTURE  OBJECT IDENTITY + RESOLVED OWNER
+LINE 1     FACT / PROBLEM
+LINE 2     ACTION AND OBJECT + RECIPIENT + REQUIRED RESULT
 ```
 
 Every action must answer:
 
-- **WHO** acts — named person or governed duty owner;
+- **WHO** acts — resolved from the governed Owner Rule and shown as structured avatar/metadata;
 - **OBJECT** — exact Issue, SO, PO, Unit, document, evidence or amount;
 - **RECIPIENT** — supplier, Logistics, customer, team or other receiving party;
 - **REQUIRED RESULT** — the answer, evidence, confirmation or decision that completes it;
@@ -175,15 +176,16 @@ Valid:
 
 ```text
 Supplier has not replied
-Yu Jun · Call Macio about IS-204 · Ask if they accept RM80.
+Call Macio about IS-204 · Ask if they accept RM80.
 
 Recovery amount is missing
-Finance Duty · Add the amount to IS-204 · Link the Finance record.
+Add the amount to IS-204 · Link the Finance record.
 ```
 
 Bare `Call`, `Ask`, `Check`, `Choose`, `Upload`, `Add`, `Send`, `Save`, `Follow up`, `Review`,
 `Handle` and `Resolve` are invalid. If one line cannot fit, show labelled `Owner · Object · Contact ·
-Do · Need`; omit nothing.
+Do · Need`; omit nothing. `Owner` remains a structured field in that expanded view and is not
+prepended to the action sentence.
 
 The system prepares the evidence/message and presents governed factual results, for example:
 

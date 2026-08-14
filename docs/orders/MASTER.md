@@ -1376,9 +1376,10 @@ DB change — nothing to deploy; Card 10 wires the surface.
 # ✅ MY WORK / TEAM WORK — SO V2 CARD 10, SHIPPED 2026-08-11
 
 **The question this card installed:** one operator opens the portal and sees
-exactly what to do — **WHO + ACTION/OBJECT + RECIPIENT + REQUIRED RESULT + WHEN (actual working
-weekday/date)** — and a manager
-sees the same set with responsibility visible.
+exactly what to do. Its then-current visible formula included **WHO + ACTION/OBJECT + RECIPIENT +
+REQUIRED RESULT + WHEN**. The 2026-08-14 Owner Engine ruling supersedes that presentation only:
+owner and object are now structured context; the semantic lines state fact/problem and concrete
+action with required recipient/result/date. A manager sees the same set grouped by resolved owner.
 
 **Built under the Production UI Execution Law** (owner ruling 2026-08-11,
 [`../ui/MASTER.md`](../ui/MASTER.md) §1.1): proactive design judgment inside
@@ -1473,8 +1474,8 @@ ISSUE TRACKER = ACCOUNTABILITY + MEMORY + LEARNING
 ```
 
 - Sales Order, PO, Receiving, Unit, Delivery, Money and Loan preserve what is true.
-- Work translates authoritative facts into **WHO + ACTION/OBJECT + RECIPIENT + REQUIRED RESULT +
-  WHEN (actual working weekday/date)**. It owns no
+- Work translates authoritative facts into **structured Owner + structured Object + Fact/Problem +
+  Action/Object + required Recipient/Result + WHEN (actual working weekday/date)**. It owns no
   duplicate transaction form or free-standing completion status.
 - Issue Tracker records the incident, accountability, financial consequence, recovery and
   learning. It never substitutes for operational transaction truth.
@@ -1614,14 +1615,16 @@ let Work derive the next action. Sales Orders lists truth; it does not become th
 ## Card 9 · Unified Work Engine — approved and built
 
 Work reads module facts and produces one open work set. Every system rule must define exactly:
-**Trigger · Owner · Action · Due rule · Completion fact**. If it cannot name an authoritative
-completion fact, it does not enter the engine.
+**Trigger · Owner Rule · Resolved Owner · Action · Due/calendar · Completion Fact · Source Object ·
+Cover Rule**. If it cannot name an authoritative completion fact, it does not enter the engine.
 
 ```
-WHO + ACTION/OBJECT + RECIPIENT + REQUIRED RESULT + WHEN (ACTUAL WORKING WEEKDAY/DATE)
+STRUCTURED OWNER + STRUCTURED OBJECT + FACT/PROBLEM + ACTION/OBJECT
++ REQUIRED RECIPIENT/RESULT + WHEN (ACTUAL WORKING WEEKDAY/DATE)
 ```
 
-Show a named person when the roster/PIC determines one; use a shared station such as Warehouse
+Resolve the person from the action's Owner Rule plus roster/cover and show that identity as avatar,
+metadata or Team Work group, never repeated sentence copy. Use a shared station such as Warehouse
 only when the work genuinely belongs there. Deadlines come from approved business rules and the
 applicable working calendar, including public holidays. Staff see weekday + date, never only
 `Today`, `Tomorrow` or `T−2`. Late work remains on its original due date with working days late;
