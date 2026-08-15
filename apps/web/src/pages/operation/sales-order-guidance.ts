@@ -46,6 +46,40 @@ export interface SalesOrderGuidance {
  *  truncating. The party is named in `detail` and in the workspace panel. */
 const CONFIRM_DELIVERY_DATE = "Confirm delivery date";
 
+/**
+ * The customer WAS asked and answered *not yet*. That is a different fact from
+ * nobody having asked, and printing the same `Confirm delivery date` on both
+ * sends the operator to chase a customer who already replied — measured on
+ * production 2026-08-15 as 8 of the 11 dateless orders.
+ * (`docs/orders/MASTER.md` — THE THREE DELIVERY DATES.)
+ *
+ * The governed string is `Delivery date to be confirmed` (`COPY-STANDARD.md`
+ * :1161), which is also the label on the checkbox that sets this flag. In the
+ * `Customer Delivery` column the first two words are the column header, and the
+ * locked two-line grammar forbids repeating context the row already supplies —
+ * so the cell prints the tail and the hover carries the whole sentence.
+ */
+export const DATE_TO_BE_CONFIRMED_CELL = "To be confirmed";
+export const DATE_TO_BE_CONFIRMED_FULL = "Delivery date to be confirmed";
+
+/** The customer answered `not yet`. NOT work to do — no action clause, and no
+ *  warning colour: nothing here is wrong or late. */
+export function deliveryDateToBeConfirmedGuidance(input: {
+  customer: string;
+  salesperson?: string | null;
+  phone?: string | null;
+}): { fact: string; detail: string } {
+  const owner = input.salesperson?.trim() || "Sales";
+  const phone = input.phone?.trim() || "Phone not recorded";
+  return {
+    fact: DATE_TO_BE_CONFIRMED_CELL,
+    detail:
+      `${DATE_TO_BE_CONFIRMED_FULL}\n` +
+      `${input.customer} · ${phone} · ${owner}\n` +
+      "The customer has been asked and has not fixed a date yet.",
+  };
+}
+
 export function missingDeliveryDateGuidance(input: {
   so: number;
   customer: string;
