@@ -1144,11 +1144,12 @@ function DataGridInner<T>({
      view, the selection bar passes the selected rows. Cells render ReactNode,
      so we derive a text value per cell. xlsx is dynamic-imported (mirrors the
      pdf generators) to keep it out of the main bundle. */
-  const exportRows = useCallback(
-    async (whichRows: T[]) => {
-      if (whichRows.length === 0) return;
-      const cols = visibleColumns.filter((c) => !c.key.startsWith("__"));
-      if (cols.length === 0) return;
+  /* One derivation, two outputs. Excel and PDF disagreeing about a cell is the
+     defect this shape exists to make impossible. */
+  const deriveTable = useCallback(
+    (whichRows: T[]): { headers: string[]; rows: string[][]; stem: string } => {
+      const cols =
+        whichRows.length === 0 ? [] : visibleColumns.filter((c) => !c.key.startsWith("__"));
       // Header for a column in the sheet: an explicit exportLabel (used by pure
       // icon/checkbox columns whose on-screen label is blank) else the on-screen
       // label. Falls back to the column key so a blank header never leaves an
@@ -1176,23 +1177,6 @@ function DataGridInner<T>({
         for (const c of cols) o[header(c)] = cellText(c, row);
         return o;
       });
-      const XLSX = await import("xlsx");
-      const ws = XLSX.utils.json_to_sheet(data, { header: cols.map((c) => header(c)) });
-      // Auto-size each column to its widest cell (header included) so the sheet is
-      // legible instead of squished into one default width (Wei Siang 2026-06-20
-      // "很乱很难看"). Capped so a stray long value can't blow a column out.
-      ws["!cols"] = cols.map((c) => {
-        const h = header(c);
-        let w = h.length;
-        for (const o of data) w = Math.max(w, String(o[h] ?? "").length);
-        return { wch: Math.min(60, Math.max(8, w + 2)) };
-      });
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
-      // Filename: prefer the caller's human exportName ("Purchase Orders"); else
-      // clean the storageKey down to something legible (strip dg-/pr-g- prefixes,
-      // -v1 / layout suffixes, dashes→spaces). A YYYY-MM-DD date is appended so
-      // repeated exports are self-dating and don't silently overwrite.
       const stem =
         (exportName && exportName.trim()) ||
         (storageKey || "export")
@@ -1204,10 +1188,67 @@ function DataGridInner<T>({
           .replace(/\s+/g, " ")
           .trim() ||
         `export-${whichRows.length}`;
+      return {
+        headers: cols.map((c) => header(c)),
+        rows: data.map((o) => cols.map((c) => String(o[header(c)] ?? ""))),
+        stem,
+      };
+    },
+    [visibleColumns, storageKey, exportName],
+  );
+
+  const exportRows = useCallback(
+    async (whichRows: T[]) => {
+      if (whichRows.length === 0) return;
+      const { headers, rows, stem } = deriveTable(whichRows);
+      if (headers.length === 0) return;
+      const data = rows.map((r) => {
+        const o: Record<string, string> = {};
+        headers.forEach((h, i) => { o[h] = r[i] ?? ""; });
+        return o;
+      });
+      const cols = headers;
+      const XLSX = await import("xlsx");
+      const ws = XLSX.utils.json_to_sheet(data, { header: cols });
+      // Auto-size each column to its widest cell (header included) so the sheet is
+      // legible instead of squished into one default width (Wei Siang 2026-06-20
+      // "很乱很难看"). Capped so a stray long value can't blow a column out.
+      ws["!cols"] = cols.map((h) => {
+        let w = h.length;
+        for (const o of data) w = Math.max(w, String(o[h] ?? "").length);
+        return { wch: Math.min(60, Math.max(8, w + 2)) };
+      });
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
+      // Filename: prefer the caller's human exportName ("Purchase Orders"); else
+      // clean the storageKey down to something legible (strip dg-/pr-g- prefixes,
+      // -v1 / layout suffixes, dashes→spaces). A YYYY-MM-DD date is appended so
+      // repeated exports are self-dating and don't silently overwrite.
       const stamp = new Date().toISOString().slice(0, 10);
       XLSX.writeFile(wb, `${stem} ${stamp}.xlsx`);
     },
-    [visibleColumns, storageKey, exportName],
+    [deriveTable],
+  );
+
+  /** The current view as a PDF — same derived cells, opened in a new tab so the
+   *  operator can read it before deciding to save or print it. */
+  const exportPdfRows = useCallback(
+    async (whichRows: T[]) => {
+      if (whichRows.length === 0) return;
+      const { headers, rows, stem } = deriveTable(whichRows);
+      if (headers.length === 0) return;
+      const { renderRegisterListPdf } = await import("@/lib/pdf/render");
+      const blob = await renderRegisterListPdf({
+        title: stem,
+        headers,
+        rows,
+        printedAt: new Date().toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" }),
+      });
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank");
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    },
+    [deriveTable],
   );
 
   // ── Sort handlers ─────────────────────────────────────────────────
@@ -1468,7 +1509,9 @@ function DataGridInner<T>({
           <button
             ref={outputBtnRef}
             type="button"
-            className={`${styles.toolbarPill} ${outputMenuOpen ? styles.toolbarPillOn : ""}`}
+            aria-label="Export"
+            title="Export"
+            className={`${styles.toolbarPill} ${isReference ? styles.toolbarPillIconCaret : ""} ${outputMenuOpen ? styles.toolbarPillOn : ""}`}
             onClick={() => setOutputMenuOpen((open) => {
               const next = !open;
               if (next && outputBtnRef.current) {
@@ -1482,7 +1525,7 @@ function DataGridInner<T>({
             aria-expanded={outputMenuOpen}
           >
             <Download size={14} strokeWidth={1.75} aria-hidden />
-            <span>Export</span>
+            {!isReference && <span>Export</span>}
             <ChevronDown size={12} strokeWidth={2} aria-hidden />
           </button>
           {outputMenuOpen && (
@@ -1504,7 +1547,18 @@ function DataGridInner<T>({
                   void exportRows(sortedRows);
                 }}
               >
-                Export Excel
+                Excel
+              </button>
+              <button
+                type="button"
+                className={styles.filterLauncherItem}
+                role="menuitem"
+                onClick={() => {
+                  setOutputMenuOpen(false);
+                  void exportPdfRows(sortedRows);
+                }}
+              >
+                PDF
               </button>
               {(outputActions ?? []).map((action) => (
                 <button

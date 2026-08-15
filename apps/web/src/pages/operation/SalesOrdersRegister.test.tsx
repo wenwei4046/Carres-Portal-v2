@@ -196,6 +196,19 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     expect(screen.queryByText("Not delivered")).not.toBeInTheDocument();
   });
 
+  it("Export is icon-only and its menu offers Excel, PDF and Print (§6.7)", () => {
+    mount();
+    const exportBtn = screen.getByRole("button", { name: "Export" });
+    /* Icon-only: the accessible name comes from aria-label, so the word must
+     * NOT also be rendered as text — otherwise it is not icon-only. */
+    expect(exportBtn).not.toHaveTextContent("Export");
+    expect(exportBtn).toHaveAttribute("aria-haspopup", "menu");
+    fireEvent.click(exportBtn);
+    expect(screen.getByRole("menuitem", { name: "Excel" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "PDF" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Print" })).toBeInTheDocument();
+  });
+
   it("shows a governed missing Customer Delivery exception instead of a passive empty value", () => {
     listHookState.data = { orders: [order({
       delivery_date: null,

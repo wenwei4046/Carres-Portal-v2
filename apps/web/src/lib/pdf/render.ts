@@ -21,6 +21,7 @@ import { PickupEventTemplate } from "./pickup-event-template";
 import { ReceiptTemplate } from "./receipt-template";
 import { ExtensionAgreementTemplate } from "./extension-agreement-template";
 import { LoanNoteTemplate } from "./loan-note-template";
+import { RegisterListTemplate, type RegisterListTemplateData } from "./register-list-template";
 import { registerNotoSansSC } from "./fonts/noto";
 import type {
   DoTemplateData,
@@ -69,6 +70,13 @@ export function renderDoPdf(data: DoTemplateData): Promise<Blob> {
  *  loaner). Rendered on-demand from the ops_sofa_loans row + order. */
 export function renderLoanNotePdf(data: LoanNoteTemplateData): Promise<Blob> {
   return toBlob(LoanNoteTemplate(data));
+}
+
+/** A Register's CURRENT VIEW as a document — not a business document, so it
+ *  carries no letterhead, terms or signature block. Its cells are the same
+ *  derived text the Excel export writes. */
+export function renderRegisterListPdf(data: RegisterListTemplateData): Promise<Blob> {
+  return toBlob(RegisterListTemplate(data));
 }
 
 export function renderPoPdf(data: PoTemplateData): Promise<Blob> {

@@ -816,3 +816,11 @@ div:first-child > .columnsMenuGroup {
   padding: 0;
   justify-content: center;
 }
+
+/* Export at rest on the reference Register: icon + caret, no word. The caret
+   stays because a control that opens a menu must say so. */
+.toolbarPillIconCaret {
+  padding: 0 4px;
+  gap: 1px;
+  justify-content: center;
+}
