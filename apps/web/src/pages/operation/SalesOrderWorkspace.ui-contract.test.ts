@@ -61,6 +61,16 @@ describe("Sales Order object template contract", () => {
     expect(workspace).toContain("setBaseline(draftRef.current)");
   });
 
+  /* `01-design-tokens.md` §2.2 is frozen: blue appears ONCE on a screen. Eight
+     blue section rules would spend the accent eight times over. */
+  it("keeps the section bars grey so the one accent stays the current thing", () => {
+    expect(workspace).toContain("border-l-2 border-base-300 pl-2");
+    expect(workspace).not.toContain("border-l-2 border-kit-blue-9");
+    /* The tab underline is the screen's one accent, and it marks the current
+       view — the accent's own job. */
+    expect(workspace.match(/bg-kit-blue-9/g)).toHaveLength(1);
+  });
+
   it("draws two 50/50 panes that scroll separately and stack below 1024px", () => {
     expect(workspace).toContain('data-testid="object-two-panes"');
     expect(workspace).toContain("flex h-full min-h-0 flex-col lg:flex-row");
@@ -102,6 +112,18 @@ describe("Sales Order object template contract", () => {
        the banner from `proposed_snapshot` and never the template data. */
     expect(workspace).toContain("proposed_snapshot");
     expect(workspace).not.toContain("draftTemplateData(liveAmendment");
+  });
+
+  /* AN OLD REVISION IS A PHOTOGRAPH. The same fields render, filled from THAT
+     snapshot and locked — never today's values wearing a read-only pill. */
+  it("fills the form from the snapshot and locks it when a revision is open", () => {
+    expect(workspace).toContain("function draftFromSnapshot(snap: SalesOrderSnapshot): Draft");
+    expect(workspace).toContain("const seed = `${orderId}:rev:${viewRev}`");
+    expect(workspace).toContain('disabled={mode === "oldrev"}');
+    expect(workspace).toContain("<fieldset");
+    expect(workspace).toContain("Viewing Rev {viewedRevision.revision} · read-only");
+    /* No save bar can exist there — the diff is empty by construction. */
+    expect(workspace).toContain('if (mode === "oldrev") return [];');
   });
 
   it("puts no toolbar on or above the paper", () => {

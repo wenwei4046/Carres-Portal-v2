@@ -498,10 +498,68 @@ function snapshotTemplateData(
   } as SalesOrderTemplateData;
 }
 
+/** An old revision's snapshot → the same form shape, so a historical view
+ *  shows THAT version's fields rather than today's values behind a pill. */
+function draftFromSnapshot(snap: SalesOrderSnapshot): Draft {
+  const h = snap.header ?? {};
+  const str = (k: string) => (h[k] == null ? "" : String(h[k]));
+  const fields = (h["entry_fields"] ?? {}) as Record<string, unknown>;
+  const custom: Record<string, string> = {};
+  for (const [k, v] of Object.entries(fields)) {
+    if (k === "building_type") continue;
+    custom[k] = v == null ? "" : String(v);
+  }
+  const emergency = parseEmergencyContact(str("customer_emergency"));
+  return {
+    ...EMPTY_DRAFT,
+    customer_name: str("customer_name"),
+    customer_phone: str("customer_phone"),
+    customer_email: str("customer_email"),
+    customer_race: str("customer_race"),
+    customer_gender: str("customer_gender"),
+    customer_birthday: str("customer_birthday").slice(0, 10) || null,
+    customer_address: str("customer_address"),
+    customer_address_line1: str("customer_address_line1"),
+    customer_address_line2: str("customer_address_line2"),
+    customer_address_city: str("customer_address_city"),
+    customer_address_state: str("customer_address_state"),
+    customer_address_postcode: str("customer_address_postcode"),
+    customer_address_unknown: Boolean(h["customer_address_unknown"]),
+    building_type: fields.building_type == null ? "" : String(fields.building_type),
+    emergency_name: emergency.name,
+    emergency_phone: emergency.phone,
+    emergency_relationship: emergency.relationship,
+    customer_billing: str("customer_billing"),
+    customer_billing_same: h["customer_billing_same"] !== false,
+    delivery_date: str("delivery_date") || null,
+    delivery_date_tbd: Boolean(h["delivery_date_tbd"]),
+    proceed_date: str("proceed_date") || null,
+    delivery_floor: Number(h["delivery_floor"] ?? 1),
+    delivery_has_lift: Boolean(h["delivery_has_lift"]),
+    delivery_stair_items:
+      h["delivery_stair_items"] == null ? null : Number(h["delivery_stair_items"]),
+    custom,
+    lines: (snap.lines ?? []).map((l) => ({
+      key: nextKey(),
+      sku: l.sku,
+      qty: Number(l.qty),
+      unit_price: Number(l.unit_price),
+    })),
+  };
+}
+
 /* ── Small atoms ───────────────────────────────────────────────────────────── */
 
-/** A left-pane block. The accent bar is the section's whole chrome — §6.4 ④
- *  ruled the panel CALM: sections, not a box around every field. */
+/**
+ * A left-pane block. The bar beside the title is the section's whole chrome —
+ * §6.4 ④ ruled the panel CALM: sections, not a box around every field.
+ *
+ * **The bar is GREY, and that is a token law, not taste.**
+ * `../../01-design-tokens.md` §2.2 is frozen: *"Blue appears ONCE on a screen —
+ * on the primary button."* Eight blue rules down the left of one form would
+ * spend the accent eight times and leave nothing to mark the current thing.
+ * The tab underline above already holds the screen's one accent.
+ */
 function Block({
   title,
   note,
@@ -513,7 +571,7 @@ function Block({
 }) {
   return (
     <section className="rounded-card border border-kit-slate-5 bg-white px-4 py-3" data-block={title}>
-      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-l-2 border-kit-blue-9 pl-2">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-l-2 border-base-300 pl-2">
         <h2 className="text-label font-semibold tracking-wide text-base-700 uppercase">{title}</h2>
         {note && <span className="text-label font-normal text-base-600">{note}</span>}
       </div>
@@ -666,6 +724,11 @@ export default function SalesOrderWorkspace() {
     };
   }, [salespersonsQ.data, outletsQ.data, dealersQ.data]);
 
+  const revisions = revisionsQ.data?.revisions ?? [];
+  const currentRev = revisions.length > 0 ? revisions[revisions.length - 1]!.revision : null;
+  const viewedRevision: SalesOrderRevisionRow | null =
+    viewRev != null ? (revisions.find((r) => r.revision === viewRev) ?? null) : null;
+
   /* ── The draft — seeded from the order, empty for CREATE. ─────────────── */
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
   const [baseline, setBaseline] = useState<Draft>(EMPTY_DRAFT);
@@ -735,6 +798,18 @@ export default function SalesOrderWorkspace() {
       }
       return;
     }
+    /* AN OLD REVISION IS A PHOTOGRAPH. The same fields render, filled from
+       THAT snapshot and locked — never the current row's values wearing a
+       "read-only" pill, which is how a historical view starts lying. */
+    if (viewRev != null) {
+      const seed = `${orderId}:rev:${viewRev}`;
+      if (!viewedRevision || draftSeed === seed) return;
+      const next = draftFromSnapshot(viewedRevision.snapshot);
+      setDraft(next);
+      setBaseline(next);
+      setDraftSeed(seed);
+      return;
+    }
     /* ⛔ A REFETCH MAY NEVER CLOBBER AN OPEN EDIT (ui/MASTER.md §6.4 C3). The
        seed moves with the server's answer, so a save or an approval reseeds the
        form from fresh truth — but never while the operator has unsaved words on
@@ -796,7 +871,17 @@ export default function SalesOrderWorkspace() {
     setBaseline(next);
     setDraftSeed(seed);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isNew, order, orderId, copyFrom, detailLines, draftSeed, detailQ.dataUpdatedAt]);
+  }, [
+    isNew,
+    order,
+    orderId,
+    copyFrom,
+    detailLines,
+    draftSeed,
+    detailQ.dataUpdatedAt,
+    viewRev,
+    viewedRevision,
+  ]);
 
   const mode: Mode = isNew ? "create" : viewRev != null ? "oldrev" : "object";
 
@@ -826,10 +911,6 @@ export default function SalesOrderWorkspace() {
   const draftRef = useRef(draft);
   draftRef.current = draft;
 
-  const revisions = revisionsQ.data?.revisions ?? [];
-  const currentRev = revisions.length > 0 ? revisions[revisions.length - 1]!.revision : null;
-  const viewedRevision: SalesOrderRevisionRow | null =
-    viewRev != null ? (revisions.find((r) => r.revision === viewRev) ?? null) : null;
   const liveAmendment = amendmentQ.data?.amendment ?? null;
   /* THE PROPOSAL NEVER ENTERS THE PAPER — it shows as a banner above it. */
   const pendingDeliveryDate =
@@ -1281,7 +1362,16 @@ export default function SalesOrderWorkspace() {
 
   /* ── THE LEFT PANE ─────────────────────────────────────────────────────── */
   const form = (
-    <div className="flex flex-col gap-3" data-testid="sales-order-workspace" id="sales-order-workspace">
+    /* A `fieldset` because the browser's own disabled-descendants rule is the
+       only lock that cannot be forgotten one control at a time. `contents`
+       keeps it out of the layout. */
+    <fieldset
+      disabled={mode === "oldrev"}
+      className="contents"
+      data-testid="sales-order-workspace"
+      id="sales-order-workspace"
+    >
+    <div className="flex flex-col gap-3">
       {mode === "oldrev" && viewedRevision && (
         <div className="px-1">
           <span className="rounded-full bg-base-900 px-2 py-0.5 text-label font-semibold text-white">
@@ -1723,6 +1813,7 @@ export default function SalesOrderWorkspace() {
         </Block>
       )}
     </div>
+    </fieldset>
   );
 
   return (
@@ -1910,7 +2001,7 @@ export default function SalesOrderWorkspace() {
                 {/* A PENDING AMENDMENT IS A BANNER, NEVER THE DOCUMENT BODY. */}
                 {pendingDeliveryDate && (
                   <div
-                    className="mx-auto mb-3 max-w-[700px] rounded-control border border-kit-amber-3 bg-kit-amber-3 px-3 py-2 text-body font-medium text-kit-amber-11"
+                    className="mx-auto mb-3 max-w-[700px] rounded-control border border-kit-slate-5 bg-kit-amber-3 px-3 py-2 text-body font-medium text-kit-amber-11"
                     data-testid="pending-amendment-banner"
                   >
                     ⚠ Amendment pending approval: delivery date → {fmtDate(pendingDeliveryDate)}
