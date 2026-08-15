@@ -124,6 +124,7 @@ describe("FIX 1 · the register asks the SERVER", () => {
 
   it("the typed term reaches useOperationOrders as { search } — the API is asked, not just the loaded rows filtered", async () => {
     mount();
+    fireEvent.click(screen.getByTestId("search-icon"));
     const box = screen.getByPlaceholderText("Search sales orders…");
     fireEvent.change(box, { target: { value: "  Umi  " } });
     /* The engine debounces 150ms and emits the TRIMMED term; the register
@@ -140,6 +141,7 @@ describe("FIX 1 · the register asks the SERVER", () => {
 
   it("clearing the box returns the hook to the unfiltered population", async () => {
     mount();
+    fireEvent.click(screen.getByTestId("search-icon"));
     const box = screen.getByPlaceholderText("Search sales orders…");
     fireEvent.change(box, { target: { value: "Umi" } });
     await waitFor(() => {
@@ -166,21 +168,26 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     expect(screen.queryByText("Sales Order")).not.toBeInTheDocument();
   });
 
-  it("renders exactly one work toolbar and one Search", () => {
+  it("renders exactly one work toolbar, and Search rests as an icon (§6.7)", () => {
     mount();
     expect(screen.getAllByTestId("work-toolbar")).toHaveLength(1);
+    /* §6.7 — Search rests as an icon and expands on click. At rest there is no
+     * searchbox at all; one click produces exactly one. */
+    expect(screen.queryAllByRole("searchbox")).toHaveLength(0);
+    fireEvent.click(screen.getByTestId("search-icon"));
     expect(screen.getAllByRole("searchbox")).toHaveLength(1);
     expect(screen.queryByRole("button", { name: "Filters" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Export" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Columns" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "New Sales Order" })).toBeInTheDocument();
+    /* §6.7 — Row 1 carries global utilities only. The one primary create action
+     * lives on the LEFT of Row 2. Reversing either half is the defect. */
     expect(
-      within(screen.getByTestId("sales-orders-destination-header")).getByRole("button", {
+      within(screen.getByTestId("work-toolbar")).getByRole("button", {
         name: "New Sales Order",
       }),
     ).toBeInTheDocument();
     expect(
-      within(screen.getByTestId("work-toolbar")).queryByRole("button", {
+      within(screen.getByTestId("sales-orders-destination-header")).queryByRole("button", {
         name: "New Sales Order",
       }),
     ).not.toBeInTheDocument();

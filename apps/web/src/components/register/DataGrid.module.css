@@ -792,3 +792,27 @@ div:first-child > .columnsMenuGroup {
   color: var(--fg-muted);
   min-height: 22px;
 }
+
+/* §6.7 Register shell (owner ruling 2026-08-15) — the Work Toolbar's right side.
+   Search rests as an icon and expands leftward; Columns is icon-only. Both keep
+   the toolbar's own 6px control shape so they read as one family. */
+.toolbarIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  box-sizing: border-box;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--c-paper);
+  color: var(--fg-muted);
+  cursor: pointer;
+  padding: 0;
+}
+.toolbarIcon:hover { background: var(--c-cream); color: var(--c-ink); }
+.toolbarPillIconOnly {
+  width: 28px;
+  padding: 0;
+  justify-content: center;
+}
