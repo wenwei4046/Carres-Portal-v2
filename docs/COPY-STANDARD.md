@@ -1128,6 +1128,13 @@ its name: renaming a label is a copy decision, renaming an identifier is a break
 | Payments' chip for that scope | **`Sales Order SO-{n}`** | Filtered by order · Order scope |
 | Order Route, a promise with no trip arranged | **`Customer date {date} · Delivery not arranged`** | `Promised this day, no date yet` — retired 2026-08-15: it named a day and denied it in one line |
 | Order Route, no promise at all | **`No delivery date`** | any second spelling — this is the same governed value the Register prints |
+| Order Route first-layer heading | **`Order tracks`** | Overall status · Order status · Still owed |
+| Order Route conditional linked-case heading | **`Linked problems`** | Service track · Other track · Exceptions |
+| Order Route delivery-gate heading | **`Delivery release`** | Release checklist · Delivery status |
+| Delivery release is blocked | **`Not ready for delivery`** | Cannot proceed · On hold · Blocked |
+| Delivery release is clear | **`Ready for delivery`** | All done · Released · Complete |
+| A required purchasing document does not exist | **`No Purchase Order yet`** | PO: — · Waiting Purchasing |
+| A route document door | **`Open {document number}`** | an unexplained ↗ · View document · Go to document |
 
 ### The Sales Order entry-gate words (owner ruling 2026-08-15)
 
