@@ -49,7 +49,7 @@ function mockUser() {
     not: () => chain,
     order: () => chain,
     limit: async () => ({ data: [AUDIT_ROW], error: null }),
-    in: async () => ({ data: [{ id: AUDIT_ROW.dealer_id, name: "AutoCount Archive (旧账)" }], error: null }),
+    in: async () => ({ data: [{ id: AUDIT_ROW.dealer_id, name: "AutoCount Archive" }], error: null }),
   };
   return {
     from: () => chain,
@@ -90,7 +90,7 @@ describe("GET /api/bd/dealers/activity", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { rows: Array<{ dealerName: string | null }> };
     expect(body.rows).toHaveLength(1);
-    expect(body.rows[0].dealerName).toBe("AutoCount Archive (旧账)");
+    expect(body.rows[0].dealerName).toBe("AutoCount Archive");
   });
 
   // Loo 2026-07-25 — BD sees dealers only: a showroom-touching audit event

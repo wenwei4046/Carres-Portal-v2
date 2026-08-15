@@ -12,9 +12,9 @@
  * stay off this page; a chooser is exactly the back door they would walk in
  * through.
  *
- * The DEFAULT ROW is Stage 1's, verbatim:
- *   ☐ ▸ SO No · Customer · Items · Total · Balance · Promised · Ordered ·
- *   Dealer · Showroom
+ * THE DEFAULT ROW — re-ruled to EIGHT by the owner, 2026-08-15:
+ *   ☐ ▸ SO No · Ordered · Customer Delivery · Customer · Delivery Location ·
+ *   Showroom · PO No · DO No
  *
  * `text` IS THE COLUMN. It is what the cell prints, what the column's filter
  * box matches, what a sort compares and what Export writes — one string, four
@@ -45,6 +45,21 @@ import {
 export const NOT_GIVEN = "Not given";
 export const NOT_RECORDED = "Not recorded";
 export const NO_DATE_YET = "No delivery date";
+
+/**
+ * ⭐ AN ABSENCE IS QUIETER THAN A FACT — owner ruling 2026-08-15 (Chai).
+ *
+ * `Not recorded` and `Not given` are the honest words for an empty cell (a
+ * blank may never carry two meanings), but printed in the same ink as a real
+ * PO number they compete with it: a `PO No` column of eight `Not recorded`s
+ * and two real documents reads as ten facts. They keep their words and lose
+ * their weight, rendering in the secondary token.
+ *
+ * `No delivery date` is deliberately NOT in this set. It is not a quiet
+ * absence — it is the head of a governed two-line action, and §0.1 already
+ * rules how it paints.
+ */
+export const MUTED_ABSENCES: ReadonlySet<string> = new Set([NOT_GIVEN, NOT_RECORDED]);
 
 export function conciseLocality(city?: string | null, state?: string | null): string {
   const cleanCity = city?.trim() || "";
@@ -127,7 +142,7 @@ export interface RegisterField {
   align?: "right";
   numeric?: boolean;
   group: FieldGroup;
-  /** On the register by default. Exactly seven are, in the owner-ruled order. */
+  /** On the register by default. Exactly eight are, in the owner-ruled order. */
   on?: true;
   /** The ONE string: printed, filtered, sorted and exported. */
   text: (r: RegisterRow) => string;
@@ -148,13 +163,13 @@ const date = (v: string | null | undefined, absent: string) => (v ? fmtDate(v) :
 const amountOf = (s: MoneyState): number => (s.kind === "amount" ? s.value : 0);
 
 /**
- * THE CATALOG — nine defaults (Stage 1's row, in its order), everything else
+ * THE CATALOG — the eight owner-ruled defaults in their order, everything else
  * hidden. Hidden columns are sized to their own longest live value plus the
  * kit's `px-2`, and every one of them is off by default, so none of them can
  * widen the sheet an operator did not ask to widen.
  */
 export const REGISTER_FIELDS: readonly RegisterField[] = [
-  /* The seven owner-ruled defaults, in their governed order. */
+  /* The eight owner-ruled defaults, in their governed order. */
   { key: "so", label: "SO No", width: "85px", group: "Document", on: true,
     text: (r) => `SO-${r.so}`, sortBy: (r) => r.so },
   { key: "ordered", label: "Ordered", width: "113px", group: "Dates", on: true,
@@ -167,6 +182,12 @@ export const REGISTER_FIELDS: readonly RegisterField[] = [
     text: (r) => r.customer, sortBy: (r) => r.customer },
   { key: "delivery_location", label: "Delivery Location", width: "280px", group: "Customer", on: true,
     text: (r) => r.deliveryLocation },
+  /* Re-ruled to EIGHT defaults, 2026-08-15 (Chai). `Showroom` READS the
+     Sales-ownership fact the order already carries (`outlets.name`) — it is
+     the same declaration that has always been in this catalog, promoted to a
+     default. No new writer, no new query, no new fact. */
+  { key: "showroom", label: "Showroom", width: "126px", group: "Sales ownership", on: true,
+    text: (r) => r.o.outlets?.name || NOT_RECORDED },
   { key: "po_number", label: "PO No", width: "170px", group: "Document", on: true,
     text: (r) => r.poNumbers.join(" · ") || NOT_RECORDED },
   { key: "do_number", label: "DO No", width: "150px", group: "Document", on: true,
@@ -178,7 +199,12 @@ export const REGISTER_FIELDS: readonly RegisterField[] = [
     sortBy: (r) => (r.total.kind === "amount" ? r.total.value : -1),
     kind: "number", num: (r) => (r.total.kind === "amount" ? r.total.value : null),
     footerSum: (r) => amountOf(r.total) },
-  { key: "balance", label: "Balance", width: "109px", align: "right", numeric: true,
+  /* THE CUSTOMER-MONEY WORD IS `Outstanding` (owner ruling 2026-08-15; already
+     CLAUDE.md §7 — what the CUSTOMER owes HQ). The KEY stays `balance`: a
+     label is presentation, an identifier is a contract, and renaming it would
+     silently reset every saved column layout (01-design-tokens §0). `balance`
+     remains the ruled GOODS word for short-delivery quantity elsewhere. */
+  { key: "balance", label: "Outstanding", width: "125px", align: "right", numeric: true,
     group: "Money", text: (r) => moneyText(r.balance),
     sortBy: (r) => (r.balance.kind === "amount" ? r.balance.value : -1),
     kind: "number",
@@ -195,8 +221,6 @@ export const REGISTER_FIELDS: readonly RegisterField[] = [
     kind: "date", iso: (r) => r.promised },
   { key: "dealer", label: "Dealer", width: "160px", group: "Sales ownership",
     text: (r) => r.o.dealers?.name || NOT_RECORDED },
-  { key: "showroom", label: "Showroom", width: "126px", group: "Sales ownership",
-    text: (r) => r.o.outlets?.name || NOT_RECORDED },
 
   /* ── DOCUMENT — the papers this order produced, and its references ──────── */
   { key: "source_ref", label: "Customer reference", width: "160px", group: "Document",
@@ -281,7 +305,7 @@ export const REGISTER_FIELDS: readonly RegisterField[] = [
    * operational may enter through any other door. ─────────────────────────── */
 ] as const;
 
-/** Stage 1's nine, and the ONE place the register's default shape is stated. */
+/** The owner-ruled eight, and the ONE place the register's default shape is stated. */
 export const DEFAULT_COLUMNS: readonly string[] = REGISTER_FIELDS.filter((f) => f.on).map(
   (f) => f.key,
 );

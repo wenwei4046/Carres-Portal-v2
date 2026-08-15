@@ -602,6 +602,40 @@ div:first-child > .columnsMenuGroup {
 .tdMuted {
   color: var(--fg-muted);
 }
+
+/* ── STICKY IDENTITY (owner ruling 2026-08-15) ─────────────────────────────
+   When optional columns widen the sheet, the control gutter and the FIRST
+   data column stay against the left edge and the rest slides under them. A
+   row that scrolls sideways must never stop saying WHICH record it is.
+
+   Two things make it work and both are easy to get wrong:
+   · a sticky cell needs its OWN opaque fill, or the scrolled columns show
+     through it — so hover and selection are repainted here as well, or the
+     pinned block would be the one part of the row that never highlights;
+   · `.thead` is already sticky at z-index 2, so the pinned HEADER cells must
+     outrank it (3) while the pinned BODY cells sit below it (1) — otherwise
+     the corner cell either scrolls away vertically or covers the header. */
+.stickyCell {
+  position: sticky;
+  z-index: 1;
+  background: var(--c-paper);
+}
+.thead .stickyCell {
+  z-index: 3;
+  background: var(--c-cream);
+}
+.tr:hover .stickyCell {
+  background: var(--c-cream);
+}
+.trSelected .stickyCell {
+  background: var(--kit-blue-3, #e8f3ff);
+}
+/* The block's right edge, drawn as a shadow rather than a border so it does
+   not change any column's box and cannot shave a control (§5.1's rule about
+   the control gutter). */
+.stickyEdge {
+  box-shadow: 1px 0 0 0 var(--line);
+}
 .tdNumeric {
   font-variant-numeric: tabular-nums;
 }

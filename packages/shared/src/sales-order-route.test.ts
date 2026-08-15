@@ -211,9 +211,13 @@ describe("resolveSalesOrderRoute", () => {
     facts.delivery.attempts = [];
     let route = resolveSalesOrderRoute(facts);
     expect(route.lanes[0]!.groups[0]!.facts[0]!.title).toBe("Waiting for Purchasing · 1 item");
+    /* ⭐ TWO PLAIN FACTS — owner re-ruling 2026-08-15, overwriting the
+       2026-08-14 acceptance wording. `Promised this day, no date yet` named a
+       day and denied it in the same breath. The customer's promise and the
+       trip nobody has arranged are two facts with two different owners. */
     expect(route.lanes.find((lane) => lane.key === "delivery")!.groups[0]!.facts[0]).toMatchObject({
-      title: "Promised this day, no date yet",
-      detail: "Customer Delivery · 2026-08-20",
+      title: "Customer date 2026-08-20 · Delivery not arranged",
+      detail: null,
     });
     expect(route.noActionRequired).toBe(false);
 
@@ -239,5 +243,41 @@ describe("resolveSalesOrderRoute", () => {
 
     route = resolveSalesOrderRoute(facts);
     expect(route.noActionRequired).toBe(true);
+  });
+});
+
+/**
+ * ⭐ THE DELIVERY LINE STATES TWO FACTS, NEVER A RIDDLE — owner ruling
+ * 2026-08-15 (Chai), overwriting the 2026-08-14 acceptance wording.
+ *
+ * `Promised this day, no date yet` named a day and denied it in one line, and
+ * "this day" pointed at nothing on screen. The customer's promise and the trip
+ * nobody has arranged are two different facts owned by two different modules.
+ */
+describe("Order Route · the delivery line before anything is arranged", () => {
+  it("states the customer's date and that the trip is not arranged", () => {
+    const facts = input();
+    facts.delivery.booking = null;
+    facts.delivery.attempts = [];
+    facts.order.deliveryDate = "2026-08-20";
+    const route = resolveSalesOrderRoute(facts);
+    const line = route.lanes.find((lane) => lane.key === "delivery")!.groups[0]!.facts[0]!;
+    expect(line.title).toBe("Customer date 2026-08-20 · Delivery not arranged");
+    expect(line.title).not.toContain("Promised this day");
+    /* The date is not repeated underneath — it was a detail line saying the
+       same thing the title now says. */
+    expect(line.detail).toBeNull();
+  });
+
+  it("falls back to the governed `No delivery date` when no promise exists", () => {
+    const facts = input();
+    facts.delivery.booking = null;
+    facts.delivery.attempts = [];
+    facts.order.deliveryDate = null;
+    const route = resolveSalesOrderRoute(facts);
+    const line = route.lanes.find((lane) => lane.key === "delivery")!.groups[0]!.facts[0]!;
+    /* The SAME string the Register prints — one absence, one word. */
+    expect(line.title).toBe("No delivery date");
+    expect(line.state).toBe("attention");
   });
 });

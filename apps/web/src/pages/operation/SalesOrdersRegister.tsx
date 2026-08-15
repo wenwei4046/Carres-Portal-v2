@@ -66,10 +66,29 @@ import {
   buildRegisterRow,
   defaultOnFor,
   moneyText,
+  MUTED_ABSENCES,
   REGISTER_FIELDS,
   type RegisterField,
   type RegisterRow,
 } from "./sales-order-columns";
+
+/**
+ * ⭐ AN ABSENCE IS QUIETER THAN A FACT — owner ruling 2026-08-15 (Chai).
+ *
+ * `Not recorded` / `Not given` keep their words — a blank may never carry two
+ * meanings — and lose their weight. A `PO No` column of eight absences and two
+ * real documents used to read as ten facts; muted, the two documents are the
+ * only things the eye lands on. Everything else prints exactly as before, so
+ * this is presentation, not a second string.
+ */
+function absenceAware(text: string) {
+  if (!MUTED_ABSENCES.has(text)) return text;
+  return (
+    <span className="text-kit-slate-9" data-absence="true">
+      {text}
+    </span>
+  );
+}
 
 /** ONE cell, ONE fact. A money state is a number or a sentence, never nothing. */
 function moneyCell(state: MoneyState) {
@@ -105,7 +124,7 @@ function toGridColumn(
     sortable: true,
     defaultHidden: !defaultOnFor(f, role),
     chooserGroup: f.group,
-    accessor: (r) => f.text(r),
+    accessor: (r) => absenceAware(f.text(r)),
     searchValue: (r) => f.text(r),
     filterValue: (r) => f.text(r),
     ...(f.sortBy
@@ -156,7 +175,7 @@ function toGridColumn(
       ...base,
       accessor: (r) =>
         r.poNumbers.length === 0 ? (
-          f.text(r)
+          absenceAware(f.text(r))
         ) : (
           <span className="inline-flex gap-1.5">
             {r.poNumbers.map((po) => (
@@ -192,7 +211,7 @@ function toGridColumn(
             {r.o.do_number}
           </button>
         ) : (
-          f.text(r)
+          absenceAware(f.text(r))
         ),
     };
   }
@@ -419,8 +438,11 @@ export default function SalesOrdersRegister() {
     () => REGISTER_FIELDS.map((f) => toGridColumn(f, role, navigate)),
     [navigate, role],
   );
-  /* v2 intentionally resets the superseded nine-column Stage A layout. */
-  const storageKey = `carres.salesOrders.register.v2.${role ?? "anon"}`;
+  /* The version resets a SUPERSEDED default. v2 dropped Stage A's nine
+     columns; v3 is the owner's eight (2026-08-15) — without the bump a
+     returning browser would replay its saved seven-column order and the
+     re-ruled default would never paint on the one machine that matters. */
+  const storageKey = `carres.salesOrders.register.v3.${role ?? "anon"}`;
 
   /* ── SELECTION — the REGISTER LAW's clause: ticks feed Export and nothing
      else. Header checkbox = select all visible / clear (the engine says which). */
@@ -528,10 +550,21 @@ export default function SalesOrdersRegister() {
             storageKey={storageKey}
             rowKey={(r) => r.id}
             exportName="Sales Orders"
-            searchPlaceholder="SO number, customer, phone or item…"
+            /* The search box is a governed 200px at EVERY width (REGISTER LAW
+               2), so the old four-item placeholder clipped to `SO number,
+               custome…` on a narrow window and on a wide one alike — it was
+               never a breakpoint problem. A placeholder that fits is the fix;
+               the search itself still matches SO number, customer, phone and
+               item, and the ▽ per-column filters say so column by column. */
+            searchPlaceholder="Search sales orders…"
             isLoading={isLoading}
             emptyMessage={rows.length === 0 ? "No orders yet" : "No matching sales orders."}
             groupBanner={false}
+            /* Optional columns may widen the sheet (MASTER §0.1), so the row's
+               identity pins: ☐ · ▸ · SO No stay against the left edge while
+               the rest scrolls under them. An engine capability, never a
+               page-local hack (`docs/ui/MASTER.md` §4). */
+            stickyIdentity
             chooserGroupOrder={[
               "Document",
               "Customer",
@@ -566,6 +599,49 @@ export default function SalesOrdersRegister() {
   );
 }
 
+/**
+ * ⭐ THE FOOTER SPEAKS THE DICTIONARY, AND IT COUNTS EVERYTHING IT SEES.
+ *
+ * Owner ruling 2026-08-15: no unruled abbreviation may print here. The old
+ * shape had TWO defects and only one of them was the abbreviation:
+ *
+ * · `accShort`'s fallback capitalises the SKU's first word, so a line nothing
+ *   recognised could print a supplier's code — `M.P`, `Leg`, `Mp001`. The
+ *   words below are the ONLY ones that reach the screen, so an unruled string
+ *   is now impossible by construction rather than by luck.
+ * · the previous ORDER array was ALSO the filter, so any label outside it was
+ *   silently DROPPED — a `Disposal` line and every unrecognised accessory
+ *   vanished from a tally that claims to describe the filtered result. A
+ *   footer that under-counts is worse than one that abbreviates: it is a
+ *   number the operator trusts and cannot reproduce.
+ *
+ * Anything not positively recognised is `Other goods` — governed, honest, and
+ * still counted.
+ */
+const FOOTER_WORDS = [
+  "Mattress",
+  "Bedframe",
+  "Sofa",
+  "Pillow",
+  "Mattress protector",
+  "Topper",
+  "Footrest",
+  "Service",
+  "Other goods",
+] as const;
+
+function footerWord(sku: string): (typeof FOOTER_WORDS)[number] {
+  if (lineKind(sku) === "service") return "Service";
+  const cls = lineClass(sku);
+  if (cls === "mattress") return "Mattress";
+  if (cls === "bedframe") return "Bedframe";
+  if (cls === "sofa") return "Sofa";
+  const short = accShort(sku);
+  return (FOOTER_WORDS as readonly string[]).includes(short)
+    ? (short as (typeof FOOTER_WORDS)[number])
+    : "Other goods";
+}
+
 function RegisterResultSummary({
   filtered,
   selected,
@@ -579,15 +655,7 @@ function RegisterResultSummary({
   const counts = new Map<string, number>();
   for (const row of scope) {
     for (const line of row.o.order_lines ?? []) {
-      const kind = lineKind(line.sku);
-      const cls = lineClass(line.sku);
-      const label = kind === "service" ? "Service"
-        : cls === "mattress" ? "Mattress"
-        : cls === "bedframe" ? "Bedframe"
-        : cls === "sofa" ? "Sofa"
-        : cls === "unknown" ? "Other goods"
-        : accShort(line.sku);
-      counts.set(label, (counts.get(label) ?? 0) + Number(line.qty || 0));
+      counts.set(footerWord(line.sku), (counts.get(footerWord(line.sku)) ?? 0) + Number(line.qty || 0));
     }
     for (const addon of row.o.order_addons ?? []) {
       counts.set("Service", (counts.get("Service") ?? 0) + Number(addon.qty || 0));
@@ -599,11 +667,12 @@ function RegisterResultSummary({
     : filtered.length === total
       ? `${filtered.length} ${orderWord}`
       : `${filtered.length} of ${total} orders`;
-  /* The footer's category words come from `accShort` (the ONE accessory
-     vocabulary); this array only fixes their ORDER. `Mattress protector` is
-     the governed word — `M.P` was the AutoCount sheet's abbreviation and it
-     never belonged on a screen (`COPY-STANDARD.md`). */
-  const order = ["Mattress", "Bedframe", "Sofa", "Pillow", "Mattress protector", "Topper", "Footrest", "Service", "Other goods"];
-  const parts = order.filter((label) => (counts.get(label) ?? 0) > 0).map((label) => `${label} ${counts.get(label)}`);
-  return <span>{[countWord, ...parts].join(" · ")}</span>;
+  const parts = FOOTER_WORDS.filter((label) => (counts.get(label) ?? 0) > 0).map(
+    (label) => `${label} ${counts.get(label)}`,
+  );
+  /* One unwrapped line by law (REGISTER STATUS FOOTER), so a long tally on a
+     narrow window truncates instead of pushing a second row into the frame —
+     and the full sentence rides the title. */
+  const line = [countWord, ...parts].join(" · ");
+  return <span className="block truncate" title={line}>{line}</span>;
 }

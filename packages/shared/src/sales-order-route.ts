@@ -284,13 +284,23 @@ function deliveryLane(input: SalesOrderRouteInput): { lane: SalesOrderRouteLane;
     ));
   }
   if (attempts.length === 0) {
+    /* ⭐ TWO PLAIN FACTS, NOT ONE RIDDLE — owner ruling 2026-08-15 (Chai),
+       overwriting the 2026-08-14 acceptance wording.
+       `Promised this day, no date yet` read as a contradiction: it named a day
+       and then denied it, and "this day" pointed at nothing on screen. The two
+       facts are separate and both belong to different owners — the customer
+       date is Sales' promise, and arranging the trip is Delivery's act. With
+       no promise at all the governed `No delivery date` value stands, exactly
+       as it does in the Register (MASTER §0.1). The ISO date is rendered
+       through the ONE date spelling by the page (`fmtDate`). */
     attempts.push(fact(
       "delivery:unassigned",
-      "Promised this day, no date yet",
+      input.order.deliveryDate
+        ? `Customer date ${input.order.deliveryDate} · Delivery not arranged`
+        : "No delivery date",
       "attention",
       "Delivery",
       deliveryHref,
-      input.order.deliveryDate ? `Customer Delivery · ${input.order.deliveryDate}` : null,
     ));
   }
   const clear = input.delivery.attempts.some((attempt) => attempt.result === "delivered") || !!input.order.deliveredAt;

@@ -15,13 +15,18 @@ function StateIcon({ fact }: { fact: SalesOrderRouteFact }) {
   return <span className={`grid h-5 w-5 shrink-0 place-items-center rounded-pill ${stateStyle[fact.state]}`}><Icon size={12} aria-hidden="true" /></span>;
 }
 
+/* ONE date spelling, wherever a route fact carries one. `fmtDate` is the only
+   date format in the portal, so an ISO string in a fact — title or detail —
+   is rendered through it rather than printed raw (01-design-tokens §1). */
+const spellDates = (s: string) => s.replace(/\b\d{4}-\d{2}-\d{2}\b/g, (date) => fmtDate(date));
+
 function FactStep({ fact, currentLabel = false }: { fact: SalesOrderRouteFact; currentLabel?: boolean }) {
-  const detail = fact.detail?.replace(/\b\d{4}-\d{2}-\d{2}\b/g, (date) => fmtDate(date)) ?? null;
+  const detail = fact.detail ? spellDates(fact.detail) : null;
   const body = (
     <>
       <StateIcon fact={fact} />
       <span className="min-w-0">
-        <span className="block text-body font-medium text-kit-slate-12">{fact.title}</span>
+        <span className="block text-body font-medium text-kit-slate-12">{spellDates(fact.title)}</span>
         {detail && <span className="block text-meta text-kit-slate-9">{detail}</span>}
         {currentLabel && <span className="mt-1 inline-block text-label font-semibold tracking-wide text-kit-blue-11">CURRENT</span>}
       </span>

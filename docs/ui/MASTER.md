@@ -331,6 +331,24 @@ DetailShell · DialogFrame · FieldFrame · GridToolbar · SectionHeader
 - **Kit `DataTable` layout is NOT remembered across a reload.** Sales Orders uses the existing
   `register/DataGrid` engine instead; Loo explicitly ruled that Stage A preserves that engine's
   browser layout persistence. This is a page-scoped exception, not a new kit default.
+- **⭐ STICKY IDENTITY IS AN ENGINE CAPABILITY — owner ruling 2026-08-15 (Chai).** When optional
+  columns widen a register past its frame it scrolls sideways, and the row loses the only thing
+  that says WHICH record it is. `register/DataGrid` takes an OPTIONAL `stickyIdentity`: the control
+  gutter (selection + expand) and the **first data column** pin to the left edge while the rest
+  slides under them. The engine does not know what an `SO No` is — the identity column is whatever
+  the page put first.
+  - **The ruling said `kit/DataTable`, and that was a factual slip we are recording rather than
+    obeying.** The Sales Orders Register runs `register/DataGrid` under the ruled exception in the
+    line above, so building the capability in the kit component would have satisfied the words and
+    left the actual register scrolling its identity away. What binds is the ruling's own reason —
+    *"never a page-local hack"* — and it is honoured: one engine, every register that scrolls.
+  - **Default OFF**, so no signature moved and no unwired page changed. `DataGrid.sticky.test.tsx`
+    asserts BOTH directions, and the absence is the more important half: a power that quietly
+    appears later is the failure the "every optional power is OPTIONAL" rule exists to stop.
+  - A pinned cell paints its own fill and repaints hover/selection, or it becomes the one part of
+    the row that never highlights; the pinned HEADER cells outrank the already-sticky `thead` while
+    the pinned BODY cells sit below it. The edge is a shadow, never a border, so it cannot shave a
+    control in the gutter (`01-design-tokens` §5.1).
 - **The 40px row law remains the kit `DataTable` default.** Sales Orders reference rows use the
   approved page-scoped 38px exception in §6.5. The expanded cell is allowed to be tall and wrap.
 - **40px is the international default, measured 2026-08-07 — not merely our own habit.**

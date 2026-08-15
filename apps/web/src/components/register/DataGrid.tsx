@@ -192,6 +192,24 @@ export type DataGridProps<T> = {
   focusSearchNonce?: number;
   /** bump to collapse every expanded drill-down row ("Collapse all") */
   collapseAllNonce?: number;
+  /**
+   * ⭐ STICKY IDENTITY — owner ruling 2026-08-15 (Chai). OPTIONAL, default OFF.
+   *
+   * When optional columns widen the sheet past its frame, the grid scrolls
+   * sideways and the row loses the only thing that says WHICH record it is.
+   * With this on, the control gutter (selection + expand) and the FIRST data
+   * column pin to the left edge and the rest of the sheet slides under them.
+   *
+   * It is an ENGINE capability, not a page hack: any register that scrolls
+   * horizontally has the same problem, and one implementation is the only way
+   * two of them cannot disagree. The default stays OFF so no signature moved
+   * and no unwired page changed — an unwired power's absence is asserted by a
+   * test (`docs/ui/MASTER.md` §4).
+   *
+   * The FIRST data column is pinned, not a named one: the engine does not know
+   * what a `SO No` is, and the identity column is whatever the page put first.
+   */
+  stickyIdentity?: boolean;
   /** show "Drag a column header here to group by that column" banner */
   groupBanner?: boolean;
   emptyMessage?: string;
@@ -368,6 +386,7 @@ function DataGridInner<T>({
   outputActions,
   focusSearchNonce,
   collapseAllNonce,
+  stickyIdentity = false,
   groupBanner = true,
   emptyMessage = "No data.",
   isLoading = false,
@@ -743,6 +762,41 @@ function DataGridInner<T>({
     }
     return synthetic.length ? [...synthetic, ...base] : base;
   }, [columns, layout.order, effectiveHidden, expandable, selectable]);
+
+  /**
+   * ⭐ STICKY IDENTITY — which columns pin, and how far from the left edge.
+   *
+   * The pinned block is the control gutter plus the FIRST data column. Its
+   * offsets are cumulative and read the SAME width source the cells do
+   * (`layout.widths` first, the column's own width second), so a resized or
+   * reordered identity column keeps the block correct instead of leaving a
+   * gap the rows slide through. Empty when the capability is off, which is
+   * what keeps every other register byte-identical.
+   */
+  const pinnedLefts = useMemo(() => {
+    const m = new Map<string, number>();
+    if (!stickyIdentity) return m;
+    let left = 0;
+    for (const col of visibleColumns) {
+      m.set(col.key, left);
+      left += Number(layout.widths[col.key] ?? col.width ?? 140);
+      // Stop AFTER the first real data column — the identity, not the record.
+      if (!col.key.startsWith("__")) break;
+    }
+    return m;
+  }, [stickyIdentity, visibleColumns, layout.widths]);
+  /** The last pinned column carries the edge that says where the block ends. */
+  const pinnedEdgeKey = useMemo(() => {
+    const keys = [...pinnedLefts.keys()];
+    return keys.length ? keys[keys.length - 1] : null;
+  }, [pinnedLefts]);
+  /** Both a `<th>` and a `<td>` need the same two decisions — one helper. */
+  const pinStyle = (key: string): CSSProperties =>
+    pinnedLefts.has(key) ? { left: pinnedLefts.get(key) } : {};
+  const pinClass = (key: string): string =>
+    pinnedLefts.has(key)
+      ? ` ${styles.stickyCell}${key === pinnedEdgeKey ? ` ${styles.stickyEdge}` : ""}`
+      : "";
 
   /* The Columns pill counts DATA columns only — the synthetic __select__ /
      __expand__ columns are chrome, not catalog (2990 subtracted only the
@@ -1253,8 +1307,8 @@ function DataGridInner<T>({
               return (
                 <td
                   key={col.key}
-                  className={styles.td}
-                  style={{ width: w, maxWidth: w, padding: "4px 6px", textAlign: "center" }}
+                  className={`${styles.td}${pinClass(col.key)}`}
+                  style={{ width: w, maxWidth: w, padding: "4px 6px", textAlign: "center", ...pinStyle(col.key) }}
                   onClick={(e) => e.stopPropagation()}
                 >
                   <input
@@ -1270,8 +1324,8 @@ function DataGridInner<T>({
               return (
                 <td
                   key={col.key}
-                  className={styles.td}
-                  style={{ width: w, maxWidth: w, padding: "4px 6px", textAlign: "center" }}
+                  className={`${styles.td}${pinClass(col.key)}`}
+                  style={{ width: w, maxWidth: w, padding: "4px 6px", textAlign: "center", ...pinStyle(col.key) }}
                 >
                   <button
                     type="button"
@@ -1308,8 +1362,8 @@ function DataGridInner<T>({
             return (
               <td
                 key={col.key}
-                className={`${styles.td} ${col.align === "right" ? styles.tdAlignRight : ""}`}
-                style={{ width: w, maxWidth: w }}
+                className={`${styles.td} ${col.align === "right" ? styles.tdAlignRight : ""}${pinClass(col.key)}`}
+                style={{ width: w, maxWidth: w, ...pinStyle(col.key) }}
               >
                 {isEmpty ? (col.key.startsWith("__") ? null : "—") : content}
               </td>
@@ -1579,7 +1633,11 @@ function DataGridInner<T>({
             <tr>
               {visibleColumns.map((col) => {
                 const w = layout.widths[col.key] ?? col.width ?? 140;
-                const style: CSSProperties = { width: w, minWidth: col.minWidth ?? 40 };
+                const style: CSSProperties = {
+                  width: w,
+                  minWidth: col.minWidth ?? 40,
+                  ...pinStyle(col.key),
+                };
                 const isSorted = layout.sort?.key === col.key;
                 const arrow = isSorted ? (layout.sort!.dir === "asc" ? "A" : "V") : "";
                 if (col.key === "__select__" && selectable) {
@@ -1587,7 +1645,7 @@ function DataGridInner<T>({
                   const allSel = keys.length > 0 && keys.every((k) => selectable.selectedKeys.has(k));
                   const someSel = !allSel && keys.some((k) => selectable.selectedKeys.has(k));
                   return (
-                    <th key={col.key} className={styles.th} style={style}>
+                    <th key={col.key} className={`${styles.th}${pinClass(col.key)}`} style={style}>
                       <span className={styles.thInner}>
                         <input
                           type="checkbox"
@@ -1607,7 +1665,7 @@ function DataGridInner<T>({
                     key={col.key}
                     className={`${styles.th} ${col.align === "right" ? styles.thAlignRight : ""} ${
                       dropTarget === col.key ? styles.thDragOver : ""
-                    }`}
+                    }${pinClass(col.key)}`}
                     style={style}
                     draggable
                     onDragStart={(e) => onDragStartHeader(e, col.key)}
