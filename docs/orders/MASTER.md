@@ -233,6 +233,53 @@ Order does not gain a writer.
   governed print handler, focused tests and production build passed. This record supersedes the
   earlier closure and locks Owner Visual Acceptance without changing business authority.
 
+## THE THREE DELIVERY DATES — OWNER RULING 2026-08-15 (Jess) · APPROVED / LOCKED
+
+**One cell has been carrying three different business facts.** Sales Order owns exactly one of
+them. This section defines all three so that no screen, import or job may substitute one for
+another.
+
+| # | Name | What it is | Who writes it | Where it shows | May it be overwritten? |
+|---|---|---|---|---|---|
+| 1 | **`Customer Delivery`** | The date Carres has **promised** the customer. A commitment. | Sales at order entry; Operation only through the governed amendment, which records who and why | `Customer Delivery` column · Object Header · every customer-facing document | **NEVER automatically.** Only a governed amendment with an owner and a reason. |
+| 2 | **`Customer Delivery Window`** | What the customer answered when they have no firm date — `Mid September`, `This month`, `Customer will call` | Sales, at the Sales Portal, at the moment the customer cannot give a date | The same `Customer Delivery` cell, **marked as a window, never rendered as a date** | Replaced by #1 the moment a firm date is agreed. Never by a job. |
+| 3 | **`Estimated delivery`** | When Carres **believes** it can deliver, derived from goods arrival and logistics facts. **Not a promise.** | Nobody types it. Derived from Purchasing/Delivery facts. | Order Route and Delivery surfaces; in the Register cell only as the third fallback, **always labelled `Estimated`** | Recomputed freely — it is derived, never committed |
+
+### FALLBACK ORDER — what the `Customer Delivery` cell shows
+
+```
+1  a promised date exists            →  show the date
+2  else a customer window exists     →  show the window, marked as a window
+3  else goods/logistics facts exist  →  show it, labelled `Estimated`
+4  else nobody has asked the customer→  the fact, then the action
+```
+
+### TWO HARD RULES
+
+- **`Estimated delivery` is never presented as `Customer Delivery`.** It is always labelled and
+  always visually quieter. A derived guess may not wear a promise's clothes — a customer-facing
+  document carries #1 and nothing else.
+- **No process, import, scheduled job or screen may overwrite an existing `Customer Delivery`.**
+  Changing a promise is an amendment: it has an owner, a reason and a history entry.
+
+### THE WRONG ATTRIBUTION THIS RULING CORRECTS
+
+Measured on production 2026-08-15 — 11 not-delivered orders carry no `Customer Delivery`:
+
+```
+8  delivery_date_tbd = TRUE    the customer WAS asked and answered "not sure yet"
+3  delivery_date_tbd = FALSE   nobody has asked
+```
+
+The Register prints the identical two lines on all 11 — `No delivery date` / `Confirm delivery
+date`. That sends the operator to ask 8 customers who have already answered, and it attributes to
+the customer a silence that is in fact ours. **Those 8 must read as *the customer answered, no firm
+date yet*; only the 3 may read as work to do.** No data is rewritten — `delivery_date_tbd` already
+carries the distinction and the screen discards it.
+
+`Estimated delivery` does not exist as a stored fact today and is not invented by this ruling; it
+enters the fallback only where Purchasing/Delivery already own the facts it derives from.
+
 ## Guided operations and Service Case boundary — CLOSED / PRODUCTION-VERIFIED 2026-08-14
 
 - A missing Customer Delivery date uses the governed two-line action grammar in the Register:
