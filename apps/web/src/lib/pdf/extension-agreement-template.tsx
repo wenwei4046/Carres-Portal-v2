@@ -11,6 +11,7 @@
  */
 
 import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
+import { displayCustomerName } from "@/lib/customer-name";
 import { NOTO_SANS_SC_FAMILY } from "./fonts/noto";
 import { DocHeader } from "./letterhead";
 import type { ExtensionAgreementTemplateData } from "./types";
@@ -88,7 +89,7 @@ export function ExtensionAgreementTemplate(data: ExtensionAgreementTemplateData)
 
         <View style={styles.party}>
           <Text style={styles.partyLabel}>Customer</Text>
-          <Text style={styles.partyName}>{customer.name || "—"}</Text>
+          <Text style={styles.partyName}>{displayCustomerName(customer.name) || "—"}</Text>
           {customer.phone ? <Text style={styles.partySub}>{customer.phone}</Text> : null}
         </View>
 

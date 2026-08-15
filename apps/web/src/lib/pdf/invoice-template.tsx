@@ -22,6 +22,7 @@
  */
 
 import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
+import { displayCustomerName } from "@/lib/customer-name";
 import { NOTO_SANS_SC_FAMILY } from "./fonts/noto";
 import { CARRES_COMPANY } from "./letterhead";
 import type { InvoiceTemplateData } from "./types";
@@ -263,7 +264,7 @@ export function InvoiceTemplate(data: InvoiceTemplateData) {
             <Text style={styles.blockLabel}>Bill To</Text>
             <View style={{ marginTop: mm(1.5) }}>
               {([
-                ["Name", customer.name],
+                ["Name", displayCustomerName(customer.name)],
                 ["Address", customer.address],
                 ["Tel", customer.phone],
               ] as Array<[string, string | null]>).map(([label, value]) =>

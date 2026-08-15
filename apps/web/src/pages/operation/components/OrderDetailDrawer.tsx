@@ -116,6 +116,7 @@ import {
 } from "@/lib/queries";
 import { cjkClassName } from "@/lib/cjk";
 import { fmtDate, fmtDateShort } from "@/lib/fmt-date";
+import { displayCustomerName } from "@/lib/customer-name";
 import { orderStatusPill } from "@/lib/status-pill";
 import { locationForAddress } from "@/lib/region";
 import { lineReadiness, readinessCounts } from "@/lib/line-readiness";
@@ -129,7 +130,6 @@ import {
   buildSupplierReminder,
   rmAmount,
   salutationOf,
-  titleCaseName,
 } from "@/lib/wa-templates";
 import {
   lineCategory,
@@ -2342,7 +2342,7 @@ function DrawerBody({
   if (balanceOwing) {
     chaseRows.push({
       key: "customer",
-      label: order.customer_name ? titleCaseName(order.customer_name) : "Customer",
+      label: order.customer_name ? displayCustomerName(order.customer_name) : "Customer",
       sub: `${RM(moneyOutstanding)} outstanding`,
       urgency: balanceGate === "hold" ? "overdue" : "attention",
       onAct: (tone) => copyChase("customer", tone),
@@ -4654,7 +4654,7 @@ function CustomerIdentityCard({
     return (
       <div
         className="kpi-box grid place-items-center py-2"
-        title={`${order.customer_name ? titleCaseName(order.customer_name) : "—"} · #${order.so} · ${statusWord}`}
+        title={`${order.customer_name ? displayCustomerName(order.customer_name) : "—"} · #${order.so} · ${statusWord}`}
       >
         <span className="size-[34px] rounded-full grid place-items-center shrink-0 bg-base-100 text-base-500">
           <User size={18} strokeWidth={2} aria-hidden="true" />
@@ -4673,7 +4673,7 @@ function CustomerIdentityCard({
             className={`block text-body font-semibold leading-tight ${cjkClassName(order.customer_name ?? "")}`}
             title={order.customer_name ?? undefined}
           >
-            {order.customer_name ? titleCaseName(order.customer_name) : "—"}
+            {order.customer_name ? displayCustomerName(order.customer_name) : "—"}
           </span>
           <span className="mt-0.5 flex items-center gap-1.5 min-w-0 flex-wrap">
             {/* The ONE black element on the page — the order id badge. */}
