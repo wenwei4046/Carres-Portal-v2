@@ -61,7 +61,10 @@ import CancelSalesOrderDialog from "./CancelSalesOrderDialog";
 import DestinationHeader from "./DestinationHeader";
 import { lineConfigBits } from "../dealer/new-order/special-addons-picker";
 import { isRental, lineName, type MoneyState } from "./sales-order-facts";
-import { missingDeliveryDateGuidance } from "./sales-order-guidance";
+import {
+  deliveryDateToBeConfirmedGuidance,
+  missingDeliveryDateGuidance,
+} from "./sales-order-guidance";
 import {
   buildRegisterRow,
   defaultOnFor,
@@ -238,6 +241,24 @@ function toGridColumn(
       ...base,
       accessor: (r) => {
         if (r.customerDelivery) return f.text(r);
+        /* THE 8 vs THE 3 — owner ruling 2026-08-15, docs/orders/MASTER.md.
+           `delivery_date_tbd` already records that the customer WAS asked and
+           answered *not yet*; the screen was discarding it and printing the
+           same warning on all eleven. A customer who has answered is not work
+           to do, so this reads as a plain fact: one line, no action clause and
+           no amber — amber is reserved for the three nobody has asked. */
+        if (r.o.delivery_date_tbd) {
+          const tbd = deliveryDateToBeConfirmedGuidance({
+            customer: r.customer,
+            salesperson: r.o.salespersons?.name,
+            phone: r.phone,
+          });
+          return (
+            <span className="block min-w-0 truncate text-base-600" title={tbd.detail}>
+              {tbd.fact}
+            </span>
+          );
+        }
         const guidance = missingDeliveryDateGuidance({
           so: r.so,
           customer: r.customer,

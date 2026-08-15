@@ -227,10 +227,31 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     expect(screen.getByRole("button", { name: /Export Excel \(1\)/ })).toBeInTheDocument();
   });
 
-  it("shows a governed missing Customer Delivery exception instead of a passive empty value", () => {
+  it("a customer who already answered is not work to do — the 8 read differently from the 3", () => {
     listHookState.data = { orders: [order({
       delivery_date: null,
       delivery_date_tbd: true,
+      customer_name: "Kimmy",
+      salespersons: { name: "Shasha" },
+    })] };
+    mount();
+    /* The customer WAS asked. No warning, and no instruction to ask again —
+     * printing `Confirm delivery date` here is the wrong attribution this
+     * ruling corrects (docs/orders/MASTER.md · THE THREE DELIVERY DATES). */
+    expect(screen.getByText("To be confirmed")).toBeInTheDocument();
+    expect(screen.queryByText("No delivery date")).not.toBeInTheDocument();
+    expect(screen.queryByText("Confirm delivery date")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("attention-warning")).not.toBeInTheDocument();
+    /* The full governed sentence, the party and the phone stay reachable. */
+    const hover = screen.getByTitle(/Delivery date to be confirmed/);
+    expect(hover).toHaveAttribute("title", expect.stringContaining("Kimmy"));
+    expect(hover).toHaveAttribute("title", expect.stringContaining("Shasha"));
+  });
+
+  it("shows a governed missing Customer Delivery exception instead of a passive empty value", () => {
+    listHookState.data = { orders: [order({
+      delivery_date: null,
+      delivery_date_tbd: false,
       customer_name: "Kimmy",
       salespersons: { name: "Shasha" },
     })] };
@@ -259,7 +280,7 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
   it("ranks the guidance cell 13 / 11 — body semibold over label regular", () => {
     listHookState.data = { orders: [order({
       delivery_date: null,
-      delivery_date_tbd: true,
+      delivery_date_tbd: false,
       customer_name: "Kimmy",
       salespersons: { name: "Shasha" },
     })] };

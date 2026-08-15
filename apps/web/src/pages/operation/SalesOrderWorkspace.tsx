@@ -990,7 +990,10 @@ export default function SalesOrderWorkspace() {
   );
 
   const soWord = isNew ? "New Sales Order" : order ? `SO-${order.so}` : "Sales Order";
-  const missingDateAction = order && !order.delivery_date
+  /* Same ruling as the Register: a customer who answered *not yet* is not work
+     to do, so the panel does not raise the confirm action for them either
+     (docs/orders/MASTER.md · THE THREE DELIVERY DATES, 2026-08-15). */
+  const missingDateAction = order && !order.delivery_date && !order.delivery_date_tbd
     ? missingDeliveryDateGuidance({
         so: order.so,
         customer: displayCustomerName(order.customer_name),
