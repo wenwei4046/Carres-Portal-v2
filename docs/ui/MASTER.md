@@ -573,15 +573,15 @@ design decision and must demonstrate that it passes every admission condition ab
 
 **REGISTER REFERENCE DIVISION — APPROVED / LOCKED.** Carres does not copy one product's whole
 page. Register headers follow the compact, width-spending Linear pattern: portal navigation
-owns destination switching; the content header stays one 44px identity row and uses horizontal
+owns destination switching; the content header stays one identity row (50px, §6.7) and uses horizontal
 room instead of adding title, breadcrumb, KPI or tab bands. Register listing behaviour and
 readability follow the governed 2990 reference: its listing engine, controls, column powers,
 row disclosure and table hierarchy are the reference. GitHub is evidence for tab admission,
 not the Carres Register shell. Carres business ownership remains authoritative over all three.
 
 **REGISTER PAGE HEADER — APPROVED / LOCKED (Loo, 2026-08-11).** Every Register begins with one
-rendered 44px Page Header. Left = the current destination's governed icon + one short identity
-title, for example `Sales Orders`. Right = genuine global utilities only: `Jump to…` with its
+rendered 50px Page Header (44px until the 2026-08-15 ruling in §6.7). Left = one short identity
+title, for example `Sales Orders`, as the word alone. Right = genuine global utilities only: `Jump to…` with its
 keyboard hint · Notifications · Help · System Settings. `Jump to…` is an approved missing
 global-navigation capability: it finds permitted modules/destinations and exact document numbers,
 offers recent destinations, and only navigates; it never performs workflow. The header contains
@@ -750,7 +750,7 @@ touch-up below also governs the shared ERP Shell and Object Header; it does not 
 production-verified Sales Order business engine or another module's ownership.
 
 ```
-DestinationHeader  44px  Sales Orders identity + genuine global utilities only
+DestinationHeader  50px  Sales Orders identity + genuine global utilities only
 Work Toolbar       45px  View · one Search · Export · Columns · actions · overflow
 Work Surface             one DataGrid + fixed status footer; loading · empty · error remain inside it
 ```
@@ -926,7 +926,13 @@ its own tools, and nothing that is not needed is on screen.*
    ── 8px ──
 ```
 
-**ROW 1 · DESTINATION HEADER, 44px.** Left = the destination's governed icon + one short identity.
+**ROW 1 · DESTINATION HEADER, 50px.** Left = one short identity, **the word alone** — owner ruling
+2026-08-15: the icon is dropped and the word rises to the governed `text-page` (24px / 32px / 600),
+which is why the row grew from 44px to 50px. 24px inside 44px leaves 5.5px above and below and the
+word reads as if it is touching the rule; 50px leaves 8.5px. The module's icon still identifies it
+in the sidebar, where switching happens; repeating it beside a 24px word that says the same thing
+spends width on a second copy of one fact. Other module headers keep their 44px tab-strip row and
+their 13px word until they migrate to this template.
 Right = genuine global utilities only: `Jump to…` (⌘K) · Notifications · Help · Settings. **No
 page-owned control may enter this row — ever.** Not create, not Scan, not Export, not Columns, not
 Search, not View, not filters, not selection state. **No search box on this row:** `Jump to…` is the

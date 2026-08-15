@@ -169,6 +169,17 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     expect(screen.queryByText("Sales Order")).not.toBeInTheDocument();
   });
 
+  it("the Destination Header is 50px, wordmark-only, at the governed 24px (§6.7)", () => {
+    mount();
+    const word = screen.getByTestId("sales-orders-destination-header-module-word");
+    expect(word).toHaveTextContent("Sales Orders");
+    /* The icon is gone: the word alone carries the identity, so nothing else
+     * may sit inside the nameplate. */
+    expect(word.querySelector("svg")).toBeNull();
+    expect(word).toHaveClass("text-page");
+    expect(screen.getByTestId("sales-orders-destination-header")).toHaveClass("h-[50px]");
+  });
+
   it("renders exactly one work toolbar, and Search rests as an icon (§6.7)", () => {
     mount();
     expect(screen.getAllByTestId("work-toolbar")).toHaveLength(1);
