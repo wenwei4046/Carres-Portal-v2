@@ -196,6 +196,36 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     expect(screen.queryByText("Not delivered")).not.toBeInTheDocument();
   });
 
+  it("Export is icon-only and its menu offers Excel, PDF and Print (§6.7)", () => {
+    mount();
+    const exportBtn = screen.getByRole("button", { name: "Export" });
+    /* Icon-only: the accessible name comes from aria-label, so the word must
+     * NOT also be rendered as text — otherwise it is not icon-only. */
+    expect(exportBtn).not.toHaveTextContent("Export");
+    expect(exportBtn).toHaveAttribute("aria-haspopup", "menu");
+    fireEvent.click(exportBtn);
+    expect(screen.getByRole("menuitem", { name: "Excel" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "PDF" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Print" })).toBeInTheDocument();
+  });
+
+  it("ticking rows offers the REAL sales orders, not a picture of the list (§6.7)", () => {
+    mount();
+    /* Normal state carries the list outputs only — no document action is
+     * offered for a selection that does not exist yet. */
+    expect(screen.queryByRole("button", { name: /Print \d+ sales order/ })).not.toBeInTheDocument();
+    /* Re-query after each tick: selection REPLACES the toolbar, so the
+     * select-all box leaves the DOM and a stale snapshot holds detached nodes. */
+    const rowBoxes = () => screen.getAllByRole("checkbox").slice(-2);
+    fireEvent.click(rowBoxes()[0]!);
+    /* Selection replaces the toolbar in place and prints the truthful count. */
+    expect(screen.getByTestId("selection-bar")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Print 1 sales order" })).toBeInTheDocument();
+    /* Excel stays scoped to the same selection beside it — the selection bar
+     * offers list output AND document output, both counting the same rows. */
+    expect(screen.getByRole("button", { name: /Export Excel \(1\)/ })).toBeInTheDocument();
+  });
+
   it("shows a governed missing Customer Delivery exception instead of a passive empty value", () => {
     listHookState.data = { orders: [order({
       delivery_date: null,

@@ -406,8 +406,8 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
         <View
           style={styles.header}
           fixed
-          render={({ pageNumber }) =>
-            pageNumber === 1 ? (
+          render={({ subPageNumber }) =>
+            subPageNumber === 1 ? (
               <View>
                 <View style={styles.headerRow}>
                   {/* Left column is WIDTH-BOUNDED (flex + padding) so the
@@ -737,7 +737,9 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
             <Text style={styles.footerCenter}>Computer-generated document · No company signature required.</Text>
             <Text
               style={styles.footerPage}
-              render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`}
+              render={({ subPageNumber, subPageTotalPages }) =>
+                `Page ${subPageNumber} of ${subPageTotalPages}`
+              }
             />
           </View>
         </View>

@@ -50,7 +50,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { Search, Columns3, RotateCcw, Filter, Download, ChevronDown } from "lucide-react";
+import { Search, Columns3, RotateCcw, Filter, Download, ChevronDown, Printer } from "lucide-react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
 import { SkeletonRows } from "./Skeleton";
@@ -182,6 +182,9 @@ export type DataGridProps<T> = {
   /** Reference-toolbar slots. Start renders before Search; End renders after
       Filters / Export / Columns. The legacy `toolbar` slot is unchanged. */
   toolbarStart?: ReactNode;
+  /** Outputs valid ONLY for the exact selection — MASTER.md:588. The label
+   *  receives the count so the button prints the truthful number. */
+  selectionActions?: Array<{ label: (n: number) => string; onClick: (rows: never[]) => void }>;
   toolbarEnd?: ReactNode;
   /** Fixed informational footer. Receives the filtered result and, when
       present, the selected rows that remain in that result. */
@@ -382,6 +385,7 @@ function DataGridInner<T>({
   toolbar,
   toolbarStart,
   toolbarEnd,
+  selectionActions,
   statusSummary,
   outputActions,
   focusSearchNonce,
@@ -449,6 +453,8 @@ function DataGridInner<T>({
      scroll (the operator scrolling the column list) from an OUTSIDE scroll
      (the page/grid moving, which should dismiss the detached fixed popover). */
   const columnsMenuRef = useRef<HTMLDivElement>(null);
+  const outputBtnRef = useRef<HTMLButtonElement>(null);
+  const [outputMenuPos, setOutputMenuPos] = useState<{ top: number; right: number } | null>(null);
   const [columnsMenuPos, setColumnsMenuPos] = useState<{ top: number; right: number } | null>(
     null,
   );
@@ -1142,11 +1148,12 @@ function DataGridInner<T>({
      view, the selection bar passes the selected rows. Cells render ReactNode,
      so we derive a text value per cell. xlsx is dynamic-imported (mirrors the
      pdf generators) to keep it out of the main bundle. */
-  const exportRows = useCallback(
-    async (whichRows: T[]) => {
-      if (whichRows.length === 0) return;
-      const cols = visibleColumns.filter((c) => !c.key.startsWith("__"));
-      if (cols.length === 0) return;
+  /* One derivation, two outputs. Excel and PDF disagreeing about a cell is the
+     defect this shape exists to make impossible. */
+  const deriveTable = useCallback(
+    (whichRows: T[]): { headers: string[]; rows: string[][]; stem: string } => {
+      const cols =
+        whichRows.length === 0 ? [] : visibleColumns.filter((c) => !c.key.startsWith("__"));
       // Header for a column in the sheet: an explicit exportLabel (used by pure
       // icon/checkbox columns whose on-screen label is blank) else the on-screen
       // label. Falls back to the column key so a blank header never leaves an
@@ -1174,23 +1181,6 @@ function DataGridInner<T>({
         for (const c of cols) o[header(c)] = cellText(c, row);
         return o;
       });
-      const XLSX = await import("xlsx");
-      const ws = XLSX.utils.json_to_sheet(data, { header: cols.map((c) => header(c)) });
-      // Auto-size each column to its widest cell (header included) so the sheet is
-      // legible instead of squished into one default width (Wei Siang 2026-06-20
-      // "很乱很难看"). Capped so a stray long value can't blow a column out.
-      ws["!cols"] = cols.map((c) => {
-        const h = header(c);
-        let w = h.length;
-        for (const o of data) w = Math.max(w, String(o[h] ?? "").length);
-        return { wch: Math.min(60, Math.max(8, w + 2)) };
-      });
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
-      // Filename: prefer the caller's human exportName ("Purchase Orders"); else
-      // clean the storageKey down to something legible (strip dg-/pr-g- prefixes,
-      // -v1 / layout suffixes, dashes→spaces). A YYYY-MM-DD date is appended so
-      // repeated exports are self-dating and don't silently overwrite.
       const stem =
         (exportName && exportName.trim()) ||
         (storageKey || "export")
@@ -1202,10 +1192,67 @@ function DataGridInner<T>({
           .replace(/\s+/g, " ")
           .trim() ||
         `export-${whichRows.length}`;
+      return {
+        headers: cols.map((c) => header(c)),
+        rows: data.map((o) => cols.map((c) => String(o[header(c)] ?? ""))),
+        stem,
+      };
+    },
+    [visibleColumns, storageKey, exportName],
+  );
+
+  const exportRows = useCallback(
+    async (whichRows: T[]) => {
+      if (whichRows.length === 0) return;
+      const { headers, rows, stem } = deriveTable(whichRows);
+      if (headers.length === 0) return;
+      const data = rows.map((r) => {
+        const o: Record<string, string> = {};
+        headers.forEach((h, i) => { o[h] = r[i] ?? ""; });
+        return o;
+      });
+      const cols = headers;
+      const XLSX = await import("xlsx");
+      const ws = XLSX.utils.json_to_sheet(data, { header: cols });
+      // Auto-size each column to its widest cell (header included) so the sheet is
+      // legible instead of squished into one default width (Wei Siang 2026-06-20
+      // "很乱很难看"). Capped so a stray long value can't blow a column out.
+      ws["!cols"] = cols.map((h) => {
+        let w = h.length;
+        for (const o of data) w = Math.max(w, String(o[h] ?? "").length);
+        return { wch: Math.min(60, Math.max(8, w + 2)) };
+      });
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
+      // Filename: prefer the caller's human exportName ("Purchase Orders"); else
+      // clean the storageKey down to something legible (strip dg-/pr-g- prefixes,
+      // -v1 / layout suffixes, dashes→spaces). A YYYY-MM-DD date is appended so
+      // repeated exports are self-dating and don't silently overwrite.
       const stamp = new Date().toISOString().slice(0, 10);
       XLSX.writeFile(wb, `${stem} ${stamp}.xlsx`);
     },
-    [visibleColumns, storageKey, exportName],
+    [deriveTable],
+  );
+
+  /** The current view as a PDF — same derived cells, opened in a new tab so the
+   *  operator can read it before deciding to save or print it. */
+  const exportPdfRows = useCallback(
+    async (whichRows: T[]) => {
+      if (whichRows.length === 0) return;
+      const { headers, rows, stem } = deriveTable(whichRows);
+      if (headers.length === 0) return;
+      const { renderRegisterListPdf } = await import("@/lib/pdf/render");
+      const blob = await renderRegisterListPdf({
+        title: stem,
+        headers,
+        rows,
+        printedAt: new Date().toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" }),
+      });
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank");
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    },
+    [deriveTable],
   );
 
   // ── Sort handlers ─────────────────────────────────────────────────
@@ -1464,19 +1511,37 @@ function DataGridInner<T>({
             2026-06-19). Wording says the scope out loud (REGISTER LAW 3). */}
         <div className={styles.columnsAnchor}>
           <button
+            ref={outputBtnRef}
             type="button"
-            className={`${styles.toolbarPill} ${outputMenuOpen ? styles.toolbarPillOn : ""}`}
-            onClick={() => setOutputMenuOpen((open) => !open)}
+            aria-label="Export"
+            title="Export"
+            className={`${styles.toolbarPill} ${isReference ? styles.toolbarPillIconCaret : ""} ${outputMenuOpen ? styles.toolbarPillOn : ""}`}
+            onClick={() => setOutputMenuOpen((open) => {
+              const next = !open;
+              if (next && outputBtnRef.current) {
+                const r = outputBtnRef.current.getBoundingClientRect();
+                setOutputMenuPos({ top: r.bottom + 4, right: window.innerWidth - r.right });
+              }
+              return next;
+            })}
             disabled={sortedRows.length === 0}
             aria-haspopup="menu"
             aria-expanded={outputMenuOpen}
           >
             <Download size={14} strokeWidth={1.75} aria-hidden />
-            <span>Export</span>
+            {!isReference && <span>Export</span>}
             <ChevronDown size={12} strokeWidth={2} aria-hidden />
           </button>
           {outputMenuOpen && (
-            <div className={styles.columnsMenu} role="menu">
+            <div
+              className={styles.columnsMenu}
+              role="menu"
+              style={
+                outputMenuPos
+                  ? { position: "fixed", top: outputMenuPos.top, right: outputMenuPos.right }
+                  : undefined
+              }
+            >
               <button
                 type="button"
                 className={styles.filterLauncherItem}
@@ -1486,7 +1551,18 @@ function DataGridInner<T>({
                   void exportRows(sortedRows);
                 }}
               >
-                Export Excel
+                Excel
+              </button>
+              <button
+                type="button"
+                className={styles.filterLauncherItem}
+                role="menuitem"
+                onClick={() => {
+                  setOutputMenuOpen(false);
+                  void exportPdfRows(sortedRows);
+                }}
+              >
+                PDF
               </button>
               {(outputActions ?? []).map((action) => (
                 <button
@@ -1613,6 +1689,17 @@ function DataGridInner<T>({
             <Download size={14} strokeWidth={1.75} aria-hidden />
             <span>Export Excel ({selectedVisibleRows.length})</span>
           </button>
+          {(selectionActions ?? []).map((a) => (
+            <button
+              key={a.label(0)}
+              type="button"
+              className={styles.toolbarPill}
+              onClick={() => a.onClick(selectedVisibleRows as never[])}
+            >
+              <Printer size={14} strokeWidth={1.75} aria-hidden />
+              <span>{a.label(selectedVisibleRows.length)}</span>
+            </button>
+          ))}
         </div>
       )}
 

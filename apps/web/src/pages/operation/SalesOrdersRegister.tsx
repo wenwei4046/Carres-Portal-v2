@@ -54,7 +54,7 @@ import {
 import Money from "@/components/Money";
 import { apiFetch, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { renderDoPdf, renderSalesOrderPdf } from "@/lib/pdf/render";
+import { renderCombinedSalesOrderPdf, renderDoPdf, renderSalesOrderPdf } from "@/lib/pdf/render";
 import type { DoTemplateData, SalesOrderTemplateData } from "@/lib/pdf/types";
 import { useOperationOrders, useSalesOrderExpansion } from "@/lib/queries";
 import CancelSalesOrderDialog from "./CancelSalesOrderDialog";
@@ -368,6 +368,33 @@ function ExpandedLines({ row }: { row: RegisterRow }) {
  * server-side (`/sales-order-data`, RLS-scoped); the browser renders and
  * opens the blob. READ-ONLY: nothing is written anywhere.
  */
+/**
+ * The batch behind `Print N sales orders` — the 2990 shape, in Carres terms:
+ * the operator ticks rows and gets the REAL documents, not a picture of the
+ * list. Each order's data is assembled server-side under RLS exactly as the
+ * single-order print does, so a row the user may not read cannot enter the
+ * file; the browser then renders one PDF carrying one governed page per order.
+ * READ-ONLY.
+ */
+async function printSalesOrders(rows: Array<{ id: string; so: number }>): Promise<void> {
+  if (rows.length === 0) return;
+  try {
+    const bundles: SalesOrderTemplateData[] = [];
+    for (const r of rows) {
+      bundles.push(
+        await apiFetch<SalesOrderTemplateData>(`/api/orders/${r.id}/sales-order-data`),
+      );
+    }
+    const blob = await renderCombinedSalesOrderPdf(bundles);
+    const url = URL.createObjectURL(blob);
+    window.open(url, "_blank");
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  } catch (error) {
+    const message = error instanceof ApiError ? error.message : String(error);
+    toast.error(`Printing ${rows.length} sales orders failed: ${message}`);
+  }
+}
+
 async function openSalesOrderPdf(orderId: string, so: number): Promise<void> {
   try {
     const data = await apiFetch<SalesOrderTemplateData>(
@@ -576,6 +603,14 @@ export default function SalesOrdersRegister() {
               onToggleAll: toggleAll,
             }}
             outputActions={[{ label: "Print", onClick: () => window.print() }]}
+            selectionActions={[
+              {
+                label: (n) => `Print ${n} sales order${n === 1 ? "" : "s"}`,
+                onClick: (picked) => {
+                  void printSalesOrders(picked as unknown as RegisterRow[]);
+                },
+              },
+            ]}
             toolbarStart={
               <button
                 type="button"

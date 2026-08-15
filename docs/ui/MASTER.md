@@ -920,8 +920,22 @@ looks at this page: Search · `Export ▾` · Columns. Nothing else lives here.
   inside; `Esc` collapses it. While a query is active it stays collapsed but carries its result
   count (`🔍⁷`) so a narrowed listing can never look like the whole listing.
 - **Columns is icon-only** (`▥`). Its hover/accessible name is `Columns`.
-- **`Export ▾` keeps its word** — it is a verb the operator performs — and offers Excel · PDF ·
-  Print. Icon-only is for controls that configure a view, never for a verb.
+- **Export is icon-only too** (`⤓ ⌄`) — owner ruling 2026-08-15, correcting this section's first
+  draft, which reserved icon-only for view controls and kept the word on the verb. The right side
+  of Row 2 is a row of icons; one word inside it reads as an exception, and the caret already says
+  a menu opens. Its hover/accessible name is `Export`, and the menu offers **Excel · PDF · Print**
+  — three outputs, one door, never scattered across `…` or separate permanent buttons.
+- **Selection changes WHAT `Export ▾` can produce, not just how many.** With no selection the
+  outputs describe the LIST: Excel · PDF · Print. With rows ticked the same space also offers the
+  DOCUMENTS those rows own — `Print {n} sales orders` — assembled server-side under RLS, one
+  governed single-order page per order in one file, with the truthful count in the label. This is
+  the 2990 batch shape (`SalesInvoicesList.tsx:400`) translated into Carres: the operator who ticks
+  69 rows wants the 69 documents, not a picture of the listing. The two must never be confused, so
+  they never share a word.
+- **The Excel and PDF outputs derive their cells ONCE.** A cell that says one thing on screen,
+  another in Excel and a third in the PDF is the defect that shared derivation exists to prevent.
+  The PDF prints the current view and carries no letterhead, terms or signature block: it is a
+  listing, and it must never be mistakable for a business document.
 - **Register Search and `Jump to…` are two different tools and both stay.** `⌘K` finds destinations
   and document numbers across the ERP; `🔍` finds customers, phones and items inside this page only.
   Proven live: `Kimmy` returns SO-1303 in Register Search and `No results` in `Jump to…`. Removing
