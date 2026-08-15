@@ -128,7 +128,9 @@ keep a superseded target.
   sheet and create horizontal scroll; default columns are never squeezed unnaturally to make an
   added column fit.
 - `▸` expands goods only as one clean read-only mini-table beneath the parent row. Its locked
-  columns are `Category | Unit ID | SKU | Qty | Item | Deliver To`. `Item` consolidates the
+  columns are `Category | Unit ID | Deliver To | SKU | Qty | Item` (re-ruled by the owner on
+  2026-08-15 — see THE CHILD MINI-TABLE below, which also governs how the box aligns, how it is
+  typeset and when it may carry a checkbox). `Item` consolidates the
   product/configuration facts Operations uses to identify the exact goods; it does not create
   one column per product attribute. Unit ID reads Stock's per-unit register. Deliver To reads
   Purchasing's PO/PO-line result (including quantity splits). Sales Orders stores neither fact.
@@ -360,9 +362,47 @@ query.**
   four-item placeholder clipped on a wide window as well as a narrow one — it was never a
   breakpoint problem. `Search sales orders…` is the ruled string; the ▽ per-column filters say what
   each column matches.
-- Everything else in §0.1 stands unchanged: expansion, context menu, all-orders scope, search
-  placement beside Export, no overall status column, the six-column goods expansion, the two-door
-  navigation.
+- Everything else in §0.1 stands unchanged: context menu, all-orders scope, search
+  placement beside Export, no overall status column, the two-door navigation. The goods expansion
+  is re-ruled below.
+
+### THE CHILD MINI-TABLE — OWNER RULING 2026-08-15 (Chai) · APPROVED / LOCKED
+
+**One implementation, and it is shared.** The box `▸` opens is a single component
+(`pages/operation/components/GoodsMiniTable.tsx`). A second page adopting it switches a
+CAPABILITY on; it does not copy a table. This overwrites the older column order and every earlier
+description of the expansion's alignment and typography.
+
+**COLUMN ORDER**
+
+```
+[☑] │ Category │ Unit ID │ Deliver To │ SKU │ Qty │ Item
+```
+
+`Item` is ALWAYS LAST and is the only flexible column — a flexible column in the middle moves every
+column after it and destroys the alignment the fixed widths exist to buy.
+
+**ALIGNMENT — the box's left edge IS the `SO No` column's left edge.** The parent ☐ and `▸` cells
+stay EMPTY beside the child rows; that indent is the parent-child link. The box's right edge ends
+with the parent table. This is drawn by the register ENGINE, as real empty gutter cells in the
+expansion row, never by a padding a page computes: a `<td>` width is a hint and this grid stretches
+its columns, so at 1440 the declared 30px ☐ and 32px `▸` render 41 and 43 and any arithmetic on the
+declared numbers lands short. Every child column but `Item` is a FIXED width, identical on every
+expanded row, with the parent grid's own 8px cell padding — a 16px minimum gap between columns, and
+the first child value lands directly under the parent's `SO No` text.
+
+**TYPOGRAPHY — TWO LEVELS, NEVER THREE.** The header row is 11px grey in the parent header's own
+treatment and carries NO checkbox. EVERY value is 13px, in one ink. `Unit ID` and `SKU` keep the
+mono family at that same 13px; an ABSENCE inside them reverts to the body face, because
+`Not allocated` is a word and not a code. `Category` is written the way a person writes it —
+`Mattress`, never `MATTRESS`. Governed absences stay muted at 13px.
+
+**SELECTION IS A CAPABILITY, SWITCHED PER PAGE.** The leading ☑ column exists only on a page that
+BUYS from these lines. **The Sales Orders Register passes no selection and therefore has no ☑
+column inside the box** — a truth register selects nothing (§0 CHARTER). Where the capability is
+on: one checkbox per purchasable line, `—` on a line nothing can be bought for (select-all skips
+it), never a checkbox in the header row, and the whole-order switch is the PARENT row's box with
+its three states `☐ none · ▣ partial · ☑ all`.
 
 ### Sales Order object
 

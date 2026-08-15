@@ -805,6 +805,33 @@ function DataGridInner<T>({
       ? ` ${styles.stickyCell}${key === pinnedEdgeKey ? ` ${styles.stickyEdge}` : ""}`
       : "";
 
+  /**
+   * ⭐ THE CHILD BOX BEGINS WHERE THE RECORD BEGINS — owner ruling 2026-08-15.
+   *
+   * An expansion used to start at whatever padding the calling page happened
+   * to write, which on Sales Orders was 40px against a 62px gutter: the child
+   * table's left edge landed inside the `▸` column, two pixels of nothing on
+   * either side of nowhere. The indent is not decoration — the EMPTY ☐ and ▸
+   * cells beside the child rows are the parent-child link, and they only read
+   * as one when the box starts exactly at the first data column.
+   *
+   * SO THE TABLE ALIGNS IT, NOT A NUMBER. The expansion row now carries one
+   * REAL empty cell per gutter column and spans the data columns with the
+   * rest; the browser's own column layout then puts the box's left edge on the
+   * first data column's left edge exactly. A computed `padding-left` cannot:
+   * `width` on a `<td>` is a HINT, and this grid's columns stretch to fill the
+   * frame — measured live at 1440, the 30px ☐ and 32px ▸ render 41px and 43px,
+   * so a 62px padding lands 22px short of `SO No`. Nothing is measured here,
+   * so nothing can drift when a column is resized, hidden or reordered.
+   *
+   * (Law 13: an alignment every register needs is an engine capability, never
+   * a page-local hack — `docs/ui/MASTER.md` §4.)
+   */
+  const expansionGutter = useMemo(
+    () => visibleColumns.filter((c) => c.key.startsWith("__")).map((c) => c.key),
+    [visibleColumns],
+  );
+
   /* The Columns pill counts DATA columns only — the synthetic __select__ /
      __expand__ columns are chrome, not catalog (2990 subtracted only the
      chevron; a selectable grid was off by one). */
@@ -1420,7 +1447,22 @@ function DataGridInner<T>({
         </tr>
         {isExpanded && expandable && (
           <tr className={styles.tr} style={{ background: "var(--c-cream)" }}>
-            <td colSpan={visibleColumns.length} style={{ padding: 0, borderTop: "1px solid var(--line)" }}>
+            {/* The gutter, kept EMPTY beside the child rows — the indent IS
+                the parent-child link (owner ruling 2026-08-15). */}
+            {expansionGutter.map((key) => (
+              <td
+                key={key}
+                data-testid={`grid-expansion-gutter-${key}`}
+                style={{ padding: 0, borderTop: "1px solid var(--line)" }}
+              />
+            ))}
+            <td
+              colSpan={visibleColumns.length - expansionGutter.length}
+              data-testid="grid-expansion-cell"
+              /* No padding at all: the left edge is the first data column's,
+                 the right edge is the parent table's. */
+              style={{ padding: 0, borderTop: "1px solid var(--line)" }}
+            >
               {expandable.renderExpansion(row)}
             </td>
           </tr>

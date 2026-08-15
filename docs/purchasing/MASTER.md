@@ -702,6 +702,54 @@ historical `operation_issue_pos_for_order(uuid)` function without deleting legac
 - **The September switch** — Nice Future stops supplying; a new mattress supplier takes over on
   the subscription model. Sofa and bedframe unchanged.
 
+### ⛔ THE CHILD MINI-TABLE ON THIS TAB — NOT ADOPTED, AND THE OWNER MUST RULE
+
+**Status: OPEN OWNER DECISION, 2026-08-15. Nothing below is law.** The Expand Mini-Table card
+ruled the shared child mini-table (`docs/orders/MASTER.md` §0.1 — THE CHILD MINI-TABLE) onto BOTH
+the Sales Orders Register and this tab, with the ☑ capability switched on here. **The Register half
+is built and shipped. This half is not**, and the reason is measured, not preferred.
+
+**WHAT THE CARD ASSUMES.** That this tab is a grid of customer ORDERS, each with a `▸` that opens
+its goods. **It is not.** This tab is a flat grid of BUILDS — one row per piece of goods to buy —
+clustered under a white order line, and its `▸` opens the row's two ACTS (`Reserve` ·
+`Cancel Purchase`), not a table. Adopting the card literally means rebuilding the grid into
+order-rows plus expansions.
+
+**THREE OF THE CARD'S FOUR SELECTION RULES ALREADY HOLD HERE, AND THE FOURTH CANNOT OCCUR.**
+
+| Card §4 rule | This tab today |
+|---|---|
+| every purchasable line has its own checkbox | ✅ selection is BUILD-level and frozen that way |
+| the parent switch cycles `☐ none · ▣ partial · ☑ all` | ✅ `groupSelState` / `groupSelToggle` |
+| the action bar counts selected LINES, never orders | ✅ the toolbar's selection state |
+| a Service line shows `—` and select-all skips it | **cannot occur** — a service never becomes purchase demand, so this tab has no service rows |
+
+**WHAT ADOPTING IT WOULD COST, MEASURED.** The ruled child columns are
+`Category | Unit ID | Deliver To | SKU | Qty | Item`. On this tab:
+
+- **TWO OF THE SIX WOULD BE PERMANENTLY EMPTY.** `Unit ID` reads Stock's allocation and
+  `Deliver To` reads the PO/PO-line result (`GET /api/operation/orders/:id/expansion`). A row a
+  buyer can still ACT on is by definition a row with no purchase order and no allocated unit — a
+  row that has both is a RECEIPT and cannot be ticked. So every actionable line would print
+  `Not allocated` and a constant default destination. **`CLAUDE.md` §10: empty fields do not reach
+  the screen.**
+- **FOUR DECISION COLUMNS WOULD LEAVE THE SCAN PATH.** `Supplier · Ready Stock · On PO · PO No.`
+  are not among the ruled six. `Ready Stock` and `On PO` exist precisely because *a fact is
+  scanned, an act is chosen* (T1.1 · T3 above) — burying them inside a disclosure re-creates the
+  defect those two cards were written to close.
+- **THE SCAN ITSELF WOULD BECOME A CLICK.** The buyer's morning is *tick everything due today*.
+  Order-rows plus expansions turns one pass down a sheet into one expand per order.
+
+**RECOMMENDATION (Carres, evidence-based): KEEP this tab's grid; the ruling stands unchanged on the
+Sales Orders Register.** The shared component carries the ☑ capability and is tested, so the day a
+page genuinely needs a goods child table with line selection — `Manual Purchase`'s create
+workspace is the likely one — it switches on rather than being rebuilt.
+
+**WHAT WOULD OVERTURN IT (the falsifier):** either (a) the owner's intent is the grid restructure
+itself, in which case the four buyer columns need a ruled home before any code moves, or (b)
+`Unit ID` and `Deliver To` gain a pre-purchase meaning on this tab — a planned destination on the
+demand row rather than a PO result — which is a Purchasing business change, not a presentation one.
+
 ---
 
 # §4 · Purchase Orders
