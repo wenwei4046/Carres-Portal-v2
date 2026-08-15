@@ -2556,6 +2556,10 @@ export {
 export * from "./schemas/hr-team";
 export * from "./sales-order-classification";
 export * from "./sales-order-commitment";
+// ONE FIELD CONTRACT — the choices the Sales Portal offers and the emergency
+// contact's three-fields-⇄-one-column codec, shared with the object page so the
+// two surfaces cannot drift (owner ruling 2026-08-15).
+export * from "./sales-order-form";
 // CARD 2 — unit/stock allocation truth: the one arithmetic for "which real
 // Units are reserved/sold to this SO, and what is still unallocated".
 export * from "./sales-order-allocation";

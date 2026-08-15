@@ -3056,6 +3056,15 @@ export interface operationOrderDetailOrder {
    *  `fields.building_type` (delivery-address building type). Optional so
    *  older detail fixtures keep typechecking. */
   entry_data?: Record<string, unknown> | null;
+  /** 0200 — the demographics the Sales Portal asks for. The Sales Order object
+   *  page renders and corrects them (owner ruling 2026-08-15); optional so
+   *  older detail fixtures keep typechecking. */
+  customer_race?: string | null;
+  customer_gender?: string | null;
+  customer_birthday?: string | null;
+  /** 0104 — how many items the salesperson says need carrying up the stairs.
+   *  Null = every item (the legacy "auto" meaning). */
+  delivery_stair_items?: number | null;
   delivery_date: string | null;
   delivery_date_tbd: boolean;
   /** Phase 11.1 (migration 0165) — salesperson-entered planned production-start
@@ -4744,6 +4753,9 @@ export interface SalesOrderAmendment {
   stale: boolean;
   proposed_snapshot: Record<string, unknown>;
   submitted_at: string;
+  /** 0354 — the day the CUSTOMER asked, as the operator was told it. Null on
+   *  a goods proposal and on every amendment written before the field. */
+  customer_asked_on?: string | null;
 }
 
 export function useSalesOrderAmendment(
@@ -4848,13 +4860,20 @@ export function useDecideSalesOrderAmendment(
   });
 }
 
+export interface SubmitAmendmentInput {
+  proposed: AmendmentProposal;
+  reason: string;
+  /** 0354 — `Amend date (from customer)`. Omitted by the goods proposal. */
+  customerAskedOn?: string | null;
+}
+
 export function useSubmitSalesOrderAmendment(
   orderId: string,
   opts?: Partial<
     UseMutationOptions<
       { id: string; base_revision: number; base_contractual_hash: string },
       ApiError,
-      { proposed: AmendmentProposal; reason: string }
+      SubmitAmendmentInput
     >
   >,
 ) {
@@ -4862,7 +4881,7 @@ export function useSubmitSalesOrderAmendment(
   return useMutation<
     { id: string; base_revision: number; base_contractual_hash: string },
     ApiError,
-    { proposed: AmendmentProposal; reason: string }
+    SubmitAmendmentInput
   >({
     mutationFn: (input) =>
       apiFetch<{ id: string; base_revision: number; base_contractual_hash: string }>(
