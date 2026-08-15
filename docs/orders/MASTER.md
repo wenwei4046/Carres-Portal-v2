@@ -117,7 +117,8 @@ keep a superseded target.
 ## Register
 
 - The default business columns are exactly, in order:
-  `SO No | Ordered | Customer Delivery | Customer | Delivery Location | PO No | DO No`.
+  `SO No | Ordered | Customer Delivery | Customer | Delivery Location | Showroom | PO No | DO No`
+  (re-ruled to EIGHT by the owner on 2026-08-15 — see REGISTER AND OBJECT COMPOSITION below).
   The small `▸` is UI chrome, not a business column. There is no invented overall `Current` or
   combined status column.
 - The page has a compact destination header/work toolbar, then a breathing gap, then one light,
@@ -326,6 +327,83 @@ fails OPEN for the same reason; the client gate is the primary UX and the door i
 `ATTACHED_ONLY_CATEGORIES` + `cartHasGoods` in `packages/shared` are the ONE arithmetic both sides
 read (ownership Law D), and `sku-categories.ts` is the ONE catalog join the lead-time floor and the
 goods gate share.
+
+## REGISTER AND OBJECT COMPOSITION — OWNER RULING 2026-08-15 (Chai) · APPROVED / LOCKED
+
+From an authenticated top-to-toe production review at 1364px and 924px. Everything below is
+presentation over facts the Sales Order already owns. **No new writer, no new stored fact, no new
+query.**
+
+### Register
+
+- **The default columns are exactly EIGHT**, in order:
+  `SO No | Ordered | Customer Delivery | Customer | Delivery Location | Showroom | PO No | DO No`.
+  This overwrites the seven-column default in §0.1. `Showroom` READS the Sales-ownership fact the
+  order already carries (`outlets.name`); it has been a declaration in the register's catalog since
+  Stage 1 and is promoted, not invented. It is read-only and the register may never gain a writer
+  for it.
+- **An absence is quieter than a fact.** `Not recorded` / `Not given` keep their words — a blank
+  may never carry two meanings — and render in the secondary token so real document numbers stand
+  out. `No delivery date` is deliberately excluded: it is not a quiet absence but the head of a
+  governed two-line action.
+- **Identity survives horizontal scroll.** When optional columns widen the sheet, the selection,
+  expand and `SO No` columns pin to the left edge. Built as a capability of the register ENGINE, not
+  as a page-local hack — see the correction recorded in `docs/ui/MASTER.md` §4.
+- **The footer speaks the dictionary and counts everything it sees.** Only the governed category
+  words may print, so no unruled abbreviation (`M.P`, a supplier's code) can reach the screen. The
+  previous shape ALSO under-counted: its word list was both the order and the filter, so any label
+  outside it — `Disposal`, any unrecognised accessory — was silently dropped from a tally that
+  claims to describe the filtered result. Anything not positively recognised is now `Other goods`,
+  governed and still counted. The line truncates rather than wrapping (the footer is one line by
+  law) and carries the full sentence in its title.
+- **The search placeholder fits its box.** The box is a governed 200px at every width, so the
+  four-item placeholder clipped on a wide window as well as a narrow one — it was never a
+  breakpoint problem. `Search sales orders…` is the ruled string; the ▽ per-column filters say what
+  each column matches.
+- Everything else in §0.1 stands unchanged: expansion, context menu, all-orders scope, search
+  placement beside Export, no overall status column, the six-column goods expansion, the two-door
+  navigation.
+
+### Sales Order object
+
+- **`More actions` carries `Copy to new Sales Order`.** It opens the SAME route the register's
+  right-click menu already opens — one implementation, two doors. A second copy path would be two
+  record-creating forms for one business act (ownership Law C).
+- **The MONEY card gains ONE read-only door to Payments, scoped to this order.** Sales Order
+  summarises money and may never gain a form for it (Law B), so the one thing it adds is the way
+  out to the desk that owns collection. The scope overrides Payments' `To collect` view on purpose:
+  a settled order must not open an empty desk, because *"the order you asked for is not here"* is
+  the one answer a door may not give. It is clearable through the same chip as every other
+  narrowing.
+- **Identity survives narrow width.** The header identity was ONE truncating span, so below medium
+  desktop it collapsed to a bare icon. The SO number never shrinks; the customer name is the part
+  allowed to truncate away. Identity persists in View AND Edit (§0.1).
+- **The customer-money word is `Outstanding`**, on the object MONEY summary and on the register's
+  MONEY column. It was already the dictionary's word (`CLAUDE.md` §7 — what the CUSTOMER owes HQ).
+  `balance` remains the ruled GOODS word for short-delivery quantity and is untouched. The column
+  KEY stays `balance`: a label is presentation, an identifier is a contract.
+- **No Chinese on an operator screen.** `AutoCount Archive (旧账)` reached the screen through the
+  Edit → Order dealer picker. **The string was never in the code** — it is a `dealers` row, which is
+  why every English-only sweep walked past it. Migration `0353` renames the row; masking one value
+  in the display layer would have left the next one to be found by eye. `dealers` is configuration,
+  which survives go-live (`CLAUDE.md` §6), so the row had to be right. The rename is a display label
+  only; the id, channel and every attributed order are untouched, and the HR scoreable-store
+  exclusion derives from staff, not from that name.
+
+### Order Route — delivery line, re-ruled
+
+`Promised this day, no date yet` is **overwritten**. It named a day and denied it in the same
+breath, and *"this day"* pointed at nothing on screen. The line now states two plain facts owned by
+two different modules:
+
+```
+a promise exists   →  Customer date {formatted date} · Delivery not arranged
+no promise         →  No delivery date          (the same governed value the Register prints)
+```
+
+This explicitly re-rules the 2026-08-14 acceptance wording recorded above; that record's other
+clauses stand. Dates in a route fact are rendered through the ONE date spelling (`fmtDate`), title
+as well as detail.
 
 ## Guided operations and Service Case boundary — CLOSED / PRODUCTION-VERIFIED 2026-08-14
 

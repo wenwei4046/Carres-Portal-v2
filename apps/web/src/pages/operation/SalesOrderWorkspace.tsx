@@ -923,7 +923,20 @@ export default function SalesOrderWorkspace() {
       {mode === "view" && objectView === "Order" && !showRoute && order && order.status !== "cancelled" && (
         <details className="relative">
           <summary className="btn-ghost cursor-pointer list-none text-meta">More actions</summary>
-          <div className="absolute right-0 top-full z-20 mt-1 w-40 rounded-control border border-kit-slate-5 bg-white p-1 shadow-lg">
+          <div className="absolute right-0 top-full z-20 mt-1 w-56 rounded-control border border-kit-slate-5 bg-white p-1 shadow-lg">
+            {/* ⭐ ONE IMPLEMENTATION, TWO DOORS — owner ruling 2026-08-15. Copy
+                already ships on the register's right-click menu and seeds the
+                authoritative create form; the object page reaches the SAME
+                route rather than growing a second copy path (Law C: a door,
+                never a duplicate). */}
+            <button
+              type="button"
+              onClick={() => navigate(`/operation/orders/so/new?copyFrom=${orderId}`)}
+              data-testid="workspace-copy-so"
+              className="w-full rounded-control px-2 py-1.5 text-left text-meta text-base-700 hover:bg-hovertint"
+            >
+              Copy to new Sales Order
+            </button>
             <button type="button" onClick={() => setCancelOpen(true)} data-testid="workspace-cancel-so" className="w-full rounded-control px-2 py-1.5 text-left text-meta text-danger hover:bg-hovertint">Cancel SO</button>
           </div>
         </details>
@@ -1420,13 +1433,35 @@ export default function SalesOrderWorkspace() {
                 <div className="grid grid-cols-3 gap-x-5">
                   <Fact label="Total" value={money.known && money.total != null ? <Money value={money.total} /> : "No price yet"} />
                   <Fact label="Paid" value={<Money value={money.paid} />} />
+                  {/* ⭐ THE CUSTOMER-MONEY WORD IS `Outstanding` — owner ruling
+                      2026-08-15, and it was already the dictionary's (CLAUDE.md
+                      §7: what the CUSTOMER owes HQ). `balance` stays the goods
+                      word for a short-delivery quantity; the two facts were
+                      wearing one label. */}
                   <Fact
-                    label="Balance"
+                    label="Outstanding"
                     value={
                       !money.known ? "No price yet" : money.outstanding > 0 ? <Money value={money.outstanding} /> : "Paid in full"
                     }
                   />
                 </div>
+                {/* ⭐ A DOOR, NEVER A DUPLICATE (ownership Law C). Sales Order
+                    SUMMARISES money and may never gain a form for it — so the
+                    one thing it adds is the way OUT, to the desk that owns
+                    collection, already scoped to this order. Read-only: it
+                    navigates, it writes nothing. */}
+                {!isNew && order && (
+                  <div className="mt-3 border-t border-kit-slate-5 pt-3">
+                    <button
+                      type="button"
+                      data-testid="workspace-open-payments"
+                      className="text-meta font-medium text-kit-blue-11 underline-offset-2 hover:underline"
+                      onClick={() => navigate(`/operation?tab=payments&so=${order.so}`)}
+                    >
+                      Open this order in Payments
+                    </button>
+                  </div>
+                )}
               </Section></div>
 
               {/* ⑦ WHAT THIS CHANGE STARTED ELSEWHERE — 3.4.

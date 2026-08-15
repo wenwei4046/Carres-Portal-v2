@@ -1,6 +1,6 @@
 /**
  * STAGE 1 — the register's catalog, tested as LAW:
- *   · the default row is the card's nine, in the card's order
+ *   · the default row is the owner's EIGHT, in the owner's order
  *   · every field sits in one of the card's eight chooser groups
  *   · role defaults: Operations opens money-hidden, Finance money-visible
  *   · the money columns carry a footer sum (AutoCount's power)
@@ -13,6 +13,10 @@ import {
   DEFAULT_COLUMNS,
   defaultOnFor,
   moneyText,
+  MUTED_ABSENCES,
+  NO_DATE_YET,
+  NOT_GIVEN,
+  NOT_RECORDED,
   REGISTER_FIELDS,
 } from "./sales-order-columns";
 
@@ -48,17 +52,38 @@ const order = (over: Partial<operationOrderListRow> = {}): operationOrderListRow
     ...over,
   }) as operationOrderListRow;
 
-describe("the default row is Stage 1's nine, in Stage 1's order", () => {
-  it("SO No · Customer · Items · Total · Balance · Promised · Ordered · Dealer · Showroom", () => {
+describe("the default row is the owner's EIGHT, in the owner's order", () => {
+  it("SO No · Ordered · Customer Delivery · Customer · Delivery Location · Showroom · PO No · DO No", () => {
     expect(DEFAULT_COLUMNS).toEqual([
       "so",
       "ordered",
       "customer_delivery",
       "customer",
       "delivery_location",
+      "showroom",
       "po_number",
       "do_number",
     ]);
+  });
+
+  /* `Showroom` was promoted, not invented — it has been a declaration in this
+     catalog since Stage 1. The register may never grow a writer for it. */
+  it("Showroom READS the Sales-ownership fact the order already carries", () => {
+    const showroom = REGISTER_FIELDS.find((f) => f.key === "showroom")!;
+    expect(showroom.group).toBe("Sales ownership");
+    expect(showroom.text(buildRegisterRow(order({ outlets: { name: "Carres Kelana Jaya" } })))).toBe(
+      "Carres Kelana Jaya",
+    );
+    expect(showroom.text(buildRegisterRow(order({ outlets: null })))).toBe(NOT_RECORDED);
+  });
+
+  /* An absence is quieter than a fact — the page mutes exactly these two and
+     never `No delivery date`, which heads a governed two-line action. */
+  it("mutes `Not recorded` and `Not given`, and only those", () => {
+    expect(MUTED_ABSENCES.has(NOT_RECORDED)).toBe(true);
+    expect(MUTED_ABSENCES.has(NOT_GIVEN)).toBe(true);
+    expect(MUTED_ABSENCES.has(NO_DATE_YET)).toBe(false);
+    expect(MUTED_ABSENCES.size).toBe(2);
   });
 });
 describe("FIX 2 · Current is a DOCUMENT pointer", () => {

@@ -1091,6 +1091,8 @@ Information Architecture and live in [`ERP-ARCHITECTURE.md`](ERP-ARCHITECTURE.md
 | An SO edit because the CUSTOMER asked for something different | **Customer change** | Amendment · Change request (that is the pending ASK, not the applied change) · Revision (that is the record it mints) |
 | A fulfilment-side substitution/recovery that does not create a new customer transaction | **Fulfilment replacement** | Customer change · Staff correction · Cancel and reorder |
 | Register date promised/requested for the customer | **Customer Delivery** | Promised · Delivery date (as this register header) · Current |
+| Register column of what the customer still owes | **Outstanding** | Balance — re-ruled 2026-08-15; `balance` is the goods word, two rows above |
+| Register column naming the selling showroom | **Showroom** | Outlet · Branch · Store |
 | Register destination summary | **Delivery Location** | Address · Location (ambiguous) · Ship-to |
 | Direct customer-order document identity | **SO No** | Doc. No. · Current |
 | Direct purchase-order document lineage | **PO No** | PO Doc No. · Current |
@@ -1099,6 +1101,33 @@ Information Architecture and live in [`ERP-ARCHITECTURE.md`](ERP-ARCHITECTURE.md
 | Complete immutable versions of one SO | **Revisions** | History · Amendments |
 | Append-only events on one SO | **History** | Revisions · Activity (for this object view) |
 | Fact-derived document/fulfilment/obligation map | **Order Route** | Relationship Map · Journey · Workflow · Checklist · Status |
+
+### The customer-money word is `Outstanding` (owner ruling 2026-08-15)
+
+**`Outstanding` is what the CUSTOMER owes HQ** (`CLAUDE.md` §7). It was already this dictionary's
+word for a column of what is still owed; the ruling ends the last two places that said `Balance` —
+the Sales Order MONEY summary and the register's MONEY column.
+
+**`balance` stays the GOODS word** for what is still owed after a short delivery (the row in the
+canonical vocabulary below). The two facts were wearing one label. A stored key or test id keeps
+its name: renaming a label is a copy decision, renaming an identifier is a breaking change.
+
+| Concept | Canonical word | Do NOT use |
+|---|---|---|
+| What the customer still owes HQ, anywhere on screen | **`Outstanding`** | Balance · Balance owing · Amount due · Owing |
+
+### The Sales Order register and object words (owner ruling 2026-08-15)
+
+| Meaning | Use exactly | Do NOT use |
+|---|---|---|
+| The register's search placeholder | **`Search sales orders…`** | `SO number, customer, phone or item…` — the box is a governed 200px, so the long form clipped at every width, not only a narrow one |
+| The register's eighth default column | **`Showroom`** | Outlet · Branch · Store |
+| The footer's category tally | the governed words only — `Mattress · Bedframe · Sofa · Pillow · Mattress protector · Topper · Footrest · Service · Other goods` | any raw SKU word, and above all `M.P` — the AutoCount sheet's abbreviation. Anything not positively recognised is **`Other goods`**, never dropped from the count |
+| Copy this order into a new one, from the object page | **`Copy to new Sales Order`** | Duplicate · Clone · New from this |
+| The object MONEY card's door to the collections desk | **`Open this order in Payments`** | View payments · Go to Payments · Collect |
+| Payments' chip for that scope | **`Sales Order SO-{n}`** | Filtered by order · Order scope |
+| Order Route, a promise with no trip arranged | **`Customer date {date} · Delivery not arranged`** | `Promised this day, no date yet` — retired 2026-08-15: it named a day and denied it in one line |
+| Order Route, no promise at all | **`No delivery date`** | any second spelling — this is the same governed value the Register prints |
 
 ### The Sales Order entry-gate words (owner ruling 2026-08-15)
 

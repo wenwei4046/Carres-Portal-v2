@@ -81,4 +81,42 @@ describe("Sales Order object template contract", () => {
       expect(workspace).toContain(label);
     }
   });
+
+  /* ── Owner rulings 2026-08-15 (Chai) ──────────────────────────────────── */
+
+  it("reaches the SHIPPED Copy action from More actions — one implementation, two doors", () => {
+    expect(workspace).toContain("Copy to new Sales Order");
+    /* The SAME route the register's context menu opens. A second copy path
+       would be a second record-creating act for one business act (Law C). */
+    expect(workspace).toContain("/operation/orders/so/new?copyFrom=");
+  });
+
+  it("adds one READ-ONLY door to Payments, scoped to this order, and no money form", () => {
+    expect(workspace).toContain("Open this order in Payments");
+    expect(workspace).toContain("tab=payments&so=");
+    /* A summary is read-only forever (Law B) — the door navigates, it never
+       records a payment here. */
+    expect(workspace).not.toContain("Record payment");
+    expect(workspace).not.toContain("Collect $");
+  });
+
+  it("calls the customer's money `Outstanding`, never `Balance`", () => {
+    expect(workspace).toContain('label="Outstanding"');
+    expect(workspace).not.toContain('label="Balance"');
+  });
+
+  it("keeps the SO number visible when the header runs out of room", () => {
+    /* The identity does not shrink; the CUSTOMER is the part allowed to
+       truncate away. One truncating span for both is how the header collapsed
+       to a bare icon below medium desktop. */
+    expect(header).toContain('data-testid="object-identity"');
+    expect(header).toContain('className="shrink-0" data-testid="object-identity"');
+    expect(header).toContain('data-testid="object-identity-customer"');
+  });
+
+  it("puts no Chinese on an operator screen", () => {
+    for (const source of [workspace, header, attribution]) {
+      expect(source).not.toMatch(/[\u4e00-\u9fff]/);
+    }
+  });
 });

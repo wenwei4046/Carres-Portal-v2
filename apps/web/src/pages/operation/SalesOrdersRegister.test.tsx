@@ -124,7 +124,7 @@ describe("FIX 1 · the register asks the SERVER", () => {
 
   it("the typed term reaches useOperationOrders as { search } — the API is asked, not just the loaded rows filtered", async () => {
     mount();
-    const box = screen.getByPlaceholderText("SO number, customer, phone or item…");
+    const box = screen.getByPlaceholderText("Search sales orders…");
     fireEvent.change(box, { target: { value: "  Umi  " } });
     /* The engine debounces 150ms and emits the TRIMMED term; the register
      * must re-call the hook with it. Client-only search would leave every
@@ -140,7 +140,7 @@ describe("FIX 1 · the register asks the SERVER", () => {
 
   it("clearing the box returns the hook to the unfiltered population", async () => {
     mount();
-    const box = screen.getByPlaceholderText("SO number, customer, phone or item…");
+    const box = screen.getByPlaceholderText("Search sales orders…");
     fireEvent.change(box, { target: { value: "Umi" } });
     await waitFor(() => {
       expect(
@@ -249,6 +249,77 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     expect(footer).not.toHaveTextContent("M.P");
     expect(footer).not.toHaveTextContent("Reset layout");
     expect(footer).not.toHaveTextContent("rows");
+  });
+
+  /**
+   * ⭐ THE FOOTER COUNTS EVERYTHING IT SEES, IN THE DICTIONARY'S WORDS.
+   *
+   * Owner ruling 2026-08-15. The tally used to be filtered through the same
+   * array that ordered it, so any word outside that list was silently DROPPED
+   * — an unrecognised accessory vanished from a count that claims to describe
+   * the filtered result. A footer that under-counts is worse than one that
+   * abbreviates: it is a number the operator trusts and cannot reproduce.
+   */
+  it("counts an unrecognised line as `Other goods` instead of dropping it, and prints no raw SKU word", () => {
+    listHookState.data = {
+      orders: [
+        order({
+          order_lines: [
+            { sku: "B1201S-K", qty: 1, unit_price: 2499, label: "B1201S · King" },
+            // Nothing recognises these two — the old whitelist dropped both.
+            { sku: "M.P/QUEEN", qty: 2, unit_price: 129, label: "M.P" },
+            { sku: "Leg 4\"", qty: 5, unit_price: 20, label: "Leg" },
+          ],
+        }),
+      ],
+    };
+    mount();
+    const footer = screen.getByTestId("grid-footer");
+    expect(footer).toHaveTextContent("Mattress 1");
+    /* `M.P/QUEEN` IS positively recognised as a protector — the governed word
+       prints and the sheet's abbreviation never does. */
+    expect(footer).toHaveTextContent("Mattress protector 2");
+    expect(footer).toHaveTextContent("Other goods 5");
+    expect(footer).not.toHaveTextContent("M.P");
+    expect(footer).not.toHaveTextContent("Leg");
+  });
+
+  /**
+   * ⭐ AN ABSENCE IS QUIETER THAN A FACT — owner ruling 2026-08-15.
+   * The words are unchanged; only their weight moves, so search, filter, sort
+   * and Export still read the same string.
+   */
+  it("mutes `Not recorded` in the document columns while a real PO number stays full ink", () => {
+    listHookState.data = {
+      orders: [order({ po_numbers: ["PO-2041"], do_number: null })],
+    };
+    mount();
+    const absences = document.querySelectorAll('[data-absence="true"]');
+    expect(absences.length).toBeGreaterThan(0);
+    for (const el of absences) expect(el.className).toContain("text-kit-slate-9");
+    // The real document is a link, never a muted absence.
+    expect(screen.getByText("PO-2041").closest("[data-absence]")).toBeNull();
+  });
+
+  /* The re-ruled EIGHTH default column, read-only, no new writer. */
+  it("shows Showroom as a default column between Delivery Location and PO No", () => {
+    listHookState.data = { orders: [order({ outlets: { name: "Carres Kelana Jaya" } })] };
+    mount();
+    const headers = [...screen.getByTestId("grid-header").querySelectorAll("th")].map((th) =>
+      (th.textContent ?? "").trim(),
+    );
+    const business = headers.filter(Boolean);
+    expect(business.map((h) => h.replace(/[AV]$/, "").trim())).toEqual([
+      "SO No",
+      "Ordered",
+      "Customer Delivery",
+      "Customer",
+      "Delivery Location",
+      "Showroom",
+      "PO No",
+      "DO No",
+    ]);
+    expect(screen.getByText("Carres Kelana Jaya")).toBeInTheDocument();
   });
 
   it("shows only the customer name in the default cell while retaining phone search context", () => {

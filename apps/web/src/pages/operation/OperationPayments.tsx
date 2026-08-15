@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -385,6 +386,7 @@ function inQueue(r: Row, q: QueueKey): boolean {
 
 export default function OperationPayments() {
   const qc = useQueryClient();
+  const [params, setParams] = useSearchParams();
   const [view, setView] = useState<"owing" | "all">("owing");
   const [facetOpen, setFacetOpen] = useState(true);
   const [queueFilter, setQueueFilter] = useState<Set<QueueKey>>(new Set());
@@ -517,10 +519,22 @@ export default function OperationPayments() {
     });
   }, [data, today]);
 
-  const baseRows = useMemo(
-    () => (view === "all" ? rows : rows.filter(isOwingRow)),
-    [rows, view],
-  );
+  /**
+   * ⭐ THE SALES ORDER'S DOOR INTO THIS DESK — owner ruling 2026-08-15.
+   *
+   * `?so=1318` scopes the desk to ONE order. It is a READ scope and nothing
+   * else: no writer, no new query, no second money truth — the Sales Order
+   * summarises money and this page owns collection (ownership Law C).
+   *
+   * The scope overrides the `To collect` view on purpose. An order that is
+   * already paid in full would otherwise open to an empty desk, and "the
+   * order you asked for is not here" is the one answer a door may not give.
+   */
+  const scopedSo = params.get("so");
+  const baseRows = useMemo(() => {
+    if (scopedSo) return rows.filter((r) => String(r.so) === scopedSo);
+    return view === "all" ? rows : rows.filter(isOwingRow);
+  }, [rows, view, scopedSo]);
 
   const visible = useMemo(() => {
     let r = baseRows;
@@ -591,6 +605,22 @@ export default function OperationPayments() {
 
   // ── Active chips (each multi-select pick = one ✕-able chip) ─────────────────
   const activeChips: ActiveChip[] = [];
+  /* The Sales Order scope wears the SAME chip as every other narrowing, so the
+     operator can see it and clear it with the control they already know. */
+  if (scopedSo) {
+    activeChips.push({
+      label: `Sales Order SO-${scopedSo}`,
+      onClear: () =>
+        setParams(
+          (prev) => {
+            const next = new URLSearchParams(prev);
+            next.delete("so");
+            return next;
+          },
+          { replace: true },
+        ),
+    });
+  }
   for (const q of queueFilter) {
     const def = QUEUES.find((x) => x.key === q);
     activeChips.push({
@@ -607,6 +637,14 @@ export default function OperationPayments() {
     setQueueFilter(new Set());
     setPayFilter(new Set());
     setRegionFilter(new Set());
+    setParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("so");
+        return next;
+      },
+      { replace: true },
+    );
   };
 
   if (isError) {
