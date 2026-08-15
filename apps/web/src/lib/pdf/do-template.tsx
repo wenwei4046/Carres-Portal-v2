@@ -33,6 +33,7 @@
  */
 
 import { Document, Image, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
+import { displayCustomerName } from "@/lib/customer-name";
 import { NOTO_SANS_SC_FAMILY } from "./fonts/noto";
 import { CARRES_COMPANY } from "./letterhead";
 import type { DoTemplateData } from "./types";
@@ -306,7 +307,7 @@ export function DoTemplate(data: DoTemplateData) {
             <Text style={styles.blockLabel}>Deliver To</Text>
             <View style={{ marginTop: mm(1.5) }}>
               {([
-                ["Name", customer.name],
+                ["Name", displayCustomerName(customer.name)],
                 ["Address", deliveryAddress],
                 ["Tel", customer.phone],
                 /* who the driver calls when the customer is unreachable */
@@ -475,7 +476,7 @@ export function DoTemplate(data: DoTemplateData) {
           <View style={styles.signZone}>
             <View style={styles.signBox}>
               {podSigned ? <Image src={pod!.signature_url!} style={styles.signImage} /> : null}
-              <Text style={styles.signCaption}>Customer Signature · {customer.name}</Text>
+              <Text style={styles.signCaption}>Customer Signature · {displayCustomerName(customer.name)}</Text>
             </View>
           </View>
           <Text style={styles.ackLine}>

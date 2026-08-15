@@ -1347,18 +1347,34 @@ which is also why it must have ONE home: a name shown three ways on three screen
 customers. `displayCustomerName()` in `@/lib/customer-name`, and no page-local copy. The one
 that existed — `properCase` in To Order — had the WRONG rule and is deleted.
 
-**Where it applies:** the Register's Customer column and its search, filter and export · the
-object header and CUSTOMER card · Payments · Order Route · Activity · Work rows · the Quick
-Rail's Team, Calendar and Work peeks · the Delivery workspace. Everywhere the portal shows an
-operator a customer's name.
+**Where it applies — EVERY surface that names a customer, owner ruling 2026-08-15.** The
+Register's Customer column and its search, filter and export · the object header and CUSTOMER
+card · Payments · Order Route · Activity · Work rows · the Quick Rail's Team, Calendar and Work
+peeks · the Delivery workspace · **the WhatsApp greeting** · **every PDF document**.
 
-**Where it does NOT apply, and the boundary is deliberate.** An EDIT field stays on the raw
-stored value — a cased input writes its casing back to the record on save, which is the one
-thing this rule forbids. And `titleCaseName()` in `wa-templates.ts` answers a different
-question — how to address a human politely in a message we are about to send them — so it keeps
-softening `LEE WEI YANG` to `Lee Wei Yang`. **These two are not duplicates and must not be
-merged without an owner ruling on the greeting**, because that ruling changes customer-facing
-copy, not an internal screen.
+**The WhatsApp greeting obeys the same rule.** `titleCaseName()` used to soften `LEE WEI YANG`
+into `Lee Wei Yang` for politeness. The owner ruled it out, because the same guess that softens
+a shouted name also turns `KJ NG` into `Kj Ng` — **and a message addressed to `Kj` is addressed
+to nobody.** The function is DELETED rather than re-pointed at the shared helper: a second name
+for one rule is how two rules come back. `salutationOf()` calls `displayCustomerName`, and the
+preferred-name field still wins over both.
+
+**A PDF prints what the screen prints,** and the helper is applied **in the TEMPLATE, not in the
+payload each caller assembles.** That placement is the rule, not an implementation detail: there
+are many doors into a document — the workspace, Payments, a regenerated historical PDF — and a
+rule applied at each door is a rule that one new door will miss. Applied at the render, every
+door and every later regeneration passes through it. A document whose casing disagrees with the
+register it was raised from reads as a different customer.
+
+**The ONE place it does not apply, and the boundary is deliberate: an EDIT field.** An input
+stays on the raw stored value, because a cased field writes its casing back to the record on
+save — which is the one thing this rule forbids. Display-only means display-only.
+
+**Enforcement is structural.** `wa-templates.test.ts` asserts the module exports no second
+casing entry point. `pdf/customer-name-display.test.ts` scans every `*-template.tsx` source —
+not a render, because a render test only sees the branches its fixture reaches, and a signature
+caption is exactly the branch a fixture forgets — and fails if any customer name reaches a
+render unwrapped.
 
 ## ⭐ NO RELATIVE DATE WORDS — owner ruling 2026-08-15, portal-wide
 

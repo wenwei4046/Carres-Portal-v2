@@ -26,11 +26,19 @@
  * also why it must live in ONE file: a name shown three ways on three screens
  * reads as three customers.
  *
- * **Not for a WhatsApp greeting.** `titleCaseName` in `wa-templates.ts` answers
- * a different question — how to address a human politely in a message we are
- * about to send them — and it deliberately softens `LEE WEI YANG` to
- * `Lee Wei Yang`. That is customer-facing copy under its own rule. These two are
- * not duplicates and must not be merged without an owner ruling on the greeting.
+ * **This is the ONLY name-casing rule in the portal — owner ruling 2026-08-15.**
+ * It reaches the screen, the WhatsApp greeting and the PDF alike. `titleCaseName`
+ * in `wa-templates.ts` used to soften `LEE WEI YANG` to `Lee Wei Yang` for a
+ * greeting; the owner ruled that out, because the same guess that softens a
+ * shouted name also rewrites `KJ NG` into `Kj Ng` — and a message addressed to
+ * `Kj` is addressed to nobody. That function is deleted, not re-pointed: a
+ * second entry point is how two rules come back.
+ *
+ * **A PDF prints what the screen prints.** The helper is applied in the PDF
+ * TEMPLATE rather than in the payload each caller assembles, so every door into
+ * a document — and every historical document regenerated later — passes through
+ * the one rule. A document whose casing disagrees with the register it was
+ * raised from reads as a different customer.
  */
 
 /**
