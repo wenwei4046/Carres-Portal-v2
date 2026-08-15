@@ -248,13 +248,23 @@ function toGridColumn(
            Who must act, whose phone to call, what to ask and what to write
            down ride the hover (`guidance.detail`) and the Sales Order
            workspace panel — they are not cell-sized facts, and the expand
-           has exactly one job (CLAUDE.md §2: the order's own goods). */
+           has exactly one job (CLAUDE.md §2: the order's own goods).
+
+           ⭐ 13 / 11 — owner ruling 2026-08-15. Line 1 keeps the governed body
+           13 semibold; line 2 moves from `text-meta` (12) to `text-label` (11)
+           at regular weight. One point of separation was not enough to read as
+           a second RANK — the two lines looked like one wrapped sentence, and
+           the whole point of the grammar is that the eye takes the fact first
+           and the instruction second. the colour token is unchanged, and
+           `text-base-600` measures 8.6:1 on the white row — so the quieter line
+           stays well clear of the §5 lock's accessible contrast floor at the
+           smaller size rather than being rescued by it. */
         return (
           <span className="block min-w-0" title={guidance.detail}>
             <span data-attention="warning" className="block truncate font-semibold text-kit-amber-11">
               {guidance.problem}
             </span>
-            <span className="block truncate text-meta font-normal text-base-600">
+            <span className="block truncate text-label font-normal text-base-600">
               {guidance.action}
             </span>
           </span>

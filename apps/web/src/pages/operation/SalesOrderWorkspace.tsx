@@ -52,6 +52,7 @@ import Money from "@/components/Money";
 import { apiFetch, ApiError } from "@/lib/api";
 import { cjkClassName } from "@/lib/cjk";
 import { fmtDate } from "@/lib/fmt-date";
+import { displayCustomerName } from "@/lib/customer-name";
 import { renderSalesOrderPdf } from "@/lib/pdf/render";
 import type { SalesOrderTemplateData } from "@/lib/pdf/types";
 import {
@@ -992,7 +993,7 @@ export default function SalesOrderWorkspace() {
   const missingDateAction = order && !order.delivery_date
     ? missingDeliveryDateGuidance({
         so: order.so,
-        customer: order.customer_name,
+        customer: displayCustomerName(order.customer_name),
         salesperson: order.salespersons?.name,
         phone: order.customer_phone,
       })
@@ -1002,7 +1003,10 @@ export default function SalesOrderWorkspace() {
     <div className="flex h-full min-h-0 flex-col">
       <SalesOrderTabs
         identity={soWord}
-        customer={order?.customer_name}
+        /* Capitalize up — owner ruling 2026-08-15. Display only; the
+           `Name` INPUT below stays on the raw draft value, because a
+           cased edit field would write the casing back to the record. */
+        customer={displayCustomerName(order?.customer_name)}
         onBack={(event) => {
           if (!confirmDiscard()) event.preventDefault();
         }}
@@ -1196,7 +1200,7 @@ export default function SalesOrderWorkspace() {
                   <div className="grid grid-cols-2 gap-x-5 gap-y-3">
                     <Fact label="Name" value={
                       <span className={cjkClassName(displayHeader(mode, viewedRevision, order, "customer_name"))}>
-                        {displayHeader(mode, viewedRevision, order, "customer_name") || "—"}
+                        {displayCustomerName(displayHeader(mode, viewedRevision, order, "customer_name")) || "—"}
                       </span>
                     } />
                     <Fact label="Phone" value={displayHeader(mode, viewedRevision, order, "customer_phone") || "Not given"} />
@@ -1483,7 +1487,9 @@ export default function SalesOrderWorkspace() {
                     <details open className="mb-4 rounded-control border border-kit-slate-5 bg-kit-amber-3 p-3">
                       <summary className="cursor-pointer list-none">
                         <span className="block text-body font-semibold text-kit-amber-11">{missingDateAction.problem}</span>
-                        <span className="block text-meta font-normal text-base-600">{missingDateAction.action}</span>
+                        {/* 13 / 11 — the governed two-line grammar (ui/MASTER.md
+                            §5, owner ruling 2026-08-15). */}
+                        <span className="block text-label font-normal text-base-600">{missingDateAction.action}</span>
                       </summary>
                       <dl className="mt-3 grid gap-2 border-t border-kit-slate-5 pt-3 sm:grid-cols-2">
                         {[

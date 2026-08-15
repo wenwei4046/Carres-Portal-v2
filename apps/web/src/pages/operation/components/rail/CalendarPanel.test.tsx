@@ -24,6 +24,7 @@ vi.mock("@/lib/queries", () => ({
 }));
 
 import CalendarPanel from "./CalendarPanel";
+import { fmtDate } from "@/lib/fmt-date";
 
 // 2026-07-27 is a Monday — so "This week" runs Mon 27 Jul → Sat 1 Aug.
 const TODAY = "2026-07-27";
@@ -247,15 +248,25 @@ describe("CalendarPanel — NO RELATIVE DATE WORDS (owner ruling 2026-08-15)", (
     expect(screen.getByTestId("calendar-range-week").textContent).toContain("This week");
   });
 
-  it("a chip keeps the full ruled date on hover", () => {
+  it("a single-day chip needs NO hover — its face carries the ruled date", () => {
+    // THE YEAR RULE (owner ruling 2026-08-15) put the full ruled date on the
+    // chip itself. A hover could then only repeat it or say less, and a
+    // tooltip that says less than the thing it explains is a defect.
     render(<CalendarPanel />);
-    expect(screen.getByTestId("calendar-range-today").getAttribute("title")).toBe("27 Jul 26");
+    const chip = screen.getByTestId("calendar-range-today");
+    expect(chip.getAttribute("title")).toBeNull();
+    expect(chip.textContent).toContain(fmtDate(TODAY));
+  });
+
+  it("a SPAN chip keeps its hover — `This week` names no date", () => {
+    render(<CalendarPanel />);
+    expect(screen.getByTestId("calendar-range-week").getAttribute("title")).toMatch(/ – /);
   });
 
   it("the day heading prints the weekday + date, never `TODAY ·`", () => {
     h.orders = [confirmed(TODAY, { so: 1207 })];
     render(<CalendarPanel />);
-    expect(within(day(TODAY)!).getByText("Mon, 27 Jul 26")).toBeTruthy();
+    expect(within(day(TODAY)!).getByText(fmtDate(TODAY))).toBeTruthy();
   });
 
   it("`Today` and `Tomorrow` appear nowhere on the panel", () => {

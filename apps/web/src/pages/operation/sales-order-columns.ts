@@ -30,6 +30,7 @@
  *   No date yet    a promise with no date on it
  */
 import { fmtDate } from "@/lib/fmt-date";
+import { displayCustomerName } from "@/lib/customer-name";
 import type { operationOrderListRow } from "@/lib/queries";
 import {
   digits,
@@ -97,7 +98,11 @@ export function buildRegisterRow(o: operationOrderListRow): RegisterRow {
     o,
     id: o.id,
     so: o.so,
-    customer: o.customer_name,
+    /* ⭐ CAPITALIZE UP — owner ruling 2026-08-15. Cased ONCE here, at the
+       row, so the Customer column, the guidance sentence, the search, the
+       filter and the CSV export cannot print the name four ways. Display
+       only: `o.customer_name` is untouched and nothing is written back. */
+    customer: displayCustomerName(o.customer_name),
     phone,
     items: itemsSummary(o),
     promised: o.delivery_date_tbd ? null : (o.delivery_date ?? null),

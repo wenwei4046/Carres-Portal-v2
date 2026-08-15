@@ -15,5 +15,9 @@ export default defineConfig({
     environment: "jsdom",
     include: ["src/**/*.{test,spec}.{ts,tsx}"],
     setupFiles: ["./src/test/setup.ts"],
+    /* Must sit above `asyncUtilTimeout` in setup.ts, or a slow render fails as
+       a TEST timeout before the wait budget it was given can run out. */
+    testTimeout: 20_000,
+    hookTimeout: 20_000,
   },
 });

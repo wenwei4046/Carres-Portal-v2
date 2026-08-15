@@ -58,6 +58,15 @@ a seventh cannot be written without editing the config.
 
 **Numbers and codes** use `tabular-nums` so a column of figures lines up.
 **Dates** are `fmtDate()` and nothing else — a second date spelling is a defect.
+It prints `Wed, 12 Aug`, and the year only when it is not the current year
+(`Fri, 15 Jan 27`) — THE YEAR RULE, owner ruling 2026-08-15, recorded in
+`COPY-STANDARD.md`.
+
+**The two-line action grammar is 13 / 11** — `text-body` semibold over
+`text-label` at `font-normal` (owner ruling 2026-08-15). Two tokens one step
+apart do not read as two ranks; these two do. The law itself is
+`ui/MASTER.md` §5 — this row exists so the ramp above is not read as leaving
+the pairing open.
 
 ---
 

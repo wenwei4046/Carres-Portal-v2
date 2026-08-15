@@ -32,6 +32,7 @@ import { apiFetch } from "@/lib/api";
 import { cjkClassName } from "@/lib/cjk";
 import { rm } from "@/lib/format-currency";
 import { fmtDate } from "@/lib/fmt-date";
+import { displayCustomerName } from "@/lib/customer-name";
 import { orderStatusPill } from "@/lib/status-pill";
 import { useOrderPayments, useRecordPayment } from "@/lib/queries";
 import { renderReceiptPdf } from "@/lib/pdf/render";
@@ -487,7 +488,8 @@ export default function OperationPayments() {
       return {
         id: r.id,
         so: r.so,
-        customer: r.customer_name,
+        /* Capitalize up, once at the row — owner ruling 2026-08-15. */
+        customer: displayCustomerName(r.customer_name),
         phone: r.customer_phone,
         region: regionBucket(r.customer_address ?? null),
         ref: (r.source_ref ?? []).filter(Boolean),
