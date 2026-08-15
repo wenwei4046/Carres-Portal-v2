@@ -1100,6 +1100,21 @@ Information Architecture and live in [`ERP-ARCHITECTURE.md`](ERP-ARCHITECTURE.md
 | Append-only events on one SO | **History** | Revisions · Activity (for this object view) |
 | Fact-derived document/fulfilment/obligation map | **Order Route** | Relationship Map · Journey · Workflow · Checklist · Status |
 
+### The Sales Order entry-gate words (owner ruling 2026-08-15)
+
+Two rules refuse an order at entry, and each refusal names what is wrong and exactly how to fix it
+(the Error pattern above). **`(TBD)`, `Confirm later` and `For Further Notice` are RETIRED** — a
+new Sales Order always carries a real Customer Delivery date.
+
+| Meaning | Use exactly | Do NOT use |
+|---|---|---|
+| Step 3's standing note under the date picker | **`Ask the customer for the date before you save the order. An order without a delivery date cannot be filed.`** | Confirm later · TBD · For Further Notice · Optional |
+| The wizard refuses a dateless step | **`Delivery date — ask the customer for the date, then pick it`** | `Delivery — pick a date, or tick 'Confirm later'` |
+| The wizard refuses a missing production start | **`Proceed date — pick the day production should start`** | …`or tick 'Confirm later'` |
+| The create door refuses a dateless order | **`Delivery date is required. Ask the customer for the date before you save the order.`** | `delivery date is required unless marked TBD` |
+| The cart refuses a service-only order | **`This order has no product — add the product this service belongs to`** | Invalid cart · Nothing to sell · Add an item |
+| The create door refuses a service-only order | **`A Sales Order must contain a product. Add the product this service belongs to, or open a Service Case instead.`** | Bad request · Service not allowed |
+
 ### The Sales Order amendment words
 
 | Meaning | Use exactly |

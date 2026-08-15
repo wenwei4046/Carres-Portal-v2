@@ -23,6 +23,13 @@ const env = {
   STAFF_SESSION_SECRET,
 };
 
+/** A date safely past any configurable earliest-sell floor. */
+const isoIn = (days: number): string => {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+};
+
 const DEALER_A = "00000000-0000-0000-0000-000000000d01";
 const DEALER_B = "00000000-0000-0000-0000-000000000d02";
 const OUTLET_1 = "00000000-0000-0000-0000-00000000ee01";
@@ -216,8 +223,9 @@ function createBody(over: Record<string, unknown> = {}) {
       billingSame: true,
       emergency: "Tan Junior · 012-9988776 · Spouse",
     },
-    // TBD date — skips the server lead-time floor entirely.
-    delivery: { date: null, proceedDate: null, dateTbd: true, floor: 1, hasLift: false },
+    // A date far past the lead-time floor. It used to be TBD, which the
+    // 2026-08-15 owner ruling retired: a new Sales Order is never dateless.
+    delivery: { date: isoIn(400), proceedDate: isoIn(0), dateTbd: false, floor: 1, hasLift: false },
     lines: [{ sku: "mattress:carres-classic:queen", qty: 1, attrs: null, unitPrice: 1500 }],
     addons: [],
     paid: 750,

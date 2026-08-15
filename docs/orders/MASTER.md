@@ -280,6 +280,53 @@ carries the distinction and the screen discards it.
 `Estimated delivery` does not exist as a stored fact today and is not invented by this ruling; it
 enters the fallback only where Purchasing/Delivery already own the facts it derives from.
 
+## THE SALES PORTAL ENTRY GATE — OWNER RULING 2026-08-15 (Chai) · APPROVED / LOCKED
+
+**Two things must be true before Operation may receive a Sales Order.** Both are enforced in the
+wizard AND at the create door, because a rule that lives only in the browser is a rule a stale tab
+can break.
+
+### 1 · Customer Delivery is mandatory at order entry
+
+**If the date is not confirmed with the customer, Operation must not receive the order.** The
+`(TBD)` / `Confirm later` option is REMOVED from the new-order wizard's Step 3; a real date
+respecting the existing earliest-sell floor is required to submit. `createOrderInputSchema` refuses
+`dateTbd: true` and refuses a missing `delivery.date`, so `POST /api/orders` answers 400 with
+*"Delivery date is required. Ask the customer for the date before you save the order."*
+
+This closes the gap the THREE DELIVERY DATES ruling above exposed from the other end. That ruling
+says the Register must stop attributing OUR silence to the customer; this one stops minting the
+silence. **Together they mean `delivery_date_tbd` describes only orders taken before 2026-08-15.**
+
+- **Legacy no-date orders are untouched.** They stay readable, keep the governed `No delivery date`
+  value with its two-line guidance, and keep `POST /orders/:id/date` + `ConfirmDateModal` as the
+  door that closes them. Nothing is backfilled, repaired or cleaned up — every current row is test
+  data and go-live starts clean (`CLAUDE.md` §6).
+- **The retired flag stays on the wire.** `WizardDraft.delivery.dateTbd` and the
+  `CreateOrderInput` field remain in the shape so old sessionStorage drafts still parse;
+  `loadDraft` normalises a restored `true` to `false`, and nothing sets it any more.
+
+### 2 · A Sales Order must contain goods; service never sells alone
+
+**A service line must attach to a product on the same order.** A cart of nothing but
+service/guarantee lines is refused at submit — in the cart drawer, at the last gate before
+CONFIRM, and at the create door with 422 `goods_required`. **Standalone service belongs to the
+Service channel**, which already owns that intake (`Report a problem` → Service Case).
+
+This GENERALISES the Guarantee attachment law (`docs/guarantee/MASTER.md`: *"a guarantee only
+sells attached to the item it covers"*). It does not weaken it: `guarantee` is one of the two
+attachment-only categories, so a guarantee still cannot be the whole order.
+
+**The recognition is POSITIVE, and that is the rule, not an implementation detail.** Only a line
+the catalog positively resolves to `service` or `guarantee` may be refused; an unresolved,
+legacy or not-yet-catalogued SKU counts as GOODS. The inverse would make every uncatalogued line
+silently unsellable — the same failure `line-category.ts` D9 exists to stop. A catalog read error
+fails OPEN for the same reason; the client gate is the primary UX and the door is defence in depth.
+
+`ATTACHED_ONLY_CATEGORIES` + `cartHasGoods` in `packages/shared` are the ONE arithmetic both sides
+read (ownership Law D), and `sku-categories.ts` is the ONE catalog join the lead-time floor and the
+goods gate share.
+
 ## Guided operations and Service Case boundary — CLOSED / PRODUCTION-VERIFIED 2026-08-14
 
 - A missing Customer Delivery date uses the governed two-line action grammar in the Register:

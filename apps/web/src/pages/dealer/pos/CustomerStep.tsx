@@ -18,7 +18,7 @@ import { composeAddress } from "@/data/malaysia-postcodes";
 import { useStaffSession } from "@/lib/staff";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
 import { useCustomerSearch, useCustomerTypeProbe, type CustomerSearchHit } from "@/lib/queries";
-import { step2FirstDisposalIssue, step3DateValid, type WizardDraft } from "../new-order/draft";
+import { cartGoodsIssue, step2FirstDisposalIssue, step3DateValid, type WizardDraft } from "../new-order/draft";
 import Step3Delivery from "../new-order/Step3Delivery";
 import BirthdayWheelField from "./date-keyin/BirthdayWheelField";
 import AddonsPanel, { offerableAddons } from "./AddonsPanel";
@@ -282,6 +282,10 @@ export default function CustomerStep({
     return (
       step3DateValid(draft, minLeadDays) &&
       step2FirstDisposalIssue(draft) === null &&
+      /* ⛔ A SALES ORDER MUST CONTAIN GOODS (owner ruling 2026-08-15) — the
+         cart drawer refuses it first; the last gate before CONFIRM refuses it
+         again for a cart edited after the drawer closed. */
+      cartGoodsIssue(draft, catalog) === null &&
       customsValid(targetTab)
     );
   }

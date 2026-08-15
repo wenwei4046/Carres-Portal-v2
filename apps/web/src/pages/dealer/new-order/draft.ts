@@ -1,8 +1,10 @@
 import {
+  cartHasGoods,
   ORDER_ENTRY_TABS,
   resolveFormTab,
   resolvePaymentMethods,
   STRIPE_METHOD_KEY,
+  type CatalogResponse,
   type FormFieldsConfig,
   type PaymentMethodConfig,
 } from "@carres/shared";
@@ -201,9 +203,13 @@ export interface WizardDraft {
   delivery: {
     date: string;
     // Phase 11.1 (Loo) — salesperson-entered planned production-start
-    // ("Proceed") date. Paired with `date` via the same `dateTbd` toggle
-    // (both-or-neither). Must be on/before `date`. Empty string = not picked.
+    // ("Proceed") date. Paired with `date` (both-or-neither) and must be
+    // on/before it. Empty string = not picked.
     proceedDate: string;
+    /** ⛔ RETIRED 2026-08-15 (Jess) — nothing sets this to `true` any more.
+     *  The field stays in the shape so `CreateOrderInput` keeps its wire
+     *  contract and old sessionStorage drafts still parse; `loadDraft`
+     *  normalises it to `false` on restore. */
     dateTbd: boolean;
     floor: number;
     hasLift: boolean;
@@ -341,6 +347,13 @@ export function loadDraft(storageKey: string = DRAFT_STORAGE_KEY): WizardDraft |
     // draft never had, breaking save/load round-trip equality).
     const delivery = {
       ...parsed.delivery,
+      // ⛔ 2026-08-15 (Jess) — "Confirm later" is retired. A draft saved from
+      // the old wizard may still carry `dateTbd: true`; restoring it as-is
+      // would put the salesperson in front of a disabled picker with no way
+      // to clear it, and the create door would refuse the submit. Normalise
+      // on restore: the date fields keep whatever was typed, the retired flag
+      // does not survive.
+      dateTbd: false,
       // Phase 11.1 — backfill proceedDate for drafts saved before this field
       // existed, so old in-flight drafts restore cleanly.
       proceedDate:
@@ -502,6 +515,38 @@ export function step2Valid(d: WizardDraft): boolean {
   return true;
 }
 
+/**
+ * ⛔ A SALES ORDER MUST CONTAIN GOODS — owner ruling 2026-08-15.
+ *
+ * `docs/guarantee/MASTER.md` already gates one category this way (*"a
+ * guarantee only sells attached to the item it covers"*); the ruling
+ * generalises it to the whole cart. A service with no product on the same
+ * order is not a sale — it is a Service Case, and it belongs to the Service
+ * channel.
+ *
+ * **Positive recognition only** (the same rule `line-category.ts` applies to
+ * accessories): a SKU the catalog cannot resolve counts as GOODS, so a
+ * not-yet-catalogued line never blocks a real sale. With no catalog in hand
+ * the gate is silent — the create door re-runs it against the catalog and is
+ * the authority.
+ *
+ * Returns the reason, or `null` when the cart is sellable.
+ */
+export function cartGoodsIssue(
+  d: WizardDraft,
+  catalog?: CatalogResponse | null,
+): string | null {
+  if (!catalog || d.lines.length === 0) return null;
+  const categoryBySku = new Map<string, string>();
+  const modelById = new Map(catalog.models.map((m) => [m.id, m]));
+  for (const s of catalog.skus) {
+    const category = modelById.get(s.modelId)?.category;
+    if (category) categoryBySku.set(s.sku, category);
+  }
+  if (cartHasGoods(d.lines.map((l) => categoryBySku.get(l.sku)))) return null;
+  return "This order has no product — add the product this service belongs to";
+}
+
 /** Returns the first failing sized addon's display label, or null when
  *  every sized-addon unit has a size. Used by the wizard footer to surface a
  *  specific reason rather than a generic "Continue" disabled state. */
@@ -525,8 +570,9 @@ export function step2FirstDisposalIssue(d: WizardDraft): string | null {
  * from the cart's categories — see shared `maxLeadDaysFor`) so this module
  * stays catalog-agnostic.
  *
- *   - TBD is accepted (order parks in Place until a real date is entered)
- *   - Otherwise the picked date must be on/after today + minLeadDays
+ * ⛔ 2026-08-15 (Jess) — **the date is mandatory.** "Confirm later" is retired:
+ * if the date is not confirmed with the customer, Operation must not receive
+ * the order. The picked date must still be on/after today + minLeadDays.
  */
 export function step3DateValid(d: WizardDraft, minLeadDays: number, today: Date = new Date()): boolean {
   return step3DateFirstIssue(d, minLeadDays, today) === null;
@@ -537,8 +583,9 @@ export function step3DateFirstIssue(
   minLeadDays: number,
   today: Date = new Date(),
 ): string | null {
-  if (d.delivery.dateTbd) return null;
-  if (!d.delivery.date) return "Delivery — pick a date, or tick 'Confirm later'";
+  if (!d.delivery.date) {
+    return "Delivery date — ask the customer for the date, then pick it";
+  }
   if (minLeadDays > 0) {
     const min = new Date(today);
     min.setDate(min.getDate() + minLeadDays);
@@ -550,10 +597,9 @@ export function step3DateFirstIssue(
   // Phase 11.1 (Loo) — the salesperson must ALSO commit a proceed
   // (production-start) date whenever a delivery date is set. It can't be in the
   // past and can't be after the delivery date (you don't start building after
-  // you've promised delivery). TBD orders skip this (handled by the early
-  // return above) — both dates get filled in later via the confirm-date flow.
+  // you've promised delivery).
   if (!d.delivery.proceedDate) {
-    return "Proceed date — pick when production should start, or tick 'Confirm later'";
+    return "Proceed date — pick the day production should start";
   }
   const todayIso = today.toISOString().slice(0, 10);
   if (d.delivery.proceedDate < todayIso) {

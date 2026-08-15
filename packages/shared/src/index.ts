@@ -21,6 +21,9 @@ export {
   MAX_DELIVERY_FLOOR,
   EARLIEST_SELL_GATED_CATEGORIES,
   maxLeadDaysFor,
+  // Owner ruling 2026-08-15 — a Sales Order must contain goods.
+  ATTACHED_ONLY_CATEGORIES,
+  cartHasGoods,
   minDeliveryDateISO,
   // 0169-0173 — Product & Maintenance rebuild.
   PRODUCT_CATEGORIES,

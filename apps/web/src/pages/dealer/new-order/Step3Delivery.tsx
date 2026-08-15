@@ -16,8 +16,14 @@ import { fmtChipDate } from "../pos/date-keyin/date-keyin";
  *   - Mattress + Bedframe SKUs gate at 14 days
  *   - Sofa SKUs gate at 21 days
  *   - When cart has mixed categories, the longest lead wins
- *   - "Confirm later" (TBD) still allowed — order parks in Place until a
- *     real date is entered later
+ *
+ * ⛔ 2026-08-15 (Jess) — **"Confirm later" is GONE.** The delivery date is a
+ * PROMISE to the customer (`docs/orders/MASTER.md` — THE THREE DELIVERY
+ * DATES), and if the date is not confirmed with the customer, Operation must
+ * not receive the order. The step cannot be passed without a real date, and
+ * `createOrderInputSchema` refuses a dateless order at the door as well.
+ * Legacy no-date orders keep their governed `No delivery date` rendering and
+ * their ConfirmDateModal until they close — nothing is rewritten.
  *
  * 2026-07-12 (Loo) — the "As Fast As Possible" pill is REMOVED. The dealer
  * always picks explicit dates; the `delivery.asap` draft flag stays in the
@@ -76,8 +82,8 @@ export default function Step3Delivery({ draft, onChange, catalog, minLeadDays }:
             : undefined
         }
       >
-        <div className="grid grid-cols-[1fr_auto] gap-3.5 items-end">
-          <Field label={d.dateTbd ? "Delivery date (TBD)" : "Delivery date *"}>
+        <div>
+          <Field label="Delivery date *">
             <CalendarDateField
               value={d.date}
               onChange={(iso) =>
@@ -87,7 +93,6 @@ export default function Step3Delivery({ draft, onChange, catalog, minLeadDays }:
               }
               minIso={minDate}
               todayIso={todayIso}
-              disabled={d.dateTbd}
               ariaLabel="Pick delivery date"
               footNote={
                 minLeadDays > 0 ? (
@@ -101,35 +106,23 @@ export default function Step3Delivery({ draft, onChange, catalog, minLeadDays }:
               testId="delivery-date-input"
             />
           </Field>
-          <div className="pb-2.5">
-            <InlineCheckbox
-              label="Confirm later"
-              checked={d.dateTbd}
-              onChange={(v) =>
-                // Phase 11.1 — TBD covers BOTH dates (clear proceed date too).
-                setD({
-                  dateTbd: v,
-                  date: v ? "" : d.date,
-                  proceedDate: v ? "" : d.proceedDate,
-                  asap: v ? false : d.asap,
-                })
-              }
-            />
-          </div>
+          <p className="text-[11px] text-base-500 mt-1.5" data-testid="delivery-date-required-note">
+            Ask the customer for the date before you save the order. An order
+            without a delivery date cannot be filed.
+          </p>
         </div>
 
         {/* Phase 11.1 (Loo) — Proceed date = the day production should START.
             Picked deliberately so we don't pull stock too early for a far-out
             delivery. Bounded today..deliveryDate. Hidden value when TBD. */}
         <div className="mt-3.5">
-          <Field label={d.dateTbd ? "Proceed date · production start (TBD)" : "Proceed date · production start *"}>
+          <Field label="Proceed date · production start *">
             <CalendarDateField
               value={d.proceedDate}
               onChange={(iso) => setD({ proceedDate: iso, asap: false })}
               minIso={todayIso}
               maxIso={d.date || undefined}
               todayIso={todayIso}
-              disabled={d.dateTbd}
               ariaLabel="Pick proceed date"
               footNote={
                 d.date ? (
@@ -149,13 +142,6 @@ export default function Step3Delivery({ draft, onChange, catalog, minLeadDays }:
             before the delivery date.
           </p>
         </div>
-
-        {d.dateTbd && (
-          <div className="rounded bg-warning-soft text-warning px-3 py-2.5 text-xs font-body mt-2.5">
-            ⓘ Order will sit in <strong>Place</strong> until you confirm a date — it can't move
-            to <em>Proceed</em> without one.
-          </div>
-        )}
       </Section>
     </div>
   );
@@ -194,24 +180,3 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-function InlineCheckbox({
-  label,
-  checked,
-  onChange,
-}: {
-  label: string;
-  checked: boolean;
-  onChange: (v: boolean) => void;
-}) {
-  return (
-    <label className="inline-flex items-center gap-2 cursor-pointer text-[12px]">
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-        className="w-4 h-4"
-      />
-      {label}
-    </label>
-  );
-}
