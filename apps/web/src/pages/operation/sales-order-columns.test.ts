@@ -71,9 +71,17 @@ describe("the default row is the owner's EIGHT, in the owner's order", () => {
   it("Showroom READS the Sales-ownership fact the order already carries", () => {
     const showroom = REGISTER_FIELDS.find((f) => f.key === "showroom")!;
     expect(showroom.group).toBe("Sales ownership");
+    /* The cell prints the PLACE (owner ruling 2026-08-15): every showroom is
+     * ours and the column already says `Showroom`, so the house name only
+     * clipped the part that identifies the branch. Display only — the outlet's
+     * registered name is untouched, and `Deliver To` deliberately keeps its
+     * `Carres ` because there it separates our warehouse from a partner's. */
     expect(showroom.text(buildRegisterRow(order({ outlets: { name: "Carres Kelana Jaya" } })))).toBe(
-      "Carres Kelana Jaya",
+      "Kelana Jaya",
     );
+    /* A showroom without the prefix is printed as it stands, never stripped
+     * into nothing. */
+    expect(showroom.text(buildRegisterRow(order({ outlets: { name: "Kepong" } })))).toBe("Kepong");
     expect(showroom.text(buildRegisterRow(order({ outlets: null })))).toBe(NOT_RECORDED);
   });
 
