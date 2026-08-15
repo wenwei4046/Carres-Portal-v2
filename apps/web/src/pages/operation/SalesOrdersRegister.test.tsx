@@ -523,7 +523,7 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
       "Category", "Unit ID", "Deliver To", "SKU", "Qty", "Item",
     ]);
     const row = screen.getByTestId("expanded-good-B1201S-K");
-    expect(row).toHaveTextContent("MATTRESS");
+    expect(row).toHaveTextContent("Mattress");
     expect(row).toHaveTextContent("id-001");
     expect(row).toHaveTextContent("id-002");
     expect(row).toHaveTextContent("B1201S-K");
@@ -567,9 +567,66 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     };
     mount();
     fireEvent.click(screen.getByRole("button", { name: "Expand row" }));
-    expect(screen.getByText("MATTRESS")).toBeInTheDocument();
+    expect(screen.getByText("Mattress")).toBeInTheDocument();
     expect(screen.getByText("Not allocated")).toBeInTheDocument();
-    expect(screen.queryByText("OTHER GOODS")).not.toBeInTheDocument();
+    expect(screen.queryByText(/other goods/i)).not.toBeInTheDocument();
+  });
+
+  /**
+   * ⭐ THE CHILD BOX BEGINS AT `SO No` — owner ruling 2026-08-15.
+   *
+   * The indent is the parent-child link, and it is the TABLE's own column
+   * layout that draws it: one real EMPTY cell per gutter column, then the box
+   * spanning the data columns with no padding of its own. A computed
+   * `padding-left` was tried and measured wrong — `width` on a `<td>` is a
+   * hint, and this grid stretches its columns to fill the frame, so the 30px
+   * ☐ and 32px ▸ render 41 and 43 at 1440 and a 62px padding lands 22px short.
+   */
+  it("starts the expansion at the first data column, with the gutter left empty", () => {
+    mount();
+    fireEvent.click(screen.getByRole("button", { name: "Expand row" }));
+    const gutter = screen.getAllByTestId(/^grid-expansion-gutter-/);
+    expect(gutter.map((c) => c.dataset.testid)).toEqual([
+      "grid-expansion-gutter-__select__",
+      "grid-expansion-gutter-__expand__",
+    ]);
+    for (const cell of gutter) expect(cell).toBeEmptyDOMElement();
+    /* Eight default business columns; the gutter is not one of them, and the
+       box's right edge is therefore the parent table's. */
+    expect(screen.getByTestId("grid-expansion-cell")).toHaveAttribute("colspan", "8");
+    expect(screen.getByTestId("grid-expansion-cell")).toHaveStyle({ padding: "0px" });
+  });
+
+  /**
+   * ⭐ TWO TYPE LEVELS, AND A REGISTER SELECTS NOTHING (owner rulings
+   * 2026-08-15). The header is the parent header's own 11px grey; every value
+   * is 13px `text-body`; and no child row on a TRUTH register may carry a
+   * checkbox — the parent row's tick already scopes Export, and a second tick
+   * inside the box would claim the register can act on one line.
+   */
+  it("prints the child header at 11px with no checkbox, and every value at 13px", () => {
+    mount();
+    fireEvent.click(screen.getByRole("button", { name: "Expand row" }));
+    const goods = screen.getByRole("table", { name: "Goods on SO-1303" });
+    for (const header of within(goods).getAllByRole("columnheader")) {
+      expect(header.className).toContain("text-label");
+      expect(header.className).toContain("text-base-500");
+    }
+    expect(within(goods).queryByRole("checkbox")).not.toBeInTheDocument();
+    expect(within(goods).getAllByRole("rowgroup")[1].className).toContain("text-body");
+  });
+
+  /** An absence keeps its word and loses its weight — inside the box too. */
+  it("mutes the governed absences in the child table", () => {
+    listHookState.data = { orders: [order({ order_lines: [
+      { id: "line-1", sku: "B1201S-K", qty: 1, unit_price: 2499, label: "B1201S · King" },
+    ] })] };
+    expansionHookState.data = { lines: [] };
+    mount();
+    fireEvent.click(screen.getByRole("button", { name: "Expand row" }));
+    const goods = screen.getByRole("table", { name: "Goods on SO-1303" });
+    expect(within(goods).getByText("Not allocated")).toHaveAttribute("data-absence", "true");
+    expect(within(goods).getByText("Not recorded")).toHaveAttribute("data-absence", "true");
   });
 
   it("uses a dash for Service Unit ID and routing instead of inventing a non-applicable state", () => {

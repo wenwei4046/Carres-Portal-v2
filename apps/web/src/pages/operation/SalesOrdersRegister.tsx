@@ -59,6 +59,7 @@ import type { DoTemplateData, SalesOrderTemplateData } from "@/lib/pdf/types";
 import { useOperationOrders, useSalesOrderExpansion } from "@/lib/queries";
 import CancelSalesOrderDialog from "./CancelSalesOrderDialog";
 import DestinationHeader from "./DestinationHeader";
+import GoodsMiniTable, { categoryWord, type GoodsMiniLine } from "./components/GoodsMiniTable";
 import { lineConfigBits } from "../dealer/new-order/special-addons-picker";
 import { isRental, lineName, type MoneyState } from "./sales-order-facts";
 import {
@@ -323,21 +324,25 @@ function toGridColumn(
  * ▸ EXPAND HAS EXACTLY ONE JOB (CLAUDE.md §2): the order's own lines, each
  * with its name, quantity and price — a fixed sub-table, not a second grid
  * engine. The reader who needs more opens the document.
+ *
+ * The BOX is `GoodsMiniTable`, written once and shared; this function's whole
+ * job is turning one order into the strings that box prints. A truth register
+ * passes no `selection`, so the ☑ column does not exist here (owner ruling
+ * 2026-08-15: a register selects nothing).
  */
 function ExpandedLines({ row }: { row: RegisterRow }) {
   const lines = row.o.order_lines ?? [];
   const addons = row.o.order_addons ?? [];
   const expansion = useSalesOrderExpansion(row.o.id);
   if (lines.length === 0 && addons.length === 0) {
-    return <div className="px-10 py-2 text-meta text-base-500">No items on this order</div>;
+    return <div className="px-2 py-2 text-body text-base-500">No items on this order</div>;
   }
   const categoryOf = (line: (typeof lines)[number]) => {
     const fromAttrs = typeof line.attrs?.category === "string" ? line.attrs.category : "";
     const fromSku = line.sku.includes(":") ? line.sku.split(":", 1)[0] : "";
     const classified = lineClass(line.sku);
     const classifiedLabel = classified === "acc" ? "Accessory" : classified === "unknown" ? "Other goods" : classified;
-    const category = fromAttrs || fromSku || classifiedLabel;
-    return category.replace(/[_-]+/g, " ").toUpperCase();
+    return categoryWord(fromAttrs || fromSku || classifiedLabel);
   };
   const configOf = (line: (typeof lines)[number]) => {
     const attrs = line.attrs ?? {};
@@ -363,32 +368,48 @@ function ExpandedLines({ row }: { row: RegisterRow }) {
     return facts;
   };
   const factsByLine = new Map((expansion.data?.lines ?? []).map((l) => [l.lineId, l]));
+  /* The goods lines, then the services — the same order the document prints. */
+  const miniLines: GoodsMiniLine[] = [
+    ...lines.map((line, index): GoodsMiniLine => {
+      const fact = factsByLine.get(line.id ?? "");
+      const detail = configOf(line);
+      return {
+        key: line.id ?? `${line.sku}-${index}`,
+        testId: `expanded-good-${line.sku}`,
+        category: categoryOf(line),
+        unitIds: fact?.unitIds ?? [],
+        unitAbsence: "Not allocated",
+        /* A single destination prints its name alone; only a SPLIT earns the
+           quantity, because `×1` on a one-route line is noise. */
+        deliverTo: (fact?.deliverTo ?? []).map((d) =>
+          (fact?.deliverTo.length ?? 0) > 1 ? `${d.name} ×${d.qty}` : d.name,
+        ),
+        deliverToAbsence: expansion.isLoading ? "Loading…" : "Not recorded",
+        sku: line.sku,
+        qty: line.qty,
+        item: lineName(line),
+        ...(detail.length ? { itemDetail: detail.join(" · ") } : {}),
+        selectable: true,
+      };
+    }),
+    /* A Service buys nothing from a factory and allocates no Unit — the
+       dash is the shipped ruling here, not an invented `Not applicable`. */
+    ...addons.map((addon, index): GoodsMiniLine => ({
+      key: `addon-${index}`,
+      category: "Service",
+      unitIds: [],
+      unitAbsence: "—",
+      deliverTo: [],
+      deliverToAbsence: "—",
+      sku: addon.addon_key ?? "",
+      qty: addon.qty,
+      item: addon.addon_key?.replace(/[_-]+/g, " ") ?? "Add-on",
+      selectable: false,
+    })),
+  ];
   return (
-    <div className="px-10 py-3" data-testid="row-expansion">
-      <div className="overflow-x-auto rounded-control border border-base-200 bg-white">
-        <table className="w-full min-w-[860px] table-fixed text-left text-body" aria-label={`Goods on SO-${row.o.so}`}>
-          <colgroup><col className="w-28" /><col className="w-36" /><col className="w-52" /><col className="w-36" /><col className="w-16" /><col /></colgroup>
-          <thead className="border-b border-base-200 bg-base-50 text-label font-semibold text-base-600">
-            <tr>{["Category", "Unit ID", "Deliver To", "SKU", "Qty", "Item"].map((label) => <th key={label} className="px-3 py-2">{label}</th>)}</tr>
-          </thead>
-          <tbody className="divide-y divide-base-100">
-            {lines.map((line, index) => {
-              const fact = factsByLine.get(line.id ?? "");
-              return <tr key={line.id ?? `${line.sku}-${index}`} data-testid={`expanded-good-${line.sku}`} className="align-top">
-                <td className="px-3 py-2 text-label font-semibold text-base-600">{categoryOf(line)}</td>
-                <td className="px-3 py-2 font-mono text-meta">{fact?.unitIds.length ? fact.unitIds.map((id) => <div key={id}>{id}</div>) : "Not allocated"}</td>
-                <td className="px-3 py-2">{fact?.deliverTo.length ? fact.deliverTo.map((d) => <div key={`${d.name}-${d.qty}`}>{fact.deliverTo.length > 1 ? `${d.name} ×${d.qty}` : d.name}</div>) : expansion.isLoading ? "Loading…" : "Not recorded"}</td>
-                <td className="px-3 py-2 font-mono text-meta">{line.sku}</td>
-                <td className="px-3 py-2 tabular-nums">{line.qty}</td>
-                <td className="px-3 py-2"><div className="font-medium text-base-900">{lineName(line)}</div>{configOf(line).length ? <div className="mt-0.5 text-meta text-base-600">{configOf(line).join(" · ")}</div> : null}</td>
-              </tr>;
-            })}
-            {addons.map((addon, index) => <tr key={`addon-${index}`} className="align-top">
-              <td className="px-3 py-2 text-label font-semibold text-base-600">SERVICE</td><td className="px-3 py-2">—</td><td className="px-3 py-2">—</td><td className="px-3 py-2 font-mono text-meta">{addon.addon_key}</td><td className="px-3 py-2 tabular-nums">{addon.qty}</td><td className="px-3 py-2">{addon.addon_key?.replace(/[_-]+/g, " ") ?? "Add-on"}</td>
-            </tr>)}
-          </tbody>
-        </table>
-      </div>
+    <div data-testid="row-expansion">
+      <GoodsMiniTable label={`Goods on SO-${row.o.so}`} lines={miniLines} />
     </div>
   );
 }
