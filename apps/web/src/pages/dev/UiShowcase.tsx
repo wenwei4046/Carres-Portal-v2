@@ -52,6 +52,7 @@ import Textarea from "@/components/kit/Textarea";
 import Toast from "@/components/kit/Toast";
 import Tooltip from "@/components/kit/Tooltip";
 import { Z_LADDER } from "@/components/kit/overlay-layer";
+import { fmtDate } from "@/lib/fmt-date";
 import {
   ICON_STROKE,
   RADII,
@@ -146,7 +147,10 @@ const DEMO_IDENTITY: IdentitySlot = {
   persistentFacts: [
     { label: "Customer", value: "Tan Wei Ming" },
     { label: "Ref", value: <span className="font-mono">SO-1256</span> },
-    { label: "Promised", value: "Sun, 27 Jul 26" },
+    /* Through the formatter, never a literal — the showcase is the law's own
+       mirror, and a hard-coded date here quietly outlived the 2026-08-15
+       year ruling AND named 27 Jul 2026 a Sunday when it is a Monday. */
+    { label: "Promised", value: fmtDate("2026-07-27") },
     { label: "Outstanding", value: "RM 2,000" },
   ],
 };
@@ -858,7 +862,7 @@ export default function UiShowcase() {
             </Card>
             <Card>
               <div className="flex flex-col gap-8">
-                <Sample label="a date — the canonical Sun, 19 Jul 26, from fmtDate()">
+                <Sample label={`a date — the canonical ${fmtDate("2026-07-19")}, from fmtDate(); the year shows only off-year`}>
                   <div className="w-full">
                     <DatePicker id="ui-date" label="Delivery date" value={date} onChange={setDate} />
                   </div>

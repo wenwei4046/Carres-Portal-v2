@@ -23,7 +23,8 @@ import {
 import { orderBookingDay } from "@/lib/order-booking";
 import { cjkClassName } from "@/lib/cjk";
 import { locationForAddress } from "@/lib/region";
-import { fmtDate, fmtDateShort, fmtDayChip } from "@/lib/fmt-date";
+import { fmtDate, fmtDateShort } from "@/lib/fmt-date";
+import { displayCustomerName } from "@/lib/customer-name";
 
 /**
  * CalendarPanel — right-rail Calendar (Jess COO ask, extended 2026-07-23):
@@ -54,15 +55,20 @@ import { fmtDate, fmtDateShort, fmtDayChip } from "@/lib/fmt-date";
  * `Tomorrow` are only true on the day they are read — they rot in a
  * screenshot and re-sort themselves overnight — so the delivery word table's
  * existing ban now reaches the rail as well. `This week` stays: it is a SPAN,
- * not a day, and no date can spell it. The chip carries the compact form and
- * its hover carries the full ruled date.
+ * not a day, and no date can spell it.
+ *
+ * **The chip now carries the SAME string as every other date (owner ruling
+ * 2026-08-15, THE YEAR RULE).** It used to need its own compact spelling
+ * because the year would not fit; the year is no longer printed for a
+ * current-year date, so the chip's form and the portal's form are one string
+ * and `fmtDayChip` is deleted.
  */
 const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"];
 
 /** The chip's own text. A single-day range names its day; the span keeps the
  *  one ruled span word. This is the only place the three chips are worded. */
 function rangeChipLabel(key: DeliveryRangeKey, fromIso: string): string {
-  return key === "week" ? "This week" : fmtDayChip(fromIso);
+  return key === "week" ? "This week" : fmtDate(fromIso);
 }
 
 
@@ -130,7 +136,7 @@ export default function CalendarPanel() {
       const entry: DayDelivery = {
         orderId: o.id,
         so: o.so,
-        customer: o.customer_name,
+        customer: displayCustomerName(o.customer_name),
         partnerId: carrier.id,
         partnerName: carrier.name,
         kind: booking.kind,
@@ -232,9 +238,13 @@ export default function CalendarPanel() {
                 const [y, m] = r.fromIso.split("-").map(Number);
                 if (y && m) setView({ y, m: m - 1 });
               }}
+              /* A SPAN still needs its hover — `This week` names no date.
+                 A single-day chip does NOT: THE YEAR RULE (owner ruling
+                 2026-08-15) put the full ruled date on the chip face, so a
+                 hover could only ever repeat it or, worse, say less. */
               title={
                 r.fromIso === r.toIso
-                  ? fmtDateShort(r.fromIso)
+                  ? undefined
                   : `${fmtDateShort(r.fromIso)} – ${fmtDateShort(r.toIso)}`
               }
               className={`flex-1 flex items-center justify-center gap-1 rounded-lg px-2 py-1 text-label font-semibold transition-colors ${

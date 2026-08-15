@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { describeActivity } from "./activity-display";
+import { fmtDate } from "@/lib/fmt-date";
 
 /**
  * SALES ORDER V2 · CARD 4 closing slice (0347) — money leaves a trace on the
@@ -114,7 +115,7 @@ describe("describeActivity — no internal enum reaches the screen", () => {
       action: "order.date_changed",
       detail: { field: "delivery_date", from: "2026-07-27", to: "2026-08-28" },
     });
-    expect(d.body).toBe("Mon, 27 Jul 26 → Fri, 28 Aug 26");
+    expect(d.body).toBe(`${fmtDate("2026-07-27")} → ${fmtDate("2026-08-28")}`);
   });
 
   it("prints money with its currency and its two decimals", () => {
@@ -156,7 +157,7 @@ describe("describeActivity — an absent value reads as words, never a dash", ()
       action: "order.field_changed",
       detail: { field: "logistic_eta", from: "2026-07-21", to: null },
     });
-    expect(d.body).toBe("Tue, 21 Jul 26 → No logistics' date");
+    expect(d.body).toBe(`${fmtDate("2026-07-21")} → No logistics' date`);
   });
 
   it("no `—` survives on either side of the arrow", () => {

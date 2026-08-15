@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { SalesOrderSnapshot } from "@/lib/queries";
 import { describeRevisionChanges } from "./sales-order-revisions";
+import { fmtDate } from "@/lib/fmt-date";
 
 const snap = (over: Partial<SalesOrderSnapshot>): SalesOrderSnapshot => ({
   header: {
@@ -27,7 +28,9 @@ describe("describeRevisionChanges — + added · − removed · old → new", ()
       snap({}),
       snap({ header: { customer_name: "Kimmy", delivery_date: "2026-09-05", delivery_floor: 1 } }),
     );
-    expect(out).toEqual(["Promised delivery: Sun, 30 Aug 26 → Sat, 5 Sep 26"]);
+    expect(out).toEqual([
+      `Promised delivery: ${fmtDate("2026-08-30")} → ${fmtDate("2026-09-05")}`,
+    ]);
   });
 
   it("added / removed / qty lines carry their signs", () => {

@@ -275,17 +275,12 @@ function workStateOf(po: operationPoListRow, today: string): WorkState {
 // speaks the same presets and the same Custom Date Range.
 
 /**
- * `Fri 7 Aug` — a rail day row's word (Loo, 2026-08-06 · §2.4: weekday + date
- * on EVERY row, one format; never a bare weekday, never Today/Tomorrow; the
- * full date stays on the hover). Composed from the portal's own two date
- * spellings so no third format is invented. To Order's rail holds the same
- * one-line compose; merging the two copies belongs to a card that owns both
- * pages — this one may not touch To Order.
+ * `Fri, 7 Aug` — a rail day row's word. `railDayLabel` is DELETED (owner ruling
+ * 2026-08-15): it composed a no-year date by slicing the weekday off `fmtDate`
+ * and regexing the year off `fmtDateShort`, which is a fourth date spelling
+ * built out of two others. THE YEAR RULE makes the no-year form the formatter's
+ * own answer, so the rail calls `fmtDate` like everything else.
  */
-function railDayLabel(iso: string): string {
-  return `${fmtDate(iso).slice(0, 3)} ${fmtDateShort(iso).replace(/ \d{2}$/, "")}`;
-}
-
 /** The document's quiet control — one recipe, spelled once (§6.6). */
 /** Pane hide/expand chevron — one recipe, spelled once (§6.6). */
 const PANE_BTN =
@@ -1505,7 +1500,7 @@ export default function OperationPurchaseOrders() {
             {callCalendar.days.map((d) => (
               <RailItem
                 key={d.dayIso}
-                label={railDayLabel(d.dayIso)}
+                label={fmtDate(d.dayIso)}
                 count={d.count}
                 active={calSel === `day:${d.dayIso}`}
                 onClick={() =>

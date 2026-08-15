@@ -13,6 +13,7 @@ import { MemoryRouter, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { operationOrderListRow } from "@/lib/queries";
 import SalesOrdersRegister from "./SalesOrdersRegister";
+import { fmtDate } from "@/lib/fmt-date";
 
 let listHookState: {
   data: { orders: operationOrderListRow[] } | undefined;
@@ -250,6 +251,75 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     );
     expect(cell).toHaveTextContent("Confirm delivery date");
     expect(screen.queryByText("No date yet")).not.toBeInTheDocument();
+  });
+
+  /* ⭐ THE TWO-LINE GRAMMAR IS 13 / 11 — owner ruling 2026-08-15, held here so
+     the sizes cannot drift back. ui/MASTER.md §5 locks the RANKS (fact above
+     action, body above supporting); this asserts the tokens that carry them. */
+  it("ranks the guidance cell 13 / 11 — body semibold over label regular", () => {
+    listHookState.data = { orders: [order({
+      delivery_date: null,
+      delivery_date_tbd: true,
+      customer_name: "Kimmy",
+      salespersons: { name: "Shasha" },
+    })] };
+    mount();
+
+    // Line 1 — the FACT. Governed body 13 (inherited from the row) at
+    // semibold, in the warning ink the §5 lock reserves for it.
+    const problem = screen.getByText("No delivery date");
+    expect(problem.className).toContain("font-semibold");
+    expect(problem.className).not.toContain("text-meta");
+    expect(problem.className).not.toContain("text-label");
+
+    // Line 2 — the ACTION. `text-label` is 11px, and `font-normal` overrides
+    // that token's own 500 down to regular weight, exactly as ruled.
+    const action = screen.getByText("Confirm delivery date");
+    expect(action.className).toContain("text-label");
+    expect(action.className).toContain("font-normal");
+    // The retired size, named so a revert is caught rather than merely absent.
+    expect(action.className).not.toContain("text-meta");
+  });
+
+  /* ⭐ CUSTOMER NAME — CAPITALIZE UP ONLY, owner ruling 2026-08-15. */
+  it("capitalizes a lowercase customer name and leaves existing capitals alone", () => {
+    listHookState.data = {
+      orders: [
+        order({ id: "a", so: 1, customer_name: "jimmy" }),
+        order({ id: "b", so: 2, customer_name: "mei emi" }),
+        order({ id: "c", so: 3, customer_name: "KJ NG" }),
+        order({ id: "d", so: 4, customer_name: "LIM KUAN YANG" }),
+      ],
+    };
+    mount();
+    expect(screen.getByText("Jimmy")).toBeInTheDocument();
+    expect(screen.getByText("Mei Emi")).toBeInTheDocument();
+    // Initials and an all-capitals name survive untouched — the rule raises a
+    // first letter and never lowers one.
+    expect(screen.getByText("KJ NG")).toBeInTheDocument();
+    expect(screen.getByText("LIM KUAN YANG")).toBeInTheDocument();
+    expect(screen.queryByText("Kj Ng")).not.toBeInTheDocument();
+    expect(screen.queryByText("Lim Kuan Yang")).not.toBeInTheDocument();
+    // Display only — nothing is written back to the record.
+    expect(listHookState.data.orders.map((o) => o.customer_name)).toEqual([
+      "jimmy", "mei emi", "KJ NG", "LIM KUAN YANG",
+    ]);
+  });
+
+  /* ⭐ THE YEAR RULE — owner ruling 2026-08-15. */
+  it("prints a current-year date without its year and an off-year date with it", () => {
+    const thisYear = new Date().getFullYear();
+    listHookState.data = {
+      orders: [
+        order({ id: "a", so: 1, delivery_date: `${thisYear}-08-12`, delivery_date_tbd: false }),
+        order({ id: "b", so: 2, delivery_date: `${thisYear + 1}-01-15`, delivery_date_tbd: false }),
+      ],
+    };
+    mount();
+    expect(screen.getByText(fmtDate(`${thisYear}-08-12`))).toBeInTheDocument();
+    expect(fmtDate(`${thisYear}-08-12`)).not.toMatch(/\d{2}$/);
+    expect(screen.getByText(fmtDate(`${thisYear + 1}-01-15`))).toBeInTheDocument();
+    expect(fmtDate(`${thisYear + 1}-01-15`)).toMatch(/ \d{2}$/);
   });
 
   it("collapses duplicate city and state into one concise locality", () => {
