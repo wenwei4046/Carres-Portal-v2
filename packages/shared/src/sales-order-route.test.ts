@@ -1,283 +1,584 @@
 import { describe, expect, it } from "vitest";
-import { resolveSalesOrderRoute, type SalesOrderRouteInput } from "./sales-order-route";
+import {
+  resolveSalesOrderRoute,
+  type RoutePurchaseOrder,
+  type SalesOrderRouteInput,
+} from "./sales-order-route";
+import type { AllocationUnit } from "./sales-order-allocation";
 
-const input = (): SalesOrderRouteInput => ({
-  order: {
-    id: "order-1",
-    so: 1318,
-    placedAt: "2026-08-01T03:00:00Z",
-    deliveryDate: "2026-08-20",
-    doNumber: "DO-130826-0031",
-    dispatchedAt: "2026-08-13T02:00:00Z",
-    deliveredAt: null,
-    invoiceNo: "INV-1318",
-  },
-  revisions: [1, 2],
-  lineLabels: { "BED-A": "Cloud Bed", "SOFA-B": "Haven Sofa" },
-  allocation: {
-    orderId: "order-1",
-    soRef: "SO-1318",
-    lines: [
-      {
-        sku: "BED-A",
-        committedQty: 1,
-        reservedUnits: [],
-        soldUnits: [{
-          id: "unit-bed",
-          unitCode: "id-bed000001",
-          sku: "BED-A",
-          status: "sold",
-          condition: "new",
-          warehouseId: "wh-1",
-          poNo: "PO-8001",
-          qty: 1,
-          dateIn: "2026-08-10",
-          soldAt: "2026-08-13T04:00:00Z",
-        }],
-        reservedQty: 0,
-        soldQty: 1,
-        outstandingQty: 0,
-      },
-      {
-        sku: "SOFA-B",
-        committedQty: 2,
-        reservedUnits: [{
-          id: "unit-sofa",
-          unitCode: "id-sofa00001",
-          sku: "SOFA-B",
-          status: "reserved",
-          condition: "new",
-          warehouseId: "wh-2",
-          poNo: "PO-8002",
-          qty: 1,
-          dateIn: "2026-08-12",
-        }],
-        soldUnits: [],
-        reservedQty: 1,
-        soldQty: 0,
-        outstandingQty: 1,
-      },
-    ],
-    unmatchedUnits: [],
-    totals: { committedQty: 3, reservedQty: 1, soldQty: 1, outstandingQty: 1 },
-  },
-  purchaseOrders: [
-    {
-      id: "PO-8001",
-      currentFact: "Fully received",
-      etaDate: "2026-08-10",
-      supplierDoNumber: "SDO-81",
-      lines: [{ sku: "BED-A", qty: 1, receivedQty: 1 }],
-    },
-    {
-      id: "PO-8002",
-      currentFact: "In production at supplier",
-      etaDate: "2026-08-18",
-      supplierDoNumber: null,
-      lines: [{ sku: "SOFA-B", qty: 2, receivedQty: 1 }],
-    },
-  ],
-  receivingRecords: [],
-  delivery: {
-    booking: { date: "2026-08-15", slot: "10:00–12:00", partnerName: "Amy Logistics" },
-    attempts: [
-      {
-        id: "attempt-1",
-        attemptNo: 1,
-        result: "failed",
-        reason: "Customer unavailable",
-        doNumber: "DO-130826-0031",
-        scheduledDate: "2026-08-13",
-        recordedAt: "2026-08-13T05:00:00Z",
-      },
-    ],
-  },
-  money: { known: true, total: 4500, paid: 3000, outstanding: 1500 },
-  refunds: [{ id: "refund-1", amount: 200, status: "approved", requestedAt: "2026-08-12" }],
-  loans: [{
-    id: "loan-1",
-    label: "Display sofa",
-    status: "returned",
-    source: "supplier",
-    loanNoteNo: "LN-91",
-    loanedAt: "2026-08-02",
-    returnedAt: "2026-08-09",
-    returnedToSupplierAt: null,
-  }],
-  cases: [{ id: "case-1", caseNo: "SC2608-01", closed: false, openedAt: "2026-08-11" }],
-  claims: [],
-  work: [{ id: "work-1", module: "purchasing", title: "Review PO quantity", state: "open", createdAt: "2026-08-12" }],
+/* ─────────────────────────────────────────────────────────────────────────────
+ * Fixtures. Every scenario in the owner's matrix is built from these three
+ * helpers so a test reads as the situation it describes.
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+const unit = (over: Partial<AllocationUnit> & { id: string }): AllocationUnit => ({
+  unitCode: null,
+  sku: "BED-A",
+  status: "reserved",
+  condition: "new",
+  warehouseId: "wh-1",
+  poNo: null,
+  qty: 1,
+  dateIn: "2026-08-12",
+  ...over,
 });
 
-describe("resolveSalesOrderRoute", () => {
-  it("keeps split fulfilment as simultaneous goods positions", () => {
+const line = (over: Partial<SalesOrderRouteInput["allocation"]["lines"][number]> & { sku: string }) => ({
+  committedQty: 1,
+  reservedUnits: [],
+  soldUnits: [],
+  reservedQty: 0,
+  soldQty: 0,
+  outstandingQty: 0,
+  ...over,
+});
+
+const po = (over: Partial<RoutePurchaseOrder> & { id: string }): RoutePurchaseOrder => ({
+  issuedAt: "2026-08-13",
+  expectedReadyDate: null,
+  lines: [],
+  ...over,
+});
+
+function input(over: Partial<SalesOrderRouteInput> = {}): SalesOrderRouteInput {
+  return {
+    order: {
+      id: "order-1",
+      so: 1319,
+      customerName: "LIM KUAN YANG",
+      placedAt: "2026-08-12",
+      deliveryDate: "2026-09-24",
+      deliveredAt: null,
+    },
+    lineLabels: { "B1201S": "B1201S · King" },
+    lineDestinations: {},
+    cancelledLines: [],
+    allocation: {
+      orderId: "order-1",
+      soRef: "SO-1319",
+      lines: [
+        line({
+          sku: "B1201S",
+          committedQty: 3,
+          reservedUnits: [unit({ id: "u1", unitCode: "UNT-8821", sku: "B1201S" })],
+          reservedQty: 1,
+          outstandingQty: 2,
+        }),
+      ],
+      unmatchedUnits: [],
+      totals: { committedQty: 3, reservedQty: 1, soldQty: 0, outstandingQty: 2 },
+    },
+    purchaseOrders: [po({ id: "PO-2048", lines: [{ sku: "B1201S", qty: 2, receivedQty: 0 }] })],
+    receivingRecords: [],
+    delivery: { booking: null, attempts: [] },
+    money: { known: true, outstanding: 1249, holds: true },
+    cases: [],
+    claims: [],
+    ...over,
+  };
+}
+
+const track = (route: ReturnType<typeof resolveSalesOrderRoute>, key: string) =>
+  route.tracks.find((t) => t.key === key)!;
+const requirement = (route: ReturnType<typeof resolveSalesOrderRoute>, id: string) =>
+  route.release.requirements.find((r) => r.id === id)!;
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * Layer 1 — ORDER TRACKS
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+describe("ORDER TRACKS", () => {
+  it("always renders exactly four tracks, in the ruled order, and never merges them", () => {
     const route = resolveSalesOrderRoute(input());
-    const goods = route.lanes.find((lane) => lane.key === "goods")!;
-
-    expect(goods.groups.map((group) => group.title)).toEqual(["Cloud Bed · 1", "Haven Sofa · 2"]);
-    expect(goods.groups[0]!.facts.map((fact) => fact.title)).toEqual([
-      "Delivered · Unit id-bed000001",
-    ]);
-    expect(goods.groups[1]!.facts.map((fact) => fact.title)).toEqual([
-      "At Carres · Unit id-sofa00001",
-      "In production at supplier · PO-8002",
-    ]);
-    expect(route.currentPositions).toEqual([
-      "Cloud Bed · Delivered",
-      "Haven Sofa · At Carres / In production at supplier",
-    ]);
+    expect(route.tracks.map((t) => t.title)).toEqual(["GOODS", "STOCK", "DELIVERY", "MONEY"]);
+    /* There is no overall Sales Order status field to read. */
+    expect(route).not.toHaveProperty("status");
+    expect(route).not.toHaveProperty("overall");
   });
 
-  it("builds clickable document lineage without inventing sent or received evidence", () => {
+  it("states the owner's own four facts", () => {
     const route = resolveSalesOrderRoute(input());
-    expect(route.documents.map((doc) => [doc.kind, doc.number, doc.href])).toEqual([
-      ["Sales Order", "SO-1318", "/operation/orders/so/order-1"],
-      ["Revision", "Rev 1", "/operation/orders/so/order-1?revision=1"],
-      ["Revision", "Rev 2", "/operation/orders/so/order-1?revision=2"],
-      ["Purchase Order", "PO-8001", "/operation/procurement?po=PO-8001"],
-      ["Supplier DO", "SDO-81", "/operation/procurement?po=PO-8001"],
-      ["Purchase Order", "PO-8002", "/operation/procurement?po=PO-8002"],
-      ["Delivery Order", "DO-130826-0031", "/operation?tab=delivery&order=order-1"],
-      ["Invoice", "INV-1318", "/finance/invoices?order=order-1"],
-      ["Loan Note", "LN-91", "/operation/orders/so/order-1?route=1#loan"],
-      ["Service Case", "SC2608-01", "/operation?tab=service-notes&case=case-1"],
-    ]);
-    expect(route.documents.every((doc) => !/sent|received by customer/i.test(doc.detail ?? ""))).toBe(true);
+    expect(track(route, "goods").status).toBe("2 items on order with the supplier");
+    expect(track(route, "stock").status).toBe("1 of 3 Units ready");
+    expect(track(route, "delivery").status).toBe("Appointment not confirmed");
+    expect(track(route, "money").status).toBe("RM 1,249.00 still to collect");
   });
 
-  it("keeps delivery runs, both money directions, loan return, cases and owner work independent", () => {
+  it("gives MONEY the door to the desk that owns collection, and no other track a door", () => {
     const route = resolveSalesOrderRoute(input());
-    const lane = (key: string) => route.lanes.find((item) => item.key === key)!;
-
-    expect(lane("delivery").groups[0]!.facts.map((fact) => fact.title)).toEqual([
-      "Delivery 1 · Not Delivered",
-      "Amy Logistics · Confirmed",
-    ]);
-    expect(lane("delivery").groups[0]!.facts[0]!.detail).toContain("Customer unavailable");
-    expect(lane("money").groups.flatMap((group) => group.facts.map((fact) => fact.title))).toEqual([
-      "RM 1,500.00 owed by customer",
-      "RM 200.00 approved refund not paid",
-    ]);
-    expect(lane("loan").groups[0]!.facts[0]!.title).toBe("Returned by customer · supplier return open");
-    expect(lane("other").groups.filter((group) => group.id !== "claims").flatMap((group) => group.facts.map((fact) => fact.title))).toEqual([
-      "SC2608-01 · Open",
-      "Review PO quantity · Open",
-    ]);
-    expect(route.noActionRequired).toBe(false);
-  });
-
-  it("includes real receiving and supplier-claim documents with owner links", () => {
-    const facts = input();
-    facts.receivingRecords = [{
-      id: "receipt-1",
-      recordNo: "GRN-120826-4491",
-      poId: "PO-8002",
-      supplierDoNumber: "SDO-92",
-      status: "Posted",
-      receivedAt: "2026-08-12",
-    }];
-    facts.claims = [{
-      id: "claim-1",
-      claimNo: "CL-109",
-      poId: "PO-8002",
-      status: "open",
-      reportedAt: "2026-08-12",
-    }];
-    const route = resolveSalesOrderRoute(facts);
-    expect(route.documents).toEqual(expect.arrayContaining([
-      expect.objectContaining({ kind: "Supplier DO", number: "SDO-92", href: "/operation?tab=receiving&receipt=receipt-1" }),
-      expect.objectContaining({ kind: "Receiving Record", number: "GRN-120826-4491", href: "/operation?tab=receiving&receipt=receipt-1" }),
-      expect.objectContaining({ kind: "Supplier Claim", number: "CL-109", href: "/operation?tab=claims&claim=claim-1" }),
-    ]));
-    const other = route.lanes.find((lane) => lane.key === "other")!;
-    expect(other.groups[0]!.facts[0]!.title).toBe("CL-109 · Open");
-    expect(route.noActionRequired).toBe(false);
-  });
-
-  it("states unassigned goods plainly and reports no action only when every applicable obligation is clear", () => {
-    const facts = input();
-    facts.allocation.lines = [{
-      sku: "MATTRESS-C",
-      committedQty: 1,
-      reservedUnits: [],
-      soldUnits: [],
-      reservedQty: 0,
-      soldQty: 0,
-      outstandingQty: 1,
-    }];
-    facts.allocation.totals = { committedQty: 1, reservedQty: 0, soldQty: 0, outstandingQty: 1 };
-    facts.purchaseOrders = [];
-    facts.delivery.booking = null;
-    facts.delivery.attempts = [];
-    let route = resolveSalesOrderRoute(facts);
-    expect(route.lanes[0]!.groups[0]!.facts[0]!.title).toBe("Waiting for Purchasing · 1 item");
-    /* ⭐ TWO PLAIN FACTS — owner re-ruling 2026-08-15, overwriting the
-       2026-08-14 acceptance wording. `Promised this day, no date yet` named a
-       day and denied it in the same breath. The customer's promise and the
-       trip nobody has arranged are two facts with two different owners. */
-    expect(route.lanes.find((lane) => lane.key === "delivery")!.groups[0]!.facts[0]).toMatchObject({
-      title: "Customer date 2026-08-20 · Delivery not arranged",
-      detail: null,
+    expect(track(route, "money").door).toEqual({
+      label: "Open Payments →",
+      href: "/operation?tab=payments&so=1319",
     });
-    expect(route.noActionRequired).toBe(false);
+    for (const key of ["goods", "stock", "delivery"]) expect(track(route, key).door).toBeNull();
+  });
 
-    facts.allocation.lines[0] = {
-      ...facts.allocation.lines[0]!,
-      soldUnits: [{
-        id: "u1", unitCode: "id-1", sku: "MATTRESS-C", status: "sold", condition: "new",
-        warehouseId: null, poNo: null, qty: 1, dateIn: null, soldAt: "2026-08-13",
-      }],
-      soldQty: 1,
-      outstandingQty: 0,
-    };
-    facts.allocation.totals = { committedQty: 1, reservedQty: 0, soldQty: 1, outstandingQty: 0 };
-    facts.delivery.attempts = [{
-      id: "d", attemptNo: 1, result: "delivered", reason: null, doNumber: "DO-1",
-      scheduledDate: "2026-08-13", recordedAt: "2026-08-13",
-    }];
-    facts.money = { known: true, total: 4500, paid: 4500, outstanding: 0 };
-    facts.refunds = [{ id: "r", amount: 200, status: "paid", requestedAt: "2026-08-12" }];
-    facts.loans = [{ ...facts.loans[0]!, returnedToSupplierAt: "2026-08-12" }];
-    facts.cases = [{ ...facts.cases[0]!, closed: true }];
-    facts.work = [{ ...facts.work[0]!, state: "closed" }];
+  it("says a line is waiting for Purchasing when no Purchase Order covers it", () => {
+    const route = resolveSalesOrderRoute(input({ purchaseOrders: [] }));
+    expect(track(route, "goods").status).toBe("2 items waiting for Purchasing");
+    expect(track(route, "goods").mark).toBe("current");
+  });
 
-    route = resolveSalesOrderRoute(facts);
-    expect(route.noActionRequired).toBe(true);
+  it("blocks GOODS with its reason when a Unit sits outside the order lines", () => {
+    const route = resolveSalesOrderRoute(
+      input({
+        allocation: {
+          ...input().allocation,
+          unmatchedUnits: [unit({ id: "stray", unitCode: "UNT-9000", sku: "OTHER" })],
+        },
+      }),
+    );
+    expect(track(route, "goods").mark).toBe("blocked");
+    expect(track(route, "goods").status).toContain("not on this order");
+  });
+
+  it("labels the delivery appointment date rather than printing a bare date", () => {
+    const route = resolveSalesOrderRoute(
+      input({ delivery: { booking: { confirmedDate: "2026-09-24", slot: null, scope: null }, attempts: [] } }),
+    );
+    expect(track(route, "delivery").status).toBe("Delivery appointment: 2026-09-24");
+  });
+
+  it("reads a failed attempt as blocked, with its reason", () => {
+    const route = resolveSalesOrderRoute(
+      input({
+        delivery: {
+          booking: null,
+          attempts: [
+            {
+              id: "a1",
+              attemptNo: 1,
+              result: "failed",
+              reason: "Customer unavailable",
+              doNumber: "DO-2088",
+              scheduledDate: "2026-09-20",
+              recordedAt: "2026-09-20",
+            },
+          ],
+        },
+      }),
+    );
+    expect(track(route, "delivery").mark).toBe("blocked");
+    expect(track(route, "delivery").status).toContain("Customer unavailable");
   });
 });
 
-/**
- * ⭐ THE DELIVERY LINE STATES TWO FACTS, NEVER A RIDDLE — owner ruling
- * 2026-08-15 (Chai), overwriting the 2026-08-14 acceptance wording.
- *
- * `Promised this day, no date yet` named a day and denied it in one line, and
- * "this day" pointed at nothing on screen. The customer's promise and the trip
- * nobody has arranged are two different facts owned by two different modules.
- */
-describe("Order Route · the delivery line before anything is arranged", () => {
-  it("states the customer's date and that the trip is not arranged", () => {
-    const facts = input();
-    facts.delivery.booking = null;
-    facts.delivery.attempts = [];
-    facts.order.deliveryDate = "2026-08-20";
-    const route = resolveSalesOrderRoute(facts);
-    const line = route.lanes.find((lane) => lane.key === "delivery")!.groups[0]!.facts[0]!;
-    expect(line.title).toBe("Customer date 2026-08-20 · Delivery not arranged");
-    expect(line.title).not.toContain("Promised this day");
-    /* The date is not repeated underneath — it was a detail line saying the
-       same thing the title now says. */
-    expect(line.detail).toBeNull();
+/* ─────────────────────────────────────────────────────────────────────────────
+ * LINKED PROBLEMS — never a fifth track
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+describe("LINKED PROBLEMS", () => {
+  it("is empty when nothing is linked", () => {
+    expect(resolveSalesOrderRoute(input()).linkedProblems).toEqual([]);
   });
 
-  it("falls back to the governed `No delivery date` when no promise exists", () => {
-    const facts = input();
-    facts.delivery.booking = null;
-    facts.delivery.attempts = [];
-    facts.order.deliveryDate = null;
-    const route = resolveSalesOrderRoute(facts);
-    const line = route.lanes.find((lane) => lane.key === "delivery")!.groups[0]!.facts[0]!;
-    /* The SAME string the Register prints — one absence, one word. */
-    expect(line.title).toBe("No delivery date");
-    expect(line.state).toBe("attention");
+  it("renders an open Service Case with its door and never as a track", () => {
+    const route = resolveSalesOrderRoute(
+      input({
+        cases: [{ id: "case-1", caseNo: "SC-1031", statusLabel: "Investigation in progress", closed: false }],
+      }),
+    );
+    expect(route.linkedProblems).toEqual([
+      {
+        id: "case:case-1",
+        title: "SC-1031 · Investigation in progress",
+        door: { label: "Open SC-1031 →", href: "/operation?tab=service-notes&case=case-1" },
+      },
+    ]);
+    expect(route.tracks).toHaveLength(4);
+    expect(route.tracks.map((t) => t.title)).not.toContain("SERVICE");
+  });
+
+  it("drops a closed exception — a closed case is not a problem", () => {
+    const route = resolveSalesOrderRoute(
+      input({
+        cases: [{ id: "case-1", caseNo: "SC-1031", statusLabel: "Closed", closed: true }],
+        claims: [{ id: "claim-1", claimNo: "CLM-4", statusLabel: "Settled", closed: true }],
+      }),
+    );
+    expect(route.linkedProblems).toEqual([]);
+  });
+});
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * Layer 2 — GOODS ROUTES
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+describe("GOODS ROUTES", () => {
+  it("forks a split quantity into two sub-lanes with their counts", () => {
+    const route = resolveSalesOrderRoute(input());
+    const goods = route.goodsRoutes[0]!;
+    expect(goods.title).toBe("B1201S · King · Qty 3");
+    expect(goods.forked).toBe(true);
+    expect(goods.lanes.map((l) => l.title)).toEqual(["Qty 1 · READY STOCK", "Qty 2 · PURCHASE"]);
+  });
+
+  it("puts CURRENT on a sub-lane station, never on the Sales Order", () => {
+    const route = resolveSalesOrderRoute(input());
+    const currents = route.goodsRoutes.flatMap((g) =>
+      g.lanes.flatMap((l) => l.stations.filter((s) => s.current).map((s) => `${l.title} · ${s.title}`)),
+    );
+    /* The ready-stock lane is complete and holds no CURRENT; the purchase lane
+       stands at SUPPLIER. Two lanes, one position each where work remains. */
+    expect(currents).toEqual(["Qty 2 · PURCHASE · SUPPLIER"]);
+    expect(route).not.toHaveProperty("currentPositions");
+  });
+
+  it("renders a ready-stock lane without any purchase station", () => {
+    const route = resolveSalesOrderRoute(
+      input({
+        allocation: {
+          ...input().allocation,
+          lines: [
+            line({
+              sku: "B1201S",
+              committedQty: 1,
+              reservedUnits: [unit({ id: "u1", unitCode: "UNT-8821", sku: "B1201S" })],
+              reservedQty: 1,
+              outstandingQty: 0,
+            }),
+          ],
+          totals: { committedQty: 1, reservedQty: 1, soldQty: 0, outstandingQty: 0 },
+        },
+        purchaseOrders: [],
+        lineDestinations: { "B1201S": [{ name: "Carres Klang", qty: 1 }] },
+      }),
+    );
+    const lanes = route.goodsRoutes[0]!.lanes;
+    expect(lanes).toHaveLength(1);
+    expect(lanes[0]!.stations.map((s) => s.title)).toEqual(["STOCK"]);
+    expect(lanes[0]!.stations[0]!.evidence).toBe("UNT-8821 · Carres Klang");
+  });
+
+  it("gives every ✓ station its document number, labelled date and door", () => {
+    const route = resolveSalesOrderRoute(
+      input({
+        purchaseOrders: [
+          po({
+            id: "PO-2048",
+            issuedAt: "2026-08-13",
+            expectedReadyDate: "2026-09-01",
+            lines: [{ sku: "B1201S", qty: 2, receivedQty: 0 }],
+          }),
+        ],
+      }),
+    );
+    const purchase = route.goodsRoutes[0]!.lanes.find((l) => l.source === "purchase")!;
+    const purchasing = purchase.stations.find((s) => s.title === "PURCHASING")!;
+    expect(purchasing.mark).toBe("complete");
+    expect(purchasing.evidence).toBe("PO-2048 · Issued: 2026-08-13");
+    expect(purchasing.door).toEqual({ label: "Open PO-2048 →", href: "/operation/procurement?po=PO-2048" });
+
+    const supplier = purchase.stations.find((s) => s.title === "SUPPLIER")!;
+    expect(supplier.mark).toBe("complete");
+    expect(supplier.evidence).toBe("Estimated ready: 2026-09-01");
+  });
+
+  it("marks the SALES ORDER origin with its Ordered date — never a bare date", () => {
+    const route = resolveSalesOrderRoute(input());
+    expect(route.goodsRoutes[0]!.origin!.evidence).toBe("SO-1319 · Ordered: 2026-08-12");
+  });
+
+  it("names every not-started station in words rather than a dash", () => {
+    const route = resolveSalesOrderRoute(input());
+    const purchase = route.goodsRoutes[0]!.lanes.find((l) => l.source === "purchase")!;
+    const notStarted = purchase.stations.filter((s) => s.mark !== "complete").map((s) => s.status);
+    expect(notStarted).toEqual([
+      "Ready date not confirmed",
+      "Not received yet",
+      "Units not created yet",
+    ]);
+    for (const station of purchase.stations) expect(station.status).not.toBe("—");
+  });
+
+  it("keeps a partly-received station CURRENT and says how far it got", () => {
+    const route = resolveSalesOrderRoute(
+      input({
+        purchaseOrders: [
+          po({
+            id: "PO-2048",
+            expectedReadyDate: "2026-09-01",
+            lines: [{ sku: "B1201S", qty: 2, receivedQty: 1 }],
+          }),
+        ],
+      }),
+    );
+    const purchase = route.goodsRoutes[0]!.lanes.find((l) => l.source === "purchase")!;
+    const receiving = purchase.stations.find((s) => s.title === "RECEIVING")!;
+    expect(receiving.mark).toBe("current");
+    expect(receiving.current).toBe(true);
+    expect(receiving.status).toBe("1 of 2 received");
+  });
+
+  it("completes RECEIVING only against a real receiving record", () => {
+    const withRecord = resolveSalesOrderRoute(
+      input({
+        purchaseOrders: [
+          po({ id: "PO-2048", expectedReadyDate: "2026-09-01", lines: [{ sku: "B1201S", qty: 2, receivedQty: 2 }] }),
+        ],
+        receivingRecords: [{ id: "rec-1", recordNo: "GRN-77", poId: "PO-2048", receivedAt: "2026-09-05" }],
+      }),
+    );
+    const receiving = withRecord.goodsRoutes[0]!.lanes
+      .find((l) => l.source === "purchase")!
+      .stations.find((s) => s.title === "RECEIVING")!;
+    expect(receiving.mark).toBe("complete");
+    expect(receiving.evidence).toBe("GRN-77 · Received: 2026-09-05");
+    expect(receiving.door).toEqual({ label: "Open GRN-77 →", href: "/operation?tab=receiving&receipt=rec-1" });
+  });
+
+  it("carries the action-engine line with its owner on the CURRENT station only", () => {
+    const route = resolveSalesOrderRoute(input());
+    const purchase = route.goodsRoutes[0]!.lanes.find((l) => l.source === "purchase")!;
+    const supplier = purchase.stations.find((s) => s.title === "SUPPLIER")!;
+    expect(supplier.action).toEqual({ ownerKey: "purchasing", label: "Confirm the ready date" });
+    for (const station of purchase.stations.filter((s) => !s.current)) {
+      expect(station.action).toBeNull();
+    }
+  });
+
+  it("blocks the lane that has no Purchase Order and shows only that station", () => {
+    const route = resolveSalesOrderRoute(input({ purchaseOrders: [] }));
+    const lane = route.goodsRoutes[0]!.lanes.find((l) => l.source === "unassigned")!;
+    expect(lane.title).toBe("Qty 2 · PURCHASE");
+    expect(lane.stations).toHaveLength(1);
+    expect(lane.stations[0]!.mark).toBe("blocked");
+    expect(lane.stations[0]!.status).toBe("No Purchase Order yet");
+    expect(lane.stations[0]!.action).toEqual({ ownerKey: "purchasing", label: "Raise the Purchase Order" });
+  });
+
+  it("splits ONE purchase lane into one lane per Deliver To when Purchasing names the split", () => {
+    const route = resolveSalesOrderRoute(
+      input({
+        lineDestinations: {
+          "B1201S": [
+            { name: "Carres Klang", qty: 1 },
+            { name: "Balakong", qty: 1 },
+          ],
+        },
+      }),
+    );
+    const purchaseLanes = route.goodsRoutes[0]!.lanes.filter((l) => l.source === "purchase");
+    expect(purchaseLanes.map((l) => l.title)).toEqual([
+      "Qty 1 · PURCHASE · Carres Klang",
+      "Qty 1 · PURCHASE · Balakong",
+    ]);
+  });
+
+  it("refuses to distribute a destination it cannot prove", () => {
+    /* Two destinations whose quantities do not add up to the lane: the split
+       is not this order's, so the lane states them instead of inventing one. */
+    const route = resolveSalesOrderRoute(
+      input({
+        lineDestinations: {
+          "B1201S": [
+            { name: "Carres Klang", qty: 5 },
+            { name: "Balakong", qty: 4 },
+          ],
+        },
+      }),
+    );
+    const purchaseLanes = route.goodsRoutes[0]!.lanes.filter((l) => l.source === "purchase");
+    expect(purchaseLanes).toHaveLength(1);
+    expect(purchaseLanes[0]!.destination).toBe("Carres Klang ×5 · Balakong ×4");
+  });
+
+  it("renders a delivered quantity as its own lane", () => {
+    const route = resolveSalesOrderRoute(
+      input({
+        allocation: {
+          ...input().allocation,
+          lines: [
+            line({
+              sku: "B1201S",
+              committedQty: 2,
+              soldUnits: [unit({ id: "u9", unitCode: "UNT-9001", sku: "B1201S", status: "sold" })],
+              soldQty: 1,
+              reservedUnits: [unit({ id: "u8", unitCode: "UNT-9002", sku: "B1201S" })],
+              reservedQty: 1,
+              outstandingQty: 0,
+            }),
+          ],
+          totals: { committedQty: 2, reservedQty: 1, soldQty: 1, outstandingQty: 0 },
+        },
+        purchaseOrders: [],
+      }),
+    );
+    expect(route.goodsRoutes[0]!.lanes.map((l) => l.title)).toEqual([
+      "Qty 1 · DELIVERED",
+      "Qty 1 · READY STOCK",
+    ]);
+  });
+
+  it("states a cancelled line's outcome and gives it no stations", () => {
+    const route = resolveSalesOrderRoute(
+      input({ cancelledLines: [{ sku: "SOFA-X", label: "Haven Sofa", qty: 1, revision: 3 }] }),
+    );
+    const cancelled = route.goodsRoutes.find((g) => g.cancelled)!;
+    expect(cancelled.title).toBe("Haven Sofa · Qty 1");
+    expect(cancelled.cancelledWord).toBe("Cancelled · Rev 3");
+    expect(cancelled.lanes).toEqual([]);
+    expect(cancelled.origin).toBeNull();
+  });
+
+  it("gives a service-only order no goods route at all", () => {
+    const route = resolveSalesOrderRoute(
+      input({
+        allocation: {
+          ...input().allocation,
+          lines: [],
+          totals: { committedQty: 0, reservedQty: 0, soldQty: 0, outstandingQty: 0 },
+        },
+        purchaseOrders: [],
+      }),
+    );
+    expect(route.goodsRoutes).toEqual([]);
+    expect(track(route, "goods").status).toBe("No goods on this order");
+  });
+
+  it("has no writer — no station carries anything tickable", () => {
+    const route = resolveSalesOrderRoute(input());
+    for (const goods of route.goodsRoutes) {
+      for (const lane of goods.lanes) {
+        for (const station of lane.stations) {
+          expect(Object.keys(station)).toEqual([
+            "id",
+            "title",
+            "mark",
+            "evidence",
+            "status",
+            "action",
+            "door",
+            "current",
+          ]);
+        }
+      }
+    }
+  });
+});
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * DELIVERY RELEASE
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+describe("DELIVERY RELEASE", () => {
+  it("counts the open requirements and offers only the Delivery door", () => {
+    const route = resolveSalesOrderRoute(input());
+    expect(route.release.ready).toBe(false);
+    expect(route.release.headline).toBe("NOT READY FOR DELIVERY");
+    expect(route.release.summary).toBe("3 requirements still open");
+    expect(route.release.door).toEqual({
+      label: "Open Delivery →",
+      href: "/operation?tab=delivery&order=order-1",
+    });
+    expect(route.release).not.toHaveProperty("action");
+  });
+
+  it("keeps the partial-goods gate honest", () => {
+    const route = resolveSalesOrderRoute(input());
+    const goods = requirement(route, "goods");
+    expect(goods.mark).toBe("waiting");
+    expect(goods.title).toBe("Goods not ready");
+    expect(goods.details).toEqual(["1 of 3 ready"]);
+  });
+
+  it("shows the two money facts apart — a release never hides the amount", () => {
+    const held = requirement(resolveSalesOrderRoute(input()), "money");
+    expect(held.mark).toBe("blocked");
+    expect(held.title).toBe("Money release not cleared");
+    expect(held.details).toEqual(["RM 1,249.00 still to collect"]);
+
+    const released = requirement(
+      resolveSalesOrderRoute(input({ money: { known: true, outstanding: 1249, holds: false } })),
+      "money",
+    );
+    expect(released.mark).toBe("complete");
+    expect(released.title).toBe("Money release cleared");
+    expect(released.details).toEqual(["RM 1,249.00 remains to collect", "Manager release recorded"]);
+  });
+
+  it("never lets an unknown price hold a delivery", () => {
+    const money = requirement(
+      resolveSalesOrderRoute(input({ money: { known: false, outstanding: 0, holds: false } })),
+      "money",
+    );
+    expect(money.mark).toBe("complete");
+    expect(money.details).toContain("No price yet");
+  });
+
+  it("states the customer's requested date under an unconfirmed appointment", () => {
+    const appointment = requirement(resolveSalesOrderRoute(input()), "appointment");
+    expect(appointment.mark).toBe("waiting");
+    expect(appointment.title).toBe("Appointment not confirmed");
+    expect(appointment.details).toEqual(["Customer requested: 2026-09-24"]);
+  });
+
+  it("says READY only when every requirement is complete", () => {
+    const route = resolveSalesOrderRoute(
+      input({
+        allocation: {
+          ...input().allocation,
+          lines: [
+            line({
+              sku: "B1201S",
+              committedQty: 1,
+              reservedUnits: [unit({ id: "u1", unitCode: "UNT-8821", sku: "B1201S" })],
+              reservedQty: 1,
+              outstandingQty: 0,
+            }),
+          ],
+          totals: { committedQty: 1, reservedQty: 1, soldQty: 0, outstandingQty: 0 },
+        },
+        purchaseOrders: [],
+        delivery: { booking: { confirmedDate: "2026-09-24", slot: "10:00–12:00", scope: null }, attempts: [] },
+        money: { known: true, outstanding: 0, holds: false },
+      }),
+    );
+    expect(route.release.ready).toBe(true);
+    expect(route.release.headline).toBe("READY FOR DELIVERY");
+    expect(route.release.summary).toBe("All release requirements are complete.");
+    expect(route.release.openCount).toBe(0);
+  });
+
+  it("allows ✓ on partial goods only with an explicit, displayed delivery scope", () => {
+    const bedOnly = resolveSalesOrderRoute(
+      input({
+        allocation: {
+          orderId: "order-1",
+          soRef: "SO-1319",
+          lines: [
+            line({
+              sku: "M1401F-K",
+              committedQty: 1,
+              reservedUnits: [unit({ id: "u1", unitCode: "UNT-1", sku: "M1401F-K" })],
+              reservedQty: 1,
+              outstandingQty: 0,
+            }),
+            line({ sku: "SOFA-2S", committedQty: 2, outstandingQty: 2 }),
+          ],
+          unmatchedUnits: [],
+          totals: { committedQty: 3, reservedQty: 1, soldQty: 0, outstandingQty: 2 },
+        },
+        purchaseOrders: [],
+        delivery: {
+          booking: { confirmedDate: "2026-09-24", slot: null, scope: ["bed"] },
+          attempts: [
+            {
+              id: "a1",
+              attemptNo: 1,
+              result: "partial",
+              reason: null,
+              doNumber: "DO-2088",
+              scheduledDate: "2026-09-24",
+              recordedAt: null,
+            },
+          ],
+        },
+      }),
+    );
+    const goods = requirement(bedOnly, "goods");
+    expect(goods.mark).toBe("complete");
+    expect(goods.title).toBe("Goods ready for this delivery");
+    expect(goods.details).toEqual(["1 Unit included in DO-2088", "2 Units remain open"]);
   });
 });

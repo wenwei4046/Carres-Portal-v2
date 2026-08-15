@@ -594,7 +594,24 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     /* Eight default business columns; the gutter is not one of them, and the
        box's right edge is therefore the parent table's. */
     expect(screen.getByTestId("grid-expansion-cell")).toHaveAttribute("colspan", "8");
-    expect(screen.getByTestId("grid-expansion-cell")).toHaveStyle({ padding: "0px" });
+    /* Air above and below, NOTHING left or right — horizontal padding is the
+       very thing the gutter cells replaced (owner correction 2026-08-15). */
+    expect(screen.getByTestId("grid-expansion-cell")).toHaveStyle({
+      paddingTop: "12px",
+      paddingBottom: "12px",
+      paddingLeft: "0px",
+      paddingRight: "0px",
+    });
+  });
+
+  /** The child of a record is its own object, and the frame is what says so. */
+  it("draws the child table as a bordered box, not a continuation of the sheet", () => {
+    mount();
+    fireEvent.click(screen.getByRole("button", { name: "Expand row" }));
+    const box = screen.getByTestId("goods-mini-table");
+    expect(box.className).toContain("rounded-control");
+    expect(box.className).toContain("border-base-200");
+    expect(box.className).not.toContain("border-y");
   });
 
   /**

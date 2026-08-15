@@ -1,19 +1,13 @@
+import { EMERGENCY_RELATIONSHIPS } from "@carres/shared";
 import type { CustomerSearchHit } from "@/lib/queries";
 import { MY_ADDRESS } from "@/data/malaysia-postcodes";
 import type { WizardDraft } from "../new-order/draft";
 
-/** Emergency-contact relationship options (single source — CustomerStep's
- *  dropdown and the autofill reverse-mapping both read this list). */
-export const RELATIONSHIPS = [
-  "Spouse",
-  "Parent",
-  "Child",
-  "Sibling",
-  "Relative",
-  "Friend",
-  "Colleague",
-  "Helper",
-] as const;
+/** Emergency-contact relationship options. The list moved to
+ *  `@carres/shared` (`sales-order-form.ts`) on 2026-08-15 so the Sales Order
+ *  object page offers the SAME choices this wizard does; this re-export keeps
+ *  the POS's existing import path. */
+export const RELATIONSHIPS = EMERGENCY_RELATIONSHIPS;
 
 /**
  * Reverse of `composeAddress` ("{line1}, {line2?}, {city} {postcode}, {state}").
