@@ -2376,6 +2376,23 @@ export * from "./store-kind";
 // scheme: PREFIX-DDMMYY-NNNN, tail derived per-order (never a counter).
 export { docNumber, docTail, amendmentSuffix, type DocNumberInput } from "./doc-number";
 
+// `Jump to…` — the ONE global navigate-only command surface (ui/MASTER,
+// APPROVED / LOCKED 2026-08-11). The PURE half: how a typed query is read, and
+// the shape of a document result. Shared so the Worker's lookup and the
+// browser's surface cannot disagree about the locked result contract.
+export {
+  JUMP_DOC_TYPES,
+  JUMP_DOC_LABEL,
+  parseJumpQuery,
+  numericPrefixRanges,
+  grnDateFromQuery,
+  rankJumpDocuments,
+  type JumpDocType,
+  type JumpDocumentResult,
+  type JumpSearchResponse,
+  type ParsedJumpQuery,
+} from "./jump-to";
+
 // Rental + Service Plan base (0247-0249) — customers, service packages, rental
 // plans, agreements/billings, the rented-asset registry + the service
 // entitlement/visit engine. The PURE plan math (visit cadence + contract value

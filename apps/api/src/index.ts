@@ -20,6 +20,9 @@ import operationOrdersFeedRouter from "./routes/operation/orders-feed";
 import operationSuppliersOverviewRouter from "./routes/operation/suppliers-overview";
 import operationBadgesRouter from "./routes/operation/badges";
 import operationDashboardRouter from "./routes/operation/dashboard";
+// `Jump to…` — the document half of the ONE global navigate-only command
+// surface (ui/MASTER, APPROVED / LOCKED 2026-08-11). Read-only, no create.
+import jumpRouter from "./routes/operation/jump";
 import operationMovementsRouter from "./routes/operation/movements";
 import correctionWorkRouter from "./routes/operation/correction-work";
 import operationOrdersRouter from "./routes/operation/orders";
@@ -176,6 +179,7 @@ api.route("/account", accountRouter);
 api.route("/guarantees", guaranteesRouter);
 api.route("/operation/badges", operationBadgesRouter);
 api.route("/operation/dashboard", operationDashboardRouter);
+api.route("/operation/jump", jumpRouter);
 api.route("/operation/movements", operationMovementsRouter);
 api.route("/operation/orders", operationOrdersRouter);
 // STAGE 3 card 3.4 — durable correction work, read by the RECEIVING module.

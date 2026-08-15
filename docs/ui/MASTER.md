@@ -569,6 +569,30 @@ every ERP field. Expanding beyond destination + document-number + recents requir
 cross-module search index and a new architecture decision; individual modules may not expand the
 global result contract locally.
 
+**`JUMP TO…` — BUILT 2026-08-15.** The capability was approved 2026-08-11 and unbuilt until this
+date; every Register inherited the hole. It is now on screen from
+`apps/web/src/pages/operation/components/JumpTo.tsx`, mounted first in `TopBarIcons` so it renders
+in every Page Header and in the slim utility bar at once. The overlay is the kit's `Modal` — focus
+trap, Esc, scroll lock, returned focus — never a hand-rolled one; `w-full max-w-modal` +
+`max-h-dialog` is what makes the small-screen case the same surface, full-width.
+
+Four implementation boundaries the law left open, decided by build and recorded here so the next
+chat does not re-decide them:
+
+| Question | Decision | Why |
+|---|---|---|
+| Where do the DESTINATIONS come from? | `portal-nav`'s `visibleGroups` / `visibleItems` — the sidebar's own functions | A second destination list is a second permission model, and the copy is the one that drifts |
+| How are DOCUMENTS permission-filtered? | `GET /api/operation/jump` reads under the caller's own token; RLS decides what exists. `requireOperation` keeps every other role off the route entirely | A row the caller may not select is never returned to the Worker, so there is no filtered list to leak |
+| What does a `GRN` result open, given the number is DERIVED and never stored? | A query carrying a full `DDMMYY` reads the date back out of the number and asks for that day exactly; a half-typed query scans the 200 most recent posted records | An exact lookup must not depend on how far a recent window happens to reach |
+| What does an `INV` result open? | The Sales Order it invoices | An invoice is a document OF an order (`invoices.order_id`, `orders.invoice_no`); the order's workspace is where the paper is read and reprinted |
+
+🟡 **ONE WORD IS OWED A RULING.** The locked contract names the empty state `No results`, and
+`COPY-STANDARD.md` rule 5 lists that exact string as the ✘ example of an empty state that teaches
+nothing. The locked, dated, surface-specific ruling was implemented verbatim. The two are
+reconcilable — a worklist is empty because there is no work and can say so, while a search that
+matched nothing has nothing to teach — but COPY-STANDARD does not yet carry that split, and until
+it does the two documents disagree in writing.
+
 **REGISTER WORK TOOLBAR / SECOND HEADER — APPROVED / LOCKED (Loo, 2026-08-11).** Immediately
 below the Page Header, a Register may own one rendered 45px Work Toolbar; it is one row and never
 scrolls horizontally. Normal state spends the left side on the current View control and current-

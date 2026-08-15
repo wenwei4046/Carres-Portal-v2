@@ -15,6 +15,7 @@ import {
   type AwaitingStockShortageResponse,
   type CancelOrderInput,
   type CatalogResponse,
+  type JumpSearchResponse,
   type ProductModelDto,
   type ProductSkuDto,
   type SofaFabricDto,
@@ -482,6 +483,10 @@ export const qk = {
      *  `SetThresholdDialog` invalidates this key on save so the tile
      *  re-derives. */
     stockAlerts: () => ["operation", "stock-alerts"] as const,
+    /** `Jump to…` document lookup, keyed by the typed query. Read-only and
+     *  navigate-only: nothing invalidates it, because nothing it returns can
+     *  be written from the surface that shows it. */
+    jump: (q: string) => ["operation", "jump", q] as const,
     /** R2 — the supplier-claim queue. Invalidated by a receive, because a
      *  receive is the thing that opens claims. */
     supplierClaims: (status: string) =>
@@ -3984,6 +3989,34 @@ export function useWarehouseReceiptReviewMutation(
       ]);
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
+  });
+}
+
+/**
+ * `Jump to…` document lookup — GET /api/operation/jump?q=
+ * (ui/MASTER `JUMP TO… INTERACTION`, APPROVED / LOCKED 2026-08-11).
+ *
+ * Governed document numbers only (SO · PO · GRN · INV), permission-filtered by
+ * the database before the browser ever sees a row. Destinations are NOT here:
+ * they are resolved locally from the portal nav, so an empty box costs nothing
+ * and typing a destination name never leaves the tab.
+ *
+ * Disabled while the box is empty. `keepPreviousData` holds the last list in
+ * place between keystrokes so the surface does not blink to `No results` and
+ * back on every character.
+ */
+export function useJumpSearch(
+  q: string,
+  opts?: Partial<UseQueryOptions<JumpSearchResponse>>,
+) {
+  return useQuery({
+    queryKey: qk.operation.jump(q),
+    queryFn: () =>
+      apiFetch<JumpSearchResponse>(`/api/operation/jump?q=${encodeURIComponent(q)}`),
+    enabled: q.trim().length > 0,
+    placeholderData: keepPreviousData,
+    staleTime: 30_000,
+    ...opts,
   });
 }
 
