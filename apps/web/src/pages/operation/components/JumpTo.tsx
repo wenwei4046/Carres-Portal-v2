@@ -215,10 +215,16 @@ export default function JumpTo() {
 
   useEffect(() => setActive(0), [query]);
 
+  /* The debounced lookup can land a SHORTER list than the one the operator was
+   * arrowing through. Clamping in render rather than in an effect means there
+   * is no frame where the highlight is on a row that no longer exists and
+   * Enter does nothing. */
+  const activeRow = rows.length === 0 ? 0 : Math.min(active, rows.length - 1);
+
   useEffect(() => {
     if (!open) return;
     listRef.current?.querySelector('[data-active="true"]')?.scrollIntoView({ block: "nearest" });
-  }, [active, open, rows.length]);
+  }, [activeRow, open, rows.length]);
 
   const close = useCallback(() => {
     setOpen(false);
@@ -256,17 +262,17 @@ export default function JumpTo() {
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setActive((i) => (rows.length === 0 ? 0 : (i + 1) % rows.length));
+      setActive(rows.length === 0 ? 0 : (activeRow + 1) % rows.length);
       return;
     }
     if (e.key === "ArrowUp") {
       e.preventDefault();
-      setActive((i) => (rows.length === 0 ? 0 : (i - 1 + rows.length) % rows.length));
+      setActive(rows.length === 0 ? 0 : (activeRow - 1 + rows.length) % rows.length);
       return;
     }
     if (e.key === "Enter") {
       e.preventDefault();
-      const row = rows[active];
+      const row = rows[activeRow];
       if (row) go(row);
       return;
     }
@@ -315,7 +321,7 @@ export default function JumpTo() {
             role="combobox"
             aria-expanded
             aria-controls="jump-to-results"
-            aria-activedescendant={rows[active] ? rowDomId(rows[active]) : undefined}
+            aria-activedescendant={rows[activeRow] ? rowDomId(rows[activeRow]) : undefined}
             autoFocus
             value={query}
             onChange={(e) => setQuery(e.currentTarget.value)}
@@ -349,7 +355,7 @@ export default function JumpTo() {
                       {isFirstDoc && <GroupLabel>Documents</GroupLabel>}
                       <RowButton
                         row={row}
-                        activeRow={i === active}
+                        activeRow={i === activeRow}
                         onHover={() => setActive(i)}
                         onSelect={() => go(row)}
                       />

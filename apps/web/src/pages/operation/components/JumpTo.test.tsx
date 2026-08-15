@@ -187,6 +187,29 @@ describe("the keyboard", () => {
     expect(screen.getByTestId("here")).toHaveTextContent("/operation/orders/so/abc");
   });
 
+  it("↑ from the first row wraps to the last — the list has no dead end", () => {
+    renderJump();
+    const input = openSurface();
+    fireEvent.change(input, { target: { value: "orders" } });
+    const rows = screen.getAllByRole("option");
+    expect(rows.length).toBeGreaterThan(1);
+    fireEvent.keyDown(input, { key: "ArrowUp" });
+    expect(screen.getAllByRole("option").at(-1)).toHaveAttribute("data-active", "true");
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    expect(screen.getAllByRole("option")[0]).toHaveAttribute("data-active", "true");
+  });
+
+  it("exactly one row is active at a time, whatever the list is", () => {
+    renderJump();
+    const input = openSurface();
+    fireEvent.change(input, { target: { value: "o" } });
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    const activeCount = screen
+      .getAllByRole("option")
+      .filter((el) => el.dataset.active === "true").length;
+    expect(activeCount).toBe(1);
+  });
+
   it("Esc closes without navigating", () => {
     renderJump();
     const input = openSurface();
