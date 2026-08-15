@@ -336,9 +336,9 @@ function ExpandedLines({ row }: { row: RegisterRow }) {
     <div className="px-10 py-3" data-testid="row-expansion">
       <div className="overflow-x-auto rounded-control border border-base-200 bg-white">
         <table className="w-full min-w-[860px] table-fixed text-left text-body" aria-label={`Goods on SO-${row.o.so}`}>
-          <colgroup><col className="w-28" /><col className="w-36" /><col className="w-36" /><col className="w-16" /><col /><col className="w-52" /></colgroup>
+          <colgroup><col className="w-28" /><col className="w-36" /><col className="w-52" /><col className="w-36" /><col className="w-16" /><col /></colgroup>
           <thead className="border-b border-base-200 bg-base-50 text-label font-semibold text-base-600">
-            <tr>{["Category", "Unit ID", "SKU", "Qty", "Item", "Deliver To"].map((label) => <th key={label} className="px-3 py-2">{label}</th>)}</tr>
+            <tr>{["Category", "Unit ID", "Deliver To", "SKU", "Qty", "Item"].map((label) => <th key={label} className="px-3 py-2">{label}</th>)}</tr>
           </thead>
           <tbody className="divide-y divide-base-100">
             {lines.map((line, index) => {
@@ -346,14 +346,14 @@ function ExpandedLines({ row }: { row: RegisterRow }) {
               return <tr key={line.id ?? `${line.sku}-${index}`} data-testid={`expanded-good-${line.sku}`} className="align-top">
                 <td className="px-3 py-2 text-label font-semibold text-base-600">{categoryOf(line)}</td>
                 <td className="px-3 py-2 font-mono text-meta">{fact?.unitIds.length ? fact.unitIds.map((id) => <div key={id}>{id}</div>) : "Not allocated"}</td>
+                <td className="px-3 py-2">{fact?.deliverTo.length ? fact.deliverTo.map((d) => <div key={`${d.name}-${d.qty}`}>{fact.deliverTo.length > 1 ? `${d.name} ×${d.qty}` : d.name}</div>) : expansion.isLoading ? "Loading…" : "Not recorded"}</td>
                 <td className="px-3 py-2 font-mono text-meta">{line.sku}</td>
                 <td className="px-3 py-2 tabular-nums">{line.qty}</td>
                 <td className="px-3 py-2"><div className="font-medium text-base-900">{lineName(line)}</div>{configOf(line).length ? <div className="mt-0.5 text-meta text-base-600">{configOf(line).join(" · ")}</div> : null}</td>
-                <td className="px-3 py-2">{fact?.deliverTo.length ? fact.deliverTo.map((d) => <div key={`${d.name}-${d.qty}`}>{fact.deliverTo.length > 1 ? `${d.name} ×${d.qty}` : d.name}</div>) : expansion.isLoading ? "Loading…" : "Not recorded"}</td>
               </tr>;
             })}
             {addons.map((addon, index) => <tr key={`addon-${index}`} className="align-top">
-              <td className="px-3 py-2 text-label font-semibold text-base-600">SERVICE</td><td className="px-3 py-2">—</td><td className="px-3 py-2 font-mono text-meta">{addon.addon_key}</td><td className="px-3 py-2 tabular-nums">{addon.qty}</td><td className="px-3 py-2">{addon.addon_key?.replace(/[_-]+/g, " ") ?? "Add-on"}</td><td className="px-3 py-2">—</td>
+              <td className="px-3 py-2 text-label font-semibold text-base-600">SERVICE</td><td className="px-3 py-2">—</td><td className="px-3 py-2">—</td><td className="px-3 py-2 font-mono text-meta">{addon.addon_key}</td><td className="px-3 py-2 tabular-nums">{addon.qty}</td><td className="px-3 py-2">{addon.addon_key?.replace(/[_-]+/g, " ") ?? "Add-on"}</td>
             </tr>)}
           </tbody>
         </table>

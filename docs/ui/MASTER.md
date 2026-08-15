@@ -786,7 +786,9 @@ breathing gap
   not resize to repair the default. Optional columns may cause grid-owned horizontal overflow and
   may not squeeze the default set.
 - Expansion is goods-only: a small clean, non-filterable table beneath the parent row with the
-  locked columns `Category | Unit ID | SKU | Qty | Item | Deliver To`. It may use its own column
+  locked columns `Category | Unit ID | Deliver To | SKU | Qty | Item` (owner ruling 2026-08-15,
+  moving `Deliver To` next to `Unit ID`: both answer *where is this piece*, and separating them by
+  three columns made the operator read across the whole table to pair them). It may use its own column
   tracks; it must retain the parent Register's seven-column structure and horizontal behaviour.
   Unit ID is Stock truth; Deliver To is read-only Purchasing truth, not Warehouse location.
 - Keep the proven Search, typed filters, Columns, Export and right-click document interaction.
@@ -920,10 +922,12 @@ looks at this page: Search · `Export ▾` · Columns. Nothing else lives here.
   inside; `Esc` collapses it. While a query is active it stays collapsed but carries its result
   count (`🔍⁷`) so a narrowed listing can never look like the whole listing.
 - **Columns is icon-only** (`▥`). Its hover/accessible name is `Columns`.
-- **Export is icon-only too** (`⤓ ⌄`) — owner ruling 2026-08-15, correcting this section's first
+- **Export is icon-only too** (`⤓`) — owner ruling 2026-08-15, correcting this section's first
   draft, which reserved icon-only for view controls and kept the word on the verb. The right side
-  of Row 2 is a row of icons; one word inside it reads as an exception, and the caret already says
-  a menu opens. Its hover/accessible name is `Export`, and the menu offers **Excel · PDF · Print**
+  of Row 2 is a row of icons; one word inside it reads as an exception. It carries **no caret**
+  either (owner ruling, same day): Gmail's toolbar icons open menus without one, and a caret bolted
+  to a bare icon reads as a split button that was never split. Its hover/accessible name is
+  `Export`, and the menu offers **Excel · PDF · Print**
   — three outputs, one door, never scattered across `…` or separate permanent buttons.
 - **Selection changes WHAT `Export ▾` can produce, not just how many.** With no selection the
   outputs describe the LIST: Excel · PDF · Print. With rows ticked the same space also offers the

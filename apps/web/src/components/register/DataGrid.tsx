@@ -1529,8 +1529,12 @@ function DataGridInner<T>({
             aria-expanded={outputMenuOpen}
           >
             <Download size={14} strokeWidth={1.75} aria-hidden />
-            {!isReference && <span>Export</span>}
-            <ChevronDown size={12} strokeWidth={2} aria-hidden />
+            {!isReference && (
+              <>
+                <span>Export</span>
+                <ChevronDown size={12} strokeWidth={2} aria-hidden />
+              </>
+            )}
           </button>
           {outputMenuOpen && (
             <div
