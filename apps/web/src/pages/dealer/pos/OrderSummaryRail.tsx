@@ -321,14 +321,10 @@ export default function OrderSummaryRail({
         {/* Delivery */}
         <div className="summary__section">
           <div className="summary__section-label">Delivery</div>
-          {draft.delivery.dateTbd ? (
-            <div className="summary__row">
-              <span className="key">Date</span>
-              <span className="val" style={{ fontStyle: "italic", color: "var(--c-orange)" }}>
-                For Further Notice
-              </span>
-            </div>
-          ) : draft.delivery.date ? (
+          {/* "For Further Notice" is retired with "Confirm later" (owner ruling
+              2026-08-15): a new order always carries a real date, so the only
+              two states left are the date and "not picked yet". */}
+          {draft.delivery.date ? (
             <div className="summary__row">
               <span className="key">Date</span>
               <span className="val">{draft.delivery.date}</span>

@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { CatalogResponse } from "@carres/shared";
 import {
   DRAFT_STORAGE_KEY,
   type WizardDraft,
+  cartGoodsIssue,
   clearDraft,
   composeDisposalSizeSummary,
   composeEmergency,
@@ -494,19 +496,24 @@ describe("step3DateValid — delivery date gate (2026-05-22, Loo)", () => {
     return d.toISOString().slice(0, 10);
   }
 
-  it("accepts dateTbd regardless of lead time", () => {
+  /* ⛔ OWNER RULING 2026-08-15 (Jess) — the Customer Delivery date is a
+     PROMISE, and "Confirm later" is retired. A dateless draft is refused
+     whatever the retired flag says, so the operator can never be sent to a
+     customer who has already answered. */
+  it("refuses a dateless draft even when the retired dateTbd flag is set", () => {
     const d = validDraft();
     d.delivery.date = "";
     d.delivery.dateTbd = true;
-    expect(step3DateValid(d, 21, TODAY)).toBe(true);
+    expect(step3DateValid(d, 21, TODAY)).toBe(false);
+    expect(step3DateFirstIssue(d, 21, TODAY)).toContain("ask the customer for the date");
   });
 
-  it("rejects when date empty and not TBD", () => {
+  it("rejects when the date is empty", () => {
     const d = validDraft();
     d.delivery.date = "";
     d.delivery.dateTbd = false;
     expect(step3DateValid(d, 14, TODAY)).toBe(false);
-    expect(step3DateFirstIssue(d, 14, TODAY)).toContain("pick a date");
+    expect(step3DateFirstIssue(d, 14, TODAY)).toContain("ask the customer for the date");
   });
 
   it("rejects mattress date < today + 14", () => {
@@ -677,6 +684,69 @@ describe("dataUrlToBlob", () => {
 
   it("throws on malformed input", () => {
     expect(() => dataUrlToBlob("garbage")).toThrow();
+  });
+});
+
+/**
+ * ⛔ A SALES ORDER MUST CONTAIN GOODS — owner ruling 2026-08-15.
+ *
+ * The Guarantee attachment law generalised to the whole cart. The gate is
+ * POSITIVE-recognition only, which is the half a test has to pin: an
+ * unresolvable SKU must stay sellable, or a not-yet-catalogued line silently
+ * blocks a real sale.
+ */
+describe("cartGoodsIssue — a service never sells alone", () => {
+  function catalogOf(pairs: Array<[sku: string, category: string]>): CatalogResponse {
+    const models = pairs.map(([, category], i) => ({ id: `m${i}`, category }));
+    return {
+      models,
+      skus: pairs.map(([sku], i) => ({ sku, modelId: `m${i}` })),
+    } as unknown as CatalogResponse;
+  }
+  const line = (sku: string) => ({ localId: sku, sku, qty: 1, attrs: null, unitPrice: 100, label: sku });
+
+  it("passes a cart that carries a product", () => {
+    const d = validDraft();
+    d.lines = [line("MS-Q"), line("SVC-DISPOSE-MATTRESS")];
+    expect(
+      cartGoodsIssue(d, catalogOf([["MS-Q", "mattress"], ["SVC-DISPOSE-MATTRESS", "service"]])),
+    ).toBeNull();
+  });
+
+  it("refuses a cart of nothing but service lines", () => {
+    const d = validDraft();
+    d.lines = [line("SVC-DISPOSE-MATTRESS")];
+    expect(
+      cartGoodsIssue(d, catalogOf([["SVC-DISPOSE-MATTRESS", "service"]])),
+    ).toContain("add the product this service belongs to");
+  });
+
+  it("refuses a guarantee sold on its own — the attachment law, generalised", () => {
+    const d = validDraft();
+    d.lines = [line("GRT-MATTRESS-15Y")];
+    expect(cartGoodsIssue(d, catalogOf([["GRT-MATTRESS-15Y", "guarantee"]]))).not.toBeNull();
+  });
+
+  it("treats a SKU the catalog cannot resolve as GOODS — nothing is refused by elimination", () => {
+    const d = validDraft();
+    d.lines = [line("SOME-LEGACY-CODE")];
+    expect(cartGoodsIssue(d, catalogOf([["SVC-DISPOSE-MATTRESS", "service"]]))).toBeNull();
+  });
+
+  it("says nothing without a catalog — the create door is the authority", () => {
+    const d = validDraft();
+    d.lines = [line("SVC-DISPOSE-MATTRESS")];
+    expect(cartGoodsIssue(d, null)).toBeNull();
+  });
+});
+
+describe("loadDraft — the retired 'Confirm later' flag does not survive a restore", () => {
+  it("normalises a pre-2026-08-15 draft's dateTbd to false", () => {
+    const d = validDraft();
+    d.delivery.dateTbd = true;
+    d.delivery.date = "";
+    saveDraft(d);
+    expect(loadDraft()?.delivery.dateTbd).toBe(false);
   });
 });
 

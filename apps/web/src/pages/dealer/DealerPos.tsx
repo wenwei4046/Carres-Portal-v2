@@ -43,6 +43,7 @@ import { triggerLinesInCart, type PwpTriggerLine } from "./pos/pwp-line";
 import { extensionForMime, uploadDataUrl } from "@/lib/storage";
 import {
   type WizardDraft,
+  cartGoodsIssue,
   clearDraft,
   composeEmergency,
   emptyDraft,
@@ -484,8 +485,12 @@ export default function DealerPos({
       !!effectiveDealerId &&
       step1Valid(draft, entryFormCfg) &&
       step2Valid(draft) &&
+      /* ⛔ A SALES ORDER MUST CONTAIN GOODS (owner ruling 2026-08-15). The
+         shell's own gate, so a cart edited outside the drawer cannot reach
+         CONFIRM either. */
+      cartGoodsIssue(draft, catalogQ.data ?? null) === null &&
       step3DateValid(draft, minLeadDays),
-    [draft, minLeadDays, effectiveDealerId, entryFormCfg],
+    [draft, minLeadDays, effectiveDealerId, entryFormCfg, catalogQ.data],
   );
   // 0276 — a RENTAL cart collects nothing at signing, so the payment half of
   // step4Valid does not apply to it (it made the Complete button permanently
@@ -732,9 +737,12 @@ export default function DealerPos({
           birthday: draft.customer.birthday || null,
         },
         delivery: {
-          date: draft.delivery.dateTbd ? null : draft.delivery.date,
-          proceedDate: draft.delivery.dateTbd ? null : (draft.delivery.proceedDate || null),
-          dateTbd: draft.delivery.dateTbd,
+          /* ⛔ Owner ruling 2026-08-15 — a new Sales Order always carries a
+             real Customer Delivery date. `step3DateValid` has already refused
+             an empty one, and the create door refuses `dateTbd` outright. */
+          date: draft.delivery.date,
+          proceedDate: draft.delivery.proceedDate || null,
+          dateTbd: false,
           floor: draft.delivery.floor,
           hasLift: draft.delivery.hasLift,
           stairItems: draft.delivery.stairItems,
