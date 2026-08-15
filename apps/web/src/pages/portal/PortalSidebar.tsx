@@ -50,7 +50,12 @@ function orderedItems(group: PortalNavGroup, role: Parameters<typeof visibleItem
  * column is `auto`, so every area collapses consistently. Collapsed mode shows
  * the real heart mark (`/carres-logo.png`) + the active area's items as icons.
  *
- * Visual: the v17 Operation rail (clean cool-gray, 3px flame active bar). Badge
+ * Visual: the v17 Operation rail (clean cool-gray), with the governed blue
+ * selection treatment on the current destination — 3px `kit-blue-9` active bar
+ * + `kit-blue-3` wash (`docs/ui/MASTER.md` PORTAL NAVIGATION ACTIVE COLOUR,
+ * APPROVED / LOCKED). Never flame: red in Carres means late / act now, so an
+ * "I am on this page" marker may not spend it. The grey `base-100` wash it
+ * replaced was not a selection colour at all. Badge
  * counts (orders / procurement / service-notes) + the Approvals pending pill are
  * fetched here, each gated by role so an operation user never calls the
  * principal dashboard API (and vice-versa).
@@ -240,19 +245,19 @@ export default function PortalSidebar() {
                   onClick={() => fireMarkSeen(item.badge)}
                   title={item.label}
                   className={`relative w-full px-0 py-[9px] rounded flex items-center justify-center ${
-                    active ? "bg-base-100" : "hover:bg-hovertint"
+                    active ? "bg-kit-blue-3" : "hover:bg-hovertint"
                   }`}
                 >
                   {active && (
                     <span
-                      className="absolute left-0 top-[7px] bottom-[7px] bg-primary rounded-r-sm"
+                      className="absolute left-0 top-[7px] bottom-[7px] bg-kit-blue-9 rounded-r-sm"
                       style={{ width: 3 }}
                     />
                   )}
                   <item.icon
                     size={18}
                     strokeWidth={2}
-                    className={`shrink-0 ${active ? "text-primary" : "text-base-400"}`}
+                    className={`shrink-0 ${active ? "text-kit-blue-9" : "text-base-400"}`}
                   />
                   {dot && (
                     <span className="absolute top-1 right-1.5 w-1.5 h-1.5 rounded-full bg-primary" />
@@ -292,7 +297,7 @@ export default function PortalSidebar() {
                         const baseCls =
                           "relative w-full text-left px-3.5 py-[9px] rounded text-body flex items-center gap-[11px]";
                         const cls = active
-                          ? `${baseCls} bg-base-100 text-base-900 font-semibold`
+                          ? `${baseCls} bg-kit-blue-3 text-base-900 font-semibold`
                           : `${baseCls} text-base-600 font-medium hover:bg-hovertint`;
                         const startsSection = item.section && item.section !== items[index - 1]?.section;
                         return (
@@ -309,7 +314,7 @@ export default function PortalSidebar() {
                           >
                             {active && (
                               <span
-                                className="absolute left-0 top-[7px] bottom-[7px] bg-primary rounded-r-sm"
+                                className="absolute left-0 top-[7px] bottom-[7px] bg-kit-blue-9 rounded-r-sm"
                                 style={{ width: 3 }}
                               />
                             )}
@@ -317,7 +322,7 @@ export default function PortalSidebar() {
                               size={18}
                               strokeWidth={2}
                               className={`shrink-0 ${
-                                active ? "text-primary" : "text-base-400"
+                                active ? "text-kit-blue-9" : "text-base-400"
                               }`}
                             />
                             <span className="flex-1">{item.label}</span>
