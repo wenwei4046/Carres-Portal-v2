@@ -4,17 +4,28 @@ export * from "./issue-tracker";
 
 export {
   resolveSalesOrderRoute,
+  type DeliveryRelease,
+  type GoodsRoute,
+  type GoodsSubLane,
+  type LinkedProblem,
+  type OrderTrack,
+  type OrderTrackKey,
+  type ReleaseRequirement,
+  type ReleaseRequirementId,
   type RouteDeliveryAttempt,
-  type RouteLoan,
+  type RouteDoor,
+  type RouteLinkedCase,
+  type RouteLinkedClaim,
+  type RouteMark,
   type RoutePurchaseOrder,
+  type RouteReceivingRecord,
+  type RouteStation,
   type SalesOrderRoute,
-  type SalesOrderRouteDocument,
-  type SalesOrderRouteFact,
-  type SalesOrderRouteFactState,
-  type SalesOrderRouteGroup,
   type SalesOrderRouteInput,
-  type SalesOrderRouteLane,
-  type SalesOrderRouteLaneKey,
+  type StationAction,
+  type StationOwnerKey,
+  type SubLaneSource,
+  type TrackMark,
 } from "./sales-order-route";
 
 export {
@@ -2545,6 +2556,10 @@ export {
 export * from "./schemas/hr-team";
 export * from "./sales-order-classification";
 export * from "./sales-order-commitment";
+// ONE FIELD CONTRACT — the choices the Sales Portal offers and the emergency
+// contact's three-fields-⇄-one-column codec, shared with the object page so the
+// two surfaces cannot drift (owner ruling 2026-08-15).
+export * from "./sales-order-form";
 // CARD 2 — unit/stock allocation truth: the one arithmetic for "which real
 // Units are reserved/sold to this SO, and what is still unallocated".
 export * from "./sales-order-allocation";

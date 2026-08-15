@@ -35,6 +35,7 @@ import Button from "@/components/kit/Button";
 import Modal from "@/components/kit/Modal";
 import Select from "@/components/kit/Select";
 import Textarea from "@/components/kit/Textarea";
+import { useAuth } from "@/lib/auth";
 import { fmtDate } from "@/lib/fmt-date";
 import {
   useApplyAttributionChange,
@@ -91,6 +92,11 @@ export default function SalesOrderAttribution({
 }) {
   const liveQ = useSalesOrderAttribution(orderId);
   const request = liveQ.data?.request ?? null;
+  /* GATE 3 names HR and the principal as the deciders; the owner ruling of
+     2026-08-15 makes them the only ones who may OPEN the change too. A hidden
+     button is courtesy — `sales_order_*_attribution` is still the control. */
+  const role = useAuth((s) => s.role);
+  const canRequest = role === "principal" || role === "hr";
 
   const [formOpen, setFormOpen] = useState(false);
   const [withdrawing, setWithdrawing] = useState(false);
@@ -275,14 +281,21 @@ export default function SalesOrderAttribution({
           <p className="text-meta text-base-500">
             Sales ownership changes only after approval.
           </p>
-          <Button
-            size="sm"
-            variant="neutral"
-            onClick={() => setFormOpen(true)}
-            data-testid="attribution-open"
-          >
-            Request ownership change
-          </Button>
+          {/* ⭐ READ-ONLY FOR OPERATION — owner ruling 2026-08-15. Who gets paid
+              is not an Operation correction, and a button that always refuses
+              teaches the operator to ignore refusals. The door appears for the
+              roles GATE 3 lets decide it; the REQUEST panel above stays visible
+              to everyone, because a pending change is truth, not an action. */}
+          {canRequest && (
+            <Button
+              size="sm"
+              variant="neutral"
+              onClick={() => setFormOpen(true)}
+              data-testid="attribution-open"
+            >
+              Change salesperson — needs approval
+            </Button>
+          )}
         </div>
       )}
 
