@@ -48,7 +48,7 @@ export default function Toast({ kind, message }: { kind: ToastKind; message: str
       {/* The tone lives on the GLYPH, not on the surface: a fully coloured
        *  toast is a status pill the size of a card, and §3.4 keeps colour for
        *  the thing that earned it. */}
-      <span className={`flex items-center rounded-pill p-1 ${TONE_CLASS[kind]}`}>
+      <span className={`flex items-center rounded-full p-1 ${TONE_CLASS[kind]}`}>
         <Icon name={GLYPH[kind]} size={14} />
       </span>
       {message}

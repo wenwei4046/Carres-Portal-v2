@@ -1847,7 +1847,7 @@ export default function OperationToOrder() {
           partly || (g && g.pos.length > 0) ? (
             <span className="flex items-center gap-2 min-w-0">
               {partly ? (
-                <span className="shrink-0 rounded-pill bg-kit-amber-3 px-2 py-0.5 text-label text-kit-amber-11">
+                <span className="shrink-0 rounded-full bg-kit-amber-3 px-2 py-0.5 text-label text-kit-amber-11">
                   {W.partlyOrdered}
                 </span>
               ) : null}

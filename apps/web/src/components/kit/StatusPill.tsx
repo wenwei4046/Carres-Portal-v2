@@ -42,7 +42,7 @@ export default function StatusPill({
     <span
       data-kit="status-pill"
       data-tone={tone}
-      className={`inline-flex items-center gap-1 rounded-pill px-2 py-1 text-label max-w-full ${TONE_CLASS[tone]}`}
+      className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-label max-w-full ${TONE_CLASS[tone]}`}
     >
       {icon && <Icon name={icon} size={14} />}
       <span className="truncate">{children}</span>
