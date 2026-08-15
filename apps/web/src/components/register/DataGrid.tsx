@@ -50,7 +50,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { Search, Columns3, RotateCcw, Filter, Download, ChevronDown } from "lucide-react";
+import { Search, Columns3, RotateCcw, Filter, Download, ChevronDown, Printer } from "lucide-react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
 import { SkeletonRows } from "./Skeleton";
@@ -182,6 +182,9 @@ export type DataGridProps<T> = {
   /** Reference-toolbar slots. Start renders before Search; End renders after
       Filters / Export / Columns. The legacy `toolbar` slot is unchanged. */
   toolbarStart?: ReactNode;
+  /** Outputs valid ONLY for the exact selection — MASTER.md:588. The label
+   *  receives the count so the button prints the truthful number. */
+  selectionActions?: Array<{ label: (n: number) => string; onClick: (rows: never[]) => void }>;
   toolbarEnd?: ReactNode;
   /** Fixed informational footer. Receives the filtered result and, when
       present, the selected rows that remain in that result. */
@@ -382,6 +385,7 @@ function DataGridInner<T>({
   toolbar,
   toolbarStart,
   toolbarEnd,
+  selectionActions,
   statusSummary,
   outputActions,
   focusSearchNonce,
@@ -1685,6 +1689,17 @@ function DataGridInner<T>({
             <Download size={14} strokeWidth={1.75} aria-hidden />
             <span>Export Excel ({selectedVisibleRows.length})</span>
           </button>
+          {(selectionActions ?? []).map((a) => (
+            <button
+              key={a.label(0)}
+              type="button"
+              className={styles.toolbarPill}
+              onClick={() => a.onClick(selectedVisibleRows as never[])}
+            >
+              <Printer size={14} strokeWidth={1.75} aria-hidden />
+              <span>{a.label(selectedVisibleRows.length)}</span>
+            </button>
+          ))}
         </div>
       )}
 

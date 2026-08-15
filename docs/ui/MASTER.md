@@ -925,6 +925,13 @@ looks at this page: Search · `Export ▾` · Columns. Nothing else lives here.
   of Row 2 is a row of icons; one word inside it reads as an exception, and the caret already says
   a menu opens. Its hover/accessible name is `Export`, and the menu offers **Excel · PDF · Print**
   — three outputs, one door, never scattered across `…` or separate permanent buttons.
+- **Selection changes WHAT `Export ▾` can produce, not just how many.** With no selection the
+  outputs describe the LIST: Excel · PDF · Print. With rows ticked the same space also offers the
+  DOCUMENTS those rows own — `Print {n} sales orders` — assembled server-side under RLS, one
+  governed single-order page per order in one file, with the truthful count in the label. This is
+  the 2990 batch shape (`SalesInvoicesList.tsx:400`) translated into Carres: the operator who ticks
+  69 rows wants the 69 documents, not a picture of the listing. The two must never be confused, so
+  they never share a word.
 - **The Excel and PDF outputs derive their cells ONCE.** A cell that says one thing on screen,
   another in Excel and a third in the PDF is the defect that shared derivation exists to prevent.
   The PDF prints the current view and carries no letterhead, terms or signature block: it is a
