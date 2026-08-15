@@ -48,6 +48,26 @@ export const NOT_RECORDED = "Not recorded";
 export const NO_DATE_YET = "No delivery date";
 
 /**
+ * `Carres Kelana Jaya` → `Kelana Jaya`, for the SHOWROOM column only.
+ *
+ * Every showroom is ours — the column is headed `Showroom` and all four rows
+ * in production read `Carres …` — so the house name distinguishes nothing here
+ * and costs the place name its width: at 126px `Carres Maluri Cheras` clipped
+ * to `Carres Maluri C…`, hiding the only part that identifies the branch.
+ *
+ * DISPLAY ONLY, and deliberately NOT applied to `Deliver To`. There the house
+ * name is the whole point: `Carres Klang` sits beside `AL Sungai Buloh`, and
+ * dropping it would leave `Klang` unable to say whose warehouse it is. Nothing
+ * is written back, and every document keeps the outlet's real registered name.
+ */
+export function showroomShort(name: string | null | undefined): string {
+  const n = (name ?? "").trim();
+  if (!n) return "";
+  const tail = n.replace(/^carres\s+/i, "").trim();
+  return tail || n;
+}
+
+/**
  * ⭐ AN ABSENCE IS QUIETER THAN A FACT — owner ruling 2026-08-15 (Chai).
  *
  * `Not recorded` and `Not given` are the honest words for an empty cell (a
@@ -192,7 +212,7 @@ export const REGISTER_FIELDS: readonly RegisterField[] = [
      the same declaration that has always been in this catalog, promoted to a
      default. No new writer, no new query, no new fact. */
   { key: "showroom", label: "Showroom", width: "126px", group: "Sales ownership", on: true,
-    text: (r) => r.o.outlets?.name || NOT_RECORDED },
+    text: (r) => showroomShort(r.o.outlets?.name) || NOT_RECORDED },
   { key: "po_number", label: "PO No", width: "170px", group: "Document", on: true,
     text: (r) => r.poNumbers.join(" · ") || NOT_RECORDED },
   { key: "do_number", label: "DO No", width: "150px", group: "Document", on: true,

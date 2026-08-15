@@ -180,6 +180,15 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     expect(screen.getByTestId("sales-orders-destination-header")).toHaveClass("h-[50px]");
   });
 
+  it("Showroom drops the house name — every showroom is ours (§6.7)", () => {
+    listHookState.data = { orders: [order({
+      outlets: { name: "Carres Maluri Cheras" },
+    })] };
+    mount();
+    expect(screen.getByText("Maluri Cheras")).toBeInTheDocument();
+    expect(screen.queryByText("Carres Maluri Cheras")).not.toBeInTheDocument();
+  });
+
   it("renders exactly one work toolbar, and Search rests as an icon (§6.7)", () => {
     mount();
     expect(screen.getAllByTestId("work-toolbar")).toHaveLength(1);
@@ -458,7 +467,7 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
       "PO No",
       "DO No",
     ]);
-    expect(screen.getByText("Carres Kelana Jaya")).toBeInTheDocument();
+    expect(screen.getByText("Kelana Jaya")).toBeInTheDocument();
   });
 
   it("shows only the customer name in the default cell while retaining phone search context", () => {
