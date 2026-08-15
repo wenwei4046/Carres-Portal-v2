@@ -59,6 +59,7 @@ vi.mock("react-router-dom", async () => {
 });
 
 import OperationWork from "./OperationWork";
+import { fmtDate } from "@/lib/fmt-date";
 
 const TODAY = "2026-07-27"; // a Monday
 
@@ -169,7 +170,11 @@ describe("OperationWork — two filters over the one open work set", () => {
     expect(screen.queryByTestId("work-row-SO-1202-assign_logistics")).toBeNull();
     // Grouped under a weekday+date header — never a bare Today.
     // 2026-08-05 (Wed) − 3 working days on the Mon–Sat week = Sat 1 Aug.
-    expect(screen.getByTestId("work-day-2026-08-01")).toHaveTextContent("Sat 1 Aug");
+    // Spelled by the ONE formatter since the 2026-08-15 year ruling deleted
+    // the engine's own `workDayLabel`, which dropped this comma.
+    expect(screen.getByTestId("work-day-2026-08-01")).toHaveTextContent(
+      fmtDate("2026-08-01"),
+    );
   });
 
   it("Team Work shows everyone and the owner chip scopes — one set, filtered", () => {
