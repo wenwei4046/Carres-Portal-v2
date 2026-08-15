@@ -61,7 +61,9 @@ describe("the radius law · a pill is a capsule", () => {
   });
 
   it("the checkbox keeps 4px — a fully rounded checkbox is a radio button", () => {
-    const { container } = render(<Checkbox checked={false} onChange={() => {}} label="Pick" />);
+    const { container } = render(
+      <Checkbox id="radius-law-box" label="Pick" checked={false} onCheckedChange={() => {}} />,
+    );
     expect(container.innerHTML).toContain("rounded-pill");
     expect(container.innerHTML).not.toContain("rounded-full");
   });
