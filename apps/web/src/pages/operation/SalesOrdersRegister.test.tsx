@@ -479,7 +479,7 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     const table = screen.getByRole("table", { name: "Goods on SO-1303" });
     expect(table).toBeInTheDocument();
     expect(within(table).getAllByRole("columnheader").map((cell) => cell.textContent)).toEqual([
-      "Category", "Unit ID", "SKU", "Qty", "Item", "Deliver To",
+      "Category", "Unit ID", "Deliver To", "SKU", "Qty", "Item",
     ]);
     const row = screen.getByTestId("expanded-good-B1201S-K");
     expect(row).toHaveTextContent("MATTRESS");
