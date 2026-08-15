@@ -50,7 +50,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { Search, Columns3, RotateCcw, Filter, Download } from "lucide-react";
+import { Search, Columns3, RotateCcw, Filter, Download, ChevronDown } from "lucide-react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
 import { SkeletonRows } from "./Skeleton";
@@ -439,6 +439,7 @@ function DataGridInner<T>({
      discoverable toolbar button + popover with a per-column checkbox + Reset
      link, matching houzs-erp/src/pages/SalesOrderPage.tsx lines 576-624. */
   const [columnsMenuOpen, setColumnsMenuOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const [outputMenuOpen, setOutputMenuOpen] = useState(false);
   /* The Columns popover is fixed-positioned (not absolute) so it escapes the
      grid card's `overflow: hidden`, which otherwise clips the dropdown when the
@@ -1395,18 +1396,40 @@ function DataGridInner<T>({
       {!(selectable && selectedVisibleRows.length > 0) ? (
       <div className={styles.toolbar} data-testid={isReference ? "work-toolbar" : undefined}>
         {isReference && toolbarStart}
+        {isReference && <div className={styles.toolbarSpacer} />}
         {!embedded && (
-          <div className={styles.searchWrap}>
-            <Search {...ICON} aria-hidden />
-            <input
-              ref={searchRef}
-              className={styles.searchInput}
-              type="search"
-              placeholder={searchPlaceholder}
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
+          isReference && !searchOpen && !search ? (
+            <button
+              type="button"
+              aria-label="Search"
+              title="Search"
+              data-testid="search-icon"
+              className={styles.toolbarIcon}
+              onClick={() => setSearchOpen(true)}
+            >
+              <Search {...ICON} aria-hidden />
+            </button>
+          ) : (
+            <div className={styles.searchWrap}>
+              <Search {...ICON} aria-hidden />
+              <input
+                ref={searchRef}
+                className={styles.searchInput}
+                type="search"
+                placeholder={searchPlaceholder}
+                value={search}
+                autoFocus={isReference && searchOpen}
+                onChange={(e) => setSearch(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") {
+                    setSearch("");
+                    setSearchOpen(false);
+                  }
+                }}
+                onBlur={() => { if (!search) setSearchOpen(false); }}
+              />
+            </div>
+          )
         )}
         {isReference ? null : toolbar}
         {!isReference && <div className={styles.toolbarSpacer} />}
@@ -1450,6 +1473,7 @@ function DataGridInner<T>({
           >
             <Download size={14} strokeWidth={1.75} aria-hidden />
             <span>Export</span>
+            <ChevronDown size={12} strokeWidth={2} aria-hidden />
           </button>
           {outputMenuOpen && (
             <div className={styles.columnsMenu} role="menu">
@@ -1485,7 +1509,9 @@ function DataGridInner<T>({
           <button
             ref={columnsBtnRef}
             type="button"
-            className={`${styles.toolbarPill} ${columnsMenuOpen ? styles.toolbarPillOn : ""}`}
+            aria-label="Columns"
+            title="Columns"
+            className={`${styles.toolbarPill} ${isReference ? styles.toolbarPillIconOnly : ""} ${columnsMenuOpen ? styles.toolbarPillOn : ""}`}
             onClick={(e) => {
               e.stopPropagation();
               setColumnsMenuOpen((v) => {
@@ -1499,7 +1525,7 @@ function DataGridInner<T>({
             }}
           >
             <Columns3 size={14} strokeWidth={1.75} aria-hidden />
-            <span>Columns</span>
+            {!isReference && <span>Columns</span>}
           </button>
           {columnsMenuOpen && (
             <>

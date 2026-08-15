@@ -500,16 +500,7 @@ export default function SalesOrdersRegister() {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <DestinationHeader right={
-        <button
-          type="button"
-          data-testid="new-sales-order"
-          onClick={() => navigate("/operation/orders/so/new")}
-          className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full bg-kit-blue-9 px-3 text-meta font-semibold text-white hover:opacity-90"
-        >
-          <Plus size={14} strokeWidth={2.25} /> New Sales Order
-        </button>
-      } />
+      <DestinationHeader />
 
       {cancelTarget && (
         <CancelSalesOrderDialog
@@ -585,6 +576,16 @@ export default function SalesOrdersRegister() {
               onToggleAll: toggleAll,
             }}
             outputActions={[{ label: "Print", onClick: () => window.print() }]}
+            toolbarStart={
+              <button
+                type="button"
+                data-testid="new-sales-order"
+                onClick={() => navigate("/operation/orders/so/new")}
+                className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-full bg-kit-blue-9 px-3 text-meta font-semibold text-white hover:opacity-90"
+              >
+                <Plus size={14} strokeWidth={2.25} /> New Sales Order
+              </button>
+            }
             statusSummary={(filtered, selectedRows) => (
               <RegisterResultSummary
                 filtered={filtered}
