@@ -139,7 +139,7 @@ describe("lineKind — the safety answer", () => {
 describe("accShort", () => {
   it("speaks the recognised type, and falls back to the first word otherwise", () => {
     expect(accShort("Memory Foam Pillow")).toBe("Pillow");
-    expect(accShort("Mattress Protector-Q")).toBe("M.P");
+    expect(accShort("Mattress Protector-Q")).toBe("Mattress protector");
     expect(accShort("Carress Footrest-K")).toBe("Footrest");
     expect(accShort("Microfiber Cloth")).toBe("Microfiber");
   });
@@ -155,7 +155,7 @@ describe("lineSortRank", () => {
     );
   });
 
-  it("keeps the frozen order mattress → bedframe → sofa → pillow → M.P → service", () => {
+  it("keeps the frozen order mattress → bedframe → sofa → pillow → protector → service", () => {
     const ranks = [
       "mattress:FirmCare-K",
       "bedframe:Hilton",

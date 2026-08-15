@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import { fmtMoney } from "@carres/shared";
+import { accShort, fmtMoney } from "@carres/shared";
 import OperationOrdersControl, {
   buildOrdersCsv,
   buildOrdersPrintHtml,
@@ -19,6 +19,7 @@ import OperationOrdersControl, {
   compareOrderSortValues,
   ORDER_SORTABLE_COLUMNS,
   ORDER_FILTER_COLUMNS,
+  CATEGORY_OPTS,
 } from "./OperationOrdersControl";
 import type {
   StockInfo,
@@ -1201,12 +1202,35 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     listHookState.data = { orders: [makeRow(partial)] };
   }
 
+  /**
+   * ⭐ THE ACCESSORY FACET'S LABEL **IS** ITS MATCH KEY.
+   *
+   * `orderHasAcc` compares `accShort(sku)` for equality, so the moment the
+   * displayed word and the vocabulary word drift apart the facet silently
+   * filters to ZERO — no error, no empty state, just a category that finds
+   * nothing. That is exactly what happened when `accShort` stopped saying
+   * `M.P`, and nothing in this suite noticed. This test ties the two together.
+   */
+  it("every accessory CATEGORY facet says the word accShort returns, and still matches on it", () => {
+    const cases = [
+      { key: "pillow", sku: "Essential Memory Pillow(L)" },
+      { key: "mp", sku: "Microfiber Waterproof Mattress Protector-K" },
+    ];
+    for (const { key, sku } of cases) {
+      const opt = CATEGORY_OPTS.find((c) => c.key === key);
+      expect(opt, `no CATEGORY option keyed ${key}`).toBeTruthy();
+      expect(opt!.label).toBe(accShort(sku));
+      expect(opt!.match(makeRow({ id: key, so: 1, order_lines: [{ sku, qty: 1 }] }))).toBe(true);
+    }
+    expect(CATEGORY_OPTS.map((c) => c.label)).not.toContain("M.P");
+  });
+
   it("catQty classifies core lines by category — MS / BF / Sofa (services + accessories excluded) (A1)", () => {
     const lines = [
       { sku: "MS01-L1201S-Q", qty: 2 }, // Mattress, Queen → core
       { sku: "BF02-1013", qty: 1 }, // Bedframe, no size → core
       { sku: "Pillow", qty: 3 }, // accessory — not a core category
-      { sku: "Microfiber Waterproof Mattress Protector-K", qty: 1 }, // → M.P, accessory
+      { sku: "Microfiber Waterproof Mattress Protector-K", qty: 1 }, // → Mattress protector, accessory
       { sku: "Sofa Disposal", qty: 1 }, // → Disposal, SERVICE
     ];
     // Accessories + service never count towards a core category.

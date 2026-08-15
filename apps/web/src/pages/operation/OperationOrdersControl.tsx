@@ -1475,7 +1475,7 @@ function orderHasAcc(o: operationOrderListRow, name: string): boolean {
     (l) => lineCategory(l.sku) === "acc" && accShort(l.sku) === name,
   );
 }
-const CATEGORY_OPTS: {
+export const CATEGORY_OPTS: {
   key: string;
   label: string;
   match: (o: operationOrderListRow) => boolean;
@@ -1484,7 +1484,11 @@ const CATEGORY_OPTS: {
   { key: "bedframe", label: "Bedframe", match: (o) => orderHasCore(o, "bedframe") },
   { key: "sofa", label: "Sofa", match: (o) => orderHasCore(o, "sofa") },
   { key: "pillow", label: "Pillow", match: (o) => orderHasAcc(o, "Pillow") },
-  { key: "mp", label: "M.P", match: (o) => orderHasAcc(o, "M.P") },
+  /* The KEY stays `mp` — it is the saved-filter identifier, not a word the
+     operator reads. The LABEL and the `accShort` sentinel are the governed
+     word (`COPY-STANDARD.md`), and they must move together: the match is an
+     equality against what `accShort` returns. */
+  { key: "mp", label: "Mattress protector", match: (o) => orderHasAcc(o, "Mattress protector") },
 ];
 
 /** Primary supplier of an order = the supplier of its FIRST core line
@@ -1641,9 +1645,12 @@ function itemTags(
         name: `${CORE_LABEL[cat]}${e.size ? `(${e.size})` : ""}`,
       });
   }
-  // Accessories ordered pillow → M.P → others, then service last (Jess: fixed
-  // item sequence). Core already ordered via CORE_ORDER above.
-  const accRank = (name: string) => (name === "Pillow" ? 0 : name === "M.P" ? 1 : 2);
+  // Accessories ordered pillow → mattress protector → others, then service
+  // last (Jess: fixed item sequence). Core already ordered via CORE_ORDER
+  // above. The names compared here come from `accShort`, so they are the
+  // governed words.
+  const accRank = (name: string) =>
+    name === "Pillow" ? 0 : name === "Mattress protector" ? 1 : 2;
   const restSorted = [...rest.entries()].sort(
     (a, b) => accRank(a[0]) - accRank(b[0]),
   );
@@ -1653,7 +1660,8 @@ function itemTags(
   return out;
 }
 
-/** Tag display label — ALWAYS qty-prefixed ("1× M.P", "2× Disposal"), no qty-1
+/** Tag display label — ALWAYS qty-prefixed ("1× Mattress protector",
+ *  "2× Disposal"), no qty-1
  *  exemption (Jess P1: the standard format). The only bare tag is the
  *  single-category CORE de-dup, decided at render time. */
 function tagLabel(t: { kind: ItemKind; qty: number; name: string }): string {
