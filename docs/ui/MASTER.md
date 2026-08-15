@@ -361,22 +361,50 @@ answer **who · when · what I must do · what just happened** without leaving t
 They are not duplicate modules and never become a second home for business truth.
 
 ### WHAT IS ON SCREEN TODAY
-`apps/web/src/pages/operation/components/rail/` — `CalendarPanel` · `TeamPanel` · `KeepPanel` ·
-`TasksPanel`. *Measured 2026-08-05 by listing the directory; **behaviour not read line by
-line.***
+`apps/web/src/pages/operation/components/rail/` — `CalendarPanel` · `TeamPanel` ·
+`TasksPanel` (`KeepPanel` is unmounted). The four rail slots are `TeamPanel` · `CalendarPanel` ·
+`TasksPanel` · `GlobalActivity`/`AnnotationTimeline`. *Measured 2026-08-15 by reading
+`OperationRightRail.tsx` and each panel line by line — the 2026-08-05 entry listed the
+directory only and said so.*
 
 ### FROZEN RULES
 - **No widget is an island.** Widgets interlink with each other AND with the LEFT panel; an
   action anywhere cascades to the relevant widgets.
 - **The rail is quick peek, not navigation truth and not a second place to act.** A row may
   deep-link to the authoritative object/action. The owning module remains the writer.
+  **ONE ruled exception: the duty edit door on Team** — duty identity has no other home
+  (`../purchasing/MASTER.md` §2.2 makes this panel the one home), so the only place it can be
+  corrected is the only place it is stated. It is not a precedent for a second writer.
 - **`My Work` in the rail is a preview of the formal `Work` destination.** The full destination
   owns the `My Work · Team Work` views over one work set; the rail may not create another work set.
-- **Team** previews availability/coverage and open/overdue workload; People/HR remains the owner.
+  **It therefore wears the Work destination's own icon** (`portal-nav.ts`, `ListTodo`) in both
+  the collapsed strip and the expanded header — owner ruling 2026-08-15. A peek wearing a
+  different face than the door it previews reads as a different feature; the `Flag` it replaced
+  was borrowed from the Orders follow-up column, a different system. Asserted by
+  `OperationRightRail.ui-contract.test.ts`, which reads the icon out of the nav rather than
+  hard-coding it, so the two can never drift.
+- **Team** previews availability/coverage and per-person `{n} open · {n} overdue`, and
+  People/HR remains the owner. **The numbers come from the ONE work engine** — `useOpenWorkSet`,
+  literally the function the Work destination runs — so the rail and Team Work are structurally
+  incapable of printing two answers for one person. Rows deep-link to Team Work scoped to that
+  person (`?tab=work&scope=team&owner=…`); a link seeds the view, it never restricts it.
+  **Everyone appears, including a clear desk at `0 open`** — a rail that hides the people at
+  zero cannot answer *"is anyone free?"*, and a missing name reads as a missing person.
+- **Team states BOTH duties, and neither is ever blank.** `PO DUTY` and `GRN DUTY` are one
+  rota (`ops_po_duty`), auto-assigned through one rotation, resolved server-side.
+  `Not assigned` may appear ONLY when no assignable staff exists, and must then say where to
+  fix it. See `../purchasing/MASTER.md` §2.2 for the duty model itself — this file does not
+  restate it.
 - **Activity** previews recent append-only events and links to their objects; it does not replace
-  an object's History or a module audit surface.
+  an object's History or a module audit surface. **No stored value reaches the screen untranslated
+  and no `—` stands in for a value** — the two rulings are in `../COPY-STANDARD.md` and bind
+  every panel that renders an event, not only this one.
 - **The calendar's day comes from the BOOKING, through the one shared rule** — never from the
   promised date, or two surfaces put one order on two days.
+- **The calendar names actual days, never `Today` / `Tomorrow`** (owner ruling 2026-08-15). Both
+  single-day chips and every day heading print the real weekday + date; `This week` survives
+  because it is a SPAN. The full ruling, its one history-group exception and the structural
+  enforcement are in `../COPY-STANDARD.md`.
 
 ### WORK OWNER + TWO-LINE ACTION GRAMMAR — OWNER-APPROVED / LOCKED 2026-08-14
 

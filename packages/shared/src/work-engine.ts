@@ -187,7 +187,11 @@ export const MODULE_WORK_RULES: readonly WorkRule[] = [
     key: "receiving.check_in",
     module: "receiving",
     trigger: "goods have an arrival promise and no posted Receiving Session covers them",
-    owner: "the month's GRN-duty holder (ops_po_duty offset−1; never the PO holder)",
+    // `offset−1` used to stand here with no direction, and it was read
+    // backwards where it mattered. The rota reaches FORWARD: GRN duty for a
+    // month is the NEXT month's `ops_po_duty` row (`grnDutyMonth`) — see
+    // `purchasing/MASTER.md` §2.2, whose table is the evidence.
+    owner: "the month's GRN-duty holder (ops_po_duty, the FOLLOWING month; never the PO holder)",
     action: "Check in",
     dueRule: "the promised arrival day",
     completionFact: "a posted Receiving Session (warehouse_receipts + receiving_events 'posted')",

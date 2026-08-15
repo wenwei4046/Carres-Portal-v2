@@ -4,7 +4,6 @@ import {
   carrierDayLoads,
   carrierDayNote,
   daysInRange,
-  dayWord,
   deliveryRange,
   inRange,
   shiftDays,
@@ -66,10 +65,10 @@ describe("bookingDayOf — the ONE booking read (T10)", () => {
   });
 });
 
-describe("deliveryRange — Today / Tomorrow / This week", () => {
+describe("deliveryRange — the three day ranges", () => {
   it("today is one day", () => {
     expect(deliveryRange("today", MON)).toMatchObject({
-      label: "Today",
+      key: "today",
       fromIso: MON,
       toIso: MON,
     });
@@ -104,7 +103,7 @@ describe("deliveryRange — Today / Tomorrow / This week", () => {
   });
 });
 
-describe("daysInRange / inRange / shiftDays / dayWord", () => {
+describe("daysInRange / inRange / shiftDays", () => {
   it("lists both ends inclusive", () => {
     expect(daysInRange(MON, "2026-07-29")).toEqual(["2026-07-27", "2026-07-28", "2026-07-29"]);
     expect(daysInRange(MON, MON)).toEqual([MON]);
@@ -132,10 +131,15 @@ describe("daysInRange / inRange / shiftDays / dayWord", () => {
     expect(shiftDays("2027-01-01", -1)).toBe("2026-12-31");
   });
 
-  it("only today and tomorrow get a word — every other day prints its date", () => {
-    expect(dayWord(MON, MON)).toBe("Today");
-    expect(dayWord("2026-07-28", MON)).toBe("Tomorrow");
-    expect(dayWord("2026-07-29", MON)).toBeNull();
+  // NO RELATIVE DATE WORDS (owner ruling 2026-08-15). `dayWord` returned
+  // `Today` / `Tomorrow` and was deleted with the ruling; a range now carries
+  // DAYS and no word, so there is nothing here that can print one. Asserting
+  // the absence is the enforcement — a `label` that quietly comes back is the
+  // failure this test exists to stop.
+  it("a range carries days and no word", () => {
+    const r = deliveryRange("today", MON);
+    expect(r).toEqual({ key: "today", fromIso: MON, toIso: MON });
+    expect("label" in r).toBe(false);
   });
 });
 

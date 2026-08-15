@@ -161,7 +161,14 @@ function FeedRow({ d, onOpen }: { d: Decorated; onOpen: (orderId: string | null)
           {body ? <span className="text-base-600"> — {body}</span> : null}
         </div>
         <div className="text-label text-base-500 truncate">
-          {row.so ? <span className="font-medium text-base-700">SO-{row.so}</span> : "—"}
+          {/* An event with no order is a portal-wide event, and saying so in
+              words beats a dash the reader has to guess at (owner ruling
+              2026-08-15 — no `—` pretending to be a value). */}
+          {row.so ? (
+            <span className="font-medium text-base-700">SO-{row.so}</span>
+          ) : (
+            "No order"
+          )}
           {row.customer_name ? ` · ${row.customer_name}` : ""}
           {row.actor_name ? ` · ${row.actor_name}` : ""}
           {" · "}

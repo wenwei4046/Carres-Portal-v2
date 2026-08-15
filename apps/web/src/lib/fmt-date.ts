@@ -86,6 +86,31 @@ export function fmtMonth(period: string | null | undefined): string {
 }
 
 /**
+ * Format an ISO date as **"Sat, 15 Aug"** — weekday + day + month, no year.
+ * The compact form for a DAY CHIP, where three chips share one rail width.
+ *
+ * NO RELATIVE DATE WORDS (owner ruling 2026-08-15). The rail's range chips
+ * used to read `Today` / `Tomorrow`; they now name the actual day. The year is
+ * dropped because a chip is ~100px and a chip always points at the current
+ * week — and the full ruled date stays on the chip's hover, which is the rail
+ * law the Purchasing calls calendar already follows.
+ *
+ * Every other date on screen uses `fmtDate`. This is the ONE exception and it
+ * lives here so there is still one home for date spelling.
+ */
+export function fmtDayChip(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const bare = iso.length === 10;
+  const d = new Date(bare ? `${iso}T00:00:00Z` : iso);
+  if (isNaN(d.getTime())) return "—";
+  if (bare) {
+    return `${DAYS[d.getUTCDay()]}, ${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`;
+  }
+  const p = appDateParts(d);
+  return `${p.dow}, ${p.day} ${p.mon}`;
+}
+
+/**
  * Format an ISO date as "12 Jun 26" (no weekday). For compact spots like the
  * Calendar panel's selected-day header.
  */
