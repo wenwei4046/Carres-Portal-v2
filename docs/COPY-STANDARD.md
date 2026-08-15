@@ -663,10 +663,10 @@ headings it needs from this list and adds none.
 recorded here so the dictionary holds them too):
 
 - **A day row prints WEEKDAY + DATE — `Thu 6 Aug` — one format on every row.** Never a bare
-  weekday (`Monday` is ambiguous — which Monday?), never `Today` / `Tomorrow` on a rail
-  (relative words rot in screenshots and re-sort themselves overnight; the Delivery calendar's
-  three VIEWS keep their own ruled names — a view is not a day row). The full date stays on
-  hover.
+  weekday (`Monday` is ambiguous — which Monday?), never `Today` / `Tomorrow`. The full date
+  stays on hover. *(This row used to carve out an exception — "the Delivery calendar's three
+  VIEWS keep their own ruled names, a view is not a day row." **The owner deleted that
+  exception on 2026-08-15**; see the generalised ruling below.)*
 - **`Overdue`** — red, above the day rows, rendered only above zero.
 - **`Later`** — everything beyond a rolling window. Never `Next Week`, which starts lying on
   Thursday. Never `Upcoming` · `Future` · `Beyond`.
@@ -1268,6 +1268,36 @@ are unchanged (`Open WhatsApp` · `Open WhatsApp group`).
 Every word above is ruled. No terminology placeholder is left in Purchasing, and a chat that finds
 one has found a document that was missed.
 
+## ⭐ NO RELATIVE DATE WORDS — owner ruling 2026-08-15, portal-wide
+
+**A date on screen names its actual day. `Today` and `Tomorrow` are not dates.**
+
+The ban already existed in three places — the delivery word table, the rail day-row rule and
+the 2026-08-14 delivery execution words. Each carved out its own exception, and the exceptions
+were where the words survived. **The owner generalised the rule and deleted the carve-outs.**
+
+| Where | Print | Never |
+|---|---|---|
+| A day heading / schedule group | **`Sat, 15 Aug 26`** (`fmtDate`) | `TODAY · 15 AUG 26` · `Today` · `Tomorrow` |
+| A day CHIP, where three share a rail width | **`Sat, 15 Aug`** (`fmtDayChip`), full date on hover | `Today` · `Tomorrow` |
+| A range that spans days | **`This week`** | `Next 7 days` · `Week view` · `Upcoming` |
+
+**Why it is not a style preference.** A relative word is true only on the day it is read. It
+rots in a screenshot, it re-sorts itself overnight, and an operator reading `Tomorrow` on a
+chip at 00:05 is reading a lie about the day the truck moves. **`This week` survives because it
+is a SPAN, not a day** — no date can spell it, and it stays true for its whole range.
+
+**THE ONE EXCEPTION, and it is a different fact: a HISTORY group.** `Today · Yesterday ·
+Earlier` remain the ruled headings for an append-only history (`ui/MASTER.md` §6.4 ⑦), because
+a history group is *recomputed live over the past* — an event correctly moves from `Today` to
+`Yesterday` as time passes, and the grouping never claims a specific day. A FUTURE date labelled
+`Tomorrow` is a claim about one day, and that is what this rule bans. **Do not "fix" the history
+headings, and do not cite them as licence for a relative future date.**
+
+**Enforcement is structural, not vigilance.** `dayWord()` — the shared helper whose only product
+was `Today` / `Tomorrow` — is DELETED, and `DeliveryRange` no longer carries a `label` field.
+A range hands its caller DAYS and no word, so there is nothing left for a screen to print.
+
 ## The delivery calendar words (T10, locked with Jess 2026-07-27)
 
 A calendar day answers ONE question: **which trucks move that day.** A day is
@@ -1277,7 +1307,7 @@ split them.
 
 | Concept | Canonical word | Do NOT use |
 |---|---|---|
-| The three calendar views | **Today · Tomorrow · This week** | Next 7 days · Week view · Upcoming |
+| The three calendar views | **`Sat, 15 Aug` · `Sun, 16 Aug` · `This week`** — the two single-day views name their day (owner, 2026-08-15; this row read `Today · Tomorrow · This week` until then) | `Today` · `Tomorrow` · Next 7 days · Week view · Upcoming |
 | The customer said yes to this date | **Confirmed** (+ the slot, e.g. `12pm–3pm`) | Booked · Locked · Scheduled |
 | Only logistics have named this date | **Logistics' date** | Provisional · Tentative · ETA · Pencilled in · Carrier's date |
 | Promised on this day, no booking yet | **Promised this day, no date yet** | Unscheduled · Not booked · Unbooked · Pending · anything with "needs" |
@@ -1414,6 +1444,55 @@ Purchase panel's ① stage fires AFTER Sales clicks Proceed, so it uses the gove
 
 ---
 
+## ⭐ AN ABSENT VALUE READS AS WORDS — owner ruling 2026-08-15
+
+**A `—` on either side of a change arrow is a dash pretending to be a value.** The reader
+cannot tell an empty field from a value that failed to load, and `— → —` says nothing at all.
+
+```
+✔  No payment status → Paid          ✘  — → Paid
+✔  Tue, 21 Jul 26 → No logistics' date   ✘  21/07/2026 → —
+```
+
+**The pattern: `No {the field's own ruled label, lowercased}`.** The field name supplies the
+noun, so the phrase says WHICH fact was missing. It is not one shared word for every field:
+an Activity feed renders `status` and `payment_status` side by side, and a bare `No status`
+on both would be ambiguous on its own screen.
+
+This does not replace the ruled absence FACTS that already exist and name their own subject —
+`Address not set` · `No logistics picked` · `Supplier not assigned` · `No date`. Those stay.
+This rule covers the generic case: a change event whose before or after simply did not exist.
+
+**And a `—` standing in for a whole missing record gets words too**: an activity row with no
+order reads `No order`, never a dash.
+
+## ⭐ NO INTERNAL ENUM ON SCREEN — owner ruling 2026-08-15
+
+**No database word reaches an operator.** This is the state-vocabulary law that
+`PLAN_STATUS_LABEL` and `EMERGENCY_STATUS_LABEL` already enforce, stated once for everyone:
+every stored value is translated through the dictionary before it is printed, and that includes
+the values inside an EVENT, not just the ones in a column.
+
+| Stored | Prints |
+|---|---|
+| `place` | **`Placed`** |
+| `proceed_order` | **`Proceed`** |
+| `delivered` | **`Delivered`** |
+| `cancelled` | **`Cancelled`** |
+
+*Measured on production 2026-08-15: the Quick Rail's Activity panel was rendering
+`Status changed — place → proceed_order` on 35 live events.*
+
+**A raw value is never "close enough" because it is readable.** `proceed_order` is not a word
+this business uses; `1000.00` is not the money spelling (`RM 1,000.00`); `2026-08-28` is not
+the date spelling (`Fri, 28 Aug 26`). **An event value is formatted by its FIELD's own kind** —
+status through the dictionary, dates through `fmtDate`, money through `fmtMoney`.
+
+**An action the event taxonomy never declared prints `Activity`, not its key.** De-underscoring
+a raw key (`stock_flag_repair` → `stock flag repair`) puts the database's vocabulary on screen
+to describe an event the portal cannot name. An undeclared type is an engineering defect, and
+the row still carries its order, its person and its time.
+
 ## The Work module words (SO V2 Card 10, owner ruling 2026-08-11)
 
 The Work page adds **no new action vocabulary** — every row line is the same
@@ -1425,9 +1504,15 @@ weekday+date spelling (`Thu 6 Aug`). Only these strings are the page's own:
 | The sidebar door / page | **Work** | Tasks · To-do · Queue · Dashboard |
 | The two filters over the one set | **My Work · Team Work** | My tasks · Everyone · All work |
 | Work with no anchor date yet | **No date** | Unscheduled · Someday · TBD |
-| The open/late tally | **{n} open · {n} late** | Total · Outstanding |
+| The open/overdue tally — page, owner chip and rail row | **{n} open · {n} overdue** | Total · Outstanding · **{n} late** |
 | The clear state | **No open work — every track is clear.** | All done · Empty |
-| Late work | **{n} working days late** (the original due stays printed) | Overdue by · Delayed |
+| Late work, on ONE row | **{n} working days late** (the original due stays printed) | Overdue by · Delayed |
+
+> **`overdue`, not `late`, and this row was corrected 2026-08-15.** `ui/MASTER.md` §5 locked the
+> owner summary as `open · overdue` on 2026-08-14 while this table still ruled `open · late`, so
+> the Work page printed `late` and the Quick Rail printed `overdue` **for the same number**. The
+> newer owner ruling wins and there is now ONE spelling. `{n} working days late` is a different
+> string — it describes ONE row's lateness, not a tally — and is unaffected.
 
 **System work has NO Done button** — an item leaves when its owning module
 records the completion fact. A human follow-up stays `ops_tasks`, labelled
@@ -1436,10 +1521,14 @@ human, and is the only explicitly completable thing.
 ## Numbers, dates, money
 
 - **Numbers**: tabular-nums font (`tabular-nums` class). `3 units` / `12 orders`.
-- **Dates**: use `fmtDate()` from `@/lib/fmt-date` → `19 Jul 26, Sun`. Never
+- **Dates**: use `fmtDate()` from `@/lib/fmt-date` → `Sun, 19 Jul 26`. Never
   hand-format. Never `toLocaleDateString`. See UI-KIT §A0 date law.
-- **Relative time** (`today`, `2 days ago`) is allowed ONLY in headers or
-  lead lines that render live — never in stored text.
+  `fmtDayChip()` is the ONE compact variant (`Sat, 15 Aug`), for a day chip
+  that must share a rail width — full date on hover.
+- **Relative time**: `Today` / `Tomorrow` are BANNED as a date — see the
+  no-relative-date-words ruling above. A live-recomputed HISTORY group
+  (`Today · Yesterday · Earlier`) is the one exception, and it is never in
+  stored text.
 - **Currency**: `RM 1,250.00`. Never `$` or `MYR` in row text.
 
 ### A money figure is never rounded to make a column tidy (Loo, 2026-07-28)

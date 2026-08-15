@@ -83,21 +83,25 @@ export function bookingDayOf(read: BookingRead | null | undefined): BookingDay {
 
 export type DeliveryRangeKey = "today" | "tomorrow" | "week";
 
+/**
+ * A range carries its DAYS and no word.
+ *
+ * **NO RELATIVE DATE WORDS — owner ruling 2026-08-15.** This interface used to
+ * hand every caller a `label` reading `Today` / `Tomorrow`. The owner extended
+ * the delivery word table's existing ban to the rail, so the two single-day
+ * ranges have no word left to carry: the caller prints the actual weekday +
+ * date from the ONE date home (`fmt-date.ts`), and a range that spans days
+ * keeps its ruled span word (`This week`). Deleting the field is the
+ * enforcement — a label nobody can read cannot rot back into a screenshot.
+ */
 export interface DeliveryRange {
   key: DeliveryRangeKey;
-  label: string;
   /** Inclusive, both ends. */
   fromIso: IsoDate;
   toIso: IsoDate;
 }
 
 export const DELIVERY_RANGE_KEYS = ["today", "tomorrow", "week"] as const;
-
-const RANGE_LABEL: Record<DeliveryRangeKey, string> = {
-  today: "Today",
-  tomorrow: "Tomorrow",
-  week: "This week",
-};
 
 function weekdayOf(iso: IsoDate): number {
   const [y, m, d] = iso.slice(0, 10).split("-").map(Number);
@@ -136,18 +140,17 @@ export function daysInRange(fromIso: IsoDate, toIso: IsoDate): IsoDate[] {
  */
 export function deliveryRange(key: DeliveryRangeKey, todayIso: string): DeliveryRange {
   const today = todayIso.slice(0, 10);
-  const label = RANGE_LABEL[key];
-  if (key === "today") return { key, label, fromIso: today, toIso: today };
+  if (key === "today") return { key, fromIso: today, toIso: today };
   if (key === "tomorrow") {
     const t = shiftDays(today, 1);
-    return { key, label, fromIso: t, toIso: t };
+    return { key, fromIso: t, toIso: t };
   }
   const dow = weekdayOf(today);
   // Sunday (0): the week ahead is tomorrow's Mon → its Sat. Otherwise: today
   // (Mon=1 … Sat=6) → the Saturday of this same week.
   const from = dow === 0 ? shiftDays(today, 1) : today;
   const to = dow === 0 ? shiftDays(today, 6) : shiftDays(today, 6 - dow);
-  return { key, label, fromIso: from, toIso: to };
+  return { key, fromIso: from, toIso: to };
 }
 
 /** Is this day inside the range (both ends inclusive)? */
@@ -156,15 +159,20 @@ export function inRange(dateIso: string, range: DeliveryRange): boolean {
   return d >= range.fromIso && d <= range.toIso;
 }
 
-/** The day's own word, for a heading: `Today` · `Tomorrow` · else null (the
- *  caller prints the date, which is the house form — never a bare weekday). */
-export function dayWord(dateIso: string, todayIso: string): string | null {
-  const d = dateIso.slice(0, 10);
-  const t = todayIso.slice(0, 10);
-  if (d === t) return "Today";
-  if (d === shiftDays(t, 1)) return "Tomorrow";
-  return null;
-}
+/**
+ * `dayWord` was DELETED by the no-relative-dates ruling (owner, 2026-08-15).
+ *
+ * It returned `Today` / `Tomorrow` for a day heading, and both of its callers
+ * — the Quick Rail Calendar and the Delivery page — printed that word in front
+ * of the date. A relative word is only true on the day it is read: it rots in
+ * a screenshot and re-sorts itself overnight, which is why the delivery word
+ * table already banned it and why the owner extended the ban to the rail.
+ *
+ * A day heading now prints the actual weekday + date through `fmtDate`, the
+ * portal's one date spelling. There is nothing left for this helper to return,
+ * so it is gone rather than deprecated — a helper that still compiles is a
+ * helper the next chat will call.
+ */
 
 // ---------------------------------------------------------------------------
 // Carrier load on a day — T9's rules, shown where the day is

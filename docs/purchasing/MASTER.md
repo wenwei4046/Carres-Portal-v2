@@ -306,7 +306,7 @@ Orders and Report all run it. To Order runs the same shell with a launcher rail.
 | claim lifecycle, asks, answers, close gates | `packages/shared/src/supplier-claim.ts` |
 | quarantine outcomes + status mapping | `packages/shared/src/stock-hold.ts` |
 | the engine's numbers | `packages/shared/src/purchasing-settings.ts` + `purchasing_settings` |
-| who is on PO duty this month | `ops_po_duty` → `GET /operation/po-duty` → `useOperationPoDuty()` |
+| who is on PO duty this month, **and who is on GRN duty** | `ops_po_duty` → `GET /operation/po-duty` → `useOperationPoDuty()`. ONE rota, ONE endpoint: the response carries `holder`, `grnHolder` and `grnMonth`, and `grnDutyMonth()` (`packages/shared`) is the only place the offset is computed |
 | the rail recipe · the facet row | `components/rail/workspace-rail.tsx` · `components/FacetRow.tsx` |
 
 > **`org_duties` does NOT hold the PO-duty holder.** Its six keys are `ops_manager` ·
@@ -324,9 +324,37 @@ Aug     Yu Jun                    Khor Yee              Shasha
 Sep     Khor Yee                  Shasha                Yu Jun
 ```
 
-- **GRN duty is COMPUTED — the next month's PO holder from the same rota (offset-1). No
-  second table, no second API.** The person who ordered never receives (segregation of
-  duties). Urgent orders may bypass the rotation; a manager may override (`DutySelect`).
+- **GRN duty is COMPUTED — the NEXT month's PO holder from the same rota. No second table,
+  no second API.** Read the table down a column: July's GRN holder is Yu Jun, who is
+  *August's* PO holder. The person who ordered never receives (segregation of duties).
+  Urgent orders may bypass the rotation; a manager may override.
+
+  > **⚠️ "offset-1" IS AMBIGUOUS AND IT COST A YEAR OF EMPTY ROWS. The arithmetic reaches
+  > FORWARD.** This line used to read "offset-1" with no direction, and two readers took it
+  > backwards: `work-engine.ts` recorded *"`ops_po_duty` offset−1"*, and the Team panel
+  > implemented it as the PREVIOUS month. The API's roster is `gte(month, current)` — it only
+  > ever contains this month and later — so the panel looked for a month that was never in the
+  > payload, found nothing, and printed `Not assigned` **every single month from the day the
+  > row shipped**. The direction is now a named function, `grnDutyMonth()`, and the rota
+  > table above is its test.
+
+- **GRN DUTY IS AUTO-ASSIGNED AND EDITABLE — owner ruling 2026-08-15, BUILT.** The row must
+  always name a current holder.
+  - **Auto-assignment reuses the PO machinery unchanged** — `resolveDutyMonth()` pointed at
+    `grnDutyMonth(thisMonth)`, filling a missing month lazily through `pickNextDutyHolder`
+    (fewest months served, deterministic, so two sessions converge). It is resolved on the
+    SERVER, not derived on the client, because the client cannot see a month the payload omits.
+  - **Segregation of duties never costs the row its holder.** The current PO holder is excluded
+    from the GRN pick **only while somebody else can take it**. With one assignable person left,
+    that person genuinely holds both and saying so is more honest than showing nobody.
+  - **The edit door is on the Team panel**, gated by the `po_duty_editor` duty (Jess's own key —
+    STRICTER than manager; the shared `operation@` login must not rewrite the rota). It writes
+    the GRN month's row through the existing `PUT /operation/po-duty`, and **it names that month
+    on screen**: because duty is derived from one rota, changing the receiver also changes who
+    issues POs then. That is the locked model, not a side effect to hide.
+  - **`Not assigned` may appear ONLY when no assignable staff exists**, and it must then say
+    where to fix it (`Add someone to the assignment pool in Settings.`). A dead-end absence is
+    a defect.
 - **BUDDY COVER.** The member with NO duty this month covers EITHER duty. **The absence
   signal and the cutoff are the Orders pool's own law** (`staff.ts`, Jess round-3 —
   reused, never respelt): before 10:00 MYT late ≠ absent; from 10:00 with no heartbeat
@@ -336,8 +364,8 @@ Sep     Khor Yee                  Shasha                Yu Jun
   of hands. Both absent → the remaining member does both and the Team panel says so to a
   manager. **Nothing is reassigned in data: duty is DERIVED, so cover changes the answer
   to "who, today?", never a row.**
-- **WHERE IDENTITY SHOWS (Loo, 2026-08-06): the Team panel is the ONE home.** It already
-  states `PO DUTY` and **must gain a `GRN DUTY` row (not built — §10)**. A page never
+- **WHERE IDENTITY SHOWS (Loo, 2026-08-06): the Team panel is the ONE home.** It states
+  `PO DUTY` and `GRN DUTY` — **both BUILT and both always named, 2026-08-15**. A page never
   repeats a duty block and no rail carries a duty chip. A per-row avatar circle appears
   ONLY where rows can carry DIFFERENT names — Claims (owner = the month it was opened).
   To Order and the supplier calls carry no per-row identity: the whole surface belongs to
@@ -1466,4 +1494,4 @@ I do*). **The operator's answer was the thing that went missing.**
 | **PO revisions** | **RULED OUT, not deferred.** A sent PO is never edited. |
 | **The Working Calendar** | Approved 2026-08-06. Public holidays live in code (`packages/shared/src/my-holidays.ts`) and a manager cannot edit them — but the real fact is *"is Carres working that day?"*, which only the office can answer (a gazetted holiday can be a working day, and the company can close on an ordinary one). Settings gains ONE company calendar: the official list auto-loads each year, a manager marks a day working / adds a closure, audited like every Settings number. **Every engine — order-by, the CALLS calendar, delivery arithmetic — reads this ONE calendar.** Until built, `myHolidaySet()` stands. |
 | **`View Flow`** | Approved 2026-08-06 — **the ONE function worth porting from AutoCount's PO-register menu** (2990s' `RelationshipMap` is the worked example): one click shows the whole chain SO → PO → Receiving → Claim for a document. Everything else on that menu was reviewed with Loo the same day and is either already here or REJECTED: blank `New` (bypasses PURCHASING DEMAND, the single entry) · `Edit` (a sent PO is never edited) · `Delete` (red line — `Cancel` keeps the record) · AP/invoice transfers (Purchasing never touches money). |
-| **Team panel `GRN DUTY` row** | Approved 2026-08-06 — the panel states PO duty and must state GRN duty too (§2.2). One home for identity; no page repeats it. |
+| ~~**Team panel `GRN DUTY` row**~~ | **DONE 2026-08-15.** The row states an auto-assigned holder and carries an edit door for the `po_duty_editor`; the rota reaches FORWARD one month. The ruling now lives in §2.2 where the duty model is, not here. |

@@ -5,7 +5,6 @@ import {
   carrierDayLoads,
   carrierDayNote,
   daysInRange,
-  dayWord,
   deliveryDueState,
   deliveryGroupLabel,
   deliveryRange,
@@ -38,7 +37,7 @@ import {
   type operationOrderListRow,
 } from "@/lib/queries";
 import { orderBookingDay, orderControlOf } from "@/lib/order-booking";
-import { fmtDate } from "@/lib/fmt-date";
+import { fmtDate, fmtDayChip } from "@/lib/fmt-date";
 import { cjkClassName } from "@/lib/cjk";
 import { locationForAddress } from "@/lib/region";
 import ListPageShell, { type ActiveChip } from "@/components/ListPageShell";
@@ -852,13 +851,20 @@ function CalendarPane({
               key={key}
               type="button"
               onClick={() => onRange(key)}
+              title={
+                r.fromIso === r.toIso
+                  ? fmtDate(r.fromIso)
+                  : `${fmtDate(r.fromIso)} – ${fmtDate(r.toIso)}`
+              }
               className={`flex-1 flex items-center justify-center gap-1 rounded-lg px-2 py-1 text-meta font-semibold transition-colors ${
                 range === key
                   ? "bg-base-900 text-white"
                   : "bg-white text-base-500 border border-base-200 hover:bg-hovertint"
               }`}
             >
-              <span>{r.label}</span>
+              <span className="truncate">
+                {key === "week" ? "This week" : fmtDayChip(r.fromIso)}
+              </span>
               {n > 0 && <span className="tabular-nums">{n}</span>}
             </button>
           );
@@ -877,12 +883,14 @@ function CalendarPane({
           // On a multi-day range an empty day is noise; on ONE day it is the
           // answer, and must still be said out loud.
           if (days.length > 1 && dayEmpty(day)) return null;
-          const word = dayWord(day, today);
           const loads = carrierDayLoads(deliveries, day, rulesByPartner);
           return (
             <div key={day} data-testid={`delivery-day-${day}`}>
+              {/* NO RELATIVE DATE WORDS (owner ruling 2026-08-15, and already
+                  the delivery execution words of 2026-08-14): a schedule group
+                  names its actual weekday + date. */}
               <div className="text-label uppercase tracking-[0.05em] text-base-500 mb-2">
-                {word ? `${word} · ${fmtDate(day)}` : fmtDate(day)}
+                {fmtDate(day)}
               </div>
               {deliveries.length === 0 ? (
                 <div className="text-meta text-base-400 text-center py-3">

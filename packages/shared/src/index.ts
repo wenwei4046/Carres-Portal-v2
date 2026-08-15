@@ -1156,14 +1156,15 @@ export {
 } from "./schemas/delivery-partner-rules";
 
 // T10 · Delivery calendar — the ONE rule that decides which day an order's
-// truck sits on (the D1 booking, never the promised date), the Today /
-// Tomorrow / This week ranges, and the carrier's load on a day (T9 rules).
+// truck sits on (the D1 booking, never the promised date), the three day
+// ranges, and the carrier's load on a day (T9 rules). The ranges carry DAYS
+// and no word: `dayWord` was deleted by the no-relative-dates ruling (owner,
+// 2026-08-15) and a caller prints the actual weekday + date through `fmtDate`.
 export {
   bookingDayOf,
   carrierDayLoads,
   carrierDayNote,
   daysInRange,
-  dayWord,
   deliveryRange,
   DELIVERY_RANGE_KEYS,
   inRange,
@@ -1189,6 +1190,7 @@ export {
 
 export {
   monthKeyMYT,
+  grnDutyMonth,
   isPoDayMYT,
   poUrgentBypass,
   opsPoDutySchema,
