@@ -391,6 +391,16 @@ declared numbers lands short. Every child column but `Item` is a FIXED width, id
 expanded row, with the parent grid's own 8px cell padding — a 16px minimum gap between columns, and
 the first child value lands directly under the parent's `SO No` text.
 
+**THE BOX IS A BOX — owner correction 2026-08-15.** The child of a record is its OWN object, and the
+frame is what says so. It carries a full `rounded-control` border on all four sides over the
+expansion band, with **12px of air above and below** so it is visibly separated from the parent row
+above it AND from the next parent row below it. The first shipped version fused it into the sheet —
+two horizontal rules and nothing else, the child header sitting directly against the parent row —
+and it read as more of the same table. The air is the ENGINE's (vertical padding on the expansion
+cell) so every register's expansion sits the same way; **the padding is vertical ONLY**, because
+horizontal padding is exactly what the empty gutter cells replaced. Left and right edges are
+unchanged by the frame.
+
 **TYPOGRAPHY — TWO LEVELS, NEVER THREE.** The header row is 11px grey in the parent header's own
 treatment and carries NO checkbox. EVERY value is 13px, in one ink. `Unit ID` and `SKU` keep the
 mono family at that same 13px; an ABSENCE inside them reverts to the body face, because
