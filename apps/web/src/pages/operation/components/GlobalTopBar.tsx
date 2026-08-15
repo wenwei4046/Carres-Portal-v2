@@ -3,6 +3,11 @@
  * operation page (Jess 2026-07-13). Right-aligned cluster only; the account menu
  * deliberately STAYS at the bottom-left of the sidebar (not moved up here).
  *
+ *   Search · Jump to… — the ERP's ONE global navigate-only command surface
+ *                 (ui/MASTER `JUMP TO… INTERACTION`, APPROVED / LOCKED
+ *                 2026-08-11). FIRST in the cluster, because that is the order
+ *                 the locked Page Header states: `Jump to…` with its keyboard
+ *                 hint · Notifications · Help · System Settings.
  *   Bell · Alerts   — REAL. Derives system alerts from the live order book + tasks
  *                 feed (overdue orders · deliveries with no ETA to chase ·
  *                 escalations for Jess); the badge shows the total count.
@@ -21,6 +26,7 @@ import { Bell, GraduationCap, HelpCircle, Settings } from "lucide-react";
 import { useOperationOrders, type operationOrderListRow } from "@/lib/queries";
 import { apiFetch } from "@/lib/api";
 import { TASKS_KEY } from "./rail/TasksPanel";
+import JumpTo from "./JumpTo";
 import type { OpsTasksListResponse } from "@carres/shared";
 
 /** ops_order_control is sometimes an array (embed) — normalise to the row. */
@@ -124,6 +130,13 @@ export function TopBarIcons() {
 
   return (
     <div ref={barRef} className="flex items-center gap-1">
+      {/* Jump to… — the ONE global command surface, and the first utility in
+          the locked Page Header order. It owns its own overlay and its own ⌘K
+          listener, so it needs nothing from this bar's popover state: the
+          three menus below are mutually exclusive with each other, never with
+          a surface that takes the screen. */}
+      <JumpTo />
+
       {/* Bell · Alerts — real counts from the order book + tasks feed. */}
       <div className="relative">
         <button
