@@ -449,6 +449,8 @@ function DataGridInner<T>({
      scroll (the operator scrolling the column list) from an OUTSIDE scroll
      (the page/grid moving, which should dismiss the detached fixed popover). */
   const columnsMenuRef = useRef<HTMLDivElement>(null);
+  const outputBtnRef = useRef<HTMLButtonElement>(null);
+  const [outputMenuPos, setOutputMenuPos] = useState<{ top: number; right: number } | null>(null);
   const [columnsMenuPos, setColumnsMenuPos] = useState<{ top: number; right: number } | null>(
     null,
   );
@@ -1464,9 +1466,17 @@ function DataGridInner<T>({
             2026-06-19). Wording says the scope out loud (REGISTER LAW 3). */}
         <div className={styles.columnsAnchor}>
           <button
+            ref={outputBtnRef}
             type="button"
             className={`${styles.toolbarPill} ${outputMenuOpen ? styles.toolbarPillOn : ""}`}
-            onClick={() => setOutputMenuOpen((open) => !open)}
+            onClick={() => setOutputMenuOpen((open) => {
+              const next = !open;
+              if (next && outputBtnRef.current) {
+                const r = outputBtnRef.current.getBoundingClientRect();
+                setOutputMenuPos({ top: r.bottom + 4, right: window.innerWidth - r.right });
+              }
+              return next;
+            })}
             disabled={sortedRows.length === 0}
             aria-haspopup="menu"
             aria-expanded={outputMenuOpen}
@@ -1476,7 +1486,15 @@ function DataGridInner<T>({
             <ChevronDown size={12} strokeWidth={2} aria-hidden />
           </button>
           {outputMenuOpen && (
-            <div className={styles.columnsMenu} role="menu">
+            <div
+              className={styles.columnsMenu}
+              role="menu"
+              style={
+                outputMenuPos
+                  ? { position: "fixed", top: outputMenuPos.top, right: outputMenuPos.right }
+                  : undefined
+              }
+            >
               <button
                 type="button"
                 className={styles.filterLauncherItem}

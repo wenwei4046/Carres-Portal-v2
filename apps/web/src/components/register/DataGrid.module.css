@@ -203,12 +203,12 @@
   cursor: not-allowed;
 }
 .toolbarPillOn {
-  background: var(--c-ink);
-  color: var(--c-paper);
-  border-color: var(--c-ink);
+  background: var(--c-cream);
+  color: var(--c-ink);
+  border-color: var(--fg-soft);
 }
 .toolbarPillOn:hover {
-  background: var(--c-ink);
+  background: var(--c-cream);
 }
 .toolbarPillBadge {
   display: inline-flex;
@@ -227,8 +227,8 @@
   font-variant-numeric: tabular-nums;
 }
 .toolbarPillOn .toolbarPillBadge {
-  background: rgba(255, 255, 255, 0.25);
-  color: var(--c-paper);
+  background: var(--line);
+  color: var(--c-ink);
 }
 .columnsMenuBackdrop {
   position: fixed;
