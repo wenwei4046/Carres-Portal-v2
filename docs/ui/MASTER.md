@@ -877,6 +877,96 @@ breathing gap
   remains the master form contract; UI composition may not create a second commercial form or an
   operational action door.
 
+# §6.7 · THE REGISTER SHELL — OWNER RULING 2026-08-15 (Jess) · APPROVED / LOCKED
+
+**This section overwrites every conflicting composition rule in §6.4–§6.6.** Those sections remain
+the measured implementation record; where they disagree with the shape below, this one rules. The
+owner's reference is Gmail: *the fixed bar carries only what is true on every page, the list carries
+its own tools, and nothing that is not needed is on screen.*
+
+```
+┌────────────────────────────────────────────────────────────────────┐
+│ 📋 Sales Orders                          ⌘K    🔔⁴⁸    ❓    ⚙     │  44
+└────────────────────────────────────────────────────────────────────┘
+     where I am                    global only: Jump to · alerts · help · settings
+                                   ⌘K IS the search here. No search box on this row.
+   ── 8px ──
+┌────────────────────────────────────────────────────────────────────┐
+│  ⊕ New Sales Order                        🔍    ⤓ Export ▾    ▥    │  45
+└────────────────────────────────────────────────────────────────────┘
+     make a new thing  ←                      → how I look at this page
+┌────────────────────────────────────────────────────────────────────┐
+│ ▸ │ SO No   │ Ordered     │ Customer Delivery  │ Customer          │  36
+├───┼─────────┼─────────────┼────────────────────┼───────────────────┤
+│ ▸ │ SO-1319 │ Wed, 12 Aug │ Thu, 24 Sep 26     │ LIM KUAN YANG     │  38
+│ ▸ │ SO-1318 │ Tue, 11 Aug │ Customer not sure  │ CARD-1            │  38
+├───┴─────────┴─────────────┴────────────────────┴───────────────────┤
+│ 77 orders · Mattress 66 · Bedframe 36 · Sofa 15 · Pillow 44        │  32
+└────────────────────────────────────────────────────────────────────┘
+   ── 8px ──
+```
+
+**ROW 1 · DESTINATION HEADER, 44px.** Left = the destination's governed icon + one short identity.
+Right = genuine global utilities only: `Jump to…` (⌘K) · Notifications · Help · Settings. **No
+page-owned control may enter this row — ever.** Not create, not Scan, not Export, not Columns, not
+Search, not View, not filters, not selection state. **No search box on this row:** `Jump to…` is the
+search that belongs to every page, and a second box here would be a second global search.
+
+**ROW 2 · WORK TOOLBAR, 45px, one row, never scrolls sideways.** Left = the one primary create
+action, written in full (`⊕ New Sales Order`) — it is the page's only blue. Right = how the operator
+looks at this page: Search · `Export ▾` · Columns. Nothing else lives here.
+
+- **Search is an icon** that expands leftward into an input on click or `/`, with the caret already
+  inside; `Esc` collapses it. While a query is active it stays collapsed but carries its result
+  count (`🔍⁷`) so a narrowed listing can never look like the whole listing.
+- **Columns is icon-only** (`▥`). Its hover/accessible name is `Columns`.
+- **`Export ▾` keeps its word** — it is a verb the operator performs — and offers Excel · PDF ·
+  Print. Icon-only is for controls that configure a view, never for a verb.
+- **Register Search and `Jump to…` are two different tools and both stay.** `⌘K` finds destinations
+  and document numbers across the ERP; `🔍` finds customers, phones and items inside this page only.
+  Proven live: `Kimmy` returns SO-1303 in Register Search and `No results` in `Jump to…`. Removing
+  either one removes a job the other cannot do.
+
+**THE THREE MESSAGE KINDS — and only one of them may move the table.**
+
+```
+① SELECTION — replaces Row 2 in place. Same 45px. The table does not move.
+
+   ┌──────────────────────────────────────────────────────────────┐
+   │  3 selected    Clear                    ⤓ Export ▾ (3)       │  45
+   └──────────────────────────────────────────────────────────────┘
+
+   Left = truthful count + Clear. Right = only actions valid for that exact
+   selection, with the true number. A one-record action disappears rather than
+   pretending to apply to many.
+
+② WARNING — a real business blocker. A 40px band between Row 2 and the table.
+
+   ┌──────────────────────────────────────────────────────────────┐
+   │  ⚠  3 orders have never been asked for a delivery date   →   │  40
+   └──────────────────────────────────────────────────────────────┘
+
+   Appears ONLY when the fact is true; costs zero height otherwise. It may not
+   become a permanent band, a KPI strip or a decoration.
+
+③ RESULT — a toast in the fixed bottom-right tray. Never in document flow.
+
+                                    ┌────────────────────────┐
+                                    │ ✓ Exported 77 orders   │
+                                    └────────────────────────┘
+```
+
+**A ticked checkbox may never move the table.** The 2990 reference grows a new band on selection and
+pushes the rows down; at 77 rows that moves the row under the operator's cursor and the next tick
+lands on the wrong order. Selection therefore replaces the toolbar in place. **Only kind ② may add
+height, and only while its fact is true.**
+
+**NO KPI PREAMBLE.** A Register is truth, not a dashboard. No card strip, no totals band and no
+counters above the table; the 32px status footer carries the summary.
+
+**THIS SHAPE IS THE TEMPLATE.** Every Register inherits Rows 1–3 and the three message kinds
+unchanged. Only Row 2's page-owned controls and the columns differ.
+
 # §7 · Approved Evolution
 
 | What | Why it is not built |
