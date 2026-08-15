@@ -1123,13 +1123,13 @@ export default function SalesOrderWorkspace() {
               {(mode === "oldrev" || mode === "edit" || (mode === "create" && copyFrom)) && (
                 <div className="px-1 py-1 text-meta text-base-600 xl:col-span-2">
                   {mode === "oldrev" && viewedRevision ? (
-                    <span className="rounded-pill bg-base-900 px-2 py-0.5 text-label font-semibold text-white">
+                    <span className="rounded-full bg-base-900 px-2 py-0.5 text-label font-semibold text-white">
                       Viewing Rev {viewedRevision.revision} · read-only
                     </span>
                   ) : mode === "edit" ? (
                     <span>Editing operational details only. Commercial changes require an amendment.</span>
                   ) : mode === "create" && copyFrom && order ? (
-                    <span className="rounded-pill bg-kit-blue-3 px-2 py-0.5 text-label font-semibold text-kit-blue-11">
+                    <span className="rounded-full bg-kit-blue-3 px-2 py-0.5 text-label font-semibold text-kit-blue-11">
                       Copied from SO-{order.so} · review before creating
                     </span>
                   ) : null}

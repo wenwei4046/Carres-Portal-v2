@@ -483,7 +483,7 @@ export default function SalesOrdersRegister() {
           type="button"
           data-testid="new-sales-order"
           onClick={() => navigate("/operation/orders/so/new")}
-          className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-pill bg-kit-blue-9 px-3 text-meta font-semibold text-white hover:opacity-90"
+          className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full bg-kit-blue-9 px-3 text-meta font-semibold text-white hover:opacity-90"
         >
           <Plus size={14} strokeWidth={2.25} /> New Sales Order
         </button>

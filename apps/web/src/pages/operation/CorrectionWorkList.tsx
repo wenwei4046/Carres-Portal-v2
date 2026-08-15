@@ -60,7 +60,7 @@ function Row({ row, canClose }: { row: CorrectionWorkRow; canClose: boolean }) {
         <span className="text-label font-semibold tracking-wide text-base-700 uppercase">
           {OWNER_WORD[row.module]}
           {row.shared && (
-            <span className="ml-2 rounded-pill bg-base-900 px-2 py-0.5 text-meta font-semibold text-white normal-case">
+            <span className="ml-2 rounded-full bg-base-900 px-2 py-0.5 text-meta font-semibold text-white normal-case">
               Shared
             </span>
           )}

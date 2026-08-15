@@ -37,7 +37,7 @@ export default function Loading({
             key={i}
             /* The last bar is short — a run of equal bars reads as a table,
              * which is the one thing a skeleton must not be mistaken for. */
-            className={`h-4 rounded-pill bg-kit-slate-3 animate-pulse ${
+            className={`h-4 rounded-full bg-kit-slate-3 animate-pulse ${
               i === lines - 1 ? "w-3/5" : "w-full"
             }`}
           />

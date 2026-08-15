@@ -139,10 +139,35 @@ own declaration, so a drift back to blue fails the suite.
 
 | px | Class | Use |
 |---:|---|---|
-| 4 | `rounded-pill` | pill · small tag · checkbox |
+| 4 | `rounded-pill` | **checkbox** |
 | 6 | `rounded-control` | button · input · dropdown |
 | 10 | `rounded-card` | card · panel · modal · drawer |
-| — | `rounded-full` | avatar · status dot |
+| — | `rounded-full` | **pill · small tag** · avatar · status dot |
+
+### 4.1 · A pill is a capsule — re-ruled by the owner, 2026-08-15
+
+**A `pill` at 4px is a rounded rectangle.** The word already named the shape and
+the number contradicted it, and the contradiction was visible on one screen:
+search and the pill toolbar buttons have been **fully rounded since Jess ruled
+the capsule language on 2026-08-01**, so a `StatusPill` sitting beside them read
+as a different family of object. Pills and small tags now join `rounded-full`,
+which is the language the portal already speaks.
+
+**The checkbox keeps 4px, and the 4px row is now honest about it.** That row
+used to claim three uses and only one of them was true; a fully rounded 16px
+checkbox is a radio button, which is a different control with a different
+meaning. It is the ONE thing the value exists for, so it is the only thing the
+row names.
+
+**`rounded-pill` KEEPS ITS NAME.** §0: a label is presentation, an identifier is
+a contract. Renaming the class would be a breaking change across the Tailwind
+config, `kit/tokens.ts` and the source scan, for no gain — the row's USE column
+is the law, not its historical spelling.
+
+**Measured 2026-08-15: 18 sites.** 14 became capsules; `Checkbox.tsx` (2) and
+the `tokens.ts` record itself (1) are excluded by the ruling, and one is this
+file's own prose. **Shape cannot be proved by checksum** — the PR that lands a
+radius change carries before/after screenshots.
 
 ---
 

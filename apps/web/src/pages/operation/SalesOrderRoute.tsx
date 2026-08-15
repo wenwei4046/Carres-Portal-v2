@@ -12,7 +12,7 @@ const stateStyle = {
 
 function StateIcon({ fact }: { fact: SalesOrderRouteFact }) {
   const Icon = fact.state === "attention" ? AlertTriangle : fact.state === "current" ? CircleDot : Check;
-  return <span className={`grid h-5 w-5 shrink-0 place-items-center rounded-pill ${stateStyle[fact.state]}`}><Icon size={12} aria-hidden="true" /></span>;
+  return <span className={`grid h-5 w-5 shrink-0 place-items-center rounded-full ${stateStyle[fact.state]}`}><Icon size={12} aria-hidden="true" /></span>;
 }
 
 function FactStep({ fact, currentLabel = false }: { fact: SalesOrderRouteFact; currentLabel?: boolean }) {

@@ -42,7 +42,7 @@ export default function SalesOrderLedger({
             role="tab"
             aria-selected={view === key}
             onClick={() => changeView(key)}
-            className={`rounded-pill px-3 py-1 text-meta font-medium ${view === key ? "bg-kit-blue-9 text-white" : "border border-base-200 bg-white text-base-700"}`}
+            className={`rounded-full px-3 py-1 text-meta font-medium ${view === key ? "bg-kit-blue-9 text-white" : "border border-base-200 bg-white text-base-700"}`}
           >
             {key === "revisions" ? "Revisions" : "History"}
           </button>
@@ -59,7 +59,7 @@ export default function SalesOrderLedger({
                 const selected = viewedRevision == null ? current : viewedRevision === r.revision;
                 return (
                   <button key={r.revision} type="button" onClick={() => onViewRevision(current ? null : r.revision)}
-                    className={`rounded-pill border px-2.5 py-0.5 text-meta font-medium ${selected ? "border-kit-blue-9 bg-kit-blue-3 text-kit-blue-11" : "border-base-200 bg-white text-base-700"}`}>
+                    className={`rounded-full border px-2.5 py-0.5 text-meta font-medium ${selected ? "border-kit-blue-9 bg-kit-blue-3 text-kit-blue-11" : "border-base-200 bg-white text-base-700"}`}>
                     Rev {r.revision}{current ? " · current" : ""}
                   </button>
                 );
@@ -72,7 +72,7 @@ export default function SalesOrderLedger({
                   <li key={r.revision} className="text-body">
                     <span className="text-meta font-semibold text-base-700">Rev {r.revision}</span>
                     <span className="text-meta text-base-500"> · {fmtDate(r.created_at, { time: true })}</span>
-                    {r.change_type && <span className="ml-1.5 rounded-pill border border-base-200 bg-base-50 px-1.5 py-px text-label text-base-700">{COMMITMENT_CHANGE_WORDS[r.change_type]}</span>}
+                    {r.change_type && <span className="ml-1.5 rounded-full border border-base-200 bg-base-50 px-1.5 py-px text-label text-base-700">{COMMITMENT_CHANGE_WORDS[r.change_type]}</span>}
                     {r.note && <span className="ml-1.5 text-meta text-base-500">“{r.note}”</span>}
                     <ul className="mt-0.5 flex flex-col gap-0.5 pl-3">
                       {describeRevisionChanges(previous?.snapshot ?? null, r.snapshot).map((change, i) => <li key={i} className="text-meta text-base-700">{change}</li>)}
