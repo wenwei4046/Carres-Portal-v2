@@ -1304,10 +1304,19 @@ where the sentence already says what the day is for. It reads the year off the S
 **`fmtMonth()` is untouched: `Jul 2026`.** It names a PERIOD in a switcher, where two adjacent
 entries may sit either side of a year boundary and the year is what tells them apart.
 
+**A BUSINESS ENGINE SPELLS NO DATES — it hands its caller DAYS and no words.** This is the same
+rule the `dayWord()` deletion established, and it caught a fifth spelling: `workDayLabel` in
+`packages/shared` fed the Work rows and Work day headings through `toLocaleDateString` (banned
+above), dropped the comma so a Work row and a Register cell named one day two ways, and printed
+NO year ever — indistinguishable from this rule until the work is due in another year, at which
+point the heading hid the one fact that made it urgent. It is deleted, with `WorkItem.dueLabel`
+and `WorkDayGroup.label`. A `WorkDayGroup` now carries `dayIso`, and the screen spells it.
+
 **Enforcement is structural.** The year is decided in ONE predicate that every spelling in the
 module calls, `fmtDayChip` is deleted, and the three page-local no-year formatters built by
 string surgery on top of these — `railDayLabel` in To Order and Purchase Orders, `dayMon` in the
-Order Detail drawer — are deleted with it. They were regexing off a year the formatter should
+Order Detail drawer — are deleted with it. `work-engine.test.ts` asserts the engine exports no
+label function and its items carry no label field. They were regexing off a year the formatter should
 never have printed; the compensation is now the rule. `fmt-date.test.ts` pins the clock and
 asserts the module exports exactly three functions, so a fourth spelling cannot be added quietly.
 

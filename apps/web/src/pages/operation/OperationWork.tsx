@@ -32,6 +32,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { Lock } from "lucide-react";
 import { groupWorkItemsByDay, isOpsManager } from "@carres/shared";
 import { cjkClassName } from "@/lib/cjk";
+import { fmtDate } from "@/lib/fmt-date";
 import { personLabel } from "@/lib/staff-avatar";
 import ListPageShell from "@/components/ListPageShell";
 import { useOperationStaff } from "@/lib/queries";
@@ -185,7 +186,9 @@ export default function OperationWork() {
           groups.map((g) => (
             <section key={g.dayIso ?? "none"} className="mb-5" data-testid={`work-day-${g.dayIso ?? "none"}`}>
               <h2 className="text-label font-semibold text-base-500 uppercase tracking-wide mb-1.5">
-                {g.label}
+                {/* The engine hands a DAY; the screen spells it, through the
+                    one formatter (THE YEAR RULE, owner ruling 2026-08-15). */}
+                {g.dayIso ? fmtDate(g.dayIso) : "No date"}
                 <span className="ml-2 font-normal normal-case text-base-400">
                   {g.items.length}
                   {g.late > 0 && <span className="text-danger"> · {g.late} overdue</span>}
