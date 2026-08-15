@@ -816,7 +816,15 @@ breathing gap
 - The detail object presents Current/Order truth, Revisions, History, the actual PDF/document and
   Order Route. Revisions (complete versions) and History (events) are separate. Order Route is a
   read-only, fact-derived, multi-position route/obligation map — never a manual checklist or
-  single overall status.
+  single overall status. Its governed visual grammar adapts parcel tracking: small state node, thin
+  connector, fact/evidence and date, using Carres tokens rather than reference-product styling.
+  The first layer is the stable four-line `Goods · Stock · Delivery · Money` summary; conditional
+  linked problems sit outside it. The second layer is a vertical/branched per-goods map whose
+  quantity/source/destination branches may have simultaneous current positions. Completed nodes
+  require owner-module evidence; nodes are never manually ticked. Document links spell their
+  destination (`Open PO-2048 →`), and absent documents use plain facts rather than `—`. At medium
+  desktop or with Quick Rail open, branches reflow vertically without hiding meaning. Delivery
+  release is a read-only convergence summary and deep-link, never a Sales Order write control.
 - **OBJECT HEADER TEMPLATE — OWNER-APPROVED / LOCKED (2026-08-14).** An ERP object has one owning-
   Register back destination, one persistent identity (`number · party`), governed actions at the
   right, and applicable object views directly below/alongside that identity. View and Edit retain

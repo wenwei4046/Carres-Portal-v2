@@ -179,16 +179,132 @@ keep a superseded target.
 
 ## Order Route
 
-`Order Route` is a read-only route map/checklist derived only from authoritative facts. It is not a
-manual checklist and not another overall status. Its primary presentation is one readable route per
-actual goods/category/item scope, rendering only applicable facts along `SO → PO → ETA → GRN → Unit
-→ DO → Delivered` and marking the present fact `CURRENT`. Split fulfilment may show simultaneous
-positions — for example, a Bed delivered while a Sofa remains at supplier — so there is no forced
-single “You are here”. Document identifiers link to their owning objects. Missing facts are stated
-truthfully (`PO not issued`, `Waiting Purchasing`) rather than filled with invented stages. A compact
-secondary `Still owed` checklist shows only meaningful Goods, Delivery, Money, Loan and Other
-Commitments obligations; it does not render a dashboard card for every clear/empty state. Sales
-Order does not gain a writer.
+**OWNER-APPROVED / LOCKED TARGET — 2026-08-15.** `Order Route` is a read-only, fact-derived route
+map/checklist. It is not a manual checklist, Work queue, writer or overall Sales Order status. It
+uses the familiar parcel-tracking reading model — small node, thin connector, time/evidence beside
+the fact — expressed only with Carres tokens, components, words and business ownership.
+
+### Layer 1 · SO Route Summary
+
+The summary always renders four independent first-class tracks. They begin in parallel when the
+Sales Order creates the relevant obligations; they do not wait in one queue and never collapse into
+one status:
+
+```
+ORDER TRACKS
+
+● GOODS      1 item waiting for Purchasing
+● STOCK      1 of 3 Units ready
+● DELIVERY   Appointment not confirmed
+● MONEY      RM 1,249.00 Outstanding
+             Open this order in Payments →
+```
+
+Each line is one authoritative fact with its own `complete · current · attention` presentation.
+`CURRENT` belongs to a track or goods sub-route, never the whole SO. A clear track remains visible
+so the summary keeps the same four-line grammar; its clear fact is short and does not explain
+itself. Money is a peer track from the start, never a station after Delivery and never demoted to a
+generic `Still owed` region.
+
+A linked Service Case is not a fifth route: not every order passes through Service. When a linked
+case exists, a separate conditional region appears below the four tracks:
+
+```
+LINKED PROBLEMS
+
+⚠ SC-1031 · Investigation in progress
+  Open SC-1031 →
+```
+
+The same conditional boundary applies to another genuine exception object: link it under the
+governed problem/obligation region only when it exists; never mint a permanent journey stage.
+
+### Layer 2 · per-goods route map
+
+Expanding a goods line shows every applicable business station and the document/fact proving it:
+`SO → purchase source → supplier → Receiving → Unit/Stock → Delivery → Delivered`. Non-applicable
+stations do not render. A document number is a labelled link to its owning object — `Open PO-2048
+→`, `Open GRN-1032 →`, `Open Unit UNT-8821 →`, `Open DO-2088 →` — never an unexplained arrow.
+No document is written as a plain fact: `No Purchase Order yet`, not `PO: —`.
+
+The route branches by actual quantity, source and destination. One item may be Ready Stock while
+two remain on a PO; Units may later split across destinations. Each branch carries its own quantity
+and may hold a simultaneous `CURRENT` position. Never force one “You are here” for the whole line:
+
+```
+▼ B1201S · King · Qty 3
+
+  SALES ORDER  SO-1319 · Wed, 12 Aug
+  │
+  ├─ Qty 1 · READY STOCK
+  │  ✓ STOCK        UNT-8821 · Carres Klang
+  │                 Open Unit UNT-8821 →
+  │
+  └─ Qty 2 · PURCHASE
+     ✓ PURCHASING   PO-2048 · Issued Thu, 13 Aug
+     │              Open PO-2048 →
+     ● SUPPLIER     CURRENT
+     │              Ready date not confirmed
+     │              [YJ] Confirm the ready date
+     ○ RECEIVING    Not received yet
+     ○ STOCK        Units not created yet
+```
+
+The visible checklist is computed evidence, never an input. `✓` means the owning module has the
+completion fact; `●` means this branch's current position; `○` means not started/not yet evidenced;
+`⚠` means blocked or missing with the reason stated. Staff cannot tick a node. Opening an actionable
+node deep-links to the owning module; Work holds the action and resolved owner.
+
+### Delivery convergence · read-only release gates
+
+Goods/Stock, Delivery planning and Money converge only when Delivery evaluates release. The route
+shows the governed gate results; it does not provide a `Release for delivery` button or duplicate
+Delivery's writer:
+
+```
+DELIVERY RELEASE
+
+○ Not ready for delivery · 2 requirements still open
+
+○ Goods not ready
+  1 of 3 ready
+
+⚠ Money release not cleared
+  RM 1,249.00 Outstanding
+
+○ Appointment not confirmed
+  Customer date Thu, 24 Sep
+
+Open Delivery →
+```
+
+A fact and its gate remain separate. A manager release may clear the Money gate while Outstanding
+remains; never print `Money cleared` as if the customer paid. `1 of 3 ready` cannot carry a `✓ Goods
+ready` icon unless the current Delivery/DO is explicitly scoped to that one Unit; a partial release
+must state the included Units and remaining obligation. When every governed requirement for the
+current Delivery scope is satisfied, render `Ready for delivery` and the Delivery deep-link — still
+no write control on Order Route.
+
+Every date names one fact. `Customer Delivery`, `Customer Delivery Window`, `Estimated delivery`,
+supplier ready/arrival, Receiving time and confirmed Delivery appointment never substitute for one
+another. The latest delivery wording ruling below remains binding.
+
+### Responsive and exception law
+
+Normal desktop may use a compact branched route. At medium desktop and whenever Quick Rail is open,
+the same nodes become a vertical tracking timeline; no horizontal squeeze, hidden branch or second
+scrolling canvas. Loading, unavailable-source, partial-data and error states name what is known and
+which owning module could not be read; they never turn unknown into not-started. Ready Stock,
+supplier/direct fulfilment, split/partial purchase, partial Receiving, multiple Units/destinations,
+service/non-stock lines, amendment/cancellation and replacement/loan obligations render only when
+their authoritative structures can prove them.
+
+**APPROVED TARGET / NOT BUILT.** Production currently renders the earlier per-goods map plus
+secondary `Still owed` checklist. A later BUILD/DELIVERY scope must replace that composition,
+preserve existing document/source facts and tests, add the four-track summary, branching and
+read-only release convergence, then verify normal desktop, medium desktop and Quick Rail-open
+production surfaces. This ruling changes presentation and reading order; no record ownership or
+write door moves to Sales Order.
 
 ## Owner UI acceptance corrections — 2026-08-14
 
