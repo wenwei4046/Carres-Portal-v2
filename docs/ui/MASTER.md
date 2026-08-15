@@ -960,6 +960,12 @@ looks at this page: Search · `Export ▾` · Columns. Nothing else lives here.
   the 2990 batch shape (`SalesInvoicesList.tsx:400`) translated into Carres: the operator who ticks
   69 rows wants the 69 documents, not a picture of the listing. The two must never be confused, so
   they never share a word.
+- **`Showroom` prints the place, not the house** — owner ruling 2026-08-15. Every showroom is ours
+  and the column already says `Showroom`, so `Carres ` distinguishes nothing there and cost the
+  place name its width: at 126px `Carres Maluri Cheras` clipped to `Carres Maluri C…`, hiding the
+  only part that identifies the branch. Display only; documents keep the outlet's registered name.
+  **`Deliver To` keeps it**, because there it is the whole point — `Carres Klang` sits beside
+  `AL Sungai Buloh`, and a bare `Klang` cannot say whose warehouse it is.
 - **The Excel and PDF outputs derive their cells ONCE.** A cell that says one thing on screen,
   another in Excel and a third in the PDF is the defect that shared derivation exists to prevent.
   The PDF prints the current view and carries no letterhead, terms or signature block: it is a
