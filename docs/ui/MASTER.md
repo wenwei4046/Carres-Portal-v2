@@ -423,6 +423,12 @@ directory only and said so.*
   single-day chips and every day heading print the real weekday + date; `This week` survives
   because it is a SPAN. The full ruling, its one history-group exception and the structural
   enforcement are in `../COPY-STANDARD.md`.
+- **The chip prints the SAME string as every other date in the portal** (THE YEAR RULE, owner
+  ruling 2026-08-15). It once needed a compact spelling of its own because the year would not fit
+  in ~100px; the year is no longer printed for a current-year date, so `fmtDayChip` is deleted and
+  the chip calls `fmtDate`. A single-day chip therefore carries NO hover — the full ruled date is
+  on its face, and a tooltip that repeats or under-states what it explains is a defect. A SPAN
+  chip keeps its hover, because `This week` names no date.
 
 ### WORK OWNER + TWO-LINE ACTION GRAMMAR — OWNER-APPROVED / LOCKED 2026-08-14
 
@@ -436,6 +442,18 @@ directory only and said so.*
   are needed. **Line 1** is the fact/problem in governed body size and medium/semibold emphasis.
   **Line 2** is the next action in the governed smaller supporting size, regular weight and quieter
   but readable colour. It is not metadata and may not fall below the accessible contrast floor.
+- **THE SIZES ARE 13 / 11 — owner ruling 2026-08-15 (Chai).** Line 1 is `text-body` (13, semibold).
+  Line 2 is **`text-label` (11) at `font-normal`**, moved down from `text-meta` (12). One point of
+  separation was not enough to read as a second RANK: at 13/12 the two lines looked like one
+  sentence that had wrapped, and the whole purpose of the grammar is that the eye takes the FACT
+  first and the INSTRUCTION second. `text-label`'s own weight is 500, so the ruling's regular
+  weight is an explicit `font-normal` — the size alone would have left line 2 heavier than line 1
+  relative to its size. The colour token does not change: `text-base-600` measures 8.6:1 on the
+  white row, so the quieter line stays well clear of this section's contrast floor at the smaller
+  size rather than being rescued by it. Applies wherever the grammar renders — Register guidance
+  cells, Work rows, the Quick Rail's Work peek, Current Action blocks. Held by
+  `SalesOrdersRegister.test.tsx`, which asserts both tokens and names the retired one, so a revert
+  fails rather than merely passing unnoticed.
 - Do not repeat context already supplied by the row: SO number stays in SO No, customer stays in
   Customer, and owner stays in the avatar/group. At medium desktop, truncate the supporting line
   with a discoverable full value; never blend both lines into one clipped sentence.

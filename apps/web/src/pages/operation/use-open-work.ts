@@ -29,6 +29,7 @@ import {
   type OpsStaffMember,
   type WorkItem,
 } from "@carres/shared";
+import { displayCustomerName } from "@/lib/customer-name";
 import { personLabel } from "@/lib/staff-avatar";
 import {
   useDeliveryPartners,
@@ -139,10 +140,13 @@ export function useOpenWorkSet(): OpenWorkSet {
           ...it,
           line: orderActionLine(it.ruleKey as Parameters<typeof orderActionLine>[0], {
             logistics: state.partner,
-            customer: o.customer_name,
+            customer: displayCustomerName(o.customer_name),
             amount: money.known ? money.outstanding : null,
           }),
-          customer: o.customer_name ?? null,
+          /* Capitalize up — owner ruling 2026-08-15. Cased where the work
+             item is composed, so the Work row, the Quick Rail peek and the
+             action sentence above all name the customer identically. */
+          customer: displayCustomerName(o.customer_name) ?? null,
           ownerId,
         });
       }

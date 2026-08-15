@@ -1,6 +1,23 @@
 import "@testing-library/jest-dom/vitest";
 import { afterEach } from "vitest";
-import { cleanup } from "@testing-library/react";
+import { cleanup, configure } from "@testing-library/react";
+
+/* ---------------------------------------------------------------------------
+ * The async wait budget.
+ *
+ * Testing Library's `waitFor` / `findBy*` default to ONE second. Measured
+ * 2026-08-15 on clean `origin/main`: under `pnpm test`, where the web, api and
+ * shared suites run at once, a handful of the heaviest page renders land
+ * between 1.3s and 1.9s and time out — a DIFFERENT one on each run, which is
+ * the signature of a load-induced flake rather than a broken assertion. The
+ * same tests pass every time in isolation.
+ *
+ * That made `pnpm test` — the CI gate itself — fail at random on code nobody
+ * had touched. The budget is not what any test is asserting, so raising it
+ * costs nothing and removes the randomness. A test that is genuinely broken
+ * still fails; it just takes longer to say so.
+ * ------------------------------------------------------------------------- */
+configure({ asyncUtilTimeout: 5000 });
 
 /* ---------------------------------------------------------------------------
  * jsdom gaps that Radix primitives depend on (card D0.5b).

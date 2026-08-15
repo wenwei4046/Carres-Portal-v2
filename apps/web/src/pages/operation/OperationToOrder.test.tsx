@@ -322,12 +322,13 @@ describe("the PO Schedule — a purchase calendar, not a menu", () => {
     expect(within(nav).getByTestId("to-order-overdue")).toHaveTextContent("4");
     // Rolling from Thursday: Fri · Mon · Wed — 3 configured days, 3 rows, no
     // Today (Thursday is not a PO day), no stale Monday. Each row prints
-    // weekday + DATE in one format (Loo, 2026-08-06: `Fri 31 Jul`, never a
-    // bare weekday), and the full spelling stays on the hover.
-    expect(within(nav).getByTestId("to-order-day-2026-07-31")).toHaveTextContent("Fri 31 Jul");
+    // weekday + DATE in one format (Loo, 2026-08-06: never a bare weekday) —
+    // and since the 2026-08-15 year ruling that format is literally `fmtDate`,
+    // because the hand-composed `railDayLabel` it used to need was deleted.
+    expect(within(nav).getByTestId("to-order-day-2026-07-31")).toHaveTextContent(fmtDate("2026-07-31"));
     expect(within(nav).getByTestId("to-order-day-2026-07-31")).toHaveTextContent("0");
-    expect(within(nav).getByTestId("to-order-day-2026-08-03")).toHaveTextContent("Mon 3 Aug");
-    expect(within(nav).getByTestId("to-order-day-2026-08-05")).toHaveTextContent("Wed 5 Aug");
+    expect(within(nav).getByTestId("to-order-day-2026-08-03")).toHaveTextContent(fmtDate("2026-08-03"));
+    expect(within(nav).getByTestId("to-order-day-2026-08-05")).toHaveTextContent(fmtDate("2026-08-05"));
     // Never the bare weekday word alone.
     expect(within(nav).queryByText(/^Friday$/)).toBeNull();
     // The hover keeps the full date.
@@ -427,7 +428,7 @@ describe("the grid — business language only", () => {
   it("T1 — an ITEM row leaves the identity cells blank; the order line fills them", async () => {
     await loaded();
     fireEvent.click(screen.getByTestId("to-order-overdue"));
-    // PETER's order: the group line says SO-1207 · Peter · the date; his two
+    // PETER's order: the group line says SO-1207 · PETER · the date; his two
     // item rows say none of it — the fact is stated once, in its column.
     const rows = [...document.querySelectorAll('[data-kit="data-row"]')];
     expect(rows.length).toBeGreaterThan(0);
@@ -447,7 +448,7 @@ describe("the grid — business language only", () => {
       expect(tds[4]?.textContent ?? "").toBe("");
     }
     const sheet = screen.getByTestId("to-order-sheet");
-    expect((sheet.textContent ?? "").match(/Peter/g)?.length).toBe(1);
+    expect((sheet.textContent ?? "").match(/PETER/g)?.length).toBe(1);
   });
 
   it("speaks the CUSTOMER's date — red when past, a dash when TBD, sorted soonest first", async () => {
@@ -582,9 +583,11 @@ describe("the Excel reflexes — header sort, per-column filters", () => {
     expect(sheet().getByText("SO-1300")).toBeInTheDocument();
     expect(sheet().queryByText("SO-1204")).toBeNull();
     fireEvent.click(screen.getByTestId("table-filter-clear-so"));
-    // Customer speaks the display spelling — `PETER` is typed, `Peter` reads.
+    // Customer speaks the display spelling. CAPITALIZE UP ONLY (owner ruling
+    // 2026-08-15): `PETER` is typed and `PETER` reads — the display rule raises
+    // a first letter and never lowers one, so a name in capitals survives.
     fireEvent.click(screen.getByTestId("table-filter-customer"));
-    fireEvent.click(screen.getByLabelText("Peter"));
+    fireEvent.click(screen.getByLabelText("PETER"));
     expect(sheet().getByText("SO-1207")).toBeInTheDocument();
     expect(sheet().queryByText("SO-1300")).toBeNull();
   });
@@ -1599,13 +1602,13 @@ describe("the group header — one line per customer order", () => {
     // ella's order has one build; PETER's has two — and PETER is named ONCE.
     const groups = [...document.querySelectorAll('[data-kit="data-group"]')];
     expect(groups.length).toBeGreaterThan(0);
-    const peter = groups.find((g) => /Peter/.test(g.textContent ?? ""));
+    const peter = groups.find((g) => /PETER/.test(g.textContent ?? ""));
     expect(peter).toBeTruthy();
     expect(peter!.textContent).toContain("SO-1207");
     expect(peter!.textContent).toContain(fmtDate("2026-08-13"));
     // …and the whole sheet says his name exactly once, not once per piece.
     const sheet = screen.getByTestId("to-order-sheet");
-    expect((sheet.textContent ?? "").match(/Peter/g)?.length).toBe(1);
+    expect((sheet.textContent ?? "").match(/PETER/g)?.length).toBe(1);
   });
 
   it("says `Partly ordered` only when SOME of the order is on a purchase order", async () => {
@@ -2540,7 +2543,7 @@ describe("P18 · the proceed date on the group header", () => {
     await loaded();
     fireEvent.click(screen.getByTestId("to-order-overdue"));
 
-    const peter = groupOf(/Peter/);
+    const peter = groupOf(/PETER/);
     expect(peter).toBeTruthy();
     expect(peter!.textContent).toContain(fmtDateShort("2026-08-01"));
     // The whole point of Loo's ruling: no parenthesised count, and above all no
@@ -2676,17 +2679,17 @@ describe("T1 · the aligned order line", () => {
     await loaded();
     fireEvent.click(screen.getByTestId("to-order-overdue"));
 
-    const peter = groupOf(/Peter/)!;
+    const peter = groupOf(/PETER/)!;
     const tds = [...peter.querySelectorAll("td")];
     // ⊞ gutter · ☑ · SO No. · Customer · Delivery · the 3-col middle span ·
     // PO No. · filler — TEN cols, EIGHT cells (the span merges three).
     // The FACT under its HEADER is the whole card: each sits in its own cell.
     const texts = tds.map((t) => (t.textContent ?? "").trim());
     expect(texts).toContain("SO-1207");
-    expect(texts).toContain("Peter");
+    expect(texts).toContain("PETER");
     expect(texts).toContain(fmtDate("2026-08-13"));
     // …three separate cells, never one concatenated sentence.
-    expect(texts.some((t) => t.includes("SO-1207") && t.includes("Peter"))).toBe(false);
+    expect(texts.some((t) => t.includes("SO-1207") && t.includes("PETER"))).toBe(false);
   });
 
   it("the group ☑ ticks and unticks ALL its builds — one press, one meaning", async () => {

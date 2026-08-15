@@ -2542,7 +2542,7 @@ describe("one purchase order, one way of looking at it (Q10)", () => {
 /* ── T2 · the CALLS calendar rail (frozen with Loo, 2026-08-06) ──────────── */
 
 import { purchasingCallCalendarDays } from "@carres/shared";
-import { fmtDate, fmtDateShort } from "@/lib/fmt-date";
+import { fmtDate } from "@/lib/fmt-date";
 
 describe("the CALLS calendar rail (T2)", () => {
   /** The window the page itself computes — today + four more OFFICE working
@@ -2573,10 +2573,12 @@ describe("the CALLS calendar rail (T2)", () => {
     await mountLoaded();
     for (const d of days()) {
       const row = screen.getByTestId(`po-rail-call-day-${d}`);
-      const label = `${fmtDate(d).slice(0, 3)} ${fmtDateShort(d).replace(/ \d{2}$/, "")}`;
+      // ONE format, and it is now literally the portal's one formatter — the
+      // hand-composed `railDayLabel` was deleted by the 2026-08-15 year ruling.
+      const label = fmtDate(d);
       expect(within(row).getByText(label)).toBeInTheDocument();
-      // never a bare weekday, never Today/Tomorrow
-      expect(label).toMatch(/^(Mon|Tue|Wed|Thu|Fri|Sat|Sun) \d{1,2} [A-Z][a-z]{2}$/);
+      // never a bare weekday, never Today/Tomorrow; the year only off-year
+      expect(label).toMatch(/^(Mon|Tue|Wed|Thu|Fri|Sat|Sun), \d{1,2} [A-Z][a-z]{2}( \d{2})?$/);
       expect(row.getAttribute("title")).toBe(fmtDate(d));
     }
   });

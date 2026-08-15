@@ -1268,6 +1268,89 @@ are unchanged (`Open WhatsApp` · `Open WhatsApp group`).
 Every word above is ruled. No terminology placeholder is left in Purchasing, and a chat that finds
 one has found a document that was missed.
 
+## ⭐ THE YEAR RULE — owner ruling 2026-08-15 (Chai), portal-wide
+
+**`Wed, 12 Aug`. The year appears only when it is not the current year.**
+
+```
+Wed, 12 Aug        a date in the year the operator is living in
+Fri, 15 Jan 27     a date that is not — and now the year IS the news
+```
+
+**One formatter, ERP-wide.** `fmtDate()` in `@/lib/fmt-date` — Register columns, object dates,
+Order Route, Activity, Calendar day headers and chips, Work rows, every one of them. There is no
+second date formatter and no page may compose one.
+
+**Why the year goes.** Nine dates in ten on an operational screen are this year. A `26` repeated
+down a column answers nothing and costs width in the one column that has none to spare — and
+because it is always there, it stops being read. **Dropping it turns the year into a signal:**
+the moment `27` appears, it is carrying the whole meaning, and the operator sees it.
+
+**Why the WEEKDAY never goes.** The no-relative-date-words rule above means an operator reads
+the day off the date itself. `12 Aug` does not say whether the truck moves on a working day;
+`Wed, 12 Aug` does. The year is context the reader already has; the weekday is not.
+
+**THE ONE EXCEPTION: a PRINTED DOCUMENT always carries its year** — `fmtDate(iso, { year:
+"always" })`. A screen is read today, so "this year" is a fact the reader is holding. A service
+note or a receipt is printed, filed and re-read in a later year by a customer or a technician
+who is holding nothing, and `Request Date: Wed, 12 Aug` has lost a fact the document exists to
+carry. **It is an option ON the one formatter, never a second formatter.**
+
+**The compact spelling is the ruled date LESS ITS WEEKDAY, not a second rule.** `fmtDateShort()`
+prints `12 Aug` / `15 Jan 27` for a date inside a sentence — `received 12 Aug`, `due 12 Aug` —
+where the sentence already says what the day is for. It reads the year off the SAME predicate
+`fmtDate` does, so the two can never disagree about a day. A date COLUMN always uses `fmtDate`.
+
+**`fmtMonth()` is untouched: `Jul 2026`.** It names a PERIOD in a switcher, where two adjacent
+entries may sit either side of a year boundary and the year is what tells them apart.
+
+**Enforcement is structural.** The year is decided in ONE predicate that every spelling in the
+module calls, `fmtDayChip` is deleted, and the three page-local no-year formatters built by
+string surgery on top of these — `railDayLabel` in To Order and Purchase Orders, `dayMon` in the
+Order Detail drawer — are deleted with it. They were regexing off a year the formatter should
+never have printed; the compensation is now the rule. `fmt-date.test.ts` pins the clock and
+asserts the module exports exactly three functions, so a fourth spelling cannot be added quietly.
+
+**A test may never hard-code a dated spelling.** "This year" moves. An expectation written as
+`"Wed, 12 Aug 26"` asserts the wrong thing for half of every year and starts failing on 1
+January with nothing deployed. Build the expected string with `fmtDate()`, or pin the clock.
+
+## ⭐ CUSTOMER NAME — CAPITALIZE UP ONLY — owner ruling 2026-08-15 (Chai)
+
+**Raise a word's first letter. Never lower a letter that is already raised.**
+
+```
+jimmy          →  Jimmy
+mei emi        →  Mei Emi
+KJ NG          →  KJ NG            ← initials survive
+LIM KUAN YANG  →  LIM KUAN YANG    ← unchanged
+```
+
+**Why one-directional.** A title-caser that lowercases the tail is guessing that the capital was
+an accident. On a Malaysian customer list that guess is wrong often enough to be a defect: `KJ`,
+`TCF`, `AL` and the `Sdn Bhd` company forms are initials and acronyms, and `Kj Ng` is not the
+reader's name. **Raising a letter can only ever fix a name typed in a hurry; lowering one can
+destroy a name that was typed correctly.** So the rule only moves in the safe direction.
+
+**Display only. The record keeps exactly what was typed.** This never runs on write, never
+reaches an import, and no migration normalises the column. It is a lens, not a correction —
+which is also why it must have ONE home: a name shown three ways on three screens reads as three
+customers. `displayCustomerName()` in `@/lib/customer-name`, and no page-local copy. The one
+that existed — `properCase` in To Order — had the WRONG rule and is deleted.
+
+**Where it applies:** the Register's Customer column and its search, filter and export · the
+object header and CUSTOMER card · Payments · Order Route · Activity · Work rows · the Quick
+Rail's Team, Calendar and Work peeks · the Delivery workspace. Everywhere the portal shows an
+operator a customer's name.
+
+**Where it does NOT apply, and the boundary is deliberate.** An EDIT field stays on the raw
+stored value — a cased input writes its casing back to the record on save, which is the one
+thing this rule forbids. And `titleCaseName()` in `wa-templates.ts` answers a different
+question — how to address a human politely in a message we are about to send them — so it keeps
+softening `LEE WEI YANG` to `Lee Wei Yang`. **These two are not duplicates and must not be
+merged without an owner ruling on the greeting**, because that ruling changes customer-facing
+copy, not an internal screen.
+
 ## ⭐ NO RELATIVE DATE WORDS — owner ruling 2026-08-15, portal-wide
 
 **A date on screen names its actual day. `Today` and `Tomorrow` are not dates.**
@@ -1278,9 +1361,16 @@ were where the words survived. **The owner generalised the rule and deleted the 
 
 | Where | Print | Never |
 |---|---|---|
-| A day heading / schedule group | **`Sat, 15 Aug 26`** (`fmtDate`) | `TODAY · 15 AUG 26` · `Today` · `Tomorrow` |
-| A day CHIP, where three share a rail width | **`Sat, 15 Aug`** (`fmtDayChip`), full date on hover | `Today` · `Tomorrow` |
+| A day heading / schedule group | **`Sat, 15 Aug`** (`fmtDate`) | `TODAY · 15 AUG 26` · `Today` · `Tomorrow` |
+| A day CHIP | **`Sat, 15 Aug`** (`fmtDate` — the same string) | `Today` · `Tomorrow` |
 | A range that spans days | **`This week`** | `Next 7 days` · `Week view` · `Upcoming` |
+
+**The chip row used to name a second formatter, and no longer can.** `fmtDayChip` existed
+because a ~100px chip could not afford the year; THE YEAR RULE below drops the year from every
+current-year date, so the chip's spelling and the portal's spelling became one string and the
+second function is DELETED. A single-day chip also lost its hover: the full ruled date is now on
+the chip's face, and a tooltip that repeats — or says less than — the thing it explains is a
+defect, not a courtesy. A SPAN chip keeps its hover, because `This week` names no date.
 
 **Why it is not a style preference.** A relative word is true only on the day it is read. It
 rots in a screenshot, it re-sorts itself overnight, and an operator reading `Tomorrow` on a
@@ -1521,10 +1611,8 @@ human, and is the only explicitly completable thing.
 ## Numbers, dates, money
 
 - **Numbers**: tabular-nums font (`tabular-nums` class). `3 units` / `12 orders`.
-- **Dates**: use `fmtDate()` from `@/lib/fmt-date` → `Sun, 19 Jul 26`. Never
-  hand-format. Never `toLocaleDateString`. See UI-KIT §A0 date law.
-  `fmtDayChip()` is the ONE compact variant (`Sat, 15 Aug`), for a day chip
-  that must share a rail width — full date on hover.
+- **Dates**: use `fmtDate()` from `@/lib/fmt-date` → `Sun, 19 Jul`. Never
+  hand-format. Never `toLocaleDateString`. See THE YEAR RULE below.
 - **Relative time**: `Today` / `Tomorrow` are BANNED as a date — see the
   no-relative-date-words ruling above. A live-recomputed HISTORY group
   (`Today · Yesterday · Earlier`) is the one exception, and it is never in

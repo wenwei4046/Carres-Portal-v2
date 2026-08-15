@@ -3,6 +3,7 @@ import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 import type { SalesOrderRoute as Route } from "@carres/shared";
 import SalesOrderRoute from "./SalesOrderRoute";
+import { fmtDate } from "@/lib/fmt-date";
 
 const route: Route = {
   orderId: "order-1",
@@ -42,7 +43,9 @@ describe("SalesOrderRoute", () => {
     expect(screen.queryByText("Document lineage")).toBeNull();
     expect(screen.queryByText("Current goods positions")).toBeNull();
     expect(screen.queryByText(/You are here/i)).toBeNull();
-    expect(screen.getByText("1 unit · Expected Tue, 18 Aug 26")).toBeInTheDocument();
+    expect(
+      screen.getByText(`1 unit · Expected ${fmtDate("2026-08-18")}`),
+    ).toBeInTheDocument();
     expect(screen.queryByText(/2026-08-18/)).toBeNull();
   });
 

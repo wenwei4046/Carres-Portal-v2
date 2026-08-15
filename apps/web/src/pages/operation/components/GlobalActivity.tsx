@@ -4,6 +4,7 @@ import type { OrderEventCategory } from "@carres/shared";
 import { useOperationActivity, type GlobalActivityRow } from "@/lib/queries";
 import { useActiveOrder } from "@/lib/active-order";
 import { fmtDate } from "@/lib/fmt-date";
+import { displayCustomerName } from "@/lib/customer-name";
 import {
   CATEGORY_ORDER,
   IconChip,
@@ -48,7 +49,7 @@ export default function GlobalActivity() {
           d.title,
           d.body ?? "",
           d.row.so ? `so-${d.row.so}` : "",
-          d.row.customer_name ?? "",
+          displayCustomerName(d.row.customer_name) ?? "",
           d.row.actor_name ?? "",
         ]
           .join(" ")
@@ -169,7 +170,7 @@ function FeedRow({ d, onOpen }: { d: Decorated; onOpen: (orderId: string | null)
           ) : (
             "No order"
           )}
-          {row.customer_name ? ` · ${row.customer_name}` : ""}
+          {row.customer_name ? ` · ${displayCustomerName(row.customer_name)}` : ""}
           {row.actor_name ? ` · ${row.actor_name}` : ""}
           {" · "}
           {fmtDate(row.occurred_at, { time: true })}

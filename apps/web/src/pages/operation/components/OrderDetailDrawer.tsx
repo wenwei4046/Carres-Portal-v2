@@ -703,9 +703,11 @@ function PanelMenu({
 
 /** Tiny status counter for a panel header — tighter than the full `.pill` so up
  *  to three fit on one header row. Colours track the locked stock vocab. */
-/** "23 Aug" — the chip's day-month form (Loo's D1 chip spec: no year, no
- *  weekday; the full "24 Aug 26" date-law form stays on the card rows). */
-const dayMon = (iso: string) => fmtDateShort(iso).replace(/\s\d{2}$/, "");
+/* `dayMon` is DELETED (owner ruling 2026-08-15). Loo's D1 chip spec — day and
+ * month, no year, no weekday — was implemented by regexing the year back off
+ * `fmtDateShort`. THE YEAR RULE means `fmtDateShort` already answers "23 Aug"
+ * for a current-year date, and answers "15 Jan 27" for the one case where the
+ * regex was hiding the fact that mattered. The chips call it directly. */
 
 /** Chip form of a time slot: "Afternoon (12pm–3pm)" → "12pm–3pm"; free text
  *  passes through unchanged. */
@@ -4064,7 +4066,7 @@ function DrawerBody({
                   )
                     return (
                       <MiniBadge tone="ready">
-                        confirmed {dayMon(form.control.confirmed_date)}
+                        confirmed {fmtDateShort(form.control.confirmed_date)}
                         {form.control.confirmed_time_slot
                           ? ` · ${shortSlot(form.control.confirmed_time_slot)}`
                           : ""}
@@ -4074,7 +4076,7 @@ function DrawerBody({
                   if (eta)
                     return (
                       <MiniBadge tone="waiting">
-                        not confirmed · logistics said {dayMon(eta)}
+                        not confirmed · logistics said {fmtDateShort(eta)}
                       </MiniBadge>
                     );
                   // C1 (Jess 2026-07-27): T1 banned "Unscheduled" and this badge

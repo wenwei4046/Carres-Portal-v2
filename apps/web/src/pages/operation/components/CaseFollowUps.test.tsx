@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import CaseFollowUps from "./CaseFollowUps";
+import { fmtDateShort } from "@/lib/fmt-date";
 
 /**
  * S3 in the case view: the chain the case is running, what has been recorded
@@ -59,7 +60,9 @@ describe("CaseFollowUps", () => {
     );
 
     expect(screen.getByText("Collected")).toBeInTheDocument();
-    expect(screen.getByText(/20 Jul 26.*recorded by operation/)).toBeInTheDocument();
+    expect(
+      screen.getByText(new RegExp(`${fmtDateShort("2026-07-20")}.*recorded by operation`)),
+    ).toBeInTheDocument();
     expect(screen.queryByText("Collect the item from Ryan Chong")).not.toBeInTheDocument();
     expect(screen.getByText("1 of 6 done")).toBeInTheDocument();
   });
