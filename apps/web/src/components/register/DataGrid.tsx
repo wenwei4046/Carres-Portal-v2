@@ -1459,9 +1459,12 @@ function DataGridInner<T>({
             <td
               colSpan={visibleColumns.length - expansionGutter.length}
               data-testid="grid-expansion-cell"
-              /* No padding at all: the left edge is the first data column's,
-                 the right edge is the parent table's. */
-              style={{ padding: 0, borderTop: "1px solid var(--line)" }}
+              /* ⭐ VERTICAL ONLY (owner correction 2026-08-15). The child is a
+                 separate object and needs air above and below it to read as
+                 one — but HORIZONTAL padding is exactly what the gutter cells
+                 replaced, so it stays at zero: the left edge is the first data
+                 column's, the right edge is the parent table's. */
+              style={{ padding: "12px 0", borderTop: "1px solid var(--line)" }}
             >
               {expandable.renderExpansion(row)}
             </td>

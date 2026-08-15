@@ -154,7 +154,19 @@ export default function GoodsMiniTable({
 }) {
   const minWidth = FIXED_TOTAL + ITEM_FLOOR + (selection ? SELECT_WIDTH : 0);
   return (
-    <div className="overflow-x-auto border-y border-base-200 bg-white" data-testid="goods-mini-table">
+    /* ⭐ A BOX, NOT A CONTINUATION OF THE SHEET — owner correction 2026-08-15.
+       The first shipped version fused it into the grid: two rules and nothing
+       else, so the child header sat directly against the parent row and read
+       as more of the same table. The child of a record is its OWN object, and
+       the frame is what says so — the same `rounded-control` border the box
+       has always carried, with the register's own breathing space above and
+       below it (the ENGINE's, so every expansion sits the same way). The
+       LEFT and RIGHT edges are untouched: the frame is drawn on the `SO No`
+       column's left edge and the parent table's right edge. */
+    <div
+      className="overflow-x-auto rounded-control border border-base-200 bg-white"
+      data-testid="goods-mini-table"
+    >
       <table
         className="w-full table-fixed text-left"
         style={{ minWidth }}
