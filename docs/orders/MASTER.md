@@ -144,9 +144,11 @@ keep a superseded target.
 - Document numbers navigate directly to their authoritative object where the relationship exists:
   SO → SO, PO → PO, DO → DO.
 - The approved row interaction is a 2990-style right-click context menu. Preserve useful document
-  capabilities. `Edit` is the explicit action that leaves the Register for the formal edit
-  context; View/Preview/Print do not edit. Do not add `Issue PO`, `Issue DO` or other operational
-  acts whose owner is Purchasing, Delivery, Money, Stock, Receiving, Claims or Work.
+  capabilities. `View` and `Edit` reach the SAME destination — the object page has one state and
+  its fields are already editable (SALES ORDER OBJECT PAGE V2 below, which overwrites the earlier
+  "formal edit context" wording); Preview/Print do not edit. Do not add `Issue PO`, `Issue DO` or
+  other operational acts whose owner is Purchasing, Delivery, Money, Stock, Receiving, Claims or
+  Work.
 
 ## Detail, edit, amendment and document truth
 
@@ -220,11 +222,10 @@ Order does not gain a writer.
   SHA on the governed production surfaces. Authenticated acceptance proved: Customer Delivery
   remains a date fact with exact missing value `No delivery date` and separate two-line guidance;
   Register location is concise and collapses duplicate city/state; the six-column goods mini-table
-  remains unchanged, with `Carres Klang` shown without quantity for a single destination; Object
-  View and Edit expose the same governed goods truth; Edit is composed as `Edit operational
-  details | Order context`, keeps Customer Delivery read-only and Sales ownership governed; Save
-  and Discard disappear in Revisions, History and Order Route, leaving those views also clears the
-  Order Edit URL state, and dirty navigation is refused safely; Activity translates logistics and
+  remains unchanged, with `Carres Klang` shown without quantity for a single destination; the
+  object exposes the governed goods truth, keeps Customer Delivery read-only and Sales ownership
+  governed; Save and Discard disappear in Revisions, History and Order Route and dirty navigation
+  is refused safely; Activity translates logistics and
   stock ETA events into governed operator terms; and Order Route retains its per-goods architecture
   with confirmed/no-date copy and formatted dates in operator English. Normal Register states,
   selection/footer, expansion,
@@ -404,6 +405,97 @@ no promise         →  No delivery date          (the same governed value the R
 This explicitly re-rules the 2026-08-14 acceptance wording recorded above; that record's other
 clauses stand. Dates in a route fact are rendered through the ONE date spelling (`fmtDate`), title
 as well as detail.
+
+## SALES ORDER OBJECT PAGE V2 — OWNER RULING 2026-08-15 (Chai) · APPROVED / LOCKED
+
+**This overwrites the Edit composition recorded on 2026-08-14.** `Edit operational details |
+Order context`, the `?edit=1` URL state and the Edit/View pair are retired by explicit owner
+re-ruling after ASCII/mock rounds on 2026-08-15. Nothing else in §0.1 moves: the write boundary,
+the amendment machinery, the goods truth and the Order Route architecture are unchanged.
+
+### One page, one state
+
+- **The Order tab is ONE page in ONE state.** There is no reading mode and no editing mode —
+  there is one document with fields in it. `?edit=1` is retired; a URL still carrying it is
+  stripped rather than refused, because the page it asks for is the page it is already on.
+  `View` and `Edit` on the Register's context menu reach the same destination.
+- **Two panes, 50% / 50%.** Left is the form, right is the document. Each pane scrolls on its
+  own and the page itself does not scroll at desktop widths. Below ~1024px the panes stack, form
+  first, and the page scrolls normally.
+- **The left pane's block order is:** `CUSTOMER → ORDER INFO → AMEND DELIVERY DATE →
+  EMERGENCY CONTACT → DELIVERY ADDRESS → MONEY → SALES OWNERSHIP`. **`GOODS` follows them**, and
+  it is not a form: the six-column `Category | Unit ID | SKU | Qty | Item | Deliver To` truth
+  locked above is Stock's and Purchasing's fact, and the customer document beside it never prints
+  Unit ID or Deliver To. Removing it would have lost governed truth the card did not name.
+- **A dark save bar appears at the bottom of the form ONLY when something changed**
+  (`⚠ {n} changes · Discard · Save`). Save is unreachable until dirty; dirty navigation still
+  refuses safely.
+
+### The preview IS the document
+
+- **The right pane renders through THE SAME template call the Print/PDF path uses.** One
+  `renderSalesOrderPdf` call, one blob; pdf.js paints those bytes and `Print ▾` opens that same
+  blob. There is no second lookalike renderer, and there is no toolbar on or above the paper —
+  `Print ▾` stays in the page header. The paper is centred at a 700px maximum.
+- **Typing updates the preview immediately** (300ms debounce), and while unsaved changes exist the
+  paper carries a light diagonal `UNSAVED` watermark. The watermark is preview chrome painted over
+  the canvas; it never enters the PDF.
+- **A submitted, not-yet-approved amendment NEVER appears in the document body.** The preview
+  always renders the current effective Revision. A pending amendment shows only as a banner strip
+  above the paper — `⚠ Amendment pending approval: delivery date → {date}` — and the body switches
+  on approval. A customer may not be handed a document stating something nobody has agreed to.
+- **The document address and the editable address parts are ONE fact.** The structured MY parts
+  compose `customer_address` on save through the same `composeAddress` the Sales Portal submits
+  with. Before this ruling the parts were editable while the printed string stayed on whatever was
+  imported. A row with no structured parts keeps its imported string untouched.
+
+### Field completeness — one contract with the Sales Portal
+
+- **Every field the Sales Portal collects appears in the left form.** The authoritative list is
+  `POS_FORM_BUILTINS` plus the wizard's own sub-fields, not a list retyped in a card, and the
+  object page renders from the SAME `order_entry_config` contract the POS renders from (0219) —
+  including the operator's custom fields, per tab. Held mechanically by
+  `SalesOrderWorkspace.ui-contract.test.ts`, which walks the POS registry and fails when a field
+  exists on one surface only.
+- **The emergency contact is THREE validated fields** — name · phone · relationship — over the one
+  `customer_emergency` text column. The three-fields-⇄-one-column codec lives in
+  `packages/shared/src/sales-order-form.ts` and is the same one the POS composes with, so a legacy
+  or hand-typed string round-trips character for character when nobody edits it. The section note
+  is `Used only if we cannot reach the customer on delivery day`.
+- **Stored data is never normalised, repaired or back-filled by this ruling.** Migration `0354`
+  widens what the writer may correct; it rewrites no value and asserts no row count.
+- **The writer widened to the portal's remaining questions.** `sales_order_save_revision` now
+  accepts `customer_race · customer_gender · customer_birthday · customer_address_unknown ·
+  customer_billing_same · delivery_stair_items · entry_fields` (the 0219 bag carrying the building
+  type and the operator's custom fields). `entry_fields` MERGES — a config field retired last month
+  is not erased by an unrelated save.
+- **The write boundary is unchanged.** Goods, price and `Customer Delivery` are never a direct
+  write here; `Ordered` and `Customer Delivery` render as read-only facts. Attribution still moves
+  by request (0329). `Customer type (auto)` is derived from the same phone probe the POS runs and
+  is read-only on both surfaces.
+
+### Amend delivery date · money · ownership · actions
+
+- **`AMEND DELIVERY DATE` is a section with exactly three fields** —
+  `Amend date (from customer)` · `Amended delivery date` · `Amend reason *` — carrying the section
+  note `creates a Revision · needs approval`. It submits the governed amendment machinery
+  (`sales_order_submit_amendment`): reason mandatory, Before/After + actor + time recorded, the
+  prior version and its PDF preserved. **It is a narrower FORM over the same act as
+  `Propose a change to the customer`, not a second record** — one live amendment per order still
+  holds, and while one is open this block submits nothing. `Amend date (from customer)` is a
+  column (`sales_order_amendments.customer_asked_on`, 0354), not a substring of the reason: a
+  change phoned in on Monday and typed on Thursday is a Monday request.
+- **The MONEY block is read-only and weighted** — Total large · Paid medium · **Outstanding
+  loudest, red whenever any of it is still owed**. This is an explicit owner ruling and it
+  overrides `docs/ui/MASTER.md` §6.4 challenge C1's narrower "only when genuinely late". The
+  existing `Open this order in Payments` door is unchanged.
+- **`SALES OWNERSHIP` is read-only for Operation — no button.** A management-authorised role
+  (principal or HR, the same lane GATE 3 lets decide it) sees the one door, worded
+  `Change salesperson — needs approval`. A pending request stays visible to everyone: it is truth,
+  not an action.
+- **`Report a problem` moved into `More actions`**, beside `Copy to new Sales Order` and
+  `Cancel SO`. The permanent Problems card is deleted; the order's Service Cases remain on
+  `Order Route`, which already reads them from the route facts.
 
 ### DELIVERY RECORD — 2026-08-15 · SHIPPED AND DEPLOYED · OWNER ACCEPTANCE OUTSTANDING
 
@@ -3806,7 +3898,8 @@ excluded them merely because they were not already implemented.
   Toolbar button or `…` item.
 - **Register `Edit` opens the full Sales Order Workspace — APPROVED / LOCKED.** It never edits
   inside the grid and never opens a small generic modal. The row context menu's `Edit` navigates
-  to that Sales Order's owned full-page Workspace in edit intent. The Workspace header keeps the
+  to that Sales Order's owned full-page Workspace — the same destination `View` reaches, since the
+  object page has one state (SALES ORDER OBJECT PAGE V2, 2026-08-15). The Workspace header keeps the
   durable History · Order Journey/Relationship Map · Print PDF controls alongside the governed
   edit/cancel actions. A change that remains above the existing contractual floors may use the
   governed revision Save door; a change blocked by production commitment, receiving, invoice,

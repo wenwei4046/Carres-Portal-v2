@@ -1,5 +1,7 @@
 import {
   cartHasGoods,
+  composeEmergencyContact,
+  EMERGENCY_RELATIONSHIP_OTHER,
   ORDER_ENTRY_TABS,
   resolveFormTab,
   resolvePaymentMethods,
@@ -704,8 +706,15 @@ export function dataUrlToBlob(dataUrl: string): Blob {
  */
 export function composeEmergency(c: WizardDraft["customer"]): string {
   const rel =
-    c.emergencyRelationship === "__OTHER__"
+    c.emergencyRelationship === EMERGENCY_RELATIONSHIP_OTHER
       ? c.emergencyRelationshipOther.trim()
       : c.emergencyRelationship;
-  return [c.emergencyName.trim(), c.emergencyPhone.trim(), rel].filter(Boolean).join(" · ");
+  /* The codec lives in `@carres/shared` since 2026-08-15 — the Sales Order
+     object page edits the same column as three fields and must write it the
+     same way (ownership Law D). */
+  return composeEmergencyContact({
+    name: c.emergencyName,
+    phone: c.emergencyPhone,
+    relationship: rel,
+  });
 }

@@ -5,6 +5,9 @@ import {
   isShowroom,
   minDeliveryDateISO,
   resolveFormTab,
+  BUILDING_TYPE_OPTIONS,
+  CUSTOMER_GENDER_OPTIONS,
+  CUSTOMER_RACE_OPTIONS,
   storeNoun,
   type CatalogResponse,
   type CustomField,
@@ -26,11 +29,14 @@ import StairCarryFields from "./StairCarryFields";
 import OrderSummaryRail from "./OrderSummaryRail";
 import { customerPatchFromHit, RELATIONSHIPS } from "./customer-autofill";
 
-/** MY-standard demographic option lists (0200 — feed Sales analysis). */
-const RACE_OPTIONS = ["Malay", "Chinese", "Indian", "Other"] as const;
-const GENDER_OPTIONS = ["Female", "Male"] as const;
-/** Delivery-address building types (Loo 2026-07-19). */
-const BUILDING_TYPES = ["Landed", "Condo", "Apartment", "Office", "Retail", "Other"] as const;
+/** MY-standard demographic option lists (0200 — feed Sales analysis) and the
+ *  delivery-address building types (Loo 2026-07-19). All three moved to
+ *  `@carres/shared` on 2026-08-15: the Sales Order object page corrects the
+ *  same fields and must offer the same choices, and two lists is how one of
+ *  them grows an option the other has never heard of. */
+const RACE_OPTIONS = CUSTOMER_RACE_OPTIONS;
+const GENDER_OPTIONS = CUSTOMER_GENDER_OPTIONS;
+const BUILDING_TYPES = BUILDING_TYPE_OPTIONS;
 
 const PHONE_RE = /^[0-9-+\s]{8,}/;
 const EMAIL_RE = /^\S+@\S+\.\S+$/;

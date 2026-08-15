@@ -517,12 +517,12 @@ export default function SalesOrdersRegister() {
   }, []);
 
   /* ROW OPENS A FULL PAGE (closed ruling — the panel is superseded).
-     Double-click and the menu's Open both land on the workspace VIEW route;
-     Edit lands on the same route with `?edit=1`, which Stage 1's workspace
-     reads as nothing (read-only stage) and Stage 2 wires to the form. */
+     ⛔ `?edit=1` IS RETIRED — owner ruling 2026-08-15. The object page has one
+     state with its fields already editable, so there is no second URL to send
+     the operator to: View and Edit are the same destination, and the menu keeps
+     both words only because 2990's operators reach for both. */
   const openWorkspace = useCallback(
-    (r: RegisterRow, edit?: boolean) =>
-      navigate(`/operation/orders/so/${r.id}${edit ? "?edit=1" : ""}`),
+    (r: RegisterRow) => navigate(`/operation/orders/so/${r.id}`),
     [navigate],
   );
   const onRowDoubleClick = useCallback((r: RegisterRow) => openWorkspace(r), [openWorkspace]);
@@ -532,7 +532,7 @@ export default function SalesOrdersRegister() {
   const contextMenu = useCallback(
     (r: RegisterRow): DataGridContextMenuItem[] => [
       { label: "View", onClick: () => openWorkspace(r) },
-      { label: "Edit", onClick: () => openWorkspace(r, true) },
+      { label: "Edit", onClick: () => openWorkspace(r) },
       { label: "Preview PDF", onClick: () => void openSalesOrderPdf(r.id, r.so) },
       { label: "Print PDF", onClick: () => void openSalesOrderPdf(r.id, r.so) },
       {

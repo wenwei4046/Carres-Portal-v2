@@ -1144,6 +1144,32 @@ new Sales Order always carries a real Customer Delivery date.
 | The cart refuses a service-only order | **`This order has no product — add the product this service belongs to`** | Invalid cart · Nothing to sell · Add an item |
 | The create door refuses a service-only order | **`A Sales Order must contain a product. Add the product this service belongs to, or open a Service Case instead.`** | Bad request · Service not allowed |
 
+### The Sales Order object page words (owner ruling 2026-08-15)
+
+The object page is ONE page in ONE state, so the words that named a MODE are retired with it.
+**`Edit`, `Edit operational details`, `Order context` and `Save changes` no longer appear on the
+object page** — nothing announces permission to type into a field that is already typeable. The
+Register's context menu keeps the word `Edit` only because it names a destination, and that
+destination is the same one `View` opens.
+
+| Meaning | Use exactly | Do NOT use |
+|---|---|---|
+| The bar that appears when something has changed | **`⚠ {n} changes`** with **`Discard`** and **`Save`** | Unsaved changes · You have edits · Save changes · Apply |
+| The mark on the document preview while changes are unsaved | **`UNSAVED`** | Draft · Preview · Not saved yet |
+| A submitted amendment, above the document | **`⚠ Amendment pending approval: delivery date → {date}`** | Pending change · Proposed · Awaiting sign-off |
+| The three-field section that moves the promised date | **`Amend delivery date`**, with the note **`creates a Revision · needs approval`** | Change delivery date · Reschedule · Postpone |
+| Its three fields, in order | **`Amend date (from customer)`** · **`Amended delivery date`** · **`Amend reason`** (required) | Request date · New date · Notes · Remark |
+| Why the emergency contact is collected | **`Used only if we cannot reach the customer on delivery day`** | Next of kin · In case of emergency · Backup contact |
+| The management-only door on Sales ownership | **`Change salesperson — needs approval`** | Request ownership change (that stays the FORM's title) · Reassign · Change owner |
+| Report a problem, now inside `More actions` | **`Report a problem`** | Raise an issue · Log a complaint · New Service Case |
+| The delivery address the customer has not given yet | **`Address not given yet`** | Unknown · Fill in later · TBC |
+| Billing that repeats the delivery address | **`Billing address same as delivery`** | Same as above · Use delivery address |
+| The stair-carry count, when the salesperson named none | the field's own hint **`Empty = every item`** | Auto · All · Default |
+| The auto-detected customer type, before a dial-able phone | **`Not known yet`** | — · N/A · Unknown |
+
+`Customer type (auto)`, `Existing customer`, `New customer` and `Checking…` are the Sales
+Portal's own words and are printed unchanged on the object page — one fact, one spelling.
+
 ### The Sales Order amendment words
 
 | Meaning | Use exactly |

@@ -1881,6 +1881,64 @@ describe("POST /api/operation/orders/:id/save", () => {
     ]);
   });
 
+  /* 0354 — the object page's form IS the Sales Portal's form (owner ruling
+     2026-08-15), so the door must accept every question the portal asks. A
+     `.strict()` schema that had never heard of `customer_race` turned a field
+     the operator could SEE into a field they could never fix. */
+  it("accepts the rest of what the Sales Portal asks", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: { revision: 3, changed: [] }, error: null });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc, from: vi.fn() } as any);
+    const jwt = await makeJwt("operation");
+    const header = {
+      customer_race: "Chinese",
+      customer_gender: "Female",
+      customer_birthday: "1990-04-02",
+      customer_address_unknown: false,
+      customer_billing_same: true,
+      delivery_stair_items: 2,
+      entry_fields: { building_type: "Condo", referral: null },
+    };
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/${ORDER_ID}/save`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ header }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    expect(rpc).toHaveBeenCalledWith("sales_order_save_revision", {
+      p_order_id: ORDER_ID,
+      p_header: header,
+      p_lines: null,
+      p_change: null,
+    });
+  });
+
+  it("still refuses attribution at the API boundary", async () => {
+    const rpc = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("operation");
+    for (const header of [
+      { salesperson_id: "00000000-0000-0000-0000-0000000000a1" },
+      { outlet_id: "00000000-0000-0000-0000-0000000000a2" },
+      { dealer_id: "00000000-0000-0000-0000-0000000000a3" },
+    ]) {
+      const res = await app.fetch(
+        new Request(`http://t/api/operation/orders/${ORDER_ID}/save`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ header }),
+        }),
+        env,
+      );
+      expect(res.status).toBe(422);
+    }
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
   it("refuses contractual items at the API boundary", async () => {
     const rpc = vi.fn();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
