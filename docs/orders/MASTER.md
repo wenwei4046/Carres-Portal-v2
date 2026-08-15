@@ -405,6 +405,36 @@ This explicitly re-rules the 2026-08-14 acceptance wording recorded above; that 
 clauses stand. Dates in a route fact are rendered through the ONE date spelling (`fmtDate`), title
 as well as detail.
 
+### DELIVERY RECORD — 2026-08-15 · SHIPPED AND DEPLOYED · OWNER ACCEPTANCE OUTSTANDING
+
+**Read the last line of this record before quoting the ones above it.** Three PRs carry the whole
+2026-08-15 scope, each merged only after the authoritative gate passed on its exact source:
+
+| PR | Merged as | Scope |
+|---|---|---|
+| #804 | `aeeca966bf7243c21fc6b5e06ddd4f8e1f28ca0e` | THE SALES PORTAL ENTRY GATE — mandatory date, goods gate |
+| #805 | `8c1ce2b3143a54fca6197ea67a1292151ec0d982` | REGISTER AND OBJECT COMPOSITION + migration `0353` |
+| #806 | `38f8b0b84dea2191db21784aca4ea4ad18f88d42` | A pill is a capsule (`01-design-tokens.md` §4 · §4.1) |
+
+Each deploy run converged its exact SHA on all five governed surfaces — both Pages projects, both
+custom domains and the API Worker `/health`. Migration `0353` was applied from the exact merged
+repository file (never retyped) and verified: `dealers` now holds `AutoCount Archive`, the id and
+channel are unchanged, its 43 attributed orders are intact, and no function or view depends on the
+old literal.
+
+**What production has actually PROVEN, unauthenticated:** the SHA convergence above; the migration
+result read back from the database; and — on the public `/ui` showcase — the computed
+`border-radius` of every pill class, `StatusPill` · `Badge` · filter chip · toast glyph · skeleton
+all at `9999px` while the checkbox holds `4px`, with the swatch labels reading from the record.
+
+**🔴 WHAT REMAINS: the AUTHENTICATED owner acceptance pass.** The register, the goods expansion,
+the object View/Edit, More actions, the Payments door, Order Route and the wizard all sit behind a
+login the delivering chat could not use, so **no one has yet looked at them in production.** The
+card's acceptance list is therefore OPEN, not closed. Until someone signs in at 1440×900 and ~920px
+and walks it, this scope is **SHIPPED AND DEPLOYED, NOT PRODUCTION-VERIFIED** — and no later chat
+may promote it to `PRODUCTION-VERIFIED / LOCKED` on the strength of a green pipeline. A passing
+gate proves the code does what its tests say; only the walk proves it does what the owner asked.
+
 ## Guided operations and Service Case boundary — CLOSED / PRODUCTION-VERIFIED 2026-08-14
 
 - A missing Customer Delivery date uses the governed two-line action grammar in the Register:
