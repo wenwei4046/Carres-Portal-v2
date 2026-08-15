@@ -59,11 +59,10 @@ import {
   lineClass,
   orderMoney,
   parseEmergencyContact,
-  poReceivingProgress,
   receivingRecordNo,
   resolveFormTab,
   resolveSalesOrderRoute,
-  warehouseReceiptStatusLabel,
+  supplierClaimStatusLabel,
   type CustomField,
   type OrderEntryTab,
   type SalesOrderRoute as SalesOrderRouteModel,
@@ -88,8 +87,10 @@ import {
   useCustomerTypeProbe,
   useOperationDealersRef,
   useOperationOrder,
+  useOperationPoDuty,
   useOrderEntryConfig,
   useOrderCorrectionWork,
+  useOrderServiceCases,
   useOutlets,
   useSalesOrderAmendment,
   useSalesOrderRevisions,
@@ -255,10 +256,8 @@ const billingString = (d: Draft, was: Draft): string => {
  * viewer only; Print opens the SAME blob the pane shows.
  * ──────────────────────────────────────────────────────────────────────────── */
 function usePdfCanvases(data: SalesOrderTemplateData | null) {
-  const [url, setUrl] = useState<string | null>(null);
   const [pdfError, setPdfError] = useState<string | null>(null);
   const paneRef = useRef<HTMLDivElement | null>(null);
-  const urlRef = useRef<string | null>(null);
   /* The pane unmounts whenever the object opens Revisions / History / Order
      Route. Coming back, `data` has not changed — so without this the operator
      returned to an empty sheet of paper. */
@@ -271,20 +270,12 @@ function usePdfCanvases(data: SalesOrderTemplateData | null) {
     let cancelled = false;
     if (!data) {
       paneRef.current?.replaceChildren();
-      if (urlRef.current) URL.revokeObjectURL(urlRef.current);
-      urlRef.current = null;
-      setUrl(null);
       return;
     }
     (async () => {
       try {
         const blob = await renderSalesOrderPdf(data);
         if (cancelled) return;
-        const objectUrl = URL.createObjectURL(blob);
-        /* Revoke the PREVIOUS blob URL on each render (the card's own line). */
-        if (urlRef.current) URL.revokeObjectURL(urlRef.current);
-        urlRef.current = objectUrl;
-        setUrl(objectUrl);
         setPdfError(null);
         const doc = await pdfjs.getDocument({ data: await blob.arrayBuffer() }).promise;
         if (cancelled) return;
@@ -322,13 +313,10 @@ function usePdfCanvases(data: SalesOrderTemplateData | null) {
       cancelled = true;
     };
   }, [data, paneEpoch]);
-  useEffect(
-    () => () => {
-      if (urlRef.current) URL.revokeObjectURL(urlRef.current);
-    },
-    [],
-  );
-  return { url, pdfError, setPane };
+  /* No blob URL is minted here any more. The PANE paints bytes; PRINT owns its
+     own blob, built from the SAVED data — one template, one call path, two
+     purposes that must not share a handle. */
+  return { pdfError, setPane };
 }
 
 /** 300ms debounce for the LIVE draft preview (the card's own number). */
@@ -693,6 +681,11 @@ export default function SalesOrderWorkspace() {
     showRoute,
     (detailQ.data?.pos ?? []).map((po) => po.id),
   );
+  /* LINKED PROBLEMS needs the case's own translated status word, and Service
+     owns that translation. The route facts carry only open/closed. */
+  const serviceCasesQ = useOrderServiceCases(isNew ? "" : (orderId ?? ""), {
+    enabled: !isNew && Boolean(orderId),
+  });
   const baseQ = useQuery({
     queryKey: ["orders", "sales-order-data", orderId ?? "new"],
     queryFn: () =>
@@ -939,7 +932,40 @@ export default function SalesOrderWorkspace() {
     return debouncedDraftData;
   }, [mode, viewedRevision, base, debouncedDraftData]);
 
-  const { url: pdfUrl, setPane } = usePdfCanvases(templateData);
+  const { setPane } = usePdfCanvases(templateData);
+
+  /* ⭐ PRINT IS THE SAVED TRUTH — owner ruling 2026-08-15.
+     Preview-equals-Print is asserted in the SAVED state only. While the form is
+     dirty the pane shows the draft under an `UNSAVED` watermark, but the
+     PRINTED document is what the record actually holds: a customer document
+     built from values nobody has saved is a document the order cannot back up.
+     So the printable blob is rendered from the SAVED data on its own — the same
+     template, the same `renderSalesOrderPdf` call path, a second blob — and the
+     operator is told which one they got. */
+  const printData: SalesOrderTemplateData | null =
+    mode === "oldrev" && viewedRevision ? templateData : base;
+  const printableRef = useRef<{ data: SalesOrderTemplateData | null; url: string | null }>({
+    data: null,
+    url: null,
+  });
+  const openPrint = async () => {
+    if (!printData) return;
+    if (printableRef.current.data !== printData || !printableRef.current.url) {
+      if (printableRef.current.url) URL.revokeObjectURL(printableRef.current.url);
+      const blob = await renderSalesOrderPdf(printData);
+      printableRef.current = { data: printData, url: URL.createObjectURL(blob) };
+    }
+    const printable = printableRef.current.url;
+    if (!printable) return;
+    if (dirty) toast.message("You have unsaved changes — printing the saved version");
+    window.open(printable, "_blank");
+  };
+  useEffect(
+    () => () => {
+      if (printableRef.current.url) URL.revokeObjectURL(printableRef.current.url);
+    },
+    [],
+  );
 
   /* ── Writes — ONE page-level Save; every write mints a revision. ── */
   const saveMut = useSaveSalesOrderRevision(orderId ?? "", {
@@ -1118,33 +1144,63 @@ export default function SalesOrderWorkspace() {
     });
   }, [mode, draft.lines, base, viewedRevision, detailQ.data, order]);
 
+  /* A line the current commitment no longer carries, but an earlier Revision
+     did, was CANCELLED — and the Route states its outcome instead of letting
+     it vanish. Derived from the revision ledger; nothing is stored. */
+  const cancelledLines = useMemo(() => {
+    const live = new Set((detailQ.data?.lines ?? []).map((line) => line.sku));
+    const gone = new Map<string, { sku: string; label: string | null; qty: number; revision: number }>();
+    for (const revision of revisions) {
+      const present = new Set((revision.snapshot.lines ?? []).map((line) => line.sku));
+      /* The FIRST Revision whose snapshot no longer holds the line is the one
+         that cancelled it — the later ones merely inherit its absence. */
+      for (const [sku, entry] of [...gone]) {
+        if (!present.has(sku) && entry.revision === 0) {
+          gone.set(sku, { ...entry, revision: revision.revision });
+        }
+      }
+      for (const line of revision.snapshot.lines ?? []) {
+        if (live.has(line.sku) || gone.has(line.sku)) continue;
+        gone.set(line.sku, {
+          sku: line.sku,
+          label: line.description?.trim() || line.sku,
+          qty: Number(line.qty),
+          revision: 0,
+        });
+      }
+    }
+    return [...gone.values()].filter((entry) => entry.revision > 0);
+  }, [detailQ.data, revisions]);
+
   const orderRoute: SalesOrderRouteModel | null = useMemo(() => {
     const detail = detailQ.data;
     const facts = routeFactsQ.data;
     if (!orderId || !detail?.order || !facts) return null;
+    const caseStatus = new Map(
+      (serviceCasesQ.data?.items ?? []).map((item) => [item.id, item.statusLabel ?? null]),
+    );
     return resolveSalesOrderRoute({
       order: {
         id: orderId,
         so: detail.order.so,
+        customerName: displayCustomerName(detail.order.customer_name),
         placedAt: detail.order.placed_at,
         deliveryDate: detail.order.delivery_date,
-        doNumber: detail.order.do_number,
-        dispatchedAt: detail.order.dispatched_at,
         deliveredAt: detail.order.delivered_at,
-        invoiceNo: detail.order.invoice_no,
       },
-      revisions: revisions.map((revision) => revision.revision),
       lineLabels: Object.fromEntries(detail.lines.map((line) => [line.sku, line.label?.trim() || line.sku])),
+      /* Deliver To is PURCHASING's answer, quantity split included. Sales
+         Order stores neither the destination nor its split, so the Route
+         reads it and never infers one. */
+      lineDestinations: Object.fromEntries(
+        (goodsTruthQ.data?.lines ?? []).map((line) => [line.sku, line.deliverTo]),
+      ),
+      cancelledLines,
       allocation: facts.allocation,
       purchaseOrders: detail.pos.map((po) => ({
         id: po.id,
-        currentFact: poReceivingProgress(po.lines.map((line) => ({
-          qty: line.qty,
-          received_qty: line.received_qty,
-        }))).label,
-        etaDate: po.eta_date,
-        /* A file path proves a file exists but is not its document number. */
-        supplierDoNumber: null,
+        issuedAt: po.placed_at ? po.placed_at.slice(0, 10) : null,
+        expectedReadyDate: po.expected_ready_date ?? null,
         lines: po.lines.map((line) => ({
           sku: line.sku,
           qty: Number(line.qty),
@@ -1159,16 +1215,14 @@ export default function SalesOrderWorkspace() {
           submitted_at: record.submitted_at,
         }),
         poId: record.po_id,
-        supplierDoNumber: record.do_number,
-        status: warehouseReceiptStatusLabel(record.status),
         receivedAt: record.goods_received_at,
       })),
       delivery: {
         booking: facts.brief.appointment
           ? {
-              date: facts.brief.appointment.dateIso,
+              confirmedDate: facts.brief.appointment.dateIso,
               slot: facts.brief.appointment.slot,
-              partnerName: facts.brief.appointment.carrier.partnerName,
+              scope: facts.brief.appointment.scope,
             }
           : null,
         attempts: facts.attempts.map((attempt) => ({
@@ -1181,50 +1235,46 @@ export default function SalesOrderWorkspace() {
           recordedAt: attempt.recorded_at,
         })),
       },
+      /* Straight from the ONE arithmetic (§8). `holds` is what decides the
+         release; `outstanding` is what the customer owes. Two facts. */
       money: {
         known: money.known,
-        total: money.total,
-        paid: money.paid,
         outstanding: money.outstanding,
+        holds: money.holds,
       },
-      refunds: facts.refunds.map((refund) => ({
-        id: refund.id,
-        amount: Number(refund.amount),
-        status: refund.status,
-        requestedAt: refund.requested_at,
-      })),
-      loans: facts.loans.map((loan) => ({
-        id: loan.id,
-        label: loan.borrowed_label ?? loan.item_sku ?? loan.category ?? "Loan item",
-        status: loan.status,
-        source: loan.source,
-        loanNoteNo: loan.loan_note_no,
-        loanedAt: loan.loaned_at,
-        returnedAt: loan.returned_at,
-        returnedToSupplierAt: loan.returned_to_supplier_at,
-      })),
       cases: facts.cases.map((item) => ({
         id: item.id,
         caseNo: item.caseNo,
+        statusLabel: caseStatus.get(item.id) ?? null,
         closed: item.statusIsClosed,
-        openedAt: item.openedAt,
       })),
       claims: facts.claims.map((item) => ({
         id: item.id,
         claimNo: item.claim_no,
-        poId: item.po_id,
-        status: item.status,
-        reportedAt: item.reported_at,
-      })),
-      work: (correctionWorkQ.data?.work ?? []).map((item) => ({
-        id: item.id,
-        module: item.module,
-        title: item.consequence,
-        state: item.state,
-        createdAt: item.raised_at,
+        statusLabel: supplierClaimStatusLabel(item.status),
+        closed: item.status === "closed",
       })),
     });
-  }, [orderId, detailQ.data, routeFactsQ.data, revisions, money, correctionWorkQ.data]);
+  }, [
+    orderId,
+    detailQ.data,
+    routeFactsQ.data,
+    goodsTruthQ.data,
+    serviceCasesQ.data,
+    cancelledLines,
+    money,
+  ]);
+
+  /* The Route hands out the action-engine line; the ROSTER names the person.
+     One duty read, the same one the Team board and the PO chips use. */
+  const dutyQ = useOperationPoDuty();
+  const routeOwners = useMemo(
+    () => ({
+      purchasing: dutyQ.data?.holder ?? null,
+      receiving: dutyQ.data?.grnHolder ?? null,
+    }),
+    [dutyQ.data],
+  );
 
   /* The real parties, with no placeholder — the attribution form supplies its
    * own "Keep …" and "Not recorded" entries, and two placeholders in one list
@@ -1333,10 +1383,8 @@ export default function SalesOrderWorkspace() {
       <Button
         size="sm"
         variant="ghost"
-        disabled={!pdfUrl}
-        onClick={() => {
-          if (pdfUrl) window.open(pdfUrl, "_blank");
-        }}
+        disabled={!printData}
+        onClick={() => void openPrint()}
         data-testid="workspace-print"
       >
         <Printer size={14} /> Print ▾
@@ -1899,7 +1947,7 @@ export default function SalesOrderWorkspace() {
               />
             </div>
           ) : orderRoute ? (
-            <SalesOrderRoute route={orderRoute} />
+            <SalesOrderRoute route={orderRoute} owners={routeOwners} />
           ) : (
             <div className="rounded-card border border-kit-slate-5 bg-white">
               <EmptyState title="No route facts were found for this sales order" />

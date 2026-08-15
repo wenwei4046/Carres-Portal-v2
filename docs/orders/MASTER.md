@@ -179,18 +179,137 @@ keep a superseded target.
   `Order Route`. `Current` here means the complete current SO version, not an overall lifecycle
   status.
 
-## Order Route
+## ORDER ROUTE — TWO LAYERS OF FACT · OWNER FINAL RULING 2026-08-15 · APPROVED / LOCKED
 
-`Order Route` is a read-only route map/checklist derived only from authoritative facts. It is not a
-manual checklist and not another overall status. Its primary presentation is one readable route per
-actual goods/category/item scope, rendering only applicable facts along `SO → PO → ETA → GRN → Unit
-→ DO → Delivered` and marking the present fact `CURRENT`. Split fulfilment may show simultaneous
-positions — for example, a Bed delivered while a Sofa remains at supplier — so there is no forced
-single “You are here”. Document identifiers link to their owning objects. Missing facts are stated
-truthfully (`PO not issued`, `Waiting Purchasing`) rather than filled with invented stages. A compact
-secondary `Still owed` checklist shows only meaningful Goods, Delivery, Money, Loan and Other
-Commitments obligations; it does not render a dashboard card for every clear/empty state. Sales
-Order does not gain a writer.
+**This OVERWRITES the earlier one-lane `SO → PO → ETA → GRN → Unit → DO → Delivered` description
+and the `Still owed` checklist beside it** (MASTER OVERWRITE LAW). The route is still read-only,
+still derived only from authoritative facts, and still gains no writer. What changed is that it
+stopped being one lane with a secondary list and became two layers.
+
+```
+LAYER 1  ORDER TRACKS      GOODS · STOCK · DELIVERY · MONEY
+         LINKED PROBLEMS   conditional, and visually separate
+LAYER 2  GOODS ROUTES      one collapsible block per goods line
+         DELIVERY RELEASE  the derived gate summary
+```
+
+### Layer 1 · ORDER TRACKS — four fixed parallel facts
+
+Four tracks, always rendered, in that order. Each row is a state mark plus ONE factual line, and a
+door only where the fact is owned on another surface — today that is `MONEY → Open Payments →`.
+
+**The four rows are four simultaneous facts and are NEVER combined into an overall Sales Order
+status.** There is no `status` field on the resolved route to read, and adding one would recreate
+the single-status column §0.1 already refuses on the Register.
+
+| Mark | Means |
+|---|---|
+| `✓` | the track is complete |
+| `●` | in progress |
+| `⚠` | blocked — **always with its reason on the same line** |
+
+### `LINKED PROBLEMS` — never a fifth track
+
+A conditional section, rendered ONLY when a linked exception exists (an open Service Case, an open
+Supplier Claim): `⚠ SC-1031 · Investigation in progress · Open SC-1031 →`. **Service is never a
+track**, because a track is a stage every Sales Order passes through and Service is not. A CLOSED
+exception does not render: a closed case is not a problem. The status word is the owning module's
+own translation — no internal enum reaches this screen.
+
+### Layer 2 · GOODS ROUTES — one block per goods line
+
+One collapsible `▼/▶` block per line, branching by quantity, source and destination into indented
+SUB-LANES: a ready-stock lane, a delivered lane, a purchase lane per Purchase Order, and an
+unassigned lane for quantity no PO covers. **`CURRENT` belongs to a specific SUB-LANE, never to the
+Sales Order** — `YOU ARE HERE` is withdrawn and `CURRENT` is the registered word. Split quantities
+carry their counts. **Only applicable stations render**; nothing is shown permanently grey.
+
+**STATION ANATOMY — a `✓` costs real completion evidence.**
+
+| Mark | What it must carry |
+|---|---|
+| `✓` | the document number, its LABELLED date and an explicit door — `PO-2048 · Issued: Thu, 13 Aug · Open PO-2048 →` |
+| `●` | the factual status line, the governed action-engine line with the resolved owner avatar chip (`[YJ] Confirm the ready date`), and the door |
+| `○` | primary-school English — `No Purchase Order yet` · `Not received yet` · `Units not created yet` — **never `PO: —`** |
+| `⚠` | blocked or missing information, always with the reason and the owning door |
+
+Evidence per station: SO row · PO row · supplier-confirmed ready date · GRN row · Unit
+created/allocated · DO + appointment · delivery completion + proof. **Dates always carry their
+meaning label** — `Ordered` · `Customer requested` · `Issued` · `Estimated ready` · `Received` ·
+`Delivery appointment` — and are spelled through the one date format (`Wed, 12 Aug`). A bare date
+never ships. Everything is derived; there is no hand-tickable mark anywhere.
+
+**THE DESTINATION FORK, AND ITS HONEST BOUNDARY.** `Deliver To` is Purchasing's answer, quantity
+split included; Sales Order stores neither. Where a line's outstanding quantity sits on ONE purchase
+lane and Purchasing names a split whose quantities add up to that lane, the lane forks into **one
+sub-lane per Deliver To** — the split is a fact, not an inference. Where several POs are involved,
+or the named quantities do not reconcile, the lane STATES the destinations instead of distributing
+them. §0.1's rule stands: a consolidated PO does not by itself prove a PO-line-to-SO-line
+allocation, and the route may not distribute another Sales Order's quantity or destination by
+inference.
+
+### `DELIVERY RELEASE` — derived, read-only, and NO release button
+
+```
+○ NOT READY FOR DELIVERY · {n} requirements still open
+✓ READY FOR DELIVERY · All release requirements are complete.
+```
+
+Three requirements: **Goods ready · Money release cleared · Appointment confirmed.** The only
+control is `Open Delivery →` — **the release ACT lives in the owning module** and this block never
+grows a button for it.
+
+**THE BALANCE FACT AND THE RELEASE DECISION ARE TWO FACTS.** `orderMoney` already separates
+`holding` from `outstanding` (§8), and this block prints both:
+
+```
+⚠ Money release not cleared · RM 1,249.00 still to collect
+✓ Money release cleared · RM 1,249.00 remains to collect · Manager release recorded
+```
+
+**A manager release NEVER erases or hides the outstanding amount.** An order whose value nobody has
+entered does not hold anything (§8 — unknown warns, never blocks); the block says `No price yet`
+and `Money does not hold this delivery`.
+
+**GATE ICONS MATCH THE FACTS.** Partial goods read `○ Goods not ready · 1 of 3 ready`. A `✓` on
+partial goods is allowed ONLY when an explicit partial-delivery scope exists **and is displayed**:
+
+```
+✓ Goods ready for this delivery · 1 Unit included in DO-2088 · 2 Units remain open
+```
+
+The scope is the booking's own delivery groups (`booking_groups`), never a guess about which goods
+the trip carries.
+
+### The scenario matrix — what renders, and what deliberately does not
+
+| Scenario | What the Route renders |
+|---|---|
+| Ready stock | one `READY STOCK` lane; **the purchase stations are omitted entirely** |
+| Supplier direct | the purchase lane's stations, with receiving/stock omitted where the facts say so |
+| Split quantity | multiple sub-lanes with counts, each with its own `CURRENT` position |
+| Partial receiving | `1 of 2 received`, and the RECEIVING station stays `CURRENT` |
+| Multiple destinations | one lane per `Deliver To` where Purchasing's split reconciles (see the boundary above) |
+| Service lines | no goods route; a linked case appears under `LINKED PROBLEMS` only |
+| Replacement | a new route lane; the original line states its outcome |
+| Cancelled line | one grey line, `{item} · Qty {n} · Cancelled · Rev {n}`, and **no stations** |
+| Amended line | routes always reflect the CURRENT effective Revision |
+| Delivered quantity | its own `DELIVERED` lane, evidenced by the Unit |
+
+**A PO WHOSE GOODS ARRIVED IS STILL ITS LINE'S ROUTE.** Measured while building this: the lane was
+keyed on the PO's still-OPEN quantity, so the moment `received` caught up with `qty` the whole lane
+vanished — at exactly the step where the work sat (`○ STOCK · Units not created yet`). The lane is
+keyed on the ORDERED quantity instead; Units that reached the register have already lowered the
+line's outstanding, so nothing double-counts.
+
+### Components and ownership
+
+`PageShell` + kit blocks + stacked rows. **No `<table>`**, no new kit component invented
+page-locally, and the loading state uses the existing kit `Loading` — a Skeleton is not in the kit,
+and adding one would be a kit card, not a page hack. The owner avatar chip reuses the same
+`personInitials` / `avatarColor` primitives the Team board and the PO duty chips already use. The
+reading model is copied from parcel-tracking / Stripe-timeline / GitHub-checks **patterns only**;
+every colour, font, spacing and component is the Carres UI Kit. Sales Order gains no writer.
 
 ## Owner UI acceptance corrections — 2026-08-14
 
@@ -431,20 +550,22 @@ its three states `☐ none · ▣ partial · ☑ all`.
   only; the id, channel and every attributed order are untouched, and the HR scoreable-store
   exclusion derives from staff, not from that name.
 
-### Order Route — delivery line, re-ruled
+### Order Route — delivery line
 
-`Promised this day, no date yet` is **overwritten**. It named a day and denied it in the same
-breath, and *"this day"* pointed at nothing on screen. The line now states two plain facts owned by
-two different modules:
+**Superseded within the same day by the two-layer model above** (ORDER ROUTE — TWO LAYERS OF FACT).
+`Promised this day, no date yet` was overwritten here because it named a day and denied it in the
+same breath; its replacement, `Customer date {date} · Delivery not arranged`, is in turn replaced by
+the two-layer split, which separates the same two facts onto two surfaces rather than two clauses:
 
 ```
-a promise exists   →  Customer date {formatted date} · Delivery not arranged
-no promise         →  No delivery date          (the same governed value the Register prints)
+DELIVERY track      Appointment not confirmed   /   Delivery appointment: {date}
+DELIVERY RELEASE    ○ Appointment not confirmed · Customer requested: {date}
 ```
 
-This explicitly re-rules the 2026-08-14 acceptance wording recorded above; that record's other
-clauses stand. Dates in a route fact are rendered through the ONE date spelling (`fmtDate`), title
-as well as detail.
+**What survives unchanged is the RULE the wording existed to enforce:** the customer's promise and
+the arranging of the trip are two facts owned by two modules, and neither is stated as the other.
+Dates in a route fact are still rendered through the ONE date spelling (`fmtDate`), and a route date
+now additionally carries its meaning label.
 
 ## SALES ORDER OBJECT PAGE V2 — OWNER RULING 2026-08-15 (Chai) · APPROVED / LOCKED
 

@@ -552,7 +552,14 @@ operationOrdersRouter.get("/:id", requireOperation, async (c) => {
   // admits operation + principal, so no new endpoint carries the file.
   const { data: pos, error: e_pos } = await sb
     .from("purchase_orders")
-    .select("id, supplier_id, warehouse_id, status, sup_status, so, so_refs, eta_date, do_file_path")
+    // 2026-08-15 (Order Route V2) — `placed_at` and `expected_ready_date` are
+    // the two dates the Route's `✓` stations must be able to NAME: a station
+    // is complete only when it can show its document number AND its labelled
+    // date (`PO-2048 · Issued: …`, `Estimated ready: …`). Read-only additions
+    // to a select the drawer already makes; no new query, no new writer.
+    .select(
+      "id, supplier_id, warehouse_id, status, sup_status, so, so_refs, eta_date, placed_at, expected_ready_date, do_file_path",
+    )
     .or(`so.eq.${order.so},so_refs.cs.{${order.so}}`);
   if (e_pos) { const m = mapPgError(e_pos); return c.json(m.body, m.status); }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

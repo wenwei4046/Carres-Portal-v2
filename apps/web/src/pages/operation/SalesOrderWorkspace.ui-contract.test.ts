@@ -82,18 +82,33 @@ describe("Sales Order object template contract", () => {
 
   /* ── THE PREVIEW IS THE DOCUMENT ───────────────────────────────────────── */
 
-  it("renders the real document through the SAME call Print opens", () => {
+  it("renders the real document through the SAME renderer Print uses", () => {
     expect(workspace).toContain('data-testid="pdf-pane"');
-    /* ONE template call path: the pane paints the bytes of the blob, and Print
-       opens THAT blob's URL. A second lookalike renderer is the failure this
-       asserts against. */
-    expect(workspace.match(/renderSalesOrderPdf\(/g)).toHaveLength(1);
+    /* ONE RENDERER, TWO PURPOSES. The pane paints the bytes of the PREVIEW
+       blob; Print opens a blob built from the SAVED data. Both go through
+       `renderSalesOrderPdf` — a second lookalike renderer is the failure this
+       asserts against, and a page-local template call would show up here as a
+       third name rather than a second call. */
+    expect(workspace.match(/renderSalesOrderPdf\(/g)).toHaveLength(2);
     expect(workspace).toContain("const blob = await renderSalesOrderPdf(data)");
-    expect(workspace).toContain("URL.createObjectURL(blob)");
-    expect(workspace).toContain("window.open(pdfUrl,");
+    expect(workspace).toContain("const blob = await renderSalesOrderPdf(printData)");
     expect(render).toContain("return toBlob(SalesOrderTemplate(data))");
     /* The paper is centred at a fixed maximum width. */
     expect(workspace).toContain('className="relative mx-auto max-w-[700px]"');
+  });
+
+  /* ⭐ PRINT IS THE SAVED TRUTH — owner ruling 2026-08-15. Preview-equals-Print
+     is asserted in the SAVED state only, so the printable blob may never be
+     built from the draft, and a dirty print must SAY which version it gave. */
+  it("prints the saved version while the form is dirty, and says so", () => {
+    expect(workspace).toContain(
+      "mode === \"oldrev\" && viewedRevision ? templateData : base",
+    );
+    expect(workspace).toContain(
+      'toast.message("You have unsaved changes — printing the saved version")',
+    );
+    /* The draft's own blob is never handed to Print. */
+    expect(workspace).not.toContain("window.open(pdfUrl,");
   });
 
   it("watermarks the paper while changes are unsaved, without printing it", () => {

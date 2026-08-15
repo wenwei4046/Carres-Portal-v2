@@ -3178,6 +3178,15 @@ export interface operationOrderDetailPo {
   so: number | null;
   so_refs: number[] | null;
   eta_date: string | null;
+  /** The day the PO was ISSUED (`purchase_orders.placed_at`). The Order Route
+   *  prints it as `Issued:` — a `✓` may never show a bare date. Optional so a
+   *  browser on this build against an older Worker degrades to the number
+   *  alone rather than crashing. */
+  placed_at?: string | null;
+  /** What the SUPPLIER confirmed (`expected_ready_date`), printed as
+   *  `Estimated ready:`. Null means nobody has confirmed it — the Route says
+   *  so rather than guessing from the arrival estimate. */
+  expected_ready_date?: string | null;
   /** J1 — the supplier's signed DO object in the `delivery-orders` bucket
    *  (column since 0030). Optional: a browser on this build talking to a
    *  pre-J1 Worker simply sees no supplier-DO row instead of crashing. */

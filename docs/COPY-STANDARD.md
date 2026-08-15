@@ -1170,6 +1170,59 @@ destination is the same one `View` opens.
 `Customer type (auto)`, `Existing customer`, `New customer` and `Checking…` are the Sales
 Portal's own words and are printed unchanged on the object page — one fact, one spelling.
 
+| Meaning | Use exactly | Do NOT use |
+|---|---|---|
+| Printing while the form is dirty | **`You have unsaved changes — printing the saved version`** | Save first · Unsaved · Print anyway |
+
+### The Order Route words (owner ruling 2026-08-15)
+
+**`CURRENT` is the Route's position word, and it belongs to a sub-lane.** `YOU ARE HERE` is
+**REJECTED**: a Sales Order with a split quantity stands in two places at once, so a phrase that
+says *here* has to point at one of them and be wrong about the other.
+
+| Meaning | Use exactly | Do NOT use |
+|---|---|---|
+| The four parallel fact rows | **`ORDER TRACKS`**, headed `GOODS` · `STOCK` · `DELIVERY` · `MONEY` | Status · Progress · Stages · Timeline · Summary |
+| The conditional exception section beside them | **`LINKED PROBLEMS`** | Issues · Exceptions · Service · Alerts — and never a fifth track |
+| The per-line block | **`GOODS ROUTES`** | Items · Fulfilment · Journey |
+| Where the work stands in a sub-lane | **`CURRENT`** | `YOU ARE HERE` (rejected) · Now · Active · Here |
+| The derived gate summary | **`DELIVERY RELEASE`** | Ready check · Can we deliver · Release gate |
+| Its two headlines | **`NOT READY FOR DELIVERY`** / **`READY FOR DELIVERY`** | Blocked · Not ready · OK to go · Cleared |
+| The open-requirement count | **`{n} requirements still open`** · **`All release requirements are complete.`** | {n} blockers · Everything done |
+| Money still holds the delivery | **`Money release not cleared`** + **`RM {amount} still to collect`** | Payment outstanding · Unpaid · On hold |
+| A manager released it, money still owed | **`Money release cleared`** + **`RM {amount} remains to collect`** + **`Manager release recorded`** | Waived · Cleared (alone) · Approved — a release may never read as forgiveness |
+| Goods partly ready | **`Goods not ready`** + **`{n} of {m} ready`** | Partial · Incomplete · Some ready |
+| Goods ready for a scoped partial trip | **`Goods ready for this delivery`** + **`{n} Units included in {DO}`** + **`{n} Units remain open`** | Ready (alone) — a `✓` on partial goods must show its scope |
+| The way out of the release block | **`Open Delivery →`** | Release · Confirm release · Book delivery — the ACT lives in Delivery |
+
+**THE MISSING-DOCUMENT PHRASES — primary-school English, never a dash.** A station nobody has
+reached says what has not happened yet, in the plainest words available:
+
+| Station | Use exactly | Do NOT use |
+|---|---|---|
+| No Purchase Order covers this quantity | **`No Purchase Order yet`** | `PO: —` · No PO · Not ordered · Pending |
+| The supplier has not confirmed a ready date | **`Ready date not confirmed`** | ETA unknown · TBC · — |
+| Nothing has been received against the PO | **`Not received yet`** | Not received · GRN: — · Outstanding |
+| Part of the PO arrived | **`{n} of {m} received`** | Partial · {n}/{m} |
+| No Unit exists yet | **`Units not created yet`** | No stock · Unit: — · Not allocated |
+| Nobody has agreed a delivery day | **`Appointment not confirmed`** | No booking · Unscheduled · TBC |
+
+**A ROUTE DATE ALWAYS CARRIES ITS MEANING.** The label says WHICH fact the day belongs to, and the
+day itself is spelled by `fmtDate` under the year rule (`Wed, 12 Aug`). **A bare date never ships.**
+
+| Fact | Prints |
+|---|---|
+| The day the order was taken | **`Ordered: {date}`** |
+| The day the customer asked for | **`Customer requested: {date}`** |
+| The day the Purchase Order was issued | **`Issued: {date}`** |
+| What the supplier confirmed | **`Estimated ready: {date}`** |
+| The day the goods arrived | **`Received: {date}`** |
+| The agreed delivery day | **`Delivery appointment: {date}`** |
+
+**`Logistics Partner`, never `Carrier`** — already this dictionary's word for the delivery module,
+restated here because the Route names the party on the delivery side and a second spelling on a new
+surface is how a dictionary splits.
+
 ### The Sales Order amendment words
 
 | Meaning | Use exactly |
