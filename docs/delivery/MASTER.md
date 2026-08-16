@@ -87,9 +87,24 @@ problems and history.
 - Bed-set goods remain inseparable. Sofa may travel separately only with customer agreement.
   Accessories do not block core large goods.
 - The issue preview states **This delivery** and **Remaining after this delivery**, with the reason.
-- **Issue Delivery Order** is the only employee act. Never use Release or free-form Create DO.
+- ⛔ **SUPERSEDED 2026-08-16 — *"Issue Delivery Order is the only employee act"*.** The owner ruled
+  that **the system issues the DO when its requirements are met**; it is no longer an employee act.
+  The rest of that sentence stands and is reinforced: **never use Release or free-form Create DO**,
+  and there is **no Release button and no Approve button** on this path (§15's dictionary entry
+  `Release → Issue Delivery Order` is unchanged and still binding). The money half of the
+  requirements also changed: **outstanding money no longer blocks the DO, and a Finance exception is
+  the only money blocker** — the full ruling, what it supersedes and the fact that `Finance
+  exception` is still **undefined** live in [`../orders/MASTER.md`](../orders/MASTER.md) §8, which
+  owns the gate. Delivery remains the writer of the document and the owner of the carrier, the trip
+  derivation and the proof.
+  **Implementation is NOT approved:** the build slice is
+  [`../cards/CARD-2026-08-16-order-route-node-map.md`](../cards/CARD-2026-08-16-order-route-node-map.md),
+  `STATUS: QUEUED · IMPLEMENTATION: NOT APPROVED`. What runs today still requires the employee act
+  and still refuses on money.
 - Issue rechecks permitted goods, split, Warehouse, address and applicable hold rules atomically,
   snapshots the scope and assigns the next owner. It does not create an actual delivery event.
+  **These rechecks survive system issuance unchanged** — what changed is who triggers the act, not
+  what the act verifies.
 - Reprint retains the number and logs the event. Once handed to Logistics, a DO is never deleted;
   cancellation, replacement or correction preserves the original history.
 

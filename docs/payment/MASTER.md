@@ -171,9 +171,29 @@ Work definitions:
 
 The delivery money gate belongs to Sales Orders, not Payment.
 
-- Agreeing a date may warn about money; issuing the DO is the hard gate.
-- Payment supplies the one outstanding answer. Sales Orders decides whether it blocks goods.
-- A manager may release delivery while money remains owed. Release never forgives money.
+- ⛔ **SUPERSEDED 2026-08-16 — *"issuing the DO is the hard gate"*.** The owner ruled that
+  **outstanding money does not block the DO** and that **a Finance exception is the only money
+  blocker**. Agreeing a date may still warn about money.
+- ⛔ **SUPERSEDED 2026-08-16 — *"A manager may release delivery while money remains owed."*** With no
+  money gate there is nothing to release, and the owner ruled **no Release button and no Approve
+  button**. **The companion rule survives in full and is the half that matters: RELEASE NEVER
+  FORGIVES MONEY.** Goods moving has never meant money forgiven — and it means it even less now that
+  goods move by default. Collection work stays open on a delivered order that still owes, and the
+  **waiver is untouched**: writing off a receivable remains a money decision, manager-gated, owned
+  here, with amount, reason, actor and time. A waiver is not a release and never was.
+- **Payment's own ownership is unchanged by all of this.** Payment supplies the ONE outstanding
+  answer and owns the one arithmetic; Sales Orders owns the delivery gate and decides what blocks
+  goods. That boundary did not move — what moved is Sales Orders' answer.
+- 🔴 **`Finance exception` is UNDEFINED.** It does not exist in this repository. Who raises it, what
+  record it is, who clears it and what evidence completes it are all unanswered, so **no money
+  blocker can be built yet.** Definition is owed by the owner; tracked as Q1 in
+  [`../cards/CARD-2026-08-16-order-route-node-map.md`](../cards/CARD-2026-08-16-order-route-node-map.md).
+  The governing ruling lives once in [`../orders/MASTER.md`](../orders/MASTER.md) §8; this MASTER
+  does not restate it.
+- **Implementation is NOT approved.** `deliveryOrderIssueGate` still refuses on an unpaid balance
+  and the T−3/T−2/T−1 collection clock still exists. Whether that clock survives as a collection
+  deadline in its own right is Q4 on the same card. Documentation states the approved target; code
+  is unchanged.
 - Operations sees the resulting Work change; no duplicate alert/status is created.
 
 Storage is split by record:

@@ -179,9 +179,92 @@ keep a superseded target.
   `Order Route`. `Current` here means the complete current SO version, not an overall lifecycle
   status.
 
-## ORDER ROUTE — TWO LAYERS OF FACT · OWNER FINAL RULING 2026-08-15 · APPROVED / LOCKED
+## ORDER ROUTE — ONE NODE MAP CANVAS · OWNER RULING 2026-08-16 · APPROVED / LOCKED
 
-**This OVERWRITES the earlier one-lane `SO → PO → ETA → GRN → Unit → DO → Delivered` description
+**This OVERWRITES the TWO LAYERS OF FACT ruling recorded below** (MASTER OVERWRITE LAW). That
+section is retained beneath this one as a labelled historical record, because most of its content —
+station anatomy, the scenario matrix, the destination-fork boundary, the evidence rules — is carried
+forward unchanged and would otherwise have to be retyped. **Where the two disagree, this section
+rules.** The route remains read-only, remains derived only from authoritative facts, and still gains
+no writer.
+
+```
+                              ┌──────────┐
+                              │    SO    │   the ONLY root
+                              └────┬─────┘
+             ┌────────────────────┼────────────────────┐
+        ┌────▼────┐          ┌────▼────┐          ┌────▼────┐
+        │  GOODS  │          │DELIVERY │          │  MONEY  │
+        └────┬────┘          └────┬────┘          └─────────┘
+             └────────┬───────────┘
+                ┌─────▼─────┐
+                │  DO GATE  │  the system issues the DO when requirements are met
+                └─────┬─────┘
+                ┌─────▼─────┐      ┌──────┐
+                │  DELIVER  │      │ LOAN │  only when a loan exists.
+                └─────┬─────┘      └──────┘  Not a main track. Blocks nothing.
+             ┌────────▼───────┐
+             │ DELIVERY PHOTO │
+             └────────────────┘
+```
+
+**THE APPROVED RULES, and they are not negotiable by a later chat:**
+
+- **ONE NODE MAP CANVAS, not stacked section cards.** The four bordered sections the superseded
+  ruling drew — Order tracks · Linked problems · Goods routes · Delivery release — are retired as a
+  layout. The facts they carried survive; the stacked composition does not.
+- **SO IS THE ONLY ROOT.** Every node descends from it. No second entry point, no floating node.
+- **GOODS · DELIVERY · MONEY LEAVE THE ROOT SIMULTANEOUSLY.** They are three parallel facts that
+  start together, never a sequence and never merged into one.
+- **GOODS AND DELIVERY CONVERGE ON THE DO GATE. MONEY DOES NOT.** Outstanding money no longer holds
+  the delivery order; **a Finance exception is the only money blocker.** The full ruling, and the
+  rules it supersedes, are in **§8 · THE GATES**.
+- **LOAN RENDERS ONLY WHEN A LOAN EXISTS.** It is **not a fourth main track**. It has no edge into
+  the DO gate and no edge into Delivery completion: **Loan never blocks the DO, and Loan never
+  blocks Delivery completion.**
+- **THE SYSTEM ISSUES THE DELIVERY ORDER when the requirements are met.** It is no longer an
+  employee act on this surface. See `../delivery/MASTER.md` §3 for the same reconciliation on
+  Delivery's side.
+- **`Deliver` and `Delivery Photo` are nodes AFTER the DO gate**, in that order — the order
+  `work-engine.ts` already computes (`issue_delivery_order → deliver_today → upload_delivery_photo`).
+- **NO Release button. NO Approve button. NO Overall Status.** There is no `status` field on the
+  resolved route and there never will be; adding one would recreate the single-status column §0.1
+  refuses on the Register. `Release` also stays a banned employee-UI word
+  (`../delivery/MASTER.md` §15).
+
+**STOCK IS NOT A ROOT-LEVEL BRANCH under this ruling.** The superseded model had four Layer-1
+tracks; this ruling names three and calls Loan the *fourth*, which parses only with three mains.
+Stock's facts (`Units not created yet`, the per-unit register read) fold into the GOODS branch as
+stations, where they already sit in the resolver. **This is a derived reading of the owner's
+wording, flagged for confirmation in
+[`../cards/CARD-2026-08-16-order-route-node-map.md`](../cards/CARD-2026-08-16-order-route-node-map.md)
+Q2, not an independent design decision.**
+
+**WHAT IS CARRIED FORWARD UNCHANGED from the superseded ruling:** station anatomy and its evidence
+cost (`✓` buys a document number, a labelled date and a door; `○` is primary-school English, never
+`PO: —`; `⚠` always carries its reason) · the one date spelling with its meaning label · `CURRENT`
+as the registered word · the destination fork and its honest boundary · the complete scenario matrix
+· `LINKED PROBLEMS` as a conditional region that is never a track · the Object Header owning the
+identity · Carres UI Kit tokens throughout · **the route gains no writer, and nothing on it is
+tickable.**
+
+> **IMPLEMENTATION IS NOT APPROVED BY THIS SECTION.** The canvas is approved as business/presentation
+> truth. The build slice is
+> [`../cards/CARD-2026-08-16-order-route-node-map.md`](../cards/CARD-2026-08-16-order-route-node-map.md),
+> which is `STATUS: QUEUED · IMPLEMENTATION: NOT APPROVED` and carries four unanswered owner
+> questions. **The current shipped surface still renders the superseded two-layer model, and that is
+> not a defect to fix on sight** — it is an approved target awaiting an approved build.
+
+---
+
+## ⛔ SUPERSEDED 2026-08-16 — ORDER ROUTE — TWO LAYERS OF FACT · OWNER FINAL RULING 2026-08-15
+
+> **HISTORICAL RECORD. This section no longer states current truth.** It is preserved because the
+> ruling above carries most of its content forward verbatim, and because it is the description the
+> currently shipped implementation was built to. Read it to understand what runs today; read the
+> section above to know what was approved. **Never quote this section as the target.**
+
+**This OVERWROTE the earlier one-lane `SO → PO → ETA → GRN → Unit → DO → Delivered` description
 and the `Still owed` checklist beside it** (MASTER OVERWRITE LAW). The route is still read-only,
 still derived only from authoritative facts, and still gains no writer. What changed is that it
 stopped being one lane with a secondary list and became two layers.
@@ -816,10 +899,18 @@ official Card numbers.
    `38d66340`), both canonical domains and Worker version
    `95d15d76-5517-4f02-a52e-bb46b7d17553`. Authenticated production verification on SO-1318
    proved the durable `?route=1` entry survives reload; live document/Revision lineage; the
-   goods-position read; all five **Goods / Delivery / Money / Loan / Other
-   Commitments** lanes; and real owner handoffs, including the selected-order Delivery link. It is
+   goods-position read; the five lanes **that model then had — Goods / Delivery / Money / Loan /
+   Other Commitments**; and real owner handoffs, including the selected-order Delivery link. It is
    fact-derived and read-only: no manual checklist, giant overall status or foreign writer was
    introduced.
+
+   ⛔ **THE FIVE-LANE MODEL IS SUPERSEDED — twice.** The 2026-08-15 two-layer ruling replaced it
+   with four Order Tracks (`GOODS · STOCK · DELIVERY · MONEY`) and removed Loan and Other
+   Commitments as lanes; the 2026-08-16 Node Map ruling replaced that in turn with three root
+   branches (`GOODS · DELIVERY · MONEY`) plus a conditional Loan node that is **not a main track**.
+   The sentence above is a historical production record of what was verified on 2026-08-13 and is
+   **not** a description of current or target truth. Current truth is §0.1 · ORDER ROUTE — ONE NODE
+   MAP CANVAS.
 5. **CLOSED / PRODUCTION-VERIFIED 2026-08-13 — Copy to new Sales Order** — exact source commit
    `f6a51d59` passed PR #764 CI, then merged without alteration as parent of `6c43c5c6`. The
    `Deploy production` run repeated the authoritative gate (`ci:migrations` · lint · typecheck ·
@@ -3850,25 +3941,70 @@ saying who moved it.
 
 **A gate REFUSES an action. Display order only decides what is read first.**
 
-**Issuing the delivery order is the HARD gate**, not agreeing a date: a date can be agreed while
-the goods and the money are still coming. Issuing is refused unless every goods line is reserved
-to this order (accessories pass automatically), **the money is collected**, and the date is not
-a Sunday or a Malaysian public holiday.
+## ⭐ MONEY NO LONGER GATES THE DELIVERY ORDER — OWNER RULING 2026-08-16 · APPROVED / LOCKED
 
-**An unpaid storage fee is part of the money, and there is no softer rule for it.**
-`orderMoney` returns `holding` beside `outstanding` and `holds` beside `owing`, because
-**a release must lift the HOLD without forgiving the MONEY.**
+**Outstanding money does not block the DO.** A customer balance, however large and however late,
+no longer refuses the delivery order. **A Finance exception is the ONLY money blocker.**
 
-**The emergency override — the only way past it.** **The manager approves it, nobody else.**
-Two outcomes, and the approver picks one out loud:
-- **released, fee still owed** — the goods go, the money action stays open. **This is the
-  default; an override must never quietly forgive money.**
-- **released and waived** — written off with a reason. `storage_fee_override = 0` already means
-  *owes no storage fee*, so `approved` means RELEASED, not FORGIVEN, and the figure written off
-  stays on the record.
+**And the DO is issued by the SYSTEM when its requirements are met**, not by a person pressing a
+button. There is **no Release button and no Approve button** anywhere on this path.
 
-**Operations is told by the work itself** — the moment the override is granted, the order's top
-action changes from collecting to delivering. **No separate alert engine.**
+The requirements that remain, unchanged by this ruling:
+
+```
+✓ the customer has confirmed a delivery date AND a time slot
+✓ the date is not a Sunday and not a Malaysian public holiday
+✓ every goods line is reserved to this order (accessories pass automatically)
+✗ the money is collected        ← RETIRED by this ruling
++ no open Finance exception     ← the one money blocker that remains
+```
+
+> ### 🔴 `Finance exception` IS UNDEFINED — OWNER DEFINITION REQUIRED
+>
+> The term does not exist anywhere in this repository. Rule 9 names it the only money blocker
+> without saying what it is, so **no gate can be written against it yet.** Four answers are
+> missing, and none of them may be invented by an engineer or a planner:
+>
+> ```
+> WHO RAISES IT          Finance? the PIC? a manager? automatically, from what trigger?
+> WHAT RECORD IS IT      a new store, a flag on the order, or a Service Case / Issue Tracker row?
+> WHO CLEARS IT          and does clearing need approval?
+> COMPLETION EVIDENCE    what fact closes it — payment, a decision, a document?
+> ```
+>
+> Until these are answered the money blocker cannot be built, and this section states only what
+> has STOPPED blocking. Tracked as Q1 in
+> [`../cards/CARD-2026-08-16-order-route-node-map.md`](../cards/CARD-2026-08-16-order-route-node-map.md).
+
+**WHAT THIS RULING SUPERSEDES, stated exactly so nobody restores it by accident:**
+
+| Superseded rule | Where it ruled | Status |
+|---|---|---|
+| *"Issuing the delivery order is the HARD gate … **the money is collected**"* | this section, pre-2026-08-16 | **SUPERSEDED** — money is out of the DO gate |
+| *"An unpaid storage fee is part of the money, and there is no softer rule for it"* | this section | **SUPERSEDED as a DO blocker.** The fee is still owed and still collected; it simply no longer holds the document |
+| *"The emergency override — the manager approves it, nobody else"* | this section | **SUPERSEDED.** With no money gate there is nothing to release, and rules 10/11 forbid the button. **Its companion rule survives in full — see below** |
+| *"issuing the DO is the hard gate"* | `../payment/MASTER.md` §6 | **SUPERSEDED** — reconciled in that MASTER |
+| *"Issue Delivery Order is the only employee act"* | `../delivery/MASTER.md` §3 | **SUPERSEDED** — reconciled in that MASTER |
+
+**WHAT SURVIVES, and it is the half that matters most:**
+
+- **A RELEASE NEVER FORGIVES MONEY.** `orderMoney` still returns `holding` beside `outstanding`,
+  and the two facts are still printed apart. Goods moving has never meant money forgiven, and it
+  means it even less now that goods move by default. **The collect action survives delivery**
+  exactly as it always did — a delivered order that still owes keeps its action and its red dot.
+- **The WAIVER is untouched.** Writing off a receivable remains a money decision, manager-gated,
+  owned by Money In, with amount, reason, actor and time. `storage_fee_override = 0` still means
+  *owes no storage fee*. A waiver is not a release and never was.
+- **An order whose value is UNKNOWN still never holds anything** — unknown warns, never blocks.
+- **Operations is still told by the work itself.** No separate alert engine.
+
+> **RUNTIME GAP, REPORTED NOT HIDDEN.** `packages/shared/src/delivery-order.ts` still refuses on
+> `gate.balanceReady`, and `work-engine.ts`'s `issue_delivery_order` still names a person as owner
+> with `orders.do_number` as its completion fact. **The code has not been changed and this ruling
+> does not authorise changing it.** Documentation states the approved target; the build slice is the
+> QUEUED card, which is `IMPLEMENTATION: NOT APPROVED`. The T−1 collection clock's stated
+> justification also rested on this gate — whether the clock survives as a collection deadline in
+> its own right is Q4 on that card.
 
 **AGREEING a date is softer than ISSUING.** It WARNS about goods, money and the calendar so
 nobody promises a day the goods cannot make, but it refuses only two things:
