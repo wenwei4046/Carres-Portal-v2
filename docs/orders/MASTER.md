@@ -232,13 +232,37 @@ no writer.
   refuses on the Register. `Release` also stays a banned employee-UI word
   (`../delivery/MASTER.md` §15).
 
-**STOCK IS NOT A ROOT-LEVEL BRANCH under this ruling.** The superseded model had four Layer-1
-tracks; this ruling names three and calls Loan the *fourth*, which parses only with three mains.
-Stock's facts (`Units not created yet`, the per-unit register read) fold into the GOODS branch as
-stations, where they already sit in the resolver. **This is a derived reading of the owner's
-wording, flagged for confirmation in
-[`../cards/CARD-2026-08-16-order-route-node-map.md`](../cards/CARD-2026-08-16-order-route-node-map.md)
-Q2, not an independent design decision.**
+**STOCK IS A STATION INSIDE THE GOODS ROUTE, NOT A ROOT-LEVEL TRACK — owner ruling 2026-08-16.**
+The root routes are exactly three: **GOODS · DELIVERY · MONEY.** Stock's facts (`Units not created
+yet`, the per-unit register read) are stations on the Goods branch, where they already sit in the
+resolver. The superseded model's fourth Layer-1 track is retired.
+
+**LOAN IS CONDITIONAL LINKED WORK, NOT A FOURTH ROUTE — owner ruling 2026-08-16.** It renders only
+when a loan exists, it hangs off the SO root as linked work rather than as a route, and it has no
+edge into the DO gate or into Delivery completion.
+
+### AN UNCOLLECTED LOAN IS NEVER `No Action Required` — OWNER RULING 2026-08-16 · APPROVED / LOCKED
+
+**Loan blocks nothing, and it finishes nothing either.** These are two different questions and the
+owner answered both:
+
+```
+DOES IT BLOCK?    No. Not the DO. Not Delivery completion. Goods move; the loan is separate work.
+IS IT FINISHED?   No — an uncollected loan is AMBER OUTSTANDING WORK, never `No Action Required`.
+CLOSED BY         Stock recording collection of the loan unit. Nothing else closes it.
+```
+
+**The completion fact belongs to Stock, and only to Stock.** A delivery result does not close a
+loan; a paid balance does not close a loan; nobody ticks it closed. The obligation stays amber
+until Stock records that the physical unit came back. This preserves Card 6's split verbatim —
+customer recovery and supplier return are separate facts — and Card 2's law that a recovered unit
+reaches the sellable pool only through inspection.
+
+**This CONFIRMS Card 8's derived completion rather than changing it.** `Goods clear + Money clear +
+Loan clear + every other explicit commitment clear = No Action Required` still holds; what this
+ruling settles is that removing Loan from the blocking path did **not** remove it from the
+completion test. **Delivered ≠ Complete** was always the point, and an unrecovered loan unit is
+exactly the case it was written for.
 
 **WHAT IS CARRIED FORWARD UNCHANGED from the superseded ruling:** station anatomy and its evidence
 cost (`✓` buys a document number, a labelled date and a door; `○` is primary-school English, never
@@ -3959,22 +3983,57 @@ The requirements that remain, unchanged by this ruling:
 + no open Finance exception     ← the one money blocker that remains
 ```
 
-> ### 🔴 `Finance exception` IS UNDEFINED — OWNER DEFINITION REQUIRED
+### `Finance exception` — OWNER DEFINITION 2026-08-16 · APPROVED / LOCKED
+
+**A Finance exception is an EXPLICIT, Finance-created record linked to the Sales Order.** It is not
+a derived state, not a flag another module may set, and not a computed consequence of a balance.
+Somebody in Finance decides there is a reason to stop the goods, and says so on the record.
+
+```
+WHAT IT IS      an explicit record, linked to the SO
+IT CARRIES      creator · reason · status · timestamps · clear evidence
+WHO CREATES     Finance, and only Finance
+WHO CLEARS      Finance, and only Finance
+STATUS OPEN     blocks the DO gate
+STATUS CLEARED  removes the block
+```
+
+**This is the only thing money does to the delivery order now.** An outstanding balance —
+of any size, of any age — does not block. A storage fee does not block. Only an OPEN Finance
+exception blocks, and only Finance can open or clear one.
+
+**Its consequences, which follow from the ownership laws rather than from preference:**
+
+- **One record, one owner (Law A).** Finance creates, changes and clears it, and owns its
+  completion evidence. Sales Orders READS it to answer the gate; Delivery READS it; neither may
+  write it, and no surface may offer a second door onto the act (Law C).
+- **`clear evidence` is a required field, not a nicety.** A block that can be lifted without saying
+  why is the hand-keyed `payment_status` defect this MASTER already retired once — a money state a
+  human can type is a money state that can contradict the record.
+- **It is not the balance wearing a new name.** Opening one is a decision; owing money is a fact.
+  The two must never be derived from each other, or the gate this ruling removed grows back under
+  another word.
+- **It renders on the Order Route as a blocking fact with its reason**, through the existing
+  station anatomy (`⚠` always carries its reason and the owning door). It is **not** a new root
+  branch and not an Overall Status.
+
+> ### 🔴 IMPLEMENTATION REQUIRED — NOT BUILT
 >
-> The term does not exist anywhere in this repository. Rule 9 names it the only money blocker
-> without saying what it is, so **no gate can be written against it yet.** Four answers are
-> missing, and none of them may be invented by an engineer or a planner:
+> **No part of the Finance exception exists in this repository today.** There is no table, no RPC,
+> no route, no permission and no UI. This section is the approved target and nothing more.
 >
 > ```
-> WHO RAISES IT          Finance? the PIC? a manager? automatically, from what trigger?
-> WHAT RECORD IS IT      a new store, a flag on the order, or a Service Case / Issue Tracker row?
-> WHO CLEARS IT          and does clearing need approval?
-> COMPLETION EVIDENCE    what fact closes it — payment, a decision, a document?
+> NOT BUILT   the record, its columns and its RLS
+> NOT BUILT   the Finance-only create / clear doors and their permission rule
+> NOT BUILT   the DO gate's read of it
+> NOT BUILT   its appearance on the Order Route
 > ```
 >
-> Until these are answered the money blocker cannot be built, and this section states only what
-> has STOPPED blocking. Tracked as Q1 in
-> [`../cards/CARD-2026-08-16-order-route-node-map.md`](../cards/CARD-2026-08-16-order-route-node-map.md).
+> **Do not describe any of this as implemented, and do not treat its absence as permission to
+> keep the old money gate.** What runs today is the retired rule: `deliveryOrderIssueGate` still
+> refuses on an unpaid balance. Documentation states the target; the build slice is
+> [`../cards/CARD-2026-08-16-order-route-node-map.md`](../cards/CARD-2026-08-16-order-route-node-map.md),
+> which remains `IMPLEMENTATION: NOT APPROVED`.
 
 **WHAT THIS RULING SUPERSEDES, stated exactly so nobody restores it by accident:**
 
@@ -3998,13 +4057,34 @@ The requirements that remain, unchanged by this ruling:
 - **An order whose value is UNKNOWN still never holds anything** — unknown warns, never blocks.
 - **Operations is still told by the work itself.** No separate alert engine.
 
+### THE T−1 COLLECTION CLOCK SURVIVES — OWNER RULING 2026-08-16 · APPROVED / LOCKED
+
+**Keep the clock.** `packages/shared/src/collection-clock.ts` stays exactly as it is: due =
+delivery − 1 working day on the Mon–Sat delivery week with Malaysian public holidays, anchored on
+the customer's confirmed day, else the promised date, with `t3`/`t2` attention and `t1` as the
+deadline. No anchor still means no clock.
+
+**What changed is only its JUSTIFICATION, not its arithmetic.** The clock used to be explained by
+the DO door — *"logistics ask for the DO the evening before and the DO door refuses while money
+holds"*. That sentence is retired with the gate it described. **The clock now stands on its own
+footing: a balance has a due date because it is owed, not because it holds goods.**
+
+```
+COLLECTION WORK RUNS INDEPENDENTLY of the delivery.
+Money is not a DO requirement — unless an OPEN Finance exception exists.
+Collection survives delivery, exactly as it always did.
+```
+
+This is the §8 rule that was already true and is now the whole of it: **the collect action
+survives delivery** — a delivered order that still owes keeps its action and its red dot. Under
+the old gate that was an exception worth naming; under this ruling it is simply how collection
+works, because goods no longer wait for money.
+
 > **RUNTIME GAP, REPORTED NOT HIDDEN.** `packages/shared/src/delivery-order.ts` still refuses on
 > `gate.balanceReady`, and `work-engine.ts`'s `issue_delivery_order` still names a person as owner
 > with `orders.do_number` as its completion fact. **The code has not been changed and this ruling
 > does not authorise changing it.** Documentation states the approved target; the build slice is the
-> QUEUED card, which is `IMPLEMENTATION: NOT APPROVED`. The T−1 collection clock's stated
-> justification also rested on this gate — whether the clock survives as a collection deadline in
-> its own right is Q4 on that card.
+> QUEUED card, which is `IMPLEMENTATION: NOT APPROVED`.
 
 **AGREEING a date is softer than ISSUING.** It WARNS about goods, money and the calendar so
 nobody promises a day the goods cannot make, but it refuses only two things:

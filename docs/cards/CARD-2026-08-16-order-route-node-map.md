@@ -121,26 +121,25 @@ is reconciled by this card's PR; the code is not, and this card does not authori
 | # | Approved rule | What runs today | Evidence |
 |---|---|---|---|
 | 8 | outstanding money does not block DO | `gate.balanceReady` refuses DO issuance while money is owed | `packages/shared/src/delivery-order.ts` (`deliveryOrderIssueGate`) |
-| 9 | Finance exception is the only money blocker | no such concept exists anywhere in the repository | — |
+| 9 | Finance exception is the only money blocker | **nothing exists** — no table, RPC, route, permission or UI. Defined by the owner 2026-08-16 (§6 A1); **IMPLEMENTATION REQUIRED** | — |
 | 12 | the system issues the DO when requirements are met | a person issues it; completion fact is `orders.do_number` existing | `packages/shared/src/work-engine.ts` (`issue_delivery_order`, owner = the order's PIC) |
 | 6/7 | Loan never blocks DO or Delivery completion | already true for DO; **Card 8 derived completion currently keeps an open loan open** | `docs/orders/MASTER.md` Card 6/Card 8 records |
 
 **Consequences a BUILD lane must handle, named here so nobody rediscovers them:**
 
-- The **T−3 / T−2 / T−1 collection clock** (Card 4, `packages/shared/src/collection-clock.ts`) exists
-  because "logistics ask for the DO the evening before and the DO door refuses while money holds".
-  Remove the money gate and the clock's stated reason for its T−1 deadline no longer holds. The
-  clock itself may still be wanted as a collection deadline — that is a separate owner decision, not
-  an engineering one.
+- The **T−3 / T−2 / T−1 collection clock** (Card 4, `packages/shared/src/collection-clock.ts`) was
+  justified by the DO door. **Owner ruling: keep the clock** (§6 A4). Its arithmetic does not change;
+  only its stated reason does. Collection runs independently of the delivery.
 - The **manager release lever** (`docs/orders/MASTER.md` §8 emergency override) exists solely to get
-  past the money gate. With no money gate there is nothing to release. Its companion rule —
-  **a release never forgives the money** — must survive in whatever replaces it, because the storage
-  waiver is a genuinely separate money act.
-- **Rule 6/7 vs Card 8.** Card 8's derived completion reads an open `ops_sofa_loans` row and keeps
-  the whole SO open. Rules 6 and 7 say Loan blocks neither DO nor *Delivery completion*. Whether an
-  open loan still blocks **`No Action Required`** (the whole-SO derived result, which is not delivery
-  completion) is **not settled by the owner's wording**. This card reads it as: Loan still keeps
-  `No Action Required` open, because recovering a loan unit is real outstanding work. See §6.
+  past the money gate. With no money gate there is nothing to release, and rules 10/11 forbid the
+  button. Its companion rule — **a release never forgives the money** — survives in full, because the
+  storage waiver is a genuinely separate money act and stays manager-gated under Money In.
+- **Rule 6/7 vs Card 8 — settled** (§6 A3). Loan blocks neither the DO nor Delivery completion, and
+  an uncollected loan is still **amber outstanding work, never `No Action Required`**, closed only
+  when **Stock records collection**. Card 8's derived completion is confirmed, not changed.
+- **The Finance exception is a whole build, not a flag.** Record + RLS · Finance-only create/clear
+  doors and their permission rule · the DO gate's read of it · its appearance on the Order Route as
+  a blocking fact with its reason. None of it exists.
 
 ---
 
@@ -158,35 +157,47 @@ is reconciled by this card's PR; the code is not, and this card does not authori
 
 ---
 
-## 6 · Open questions — OWNER DECISION REQUIRED before implementation
+## 6 · Owner answers — ALL FOUR SETTLED 2026-08-16
 
-These cannot be resolved from authority, code or ordinary engineering judgment. Each would change
-how Carres operates if answered differently.
+Every question this card opened has been answered by the owner. **No unresolved owner decision
+blocks a build.** What blocks it is that implementation is not yet approved (§8) — a different
+thing, and the owner's own instruction.
 
-**Q1 · What IS a Finance exception?** 🔴 **BLOCKING**
+**A1 · A Finance exception is an explicit, Finance-created record.** ✅ SETTLED
 
-Rule 9 makes it the only money blocker, but the term appears nowhere in the repository. To be built
-it needs four answers: **who raises it · what record it is · who clears it · what its completion
-evidence is.** Until then rule 9 states what does *not* block without naming what does, and no gate
-can be written.
+```
+WHAT IT IS      an explicit record linked to the Sales Order
+IT CARRIES      creator · reason · status · timestamps · clear evidence
+WHO CREATES     Finance, and only Finance
+WHO CLEARS      Finance, and only Finance
+OPEN            blocks the DO gate
+CLEARED         removes the block
+```
 
-**Q2 · Does STOCK survive as a main track?**
+It is the ONE money blocker. An outstanding balance of any size or age does not block; an
+uncollected storage fee does not block. **It is a decision, never a derived state** — it may not be
+computed from a balance, or the retired gate grows back under another word. Persisted in
+`orders/MASTER.md` §8, which owns the gate; `payment/MASTER.md` §6 and `delivery/MASTER.md` §3 read
+it and never write it.
 
-The superseded ruling had four Layer-1 tracks: `GOODS · STOCK · DELIVERY · MONEY`. Rule 3 names
-three, and rule 5's word *"fourth"* only parses if there are exactly three mains. This card
-therefore reads STOCK as **folded into the Goods branch as a station**, which is where its facts
-already sit (`Units not created yet`). **If the owner intended STOCK to remain a root-level branch,
-say so and this card is corrected.**
+**A2 · STOCK is a station inside the GOODS route, not a root-level track.** ✅ SETTLED
 
-**Q3 · Does an open Loan still hold `No Action Required`?**
+Root routes are exactly three: **GOODS · DELIVERY · MONEY.** LOAN is **conditional linked work, not
+a fourth route.** This confirms the reading this card proposed; the superseded model's fourth
+Layer-1 track is retired.
 
-See §4. This card's reading is **yes** — Loan does not block DO or delivery, but an unrecovered loan
-unit is outstanding work and the SO is not finished. Confirm or reverse.
+**A3 · An uncollected Loan is never `No Action Required`.** ✅ SETTLED
 
-**Q4 · Does the collection clock survive without the money gate?**
+It remains **amber outstanding work** until **Stock records collection** — that is the completion
+fact, and nothing else closes it. It still **blocks neither the DO nor Delivery completion**. This
+confirms Card 8's derived completion rather than changing it: removing Loan from the blocking path
+did not remove it from the completion test. `Delivered ≠ Complete`.
 
-See §4. Recommendation: **keep it** as a collection deadline in its own right; a balance still has a
-due date even when it stops holding goods. Owner confirms.
+**A4 · The T−1 collection clock is kept.** ✅ SETTLED
+
+Unchanged arithmetic; only its justification is retired. **A balance has a due date because it is
+owed, not because it holds goods.** Collection work runs independently of the delivery, and money
+is not a DO requirement unless an OPEN Finance exception exists.
 
 ---
 
@@ -210,23 +221,34 @@ authenticated-acceptance result. Superseded rules are labelled, never removed.
 ✗ any database migration
 ✗ any change to ERP runtime behaviour
 ✗ promoting this card to APPROVED without an owner ruling
-✗ answering Q1–Q4 by engineering judgment
-✗ building the canvas before Q1 and Q2 are answered
+✗ describing the Finance exception, system DO issuance or the canvas as implemented
+✗ treating the Finance exception's absence as permission to keep the retired money gate
 ```
+
+**All four owner questions are answered (§6). What is still missing is the owner's approval to
+build, and that is the owner's call, not a gap in the specification.**
 
 ---
 
 ## 9 · Acceptance boundary for the later BUILD lane
 
-When — and only when — the owner moves `IMPLEMENTATION` to `APPROVED` and answers Q1–Q4, the build
-slice is accepted when:
+When — and only when — the owner moves `IMPLEMENTATION` to `APPROVED`, the build slice is accepted
+when:
 
 1. One canvas renders with SO as the only root and no orphan node.
-2. Goods, Delivery and Money leave the root simultaneously.
-3. Loan renders only when a loan exists, with no edge into the DO gate or Delivery completion.
+2. Goods, Delivery and Money leave the root simultaneously; **STOCK renders as a station inside the
+   Goods route and never as a root branch.**
+3. Loan renders only when a loan exists, as conditional linked work, with no edge into the DO gate
+   or Delivery completion — **and an uncollected loan reads as amber outstanding work, never
+   `No Action Required`, closing only when Stock records collection.**
 4. DO, Deliver and Delivery Photo render as nodes in that order, after the gate.
 5. No `status` field, no Overall Status node, no Release button, no Approve button, nothing tickable.
-6. Every carried-forward rule in §2 still holds, proven by the existing route tests passing
+6. **The Finance exception exists as a real record** with creator, reason, status, timestamps and
+   clear evidence; **only Finance can create or clear it**, enforced server-side, not merely in the
+   UI. `OPEN` refuses the DO; `CLEARED` does not. An outstanding balance alone never refuses.
+7. **The T−1 collection clock still runs**, and collection work is reachable and open on a delivered
+   order that still owes.
+8. Every carried-forward rule in §2 still holds, proven by the existing route tests passing
    unchanged where they are still applicable.
-7. The full repository gate passes on the exact source, and the owner walks the surface in
+9. The full repository gate passes on the exact source, and the owner walks the surface in
    authenticated production — a green pipeline is never acceptance.
