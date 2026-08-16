@@ -818,18 +818,24 @@ breathing gap
   read-only, fact-derived, multi-position route/obligation map — never a manual checklist or
   single overall status. Its governed visual grammar adapts parcel tracking: small state node, thin
   connector, fact/evidence and date, using Carres tokens rather than reference-product styling.
-  The first layer is the stable four-line `Goods · Stock · Delivery · Money` summary; conditional
-  linked problems sit outside it. The second layer is a vertical/branched per-goods map whose
-  quantity/source/destination branches may have simultaneous current positions. Completed nodes
-  require owner-module evidence; nodes are never manually ticked. Document links spell their
-  destination (`Open PO-2048 →`), and absent documents use plain facts rather than `—`. At medium
-  desktop or with Quick Rail open, branches reflow vertically without hiding meaning. Delivery
-  release is a read-only convergence summary and deep-link, never a Sales Order write control.
-  The content starts directly with `ORDER TRACKS`: the persistent Object Header already supplies
-  the page name and `number · party`, so neither is repeated. Parallel tracks remain unconnected;
-  the visual rail is reserved for true per-goods sequence and forks. Delivery requirements are
-  shown as inputs converging on one release result. A door back to the already-open object is
-  forbidden, and full machine timestamps are formatted before display.
+  **OVERWRITTEN 2026-08-16 (owner ruling) — the two-layer stack is retired; the route is ONE NODE
+  MAP.** White node cards joined by connector lines on a single pannable, zoomable canvas that fits
+  itself to the viewport on load (`− + ⛶` bottom-left, always visible, keyboard-operable). The Sales
+  Order is the only root and goods, delivery and money leave it simultaneously; goods forks per line
+  and per source quantity; everything converges on the read-only Delivery Order gate, with
+  `DELIVER` and `DELIVERY PHOTO` below it and no trailing line after the last node. `CURRENT` is one
+  per route — up to three, never a fourth. Completed nodes require owner-module evidence and are
+  never manually ticked. Document links spell their destination (`Open PO-2048 →`); absent documents
+  use plain facts rather than `—`. The canvas never reflows: at any width it simply fits smaller and
+  the operator pans, so no node loses its anatomy. The gate is a read-only convergence result and
+  deep-link, never a Sales Order write control — no Release or Approve button exists in any state.
+  Conditional linked problems sit on a strip OUTSIDE the canvas, because a node is a stage every
+  object passes through and an exception is not one. The content starts directly with the canvas:
+  the persistent Object Header already supplies the page name and `number · party`, so neither is
+  repeated. A door back to the already-open object is forbidden, and full machine timestamps are
+  formatted before display. State is never carried by colour alone, and only the colour steps the
+  Tailwind config publishes may be used — an unpublished step renders nothing at all.
+  Governing detail: `docs/orders/MASTER.md` § ORDER ROUTE — ONE NODE MAP.
 - **OBJECT HEADER TEMPLATE — OWNER-APPROVED / LOCKED (2026-08-14).** An ERP object has one owning-
   Register back destination, one persistent identity (`number · party`), governed actions at the
   right, and applicable object views directly below/alongside that identity. View and Edit retain

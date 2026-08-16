@@ -3208,6 +3208,12 @@ export interface operationOrderDetailResponse {
    *  assignment instead of order-level `delivery_partner_id`, since per design
    *  spec §CQ1 option (b) the customer-leg LP lives on the thread now. */
   threads: operationOrderThreadRow[];
+  /** 2026-08-16 (ORDER ROUTE NODE MAP) — the read-only overlay facts the map
+   *  needs. Deliberately NOT folded into `order`: the workspace EDIT form
+   *  seeds its draft from that object. `null` = no overlay row (UNKNOWN). */
+  control?: {
+    delivery_photos?: { path: string; at: string; by: string | null }[] | null;
+  } | null;
 }
 
 /** Row in GET /api/operation/pos. `purchase_order_lines(...)` is the embedded
