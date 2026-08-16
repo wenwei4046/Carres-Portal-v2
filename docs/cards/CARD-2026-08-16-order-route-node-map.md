@@ -1,6 +1,6 @@
-STATUS: QUEUED
+STATUS: EXECUTED
 DATE: 2026-08-16
-PR: pending
+PR: #825
 IMPLEMENTATION: APPROVED — owner ruling 2026-08-16, build straight to production
 
 # ORDER ROUTE — NODE MAP CANVAS (design specification card)
