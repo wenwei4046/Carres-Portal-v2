@@ -306,10 +306,18 @@ line's outstanding, so nothing double-counts.
 
 `PageShell` + kit blocks + stacked rows. **No `<table>`**, no new kit component invented
 page-locally, and the loading state uses the existing kit `Loading` — a Skeleton is not in the kit,
-and adding one would be a kit card, not a page hack. The owner avatar chip reuses the same
-`personInitials` / `avatarColor` primitives the Team board and the PO duty chips already use. The
-reading model is copied from parcel-tracking / Stripe-timeline / GitHub-checks **patterns only**;
-every colour, font, spacing and component is the Carres UI Kit. Sales Order gains no writer.
+and adding one would be a kit card, not a page hack. The Object Header already names `Order Route`
+and `SO-number · Customer`; route content never repeats either identity. The four Order Tracks stay
+unconnected because they are parallel facts, while each goods block uses one continuous vertical
+rail that forks only where quantity/source/destination actually fork. `CURRENT` is the one visually
+emphasised station in each sub-lane. The three Delivery requirements render as a checklist that
+visually converges on the read-only release result. The Sales Order origin carries its number and
+labelled Ordered date as evidence but no circular `Open SO-{n}` door back to the object already
+open. A timestamp is reduced to its governed date before display; machine ISO time never reaches
+the operator. The owner avatar chip reuses the same `personInitials` / `avatarColor` primitives the
+Team board and the PO duty chips already use. The reading model is copied from parcel-tracking /
+Stripe-timeline / GitHub-checks **patterns only**; every colour, font, spacing and component is the
+Carres UI Kit. Sales Order gains no writer.
 
 ## Owner UI acceptance corrections — 2026-08-14
 

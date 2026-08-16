@@ -270,8 +270,6 @@ const caseHref = (caseId: string) =>
   `/operation?tab=service-notes&case=${encodeURIComponent(caseId)}`;
 const claimHref = (claimId: string) =>
   `/operation?tab=claims&claim=${encodeURIComponent(claimId)}`;
-const orderHref = (orderId: string) => `/operation/orders/so/${encodeURIComponent(orderId)}`;
-
 const door = (label: string, href: string): RouteDoor => ({ label, href });
 const open = (what: string, href: string): RouteDoor => door(`Open ${what} →`, href);
 
@@ -877,7 +875,9 @@ export function resolveSalesOrderRoute(input: SalesOrderRouteInput): SalesOrderR
     evidence: [soNumber, dated("Ordered", input.order.placedAt)].filter(Boolean).join(" · "),
     status: null,
     action: null,
-    door: open(soNumber, orderHref(input.order.id)),
+    /* Order Route already sits inside this Sales Order object. A door back to
+       the same object is circular navigation, not useful evidence. */
+    door: null,
     current: false,
   };
 

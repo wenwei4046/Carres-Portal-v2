@@ -38,10 +38,10 @@ function route(over: Partial<Route> = {}): Route {
           id: "origin",
           title: "SALES ORDER",
           mark: "complete",
-          evidence: "SO-1319 · Ordered: 2026-08-12",
+          evidence: "SO-1319 · Ordered: 2026-08-12T04:38:44.852046+00:00",
           status: null,
           action: null,
-          door: { label: "Open SO-1319 →", href: "/operation/orders/so/order-1" },
+          door: null,
           current: false,
         },
         forked: true,
@@ -141,6 +141,12 @@ const draw = (r: Route = route()) =>
   );
 
 describe("Order Route — layer 1", () => {
+  it("does not repeat the object title and identity already shown by the Object Header", () => {
+    draw();
+    expect(screen.queryByRole("heading", { level: 1, name: "Order Route" })).not.toBeInTheDocument();
+    expect(screen.queryByText("SO-1319 · Lim Kuan Yang")).not.toBeInTheDocument();
+  });
+
   it("renders the four tracks as four rows and never as one status", () => {
     draw();
     const tracks = screen.getByTestId("order-tracks");
@@ -184,11 +190,33 @@ describe("Order Route — goods routes", () => {
     expect(screen.getByText("Qty 2 · PURCHASE")).toBeInTheDocument();
   });
 
+  it("keeps the origin and every branch on one shared route spine", () => {
+    draw();
+    const goods = screen.getByTestId("goods-route-B1201S");
+    const spine = within(goods).getByTestId("goods-spine-B1201S");
+    expect(within(spine).getByTestId("station-origin")).toBeInTheDocument();
+    expect(within(spine).getByTestId("sub-lane-ready")).toBeInTheDocument();
+    expect(within(spine).getByTestId("sub-lane-purchase")).toBeInTheDocument();
+  });
+
+  it("ends the shared trunk at the final real branch", () => {
+    draw();
+    expect(screen.getByTestId("branch-trunk-ready")).toHaveAttribute("data-continues", "true");
+    expect(screen.getByTestId("branch-trunk-purchase")).toHaveAttribute("data-continues", "false");
+  });
+
   it("spells every date through the one date format, with its meaning label", () => {
     draw();
     expect(screen.getByText("SO-1319 · Ordered: Wed, 12 Aug")).toBeInTheDocument();
     expect(screen.getByText("PO-2048 · Issued: Thu, 13 Aug")).toBeInTheDocument();
     expect(screen.queryByText(/2026-08-13/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/T04:38:44/)).not.toBeInTheDocument();
+  });
+
+  it("does not offer a link from the Sales Order node back to the page already open", () => {
+    draw();
+    const origin = screen.getByTestId("station-origin");
+    expect(within(origin).queryByRole("link", { name: /Open SO-1319/ })).not.toBeInTheDocument();
   });
 
   it("marks CURRENT on the station that holds it and nowhere else", () => {
@@ -196,6 +224,7 @@ describe("Order Route — goods routes", () => {
     expect(screen.getAllByText("CURRENT")).toHaveLength(1);
     const supplier = screen.getByTestId("station-p:supplier");
     expect(within(supplier).getByText("CURRENT")).toBeInTheDocument();
+    expect(supplier).toHaveAttribute("aria-current", "step");
   });
 
   it("carries the action with the resolved owner as a chip, not a name in the sentence", () => {

@@ -277,6 +277,7 @@ describe("GOODS ROUTES", () => {
   it("marks the SALES ORDER origin with its Ordered date — never a bare date", () => {
     const route = resolveSalesOrderRoute(input());
     expect(route.goodsRoutes[0]!.origin!.evidence).toBe("SO-1319 · Ordered: 2026-08-12");
+    expect(route.goodsRoutes[0]!.origin!.door).toBeNull();
   });
 
   it("names every not-started station in words rather than a dash", () => {
