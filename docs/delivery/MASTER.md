@@ -87,9 +87,29 @@ problems and history.
 - Bed-set goods remain inseparable. Sofa may travel separately only with customer agreement.
   Accessories do not block core large goods.
 - The issue preview states **This delivery** and **Remaining after this delivery**, with the reason.
-- **Issue Delivery Order** is the only employee act. Never use Release or free-form Create DO.
+- ⛔ **SUPERSEDED 2026-08-16 — *"Issue Delivery Order is the only employee act"*.** The owner ruled
+  that **the system issues the DO when its requirements are met**; it is no longer an employee act.
+  The rest of that sentence stands and is reinforced: **never use Release or free-form Create DO**,
+  and there is **no Release button and no Approve button** on this path (§15's dictionary entry
+  `Release → Issue Delivery Order` is unchanged and still binding). The money half of the
+  requirements also changed: **outstanding money no longer blocks the DO, and an OPEN Finance
+  exception is the only money blocker.** A Finance exception is an explicit Finance-created record
+  linked to the SO, with creator, reason, status, timestamps and clear evidence; **only Finance
+  creates or clears it**, `OPEN` blocks this gate and `CLEARED` removes the block. The full ruling
+  lives once in [`../orders/MASTER.md`](../orders/MASTER.md) §8, which owns the gate — Delivery
+  READS it and may never write it. Delivery remains the writer of the document and the owner of the
+  carrier, the trip derivation and the proof.
+  🔴 **IMPLEMENTATION REQUIRED — NOT BUILT, and NOT APPROVED.** The node map shipped
+  (PR #825) and its canvas already states that the system issues the DO with no Release or Approve
+  button — but **neither automatic issuance nor the Finance exception exists in code**, and the
+  shipped gate still counts money. The correction slice is
+  [`../cards/CARD-2026-08-16-money-gate-correction.md`](../cards/CARD-2026-08-16-money-gate-correction.md),
+  `STATUS: QUEUED · IMPLEMENTATION: NOT APPROVED`. What runs today still requires the employee act
+  and still refuses on money. **Do not describe the new rules as implemented.**
 - Issue rechecks permitted goods, split, Warehouse, address and applicable hold rules atomically,
   snapshots the scope and assigns the next owner. It does not create an actual delivery event.
+  **These rechecks survive system issuance unchanged** — what changed is who triggers the act, not
+  what the act verifies.
 - Reprint retains the number and logs the event. Once handed to Logistics, a DO is never deleted;
   cancellation, replacement or correction preserves the original history.
 
