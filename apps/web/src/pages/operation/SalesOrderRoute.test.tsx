@@ -199,6 +199,12 @@ describe("Order Route — goods routes", () => {
     expect(within(spine).getByTestId("sub-lane-purchase")).toBeInTheDocument();
   });
 
+  it("ends the shared trunk at the final real branch", () => {
+    draw();
+    expect(screen.getByTestId("branch-trunk-ready")).toHaveAttribute("data-continues", "true");
+    expect(screen.getByTestId("branch-trunk-purchase")).toHaveAttribute("data-continues", "false");
+  });
+
   it("spells every date through the one date format, with its meaning label", () => {
     draw();
     expect(screen.getByText("SO-1319 · Ordered: Wed, 12 Aug")).toBeInTheDocument();
