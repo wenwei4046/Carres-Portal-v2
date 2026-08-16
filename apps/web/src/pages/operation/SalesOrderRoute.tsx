@@ -237,13 +237,26 @@ function SubLane({
 }) {
   return (
     <div
-      className={forked ? "relative ml-2.5 border-l border-kit-slate-6 pl-6" : ""}
+      className={forked ? "relative pl-8" : "relative"}
       data-testid={`sub-lane-${lane.id}`}
     >
+      <span
+        className={
+          forked
+            ? "absolute left-[10px] top-2 h-px w-8 bg-kit-slate-6"
+            : "absolute bottom-0 left-[10px] top-2 w-px bg-kit-slate-6"
+        }
+        aria-hidden="true"
+      />
       {forked && (
-        <span className="absolute -left-px top-2 h-px w-5 bg-kit-slate-6" aria-hidden="true" />
+        <span
+          className="absolute bottom-0 left-[42px] top-2 w-px bg-kit-slate-6"
+          aria-hidden="true"
+        />
       )}
-      <div className="mb-3 text-label font-semibold tracking-wide text-base-600 uppercase">{lane.title}</div>
+      <div className="mb-3 pl-8 text-label font-semibold tracking-wide text-base-600 uppercase">
+        {lane.title}
+      </div>
       <div>
         {lane.stations.map((station, index) => (
           <Station
@@ -282,11 +295,17 @@ function GoodsBlock({ goods, owners }: { goods: GoodsRoute; owners: RouteActionO
         <span className="text-body font-semibold text-base-900">{goods.title}</span>
       </button>
       {open && (
-        <div className="mt-4 pl-6">
+        <div className="mt-4 pl-6" data-testid={`goods-spine-${goods.id}`}>
           {goods.origin && (
             <Station station={goods.origin} owners={owners} last={goods.lanes.length === 0} />
           )}
-          <div className="mt-1 flex flex-col gap-5">
+          <div
+            className={`relative flex flex-col gap-5 ${
+              goods.forked
+                ? "before:absolute before:bottom-0 before:left-[10px] before:top-0 before:w-px before:bg-kit-slate-6"
+                : ""
+            }`}
+          >
             {goods.lanes.map((lane) => (
               <SubLane key={lane.id} lane={lane} forked={goods.forked} owners={owners} />
             ))}

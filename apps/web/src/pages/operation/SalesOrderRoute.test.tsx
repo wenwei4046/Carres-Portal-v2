@@ -190,6 +190,15 @@ describe("Order Route — goods routes", () => {
     expect(screen.getByText("Qty 2 · PURCHASE")).toBeInTheDocument();
   });
 
+  it("keeps the origin and every branch on one shared route spine", () => {
+    draw();
+    const goods = screen.getByTestId("goods-route-B1201S");
+    const spine = within(goods).getByTestId("goods-spine-B1201S");
+    expect(within(spine).getByTestId("station-origin")).toBeInTheDocument();
+    expect(within(spine).getByTestId("sub-lane-ready")).toBeInTheDocument();
+    expect(within(spine).getByTestId("sub-lane-purchase")).toBeInTheDocument();
+  });
+
   it("spells every date through the one date format, with its meaning label", () => {
     draw();
     expect(screen.getByText("SO-1319 · Ordered: Wed, 12 Aug")).toBeInTheDocument();
