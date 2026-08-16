@@ -63,9 +63,10 @@ import {
   resolveFormTab,
   resolveSalesOrderRoute,
   supplierClaimStatusLabel,
+  myHolidaySet,
   type CustomField,
   type OrderEntryTab,
-  type SalesOrderRoute as SalesOrderRouteModel,
+  type SalesOrderRouteMap as SalesOrderRouteModel,
 } from "@carres/shared";
 import Button from "@/components/kit/Button";
 import Checkbox from "@/components/kit/Checkbox";
@@ -1218,6 +1219,11 @@ export default function SalesOrderWorkspace() {
         receivedAt: record.goods_received_at,
       })),
       delivery: {
+        /* Delivery's own answer about who carries this order — the LOGISTICS
+           node never infers a company from the region default. */
+        logistics: facts.brief.assignedLogistics
+          ? { partnerName: facts.brief.assignedLogistics.partnerName }
+          : null,
         booking: facts.brief.appointment
           ? {
               confirmedDate: facts.brief.appointment.dateIso,
@@ -1225,6 +1231,12 @@ export default function SalesOrderWorkspace() {
               scope: facts.brief.appointment.scope,
             }
           : null,
+        /* `ops_order_control.delivery_photos` (0280) — the ledger the
+           `Upload delivery photo` queue already counts. */
+        photos: (detail.control?.delivery_photos ?? []).map((photo) => ({
+          at: photo.at ?? null,
+          by: photo.by ?? null,
+        })),
         attempts: facts.attempts.map((attempt) => ({
           id: attempt.id,
           attemptNo: attempt.attempt_no,
@@ -1254,6 +1266,17 @@ export default function SalesOrderWorkspace() {
         statusLabel: supplierClaimStatusLabel(item.status),
         closed: item.status === "closed",
       })),
+      /* Card 6 — an INDEPENDENT obligation. It renders only while an item is
+         out, and it never blocks the delivery. */
+      loans: facts.loans.map((loan) => ({
+        id: loan.id,
+        label: loan.borrowed_label?.trim() || loan.item_sku || loan.borrowed_sku || "item",
+        qty: 1,
+        returned: loan.status === "returned",
+      })),
+      /* Sunday and Malaysian public holidays are the two days no company runs
+         (§8) — the gate names the refused day instead of failing silently. */
+      publicHolidays: [...myHolidaySet()],
     });
   }, [
     orderId,

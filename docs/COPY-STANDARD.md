@@ -1181,53 +1181,115 @@ Portal's own words and are printed unchanged on the object page — one fact, on
 |---|---|---|
 | Printing while the form is dirty | **`You have unsaved changes — printing the saved version`** | Save first · Unsaved · Print anyway |
 
-### The Order Route words (owner ruling 2026-08-15)
+### The Order Route words (owner ruling 2026-08-16 — OVERWRITES the 2026-08-15 version)
 
-**`CURRENT` is the Route's position word, and it belongs to a sub-lane.** `YOU ARE HERE` is
-**REJECTED**: a Sales Order with a split quantity stands in two places at once, so a phrase that
-says *here* has to point at one of them and be wrong about the other.
+**The route is ONE NODE MAP.** The 2026-08-15 words for a three-section stack (`ORDER TRACKS`,
+`GOODS ROUTES`, `DELIVERY RELEASE`) are retired with the layout that carried them; this table is
+the only current version.
+
+**`CURRENT` is the Route's position word, and it belongs to a ROUTE.** `YOU ARE HERE` stays
+**REJECTED**: a Sales Order stands in up to three places at once, so a phrase that says *here* has
+to point at one of them and be wrong about the others.
 
 | Meaning | Use exactly | Do NOT use |
 |---|---|---|
-| The four parallel fact rows | **`ORDER TRACKS`**, headed `GOODS` · `STOCK` · `DELIVERY` · `MONEY` | Status · Progress · Stages · Timeline · Summary |
-| The conditional exception section beside them | **`LINKED PROBLEMS`** | Issues · Exceptions · Service · Alerts — and never a fifth track |
-| The per-line block | **`GOODS ROUTES`** | Items · Fulfilment · Journey |
-| Where the work stands in a sub-lane | **`CURRENT`** | `YOU ARE HERE` (rejected) · Now · Active · Here |
-| The derived gate summary | **`DELIVERY RELEASE`** | Ready check · Can we deliver · Release gate |
+| The whole surface | **`Order Route`** | Timeline · Journey · Progress · Flow chart · Diagram |
+| A node's heading | **`SALES ORDER`** · **`PURCHASING`** · **`SUPPLIER`** · **`RECEIVING`** · **`STOCK`** · **`LOGISTICS`** · **`DELIVERY DATE`** · **`MONEY`** · **`DELIVERY ORDER`** · **`DELIVER`** · **`DELIVERY PHOTO`** · **`LOAN`** | Step · Stage · Task · any renaming of these |
+| Where the work stands on a route | **`CURRENT`** | `YOU ARE HERE` (rejected) · Now · Active · Here |
+| The conditional exception strip beside the map | **`LINKED PROBLEMS`** | Issues · Exceptions · Service · Alerts — and never a node |
+| The convergence gate | **`DELIVERY ORDER`** | Release gate · Ready check · Can we deliver |
 | Its two headlines | **`NOT READY FOR DELIVERY`** / **`READY FOR DELIVERY`** | Blocked · Not ready · OK to go · Cleared |
-| The open-requirement count | **`{n} requirements still open`** · **`All release requirements are complete.`** | {n} blockers · Everything done |
-| Money still holds the delivery | **`Money release not cleared`** + **`RM {amount} still to collect`** | Payment outstanding · Unpaid · On hold |
-| A manager released it, money still owed | **`Money release cleared`** + **`RM {amount} remains to collect`** + **`Manager release recorded`** | Waived · Cleared (alone) · Approved — a release may never read as forgiveness |
-| Goods partly ready | **`Goods not ready`** + **`{n} of {m} ready`** | Partial · Incomplete · Some ready |
-| Goods ready for a scoped partial trip | **`Goods ready for this delivery`** + **`{n} Units included in {DO}`** + **`{n} Units remain open`** | Ready (alone) — a `✓` on partial goods must show its scope |
-| The way out of the release block | **`Open Delivery →`** | Release · Confirm release · Book delivery — the ACT lives in Delivery |
+| The requirement count | **`{k} of {n} requirements met`** | {n} blockers · {n} still open · Everything done |
+| The issued document | **`{DO number}`** + **`Delivery order issued`** | Released · Approved · Done |
+| The zoom controls | **`Zoom out`** · **`Zoom in`** · **`Fit the whole route`** (aria-labels) | Reset · Recenter · 100% |
 
-**THE MISSING-DOCUMENT PHRASES — primary-school English, never a dash.** A station nobody has
-reached says what has not happened yet, in the plainest words available:
+**THE GATE REQUIREMENTS — one plain sentence each, with the count that makes them countable.**
 
-| Station | Use exactly | Do NOT use |
+| Requirement | Use exactly | Do NOT use |
+|---|---|---|
+| Goods partly ready | **`Goods not ready ({n} of {m})`** | Partial · Incomplete · Some ready |
+| Goods all ready | **`Goods ready ({n} Units)`** | Ready (alone) |
+| Goods ready for a scoped partial trip | **`Goods ready for this delivery ({n} Units in, {m} Units still open)`** | Ready (alone) — a met requirement on partial goods must show its scope |
+| No company chosen | **`No logistics chosen`** | No carrier · Unassigned · TBC |
+| A company is chosen | **`Logistics chosen ({name})`** | Assigned · Booked |
+| No agreed day | **`Date + slot not confirmed`** | No booking · Unscheduled · TBC · Appointment not confirmed |
+| An agreed day | **`Date + slot confirmed`** | Booked · Scheduled |
+| Money still holds the delivery | **`RM {amount} still to collect`** | Money release not cleared · Payment outstanding · Unpaid · On hold |
+| A manager released it, money still owed | **`Manager release recorded — RM {amount} remains to collect`** | Waived · Cleared · Approved — a release may never read as forgiveness |
+| Nobody has priced the order | **`No price yet — money does not hold this delivery`** | RM 0 · Unpriced · — |
+| The agreed day is a Sunday | **`Date falls on a Sunday — pick another day`** | Invalid date · Not a working day |
+| The agreed day is a public holiday | **`Date falls on a public holiday — pick another day`** | Closed · Holiday · Not available |
+
+**⭐ MONEY IS A GATE REQUIREMENT (owner ruling 2026-08-16, decision B).** It is stated as the amount
+the customer owes, never as a release verdict, because the amount is the thing somebody can act on.
+`docs/orders/MASTER.md` § ORDER ROUTE carries the reasoning.
+
+**THE MISSING-FACT PHRASES — primary-school English, never a dash.** A node nobody has reached says
+what has not happened yet, in the plainest words available:
+
+| Node | Use exactly | Do NOT use |
 |---|---|---|
 | No Purchase Order covers this quantity | **`No Purchase Order yet`** | `PO: —` · No PO · Not ordered · Pending |
 | The supplier has not confirmed a ready date | **`Ready date not confirmed`** | ETA unknown · TBC · — |
 | Nothing has been received against the PO | **`Not received yet`** | Not received · GRN: — · Outstanding |
 | Part of the PO arrived | **`{n} of {m} received`** | Partial · {n}/{m} |
-| No Unit exists yet | **`Units not created yet`** | No stock · Unit: — · Not allocated |
-| Nobody has agreed a delivery day | **`Appointment not confirmed`** | No booking · Unscheduled · TBC |
+| Units are short on the line | **`{n} of {m} Units ready`** + **`Waiting for purchase`** | Units not created yet · No stock · Not allocated |
+| No company chosen yet | **`No logistics chosen yet`** | No carrier · Unassigned |
+| Nobody has agreed a delivery day | **`Date + slot not confirmed`** | Appointment not confirmed · No booking · TBC |
+| Not delivered | **`Not delivered yet`** | Pending · Open · In progress |
+| No photo on file | **`No delivery photo yet`** | No photo · Missing · — |
+| The photo is on file | **`Uploaded by {name}`** + **`Uploaded: {date}`** | Done · Complete |
+| A loan item is out | **`{n} {item} on loan to customer`** + **`Collect back on delivery day`** | On loan · Lent · Outstanding loan |
+| A loan is still out after delivery | **`Loan not collected back`** | Overdue loan · Not returned |
+| A line a Revision removed | **`{item} · Qty {n}`** + **`Cancelled · Rev {n}`** | Removed · Deleted · Void |
+
+**BANNED on this surface, as everywhere:** `No data` · `No results` · `Not available`. Every empty
+state answers three things — what is missing, why, and who does what next.
+
+**THE NODE ACTION LINE USES THE QUEUE WORD, and the queue word is the one this dictionary already
+owns.** The node is compact and the fact line above it already names the amount or the document, so
+the instruction is the short form and never repeats the party or the number.
+
+| Node | Action line | Where the word comes from |
+|---|---|---|
+| PURCHASING, no PO | **`Issue PO`** | the action dictionary — the ONE act that creates a Purchase Order |
+| SUPPLIER | **`Confirm ready date`** | the action dictionary |
+| RECEIVING | **`Check in`** | the act on arriving GOODS — **never `Receive`**, which this dictionary bans as a verb |
+| STOCK | **`Create the Units`** | the Stock act |
+| LOGISTICS | **`Assign logistics`** | the action dictionary |
+| DELIVERY DATE | **`Confirm delivery date`** | the action dictionary |
+| MONEY | **`Collect`** | the action dictionary's queue word; the amount is on the fact line above |
+| DELIVER, after a failed run | **`Arrange new delivery date`** | the action dictionary |
+| DELIVERY PHOTO | **`Upload delivery photo`** | the action dictionary |
+| LOAN | **`Collect the loan item`** | NEW, registered here 2026-08-16 — the generic form of the card's `Collect the loan sofa`, because a loan is not always a sofa |
+
+**🔴 FIXED IN THE SAME PR (2026-08-16):** the shipped Route said **`Receive the goods`** on its
+RECEIVING station. `Receive` as a verb has been banned since 2026-07-27 — the act is `Check in` —
+and the string reached production because it was written on a surface nobody cross-checked against
+this table. It now reads `Check in`.
 
 **A ROUTE DATE ALWAYS CARRIES ITS MEANING.** The label says WHICH fact the day belongs to, and the
 day itself is spelled by `fmtDate` under the year rule (`Wed, 12 Aug`). **A bare date never ships.**
 The source may contain a full timestamp; the Route prints only the governed date. ISO timestamps
-such as `2026-08-12T04:38:44.852046+00:00` never appear to staff. The Sales Order origin is evidence
+such as `2026-08-12T04:38:44.852046+00:00` never appear to staff. The Sales Order node is evidence
 inside the object already open, so it has no circular `Open SO-{n} →` action.
 
 | Fact | Prints |
 |---|---|
 | The day the order was taken | **`Ordered: {date}`** |
 | The day the customer asked for | **`Customer requested: {date}`** |
+| The day the delivery is due | **`Due: {date}`** |
 | The day the Purchase Order was issued | **`Issued: {date}`** |
 | What the supplier confirmed | **`Estimated ready: {date}`** |
 | The day the goods arrived | **`Received: {date}`** |
 | The agreed delivery day | **`Delivery appointment: {date}`** |
+| The booked day, before it happens | **`Scheduled: {date}`** |
+| The day it was delivered | **`Delivered: {date}`** |
+| The day the photo went on file | **`Uploaded: {date}`** |
+
+**THE EDGE WORDS.** A connector may carry a small grey label, and only these:
+**`goods`** · **`(same line)`** · **`delivery`** · **`money`** · **`loan`** ·
+**`{item} · Qty {n}`** · **`{n} to buy from factory`** · **`collect back`**.
 
 **`Logistics Partner`, never `Carrier`** — already this dictionary's word for the delivery module,
 restated here because the Route names the party on the delivery side and a second spelling on a new

@@ -1,38 +1,52 @@
 /**
- * ORDER ROUTE — the owner's two-layer drawing, rendered.
+ * ORDER ROUTE — ONE NODE MAP.
  *
- * ```
- * ORDER TRACKS      four FIXED parallel facts, never one status
- * LINKED PROBLEMS   only when a case exists — Service is not a fifth track
- * GOODS ROUTES      one collapsible block per goods line, forking by quantity
- * DELIVERY RELEASE  derived, read-only, NO release button
- * ```
+ * ⭐ OWNER RULING 2026-08-16 (`docs/cards/CARD-2026-08-16-order-route-node-map.md`).
+ * The three stacked section cards are gone. This is one connected, pannable,
+ * zoomable canvas: white node cards joined by connector lines, three routes
+ * leaving the Sales Order at once, converging on the Delivery Order gate.
  *
- * The reading model is copied from parcel tracking / Stripe timelines /
- * GitHub checks as a PATTERN only; every colour, size, spacing and component
- * here is the Carres UI Kit. Nothing on this page writes.
+ * The canvas is READ-ONLY. Every node is a door into the module that owns the
+ * fact; nothing here writes, and there is no Release or Approve control in any
+ * state — the SYSTEM issues the delivery order.
+ *
+ * Geometry (positions, sizes, elbows) is computed in `@carres/shared` so the
+ * connectors can be asserted without a DOM. The box heights below MUST match
+ * that module's constants, or a connector would stop short of its node.
+ *
+ * The reading model is copied from org-chart / parcel-tracking / GitHub-checks
+ * PATTERNS only; every colour, size, spacing and component here is the Carres
+ * UI Kit.
  */
-import { useState } from "react";
-import { AlertTriangle, Check, ChevronDown, ChevronRight, Circle, CircleDot } from "lucide-react";
-import { Link } from "react-router-dom";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { AlertTriangle, Check, Circle, CircleDot, Maximize2, Minus, Plus } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
 import type {
-  GoodsRoute,
-  GoodsSubLane,
-  RouteDoor,
-  RouteMark,
-  RouteStation,
-  SalesOrderRoute as Route,
+  NodeMark,
+  RouteEdge,
+  RouteNode,
+  SalesOrderRouteMap as RouteMap,
   StationOwnerKey,
 } from "@carres/shared";
 import Loading from "@/components/kit/Loading";
 import { fmtDate } from "@/lib/fmt-date";
 import { avatarColor, personInitials, personLabel } from "@/lib/staff-avatar";
 
-/** The resolved person behind an action-engine line. The Route never derives
- *  duty; it is handed the holder the roster already names. */
+/** The resolved people behind the action lines. The Route never derives duty;
+ *  it is handed the holders the Work Engine roster already names (card §7). */
 export interface RouteActionOwners {
-  purchasing: { userId: string; name: string | null; email: string } | null;
-  receiving: { userId: string; name: string | null; email: string } | null;
+  purchasing: RoutePerson | null;
+  receiving: RoutePerson | null;
+  stock?: RoutePerson | null;
+  delivery?: RoutePerson | null;
+  sales?: RoutePerson | null;
+  payment?: RoutePerson | null;
+}
+
+export interface RoutePerson {
+  userId: string;
+  name: string | null;
+  email: string;
 }
 
 /* ONE date spelling. Facts carry ISO with their meaning attached
@@ -43,112 +57,69 @@ const spellDates = (s: string) =>
     (_value, day: string) => fmtDate(day),
   );
 
-const MARK_TONE: Record<RouteMark, string> = {
+/* ── the box, to the pixel the shared geometry assumed ──────────────────── */
+const BOX_PAD_Y = 11;
+const TITLE_H = 20;
+const LINE_H = 18;
+const REQ_H = 16;
+const ACTION_H = 22;
+const DOOR_H = 18;
+
+const MIN_SCALE = 0.4;
+const MAX_SCALE = 1.6;
+const STEP = 0.15;
+
+/** State is never colour-only (card §12): every mark carries a glyph too. */
+const MARK_GLYPH: Record<NodeMark, typeof Check> = {
+  complete: Check,
+  current: CircleDot,
+  waiting: Circle,
+  blocked: AlertTriangle,
+  future: Circle,
+};
+
+const MARK_BADGE: Record<NodeMark, string> = {
   complete: "bg-kit-green-3 text-kit-green-11",
   current: "bg-kit-blue-3 text-kit-blue-11",
   waiting: "bg-kit-slate-3 text-kit-slate-9",
   blocked: "bg-kit-amber-3 text-kit-amber-11",
+  future: "bg-kit-slate-3 text-kit-slate-9",
 };
 
-function Mark({ mark }: { mark: RouteMark }) {
-  const Glyph =
-    mark === "complete" ? Check : mark === "blocked" ? AlertTriangle : mark === "current" ? CircleDot : Circle;
-  return (
-    <span
-      className={`grid h-5 w-5 shrink-0 place-items-center rounded-full ${MARK_TONE[mark]}`}
-      data-mark={mark}
-      aria-hidden="true"
-    >
-      <Glyph size={14} />
-    </span>
-  );
+/**
+ * The BOX stays on the neutral ramp and the MARK BADGE carries the state
+ * colour — the same division the shipped station list uses. Only the steps
+ * `tailwind.config.ts` publishes exist; a step it does not publish renders
+ * nothing at all (`kit-palette.test.ts`), so no ramp is invented here.
+ */
+const MARK_BOX: Record<NodeMark, string> = {
+  complete: "border-kit-slate-5 bg-white",
+  current: "border-kit-blue-9 bg-white shadow-sm",
+  waiting: "border-kit-slate-5 bg-white",
+  blocked: "border-kit-slate-5 bg-kit-amber-3",
+  future: "border-dashed border-kit-slate-5 bg-white",
+};
+
+function ownerOf(owners: RouteActionOwners, key: StationOwnerKey): RoutePerson | null {
+  switch (key) {
+    case "receiving":
+      return owners.receiving ?? null;
+    case "stock":
+      return owners.stock ?? null;
+    case "delivery":
+      return owners.delivery ?? null;
+    case "sales":
+      return owners.sales ?? null;
+    case "payment":
+      return owners.payment ?? null;
+    default:
+      return owners.purchasing ?? null;
+  }
 }
 
-function Door({ door }: { door: RouteDoor }) {
-  return (
-    <Link
-      to={door.href}
-      className="inline-flex text-label font-medium text-kit-blue-11 underline-offset-2 hover:underline"
-    >
-      {door.label}
-    </Link>
-  );
-}
-
-/* ─────────────────────────────────────────────────────────────────────────────
- * Layer 1
- * ──────────────────────────────────────────────────────────────────────────── */
-
-function OrderTracks({ route }: { route: Route }) {
-  return (
-    <section className="rounded-card border border-kit-slate-5 bg-white" data-testid="order-tracks">
-      <div className="border-b border-kit-slate-5 px-4 py-3">
-        <h2 className="text-label font-semibold tracking-wide text-base-500 uppercase">Order tracks</h2>
-      </div>
-      <div className="divide-y divide-kit-slate-5">
-        {route.tracks.map((track) => (
-          <div key={track.key} className="flex items-start gap-3 px-4 py-3" data-testid={`track-${track.key}`}>
-            <Mark mark={track.mark} />
-            <span className="w-24 shrink-0 text-label font-semibold tracking-wide text-base-600 uppercase">
-              {track.title}
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-body text-base-900">{spellDates(track.status)}</span>
-              {track.door && (
-                <span className="mt-1 block">
-                  <Door door={track.door} />
-                </span>
-              )}
-            </span>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-/** Conditional and visually separate. A section that says "nothing" on every
- *  order is a section the operator learns to skip. */
-function LinkedProblems({ route }: { route: Route }) {
-  if (route.linkedProblems.length === 0) return null;
-  return (
-    <section
-      className="rounded-card border border-kit-slate-5 bg-kit-amber-3"
-      data-testid="linked-problems"
-    >
-      <div className="border-b border-kit-slate-5 px-4 py-3">
-        <h2 className="text-label font-semibold tracking-wide text-kit-amber-11 uppercase">Linked problems</h2>
-      </div>
-      <div className="divide-y divide-kit-slate-5">
-        {route.linkedProblems.map((problem) => (
-          <div key={problem.id} className="flex items-start gap-3 px-4 py-3">
-            <Mark mark="blocked" />
-            <span className="min-w-0 flex-1">
-              <span className="block text-body font-medium text-base-900">{problem.title}</span>
-              <span className="mt-1 block">
-                <Door door={problem.door} />
-              </span>
-            </span>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-/* ─────────────────────────────────────────────────────────────────────────────
- * Layer 2 · a station
- * ──────────────────────────────────────────────────────────────────────────── */
-
-function OwnerChip({
-  ownerKey,
-  owners,
-}: {
-  ownerKey: StationOwnerKey;
-  owners: RouteActionOwners;
-}) {
-  const person = ownerKey === "receiving" ? owners.receiving : owners.purchasing;
-  if (!person) return null;
+/** Initials only on the node; Team Work shows the full names, and the action
+ *  sentence never repeats the person (card §7). */
+function OwnerChip({ person }: { person: RoutePerson }) {
   const colors = avatarColor(person.userId);
   const label = personLabel(person.name, person.email);
   return (
@@ -156,227 +127,185 @@ function OwnerChip({
       className="inline-grid h-5 w-5 shrink-0 place-items-center rounded-full text-label font-semibold"
       style={{ background: colors.bg, color: colors.fg }}
       title={label}
-      aria-label={label}
+      aria-hidden="true"
     >
       {personInitials(person.name, person.email)}
     </span>
   );
 }
 
-function Station({
-  station,
-  owners,
-  last = false,
-}: {
-  station: RouteStation;
-  owners: RouteActionOwners;
-  last?: boolean;
-}) {
-  return (
-    <div
-      className={`relative pl-8 ${last ? "pb-0" : "pb-4"}`}
-      data-testid={`station-${station.id}`}
-      aria-current={station.current ? "step" : undefined}
-    >
-      {!last && (
-        <span
-          className="absolute bottom-0 left-[10px] top-5 w-px bg-kit-slate-6"
-          aria-hidden="true"
-        />
-      )}
-      <span className="absolute left-0 top-0 z-10">
-        <Mark mark={station.mark} />
-      </span>
-      <div
-        className={`min-w-0 ${
-          station.current
-            ? "-mt-1 rounded-control border border-kit-blue-3 bg-kit-blue-2 px-3 py-2"
-            : "pb-1"
-        }`}
-      >
-        <div className="flex items-baseline gap-2">
-          <span className="text-label font-semibold tracking-wide text-base-600 uppercase">
-            {station.title}
-          </span>
-          {station.current && (
-            <span className="text-label font-semibold tracking-wide text-kit-blue-11">CURRENT</span>
-          )}
-        </div>
-        {station.evidence && (
-          <div className="mt-0.5 text-body text-base-900">{spellDates(station.evidence)}</div>
-        )}
-        {station.status && (
-          <div className="mt-0.5 text-body text-base-900">{spellDates(station.status)}</div>
-        )}
-        {station.action && (
-          /* The 13 / 11 two-line grammar: the FACT above, the INSTRUCTION here,
-             with the owner as a chip rather than a name inside the sentence. */
-          <div className="mt-1 flex items-center gap-1.5">
-            <OwnerChip ownerKey={station.action.ownerKey} owners={owners} />
-            <span className="text-label font-normal text-base-600">{station.action.label}</span>
-          </div>
-        )}
-        {station.door && (
-          <div className="mt-1">
-            <Door door={station.door} />
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function SubLane({
-  lane,
-  forked,
-  continues,
-  owners,
-}: {
-  lane: GoodsSubLane;
-  forked: boolean;
-  continues: boolean;
-  owners: RouteActionOwners;
-}) {
-  return (
-    <div
-      className={forked ? "relative pl-8" : "relative"}
-      data-testid={`sub-lane-${lane.id}`}
-    >
-      {forked && (
-        <>
-          <span
-            className={`absolute left-[10px] top-0 w-px bg-kit-slate-6 ${
-              continues ? "-bottom-5" : "h-2"
-            }`}
-            data-testid={`branch-trunk-${lane.id}`}
-            data-continues={continues ? "true" : "false"}
-            aria-hidden="true"
-          />
-          <span
-            className="absolute left-[10px] top-2 h-px w-8 bg-kit-slate-6"
-            aria-hidden="true"
-          />
-        </>
-      )}
-      <span
-        className={`absolute top-2 h-8 w-px bg-kit-slate-6 ${
-          forked ? "left-[42px]" : "left-[10px]"
-        }`}
-        aria-hidden="true"
-      />
-      <div className="mb-3 pl-8 text-label font-semibold tracking-wide text-base-600 uppercase">
-        {lane.title}
-      </div>
-      <div>
-        {lane.stations.map((station, index) => (
-          <Station
-            key={station.id}
-            station={station}
-            owners={owners}
-            last={index === lane.stations.length - 1}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function GoodsBlock({ goods, owners }: { goods: GoodsRoute; owners: RouteActionOwners }) {
-  const [open, setOpen] = useState(true);
-  if (goods.cancelled) {
-    return (
-      <article className="px-4 py-3" data-testid={`goods-route-${goods.id}`}>
-        <div className="text-body text-kit-slate-9">
-          {goods.title} · {goods.cancelledWord}
-        </div>
-      </article>
-    );
-  }
-  const Chevron = open ? ChevronDown : ChevronRight;
-  return (
-    <article className="px-4 py-3" data-testid={`goods-route-${goods.id}`}>
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        className="flex w-full items-center gap-2 text-left"
-      >
-        <Chevron size={16} className="shrink-0 text-base-600" aria-hidden="true" />
-        <span className="text-body font-semibold text-base-900">{goods.title}</span>
-      </button>
-      {open && (
-        <div className="mt-4 pl-6" data-testid={`goods-spine-${goods.id}`}>
-          {goods.origin && (
-            <Station station={goods.origin} owners={owners} last={goods.lanes.length === 0} />
-          )}
-          <div className="relative flex flex-col gap-5">
-            {goods.lanes.map((lane, index) => (
-              <SubLane
-                key={lane.id}
-                lane={lane}
-                forked={goods.forked}
-                continues={index < goods.lanes.length - 1}
-                owners={owners}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-    </article>
-  );
-}
-
 /* ─────────────────────────────────────────────────────────────────────────────
- * Layer 2 · the release gate. Read-only: the ONLY control is the way out.
+ * One node.
  * ──────────────────────────────────────────────────────────────────────────── */
 
-function DeliveryRelease({ route }: { route: Route }) {
-  const { release } = route;
+function Node({ node, owners }: { node: RouteNode; owners: RouteActionOwners }) {
+  const navigate = useNavigate();
+  const Glyph = MARK_GLYPH[node.mark];
+  const person = node.action ? ownerOf(owners, node.action.ownerKey) : null;
+
+  const spoken = [
+    node.title,
+    ...node.lines.map(spellDates),
+    ...node.requirements.map((r) => `${r.met ? "met" : "not met"}: ${spellDates(r.text)}`),
+    node.action
+      ? `${person ? personLabel(person.name, person.email) : "Unassigned"}: ${node.action.label}`
+      : null,
+  ]
+    .filter(Boolean)
+    .join(" — ");
+
+  const go = () => {
+    if (node.door) navigate(node.door.href);
+  };
+
   return (
-    <section className="rounded-card border border-kit-slate-5 bg-white" data-testid="delivery-release">
-      <div className="border-b border-kit-slate-5 px-4 py-3">
-        <h2 className="text-label font-semibold tracking-wide text-base-500 uppercase">Delivery release</h2>
+    <div
+      data-testid={`route-node-${node.id}`}
+      data-kind={node.kind}
+      data-mark={node.mark}
+      data-current={node.current ? "true" : "false"}
+      role={node.door ? "link" : "group"}
+      tabIndex={0}
+      aria-label={spoken}
+      aria-current={node.current ? "step" : undefined}
+      onKeyDown={(e) => {
+        if (node.door && (e.key === "Enter" || e.key === " ")) {
+          e.preventDefault();
+          go();
+        }
+      }}
+      className={`absolute overflow-hidden rounded-card border ${MARK_BOX[node.mark]} focus:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9`}
+      style={{
+        left: node.x,
+        top: node.y,
+        width: node.w,
+        height: node.h,
+        paddingTop: BOX_PAD_Y,
+        paddingBottom: BOX_PAD_Y,
+        paddingLeft: 12,
+        paddingRight: 12,
+        borderWidth: node.mark === "current" ? 2 : 1,
+      }}
+    >
+      <div className="flex items-center gap-1.5" style={{ height: TITLE_H }}>
+        <span
+          className={`grid h-5 w-5 shrink-0 place-items-center rounded-full ${MARK_BADGE[node.mark]}`}
+          aria-hidden="true"
+        >
+          <Glyph size={14} />
+        </span>
+        <span className="truncate text-label font-semibold uppercase tracking-wide text-base-600">
+          {node.title}
+        </span>
+        {node.current && (
+          <span className="ml-auto shrink-0 text-label font-semibold uppercase tracking-wide text-kit-blue-11">
+            Current
+          </span>
+        )}
       </div>
-      <div className="px-4 py-4">
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-          {release.requirements.map((requirement) => (
-            <div
-              key={requirement.id}
-              className="flex items-start gap-3 rounded-control border border-kit-slate-5 bg-white px-3 py-3"
-              data-testid={`release-${requirement.id}`}
-            >
-              <Mark mark={requirement.mark} />
-              <span className="min-w-0">
-                <span className="block text-body font-medium text-base-900">{requirement.title}</span>
-                {requirement.details.map((detail) => (
-                  <span key={detail} className="block text-label font-normal text-base-600">
-                    {spellDates(detail)}
-                  </span>
-                ))}
-              </span>
-            </div>
-          ))}
+
+      {node.lines.map((line, i) => (
+        <div
+          key={`${node.id}-line-${i}`}
+          className={`truncate text-body ${
+            node.mark === "future" ? "text-kit-slate-9" : "text-base-900"
+          }`}
+          style={{ height: LINE_H, lineHeight: `${LINE_H}px` }}
+        >
+          {spellDates(line)}
         </div>
-        <div className="relative mt-4 border-t border-kit-slate-6 pt-4">
-          <span className="absolute -top-4 left-1/2 h-4 w-px bg-kit-slate-6" aria-hidden="true" />
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div className="flex items-start gap-3">
-              <Mark mark={release.ready ? "complete" : "waiting"} />
-              <span className="min-w-0">
-                <span className="block text-body font-semibold text-base-900">{release.headline}</span>
-                <span className="block text-label font-normal text-base-600">{release.summary}</span>
-              </span>
-            </div>
-            <Door door={release.door} />
-          </div>
+      ))}
+
+      {node.requirements.map((req) => (
+        <div
+          key={req.id}
+          data-testid={`route-requirement-${req.id}`}
+          data-met={req.met ? "true" : "false"}
+          className="flex items-center gap-1 truncate text-label"
+          style={{ height: REQ_H, lineHeight: `${REQ_H}px` }}
+        >
+          <span
+            className={req.met ? "text-kit-green-11" : "text-kit-slate-9"}
+            aria-hidden="true"
+          >
+            {req.met ? "✓" : "·"}
+          </span>
+          <span className={`truncate ${req.met ? "text-base-600" : "text-base-900"}`}>
+            {spellDates(req.text)}
+          </span>
         </div>
-      </div>
-    </section>
+      ))}
+
+      {node.action && (
+        /* The 13 / 11 two-line grammar: the FACT above, the INSTRUCTION here,
+           with the owner as a chip rather than a name inside the sentence. */
+        <div
+          className="flex items-center gap-1.5"
+          style={{ height: ACTION_H }}
+          data-testid={`route-action-${node.id}`}
+        >
+          {person && <OwnerChip person={person} />}
+          <span className="truncate text-label text-base-600">{node.action.label}</span>
+        </div>
+      )}
+
+      {node.door && (
+        <div style={{ height: DOOR_H, lineHeight: `${DOOR_H}px` }}>
+          <Link
+            to={node.door.href}
+            tabIndex={-1}
+            className="truncate text-label font-medium text-kit-blue-11 underline-offset-2 hover:underline"
+          >
+            {node.door.label}
+          </Link>
+        </div>
+      )}
+    </div>
   );
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
- * The page.
+ * The connectors. One polyline per edge, plus its small grey label.
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+function Edges({ map }: { map: RouteMap }) {
+  return (
+    <svg
+      className="pointer-events-none absolute left-0 top-0"
+      width={map.width}
+      height={map.height}
+      aria-hidden="true"
+      data-testid="route-edges"
+    >
+      {map.edges.map((edge: RouteEdge) => (
+        <g key={edge.id} data-testid={`route-edge-${edge.from}--${edge.to}`} data-style={edge.style}>
+          <polyline
+            points={edge.points.map((p) => `${p.x},${p.y}`).join(" ")}
+            fill="none"
+            className={edge.style === "dashed" ? "stroke-kit-slate-6" : "stroke-kit-slate-9"}
+            strokeWidth={1.5}
+            strokeDasharray={edge.style === "dashed" ? "4 4" : undefined}
+          />
+          {edge.labelAt &&
+            edge.labelLines.map((line, i) => (
+              <text
+                key={`${edge.id}-label-${i}`}
+                x={edge.labelAt!.x}
+                y={edge.labelAt!.y - (edge.labelLines.length - 1 - i) * 12}
+                textAnchor="middle"
+                className="fill-kit-slate-9 text-label"
+              >
+                {line}
+              </text>
+            ))}
+        </g>
+      ))}
+    </svg>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * The page — a pan/zoom surface that FITS the whole map on load.
  * ──────────────────────────────────────────────────────────────────────────── */
 
 export default function SalesOrderRoute({
@@ -384,32 +313,144 @@ export default function SalesOrderRoute({
   owners = { purchasing: null, receiving: null },
   loading = false,
 }: {
-  route: Route;
+  route: RouteMap;
   owners?: RouteActionOwners;
   loading?: boolean;
 }) {
+  const frame = useRef<HTMLDivElement | null>(null);
+  const [view, setView] = useState({ scale: 1, tx: 0, ty: 0 });
+  const drag = useRef<{ x: number; y: number; tx: number; ty: number } | null>(null);
+
+  /** ⛶ — fit the whole map to the viewport. Also what happens on load, so the
+   *  operator never opens the page already lost inside it (card §11). */
+  const fit = useCallback(() => {
+    const box = frame.current?.getBoundingClientRect();
+    if (!box || box.width === 0 || route.width === 0) return;
+    const scale = Math.max(
+      MIN_SCALE,
+      Math.min(1, box.width / route.width, box.height / route.height),
+    );
+    setView({
+      scale,
+      tx: Math.max(0, (box.width - route.width * scale) / 2),
+      ty: Math.max(0, (box.height - route.height * scale) / 2),
+    });
+  }, [route.width, route.height]);
+
+  useLayoutEffect(() => {
+    fit();
+  }, [fit]);
+
+  useEffect(() => {
+    const onResize = () => fit();
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [fit]);
+
+  const zoom = (dir: 1 | -1) =>
+    setView((v) => ({
+      ...v,
+      scale: Math.min(MAX_SCALE, Math.max(MIN_SCALE, v.scale + dir * STEP)),
+    }));
+
   if (loading) return <Loading label="Opening the order route" />;
+
   return (
-    <div className="mx-auto flex max-w-[1080px] flex-col gap-4" data-testid="sales-order-route">
-      <OrderTracks route={route} />
-      <LinkedProblems route={route} />
-
-      <section className="rounded-card border border-kit-slate-5 bg-white" data-testid="goods-routes">
-        <div className="border-b border-kit-slate-5 px-4 py-3">
-          <h2 className="text-label font-semibold tracking-wide text-base-500 uppercase">Goods routes</h2>
-        </div>
-        {route.goodsRoutes.length === 0 ? (
-          <div className="px-4 py-4 text-body text-kit-slate-9">No goods on this order</div>
-        ) : (
-          <div className="divide-y divide-kit-slate-5">
-            {route.goodsRoutes.map((goods) => (
-              <GoodsBlock key={goods.id} goods={goods} owners={owners} />
+    <div className="flex flex-col gap-3" data-testid="sales-order-route">
+      {/* A linked exception is NOT a node: a node is a stage every Sales Order
+          passes through, and Service is not one. It stays a conditional strip
+          beside the map, rendered only when one is open. */}
+      {route.linkedProblems.length > 0 && (
+        <section
+          className="rounded-card border border-kit-slate-5 bg-kit-amber-3 px-4 py-3"
+          data-testid="linked-problems"
+        >
+          <h2 className="text-label font-semibold uppercase tracking-wide text-kit-amber-11">
+            Linked problems
+          </h2>
+          <ul className="mt-1 flex flex-col gap-1">
+            {route.linkedProblems.map((problem) => (
+              <li key={problem.id} className="flex items-center gap-2 text-body text-base-900">
+                <span>{problem.title}</span>
+                <Link
+                  to={problem.door.href}
+                  className="text-label font-medium text-kit-blue-11 underline-offset-2 hover:underline"
+                >
+                  {problem.door.label}
+                </Link>
+              </li>
             ))}
-          </div>
-        )}
-      </section>
+          </ul>
+        </section>
+      )}
 
-      <DeliveryRelease route={route} />
+      <div
+        ref={frame}
+        data-testid="route-canvas"
+        className="relative h-[calc(100vh-260px)] min-h-[420px] overflow-hidden rounded-card border border-kit-slate-5 bg-kit-slate-3"
+        onPointerDown={(e) => {
+          if ((e.target as HTMLElement).closest("[data-testid^='route-node-']")) return;
+          drag.current = { x: e.clientX, y: e.clientY, tx: view.tx, ty: view.ty };
+          e.currentTarget.setPointerCapture(e.pointerId);
+        }}
+        onPointerMove={(e) => {
+          const d = drag.current;
+          if (!d) return;
+          setView((v) => ({ ...v, tx: d.tx + (e.clientX - d.x), ty: d.ty + (e.clientY - d.y) }));
+        }}
+        onPointerUp={() => {
+          drag.current = null;
+        }}
+        onPointerCancel={() => {
+          drag.current = null;
+        }}
+      >
+        <div
+          data-testid="route-surface"
+          className="absolute left-0 top-0 origin-top-left motion-safe:transition-transform motion-safe:duration-150"
+          style={{
+            width: route.width,
+            height: route.height,
+            transform: `translate(${view.tx}px, ${view.ty}px) scale(${view.scale})`,
+          }}
+        >
+          <Edges map={route} />
+          {route.nodes.map((node) => (
+            <Node key={node.id} node={node} owners={owners} />
+          ))}
+        </div>
+
+        {/* `− + ⛶`, bottom-left, always visible and keyboard-operable. */}
+        <div className="absolute bottom-3 left-3 flex overflow-hidden rounded-control border border-kit-slate-5 bg-white">
+          <button
+            type="button"
+            onClick={() => zoom(-1)}
+            data-testid="route-zoom-out"
+            aria-label="Zoom out"
+            className="grid h-7 w-7 place-items-center text-base-600 hover:bg-kit-slate-3"
+          >
+            <Minus size={14} aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            onClick={() => zoom(1)}
+            data-testid="route-zoom-in"
+            aria-label="Zoom in"
+            className="grid h-7 w-7 place-items-center border-l border-kit-slate-5 text-base-600 hover:bg-kit-slate-3"
+          >
+            <Plus size={14} aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            onClick={fit}
+            data-testid="route-fit"
+            aria-label="Fit the whole route"
+            className="grid h-7 w-7 place-items-center border-l border-kit-slate-5 text-base-600 hover:bg-kit-slate-3"
+          >
+            <Maximize2 size={14} aria-hidden="true" />
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
