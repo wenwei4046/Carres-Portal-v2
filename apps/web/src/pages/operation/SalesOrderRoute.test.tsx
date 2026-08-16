@@ -141,6 +141,14 @@ const draw = (r: Route = route()) =>
   );
 
 describe("Order Route — layer 1", () => {
+  it("shows tracks, goods, and delivery release inside one route map", () => {
+    draw();
+    const map = screen.getByTestId("order-route-map");
+    expect(within(map).getByTestId("order-tracks")).toBeInTheDocument();
+    expect(within(map).getByTestId("goods-routes")).toBeInTheDocument();
+    expect(within(map).getByTestId("delivery-release")).toBeInTheDocument();
+  });
+
   it("does not repeat the object title and identity already shown by the Object Header", () => {
     draw();
     expect(screen.queryByRole("heading", { level: 1, name: "Order Route" })).not.toBeInTheDocument();

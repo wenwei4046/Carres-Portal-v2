@@ -81,7 +81,7 @@ function Door({ door }: { door: RouteDoor }) {
 
 function OrderTracks({ route }: { route: Route }) {
   return (
-    <section className="rounded-card border border-kit-slate-5 bg-white" data-testid="order-tracks">
+    <section className="border-b border-kit-slate-5" data-testid="order-tracks">
       <div className="border-b border-kit-slate-5 px-4 py-3">
         <h2 className="text-label font-semibold tracking-wide text-base-500 uppercase">Order tracks</h2>
       </div>
@@ -113,7 +113,7 @@ function LinkedProblems({ route }: { route: Route }) {
   if (route.linkedProblems.length === 0) return null;
   return (
     <section
-      className="rounded-card border border-kit-slate-5 bg-kit-amber-3"
+      className="border-b border-kit-slate-5 bg-kit-amber-3"
       data-testid="linked-problems"
     >
       <div className="border-b border-kit-slate-5 px-4 py-3">
@@ -333,7 +333,7 @@ function GoodsBlock({ goods, owners }: { goods: GoodsRoute; owners: RouteActionO
 function DeliveryRelease({ route }: { route: Route }) {
   const { release } = route;
   return (
-    <section className="rounded-card border border-kit-slate-5 bg-white" data-testid="delivery-release">
+    <section data-testid="delivery-release">
       <div className="border-b border-kit-slate-5 px-4 py-3">
         <h2 className="text-label font-semibold tracking-wide text-base-500 uppercase">Delivery release</h2>
       </div>
@@ -391,25 +391,29 @@ export default function SalesOrderRoute({
   if (loading) return <Loading label="Opening the order route" />;
   return (
     <div className="mx-auto flex max-w-[1080px] flex-col gap-4" data-testid="sales-order-route">
-      <OrderTracks route={route} />
-      <LinkedProblems route={route} />
-
-      <section className="rounded-card border border-kit-slate-5 bg-white" data-testid="goods-routes">
+      <section className="overflow-hidden rounded-card border border-kit-slate-5 bg-white" data-testid="order-route-map">
         <div className="border-b border-kit-slate-5 px-4 py-3">
-          <h2 className="text-label font-semibold tracking-wide text-base-500 uppercase">Goods routes</h2>
+          <h2 className="text-label font-semibold tracking-wide text-base-500 uppercase">Order route map</h2>
+          <p className="mt-1 text-label text-base-600">Follow the goods from the order to delivery. Money and stock run alongside the goods.</p>
         </div>
-        {route.goodsRoutes.length === 0 ? (
-          <div className="px-4 py-4 text-body text-kit-slate-9">No goods on this order</div>
-        ) : (
-          <div className="divide-y divide-kit-slate-5">
-            {route.goodsRoutes.map((goods) => (
-              <GoodsBlock key={goods.id} goods={goods} owners={owners} />
-            ))}
+        <OrderTracks route={route} />
+        <LinkedProblems route={route} />
+        <section data-testid="goods-routes">
+          <div className="border-b border-kit-slate-5 px-4 py-3">
+            <h3 className="text-label font-semibold tracking-wide text-base-500 uppercase">Goods routes</h3>
           </div>
-        )}
+          {route.goodsRoutes.length === 0 ? (
+            <div className="px-4 py-4 text-body text-kit-slate-9">No goods on this order</div>
+          ) : (
+            <div className="divide-y divide-kit-slate-5">
+              {route.goodsRoutes.map((goods) => (
+                <GoodsBlock key={goods.id} goods={goods} owners={owners} />
+              ))}
+            </div>
+          )}
+        </section>
+        <DeliveryRelease route={route} />
       </section>
-
-      <DeliveryRelease route={route} />
     </div>
   );
 }
