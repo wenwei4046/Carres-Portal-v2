@@ -179,252 +179,180 @@ keep a superseded target.
   `Order Route`. `Current` here means the complete current SO version, not an overall lifecycle
   status.
 
-## ORDER ROUTE — ONE NODE MAP CANVAS · OWNER RULING 2026-08-16 · APPROVED / LOCKED
+## ORDER ROUTE — ONE NODE MAP · OWNER RULING 2026-08-16 · APPROVED / LOCKED
 
-**This OVERWRITES the TWO LAYERS OF FACT ruling recorded below** (MASTER OVERWRITE LAW). That
-section is retained beneath this one as a labelled historical record, because most of its content —
-station anatomy, the scenario matrix, the destination-fork boundary, the evidence rules — is carried
-forward unchanged and would otherwise have to be retyped. **Where the two disagree, this section
-rules.** The route remains read-only, remains derived only from authoritative facts, and still gains
-no writer.
-
-```
-                              ┌──────────┐
-                              │    SO    │   the ONLY root
-                              └────┬─────┘
-             ┌────────────────────┼────────────────────┐
-        ┌────▼────┐          ┌────▼────┐          ┌────▼────┐
-        │  GOODS  │          │DELIVERY │          │  MONEY  │
-        └────┬────┘          └────┬────┘          └─────────┘
-             └────────┬───────────┘
-                ┌─────▼─────┐
-                │  DO GATE  │  the system issues the DO when requirements are met
-                └─────┬─────┘
-                ┌─────▼─────┐      ┌──────┐
-                │  DELIVER  │      │ LOAN │  only when a loan exists.
-                └─────┬─────┘      └──────┘  Not a main track. Blocks nothing.
-             ┌────────▼───────┐
-             │ DELIVERY PHOTO │
-             └────────────────┘
-```
-
-**THE APPROVED RULES, and they are not negotiable by a later chat:**
-
-- **ONE NODE MAP CANVAS, not stacked section cards.** The four bordered sections the superseded
-  ruling drew — Order tracks · Linked problems · Goods routes · Delivery release — are retired as a
-  layout. The facts they carried survive; the stacked composition does not.
-- **SO IS THE ONLY ROOT.** Every node descends from it. No second entry point, no floating node.
-- **GOODS · DELIVERY · MONEY LEAVE THE ROOT SIMULTANEOUSLY.** They are three parallel facts that
-  start together, never a sequence and never merged into one.
-- **GOODS AND DELIVERY CONVERGE ON THE DO GATE. MONEY DOES NOT.** Outstanding money no longer holds
-  the delivery order; **a Finance exception is the only money blocker.** The full ruling, and the
-  rules it supersedes, are in **§8 · THE GATES**.
-- **LOAN RENDERS ONLY WHEN A LOAN EXISTS.** It is **not a fourth main track**. It has no edge into
-  the DO gate and no edge into Delivery completion: **Loan never blocks the DO, and Loan never
-  blocks Delivery completion.**
-- **THE SYSTEM ISSUES THE DELIVERY ORDER when the requirements are met.** It is no longer an
-  employee act on this surface. See `../delivery/MASTER.md` §3 for the same reconciliation on
-  Delivery's side.
-- **`Deliver` and `Delivery Photo` are nodes AFTER the DO gate**, in that order — the order
-  `work-engine.ts` already computes (`issue_delivery_order → deliver_today → upload_delivery_photo`).
-- **NO Release button. NO Approve button. NO Overall Status.** There is no `status` field on the
-  resolved route and there never will be; adding one would recreate the single-status column §0.1
-  refuses on the Register. `Release` also stays a banned employee-UI word
-  (`../delivery/MASTER.md` §15).
-
-**STOCK IS A STATION INSIDE THE GOODS ROUTE, NOT A ROOT-LEVEL TRACK — owner ruling 2026-08-16.**
-The root routes are exactly three: **GOODS · DELIVERY · MONEY.** Stock's facts (`Units not created
-yet`, the per-unit register read) are stations on the Goods branch, where they already sit in the
-resolver. The superseded model's fourth Layer-1 track is retired.
-
-**LOAN IS CONDITIONAL LINKED WORK, NOT A FOURTH ROUTE — owner ruling 2026-08-16.** It renders only
-when a loan exists, it hangs off the SO root as linked work rather than as a route, and it has no
-edge into the DO gate or into Delivery completion.
-
-### AN UNCOLLECTED LOAN IS NEVER `No Action Required` — OWNER RULING 2026-08-16 · APPROVED / LOCKED
-
-**Loan blocks nothing, and it finishes nothing either.** These are two different questions and the
-owner answered both:
+**This OVERWRITES the two-layer `ORDER TRACKS + GOODS ROUTES + DELIVERY RELEASE` description**
+(MASTER OVERWRITE LAW). Three stacked section cards asked the operator to assemble the order in
+their own head: the tracks said *what is true*, the goods blocks said *where the work is* and the
+release block said *whether it may go*, and nothing on the screen joined them. The route is still
+read-only, still derived only from authoritative facts, and still gains no writer. What changed is
+that it stopped being a stack and became **one connected map**.
 
 ```
-DOES IT BLOCK?    No. Not the DO. Not Delivery completion. Goods move; the loan is separate work.
-IS IT FINISHED?   No — an uncollected loan is AMBER OUTSTANDING WORK, never `No Action Required`.
-CLOSED BY         Stock recording collection of the loan unit. Nothing else closes it.
+SO
+├── Goods            forks per goods line and per source quantity
+├── Delivery         LOGISTICS → DELIVERY DATE
+├── Money            MONEY
+└── Loan             rendered ONLY when a loan is out
+
+Goods + Logistics + Delivery Date + Money → DELIVERY ORDER (gate) → DELIVER → DELIVERY PHOTO
 ```
 
-**The completion fact belongs to Stock, and only to Stock.** A delivery result does not close a
-loan; a paid balance does not close a loan; nobody ticks it closed. The obligation stays amber
-until Stock records that the physical unit came back. This preserves Card 6's split verbatim —
-customer recovery and supplier return are separate facts — and Card 2's law that a recovered unit
-reaches the sellable pool only through inspection.
+`packages/shared/src/sales-order-route.ts` resolves the map — nodes, edges AND their geometry —
+so a connector can be asserted without a DOM. `SalesOrderRoute.tsx` draws it on one pan/zoom
+canvas. The box heights in the page and the geometry constants in the resolver are one contract:
+change one and a connector stops short of its node.
 
-**This CONFIRMS Card 8's derived completion rather than changing it.** `Goods clear + Money clear +
-Loan clear + every other explicit commitment clear = No Action Required` still holds; what this
-ruling settles is that removing Loan from the blocking path did **not** remove it from the
-completion test. **Delivered ≠ Complete** was always the point, and an unrecovered loan unit is
-exactly the case it was written for.
+### The canvas
 
-**WHAT IS CARRIED FORWARD UNCHANGED from the superseded ruling:** station anatomy and its evidence
-cost (`✓` buys a document number, a labelled date and a door; `○` is primary-school English, never
-`PO: —`; `⚠` always carries its reason) · the one date spelling with its meaning label · `CURRENT`
-as the registered word · the destination fork and its honest boundary · the complete scenario matrix
-· `LINKED PROBLEMS` as a conditional region that is never a track · the Object Header owning the
-identity · Carres UI Kit tokens throughout · **the route gains no writer, and nothing on it is
-tickable.**
+**One surface, never a stack.** White node cards joined by connector lines on a single pannable,
+zoomable canvas. It FITS the whole map to the viewport on load; `− + ⛶` sit bottom-left and are
+always visible and keyboard-operable. At any width the same map simply fits smaller — nodes keep
+their full anatomy, and there is no stacked fallback and no reflow. The Object Header already names
+`Order Route` and `SO-number · Customer`; the canvas never repeats either identity.
 
-> **IMPLEMENTATION IS NOT APPROVED BY THIS SECTION.** The canvas is approved as business/presentation
-> truth. The build slice is
-> [`../cards/CARD-2026-08-16-order-route-node-map.md`](../cards/CARD-2026-08-16-order-route-node-map.md),
-> which is `STATUS: QUEUED · IMPLEMENTATION: NOT APPROVED` and carries four unanswered owner
-> questions. **The current shipped surface still renders the superseded two-layer model, and that is
-> not a defect to fix on sight** — it is an approved target awaiting an approved build.
+**The Sales Order is the ONLY root**, and goods, delivery and money leave it simultaneously. The
+origin carries its number and labelled Ordered date as evidence but **no circular `Open SO-{n} →`
+door** back to the object already open.
 
----
-
-## ⛔ SUPERSEDED 2026-08-16 — ORDER ROUTE — TWO LAYERS OF FACT · OWNER FINAL RULING 2026-08-15
-
-> **HISTORICAL RECORD. This section no longer states current truth.** It is preserved because the
-> ruling above carries most of its content forward verbatim, and because it is the description the
-> currently shipped implementation was built to. Read it to understand what runs today; read the
-> section above to know what was approved. **Never quote this section as the target.**
-
-**This OVERWROTE the earlier one-lane `SO → PO → ETA → GRN → Unit → DO → Delivered` description
-and the `Still owed` checklist beside it** (MASTER OVERWRITE LAW). The route is still read-only,
-still derived only from authoritative facts, and still gains no writer. What changed is that it
-stopped being one lane with a secondary list and became two layers.
-
-```
-LAYER 1  ORDER TRACKS      GOODS · STOCK · DELIVERY · MONEY
-         LINKED PROBLEMS   conditional, and visually separate
-LAYER 2  GOODS ROUTES      one collapsible block per goods line
-         DELIVERY RELEASE  the derived gate summary
-```
-
-### Layer 1 · ORDER TRACKS — four fixed parallel facts
-
-Four tracks, always rendered, in that order. Each row is a state mark plus ONE factual line, and a
-door only where the fact is owned on another surface — today that is `MONEY → Open Payments →`.
-
-**The four rows are four simultaneous facts and are NEVER combined into an overall Sales Order
-status.** There is no `status` field on the resolved route to read, and adding one would recreate
-the single-status column §0.1 already refuses on the Register.
-
-| Mark | Means |
-|---|---|
-| `✓` | the track is complete |
-| `●` | in progress |
-| `⚠` | blocked — **always with its reason on the same line** |
-
-### `LINKED PROBLEMS` — never a fifth track
-
-A conditional section, rendered ONLY when a linked exception exists (an open Service Case, an open
-Supplier Claim): `⚠ SC-1031 · Investigation in progress · Open SC-1031 →`. **Service is never a
-track**, because a track is a stage every Sales Order passes through and Service is not. A CLOSED
-exception does not render: a closed case is not a problem. The status word is the owning module's
-own translation — no internal enum reaches this screen.
-
-### Layer 2 · GOODS ROUTES — one block per goods line
-
-One collapsible `▼/▶` block per line, branching by quantity, source and destination into indented
-SUB-LANES: a ready-stock lane, a delivered lane, a purchase lane per Purchase Order, and an
-unassigned lane for quantity no PO covers. **`CURRENT` belongs to a specific SUB-LANE, never to the
-Sales Order** — `YOU ARE HERE` is withdrawn and `CURRENT` is the registered word. Split quantities
-carry their counts. **Only applicable stations render**; nothing is shown permanently grey.
-
-**STATION ANATOMY — a `✓` costs real completion evidence.**
+### Node anatomy
 
 | Mark | What it must carry |
 |---|---|
-| `✓` | the document number, its LABELLED date and an explicit door — `PO-2048 · Issued: Thu, 13 Aug · Open PO-2048 →` |
-| `●` | the factual status line, the governed action-engine line with the resolved owner avatar chip (`[YJ] Confirm the ready date`), and the door |
-| `○` | primary-school English — `No Purchase Order yet` · `Not received yet` · `Units not created yet` — **never `PO: —`** |
-| `⚠` | blocked or missing information, always with the reason and the owning door |
+| `✓` complete | the document number, its LABELLED date and an explicit door — `PO-2048 · Issued: Thu, 13 Aug · Open PO-2048 →` |
+| `◉` CURRENT | the factual line, the governed action line with the resolved owner initials chip, and the door |
+| `○` waiting | primary-school English — `No Purchase Order yet` · `Not received yet` — **never `PO: —`** |
+| `⚠` blocked | the reason in words, and the owning door |
+| `○` future (dashed) | a step the work has not reached — dashed box AND dashed connector |
 
-Evidence per station: SO row · PO row · supplier-confirmed ready date · GRN row · Unit
-created/allocated · DO + appointment · delivery completion + proof. **Dates always carry their
-meaning label** — `Ordered` · `Customer requested` · `Issued` · `Estimated ready` · `Received` ·
-`Delivery appointment` — and are spelled through the one date format (`Wed, 12 Aug`). A bare date
-never ships. Everything is derived; there is no hand-tickable mark anywhere.
+**A `✓` costs real completion evidence.** Nothing is ticked because the next thing started.
+**State is never colour-only:** complete carries the tick, CURRENT carries its chip and word, future
+carries the dashed border, an exception carries `⚠` and says why.
 
-**THE DESTINATION FORK, AND ITS HONEST BOUNDARY.** `Deliver To` is Purchasing's answer, quantity
-split included; Sales Order stores neither. Where a line's outstanding quantity sits on ONE purchase
-lane and Purchasing names a split whose quantities add up to that lane, the lane forks into **one
-sub-lane per Deliver To** — the split is a fact, not an inference. Where several POs are involved,
-or the named quantities do not reconcile, the lane STATES the destinations instead of distributing
-them. §0.1's rule stands: a consolidated PO does not by itself prove a PO-line-to-SO-line
-allocation, and the route may not distribute another Sales Order's quantity or destination by
-inference.
+**`CURRENT` is one per ROUTE — up to three at once, never a fourth.** Goods, Delivery and Money each
+carry one; a Loan is an obligation, not a position, and never takes one. The action line belongs to
+the position being worked, never to a queue of nodes nobody has reached.
 
-### `DELIVERY RELEASE` — derived, read-only, and NO release button
+**Owners come from the Work Engine roster only** (buddy cover included) — never hand-picked, never
+stored by the canvas, never hard-coded. The node shows initials; Team Work shows full names; the
+action sentence never repeats the person. **MEASURED BOUNDARY 2026-08-16:** only PO duty
+(`useOperationPoDuty` → Purchasing, Receiving) has a roster read on this page. Stock, Delivery,
+Sales and Payment resolve to no holder today, so those nodes render the instruction with no chip
+rather than an invented owner. Wiring their duty reads is approved-target, not built.
 
-```
-○ NOT READY FOR DELIVERY · {n} requirements still open
-✓ READY FOR DELIVERY · All release requirements are complete.
-```
+### Connectors
 
-Three requirements: **Goods ready · Money release cleared · Appointment confirmed.** The only
-control is `Open Delivery →` — **the release ACT lives in the owning module** and this block never
-grows a button for it.
+- Goods forks per goods line and per source quantity; each fork is its own column. A line that is
+  being bought shows its purchase chain `PURCHASING → SUPPLIER → RECEIVING`, and its STOCK truth is
+  the same line's other fork off the Sales Order.
+- Every segment is orthogonal, leaves the bottom of its source and lands on the top of its target.
+- **Completed segments solid; a path the work has not walked is dashed.**
+- Edge facts (`goods`, `collect back`) sit ON the line as small grey labels.
+- `DELIVERY ORDER` is the single convergence gate; `DELIVER` and `DELIVERY PHOTO` hang below it in a
+  straight line. **The last node has no trailing line.**
+- No node is ever an orphan, and no two nodes overlap — both are asserted, not assumed.
 
-**THE BALANCE FACT AND THE RELEASE DECISION ARE TWO FACTS.** `orderMoney` already separates
-`holding` from `outstanding` (§8), and this block prints both:
-
-```
-⚠ Money release not cleared · RM 1,249.00 still to collect
-✓ Money release cleared · RM 1,249.00 remains to collect · Manager release recorded
-```
-
-**A manager release NEVER erases or hides the outstanding amount.** An order whose value nobody has
-entered does not hold anything (§8 — unknown warns, never blocks); the block says `No price yet`
-and `Money does not hold this delivery`.
-
-**GATE ICONS MATCH THE FACTS.** Partial goods read `○ Goods not ready · 1 of 3 ready`. A `✓` on
-partial goods is allowed ONLY when an explicit partial-delivery scope exists **and is displayed**:
+### The DELIVERY ORDER gate — derived, read-only, and NO release button
 
 ```
-✓ Goods ready for this delivery · 1 Unit included in DO-2088 · 2 Units remain open
+NOT READY FOR DELIVERY · {k} of {n} requirements met
+DO-DDMMYY-NNNN · Delivery order issued
 ```
 
-The scope is the booking's own delivery groups (`booking_groups`), never a guess about which goods
-the trip carries.
+Requirements are plain sentences, GitHub-checks style, with the met count:
+`Goods not ready (0 of 1)` · `No logistics chosen` · `Date + slot not confirmed` ·
+`RM {amount} still to collect`. When the confirmed date lands on a refused day the gate adds
+`Date falls on a Sunday — pick another day` (Malaysian public holidays take the same pattern).
+
+**When every requirement is met the SYSTEM issues the DO.** There is **no Release button, no Approve
+button and no manual bypass** in any state; the gate node then shows the number and turns green.
+
+**⭐ MONEY IS A GATE REQUIREMENT — OWNER RULING 2026-08-16, decision B.** The design card proposed
+dropping money from the gate and blocking only on a "Finance-recorded payment exception". That was
+put to the owner as a conflict rather than built, because three current authorities and the shipped
+engine all say otherwise: §8 below (*"Issuing is refused unless … the money is collected"*), §7's
+four-way `Issue delivery order` trigger, `docs/payment/MASTER.md` §6 (*"issuing the DO is the hard
+gate"*), and `order-actions.ts` `deliveryHeldOnMoney`, which withholds `issue_delivery_order`
+outright while money holds. **A gate that counted its requirements met while the server refused the
+DO would be the screen telling a lie** (Architecture Law D — one derived fact, one arithmetic). The
+gate therefore asks `orderMoney.holds`, the very predicate the action engine asks.
+
+**The Finance-exception mechanism the card describes does not exist in this repository** — no
+`finance exception` / `payment exception` concept appears in `packages/shared/src`, `apps/api/src`
+or `apps/web/src`, and the nearest real mechanism (the §8 manager release) has the opposite
+polarity: it UNBLOCKS. None was invented. Building one is a Payment/Delivery business decision, not
+a canvas change.
+
+**THE BALANCE FACT AND THE RELEASE DECISION ARE TWO FACTS.** A manager release MEETS the requirement
+and still prints what the customer owes:
+`Manager release recorded — RM 1,249.00 remains to collect`. **A release never erases or hides the
+outstanding amount.** An order whose value nobody has entered does not hold anything (§8 — unknown
+warns, never blocks): the gate reads `No price yet — money does not hold this delivery`.
+
+**A met goods requirement on PARTIAL goods** is allowed ONLY when an explicit partial-delivery scope
+exists **and is displayed** — `Goods ready for this delivery (1 Unit in, 2 Units still open)`. The
+scope is the booking's own delivery groups (`booking_groups`), never a guess about which goods the
+trip carries.
+
+### LOAN — conditional, and it blocks nothing
+
+Rendered ONLY while a loan item is out; there is no empty box on a clean order. Amber, with a
+**dashed edge into DELIVER labelled `collect back`**. It **never joins the gate**: a loan may not
+hold a delivery, and it never blocks delivery completion (Card 6 — an independent obligation; an
+open `ops_sofa_loans` row on a delivered order keeps the Loan obligation open, and Card 8's
+completion reads it). After delivery an uncollected loan reads `Loan not collected back`.
+
+### `LINKED PROBLEMS` — beside the map, never a node on it
+
+An open Service Case or Supplier Claim renders as a conditional strip beside the canvas:
+`SC-1031 · Investigation in progress · Open SC-1031 →`. **It is never a node**, because a node is a
+stage every Sales Order passes through and Service is not one. A CLOSED exception does not render.
+The status word is the owning module's own translation — no internal enum reaches this screen.
 
 ### The scenario matrix — what renders, and what deliberately does not
 
-| Scenario | What the Route renders |
+| Scenario | What the map draws |
 |---|---|
-| Ready stock | one `READY STOCK` lane; **the purchase stations are omitted entirely** |
-| Supplier direct | the purchase lane's stations, with receiving/stock omitted where the facts say so |
-| Split quantity | multiple sub-lanes with counts, each with its own `CURRENT` position |
-| Partial receiving | `1 of 2 received`, and the RECEIVING station stays `CURRENT` |
-| Multiple destinations | one lane per `Deliver To` where Purchasing's split reconciles (see the boundary above) |
-| Service lines | no goods route; a linked case appears under `LINKED PROBLEMS` only |
-| Replacement | a new route lane; the original line states its outcome |
-| Cancelled line | one grey line, `{item} · Qty {n} · Cancelled · Rev {n}`, and **no stations** |
-| Amended line | routes always reflect the CURRENT effective Revision |
-| Delivered quantity | its own `DELIVERED` lane, evidenced by the Unit |
+| Ready stock | the line's STOCK fork only; **the purchase chain is omitted entirely** |
+| On order | `PURCHASING → SUPPLIER → RECEIVING`, plus the line's STOCK fork |
+| No PO yet | the chain still draws, `PURCHASING ⚠ No Purchase Order yet` and the rest dashed |
+| Split quantity | one fork per Purchase Order, each in its own column |
+| Partial receiving | `1 of 2 received`, and RECEIVING holds the goods CURRENT |
+| Service lines | no goods fork; a linked case appears on the strip only |
+| Cancelled line | one node, `{item} · Qty {n}` + `Cancelled · Rev {n}`, **no chain and no gate edge** |
+| Amended line | the map always reflects the CURRENT effective Revision |
+| Delivered | DELIVER complete with its date; DELIVERY PHOTO becomes the open step |
 
-**A PO WHOSE GOODS ARRIVED IS STILL ITS LINE'S ROUTE.** Measured while building this: the lane was
-keyed on the PO's still-OPEN quantity, so the moment `received` caught up with `qty` the whole lane
-vanished — at exactly the step where the work sat (`○ STOCK · Units not created yet`). The lane is
-keyed on the ORDERED quantity instead; Units that reached the register have already lowered the
-line's outstanding, so nothing double-counts.
+**A PO WHOSE GOODS ARRIVED IS STILL ITS LINE'S ROUTE.** The fork is keyed on the PO's ORDERED
+quantity, not its still-open quantity — keyed on the latter, the whole fork vanished the moment
+`received` caught up with `qty`, at exactly the step where the work sat.
+
+### Accessibility
+
+Every node is focusable with an aria-label reading its lines in order
+(`SUPPLIER — Ready date not confirmed — Yu Jun: Confirm the ready date`). **Tab order is reading
+order** — SO → goods → delivery → money → gate → tail. Enter and Space open the node's door. The
+zoom controls are keyboard-operable, the focus ring is the token ring, and panning respects
+`prefers-reduced-motion`.
 
 ### Components and ownership
 
-`PageShell` + kit blocks + stacked rows. **No `<table>`**, no new kit component invented
-page-locally, and the loading state uses the existing kit `Loading` — a Skeleton is not in the kit,
-and adding one would be a kit card, not a page hack. The Object Header already names `Order Route`
-and `SO-number · Customer`; route content never repeats either identity. The four Order Tracks stay
-unconnected because they are parallel facts, while each goods block uses one continuous vertical
-rail that forks only where quantity/source/destination actually fork. `CURRENT` is the one visually
-emphasised station in each sub-lane. The three Delivery requirements render as a checklist that
-visually converges on the read-only release result. The Sales Order origin carries its number and
-labelled Ordered date as evidence but no circular `Open SO-{n}` door back to the object already
-open. A timestamp is reduced to its governed date before display; machine ISO time never reaches
-the operator. The owner avatar chip reuses the same `personInitials` / `avatarColor` primitives the
-Team board and the PO duty chips already use. The reading model is copied from parcel-tracking /
-Stripe-timeline / GitHub-checks **patterns only**; every colour, font, spacing and component is the
-Carres UI Kit. Sales Order gains no writer.
+`PageShell` + kit blocks + one absolutely-positioned canvas with an SVG connector layer. **No
+`<table>`**, no new kit component invented page-locally, and the loading state uses the kit
+`Loading`. Only the colour steps `tailwind.config.ts` publishes exist — a step it does not publish
+renders NOTHING (`kit-palette.test.ts`), so the node BOX stays on the neutral ramp and the MARK
+BADGE carries the state colour. Type is the governed scale (`text-body` 13/18, `text-label` 11/14);
+no size is chosen on this page. A timestamp is reduced to its governed date before display; machine
+ISO time never reaches the operator. The owner chip reuses the same `personInitials` / `avatarColor`
+primitives the Team board and the PO duty chips already use. The reading model is copied from
+org-chart / parcel-tracking / GitHub-checks **patterns only**; every colour, font, spacing and
+component is the Carres UI Kit. **Sales Order gains no writer.**
+
+**KNOWN BOUNDARY, reported not hidden.** The card's DELIVER node lists `In transit` among its
+states. Delivery owns that fact (`Handed Over` → `Received by Logistics`,
+`docs/delivery/MASTER.md` §4) and the route does not read those statuses today, so DELIVER renders
+`Not delivered yet` / `Scheduled: {date}` / `Delivered: {date}` and no `In transit` is invented.
+Wiring Delivery's handover status is approved-target, not built.
 
 ## Owner UI acceptance corrections — 2026-08-14
 
@@ -677,14 +605,15 @@ its three states `☐ none · ▣ partial · ☑ all`.
 
 ### Order Route — delivery line
 
-**Superseded within the same day by the two-layer model above** (ORDER ROUTE — TWO LAYERS OF FACT).
+**Superseded by the node map above** (ORDER ROUTE — ONE NODE MAP, 2026-08-16).
 `Promised this day, no date yet` was overwritten here because it named a day and denied it in the
 same breath; its replacement, `Customer date {date} · Delivery not arranged`, is in turn replaced by
-the two-layer split, which separates the same two facts onto two surfaces rather than two clauses:
+the map, which separates the same two facts onto two nodes rather than two clauses:
 
 ```
-DELIVERY track      Appointment not confirmed   /   Delivery appointment: {date}
-DELIVERY RELEASE    ○ Appointment not confirmed · Customer requested: {date}
+DELIVERY DATE node   Date + slot not confirmed · Customer requested: {date}
+                     /  Delivery appointment: {date} · {slot}
+DELIVERY ORDER gate  · Date + slot not confirmed        (a gate requirement)
 ```
 
 **What survives unchanged is the RULE the wording existed to enforce:** the customer's promise and
@@ -923,18 +852,10 @@ official Card numbers.
    `38d66340`), both canonical domains and Worker version
    `95d15d76-5517-4f02-a52e-bb46b7d17553`. Authenticated production verification on SO-1318
    proved the durable `?route=1` entry survives reload; live document/Revision lineage; the
-   goods-position read; the five lanes **that model then had — Goods / Delivery / Money / Loan /
-   Other Commitments**; and real owner handoffs, including the selected-order Delivery link. It is
+   goods-position read; all five **Goods / Delivery / Money / Loan / Other
+   Commitments** lanes; and real owner handoffs, including the selected-order Delivery link. It is
    fact-derived and read-only: no manual checklist, giant overall status or foreign writer was
    introduced.
-
-   ⛔ **THE FIVE-LANE MODEL IS SUPERSEDED — twice.** The 2026-08-15 two-layer ruling replaced it
-   with four Order Tracks (`GOODS · STOCK · DELIVERY · MONEY`) and removed Loan and Other
-   Commitments as lanes; the 2026-08-16 Node Map ruling replaced that in turn with three root
-   branches (`GOODS · DELIVERY · MONEY`) plus a conditional Loan node that is **not a main track**.
-   The sentence above is a historical production record of what was verified on 2026-08-13 and is
-   **not** a description of current or target truth. Current truth is §0.1 · ORDER ROUTE — ONE NODE
-   MAP CANVAS.
 5. **CLOSED / PRODUCTION-VERIFIED 2026-08-13 — Copy to new Sales Order** — exact source commit
    `f6a51d59` passed PR #764 CI, then merged without alteration as parent of `6c43c5c6`. The
    `Deploy production` run repeated the authoritative gate (`ci:migrations` · lint · typecheck ·
@@ -3965,126 +3886,25 @@ saying who moved it.
 
 **A gate REFUSES an action. Display order only decides what is read first.**
 
-## ⭐ MONEY NO LONGER GATES THE DELIVERY ORDER — OWNER RULING 2026-08-16 · APPROVED / LOCKED
+**Issuing the delivery order is the HARD gate**, not agreeing a date: a date can be agreed while
+the goods and the money are still coming. Issuing is refused unless every goods line is reserved
+to this order (accessories pass automatically), **the money is collected**, and the date is not
+a Sunday or a Malaysian public holiday.
 
-**Outstanding money does not block the DO.** A customer balance, however large and however late,
-no longer refuses the delivery order. **A Finance exception is the ONLY money blocker.**
+**An unpaid storage fee is part of the money, and there is no softer rule for it.**
+`orderMoney` returns `holding` beside `outstanding` and `holds` beside `owing`, because
+**a release must lift the HOLD without forgiving the MONEY.**
 
-**And the DO is issued by the SYSTEM when its requirements are met**, not by a person pressing a
-button. There is **no Release button and no Approve button** anywhere on this path.
+**The emergency override — the only way past it.** **The manager approves it, nobody else.**
+Two outcomes, and the approver picks one out loud:
+- **released, fee still owed** — the goods go, the money action stays open. **This is the
+  default; an override must never quietly forgive money.**
+- **released and waived** — written off with a reason. `storage_fee_override = 0` already means
+  *owes no storage fee*, so `approved` means RELEASED, not FORGIVEN, and the figure written off
+  stays on the record.
 
-The requirements that remain, unchanged by this ruling:
-
-```
-✓ the customer has confirmed a delivery date AND a time slot
-✓ the date is not a Sunday and not a Malaysian public holiday
-✓ every goods line is reserved to this order (accessories pass automatically)
-✗ the money is collected        ← RETIRED by this ruling
-+ no open Finance exception     ← the one money blocker that remains
-```
-
-### `Finance exception` — OWNER DEFINITION 2026-08-16 · APPROVED / LOCKED
-
-**A Finance exception is an EXPLICIT, Finance-created record linked to the Sales Order.** It is not
-a derived state, not a flag another module may set, and not a computed consequence of a balance.
-Somebody in Finance decides there is a reason to stop the goods, and says so on the record.
-
-```
-WHAT IT IS      an explicit record, linked to the SO
-IT CARRIES      creator · reason · status · timestamps · clear evidence
-WHO CREATES     Finance, and only Finance
-WHO CLEARS      Finance, and only Finance
-STATUS OPEN     blocks the DO gate
-STATUS CLEARED  removes the block
-```
-
-**This is the only thing money does to the delivery order now.** An outstanding balance —
-of any size, of any age — does not block. A storage fee does not block. Only an OPEN Finance
-exception blocks, and only Finance can open or clear one.
-
-**Its consequences, which follow from the ownership laws rather than from preference:**
-
-- **One record, one owner (Law A).** Finance creates, changes and clears it, and owns its
-  completion evidence. Sales Orders READS it to answer the gate; Delivery READS it; neither may
-  write it, and no surface may offer a second door onto the act (Law C).
-- **`clear evidence` is a required field, not a nicety.** A block that can be lifted without saying
-  why is the hand-keyed `payment_status` defect this MASTER already retired once — a money state a
-  human can type is a money state that can contradict the record.
-- **It is not the balance wearing a new name.** Opening one is a decision; owing money is a fact.
-  The two must never be derived from each other, or the gate this ruling removed grows back under
-  another word.
-- **It renders on the Order Route as a blocking fact with its reason**, through the existing
-  station anatomy (`⚠` always carries its reason and the owning door). It is **not** a new root
-  branch and not an Overall Status.
-
-> ### 🔴 IMPLEMENTATION REQUIRED — NOT BUILT
->
-> **No part of the Finance exception exists in this repository today.** There is no table, no RPC,
-> no route, no permission and no UI. This section is the approved target and nothing more.
->
-> ```
-> NOT BUILT   the record, its columns and its RLS
-> NOT BUILT   the Finance-only create / clear doors and their permission rule
-> NOT BUILT   the DO gate's read of it
-> NOT BUILT   its appearance on the Order Route
-> ```
->
-> **Do not describe any of this as implemented, and do not treat its absence as permission to
-> keep the old money gate.** What runs today is the retired rule: `deliveryOrderIssueGate` still
-> refuses on an unpaid balance. Documentation states the target; the build slice is
-> [`../cards/CARD-2026-08-16-order-route-node-map.md`](../cards/CARD-2026-08-16-order-route-node-map.md),
-> which remains `IMPLEMENTATION: NOT APPROVED`.
-
-**WHAT THIS RULING SUPERSEDES, stated exactly so nobody restores it by accident:**
-
-| Superseded rule | Where it ruled | Status |
-|---|---|---|
-| *"Issuing the delivery order is the HARD gate … **the money is collected**"* | this section, pre-2026-08-16 | **SUPERSEDED** — money is out of the DO gate |
-| *"An unpaid storage fee is part of the money, and there is no softer rule for it"* | this section | **SUPERSEDED as a DO blocker.** The fee is still owed and still collected; it simply no longer holds the document |
-| *"The emergency override — the manager approves it, nobody else"* | this section | **SUPERSEDED.** With no money gate there is nothing to release, and rules 10/11 forbid the button. **Its companion rule survives in full — see below** |
-| *"issuing the DO is the hard gate"* | `../payment/MASTER.md` §6 | **SUPERSEDED** — reconciled in that MASTER |
-| *"Issue Delivery Order is the only employee act"* | `../delivery/MASTER.md` §3 | **SUPERSEDED** — reconciled in that MASTER |
-
-**WHAT SURVIVES, and it is the half that matters most:**
-
-- **A RELEASE NEVER FORGIVES MONEY.** `orderMoney` still returns `holding` beside `outstanding`,
-  and the two facts are still printed apart. Goods moving has never meant money forgiven, and it
-  means it even less now that goods move by default. **The collect action survives delivery**
-  exactly as it always did — a delivered order that still owes keeps its action and its red dot.
-- **The WAIVER is untouched.** Writing off a receivable remains a money decision, manager-gated,
-  owned by Money In, with amount, reason, actor and time. `storage_fee_override = 0` still means
-  *owes no storage fee*. A waiver is not a release and never was.
-- **An order whose value is UNKNOWN still never holds anything** — unknown warns, never blocks.
-- **Operations is still told by the work itself.** No separate alert engine.
-
-### THE T−1 COLLECTION CLOCK SURVIVES — OWNER RULING 2026-08-16 · APPROVED / LOCKED
-
-**Keep the clock.** `packages/shared/src/collection-clock.ts` stays exactly as it is: due =
-delivery − 1 working day on the Mon–Sat delivery week with Malaysian public holidays, anchored on
-the customer's confirmed day, else the promised date, with `t3`/`t2` attention and `t1` as the
-deadline. No anchor still means no clock.
-
-**What changed is only its JUSTIFICATION, not its arithmetic.** The clock used to be explained by
-the DO door — *"logistics ask for the DO the evening before and the DO door refuses while money
-holds"*. That sentence is retired with the gate it described. **The clock now stands on its own
-footing: a balance has a due date because it is owed, not because it holds goods.**
-
-```
-COLLECTION WORK RUNS INDEPENDENTLY of the delivery.
-Money is not a DO requirement — unless an OPEN Finance exception exists.
-Collection survives delivery, exactly as it always did.
-```
-
-This is the §8 rule that was already true and is now the whole of it: **the collect action
-survives delivery** — a delivered order that still owes keeps its action and its red dot. Under
-the old gate that was an exception worth naming; under this ruling it is simply how collection
-works, because goods no longer wait for money.
-
-> **RUNTIME GAP, REPORTED NOT HIDDEN.** `packages/shared/src/delivery-order.ts` still refuses on
-> `gate.balanceReady`, and `work-engine.ts`'s `issue_delivery_order` still names a person as owner
-> with `orders.do_number` as its completion fact. **The code has not been changed and this ruling
-> does not authorise changing it.** Documentation states the approved target; the build slice is the
-> QUEUED card, which is `IMPLEMENTATION: NOT APPROVED`.
+**Operations is told by the work itself** — the moment the override is granted, the order's top
+action changes from collecting to delivering. **No separate alert engine.**
 
 **AGREEING a date is softer than ISSUING.** It WARNS about goods, money and the calendar so
 nobody promises a day the goods cannot make, but it refuses only two things:

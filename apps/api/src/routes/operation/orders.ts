@@ -440,7 +440,7 @@ operationOrdersRouter.get("/:id", requireOperation, async (c) => {
   // `confirm_delivery_date`, `request_for_delivery_at`, `partner_accepted_at`,
   // `partner_rejected_at`) that previously lived on the PO. Drawer reads
   // `threads[].delivery_partner_id` for the partner-assignment hint.
-  const [linesRes, addonsRes, historyRes, threadsRes] = await Promise.all([
+  const [linesRes, addonsRes, historyRes, threadsRes, controlRes] = await Promise.all([
     // 2026-05-10 (Loo) — also pull `attrs` so the OrderDetailDrawer's
     // "+ Issue POs" navigate-to-procurement flow can carry color/gap/fabric
     // into CreatePOModal's cascade picker without a second round-trip.
@@ -455,6 +455,15 @@ operationOrdersRouter.get("/:id", requireOperation, async (c) => {
         "id, supplier_id, category, operation_stage, po_id, delivery_partner_id, confirm_delivery_date, request_for_delivery_at, partner_accepted_at, partner_rejected_at",
       )
       .eq("order_id", id),
+    // 2026-08-16 (ORDER ROUTE NODE MAP) — the delivery-photo ledger (0280).
+    // Read-only and kept OFF the `order` object on purpose: the workspace EDIT
+    // form seeds its draft from `order`, and an overlay column riding that
+    // payload is a field a Save could try to write.
+    sb
+      .from("ops_order_control")
+      .select("delivery_photos")
+      .eq("order_id", id)
+      .maybeSingle(),
   ]);
   if (linesRes.error) { const m = mapPgError(linesRes.error); return c.json(m.body, m.status); }
   if (addonsRes.error) { const m = mapPgError(addonsRes.error); return c.json(m.body, m.status); }
@@ -592,6 +601,9 @@ operationOrdersRouter.get("/:id", requireOperation, async (c) => {
     pos: posWithLines,
     history: historyRes.data ?? [],
     threads: threadsRes.data ?? [],
+    /* An absent overlay row is UNKNOWN, not "no photo": the Route says
+       `No delivery photo yet` only on an explicit empty ledger. */
+    control: controlRes.error ? null : (controlRes.data ?? null),
   });
 });
 

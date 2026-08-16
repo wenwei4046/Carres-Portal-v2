@@ -1,254 +1,286 @@
-# CARD — ORDER ROUTE NODE MAP CANVAS
+STATUS: EXECUTED
+DATE: 2026-08-16
+PR: #825
+IMPLEMENTATION: APPROVED — owner ruling 2026-08-16, build straight to production
 
-```
-STATUS:          QUEUED
-IMPLEMENTATION:  NOT APPROVED
-OWNER RULING:    2026-08-16
-LANE:            DOCUMENTATION ONLY — no application code authorised by this card
-MODULE:          Sales Orders (docs/orders/MASTER.md)
-```
+# ORDER ROUTE — NODE MAP CANVAS (design specification card)
 
-> **This card does not authorise a single line of application code.** It records an
-> owner-approved business/presentation direction and the work that direction implies, so that a
-> later BUILD/DELIVERY takeover has a written boundary. `IMPLEMENTATION: NOT APPROVED` stays until
-> the owner explicitly moves it.
+This is a DESIGN SPECIFICATION, not an implementation task. No ERP code, no
+database, no `apps/`, no `packages/` may change on the strength of this card.
+Implementation starts only after the owner writes "implement" and the header
+line changes to `IMPLEMENTATION: APPROVED`.
 
 ---
 
-## 1 · What the owner approved, 2026-08-16
+## 1 · Design goal
 
-Verbatim, in the owner's own order:
+Rebuild the Sales Order `Order Route` tab as ONE node-graph canvas:
+white node cards joined by connector lines, routes arranged by hierarchy,
+pannable and zoomable, read-only, every node opening its owning module.
+Visual reference: owner's sample `_ (15).jpeg` (org-chart canvas) —
+**visual structure only; none of its business content.**
 
-```
-1   one Node Map Canvas, not stacked section cards
-2   SO is the only root
-3   Goods, Delivery, and Money start simultaneously
-4   Loan appears only when a loan exists
-5   Loan is not a fourth main track
-6   Loan never blocks DO
-7   Loan never blocks Delivery completion
-8   outstanding money does not block DO
-9   Finance exception is the only money blocker
-10  no Release button
-11  no Approve button
-12  the system issues the DO when requirements are met
-13  Deliver and Delivery Photo appear after the DO gate
-14  no Overall Status
-```
+## 2 · Explicitly NOT doing
 
-Rules 1–5, 13 and 14 are **presentation/architecture** of a read-only surface.
-Rules 6–9 and 12 are **business rule changes** with runtime consequences (§4).
-Rules 10 and 11 are **already true** in the current implementation and are now locked (§5).
+- No stacked cards, no three separate section cards, no table layout.
+- No invented Overall Status for the order — three routes, each its own truth.
+- No Release / Approve button; no manual gate bypass.
+- No manual Owner selector; owners come from the Work Engine only.
+- No editing of any business data on the canvas (read-only, doors only).
+- No new words outside `docs/COPY-STANDARD.md`; no colours outside the tokens.
 
----
+CLARIFICATION — "no stacked cards" means: no separate Order Tracks, Goods
+Routes and Delivery Release SECTION cards (the #822/#824 layout is what is
+forbidden). Node cards INSIDE the single route canvas are REQUIRED and
+allowed. The canvas must be one connected map surface.
 
-## 2 · What this replaces
+## 3 · ASCII skeleton (the approved drawing — build exactly this)
 
-`docs/orders/MASTER.md` — `ORDER ROUTE — TWO LAYERS OF FACT · OWNER FINAL RULING 2026-08-15 ·
-APPROVED / LOCKED` is superseded by the 2026-08-16 ruling. The superseded section is preserved in
-that MASTER as a historical record under the MASTER OVERWRITE LAW's history clause: the obsolete
-text no longer states current truth, and it is labelled as such rather than deleted, because its
-station anatomy, scenario matrix and evidence rules were carried forward unchanged.
+Legend: ▣ CURRENT (blue border + owner chip) · ✓ complete (green) ·
+○ waiting (grey) · ⚠ exception (amber) · ┊/┄ future path (grey dashed)
 
-**Carried forward from the superseded ruling, unchanged and still binding:**
-
-- The route is read-only, derived only from authoritative facts, and gains no writer.
-- Station anatomy: a `✓` costs a document number, its labelled date and an explicit door;
-  a `○` is written in primary-school English and never `PO: —`; a `⚠` always carries its reason.
-- Dates carry their meaning label and are spelled through the one date format.
-- `CURRENT` is the registered word; `YOU ARE HERE` stays withdrawn.
-- The destination fork's honest boundary — a consolidated PO does not prove a PO-line-to-SO-line
-  allocation, and the route may not distribute another Sales Order's quantity by inference.
-- The scenario matrix (ready stock · supplier direct · split quantity · partial receiving ·
-  multiple destinations · service lines · replacement · cancelled line · amended line ·
-  delivered quantity).
-- The Object Header owns the identity; the route never repeats SO number or customer name.
-- Every colour, size, spacing and component is the Carres UI Kit.
-
----
-
-## 3 · The approved shape
+State 1 — SO-1319 as it stands:
 
 ```
-                                  ┌──────────┐
-                                  │    SO    │   the only root
-                                  └────┬─────┘
-                 ┌────────────────────┼────────────────────┐
-                 │                    │                    │
-            ┌────▼────┐          ┌────▼────┐          ┌────▼────┐
-            │  GOODS  │          │DELIVERY │          │  MONEY  │
-            └────┬────┘          └────┬────┘          └─────────┘
-                 │                    │
-        one branch per goods          │
-        line, forking by              │
-        qty / source / destination    │
-                 │                    │
-                 └────────┬───────────┘
-                          │
-                    ┌─────▼─────┐
-                    │  DO GATE  │  system-issued when requirements are met
-                    └─────┬─────┘
-                          │
-                    ┌─────▼─────┐
-                    │  DELIVER  │
-                    └─────┬─────┘
-                          │
-                    ┌─────▼──────────┐
-                    │ DELIVERY PHOTO │
-                    └────────────────┘
-
-            ┌──────┐
-            │ LOAN │  rendered ONLY when a loan exists.
-            └──────┘  Not a fourth main track. Blocks nothing.
+                          ┌───────────────────┐
+                          │ ✓ SALES ORDER     │
+                          │ SO-1319           │
+                          │ Ordered: Wed,     │
+                          │ 12 Aug            │
+                          │ Open SO-1319 →    │
+                          └─────────┬─────────┘
+        ┌─────────────────────────┬─┴─────────────────────┬──────────────┐
+      goods                     goods                  delivery        money
+  B1201S · King · Qty 1     (same line)                   │              │
+   1 to buy from factory        │                         │              │
+        │                       │                         │              │
+ ┌──────┴──────────┐   ┌────────┴────────┐   ┌────────────┴───┐  ┌───────┴────────┐
+ │ ▣ PURCHASING    │   │ ○ STOCK         │   │ ▣ LOGISTICS    │  │ ▣ MONEY        │
+ │ No Purchase     │   │ 0 of 1 Units    │   │ No logistics   │  │ RM 1,250 paid  │
+ │ Order yet       │   │ ready           │   │ chosen yet     │  │ RM 1,249 still │
+ │ [YJ] Raise the  │   │ Waiting for     │   │ Due: Mon, 21   │  │ to collect     │
+ │ Purchase Order  │   │ purchase        │   │ Sep            │  │ [KA] Collect   │
+ │ Open            │   │ Open Stock →    │   │ [OP] Assign    │  │ RM 1,249       │
+ │ Purchasing →    │   └────────┬────────┘   │ logistics      │  │ Open           │
+ └──────┬──────────┘            ┆            │ Open Delivery →│  │ Payments →     │
+        ┆                       ┆            └────────┬───────┘  └───────┬────────┘
+ ┌──────┴──────────┐            ┆                     ┆                  ┆
+ ┊ ○ SUPPLIER      ┊            ┆            ┌────────┴───────┐          ┆
+ ┊ Ready date not  ┊            ┆            ┊ ○ DELIVERY     ┊          ┆
+ ┊ confirmed       ┊            ┆            ┊   DATE         ┊          ┆
+ └──────┬──────────┘            ┆            ┊ Date + slot    ┊          ┆
+        ┆                       ┆            ┊ not confirmed  ┊          ┆
+ ┌──────┴──────────┐            ┆            ┊ Customer       ┊          ┆
+ ┊ ○ RECEIVING     ┊            ┆            ┊ requested:     ┊          ┆
+ ┊ Not received    ┊            ┆            ┊ Thu, 24 Sep    ┊          ┆
+ ┊ yet             ┊            ┆            └────────┬───────┘          ┆
+ └──────┬──────────┘            ┆                     ┆    ┌─────────────┘
+        └───────────────────────┴──────────┬──────────┘    ┆ only blocks if
+                                           │               ┆ Finance records
+                                           │               ┆ an exception
+                              ┌────────────┴────────────┐  ┆
+                              │ 🚦 DELIVERY ORDER       │◀┄┘
+                              │ NOT READY FOR DELIVERY  │
+                              │ 0 of 3 requirements met │
+                              │ · Goods not ready       │
+                              │   (0 of 1)              │
+                              │ · No logistics chosen   │
+                              │ · Date + slot not       │
+                              │   confirmed             │
+                              │ (system issues the DO — │
+                              │ no Release button)      │
+                              └────────────┬────────────┘
+                                           ┆
+                              ┌────────────┴────────────┐
+                              ┊ ○ DELIVER               ┊
+                              ┊ Not delivered yet       ┊
+                              └────────────┬────────────┘
+                                           ┆
+                              ┌────────────┴────────────┐
+                              ┊ ○ DELIVERY PHOTO        ┊
+                              ┊ No photo yet            ┊
+                              └─────────────────────────┘
 ```
 
-- **One canvas.** Not four stacked bordered section cards.
-- **SO is the only root.** Every other node descends from it. There is no second entry point and
-  no node that floats unattached.
-- **Goods, Delivery and Money leave the root together.** They are simultaneous, not sequential.
-- **Goods and Delivery converge on the DO gate.** Money does not: under rule 8 it no longer gates.
-- **Loan** renders only when a loan obligation exists, hangs off the SO root, and has no edge into
-  the DO gate or into Delivery completion.
-- **No Overall Status node** anywhere on the canvas, and no `status` field on the resolved route.
+State 2 — after progress (the same map grows; no layout change, nodes fill in):
 
----
+```
+ ┌─────────────────┐      ┌─────────────────┐      ┌─────────────────┐
+ │ ✓ PURCHASING    │──────│ ▣ SUPPLIER      │──────┊ ○ RECEIVING     ┊
+ │ PO-2048 issued  │      │ Ready date not  │      ┊ Not received    ┊
+ │ Open PO-2048 →  │      │ confirmed       │      ┊ yet             ┊
+ └─────────────────┘      │ [YJ] Confirm    │      └─────────────────┘
+                          │ the ready date  │
+                          │ Open PO →       │
+                          └─────────────────┘
+ Gate: 🚦 2 of 3 requirements met · Goods not ready (0 of 1)
+ Refused day line: · Date falls on a Sunday — pick another day
+ Finance exception: ⚠ MONEY · Money exception recorded ·
+                    Delivery release blocked by Finance
+ Conditional LOAN (amber, only when a loan exists), dashed edge into DELIVER
+ labelled `collect back`:
+   ⚠ LOAN · 1 sofa on loan to customer · Collect back on delivery day · Open Loan →
+ Last node when everything is done: ✓ DELIVERY PHOTO · Uploaded by {name} · Mon, 28 Sep
+ The last node has NO trailing line.
+```
 
-## 4 · Business rule changes — the runtime gap this card creates
+Business structure (fixed):
 
-**These four rules contradict shipped, tested, production-verified behaviour.** The documentation
-is reconciled by this card's PR; the code is not, and this card does not authorise changing it.
+```
+SO
+├── Goods            (may fork per goods line and per source/quantity)
+├── Delivery / Logistics
+├── Money
+└── Loan             (rendered ONLY when a loan exists)
 
-| # | Approved rule | What runs today | Evidence |
+Goods + Logistics + Delivery Date  →  DELIVERY ORDER (gate)  →  DELIVER  →  DELIVERY PHOTO
+```
+
+## 4 · Node types
+
+| Node | Route | Fact line | Auto-completes when |
 |---|---|---|---|
-| 8 | outstanding money does not block DO | `gate.balanceReady` refuses DO issuance while money is owed | `packages/shared/src/delivery-order.ts` (`deliveryOrderIssueGate`) |
-| 9 | Finance exception is the only money blocker | **nothing exists** — no table, RPC, route, permission or UI. Defined by the owner 2026-08-16 (§6 A1); **IMPLEMENTATION REQUIRED** | — |
-| 12 | the system issues the DO when requirements are met | a person issues it; completion fact is `orders.do_number` existing | `packages/shared/src/work-engine.ts` (`issue_delivery_order`, owner = the order's PIC) |
-| 6/7 | Loan never blocks DO or Delivery completion | already true for DO; **Card 8 derived completion currently keeps an open loan open** | `docs/orders/MASTER.md` Card 6/Card 8 records |
+| SALES ORDER | root | SO No · Ordered date | always complete |
+| PURCHASING | goods | `No Purchase Order yet` / `PO-nnnn · issued` | PO exists |
+| SUPPLIER | goods | `Ready date not confirmed` / ready date | ready date written |
+| RECEIVING | goods | `Not received yet` / GRN fact | GRN posted |
+| STOCK | goods | `{n} of {m} Units ready` (+ Unit IDs when allocated) | all units ready |
+| LOGISTICS | delivery | `No logistics chosen yet` + `Due: {date}` | logistics recorded |
+| DELIVERY DATE | delivery | customer-requested date · confirmed date+slot or not | date AND slot customer-confirmed |
+| MONEY | money | Paid · `RM {n} still to collect` | balance = 0 |
+| DELIVERY ORDER | gate | `NOT READY FOR DELIVERY · {k} of {n} requirements met` + missing list / `DO-DDMMYY-NNNN` | system issues DO |
+| DELIVER | after gate | `Not scheduled / Scheduled / In transit / Delivered` + date + driver | Delivered (from Delivery module) |
+| DELIVERY PHOTO | after gate, LAST | `No delivery photo yet` / uploader + time | photo uploaded |
+| LOAN | conditional | `{n} {item} on loan to customer` · `Collect back on delivery day` | loan collected back |
 
-**Consequences a BUILD lane must handle, named here so nobody rediscovers them:**
+All facts are DERIVED from the owning modules. The canvas computes nothing of
+its own and stores nothing.
 
-- The **T−3 / T−2 / T−1 collection clock** (Card 4, `packages/shared/src/collection-clock.ts`) was
-  justified by the DO door. **Owner ruling: keep the clock** (§6 A4). Its arithmetic does not change;
-  only its stated reason does. Collection runs independently of the delivery.
-- The **manager release lever** (`docs/orders/MASTER.md` §8 emergency override) exists solely to get
-  past the money gate. With no money gate there is nothing to release, and rules 10/11 forbid the
-  button. Its companion rule — **a release never forgives the money** — survives in full, because the
-  storage waiver is a genuinely separate money act and stays manager-gated under Money In.
-- **Rule 6/7 vs Card 8 — settled** (§6 A3). Loan blocks neither the DO nor Delivery completion, and
-  an uncollected loan is still **amber outstanding work, never `No Action Required`**, closed only
-  when **Stock records collection**. Card 8's derived completion is confirmed, not changed.
-- **The Finance exception is a whole build, not a flag.** Record + RLS · Finance-only create/clear
-  doors and their permission rule · the DO gate's read of it · its appearance on the Order Route as
-  a blocking fact with its reason. None of it exists.
+## 5 · Node states
 
----
-
-## 5 · Already true — now locked, not new work
-
-- **No Release button.** The Order Route's only control is `Open Delivery →`. `delivery/MASTER.md`
-  §15 already bans the word `Release` in employee Delivery UI in favour of `Issue Delivery Order`;
-  rule 10 is consistent with that dictionary entry and does not change it.
-- **No Approve button.** None exists on the route.
-- **No Overall Status.** `SalesOrderRoute` carries no `status` field, and the Register carries no
-  combined status column.
-- **Deliver and Delivery Photo follow the DO.** `work-engine.ts` already orders
-  `issue_delivery_order → deliver_today → upload_delivery_photo`. Rule 13 confirms the order; what
-  is missing is that the route does not yet **render** those three as nodes (§6).
-
----
-
-## 6 · Owner answers — ALL FOUR SETTLED 2026-08-16
-
-Every question this card opened has been answered by the owner. **No unresolved owner decision
-blocks a build.** What blocks it is that implementation is not yet approved (§8) — a different
-thing, and the owner's own instruction.
-
-**A1 · A Finance exception is an explicit, Finance-created record.** ✅ SETTLED
-
-```
-WHAT IT IS      an explicit record linked to the Sales Order
-IT CARRIES      creator · reason · status · timestamps · clear evidence
-WHO CREATES     Finance, and only Finance
-WHO CLEARS      Finance, and only Finance
-OPEN            blocks the DO gate
-CLEARED         removes the block
-```
-
-It is the ONE money blocker. An outstanding balance of any size or age does not block; an
-uncollected storage fee does not block. **It is a decision, never a derived state** — it may not be
-computed from a balance, or the retired gate grows back under another word. Persisted in
-`orders/MASTER.md` §8, which owns the gate; `payment/MASTER.md` §6 and `delivery/MASTER.md` §3 read
-it and never write it.
-
-**A2 · STOCK is a station inside the GOODS route, not a root-level track.** ✅ SETTLED
-
-Root routes are exactly three: **GOODS · DELIVERY · MONEY.** LOAN is **conditional linked work, not
-a fourth route.** This confirms the reading this card proposed; the superseded model's fourth
-Layer-1 track is retired.
-
-**A3 · An uncollected Loan is never `No Action Required`.** ✅ SETTLED
-
-It remains **amber outstanding work** until **Stock records collection** — that is the completion
-fact, and nothing else closes it. It still **blocks neither the DO nor Delivery completion**. This
-confirms Card 8's derived completion rather than changing it: removing Loan from the blocking path
-did not remove it from the completion test. `Delivered ≠ Complete`.
-
-**A4 · The T−1 collection clock is kept.** ✅ SETTLED
-
-Unchanged arithmetic; only its justification is retired. **A balance has a due date because it is
-owed, not because it holds goods.** Collection work runs independently of the delivery, and money
-is not a DO requirement unless an OPEN Finance exception exists.
-
----
-
-## 7 · Documentation reconciled by this card's PR
-
-| File | What changed |
+| State | Look (map to Carres tokens; invent no colours) |
 |---|---|
-| `docs/orders/MASTER.md` | New 2026-08-16 Node Map ruling; the 2026-08-15 two-layer ruling marked SUPERSEDED and preserved; §8 money gate marked superseded; the stale five-lane/Loan text in the Order Route production record corrected |
-| `docs/delivery/MASTER.md` | `Issue Delivery Order is the only employee act` reconciled with system issuance; the `Release` dictionary ban left untouched |
-| `docs/payment/MASTER.md` | §6 `issuing the DO is the hard gate` and the manager-release lever reconciled; Payment's ownership of the one outstanding arithmetic untouched |
+| complete | green |
+| current | BLUE BORDER + owner initials chip/avatar — one per route, up to three at once |
+| waiting | grey |
+| blocked / exception | amber |
+| future (not reached) | grey DASHED box + dashed connector |
 
-**Preserved, not deleted:** every production record, PR number, merged SHA, migration number and
-authenticated-acceptance result. Superseded rules are labelled, never removed.
+## 6 · Connector rules
 
----
+- SO is the ONLY start node. Goods, Delivery, Money leave it simultaneously.
+- Goods forks per goods line and per source quantity; each fork is its own line.
+- LOAN appears only when a loan exists; dashed edge into DELIVER labelled
+  `collect back`.
+- MONEY joins the gate with a dashed edge labelled
+  `only blocks if Finance records an exception`.
+- DELIVERY ORDER is the single convergence gate; DELIVER and DELIVERY PHOTO
+  hang below it in a straight line.
+- The final node has no trailing line. Completed segments solid; future dashed.
+- Edge facts (e.g. `waiting`, `collect back`) sit ON the line, small grey label.
 
-## 8 · Boundary — what this card forbids
+## 7 · Owner display rules
 
-```
-✗ any change under apps/ or packages/
-✗ any database migration
-✗ any change to ERP runtime behaviour
-✗ promoting this card to APPROVED without an owner ruling
-✗ describing the Finance exception, system DO issuance or the canvas as implemented
-✗ treating the Finance exception's absence as permission to keep the retired money gate
-```
+- Owner = Work Engine roster output (buddy cover applies). Never hand-picked,
+  never stored by the canvas, never hard-coded in the UI.
+- Node shows initials chip only; Team Work shows full names; the action sentence
+  never repeats the name.
+- Trigger→owner table (already law): No PO → PO Duty · Supplier date missing →
+  PO Duty · Not received → GRN Duty · Unit not allocated → Stock rule ·
+  No logistics → Delivery ownership · Delivery date missing → Responsible
+  salesperson · Balance owed → Payment ownership · Finance exception → Finance
+  owner · Photo missing → Delivery owner · Loan not collected → Delivery owner.
 
-**All four owner questions are answered (§6). What is still missing is the owner's approval to
-build, and that is the owner's call, not a gap in the specification.**
+## 8 · Loan rules
 
----
+- Rendered ONLY when a loan item is out (no empty box on clean orders).
+- Amber while out; after delivery, if uncollected:
+  `Loan sofa not collected back · [Owner] Collect the loan sofa`.
+- Never blocks the DO. Never blocks Delivery completion. (Owner ruling 2026-08-16.)
 
-## 9 · Acceptance boundary for the later BUILD lane
+## 9 · Delivery Order gate rules
 
-When — and only when — the owner moves `IMPLEMENTATION` to `APPROVED`, the build slice is accepted
-when:
+- Requirements listed in plain sentences, GitHub-checks style, with the met count:
+  `Goods not ready (0 of 1)` · `No logistics chosen` · `Date + slot not confirmed`,
+  plus, when the confirmed date lands on a refused day:
+  `Date falls on a Sunday — pick another day` (Malaysian public holidays same
+  pattern).
+- Outstanding money is NEVER a requirement by itself. Only a Finance-recorded
+  payment exception blocks; then the gate adds `Delivery release blocked by
+  Finance` and MONEY turns amber with `Money exception recorded`.
+- When all requirements are met the SYSTEM issues the DO (`DO-DDMMYY-NNNN`).
+  No Release button, no Approve button, no manual bypass. The gate node then
+  shows the DO number and turns green.
 
-1. One canvas renders with SO as the only root and no orphan node.
-2. Goods, Delivery and Money leave the root simultaneously; **STOCK renders as a station inside the
-   Goods route and never as a root branch.**
-3. Loan renders only when a loan exists, as conditional linked work, with no edge into the DO gate
-   or Delivery completion — **and an uncollected loan reads as amber outstanding work, never
-   `No Action Required`, closing only when Stock records collection.**
-4. DO, Deliver and Delivery Photo render as nodes in that order, after the gate.
-5. No `status` field, no Overall Status node, no Release button, no Approve button, nothing tickable.
-6. **The Finance exception exists as a real record** with creator, reason, status, timestamps and
-   clear evidence; **only Finance can create or clear it**, enforced server-side, not merely in the
-   UI. `OPEN` refuses the DO; `CLEARED` does not. An outstanding balance alone never refuses.
-7. **The T−1 collection clock still runs**, and collection work is reachable and open on a delivered
-   order that still owes.
-8. Every carried-forward rule in §2 still holds, proven by the existing route tests passing
-   unchanged where they are still applicable.
-9. The full repository gate passes on the exact source, and the owner walks the surface in
-   authenticated production — a green pipeline is never acceptance.
+## 10 · Empty-state copy
+
+Every empty state answers: what is missing · why · who does what next.
+Example: `No Purchase Order yet` + `[YJ] Raise the Purchase Order`.
+BANNED words: `No data` · `No results` · `Not available`.
+All new strings go through `docs/COPY-STANDARD.md` in the same PR.
+
+## 11 · Responsive behaviour
+
+- The canvas is pan/zoom, so it never reflows: on load it FITS the whole map to
+  the viewport (`⛶` = fit again). Controls `− + ⛶` bottom-left, always visible.
+- At ~920 px and down the same canvas simply fits smaller; nodes keep their
+  anatomy (no dropped lines), users pan/zoom to read. No stacked fallback.
+- Header/tabs of the object page stay fixed; only the canvas is the moving surface.
+
+## 12 · Accessibility
+
+- Every node is a focusable element with an aria-label reading its lines in
+  order (`PURCHASING — No Purchase Order yet — YJ: Raise the Purchase Order`).
+- Tab order = reading order (SO → goods → delivery → money → gate → tail);
+  Enter/Space opens the node's door. Zoom controls keyboard-operable.
+- State is never colour-only: CURRENT also carries the chip, complete carries ✓,
+  future carries the dashed border, exception carries ⚠ + words.
+- Focus ring per tokens; respects `prefers-reduced-motion` (no animated panning).
+- Contrast per Carres tokens (AA).
+
+## 13 · Test / acceptance checklist
+
+Automated tests must cover nodes AND connectors:
+- [ ] one continuous canvas — zero stacked-card/table containers
+- [ ] SO is the only root; Goods, Delivery, Money edges leave it simultaneously
+- [ ] goods forks per line/source; each fork drawn
+- [ ] LOAN absent on clean orders, present + amber on loan orders
+- [ ] up to three CURRENT nodes, one per route, never a fourth
+- [ ] gate lists missing requirements with met-count; refused-day line appears
+      when the confirmed date is a Sunday/public holiday
+- [ ] no Release/Approve control rendered in any state
+- [ ] money absent from requirements unless a Finance exception exists
+- [ ] DELIVER and DELIVERY PHOTO render after the gate; last node has no tail
+- [ ] every node's door navigates to the owning module
+- [ ] read-only: no mutation call originates from the canvas
+- [ ] keyboard: tab order, Enter opens door; aria-labels present
+Production acceptance: authenticated walk at 1440×900 and ~920 px on a real SO
+against every line above.
+
+## 14 · Files to change (implementation step — verify against origin/main first)
+
+- The Order Route tab component + its tests (shipped in PR #822/#824; the
+   2026-08-11 checkout predates them, so the implementer MUST list the actual
+ file paths from `origin/main` in its plan BEFORE coding; if the structure
+  conflicts with this card, STOP and report — do not choose).
+- `docs/orders/MASTER.md` (route law overwrite)
+- `docs/ui/MASTER.md` (only if an ERP-wide visual rule is added)
+- `docs/COPY-STANDARD.md` (new strings)
+- `docs/cards/CARD-2026-08-16-order-route-node-map.md` (STATUS updates)
+
+## 15 · Business boundaries that MUST NOT change
+
+- Owner Engine / Work Engine rules and roster
+- Data sources: all facts read from Orders/Purchasing/Stock/Delivery/Payments
+- Write logic of Payments, Stock, Delivery, Purchasing (canvas writes nothing)
+- Database schema and migrations
+- Other module pages; the Object page (Order tab) shipped in #822
+- §7 delivery actions and §8 gate law (this card RENDERS them, changes nothing)
+- Date format `Wed, 12 Aug` · capitalize-up names · Inter 13 / 13-11 · capsule
+  pills · COPY-STANDARD dictionary
+
+## Before any code (implementation step, after approval)
+
+The implementer must first output: files to change · per-file change list ·
+node/edge data structure · test plan · untouched business boundaries — and wait
+for conflicts to be ruled if any are found.
