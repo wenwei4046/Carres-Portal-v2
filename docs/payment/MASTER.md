@@ -196,9 +196,11 @@ The delivery money gate belongs to Sales Orders, not Payment.
 - 🔴 **IMPLEMENTATION REQUIRED — NOT BUILT.** No table, RPC, route, permission or UI for the Finance
   exception exists in this repository. **Do not describe it as implemented**, and do not treat its
   absence as permission to keep the retired money gate. `deliveryOrderIssueGate` still refuses on an
-  unpaid balance today; documentation states the target and code is unchanged. The build slice is
-  [`../cards/CARD-2026-08-16-order-route-node-map.md`](../cards/CARD-2026-08-16-order-route-node-map.md),
-  `IMPLEMENTATION: NOT APPROVED`.
+  unpaid balance today, and the shipped node-map gate still counts a `money` requirement
+  (decision B, superseded); documentation states the target and code is unchanged. The correction
+  slice is
+  [`../cards/CARD-2026-08-16-money-gate-correction.md`](../cards/CARD-2026-08-16-money-gate-correction.md),
+  `STATUS: QUEUED · IMPLEMENTATION: NOT APPROVED`.
 - **THE T−1 COLLECTION CLOCK IS KEPT — owner ruling 2026-08-16.** The shared clock
   (T−3/T−2 attention, T−1 deadline, delivery week + Malaysian public holidays) survives unchanged.
   What retires is only its old justification — that the DO door refused while money held. **A

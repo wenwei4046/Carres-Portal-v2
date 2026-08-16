@@ -267,21 +267,49 @@ Requirements are plain sentences, GitHub-checks style, with the met count:
 **When every requirement is met the SYSTEM issues the DO.** There is **no Release button, no Approve
 button and no manual bypass** in any state; the gate node then shows the number and turns green.
 
-**⭐ MONEY IS A GATE REQUIREMENT — OWNER RULING 2026-08-16, decision B.** The design card proposed
-dropping money from the gate and blocking only on a "Finance-recorded payment exception". That was
-put to the owner as a conflict rather than built, because three current authorities and the shipped
-engine all say otherwise: §8 below (*"Issuing is refused unless … the money is collected"*), §7's
-four-way `Issue delivery order` trigger, `docs/payment/MASTER.md` §6 (*"issuing the DO is the hard
-gate"*), and `order-actions.ts` `deliveryHeldOnMoney`, which withholds `issue_delivery_order`
-outright while money holds. **A gate that counted its requirements met while the server refused the
-DO would be the screen telling a lie** (Architecture Law D — one derived fact, one arithmetic). The
-gate therefore asks `orderMoney.holds`, the very predicate the action engine asks.
+**⛔ SUPERSEDED — *"MONEY IS A GATE REQUIREMENT (decision B)"*.** The owner ruled **decision A** on
+2026-08-16, after the node-map implementation had already merged: **outstanding money does not block
+the DO, and an OPEN Finance exception is the only money blocker.** The paragraph below is preserved
+as the reasoning the shipped build was made on; **it no longer states target truth.** The correction
+slice is
+[`../cards/CARD-2026-08-16-money-gate-correction.md`](../cards/CARD-2026-08-16-money-gate-correction.md),
+`STATUS: QUEUED · IMPLEMENTATION: NOT APPROVED`.
 
-**The Finance-exception mechanism the card describes does not exist in this repository** — no
-`finance exception` / `payment exception` concept appears in `packages/shared/src`, `apps/api/src`
-or `apps/web/src`, and the nearest real mechanism (the §8 manager release) has the opposite
-polarity: it UNBLOCKS. None was invented. Building one is a Payment/Delivery business decision, not
-a canvas change.
+> **The superseded reasoning, kept because it was honest and it was right about one thing.**
+> The design card proposed dropping money from the gate and blocking only on a "Finance-recorded
+> payment exception". That was put to the owner as a conflict rather than built, because three
+> current authorities and the shipped engine all said otherwise: §8 below, §7's four-way
+> `Issue delivery order` trigger, `docs/payment/MASTER.md` §6, and `order-actions.ts`
+> `deliveryHeldOnMoney`, which withholds `issue_delivery_order` outright while money holds.
+> **A gate that counted its requirements met while the server refused the DO would be the screen
+> telling a lie** (Architecture Law D — one derived fact, one arithmetic). The gate therefore asks
+> `orderMoney.holds`, the very predicate the action engine asks. The Finance-exception mechanism did
+> not exist in the repository and none was invented.
+>
+> **Refusing to build an undefined mechanism was correct.** The owner has since defined it, so the
+> objection is answered rather than overruled. **Law D still binds the correction:** money may not
+> leave the canvas's gate while `deliveryOrderIssueGate` and `deliveryHeldOnMoney` still refuse on
+> it. Screen and server move together or the screen lies again — in the other direction.
+
+### THE MONEY REQUIREMENT IS REPLACED — OWNER RULING 2026-08-16 (decision A) · APPROVED / LOCKED
+
+```
+RETIRED   `RM {amount} still to collect` as a gate requirement
+REPLACED  an OPEN Finance exception — the ONE money blocker
+```
+
+**A Finance exception is an explicit, Finance-created record linked to the Sales Order**, carrying
+**creator · reason · status · timestamps · clear evidence**. **Only Finance creates it; only Finance
+clears it.** `OPEN` blocks the DO gate; `CLEARED` removes the block. An outstanding balance — of any
+size, of any age — does not block, and neither does an uncollected storage fee.
+
+**It is a decision, never a derived state.** It may not be computed from a balance, or the gate this
+ruling removes grows straight back under another word. The full definition, its ownership
+consequences and what it supersedes live in **§8 · THE GATES**.
+
+🔴 **NOT BUILT.** No table, RPC, route, permission or UI exists. The shipped gate still counts money.
+**Do not describe the correction as implemented, and do not treat the exception's absence as
+permission to keep the retired requirement.**
 
 **THE BALANCE FACT AND THE RELEASE DECISION ARE TWO FACTS.** A manager release MEETS the requirement
 and still prints what the customer owes:
@@ -3886,25 +3914,87 @@ saying who moved it.
 
 **A gate REFUSES an action. Display order only decides what is read first.**
 
-**Issuing the delivery order is the HARD gate**, not agreeing a date: a date can be agreed while
-the goods and the money are still coming. Issuing is refused unless every goods line is reserved
-to this order (accessories pass automatically), **the money is collected**, and the date is not
-a Sunday or a Malaysian public holiday.
+## ⭐ MONEY LEAVES THE DO GATE — OWNER RULING 2026-08-16 (decision A) · APPROVED / LOCKED
 
-**An unpaid storage fee is part of the money, and there is no softer rule for it.**
-`orderMoney` returns `holding` beside `outstanding` and `holds` beside `owing`, because
-**a release must lift the HOLD without forgiving the MONEY.**
+**Outstanding money does not block the delivery order.** A customer balance, however large and
+however late, no longer refuses it. **An OPEN Finance exception is the ONE money blocker.**
 
-**The emergency override — the only way past it.** **The manager approves it, nobody else.**
-Two outcomes, and the approver picks one out loud:
-- **released, fee still owed** — the goods go, the money action stays open. **This is the
-  default; an override must never quietly forgive money.**
-- **released and waived** — written off with a reason. `storage_fee_override = 0` already means
-  *owes no storage fee*, so `approved` means RELEASED, not FORGIVEN, and the figure written off
-  stays on the record.
+The requirements that remain:
 
-**Operations is told by the work itself** — the moment the override is granted, the order's top
-action changes from collecting to delivering. **No separate alert engine.**
+```
+✓ the customer has confirmed a delivery date AND a time slot
+✓ the date is not a Sunday and not a Malaysian public holiday
+✓ every goods line is reserved to this order (accessories pass automatically)
+✓ logistics chosen
+✗ the money is collected            ← RETIRED by this ruling
++ no OPEN Finance exception         ← the one money blocker that remains
+```
+
+**And the SYSTEM issues the DO when every requirement is met** — no Release button, no Approve
+button, no manual bypass, in any state.
+
+### `Finance exception` — OWNER DEFINITION 2026-08-16 · APPROVED / LOCKED
+
+```
+WHAT IT IS      an explicit record, linked to the Sales Order
+IT CARRIES      creator · reason · status · timestamps · clear evidence
+WHO CREATES     Finance, and only Finance
+WHO CLEARS      Finance, and only Finance
+STATUS OPEN     blocks the DO gate
+STATUS CLEARED  removes the block
+```
+
+- **One record, one owner (Law A).** Finance creates, changes and clears it and owns its completion
+  evidence. Sales Orders READS it to answer the gate; Delivery READS it; neither may write it, and
+  no surface may offer a second door onto the act (Law C).
+- **`clear evidence` is a required field, not a nicety.** A block liftable without saying why is the
+  hand-keyed `payment_status` defect this MASTER already retired once.
+- **It is a decision, never a derived state.** Opening one is a judgement; owing money is a fact.
+  Deriving either from the other rebuilds the retired gate under a new name.
+- **It renders on the Order Route as a blocking fact with its reason**, through the existing gate
+  requirement grammar. It is **not** a new root branch and **not** an Overall Status.
+
+**WHAT THIS SUPERSEDES, stated exactly so nobody restores it by accident:**
+
+| Superseded rule | Where it ruled | Status |
+|---|---|---|
+| *"Issuing is refused unless … **the money is collected**"* | this section | **SUPERSEDED** |
+| *"An unpaid storage fee is part of the money, and there is no softer rule for it"* | this section | **SUPERSEDED as a DO blocker** — still owed, still collected, simply no longer holds the document |
+| *"The emergency override — the manager approves it, nobody else"* | this section | **SUPERSEDED.** With no money gate there is nothing to release, and the buttons are forbidden |
+| *"MONEY IS A GATE REQUIREMENT (decision B)"* | §0.1, and the shipped canvas | **SUPERSEDED** by this ruling |
+| *"issuing the DO is the hard gate"* | `../payment/MASTER.md` §6 | **SUPERSEDED** — reconciled there |
+| *"Issue Delivery Order is the only employee act"* | `../delivery/MASTER.md` §3 | **SUPERSEDED** — reconciled there |
+
+**WHAT SURVIVES, and it is the half that matters most:**
+
+- **A RELEASE NEVER FORGIVES MONEY.** `orderMoney` still returns `holding` beside `outstanding`, and
+  the two facts are still printed apart. **The collect action survives delivery** exactly as it
+  always did — a delivered order that still owes keeps its action and its red dot. Goods moving has
+  never meant money forgiven, and it means it even less now that goods move by default.
+- **The WAIVER is untouched.** Writing off a receivable remains a money decision, manager-gated,
+  owned by Money In, with amount, reason, actor and time. `storage_fee_override = 0` still means
+  *owes no storage fee*. A waiver is not a release and never was.
+- **An order whose value is UNKNOWN still never holds anything** — unknown warns, never blocks.
+- **Operations is still told by the work itself.** No separate alert engine.
+
+### THE T−1 COLLECTION CLOCK SURVIVES — OWNER RULING 2026-08-16 · APPROVED / LOCKED
+
+**Keep the clock.** `packages/shared/src/collection-clock.ts` is unchanged: due = delivery − 1
+working day on the Mon–Sat delivery week with Malaysian public holidays, anchored on the customer's
+confirmed day, else the promised date; `t3`/`t2` attention, `t1` the deadline; no anchor, no clock.
+
+**Only its JUSTIFICATION retires.** It used to be explained by the DO door refusing while money
+held. **A balance now has a due date because it is owed, not because it holds goods.** Collection
+work runs **independently of the delivery**.
+
+> 🔴 **NOT BUILT — the shipped code still enforces the retired rule.** `deliveryOrderIssueGate`
+> refuses on `balanceReady`; `order-actions.ts` `deliveryHeldOnMoney` withholds
+> `issue_delivery_order` while money holds; the canvas gate counts a `money` requirement; and
+> `work-engine.ts` still names the PIC as the DO's owner, so **automatic issuance is documented but
+> not implemented.** **Law D binds the fix: the screen and the server move in the same slice**, or
+> the gate tells a lie in the opposite direction. The correction slice is
+> [`../cards/CARD-2026-08-16-money-gate-correction.md`](../cards/CARD-2026-08-16-money-gate-correction.md),
+> `IMPLEMENTATION: NOT APPROVED`.
 
 **AGREEING a date is softer than ISSUING.** It WARNS about goods, money and the calendar so
 nobody promises a day the goods cannot make, but it refuses only two things:

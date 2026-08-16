@@ -99,9 +99,11 @@ problems and history.
   lives once in [`../orders/MASTER.md`](../orders/MASTER.md) §8, which owns the gate — Delivery
   READS it and may never write it. Delivery remains the writer of the document and the owner of the
   carrier, the trip derivation and the proof.
-  🔴 **IMPLEMENTATION REQUIRED — NOT BUILT, and NOT APPROVED.** Neither system issuance nor the
-  Finance exception exists in code. The build slice is
-  [`../cards/CARD-2026-08-16-order-route-node-map.md`](../cards/CARD-2026-08-16-order-route-node-map.md),
+  🔴 **IMPLEMENTATION REQUIRED — NOT BUILT, and NOT APPROVED.** The node map shipped
+  (PR #825) and its canvas already states that the system issues the DO with no Release or Approve
+  button — but **neither automatic issuance nor the Finance exception exists in code**, and the
+  shipped gate still counts money. The correction slice is
+  [`../cards/CARD-2026-08-16-money-gate-correction.md`](../cards/CARD-2026-08-16-money-gate-correction.md),
   `STATUS: QUEUED · IMPLEMENTATION: NOT APPROVED`. What runs today still requires the employee act
   and still refuses on money. **Do not describe the new rules as implemented.**
 - Issue rechecks permitted goods, split, Warehouse, address and applicable hold rules atomically,
