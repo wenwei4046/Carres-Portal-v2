@@ -1216,6 +1216,9 @@ reached says what has not happened yet, in the plainest words available:
 
 **A ROUTE DATE ALWAYS CARRIES ITS MEANING.** The label says WHICH fact the day belongs to, and the
 day itself is spelled by `fmtDate` under the year rule (`Wed, 12 Aug`). **A bare date never ships.**
+The source may contain a full timestamp; the Route prints only the governed date. ISO timestamps
+such as `2026-08-12T04:38:44.852046+00:00` never appear to staff. The Sales Order origin is evidence
+inside the object already open, so it has no circular `Open SO-{n} →` action.
 
 | Fact | Prints |
 |---|---|

@@ -825,6 +825,11 @@ breathing gap
   destination (`Open PO-2048 →`), and absent documents use plain facts rather than `—`. At medium
   desktop or with Quick Rail open, branches reflow vertically without hiding meaning. Delivery
   release is a read-only convergence summary and deep-link, never a Sales Order write control.
+  The content starts directly with `ORDER TRACKS`: the persistent Object Header already supplies
+  the page name and `number · party`, so neither is repeated. Parallel tracks remain unconnected;
+  the visual rail is reserved for true per-goods sequence and forks. Delivery requirements are
+  shown as inputs converging on one release result. A door back to the already-open object is
+  forbidden, and full machine timestamps are formatted before display.
 - **OBJECT HEADER TEMPLATE — OWNER-APPROVED / LOCKED (2026-08-14).** An ERP object has one owning-
   Register back destination, one persistent identity (`number · party`), governed actions at the
   right, and applicable object views directly below/alongside that identity. View and Edit retain

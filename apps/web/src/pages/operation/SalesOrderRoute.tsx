@@ -37,7 +37,11 @@ export interface RouteActionOwners {
 
 /* ONE date spelling. Facts carry ISO with their meaning attached
    (`Issued: 2026-08-13`); the year rule lives in `fmtDate`. */
-const spellDates = (s: string) => s.replace(/\b\d{4}-\d{2}-\d{2}\b/g, (iso) => fmtDate(iso));
+const spellDates = (s: string) =>
+  s.replace(
+    /\b(\d{4}-\d{2}-\d{2})(?:T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?)?/g,
+    (_value, day: string) => fmtDate(day),
+  );
 
 const MARK_TONE: Record<RouteMark, string> = {
   complete: "bg-kit-green-3 text-kit-green-11",
@@ -159,11 +163,37 @@ function OwnerChip({
   );
 }
 
-function Station({ station, owners }: { station: RouteStation; owners: RouteActionOwners }) {
+function Station({
+  station,
+  owners,
+  last = false,
+}: {
+  station: RouteStation;
+  owners: RouteActionOwners;
+  last?: boolean;
+}) {
   return (
-    <div className="flex items-start gap-2.5 py-2" data-testid={`station-${station.id}`}>
-      <Mark mark={station.mark} />
-      <div className="min-w-0 flex-1">
+    <div
+      className={`relative pl-8 ${last ? "pb-0" : "pb-4"}`}
+      data-testid={`station-${station.id}`}
+      aria-current={station.current ? "step" : undefined}
+    >
+      {!last && (
+        <span
+          className="absolute bottom-0 left-[10px] top-5 w-px bg-kit-slate-6"
+          aria-hidden="true"
+        />
+      )}
+      <span className="absolute left-0 top-0 z-10">
+        <Mark mark={station.mark} />
+      </span>
+      <div
+        className={`min-w-0 ${
+          station.current
+            ? "-mt-1 rounded-control border border-kit-blue-3 bg-kit-blue-2 px-3 py-2"
+            : "pb-1"
+        }`}
+      >
         <div className="flex items-baseline gap-2">
           <span className="text-label font-semibold tracking-wide text-base-600 uppercase">
             {station.title}
@@ -207,13 +237,21 @@ function SubLane({
 }) {
   return (
     <div
-      className={forked ? "border-l border-kit-slate-6 pl-4" : ""}
+      className={forked ? "relative ml-2.5 border-l border-kit-slate-6 pl-6" : ""}
       data-testid={`sub-lane-${lane.id}`}
     >
-      <div className="text-label font-semibold tracking-wide text-base-600 uppercase">{lane.title}</div>
-      <div className="mt-1 divide-y divide-kit-slate-5 border-l border-kit-slate-5 pl-3">
-        {lane.stations.map((station) => (
-          <Station key={station.id} station={station} owners={owners} />
+      {forked && (
+        <span className="absolute -left-px top-2 h-px w-5 bg-kit-slate-6" aria-hidden="true" />
+      )}
+      <div className="mb-3 text-label font-semibold tracking-wide text-base-600 uppercase">{lane.title}</div>
+      <div>
+        {lane.stations.map((station, index) => (
+          <Station
+            key={station.id}
+            station={station}
+            owners={owners}
+            last={index === lane.stations.length - 1}
+          />
         ))}
       </div>
     </div>
@@ -244,9 +282,11 @@ function GoodsBlock({ goods, owners }: { goods: GoodsRoute; owners: RouteActionO
         <span className="text-body font-semibold text-base-900">{goods.title}</span>
       </button>
       {open && (
-        <div className="mt-3 pl-6">
-          {goods.origin && <Station station={goods.origin} owners={owners} />}
-          <div className="mt-2 flex flex-col gap-4">
+        <div className="mt-4 pl-6">
+          {goods.origin && (
+            <Station station={goods.origin} owners={owners} last={goods.lanes.length === 0} />
+          )}
+          <div className="mt-1 flex flex-col gap-5">
             {goods.lanes.map((lane) => (
               <SubLane key={lane.id} lane={lane} forked={goods.forked} owners={owners} />
             ))}
@@ -268,19 +308,12 @@ function DeliveryRelease({ route }: { route: Route }) {
       <div className="border-b border-kit-slate-5 px-4 py-3">
         <h2 className="text-label font-semibold tracking-wide text-base-500 uppercase">Delivery release</h2>
       </div>
-      <div className="px-4 py-3">
-        <div className="flex items-start gap-3">
-          <Mark mark={release.ready ? "complete" : "waiting"} />
-          <span className="min-w-0">
-            <span className="block text-body font-semibold text-base-900">{release.headline}</span>
-            <span className="block text-label font-normal text-base-600">{release.summary}</span>
-          </span>
-        </div>
-        <div className="mt-3 divide-y divide-kit-slate-5 border-t border-kit-slate-5">
+      <div className="px-4 py-4">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
           {release.requirements.map((requirement) => (
             <div
               key={requirement.id}
-              className="flex items-start gap-3 py-2.5"
+              className="flex items-start gap-3 rounded-control border border-kit-slate-5 bg-white px-3 py-3"
               data-testid={`release-${requirement.id}`}
             >
               <Mark mark={requirement.mark} />
@@ -295,8 +328,18 @@ function DeliveryRelease({ route }: { route: Route }) {
             </div>
           ))}
         </div>
-        <div className="mt-3 border-t border-kit-slate-5 pt-3">
-          <Door door={release.door} />
+        <div className="relative mt-4 border-t border-kit-slate-6 pt-4">
+          <span className="absolute -top-4 left-1/2 h-4 w-px bg-kit-slate-6" aria-hidden="true" />
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex items-start gap-3">
+              <Mark mark={release.ready ? "complete" : "waiting"} />
+              <span className="min-w-0">
+                <span className="block text-body font-semibold text-base-900">{release.headline}</span>
+                <span className="block text-label font-normal text-base-600">{release.summary}</span>
+              </span>
+            </div>
+            <Door door={release.door} />
+          </div>
         </div>
       </div>
     </section>
@@ -318,15 +361,7 @@ export default function SalesOrderRoute({
 }) {
   if (loading) return <Loading label="Opening the order route" />;
   return (
-    <div className="mx-auto flex max-w-[1080px] flex-col gap-5" data-testid="sales-order-route">
-      <div className="border-b border-kit-slate-6 pb-3">
-        <h1 className="text-page text-kit-slate-12">Order Route</h1>
-        <p className="mt-1 text-body text-kit-slate-11">
-          {route.soNumber}
-          {route.customerName ? ` · ${route.customerName}` : ""}
-        </p>
-      </div>
-
+    <div className="mx-auto flex max-w-[1080px] flex-col gap-4" data-testid="sales-order-route">
       <OrderTracks route={route} />
       <LinkedProblems route={route} />
 
