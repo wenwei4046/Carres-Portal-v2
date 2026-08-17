@@ -69,6 +69,7 @@ import financePaymentsRouter from "./routes/finance/payments";
 import financeReportsRouter from "./routes/finance/reports";
 import financeInvoicesRouter from "./routes/finance/invoices";
 import financeRefundsRouter from "./routes/finance/refunds";
+import financeExceptionsRouter from "./routes/finance/exceptions";
 import financeReconciliationRouter from "./routes/finance/reconciliation";
 import supplierActivityRouter from "./routes/supplier/activity";
 import supplierMeRouter from "./routes/supplier/me";
@@ -235,6 +236,9 @@ api.route("/finance/payments", financePaymentsRouter);
 api.route("/finance/reports", financeReportsRouter);
 api.route("/finance/invoices", financeInvoicesRouter);
 api.route("/finance/refunds", financeRefundsRouter);
+// The one money blocker on a delivery order (0355, owner ruling 2026-08-16).
+// Mounted before the catch-all `/finance` reconciliation router below.
+api.route("/finance/exceptions", financeExceptionsRouter);
 api.route("/finance", financeReconciliationRouter);
 api.route("/supplier/activity", supplierActivityRouter);
 api.route("/supplier/me", supplierMeRouter);
