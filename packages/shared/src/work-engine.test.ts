@@ -127,7 +127,12 @@ describe("workItemsForOrder — WHO + ACTION + actual working day", () => {
     );
     const collect = items.find((i) => i.ruleKey === "collect")!;
     expect(collect.dueIso).toBe("2026-08-19");
-    expect(collect.locked).toBe(true);
+    /* Decision A (2026-08-16): a plain balance no longer locks the collect —
+       and it no longer withholds the document either, so BOTH actions are on
+       the list and share the one T−1 due, which is this test's whole title. */
+    expect(collect.locked).toBeFalsy();
+    const issue = items.find((i) => i.ruleKey === "issue_delivery_order")!;
+    expect(issue.dueIso).toBe("2026-08-19");
   });
 
   it("a step with no anchor has no due and can never be late", () => {

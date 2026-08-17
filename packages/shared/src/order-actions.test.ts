@@ -233,10 +233,12 @@ describe("delivery track", () => {
     expect(orderIsDelivering(sig())).toBe(true);
   });
 
-  it("money owing HOLDS the delivery — the lock the card says to keep, on the action that clears it", () => {
-    const s = sig({ moneyOwing: true });
-    // The delivery track says nothing (PayHold: you do not arrange a delivery
-    // you may not make), the money track carries the row, and it carries the 🔒.
+  it("a Finance exception HOLDS the delivery — the lock, on the action that clears it", () => {
+    // Decision A: what used to be `moneyOwing` holding the trip is now
+    // Finance's explicit decision, and only that.
+    const s = sig({ moneyOwing: true, financeExceptionHolds: true });
+    // The delivery track says nothing (you do not arrange a delivery you may
+    // not make), the money track carries the row, and it carries the 🔒.
     expect(keys(s)).toEqual(["collect"]);
     expect(openOrderActions(s)[0]).toMatchObject({ key: "collect", locked: true });
     // And it is NOT the quiet fact: printing "Delivering 27 Jul" over an order
@@ -244,10 +246,21 @@ describe("delivery track", () => {
     expect(orderIsDelivering(s)).toBe(false);
   });
 
-  it("the hold beats today's run — you do not deliver what you may not deliver", () => {
-    const s = sig({ confirmedDateIso: "2026-07-27", moneyOwing: true });
+  it("the Finance hold beats today's run — you do not deliver what you may not deliver", () => {
+    const s = sig({
+      confirmedDateIso: "2026-07-27",
+      moneyOwing: true,
+      financeExceptionHolds: true,
+    });
     expect(first(s)).toBe("collect");
     expect(keys(s)).not.toContain("deliver_today");
+  });
+
+  it("⭐ a plain balance does NOT beat today's run any more (decision A)", () => {
+    const s = sig({ confirmedDateIso: "2026-07-27", moneyOwing: true });
+    // The goods go today; the collection rides beside the run, unlocked.
+    expect(keys(s)).toContain("deliver_today");
+    expect(openOrderActions(s).find((a) => a.key === "collect")?.locked).toBeUndefined();
   });
 
   it("the hold needs the goods in — an unpaid order whose goods are out is not held, it is late", () => {
@@ -257,29 +270,37 @@ describe("delivery track", () => {
     expect(openOrderActions(s).find((a) => a.key === "collect")?.locked).toBeUndefined();
   });
 
-  // C9 — the lock and the money action stop being the same question. C3 moved
-  // the 🔒 onto `collect`, so a RELEASE now reads as the lock simply coming off
-  // an action that stays open, which is exactly what a release means.
-  it("a RELEASED order unlocks the delivery and keeps its Collect action", () => {
-    // The manager let the goods go over an uncollected storage fee. The 🔒
-    // comes off; the money is still ours, so the money track is untouched.
-    const s = sig({ moneyOwing: true, moneyHolds: false });
+  // ⭐ Decision A (2026-08-16) — a plain outstanding balance is what C9's
+  // "released order" used to be: the goods go, the collect stays open and
+  // unlocked. What used to need a manager's lever is now simply the rule.
+  it("an order that owes money delivers anyway and keeps its open Collect", () => {
+    const s = sig({ moneyOwing: true });
     const list = openOrderActions(s);
     // The delivery track raises nothing: the goods are going on their booked
     // day and there is no human step before it (C3's FACT covers that state).
     expect(list.find((a) => a.track === "delivery")).toBeUndefined();
     expect(list.find((a) => a.track === "money")).toMatchObject({ key: "collect" });
     expect(list.find((a) => a.track === "money")?.locked).toBeUndefined();
-    // The trip IS going ahead — a release is a release — but the row never
-    // prints the quiet fact, because an open action always outranks it.
+    // The trip IS going ahead — but the row never prints the quiet fact,
+    // because an open action always outranks it.
     expect(orderIsDelivering(s)).toBe(true);
     expect(first(s)).toBe("collect");
   });
 
-  it("omitting moneyHolds reproduces the pre-C9 lock exactly", () => {
-    const s = sig({ moneyOwing: true });
-    expect(s.moneyHolds).toBeUndefined();
+  it("an OPEN Finance exception is the one thing that locks the delivery", () => {
+    const s = sig({ moneyOwing: true, financeExceptionHolds: true });
+    // The delivery track falls silent while Finance holds; the money track
+    // carries the row and carries the 🔒 — the same shape the old PayHold had,
+    // with the one lawful holder behind it.
     expect(openOrderActions(s)[0]).toMatchObject({ key: "collect", locked: true });
+    expect(orderIsDelivering(s)).toBe(false);
+  });
+
+  it("omitting financeExceptionHolds means NO lock — absent signal, absent claim", () => {
+    const s = sig({ moneyOwing: true });
+    expect(s.financeExceptionHolds).toBeUndefined();
+    expect(openOrderActions(s)[0]).toMatchObject({ key: "collect" });
+    expect(openOrderActions(s)[0]?.locked).toBeUndefined();
   });
 
   it("booked for a future day while the goods are still out → no delivering fact either", () => {
@@ -340,14 +361,16 @@ describe("delivery track", () => {
     expect(keys(s)).toEqual(["confirm_ready_date"]);
   });
 
-  it("money still holds → no delivery order, and the 🔒 stays on the money", () => {
-    const s = sig({ moneyOwing: true, deliveryOrderIssued: false });
+  it("an OPEN Finance exception → no delivery order, and the 🔒 stays on the money", () => {
+    const s = sig({ moneyOwing: true, financeExceptionHolds: true, deliveryOrderIssued: false });
     expect(keys(s)).toEqual(["collect"]);
     expect(openOrderActions(s)[0]).toMatchObject({ key: "collect", locked: true });
   });
 
-  it("a manager's release lets the document be issued — that is what a release IS", () => {
-    const s = sig({ moneyOwing: true, moneyHolds: false, deliveryOrderIssued: false });
+  it("⭐ an outstanding balance no longer withholds the document (decision A)", () => {
+    // What used to need a manager's release is now simply the rule: the paper
+    // issues, and the collection rides beside it as an ordinary open action.
+    const s = sig({ moneyOwing: true, deliveryOrderIssued: false });
     expect(keys(s)).toEqual(["issue_delivery_order", "collect"]);
     // Money still displays last (Law 4), so the row leads with the document.
     expect(first(s)).toBe("issue_delivery_order");

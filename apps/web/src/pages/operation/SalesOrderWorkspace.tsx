@@ -1247,13 +1247,20 @@ export default function SalesOrderWorkspace() {
           recordedAt: attempt.recorded_at,
         })),
       },
-      /* Straight from the ONE arithmetic (§8). `holds` is what decides the
-         release; `outstanding` is what the customer owes. Two facts. */
+      /* Straight from the ONE arithmetic (§8). Decision A retired `holds` —
+         money cannot hold a delivery, so the route reads only what is known
+         and what is owed. */
       money: {
         known: money.known,
         outstanding: money.outstanding,
-        holds: money.holds,
       },
+      /* The ONE money blocker (decision A, 0355) — the same table the
+         server-side gate reads, so the canvas cannot lie about the refusal. */
+      financeExceptions: (facts.financeExceptions ?? []).map((row) => ({
+        id: row.id,
+        status: row.status,
+        reason: row.reason,
+      })),
       cases: facts.cases.map((item) => ({
         id: item.id,
         caseNo: item.caseNo,
