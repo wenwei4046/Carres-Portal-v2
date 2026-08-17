@@ -68,6 +68,11 @@ const DOOR_H = 18;
 const MIN_SCALE = 0.4;
 const MAX_SCALE = 1.6;
 const STEP = 0.15;
+/** ⭐ OWNER RULING 2026-08-17: the load fit never shrinks below this — a text
+ *  scaled past it is an unreadable stripe, not a map. A wider map opens
+ *  centred on the Sales Order and pans; the ⛶ control still offers the true
+ *  whole-map fit as an explicit act. */
+const FIT_FLOOR = 0.7;
 
 /** State is never colour-only (card §12): every mark carries a glyph too. */
 const MARK_GLYPH: Record<NodeMark, typeof Check> = {
@@ -141,6 +146,46 @@ function OwnerChip({ person }: { person: RoutePerson }) {
 function Node({ node, owners }: { node: RouteNode; owners: RouteActionOwners }) {
   const navigate = useNavigate();
   const Glyph = MARK_GLYPH[node.mark];
+
+  /* The goods line's caption plate — a small grey header naming the line so
+     no product name ever sits on a connector (owner ruling 2026-08-17). Not
+     a station: no glyph, no state word, no action, no door. */
+  if (node.kind === "goods-line") {
+    return (
+      <div
+        data-testid={`route-node-${node.id}`}
+        data-kind={node.kind}
+        data-mark={node.mark}
+        role="group"
+        aria-label={[node.title, ...node.lines].join(" — ")}
+        className="absolute overflow-hidden rounded-card border border-kit-slate-5 bg-kit-slate-3 px-3"
+        style={{
+          left: node.x,
+          top: node.y,
+          width: node.w,
+          height: node.h,
+          paddingTop: BOX_PAD_Y,
+          paddingBottom: BOX_PAD_Y,
+        }}
+      >
+        <div
+          className="truncate text-label font-semibold text-base-900"
+          style={{ height: TITLE_H, lineHeight: `${TITLE_H}px` }}
+        >
+          {node.title}
+        </div>
+        {node.lines.map((line, i) => (
+          <div
+            key={`${node.id}-line-${i}`}
+            className="truncate text-label text-base-600"
+            style={{ height: LINE_H, lineHeight: `${LINE_H}px` }}
+          >
+            {spellDates(line)}
+          </div>
+        ))}
+      </div>
+    );
+  }
   const person = node.action ? ownerOf(owners, node.action.ownerKey) : null;
 
   const spoken = [
@@ -321,21 +366,45 @@ export default function SalesOrderRoute({
   const [view, setView] = useState({ scale: 1, tx: 0, ty: 0 });
   const drag = useRef<{ x: number; y: number; tx: number; ty: number } | null>(null);
 
-  /** ⛶ — fit the whole map to the viewport. Also what happens on load, so the
-   *  operator never opens the page already lost inside it (card §11). */
-  const fit = useCallback(() => {
-    const box = frame.current?.getBoundingClientRect();
-    if (!box || box.width === 0 || route.width === 0) return;
-    const scale = Math.max(
-      MIN_SCALE,
-      Math.min(1, box.width / route.width, box.height / route.height),
-    );
-    setView({
-      scale,
-      tx: Math.max(0, (box.width - route.width * scale) / 2),
-      ty: Math.max(0, (box.height - route.height * scale) / 2),
-    });
-  }, [route.width, route.height]);
+  /** The load fit shows the whole map while it stays readable and never drops
+   *  below FIT_FLOOR — past the floor the map opens centred on the Sales
+   *  Order and the operator pans (owner ruling 2026-08-17). ⛶ remains the
+   *  explicit whole-map fit. */
+  const fit = useCallback(
+    (whole = false) => {
+      const box = frame.current?.getBoundingClientRect();
+      if (!box || box.width === 0 || route.width === 0) return;
+      const wFit = box.width / route.width;
+      const raw = Math.min(1, wFit, box.height / route.height);
+      if (whole || raw >= FIT_FLOOR) {
+        const scale = Math.max(MIN_SCALE, raw);
+        setView({
+          scale,
+          tx: Math.max(0, (box.width - route.width * scale) / 2),
+          ty: Math.max(0, (box.height - route.height * scale) / 2),
+        });
+        return;
+      }
+      /* Readability beats completeness: fit the WIDTH when it (almost) clears
+         the floor — the fan stays whole and the operator pans down to the
+         gate — and only a genuinely wider map opens at the floor, centred on
+         the Sales Order, panning sideways. */
+      if (wFit >= FIT_FLOOR * 0.95) {
+        const scale = Math.min(1, wFit);
+        setView({ scale, tx: Math.max(0, (box.width - route.width * scale) / 2), ty: 0 });
+        return;
+      }
+      const scale = FIT_FLOOR;
+      const so = route.nodes.find((n) => n.kind === "sales-order");
+      const cx = so ? so.x + so.w / 2 : route.width / 2;
+      setView({
+        scale,
+        tx: Math.min(0, Math.max(box.width - route.width * scale, box.width / 2 - cx * scale)),
+        ty: 0,
+      });
+    },
+    [route.width, route.height, route.nodes],
+  );
 
   useLayoutEffect(() => {
     fit();
@@ -414,6 +483,24 @@ export default function SalesOrderRoute({
             transform: `translate(${view.tx}px, ${view.ty}px) scale(${view.scale})`,
           }}
         >
+          {/* The route names live on these bands — GOODS · DELIVERY · MONEY —
+              never on the connectors (owner ruling 2026-08-17). */}
+          {route.bands.map((band) => (
+            <div
+              key={band.id}
+              data-testid={`route-band-${band.id}`}
+              className="absolute truncate border-b border-kit-slate-5 text-label font-semibold uppercase tracking-wide text-base-600"
+              style={{
+                left: band.x,
+                top: band.y,
+                width: band.w,
+                height: band.h,
+                lineHeight: `${band.h - 2}px`,
+              }}
+            >
+              {band.label}
+            </div>
+          ))}
           <Edges map={route} />
           {route.nodes.map((node) => (
             <Node key={node.id} node={node} owners={owners} />
@@ -442,7 +529,7 @@ export default function SalesOrderRoute({
           </button>
           <button
             type="button"
-            onClick={fit}
+            onClick={() => fit(true)}
             data-testid="route-fit"
             aria-label="Fit the whole route"
             className="grid h-7 w-7 place-items-center border-l border-kit-slate-5 text-base-600 hover:bg-kit-slate-3"

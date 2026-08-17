@@ -143,17 +143,21 @@ describe("the node map", () => {
  * ──────────────────────────────────────────────────────────────────────────── */
 
 describe("goods forks", () => {
-  it("gives the purchase chain PURCHASING → SUPPLIER → RECEIVING, and STOCK its own fork", () => {
+  it("draws one LANE per line — plate, then the chain, converging on the line's ONE STOCK node", () => {
     const map = resolveSalesOrderRoute(input());
-    expect(edge(map, "sales-order", "PO-2048:purchasing")).toBeDefined();
+    expect(edge(map, "sales-order", "B1201S:goods-line")).toBeDefined();
+    expect(edge(map, "B1201S:goods-line", "PO-2048:purchasing")).toBeDefined();
     expect(edge(map, "PO-2048:purchasing", "PO-2048:supplier")).toBeDefined();
     expect(edge(map, "PO-2048:supplier", "PO-2048:receiving")).toBeDefined();
-    /* STOCK is the same line's other fork, straight off the Sales Order. */
-    expect(edge(map, "sales-order", "B1201S:stock")).toBeDefined();
-    expect(edge(map, "sales-order", "B1201S:stock")!.labelLines).toEqual(["goods", "(same line)"]);
+    /* STOCK is the lane's tail: the chain converges on it, it joins the gate. */
+    expect(edge(map, "PO-2048:receiving", "B1201S:stock")).toBeDefined();
+    expect(edge(map, "B1201S:stock", "delivery-order")).toBeDefined();
+    /* One line, one column — the whole journey shares one x. */
+    expect(node(map, "B1201S:stock").x).toBe(node(map, "PO-2048:purchasing").x);
+    expect(node(map, "B1201S:stock").y).toBeGreaterThan(node(map, "PO-2048:receiving").y);
   });
 
-  it("forks once per Purchase Order, and each fork is drawn in its own column", () => {
+  it("forks once per Purchase Order under ONE plate, and every fork converges on the one STOCK", () => {
     const map = resolveSalesOrderRoute(
       input({
         purchaseOrders: [
@@ -162,9 +166,14 @@ describe("goods forks", () => {
         ],
       }),
     );
-    expect(edge(map, "sales-order", "PO-1:purchasing")).toBeDefined();
-    expect(edge(map, "sales-order", "PO-2:purchasing")).toBeDefined();
+    expect(edge(map, "B1201S:goods-line", "PO-1:purchasing")).toBeDefined();
+    expect(edge(map, "B1201S:goods-line", "PO-2:purchasing")).toBeDefined();
     expect(node(map, "PO-1:purchasing").x).not.toBe(node(map, "PO-2:purchasing").x);
+    /* The plate spans both columns; the line still has exactly one STOCK. */
+    expect(node(map, "B1201S:goods-line").w).toBeGreaterThan(node(map, "PO-1:purchasing").w);
+    expect(edge(map, "PO-1:receiving", "B1201S:stock")).toBeDefined();
+    expect(edge(map, "PO-2:receiving", "B1201S:stock")).toBeDefined();
+    expect(kinds(map, "stock")).toHaveLength(1);
   });
 
   it("still walks the whole chain for a quantity no Purchase Order covers", () => {
@@ -555,22 +564,31 @@ describe("connectors", () => {
     expect(edge(map, "PO-2048:supplier", "PO-2048:receiving")!.style).toBe("dashed");
   });
 
-  it("names the route on the edge leaving the Sales Order, and nowhere else", () => {
+  it("names the routes on their group bands, and no edge carries a route caption", () => {
     const map = resolveSalesOrderRoute(input());
-    expect(edge(map, "sales-order", "logistics")!.labelLines).toEqual(["delivery"]);
-    expect(edge(map, "sales-order", "money")!.labelLines).toEqual(["money"]);
-    expect(edge(map, "sales-order", "PO-2048:purchasing")!.labelLines).toEqual([
-      "goods",
-      "B1201S · King · Qty 3",
-      "2 to buy from factory",
-    ]);
-    expect(edge(map, "PO-2048:purchasing", "PO-2048:supplier")!.labelLines).toEqual([]);
+    expect(map.bands.map((b) => b.label)).toEqual(["GOODS", "DELIVERY", "MONEY"]);
+    /* No text ever sits on a connector — the one edge fact left is the
+       loan's `collect back`. */
+    expect(map.edges.filter((e) => e.labelLines.length > 0)).toHaveLength(0);
+    /* The product name lives on the plate, never on a line. */
+    const plate = node(map, "B1201S:goods-line");
+    expect(plate.title).toBe("B1201S · King");
+    expect(plate.lines).toEqual(["Qty 3 · 2 to buy from factory"]);
+    expect(plate.door).toBeNull();
+    expect(plate.action).toBeNull();
   });
 
-  it("converges every goods fork, the delivery date and the money on the one gate", () => {
+  it("adds the LOAN band only when a loan is out", () => {
+    const map = resolveSalesOrderRoute(
+      input({ loans: [{ id: "L1", label: "sofa", qty: 1, returned: false }] }),
+    );
+    expect(map.bands.map((b) => b.label)).toEqual(["GOODS", "DELIVERY", "MONEY", "LOAN"]);
+  });
+
+  it("converges every goods lane, the delivery date and the money on the one gate", () => {
     const map = resolveSalesOrderRoute(input());
     const into = map.edges.filter((e) => e.to === "delivery-order").map((e) => e.from);
-    expect(into.sort()).toEqual(["B1201S:stock", "PO-2048:receiving", "delivery-date", "money"]);
+    expect(into.sort()).toEqual(["B1201S:stock", "delivery-date", "money"]);
   });
 
   it("never lets two nodes overlap, however many forks the order has", () => {
@@ -605,14 +623,20 @@ describe("connectors", () => {
     }
   });
 
-  it("leaves the fan-out room for its tallest label stack", () => {
+  it("separates the route GROUPS by the wider gap, with the bands above the first node row", () => {
     const map = resolveSalesOrderRoute(input());
-    const so = node(map, "sales-order");
-    const firstBranchTop = Math.min(
+    const goods = map.bands.find((b) => b.id === "goods")!;
+    const delivery = map.bands.find((b) => b.id === "delivery")!;
+    const money = map.bands.find((b) => b.id === "money")!;
+    expect(delivery.x - (goods.x + goods.w)).toBe(72);
+    expect(money.x - (delivery.x + delivery.w)).toBe(72);
+    const firstRow = Math.min(
       ...map.nodes.filter((n) => n.branch !== "root").map((n) => n.y),
     );
-    const tallest = Math.max(...map.edges.map((e) => e.labelLines.length));
-    expect(firstBranchTop - (so.y + so.h)).toBeGreaterThan(tallest * 12 + 10);
+    expect(goods.y + goods.h).toBeLessThanOrEqual(firstRow);
+    /* And the band row still clears the Sales Order above it. */
+    const so = node(map, "sales-order");
+    expect(goods.y).toBeGreaterThan(so.y + so.h);
   });
 
   it("connects every node to the graph — no orphan is ever drawn", () => {
