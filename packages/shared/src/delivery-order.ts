@@ -1,20 +1,23 @@
 /**
- * C7 · The delivery order — the HARD gate (Jess 2026-07-27).
+ * C7 · The delivery order — the HARD gate (Jess 2026-07-27), corrected by the
+ * owner ruling of 2026-08-16 ("decision A", `docs/orders/MASTER.md` §8):
  *
- * `docs/ORDERS-WORKING-FLOW.md` §5 is unambiguous about where the portal's real
- * refusal lives, and until this card the code had it one step early:
+ *   outstanding money does not block the DO
+ *   an OPEN Finance exception is the ONLY money blocker
+ *   CLEARED removes the block
  *
- *   > **Issuing the delivery order is the hard gate**, not agreeing a date: a
- *   > date can be agreed with a customer while the goods and the money are
- *   > still coming.
+ * WHAT THIS GATE STILL REFUSES — unchanged: a booking the customer has not
+ * confirmed (date AND slot), a Sunday, a Malaysian public holiday, and goods
+ * not reserved to this order. WHAT IT NO LONGER REFUSES: a balance. A customer
+ * may owe any amount, of any age, and the paper still issues — collection runs
+ * independently of the delivery, and the collect action survives it.
  *
- * So this module is the gate that used to sit on `bookingConfirmGate`. It asks
- * ONE thing more than that gate does — *is this trip's paper allowed to exist?*
- * — and it asks it out of the SAME shared readings, never a second engine: the
- * goods answer and the money answer are `bookingConfirmGate`'s own fields, so
- * the confirm screen's warning and this refusal can never disagree about an
- * order. That mattered enough to be structural: C5 and C9 each found the same
- * number being read two ways by two surfaces, one card apart.
+ * THE ONE MONEY QUESTION LEFT is `financeExceptionHolds` — the same predicate
+ * the action engine and the route canvas ask (`finance-exception.ts`, 0355).
+ * One predicate, three readers, so the map, the worklist and this refusal can
+ *  never disagree about an order (Architecture Law D). That discipline is why
+ * decision B refused to ship the earlier split: a gate that counts requirements
+ * the server does not is the screen telling a lie, in either direction.
  *
  * WHY A DATE CHECK LIVES HERE TOO. §5 names Sunday and Malaysian public
  * holidays as the two hard calendar blocks. The confirm route already refuses a
@@ -25,12 +28,17 @@
  * again.
  *
  * PURE — no clock, no I/O, no calendar of its own: the holiday set is INJECTED,
- * exactly as `working-days.ts` takes it, so the calendar stays editable data
- * rather than a constant compiled into a gate.
+ * exactly as `working-days.ts` takes it, and the Finance exceptions are handed
+ * in as rows the caller read from the one owning table. Nothing here computes
+ * an exception from a balance — that would rebuild the retired gate under a
+ * new name.
  */
 
 import { isSundayIso, type BookingGateResult } from "./booking-gate";
-import { fmtMoney } from "./money-format";
+import {
+  financeExceptionReason,
+  type FinanceException,
+} from "./finance-exception";
 
 export interface DeliveryOrderIssueInput {
   /** D1/0277 — the CUSTOMER confirmed (not the logistics company's word). */
@@ -40,11 +48,14 @@ export interface DeliveryOrderIssueInput {
   /** The customer-confirmed time slot. 0277's CHECK makes it ride the date, so
    *  a confirmed booking missing one is a row from before that migration. */
   confirmedTimeSlot: string | null;
-  /** The goods + money answers, from the ONE shared reading of this order. */
-  gate: Pick<
-    BookingGateResult,
-    "goodsReady" | "notReadySkus" | "balanceReady" | "holding" | "storageOwing"
-  >;
+  /** The goods answer, from the ONE shared reading of this order. The money
+   *  fields that used to ride beside it are gone from this gate on purpose —
+   *  decision A retired them, and accepting-but-ignoring them would let a
+   *  caller believe money still counts. */
+  gate: Pick<BookingGateResult, "goodsReady" | "notReadySkus">;
+  /** `order_finance_exceptions` (0355) — the rows for THIS order, read from
+   *  the one owning table. Only an OPEN one refuses. */
+  financeExceptions: ReadonlyArray<FinanceException>;
   /** Malaysian public holidays, injected as ISO dates (`myHolidaySet()`). */
   holidays?: ReadonlySet<string> | readonly string[];
 }
@@ -71,13 +82,15 @@ function has(
  *
  * Every refusal names the thing that is missing AND what closes it, because a
  * gate that only states a fact leaves a new hire holding a phone and no idea
- * who to ring (COPY-STANDARD's error pattern).
+ * who to ring (COPY-STANDARD's error pattern). The Finance refusal names
+ * Finance, because Finance is the only party that can clear it.
  */
 export function deliveryOrderIssueGate({
   bookingConfirmed,
   confirmedDateIso,
   confirmedTimeSlot,
   gate,
+  financeExceptions,
   holidays,
 }: DeliveryOrderIssueInput): DeliveryOrderIssueResult {
   const reasons: string[] = [];
@@ -102,17 +115,13 @@ export function deliveryOrderIssueGate({
     );
   }
 
-  if (!gate.balanceReady) {
-    // C9's split, kept: say WHICH money is missing. "RM 150 outstanding" on an
-    // order the customer paid in full sends an operator hunting the wrong thing.
-    const goods = gate.holding - gate.storageOwing;
-    reasons.push(
-      goods > 0 && gate.storageOwing > 0
-        ? `${fmtMoney(goods)} outstanding and ${fmtMoney(gate.storageOwing)} of storage fee not collected — collect both before the delivery order is issued.`
-        : gate.storageOwing > 0
-          ? `Storage fee of ${fmtMoney(gate.storageOwing)} not collected — collect it, or a manager releases the delivery.`
-          : `${fmtMoney(gate.holding)} outstanding — collect it before the delivery order is issued.`,
-    );
+  // ⭐ THE ONE MONEY BLOCKER (decision A). An outstanding balance never lands
+  // here; only an explicit OPEN Finance exception does, and the sentence names
+  // who clears it. `financeExceptionReason` is the shared spelling — this gate
+  // never words the refusal for itself.
+  const financeReason = financeExceptionReason(financeExceptions);
+  if (financeReason) {
+    reasons.push(financeReason);
   }
 
   return { ok: reasons.length === 0, reasons };

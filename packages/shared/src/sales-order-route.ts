@@ -18,27 +18,26 @@
  * Goods + Logistics + Delivery Date + Money → DELIVERY ORDER → DELIVER → PHOTO
  * ```
  *
- * ⭐ THE MONEY REQUIREMENT — OWNER RULING 2026-08-16, decision B. The card's
- * §9 proposed dropping money from the gate and blocking only on a
- * "Finance-recorded payment exception". Three current MASTERs and the shipped
- * engine say otherwise — `docs/orders/MASTER.md` §8 ("the money is collected"),
- * §7 (the payment condition is one of four triggers),
- * `docs/payment/MASTER.md` §6 ("issuing the DO is the hard gate"), and
- * `order-actions.ts` `deliveryHeldOnMoney`, which withholds
- * `issue_delivery_order` outright while money holds. A gate that counted three
- * met requirements while the server refused the DO would be the screen telling
- * a lie (Architecture Law D). Money therefore stays a requirement and is drawn
- * in the card's plain-sentence voice; the Finance-exception mechanism the card
- * describes does not exist in this repository and none was invented here.
+ * ⭐ THE MONEY REQUIREMENT IS THE FINANCE EXCEPTION — OWNER RULING 2026-08-16,
+ * decision A (`docs/orders/MASTER.md` §8). Outstanding money does not block
+ * the DO; an OPEN Finance exception is the ONLY money blocker, CLEARED removes
+ * it, and only Finance opens or clears one. Decision B — money stays a
+ * requirement — shipped first and was honest about why: the Finance-exception
+ * mechanism did not exist and inventing one was refused. The owner then
+ * defined it (0355, `order_finance_exceptions`), which answered that objection
+ * rather than overruled it, and this gate re-keyed in the same slice as
+ * `deliveryOrderIssueGate` and the action engine — because decision B's law
+ * still binds: a gate that counts requirements the server does not is the
+ * screen telling a lie (Architecture Law D), in either direction.
  *
- * TWO RULES THIS FILE STILL HOLDS, UNCHANGED BY THE REDRAW:
+ * TWO RULES THIS FILE STILL HOLDS, UNCHANGED:
  *
  * 1. **A `✓` costs real completion evidence.** A node is complete only when it
  *    can name its document, its labelled date and the door to the object that
  *    owns it. Nothing is ticked because the next thing started.
- * 2. **The balance fact and the release decision are TWO facts.** A manager
- *    release lifts the HOLD; it never erases or hides the outstanding amount
- *    (`orderMoney` separates `holding` from `outstanding` — §8).
+ * 2. **The gate never erases the money fact.** The MONEY branch keeps printing
+ *    what the customer owes, and `collect` survives delivery — money left the
+ *    GATE, not the screen and not the worklist.
  *
  * The canvas computes nothing of its own and stores nothing: every line is a
  * fact some other module owns. Dates travel as ISO with their MEANING attached
@@ -115,7 +114,12 @@ export interface GateRequirement {
   text: string;
 }
 
-export type GateRequirementId = "goods" | "logistics" | "appointment" | "money" | "refused-day";
+export type GateRequirementId =
+  | "goods"
+  | "logistics"
+  | "appointment"
+  | "finance-exception"
+  | "refused-day";
 
 export interface RouteNode {
   id: string;
@@ -280,13 +284,23 @@ export interface SalesOrderRouteInput {
     /** `ops_order_control.delivery_photos` (0280). */
     photos?: ReadonlyArray<RouteDeliveryPhoto>;
   };
-  /** Straight from `orderMoney` — this module never recomputes the number. */
+  /** Straight from `orderMoney` — this module never recomputes the number.
+   *  Decision A removed `holds`: money cannot hold a delivery any more, so a
+   *  field whose whole meaning was "does the balance stop the truck?" has no
+   *  honest value left to carry. The MONEY branch reads only the two facts
+   *  that survive — is the value known, and what is still owed. */
   money: {
     known: boolean;
     outstanding: number;
-    /** `holds` false with `outstanding` above zero IS a manager release. */
-    holds: boolean;
   };
+  /** `order_finance_exceptions` (0355) — this order's rows, read from the one
+   *  owning table. Only an OPEN one blocks the gate (decision A). REQUIRED so
+   *  a caller cannot forget the fetch and render a gate that lies. */
+  financeExceptions: ReadonlyArray<{
+    id: string;
+    status: "open" | "cleared";
+    reason: string;
+  }>;
   loans?: ReadonlyArray<RouteLoan>;
   cases: ReadonlyArray<RouteLinkedCase>;
   claims: ReadonlyArray<RouteLinkedClaim>;
@@ -645,6 +659,14 @@ function deliveryDateDraft(input: SalesOrderRouteInput): NodeDraft {
   };
 }
 
+/**
+ * The MONEY branch under decision A: a collection fact, never a gate. It keeps
+ * printing what the customer owes and keeps the collect action — money left
+ * the GATE, not the screen. The "Manager release recorded" state is retired
+ * with the release lever itself: with no money gate there is nothing to
+ * release, so an order that owes simply reads `still to collect` until it
+ * does not.
+ */
 function moneyDraft(input: SalesOrderRouteInput): NodeDraft {
   const payments = open("Payments", paymentsHref(input.order.so));
   const action: NodeAction = { ownerKey: "payment", label: "Collect" };
@@ -665,19 +687,6 @@ function moneyDraft(input: SalesOrderRouteInput): NodeDraft {
       title: "MONEY",
       complete: true,
       lines: ["Paid in full"],
-      door: payments,
-    };
-  }
-  /* ⭐ TWO FACTS, NEVER ONE. A manager release lifts the HOLD; the amount the
-     customer still owes stays on the screen and stays on the worklist. */
-  if (!input.money.holds) {
-    return {
-      id: "money",
-      kind: "money",
-      title: "MONEY",
-      complete: true,
-      lines: [`${ringgit(input.money.outstanding)} still to collect`, "Manager release recorded"],
-      action,
       door: payments,
     };
   }
@@ -788,31 +797,27 @@ function goodsRequirement(
 }
 
 /**
- * ⭐ MONEY IS A GATE REQUIREMENT — owner ruling 2026-08-16, decision B.
- * `holds` is the ONE predicate `order-actions.ts` asks before it will offer
- * `issue_delivery_order`; the gate asks the same one so the map and the engine
- * can never disagree. A manager release meets the requirement and still prints
- * what the customer owes.
+ * ⭐ THE FINANCE EXCEPTION IS THE MONEY REQUIREMENT — owner ruling 2026-08-16,
+ * decision A. `financeExceptionHolds` is the ONE predicate the issue gate and
+ * `order-actions.ts` ask; this requirement asks the same one so the map, the
+ * worklist and the server can never disagree (Law D — the rule decision B was
+ * right about, kept pointing the new way). An outstanding balance never lands
+ * here: it stays on the MONEY branch as a collection fact with its open
+ * `collect`, and the truck goes regardless.
  */
-function moneyRequirement(input: SalesOrderRouteInput): GateRequirement {
-  if (!input.money.known) {
-    return { id: "money", met: true, text: "No price yet — money does not hold this delivery" };
+function financeExceptionRequirement(input: SalesOrderRouteInput): GateRequirement {
+  const openOnes = input.financeExceptions.filter((e) => e.status === "open");
+  if (openOnes.length === 0) {
+    return { id: "finance-exception", met: true, text: "No Finance hold" };
   }
-  if (input.money.holds) {
-    return {
-      id: "money",
-      met: false,
-      text: `${ringgit(input.money.outstanding)} still to collect`,
-    };
-  }
-  if (input.money.outstanding > 0) {
-    return {
-      id: "money",
-      met: true,
-      text: `Manager release recorded — ${ringgit(input.money.outstanding)} remains to collect`,
-    };
-  }
-  return { id: "money", met: true, text: "Paid in full" };
+  return {
+    id: "finance-exception",
+    met: false,
+    text:
+      openOnes.length === 1
+        ? `Finance is holding this delivery: ${openOnes[0]!.reason} — Finance clears it`
+        : `Finance is holding this delivery for ${openOnes.length} reasons — Finance clears them`,
+  };
 }
 
 function gateRequirements(
@@ -835,7 +840,7 @@ function gateRequirements(
       met: Boolean(confirmed && booking?.slot),
       text: confirmed && booking?.slot ? "Date + slot confirmed" : "Date + slot not confirmed",
     },
-    moneyRequirement(input),
+    financeExceptionRequirement(input),
   ];
   const refused = refusedDayLine(confirmed, input.publicHolidays ?? []);
   if (refused) list.push({ id: "refused-day", met: false, text: refused });

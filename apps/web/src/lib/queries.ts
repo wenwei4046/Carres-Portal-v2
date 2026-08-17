@@ -4421,6 +4421,14 @@ export interface SalesOrderRouteClaim {
   reported_at: string | null;
 }
 
+/** `order_finance_exceptions` (0355) as `/api/finance/exceptions/:orderId`
+ *  serves it — the ONE money blocker on the DO (decision A, 2026-08-16). */
+export interface SalesOrderRouteFinanceException {
+  id: string;
+  status: "open" | "cleared";
+  reason: string;
+}
+
 export interface SalesOrderRouteFactsResponse {
   allocation: SalesOrderAllocation;
   brief: BookingBrief;
@@ -4430,6 +4438,7 @@ export interface SalesOrderRouteFactsResponse {
   cases: SalesOrderRouteCase[];
   receiving: SalesOrderRouteReceivingSession[];
   claims: SalesOrderRouteClaim[];
+  financeExceptions: SalesOrderRouteFinanceException[];
 }
 
 /**
@@ -4453,15 +4462,20 @@ export function useSalesOrderRouteFacts(
           `/api/operation/pos/${encodeURIComponent(poId)}/receiving`,
         ),
       ));
-      const [allocation, booking, attempts, loans, refunds, cases, claims] = await Promise.all([
-        apiFetch<{ allocation: SalesOrderAllocation }>(`/api/operation/orders/${id}/allocation`),
-        apiFetch<{ brief: BookingBrief }>(`/api/operation/orders/${id}/booking-brief`),
-        apiFetch<{ attempts: DeliveryAttemptRow[] }>(`/api/operation/orders/${id}/delivery-attempts`),
-        apiFetch<SofaLoansResponse>(`/api/operation/orders/${id}/loans`),
-        apiFetch<{ refunds: SalesOrderRouteRefund[] }>(`/api/operation/orders/${id}/refunds`),
-        apiFetch<{ items: SalesOrderRouteCase[] }>(`/api/ops/service-cases?orderId=${id}`),
-        apiFetch<{ claims: SalesOrderRouteClaim[] }>("/api/operation/supplier-claims?status=all"),
-      ]);
+      const [allocation, booking, attempts, loans, refunds, cases, claims, financeExceptions] =
+        await Promise.all([
+          apiFetch<{ allocation: SalesOrderAllocation }>(`/api/operation/orders/${id}/allocation`),
+          apiFetch<{ brief: BookingBrief }>(`/api/operation/orders/${id}/booking-brief`),
+          apiFetch<{ attempts: DeliveryAttemptRow[] }>(`/api/operation/orders/${id}/delivery-attempts`),
+          apiFetch<SofaLoansResponse>(`/api/operation/orders/${id}/loans`),
+          apiFetch<{ refunds: SalesOrderRouteRefund[] }>(`/api/operation/orders/${id}/refunds`),
+          apiFetch<{ items: SalesOrderRouteCase[] }>(`/api/ops/service-cases?orderId=${id}`),
+          apiFetch<{ claims: SalesOrderRouteClaim[] }>("/api/operation/supplier-claims?status=all"),
+          // Decision A (2026-08-16) — the gate's one money question. The route
+          // reads the same table the server-side gate reads, so the canvas and
+          // the refusal can never disagree (Law D).
+          apiFetch<SalesOrderRouteFinanceException[]>(`/api/finance/exceptions/${id}`),
+        ]);
       const receiving = await receivingPromise;
       return {
         allocation: allocation.allocation,
@@ -4472,6 +4486,7 @@ export function useSalesOrderRouteFacts(
         cases: cases.items,
         receiving: receiving.flatMap((result) => result.sessions),
         claims: claims.claims.filter((claim) => poIds.includes(claim.po_id)),
+        financeExceptions,
       };
     },
     enabled: !!orderId && open,
