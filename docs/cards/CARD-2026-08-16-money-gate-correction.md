@@ -1,9 +1,10 @@
-STATUS: QUEUED
-IMPLEMENTATION: NOT APPROVED
+STATUS: EXECUTED
+IMPLEMENTATION: APPROVED — owner wrote IMPLEMENT 2026-08-17; delivered and production-verified same day
 SUPERSEDES: decision B in the executed node-map implementation (PR #825)
 DATE: 2026-08-16
 OWNER RULING: decision A, 2026-08-16
-LANE: DOCUMENTATION ONLY — no application code authorised by this card
+PRS: #829 (0355, Slice 1) · #830 (Slice 3, one slice across gate + engine + canvas + API) · #831 (stale copy found by the walk)
+ACCEPTANCE: authenticated production walk PASSED 2026-08-17 on SO-1321 (DO-170826-5050 issued over RM 1,500 owing; Finance exception refused, cleared, released) — full record in docs/orders/MASTER.md §8
 
 # MONEY GATE CORRECTION — the balance stops holding the door
 
