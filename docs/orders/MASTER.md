@@ -206,10 +206,20 @@ change one and a connector stops short of its node.
 ### The canvas
 
 **One surface, never a stack.** White node cards joined by connector lines on a single pannable,
-zoomable canvas. It FITS the whole map to the viewport on load; `− + ⛶` sit bottom-left and are
-always visible and keyboard-operable. At any width the same map simply fits smaller — nodes keep
-their full anatomy, and there is no stacked fallback and no reflow. The Object Header already names
-`Order Route` and `SO-number · Customer`; the canvas never repeats either identity.
+zoomable canvas. `− + ⛶` sit bottom-left and are always visible and keyboard-operable. Nodes keep
+their full anatomy at every width — there is no stacked fallback and no reflow. The Object Header
+already names `Order Route` and `SO-number · Customer`; the canvas never repeats either identity.
+
+**THE LOAD FIT HAS A READABILITY FLOOR — owner ruling 2026-08-17.** On load the canvas fits the
+whole map, but never below **0.7×**: text scaled past that is an unreadable stripe, not a map. A
+map too wide for the floor opens **centred on the Sales Order** and the operator pans; `⛶` remains
+the explicit whole-map fit and may go smaller because the operator asked for it.
+
+**THREE ROUTES READ AS THREE GROUPS — owner ruling 2026-08-17.** One uppercase **group band** —
+`GOODS` · `DELIVERY` · `MONEY` · `LOAN` (conditional) — sits above each route's columns; columns
+inside a group sit 32px apart and **groups sit 72px apart**. The band is where a route says its
+name: edges carry no route captions. Colour still belongs to STATE alone (blue CURRENT · green
+done · amber exception); routes are told apart by band and spacing, never by hue.
 
 **The Sales Order is the ONLY root**, and goods, delivery and money leave it simultaneously. The
 origin carries its number and labelled Ordered date as evidence but **no circular `Open SO-{n} →`
@@ -242,12 +252,17 @@ rather than an invented owner. Wiring their duty reads is approved-target, not b
 
 ### Connectors
 
-- Goods forks per goods line and per source quantity; each fork is its own column. A line that is
-  being bought shows its purchase chain `PURCHASING → SUPPLIER → RECEIVING`, and its STOCK truth is
-  the same line's other fork off the Sales Order.
+- **One goods line is ONE LANE — owner ruling 2026-08-17.** A small grey **caption plate** names
+  the line (`{product} · Qty {n} · {m} to buy from factory`) at the top of its lane, so a product
+  name never sits on a connector. The purchase chain `PURCHASING → SUPPLIER → RECEIVING` hangs
+  under the plate — one column per source PO when a line is split across sources — and **every
+  chain converges on the line's ONE `STOCK` node**, the lane's tail, which joins the gate. The
+  chain order is the physical truth: goods are received, then they become Units. The plate is not
+  a station: no state, no action, no door.
 - Every segment is orthogonal, leaves the bottom of its source and lands on the top of its target.
 - **Completed segments solid; a path the work has not walked is dashed.**
-- Edge facts (`goods`, `collect back`) sit ON the line as small grey labels.
+- The one edge fact left is the loan's `collect back`, a small grey label ON its line; route names
+  live on the group bands and product names on the plates, never on a connector.
 - `DELIVERY ORDER` is the single convergence gate; `DELIVER` and `DELIVERY PHOTO` hang below it in a
   straight line. **The last node has no trailing line.**
 - No node is ever an orphan, and no two nodes overlap — both are asserted, not assumed.
