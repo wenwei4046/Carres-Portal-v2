@@ -206,6 +206,25 @@ describe("clearing costs evidence", () => {
       p_evidence: "Bank confirmed — ref 8821",
     });
   });
+
+  it("⭐ Slice 2 — the clear is a gate flip: the response carries the auto-issue result, fail-soft", async () => {
+    /* The cleared row names its order, so the route hands it to the SYSTEM's
+       delivery-order issue (owner ruling 2026-08-16, rule 12). This mock has
+       no bookable context, so the courtesy MISSES — and the clear must still
+       succeed with `autoDeliveryOrder: null`, because an automatic step never
+       turns a successful clear into an error. */
+    mockSb({
+      rpcRow: { ...OPEN_ROW, status: "cleared", clear_evidence: "Bank confirmed — ref 8821" },
+    });
+    const res = await call(`/${EXC_ID}/clear`, "finance", {
+      method: "POST",
+      body: { evidence: "Bank confirmed — ref 8821" },
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { status: string; autoDeliveryOrder: string | null };
+    expect(body.status).toBe("cleared");
+    expect(body.autoDeliveryOrder).toBeNull();
+  });
 });
 
 describe("opening costs a reason", () => {

@@ -4,6 +4,7 @@ import { financeExceptionClearInput, financeExceptionOpenInput } from "@carres/s
 import { requireFinance } from "../../lib/auth-guards";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
+import { autoIssueDeliveryOrder } from "../operation/order-control";
 import type { AppEnv } from "../../types";
 
 /**
@@ -110,7 +111,17 @@ financeExceptionsRouter.post("/:id/clear", requireFinance, async (c) => {
     const m = mapPgError(error);
     return c.json(m.body, m.status);
   }
-  return c.json(data);
+
+  // ⭐ SLICE 2 — clearing the one money blocker is a gate flip, so the SYSTEM
+  // issues the delivery order here if everything else was already ready
+  // (owner ruling 2026-08-16, rule 12). Finance's own session carries the
+  // write: `orders_dealer_update` admits the finance role, and the helper is
+  // fail-soft by contract — a miss never turns a successful clear into an
+  // error, and the fallback door plus the Work engine still stand.
+  const orderId = (data as { order_id?: string } | null)?.order_id ?? null;
+  const autoDeliveryOrder = orderId ? await autoIssueDeliveryOrder(sb, orderId) : null;
+
+  return c.json({ ...(data as Record<string, unknown>), autoDeliveryOrder });
 });
 
 export default financeExceptionsRouter;
