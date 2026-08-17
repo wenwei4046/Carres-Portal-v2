@@ -465,10 +465,11 @@ describe("OperationDelivery — the calendar reads the booking, never the promis
     expect(within(day).getByText("12pm–3pm")).toBeTruthy();
   });
 
-  it("opens a detail for a booked truck that is NOT on the board", () => {
-    // A money-held order is off the queue list (you may not deliver it yet) but
-    // its truck is still booked for that day — clicking it must say what the
-    // Orders list says, never open a blank pane.
+  it("⭐ an owing order stays ON the board, and its calendar chip opens the same detail (decision A)", () => {
+    // Until 2026-08-16 this fixture was the money-held truck: off the queue,
+    // findable only through the calendar, its detail carrying `Collect … 🔒`.
+    // Decision A retired the money hold, so the same order is now simply a
+    // booked delivery — on the board, unlocked, with its collection still open.
     listState.data = {
       orders: [
         makeRow({
@@ -485,16 +486,15 @@ describe("OperationDelivery — the calendar reads the booking, never the promis
       ],
     };
     wrap(<OperationDelivery />);
-    expect(screen.queryAllByTestId("delivery-row")).toHaveLength(0);
+    expect(screen.queryAllByTestId("delivery-row")).toHaveLength(1);
     fireEvent.click(screen.getByText("Calendar"));
     fireEvent.click(within(screen.getByTestId(`delivery-day-${TODAY}`)).getByText("SO-1223"));
     const detail = screen.getByTestId("delivery-detail");
-    // C3 — the money-held order's line is the action that CLEARS the hold, with
-    // its figure, where it used to read `Confirm delivery with …`: the resting
-    // Confirm was retired and the 🔒 moved onto `Collect`.
-    // C11 — the figure carries its sen (it read `RM 2,455` before 2026-08-05).
-    expect(within(detail).getByText(/Collect RM 2,455\.00 from/)).toBeTruthy();
-    expect(within(detail).getByText("🔒")).toBeTruthy();
+    // The lead line is the run itself — the day arrived and nothing forbids
+    // it. `Collect RM 2,455.00 🔒` is exactly what this pane printed before
+    // decision A, and the lock's absence is the ruling made visible.
+    expect(within(detail).getByText("Deliver today")).toBeTruthy();
+    expect(within(detail).queryByText("🔒")).toBeNull();
   });
 
   it("calls a logistics-only date what it is — never green, never 'carrier'", () => {

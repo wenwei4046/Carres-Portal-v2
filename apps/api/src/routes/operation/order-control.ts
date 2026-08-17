@@ -214,9 +214,11 @@ async function loadBookingContext(
  * The goods + money sentences, phrased as WARNINGS.
  *
  * C7 moved the hard refusal onto issuing (`docs/ORDERS-WORKING-FLOW.md` §5), so
- * these no longer stop a confirmation — they tell the operator what the
- * delivery order will refuse if nobody clears it. Same facts, same figures, one
- * step later.
+ * these no longer stop a confirmation. Decision A (owner ruling 2026-08-16)
+ * then took money out of that refusal too — so the money sentence may WARN
+ * that collection is open, but it may no longer claim the delivery order will
+ * refuse: it will not. §8's surviving rule — agreeing a date WARNS about
+ * money — is exactly this line.
  */
 function bookingGateWarnings(gate: BookingGateResult): string[] {
   const out: string[] = [];
@@ -230,10 +232,10 @@ function bookingGateWarnings(gate: BookingGateResult): string[] {
     const goods = gate.holding - gate.storageOwing;
     out.push(
       goods > 0 && gate.storageOwing > 0
-        ? `RM ${goods.toFixed(2)} outstanding and RM ${gate.storageOwing.toFixed(2)} of storage fee not collected — the delivery order cannot be issued until both are collected.`
+        ? `RM ${goods.toFixed(2)} outstanding and RM ${gate.storageOwing.toFixed(2)} of storage fee not collected — collection is still open.`
         : gate.storageOwing > 0
-          ? `Storage fee of RM ${gate.storageOwing.toFixed(2)} not collected — collect it, or a manager releases the delivery.`
-          : `RM ${gate.holding.toFixed(2)} outstanding — the delivery order cannot be issued until it is collected.`,
+          ? `Storage fee of RM ${gate.storageOwing.toFixed(2)} not collected — collection is still open.`
+          : `RM ${gate.holding.toFixed(2)} outstanding — collection is still open.`,
     );
   }
   return out;
@@ -837,11 +839,32 @@ orderControlRouter.post("/:id/delivery-order", async (c) => {
     return c.json({ order: { id: order.id, do_number: order.do_number }, issued: false });
   }
 
+  // ⭐ Decision A (owner ruling 2026-08-16) — the ONE money question left is
+  // whether Finance opened an exception (0355). Read from the owning table,
+  // never derived from a balance; the gate words the refusal itself through
+  // the shared spelling.
+  const { data: financeExceptions, error: feError } = await sb
+    .from("order_finance_exceptions")
+    .select("id, status, reason, opened_at, cleared_at, clear_evidence")
+    .eq("order_id", idCheck.data);
+  if (feError) {
+    const m = mapPgError(feError);
+    return c.json(m.body, m.status);
+  }
+
   const issue = deliveryOrderIssueGate({
     bookingConfirmed: (control?.booking_stage as string | null) === "confirmed",
     confirmedDateIso: (control?.confirmed_date as string | null) ?? null,
     confirmedTimeSlot: (control?.confirmed_time_slot as string | null) ?? null,
     gate,
+    financeExceptions: (financeExceptions ?? []).map((row) => ({
+      id: row.id as string,
+      status: row.status as "open" | "cleared",
+      reason: row.reason as string,
+      openedAt: (row.opened_at as string | null) ?? null,
+      clearedAt: (row.cleared_at as string | null) ?? null,
+      clearEvidence: (row.clear_evidence as string | null) ?? null,
+    })),
     holidays: myHolidaySet(),
   });
   if (!issue.ok) {

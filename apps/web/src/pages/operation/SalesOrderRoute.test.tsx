@@ -55,7 +55,8 @@ function input(over: Partial<SalesOrderRouteInput> = {}): SalesOrderRouteInput {
     ],
     receivingRecords: [],
     delivery: { logistics: null, booking: null, attempts: [] },
-    money: { known: true, outstanding: 1249, holds: true },
+    money: { known: true, outstanding: 1249 },
+    financeExceptions: [],
     loans: [],
     cases: [],
     claims: [],
@@ -195,11 +196,15 @@ describe("Order Route — the gate", () => {
     draw();
     const gate = nodeEl("delivery-order");
     expect(gate).toHaveTextContent("NOT READY FOR DELIVERY");
-    expect(gate).toHaveTextContent("0 of 4 requirements met");
+    /* Decision A — the order owes RM 1,249 and the gate does not count it:
+       the met requirement is `No Finance hold`, and the balance lives on the
+       MONEY branch with its open collect. */
+    expect(gate).toHaveTextContent("1 of 4 requirements met");
     expect(gate).toHaveTextContent("Goods not ready (0 of 3)");
     expect(gate).toHaveTextContent("No logistics chosen");
     expect(gate).toHaveTextContent("Date + slot not confirmed");
-    expect(gate).toHaveTextContent("RM 1,249.00 still to collect");
+    expect(gate).toHaveTextContent("No Finance hold");
+    expect(gate).not.toHaveTextContent("still to collect");
   });
 
   it("renders no Release, Approve or any other control inside the map", () => {

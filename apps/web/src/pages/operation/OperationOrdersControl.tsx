@@ -1010,10 +1010,12 @@ export function orderActionSignalsOf(
     // (Delay planning opens on the overshoot, as the radar always did).
     delayDecision: ovlOf(o)?.delay_decision ?? null,
     delayDecisionEtaIso: ovlOf(o)?.delay_decision_eta ?? null,
-    // C9 — two different questions. `owing` raises the money ACTION; `holds`
-    // is the 🔒 on the delivery, and a manager's release parts them.
+    // Decision A (2026-08-16) — `owing` still raises the money ACTION, but a
+    // balance no longer locks the delivery, so `moneyHolds` is retired. The
+    // one lock left is an OPEN Finance exception; this temporary cutover
+    // surface does not read that table, so it shows no lock — the server-side
+    // issue gate reads it directly and remains the enforcement.
     moneyOwing: money.owing,
-    moneyHolds: money.holds,
   };
 }
 

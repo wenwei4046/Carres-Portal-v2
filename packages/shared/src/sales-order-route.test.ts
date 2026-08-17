@@ -73,7 +73,8 @@ function input(over: Partial<SalesOrderRouteInput> = {}): SalesOrderRouteInput {
     purchaseOrders: [po({ id: "PO-2048", lines: [{ sku: "B1201S", qty: 2, receivedQty: 0 }] })],
     receivingRecords: [],
     delivery: { logistics: null, booking: null, attempts: [] },
-    money: { known: true, outstanding: 1249, holds: true },
+    money: { known: true, outstanding: 1249 },
+    financeExceptions: [],
     loans: [],
     cases: [],
     claims: [],
@@ -281,27 +282,29 @@ describe("LOAN", () => {
 });
 
 /* ─────────────────────────────────────────────────────────────────────────────
- * THE GATE. Read-only, system-issued, and money is one of its requirements —
- * owner ruling 2026-08-16, decision B.
+ * THE GATE. Read-only, system-issued, and the one money requirement is the
+ * Finance exception — owner ruling 2026-08-16, decision A.
  * ──────────────────────────────────────────────────────────────────────────── */
 
 describe("the DELIVERY ORDER gate", () => {
   it("lists every missing requirement in plain sentences with the met count", () => {
     const map = resolveSalesOrderRoute(input());
     const gate = node(map, "delivery-order");
-    expect(gate.lines).toEqual(["NOT READY FOR DELIVERY", "0 of 4 requirements met"]);
+    /* The order owes RM 1,249 and the gate does not care: 3 open requirements
+       are goods, logistics and the appointment — never the balance. */
+    expect(gate.lines).toEqual(["NOT READY FOR DELIVERY", "1 of 4 requirements met"]);
     expect(gate.requirements.map((r) => r.text)).toEqual([
       "Goods not ready (1 of 3)",
       "No logistics chosen",
       "Date + slot not confirmed",
-      "RM 1,249.00 still to collect",
+      "No Finance hold",
     ]);
   });
 
   it("never grows a Release or Approve control in any state", () => {
     for (const map of [
       resolveSalesOrderRoute(input()),
-      resolveSalesOrderRoute(input({ money: { known: true, outstanding: 0, holds: false } })),
+      resolveSalesOrderRoute(input({ money: { known: true, outstanding: 0 } })),
     ]) {
       const gate = node(map, "delivery-order");
       expect(gate.door).toBeNull();
@@ -311,32 +314,70 @@ describe("the DELIVERY ORDER gate", () => {
     }
   });
 
-  it("⭐ keeps MONEY a requirement — the map may not say releasable while the engine refuses", () => {
-    /* `holds` is the same predicate `order-actions.deliveryHeldOnMoney` asks
-       before it will offer `issue_delivery_order` (docs/orders/MASTER.md §8). */
-    const map = resolveSalesOrderRoute(input());
-    expect(requirement(map, "money")).toEqual({
-      id: "money",
+  /**
+   * ⭐ THE LAW-D GUARD, REWRITTEN FROM DECISION B — NEVER DELETED. Its
+   * ancestor read: "keeps MONEY a requirement — the map may not say
+   * releasable while the engine refuses." The LAW is unchanged and this test
+   * still enforces it: the map may not say releasable while the engine
+   * refuses. What changed is the PREDICATE the engine refuses on — decision A
+   * re-keyed `deliveryOrderIssueGate` and `order-actions` onto the OPEN
+   * Finance exception, so the map asks the same question they do. Deleting
+   * this guard instead of re-keying it is how decision B comes back.
+   */
+  it("⭐ the map may not say releasable while the engine refuses — now keyed on the Finance exception", () => {
+    const map = resolveSalesOrderRoute(
+      input({
+        financeExceptions: [
+          { id: "fe-1", status: "open", reason: "Chargeback under investigation" },
+        ],
+      }),
+    );
+    expect(requirement(map, "finance-exception")).toEqual({
+      id: "finance-exception",
       met: false,
-      text: "RM 1,249.00 still to collect",
+      text: "Finance is holding this delivery: Chargeback under investigation — Finance clears it",
     });
   });
 
-  it("⭐ counts a manager release as met and STILL prints what the customer owes", () => {
+  it("⭐ an outstanding balance is NOT a gate requirement — and it is not erased either", () => {
+    /* RM 1,249 owed, no exception: the gate requirement is met, and the MONEY
+       branch still prints the amount with its open collect. Money left the
+       GATE, never the screen. */
+    const map = resolveSalesOrderRoute(input());
+    expect(requirement(map, "finance-exception")!.met).toBe(true);
+    const money = node(map, "money");
+    expect(money.mark).not.toBe("complete");
+    expect(money.lines).toContain("RM 1,249.00 still to collect");
+  });
+
+  it("a CLEARED exception removes the block", () => {
     const map = resolveSalesOrderRoute(
-      input({ money: { known: true, outstanding: 1249, holds: false } }),
+      input({
+        financeExceptions: [
+          { id: "fe-1", status: "cleared", reason: "Chargeback under investigation" },
+        ],
+      }),
     );
-    const money = requirement(map, "money")!;
-    expect(money.met).toBe(true);
-    expect(money.text).toContain("Manager release recorded");
-    expect(money.text).toContain("RM 1,249.00");
+    expect(requirement(map, "finance-exception")!.met).toBe(true);
+  });
+
+  it("names the count when Finance holds for more than one reason", () => {
+    const map = resolveSalesOrderRoute(
+      input({
+        financeExceptions: [
+          { id: "a", status: "open", reason: "Chargeback under investigation" },
+          { id: "b", status: "open", reason: "Suspected duplicate payment" },
+        ],
+      }),
+    );
+    expect(requirement(map, "finance-exception")!.text).toContain("2 reasons");
   });
 
   it("lets an unpriced order through — a number nobody knows may not hold the goods", () => {
     const map = resolveSalesOrderRoute(
-      input({ money: { known: false, outstanding: 0, holds: false } }),
+      input({ money: { known: false, outstanding: 0 } }),
     );
-    expect(requirement(map, "money")!.met).toBe(true);
+    expect(requirement(map, "finance-exception")!.met).toBe(true);
   });
 
   it("names a refused delivery day instead of failing silently", () => {
@@ -420,7 +461,7 @@ describe("the DELIVERY ORDER gate", () => {
             },
           ],
         },
-        money: { known: true, outstanding: 0, holds: false },
+        money: { known: true, outstanding: 0 },
       }),
     );
     const gate = node(map, "delivery-order");

@@ -2392,7 +2392,11 @@ describe("nextActionOf (C2)", () => {
     expect(openActionsOf(o, { state: "ready" }, [])).toEqual([]);
   });
 
-  it("ready + carrier + customer confirmed + owing balance → Collect, held (🔒)", () => {
+  it("⭐ ready + carrier + confirmed + owing balance → the document leads, Collect open and UNLOCKED (decision A)", () => {
+    // Until 2026-08-16 this exact shape read `Collect, locked: true` — the
+    // balance held the delivery. Decision A retired that: money no longer
+    // stands between the goods and the truck, so the paper is the next act
+    // and the collection rides beside it as an ordinary open action.
     const o = makeRow({
       id: "x",
       so: 1,
@@ -2400,9 +2404,11 @@ describe("nextActionOf (C2)", () => {
       ops_order_control: { ...BOOKED, balance: 2248 },
     });
     expect(nextActionOf(o, { state: "ready" }, [])).toMatchObject({
-      label: "Collect",
-      locked: true,
+      key: "issue_delivery_order",
     });
+    const collect = openActionsOf(o, { state: "ready" }, []).find((a) => a.key === "collect");
+    expect(collect).toBeTruthy();
+    expect(collect?.locked).toBeUndefined();
   });
 
   // ── C5 · the money hold reads the number that exists ──────────────────────
@@ -2411,7 +2417,7 @@ describe("nextActionOf (C2)", () => {
   // them owed RM 56,859. It now reads the shared `orderMoney` — the priced
   // lines against `orders.paid` — the SAME rule the server's booking gate asks.
 
-  it("SO-1256's shape: priced lines with a 50% deposit → held (🔒)", () => {
+  it("SO-1256's shape: priced lines with a 50% deposit → open Collect, no lock (decision A)", () => {
     const o = makeRow({
       id: "x",
       so: 1256,
@@ -2421,10 +2427,12 @@ describe("nextActionOf (C2)", () => {
       paid: 2124,
       ops_order_control: { ...BOOKED },
     });
-    expect(nextActionOf(o, { state: "ready" }, [])).toMatchObject({
-      label: "Collect",
-      locked: true,
-    });
+    // The C5 lesson survives: the figure comes from the shared `orderMoney`
+    // over the priced lines, never the dead `balance` column. What changed is
+    // the consequence — the deposit gap raises the collect, it holds nothing.
+    const collect = openActionsOf(o, { state: "ready" }, []).find((a) => a.key === "collect");
+    expect(collect).toMatchObject({ key: "collect", track: "money" });
+    expect(collect?.locked).toBeUndefined();
   });
 
   it("SO-1209's shape: paid in full → NOT held, and the day is simply ahead", () => {
@@ -2471,17 +2479,18 @@ describe("nextActionOf (C2)", () => {
     expect(nextActionOf(o, { state: "ready" }, []).locked).toBeFalsy();
   });
 
-  it("ready + carrier + customer confirmed + owing storage → held", () => {
+  it("ready + carrier + confirmed + owing storage → still not held (decision A)", () => {
+    // An uncollected storage fee is money, and money no longer holds the
+    // delivery — the fee stays owed, the collect stays open, the truck goes.
     const o = makeRow({
       id: "x",
       so: 1,
       ops_assigned_logistic: "p1",
       ops_order_control: { ...BOOKED, storage_fee_msbf: 150 },
     });
-    expect(nextActionOf(o, { state: "ready" }, [])).toMatchObject({
-      label: "Collect",
-      locked: true,
-    });
+    const collect = openActionsOf(o, { state: "ready" }, []).find((a) => a.key === "collect");
+    expect(collect).toBeTruthy();
+    expect(collect?.locked).toBeUndefined();
   });
 
   // ── C9 · the manager's release (Jess 2026-07-27) ──
@@ -2596,7 +2605,9 @@ describe("nextActionOf (C2)", () => {
     ]);
   });
 
-  it("owing balance beats Deliver today (PayHold: never arrange a delivery we may not make)", () => {
+  it("⭐ Deliver today beats an owing balance (decision A retired PayHold-on-money)", () => {
+    // The exact inversion of the retired PayHold test: the goods go on the
+    // day, and the collection rides beside the run as an open action.
     const o = makeRow({
       id: "x",
       so: 1,
@@ -2604,9 +2615,10 @@ describe("nextActionOf (C2)", () => {
       ops_order_control: { ...BOOKED, confirmed_date: inDays(0), balance: 2248 },
     });
     expect(nextActionOf(o, { state: "ready" }, [])).toMatchObject({
-      label: "Collect",
-      locked: true,
+      key: "deliver_today",
     });
+    const collect = openActionsOf(o, { state: "ready" }, []).find((a) => a.key === "collect");
+    expect(collect?.locked).toBeUndefined();
   });
 
   // ── T7 · the delivery photo is the last outstanding act on a closed order ──
