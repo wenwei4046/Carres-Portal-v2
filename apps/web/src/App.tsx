@@ -7,6 +7,7 @@ import { roleAllowedOnPortal } from "@/lib/portal";
 import WrongPortal from "@/components/WrongPortal";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import Login from "@/pages/Login";
+import UpdatePassword from "@/pages/UpdatePassword";
 import Me from "@/pages/Me";
 import DealerApp from "@/pages/dealer/DealerApp";
 import PrincipalApp from "@/pages/principal/PrincipalApp";
@@ -89,6 +90,12 @@ export default function App() {
       <ErrorBoundary key={location.pathname} area="Carres Portal" variant="route">
       <Routes>
         <Route path="/login" element={<Login />} />
+        {/* Step 02 of recovery — the destination the reset email has always
+            named. NOT behind RequireAuth: an expired link leaves no session,
+            and the guard would bounce that person to /login with no word about
+            why, which is the silent dead end this route exists to end. The page
+            checks the session itself and says which case it is. */}
+        <Route path="/update-password" element={<UpdatePassword />} />
         <Route path="/me" element={<RequireAuth><Me /></RequireAuth>} />
         <Route
           path="/dealer/*"
