@@ -45,9 +45,12 @@ describe("collectStorageInput", () => {
 describe("summarizePayments", () => {
   const p = (amount: number, kind: PaymentKind) => ({ amount, kind });
 
-  it("empty ledger → paid 0, outstanding = bill, storage 0", () => {
+  // toEqual, not toMatchObject — it pins the SHAPE. A kind-blind `paid` total
+  // was removed here on 2026-08-17 because it had no reader and would have
+  // added goods money to a storage collection for whoever first used it. This
+  // assertion is what fails if someone adds it back.
+  it("empty ledger → outstanding = bill, storage 0, and no kind-blind total", () => {
     expect(summarizePayments([], 5000)).toEqual({
-      paid: 0,
       byKind: { payment: 0, deposit: 0, storage: 0 },
       outstanding: 5000,
       storageCollected: 0,
@@ -59,7 +62,6 @@ describe("summarizePayments", () => {
       [p(1000, "deposit"), p(1500, "payment"), p(150, "storage")],
       5000,
     );
-    expect(s.paid).toBe(2650); // every row
     expect(s.byKind).toEqual({ payment: 1500, deposit: 1000, storage: 150 });
     expect(s.outstanding).toBe(2500); // 5000 − (1000 + 1500), storage excluded
     expect(s.storageCollected).toBe(150);
@@ -86,7 +88,6 @@ describe("summarizePayments", () => {
       ],
       5000,
     );
-    expect(s.paid).toBe(1200); // 1000 + 200, the two voided rows excluded
     expect(s.byKind).toEqual({ payment: 0, deposit: 1000, storage: 200 });
     expect(s.outstanding).toBe(4000); // 5000 − 1000 (the voided payment is gone)
     expect(s.storageCollected).toBe(200);
