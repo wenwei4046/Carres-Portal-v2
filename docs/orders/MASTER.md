@@ -307,9 +307,10 @@ size, of any age — does not block, and neither does an uncollected storage fee
 ruling removes grows straight back under another word. The full definition, its ownership
 consequences and what it supersedes live in **§8 · THE GATES**.
 
-🔴 **NOT BUILT.** No table, RPC, route, permission or UI exists. The shipped gate still counts money.
-**Do not describe the correction as implemented, and do not treat the exception's absence as
-permission to keep the retired requirement.**
+✅ **BUILT AND PRODUCTION-VERIFIED 2026-08-17.** Migration `0355` applied and probed; the record,
+its two Finance-only doors, RLS and the no-delete trigger are live, and Slice 3 (PR #830) re-keyed
+the gate, the action engine, the canvas and the API onto it in one change. The authenticated walk
+record is in §8 below.
 
 **THE BALANCE FACT AND THE RELEASE DECISION ARE TWO FACTS.** A manager release MEETS the requirement
 and still prints what the customer owes:
@@ -3987,14 +3988,42 @@ confirmed day, else the promised date; `t3`/`t2` attention, `t1` the deadline; n
 held. **A balance now has a due date because it is owed, not because it holds goods.** Collection
 work runs **independently of the delivery**.
 
-> 🔴 **NOT BUILT — the shipped code still enforces the retired rule.** `deliveryOrderIssueGate`
-> refuses on `balanceReady`; `order-actions.ts` `deliveryHeldOnMoney` withholds
-> `issue_delivery_order` while money holds; the canvas gate counts a `money` requirement; and
-> `work-engine.ts` still names the PIC as the DO's owner, so **automatic issuance is documented but
-> not implemented.** **Law D binds the fix: the screen and the server move in the same slice**, or
-> the gate tells a lie in the opposite direction. The correction slice is
-> [`../cards/CARD-2026-08-16-money-gate-correction.md`](../cards/CARD-2026-08-16-money-gate-correction.md),
-> `IMPLEMENTATION: NOT APPROVED`.
+### SLICE 3 · MONEY GATE CORRECTION — PRODUCTION-VERIFIED 2026-08-17 · AUTHENTICATED ACCEPTANCE PASSED
+
+**The retired rule is out of the code.** Delivered in one slice across all four surfaces (Law D),
+after migration `0355` was applied and verified in production:
+
+| PR | Merged as | Scope |
+|---|---|---|
+| #829 | `06b7d269` | Slice 1 — the Finance exception record, Finance-only doors, RLS, no-delete trigger (migration `0355`) |
+| #830 | `c737d83d` | Slice 3 — `deliveryOrderIssueGate` drops the money fields; `deliveryHeldOnFinanceException` replaces `deliveryHeldOnMoney`; `GateRequirementId` `"money"` → `"finance-exception"`; the issue endpoint reads `order_finance_exceptions`; the decision-B Law-D guard REWRITTEN, not deleted |
+| #831 | `264d44e5` | The stale Old Orders booking hint — money leaves the goods refusal sentence and states its own truth: *collection is still open; it does not block the delivery order* (found by the acceptance walk itself) |
+
+**AUTHENTICATED PRODUCTION ACCEPTANCE — walked 2026-08-17 on `erp.carresofficial.com`, all PASS.**
+Staged end-to-end on **SO-1321** (JAGER-SS ×1 · RM 1,500 outstanding · NETS · confirmed
+Thu 20 Aug, Afternoon), built for the walk through the governed office/Stock/booking doors:
+
+- An owing order issues its DO: **`DO-170826-5050`** minted over RM 1,500 outstanding, and the
+  worklist's next action switched to `Collect` — money left the GATE, never the worklist.
+- A Finance-opened exception refused the same order with the reason on screen:
+  *"Cannot issue the delivery order: Finance is holding this delivery: … — Finance clears it."*
+  The canvas gate read `3 of 4 requirements met` with the Finance line as the one unmet item.
+- Clearing it (evidence recorded) flipped the canvas to `4 of 4 · ✓ No Finance hold` and the DO
+  issued immediately after.
+- The database-layer permission probes passed as the REAL users: `operation` refused with `42501`
+  on open and on clear; blank evidence refused; `finance` opened and cleared. `app_role()` was
+  proven to resolve `operation` before the negative test counted.
+- The canvas held at ~1440px and ~920px; the route fan-in was observed requesting
+  `GET /api/finance/exceptions/:orderId` (200); worker `/health` and the served bundle matched the
+  exact merged SHAs at every step.
+- One stale-cache false alarm was investigated and closed: a pre-deploy tab showed the old
+  four-requirement gate; a fresh load of the same orders showed `✓ No Finance hold`. Stale bundle,
+  not a regression.
+
+**What remains open, deliberately:** automatic DO issuance is documented above but the act is still
+a person's — that is **Slice 2** of
+[`../cards/CARD-2026-08-16-order-route-implementation-plan.md`](../cards/CARD-2026-08-16-order-route-implementation-plan.md),
+not part of this closure.
 
 **AGREEING a date is softer than ISSUING.** It WARNS about goods, money and the calendar so
 nobody promises a day the goods cannot make, but it refuses only two things:
