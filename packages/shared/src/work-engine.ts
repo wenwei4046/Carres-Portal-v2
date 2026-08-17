@@ -113,7 +113,14 @@ export const ORDER_WORK_RULES: readonly WorkRule[] = [
   {
     key: "issue_delivery_order",
     module: "orders",
-    trigger: "date + slot confirmed · core goods ready · money passed · DO not issued",
+    // Decision A + Slice 2 (owner ruling 2026-08-16): money is not a
+    // condition any more, and the SYSTEM issues the document itself on the
+    // gate's flip points (booking confirmed · Finance exception cleared).
+    // This rule survives as the SAFETY NET — it surfaces only for the rare
+    // ready order whose automatic issue misfired, and the fallback door it
+    // opens is the same one mint.
+    trigger:
+      "date + slot confirmed · core goods ready · no OPEN Finance exception · DO not issued (the system issues automatically; this surfaces only when that missed)",
     owner: "the order's PIC",
     action: orderActionQueue("issue_delivery_order"),
     dueRule:

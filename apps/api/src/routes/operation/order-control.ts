@@ -560,12 +560,19 @@ orderControlRouter.post("/:id/booking/confirm", async (c) => {
     partnerWarnings = [];
   }
 
+  // ⭐ SLICE 2 — the booking confirmation is the last human step of the normal
+  // flow, so the SYSTEM issues the delivery order here the moment the gate is
+  // ready (owner ruling 2026-08-16, rule 12). Fail-soft by the helper's own
+  // contract: a miss costs nothing — the booking stays recorded, and the
+  // fallback door plus the Work engine still stand.
+  const autoDeliveryOrder = await autoIssueDeliveryOrder(sb, idCheck.data);
+
   // C7 — the goods/money sentences ride the SUCCESS response now. They are the
   // same figures the old 422 carried; what changed is that they no longer cost
   // the customer their confirmed date. `gateWarnings` is a new key, so an older
   // browser simply does not read it (the same degradation rule as
-  // `partnerWarnings`).
-  return c.json({ control: data, partnerWarnings, gateWarnings });
+  // `partnerWarnings`); `autoDeliveryOrder` degrades the same way.
+  return c.json({ control: data, partnerWarnings, gateWarnings, autoDeliveryOrder });
 });
 
 /**
@@ -811,6 +818,104 @@ orderControlRouter.get("/:id/delivery-attempts", async (c) => {
   return c.json({ attempts: data ?? [] });
 });
 
+/**
+ * The ONE mint (Law D). Both doors — the manual endpoint below and the
+ * automatic issue on a gate flip — produce the document through this exact
+ * write, so a second numbering can never grow beside the first.
+ *
+ * The `is("do_number", null)` filter keeps the mint idempotent at the
+ * DATABASE: two callers in the same instant cannot produce two numbers, and
+ * the loser reads back the winner's.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function mintDeliveryOrder(sb: any, orderId: string) {
+  const doNumber = docNumber({
+    prefix: "DO",
+    date: todayIsoMYT(),
+    seed: orderId,
+    digits: 4,
+  });
+  const { data: updated, error } = await sb
+    .from("orders")
+    .update({ do_number: doNumber })
+    .eq("id", orderId)
+    .is("do_number", null)
+    .select("id, do_number")
+    .maybeSingle();
+  if (error) return { updated: null, doNumber, error };
+  if (updated) {
+    // The audit line. FAIL-SOFT, the same door and the same rule as T4/T6/T8:
+    // an annotation hiccup must never undo a document that has been issued.
+    try {
+      await sb.rpc("operation_add_annotation", {
+        p_order_id: orderId,
+        p_content: `${orderActionDone("issue_delivery_order")} — ${doNumber}`,
+        p_tag: null,
+      });
+    } catch {
+      // Recorded nowhere else is better than refusing a document that exists.
+    }
+  }
+  return { updated, doNumber, error: null };
+}
+
+/**
+ * ⭐ SLICE 2 — THE SYSTEM ISSUES THE DELIVERY ORDER (owner ruling 2026-08-16,
+ * rule 12; `docs/orders/MASTER.md` §0.1/§8). Called at the moments the gate
+ * can flip to ready — the customer confirming a date+slot, and Finance
+ * clearing its exception — so the paper exists the moment it is allowed to,
+ * with nobody pressing anything.
+ *
+ * FAIL-SOFT BY CONTRACT: this runs on the tail of ANOTHER act's success, and
+ * an automatic courtesy may never turn that success into an error. Any miss —
+ * gate not ready, a read hiccup, RLS refusing this caller — returns null and
+ * the safety nets stand: the manual endpoint below is still there, and the
+ * Work engine still surfaces `issue_delivery_order` for a ready order whose
+ * document does not exist.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function autoIssueDeliveryOrder(sb: any, orderId: string): Promise<string | null> {
+  try {
+    const first = await loadBookingContext(sb, orderId, null);
+    if (!first.ok) return null;
+    const bookedScope =
+      (first.ctx.control?.booking_groups as DeliveryGroupKey[] | null) ?? null;
+    const loaded = bookedScope ? await loadBookingContext(sb, orderId, bookedScope) : first;
+    if (!loaded.ok) return null;
+    const { order, control, gate } = loaded.ctx;
+    if (order.do_number) return order.do_number as string;
+
+    const { data: financeExceptions, error: feError } = await sb
+      .from("order_finance_exceptions")
+      .select("id, status, reason, opened_at, cleared_at, clear_evidence")
+      .eq("order_id", orderId);
+    if (feError) return null;
+
+    const issue = deliveryOrderIssueGate({
+      bookingConfirmed: (control?.booking_stage as string | null) === "confirmed",
+      confirmedDateIso: (control?.confirmed_date as string | null) ?? null,
+      confirmedTimeSlot: (control?.confirmed_time_slot as string | null) ?? null,
+      gate,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      financeExceptions: ((financeExceptions ?? []) as any[]).map((row) => ({
+        id: row.id as string,
+        status: row.status as "open" | "cleared",
+        reason: row.reason as string,
+        openedAt: (row.opened_at as string | null) ?? null,
+        clearedAt: (row.cleared_at as string | null) ?? null,
+        clearEvidence: (row.clear_evidence as string | null) ?? null,
+      })),
+      holidays: myHolidaySet(),
+    });
+    if (!issue.ok) return null;
+
+    const { updated } = await mintDeliveryOrder(sb, orderId);
+    return (updated?.do_number as string | undefined) ?? null;
+  } catch {
+    return null;
+  }
+}
+
 orderControlRouter.post("/:id/delivery-order", async (c) => {
   const auth = c.var.auth;
   requireOperationOrPrincipal(auth.role);
@@ -878,24 +983,11 @@ orderControlRouter.post("/:id/delivery-order", async (c) => {
     );
   }
 
-  // The document date is TODAY — the day it is issued and handed over, which is
-  // what the locked scheme's DDMMYY segment means.
-  const doNumber = docNumber({
-    prefix: "DO",
-    date: todayIsoMYT(),
-    seed: order.id,
-    digits: 4,
-  });
-  // `is("do_number", null)` makes the mint idempotent at the DATABASE, not just
-  // in the read above: two operators pressing at the same moment cannot produce
-  // two numbers, and the loser re-reads the winner's.
-  const { data: updated, error } = await sb
-    .from("orders")
-    .update({ do_number: doNumber })
-    .eq("id", idCheck.data)
-    .is("do_number", null)
-    .select("id, do_number")
-    .maybeSingle();
+  // The document date is TODAY — the day it is issued and handed over, which
+  // is what the locked scheme's DDMMYY segment means. The mint itself is the
+  // ONE shared implementation (Slice 2): this endpoint survives as the
+  // idempotent fallback door for the rare flip the automatic issue missed.
+  const { updated, error } = await mintDeliveryOrder(sb, idCheck.data);
   if (error) {
     const m = mapPgError(error);
     return c.json(m.body, m.status);
@@ -907,18 +999,6 @@ orderControlRouter.post("/:id/delivery-order", async (c) => {
       .eq("id", idCheck.data)
       .maybeSingle();
     return c.json({ order: raced ?? { id: idCheck.data, do_number: null }, issued: false });
-  }
-
-  // The audit line. FAIL-SOFT, the same door and the same rule as T4/T6/T8: an
-  // annotation hiccup must never undo a document that has been issued.
-  try {
-    await sb.rpc("operation_add_annotation", {
-      p_order_id: idCheck.data,
-      p_content: `${orderActionDone("issue_delivery_order")} — ${doNumber}`,
-      p_tag: null,
-    });
-  } catch {
-    // Recorded nowhere else is better than refusing a document that exists.
   }
 
   return c.json({ order: updated, issued: true });
