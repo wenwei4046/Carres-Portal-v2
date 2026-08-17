@@ -5180,8 +5180,14 @@ function BookingBlock({
         : "goods not all reserved",
     );
   else if (!goodsReadyHint && !tripGroups) gateHints.push("goods not all reserved");
-  if (balanceOwingHint)
-    gateHints.push(`RM ${outstandingHint.toFixed(2)} outstanding`);
+  // Decision A (owner ruling 2026-08-16, docs/orders/MASTER.md §8) — money no
+  // longer blocks the delivery order, so it may not ride the "cannot be
+  // issued" sentence above. It gets its own honest line: the collection stays
+  // open, and the paper issues regardless. Same voice as the server's own
+  // warning ("collection is still open").
+  const moneyHint = balanceOwingHint
+    ? `RM ${outstandingHint.toFixed(2)} outstanding — collection is still open; it does not block the delivery order`
+    : null;
   const FIELD =
     "rounded border border-base-300 bg-white px-1.5 py-0.5 text-body text-base-900 outline-none hover:border-base-400 focus:border-primary";
   return (
@@ -5411,6 +5417,13 @@ function BookingBlock({
             <div className="text-right text-meta text-warning py-0.5">
               Not ready yet: {gateHints.join(" · ")} — the delivery order cannot
               be issued until these are cleared
+            </div>
+          )}
+          {/* Money is a separate sentence because it is a separate truth
+              (decision A): it warns, it never blocks the paper. */}
+          {moneyHint && (
+            <div className="text-right text-meta text-warning py-0.5">
+              {moneyHint}
             </div>
           )}
         </DRow>

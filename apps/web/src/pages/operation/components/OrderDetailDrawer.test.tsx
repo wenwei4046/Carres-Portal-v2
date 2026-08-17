@@ -175,6 +175,21 @@ describe("OrderDetailDrawer — C7, the delivery order", () => {
     expect(SRC).not.toMatch(/system refuses to\s*\n?\s*confirm/);
   });
 
+  it("⭐ money never rides the goods refusal sentence — decision A (2026-08-16)", () => {
+    /* Found in the Slice 3 production walk: the booking hint lumped the
+       outstanding balance into "the delivery order cannot be issued until
+       these are cleared" — a refusal that no longer happens. Goods still
+       block; money warns on its own line and says so. */
+    // The balance is no longer pushed into the blocking gateHints list…
+    expect(SRC).not.toMatch(/gateHints\.push\(`RM /);
+    // …it has its own sentence, in the server warning's own voice…
+    expect(SRC).toContain(
+      "collection is still open; it does not block the delivery order",
+    );
+    // …and the blocking sentence survives for the thing that DOES refuse.
+    expect(SRC).toContain("be issued until these are cleared");
+  });
+
   it("the kebab no longer says `Confirm delivery` — the door it opens marks delivered", () => {
     // C3 reported this rename as C7's and read it as `Issue delivery order`;
     // the modal it opens attaches the customer's SIGNED DO and delivers, so the
