@@ -15,11 +15,23 @@ export const orderStatusSchema = z.enum([
 ]);
 export type OrderStatus = z.infer<typeof orderStatusSchema>;
 
+/**
+ * The stage an order IS in — this list must equal the Postgres enum exactly,
+ * because `orderSchema.parse()` runs on live rows and a value it does not know
+ * throws.
+ *
+ * It had drifted both ways. `placed` was listed here but migration 0167 remapped
+ * it to `confirmed` and dropped it from the type, so no row can hold it —
+ * `placed` survives only as a SYNTHETIC FILTER value (`ListOperationOrdersQuery`),
+ * where the route turns it into `status='place'`. And `waiting` — a real value
+ * since 0028, set by the partner-rejection lane (`resume-dispatch.ts`) — was
+ * missing, so parsing any order in that stage threw.
+ */
 export const operationStageSchema = z.enum([
-  "placed",
   "confirmed",
   "in_production",
   "ready_to_dispatch",
+  "waiting",
   "dispatched",
   "delivered",
 ]);
