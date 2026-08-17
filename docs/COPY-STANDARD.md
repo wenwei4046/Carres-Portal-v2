@@ -54,8 +54,33 @@ If any answer is missing, the sentence is not written yet.
 
 ## Row action-line template
 
-Every list row ends with a plain-English sentence telling the reader the next
-action. **Length ≤ 10 words.** Shape:
+**APPROVED / LOCKED, owner ruling 2026-08-14.** Object identity, owner identity and action copy
+are separate UI fields. The object belongs to the row/card header. The resolved owner belongs to
+structured metadata or an avatar chip. **The action sentence writes only the action** and never
+repeats an SO number, customer or staff name that the surrounding row already states.
+
+Where a Register is a reference surface, it may show only the fact/problem line. Full action,
+owner, completion and due remain available in Sales Order detail / Work Engine. Where it shows
+both lines, the shape is:
+
+    [Fact or problem]
+    [owner avatar metadata] [Action]
+
+The avatar is not part of the sentence. Hover/focus reveals the resolved person's full name.
+The action stays concise; it does not append the completion instruction unless the operator can
+actually complete that result from this surface.
+
+Sales Order Register example:
+
+    ✔ ⚠ No delivery date
+      [SH] Ask customer for a delivery date
+
+The row already has `SO No` and `Customer`, so neither is repeated. `[SH]` is a separate avatar
+chip whose accessible name/hover is `Shasha`; the stored action is `Ask customer for a delivery
+date`, not `Shasha · Ask customer…`.
+
+For a standalone list with no surrounding object/recipient columns, the action may carry the
+specific object or outside party needed to make it unambiguous. **Length ≤ 10 words.** Shape:
 
     [Verb] + [Object with a name] + [When or why]
 
@@ -72,6 +97,9 @@ Anti-patterns (all fail):
     ✘ You should follow up with the factory... (passive · no name · too long)
     ✘ Handle this.                             (all three failures)
     ✘ Awaiting action.                         (passive · does not say WHO acts)
+    ✘ Tan Qu Qu · Ask customer…                (structured owner degraded into copy)
+    ✘ SO-1318 · Delivery date missing…         (object identity duplicated in its own row)
+    ✘ Save the agreed date.                    (false when this surface cannot save it)
 
 ---
 

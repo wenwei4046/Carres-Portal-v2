@@ -3,9 +3,10 @@
 > **The only Payment document.** Overwritten when re-ruled; never versioned.
 > **You read `CLAUDE.md` and this file.**
 >
-> **The money ARITHMETIC and the delivery GATE live in
-> [`../orders/MASTER.md`](../orders/MASTER.md) §8, because they decide whether goods move.**
-> This file owns the **collections DESK** — the screen where somebody chases the money.
+> **Money arithmetic, receipt verification and any payment exception live here.** Outstanding
+> alone never blocks delivery. See [`../orders/MASTER.md`](../orders/MASTER.md) §8 for the
+> read-only order summary and the owner ruling that Operation executes unless Finance explicitly
+> records `payment not received / payment exception`.
 
 ---
 
@@ -55,6 +56,12 @@ One shared rule: `packages/shared/src/order-money.ts`. Money spelling:
 - **The promise-to-pay reuses `balance_due_date`.** No new column.
 - **Recording a payment mints a receipt number** from the portal's own
   `PREFIX-DDMMYY-NNNN` scheme, seeded on the order id, so a reprint matches the original.
+- **APPROVED / LOCKED RECEIPT + DELIVERY RULE — owner ruling 2026-08-12.** Operation follows
+  outstanding money and uploads the customer's receipt. Submission completes Operation's action
+  and exposes the record to Finance; Operation does not verify settlement and never changes price.
+  Finance verifies receipt/payment truth. Outstanding, pending verification or silence from
+  Finance never blocks delivery. Only Finance explicitly recording `payment not received` or a
+  governed payment exception creates a delivery hold; Finance also clears that hold.
 - **`Chase` is a banned word portal-wide.** The action is `Call {customer} — …`; the stored
   column `last_chased_at` is spelt on screen as **`Message copied {when}`**, and the send path
   copies the message on BOTH branches so the sentence is true of what the portal actually

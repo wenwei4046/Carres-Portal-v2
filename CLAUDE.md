@@ -156,10 +156,72 @@ Before planning, changing code, or declaring the state of any ERP module:
    truth. Do not move through further major design decisions while an approved ruling exists only in
    conversation.
 
-**PLAN / DESIGN restart contract.** If a new chat is told *“Register Template — continue from repo
-governance”*, it reads this Constitution → ERP Architecture → UI MASTER → target module MASTER,
-states the approved baseline and unresolved gaps, names the single decision surface, and works only
-on those gaps. It does not begin with a new survey or a blank-sheet redesign.
+### OWNER-APPROVED OBJECT / DOMAIN ARCHITECTURE COMPLETENESS LAW — APPROVED / LOCKED, owner ruling 2026-08-12
+
+**A mission named for a business object or domain is not a local screen question.** Before the
+planner may claim that planning is complete, name the “next unresolved decision”, or split an
+implementation Card for a Sales Order, Purchase Order, Receipt, Claim, Payment or equivalent
+object, it must prove object-level coverage. **The planner owns completeness; Jess owns business
+decisions and final approval.** Jess is not expected to know which questions, reference functions,
+downstream consequences or international patterns require investigation. The planner plans ahead,
+surfaces material omissions Jess did not ask about, and explains why they matter.
+
+The planner first enumerates and audits the object's complete **relevant** surface: creation and
+source · identity and numbering · Register / view / detail · edit · revision / amendment /
+versioning · approval and permissions · documents / PDF and historical documents · copy /
+duplicate · cancel / void · settings / maintenance / master data · scan / import · search / filter /
+columns · selection / bulk actions · context actions · history / audit · exceptions · upstream
+source · concurrency / rollback · lifecycle completion · reporting / export · every relevant
+downstream consequence, plus any capability revealed by Carres or reference evidence. This is a
+completeness checklist, not an instruction to build every capability.
+
+Reference-product function mining is **object-level, never screenshot-level**. Inspect the relevant
+backend, workflow and capability surface — not only visual layout and not only the feature the
+owner happened to mention. Use the governed references that fit the object: especially 2990 for
+Sales Orders, plus AutoCount, Linear, Shopify and appropriate mature / international ERP products.
+Carres semantics and ownership are evaluated first; references provide proven functions and faster
+reusable ideas, never foreign business truth.
+
+The required output is one complete mapping:
+
+```
+REFERENCE CAPABILITY
+→ CARRES CURRENT EQUIVALENT / OWNER
+→ KEEP / ADAPT / RELOCATE / BUILD / REJECT
+→ WHY
+→ DEPENDENCY / CONFLICT
+```
+
+For every proposed change, apply the analogous ERP consequence check. A Sales Order Amendment, for
+example, must trace Customer commitment · existing PO / Supplier commitment · Receiving · reserved
+or physical Stock / Unit allocation · Delivery / DO commitment · Payment / deposit / refund and
+commercial truth · current and historical customer-facing PDF · Work actions · permissions ·
+history / audit · Finance · Claims · Issue Tracker and every other affected owner. The source module
+may summarise or link; it does not acquire another module's writer.
+
+Missing evidence is **UNKNOWN**, never an invitation to ask the owner to remember another feature,
+say “check international”, point out Settings, or discover the next consequence for the planner.
+Locked truth is protected but is not a feature freeze: after research, the planner may recommend a
+useful missing capability, while never asking Jess to re-approve current truth.
+
+Only after this pass identifies the complete unresolved set may the planner call anything **NEXT**,
+sequence genuine owner decisions one at a time, or declare the mission complete. Maintain a
+proposed **unnumbered** dependency roadmap; never invent an official Card number. Before asking a
+local owner question, the planner must be able to state concisely: current mission · object-level
+coverage completed · important gaps · cross-module consequences · reference evidence · why this is
+genuinely the next owner decision. Synthesise; do not dump repetitive research. **The owner does
+not function-mine the reference product for the planner, and a local answer is not an architecture
+audit.**
+
+**PLAN / DESIGN restart contract.** A fresh Plan / Design chat reads this Constitution → ERP
+Architecture → target module MASTER → UI MASTER when UI is involved. It resumes approved truth,
+then performs or resumes the relevant object/domain completeness pass before naming the next
+decision surface. A Register mission additionally follows UI MASTER's Register restart contract.
+It does not begin with a blank-sheet redesign, repeat settled research, or reduce an object mission
+to the page/question in the prompt. It ends at the existing governed boundary: **READY FOR CARD**
+when a buildable slice is fully governed; **PLAN MISSION COMPLETE** when no planning work remains;
+**START A NEW CHAT** when the next mission is a different object/domain. These labels do not create
+Card numbers or license application implementation.
 
 **CONTINUOUS BUILD restart contract — separate and unchanged in purpose.** If a new chat is told
 *“Sales Order — continue next Card”* or to run continuous Card-build mode, it reads this

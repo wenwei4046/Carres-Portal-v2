@@ -78,22 +78,37 @@ LAYER 2 · DISPLAY      picks which ONE goes first in the table row.
 
 The old ladder's ordering survives ONLY as input to Layer 2.
 
-## Law 2 — every action carries six things
+## Law 2 — every action is a structured contract
 
-A thing is not an action unless all six exist. If one is missing, the design is not
-finished — do not build it.
+**APPROVED / LOCKED, owner ruling 2026-08-14.** A thing is not an action unless the
+contract below is complete. If one field is missing, the design is not finished — do not
+build it. The UI is generated from these facts; it never stores a free-text action sentence
+as a second source of truth.
 
 | | |
 |---|---|
 | **Trigger** | the condition that makes it appear, computed from stored data |
-| **Label** | verb + clear object; name the party whenever an outside party is involved (COPY-STANDARD) |
+| **Owner rule** | the governed rule that answers who owns this action — Responsible Salesperson, current PO Duty, current GRN Duty, Payment owner, Delivery owner, Service Case owner, or another module-governed rule |
+| **Resolved owner** | the person or duty resolved from that rule; structured identity, never a name embedded into the action sentence |
+| **Action** | verb + clear object; name the outside recipient only when the action needs one (COPY-STANDARD) |
 | **Checklist** | the steps that close it — each one DERIVED from a stored signal or an INPUT the system stores |
-| **Completion** | a condition the SYSTEM measures. Never "someone says they did it" |
-| **Due** | when it turns late, in **working days** |
-| **Task Owner** | assigned automatically by the module that raised the action; it may change hands |
+| **Completion fact** | a condition the SYSTEM measures. Never "someone says they did it" |
+| **Due** | the governed working date/time and the calendar that makes it late |
+| **Source object** | the one owning business object and stable identity that produced the action |
+| **Cover rule** | the roster / buddy-cover rule that resolves who acts today while retaining normal-owner and cover evidence |
 
-**Case Owner** is separate and is never written on an action: one person owns the customer's
-case from start to finish and never changes, while task owners come and go.
+**Action has an Owner. Sales Order does not have one universal Owner.** One Sales Order may
+raise several actions whose owner rules differ. A missing Customer Delivery date belongs to the
+Responsible Salesperson; issuing a PO belongs to current PO Duty; receiving belongs to current
+GRN Duty. A permanent Sales Order `Owner` column would collapse those different truths into one
+false answer.
+
+**Case Owner** is separate: one person may be answerable for a customer's case from start to
+finish, while action owners differ by required result. Case Owner is not copied onto every action.
+
+**Cover changes who acts today, not who normally owns the action.** When Shasha is away the
+contract retains `Normal owner: Shasha` and records/resolves `Today's cover: Yu Jun`. Work appears
+for Yu Jun automatically, while the source owner rule and cover evidence remain inspectable.
 
 ## Law 2A — THREE calendars, and every action names which one it counts on
 

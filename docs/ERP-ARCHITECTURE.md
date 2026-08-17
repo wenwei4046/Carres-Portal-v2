@@ -65,6 +65,24 @@ If two surfaces must agree on a number, they call ONE function. **Not two implem
 currently agree** — that is the arrangement under which a third, wrong one grows unnoticed.
 Proven three times in V1: the money rule, the storage rule, and the category (still unfixed).
 
+### Law E · An object decision carries every ERP consequence
+A decision about one business object is never only a decision about its page. Before a planner may
+call the architecture complete or identify the next owner decision, it maps the object's relevant
+lifecycle and asks every affected record owner what changes, what must wait, and what remains
+read-only. The planner owns finding those consequences; Jess owns the business ruling and final
+approval.
+
+For example, changing a Customer Order may affect an existing Purchase Order and supplier promise,
+Receiving expectations, Stock / Unit reservation, Delivery / DO commitment, Payment / deposit and
+commercial truth, customer-facing document versions, Work actions, Finance, Claims, Issue Tracker,
+permissions and audit evidence. The same test applies analogously to Purchase Order, Receiving,
+Claim, Payment, Delivery, Warehouse Unit and every other domain. **A consequence does not transfer
+ownership:** the source module links to or reads the owning module; it never gains a second writer.
+
+The governing completeness checklist, object-level reference capability matrix, evidence standard
+and Plan / Design restart boundary live in `CLAUDE.md`'s **OWNER-APPROVED OBJECT / DOMAIN
+ARCHITECTURE COMPLETENESS LAW**. This blueprint supplies the owner map that pass must use.
+
 > **The test that decides all four, and it is the one V1 needed and did not have:**
 > ```
 > Does this screen CREATE, CHANGE or CLOSE the record?
@@ -193,10 +211,11 @@ else is a consequence of it.**
 > receiving a line (D2, already removed) · reserving and releasing stock · editing carrier
 > configuration (D5) · recording a payment. **Each becomes a LINK.**
 >
-> **What STAYS, and why it is not arbitrary:** the delivery BOOKING and the money GATE stay
-> with the order, because **both are promises to the customer, and the customer's promise is
-> what this module owns.** A booking is *"we told them Tuesday"*; the gate is *"we do not send
-> goods that are not paid for"*. Neither is a fact about a truck or a ledger.
+> **What STAYS:** the delivery BOOKING stays with the order because it is a promise to the
+> customer. **The former automatic money gate is retired by owner ruling 2026-08-12.** Operation
+> executes delivery; it does not adjudicate whether an uploaded receipt cleared. Outstanding
+> money creates collection work, never an automatic delivery hold. Only an explicit Finance-owned
+> `payment not received / payment exception` decision may hold delivery.
 
 ---
 
@@ -312,12 +331,13 @@ do not chase payment for goods you cannot deliver).
 
 **LINKS TO** — the customer order.
 
-> ### THE GATE STAYS WITH THE ORDER, THE MONEY MOVES HERE
+> ### MONEY AND ITS EXCEPTION MOVE HERE
 > **The arithmetic of "what is still owed" is ONE function** (Law D) and Money In owns it.
-> **Whether that number stops a delivery is the Customer Order's rule**, because it is a
-> decision about the promise, not about the ledger. V1 proved they are different: a manager may
-> RELEASE a delivery without FORGIVING the money, and the two answers part company on exactly
-> that order.
+> **Outstanding by itself never stops delivery.** Operation follows outstanding and uploads the
+> receipt; submission completes Operation's collection act and makes it visible to Finance.
+> Finance owns verification. Unless Finance explicitly records that payment was not received or
+> opens a payment exception, Delivery continues. The hold therefore follows a Finance decision,
+> never a balance calculation or Operation judgement.
 
 > ### STORAGE — FROZEN (§6.1, Decision ①)
 > **Money In owns the FEE** — the rate table, the one arithmetic, the charge, the collection

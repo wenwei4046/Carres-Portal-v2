@@ -79,6 +79,36 @@ Matt · Bed · Sofa · Acc · Total
   available width.
 - `Columns` decides which optional factual columns to display, not staff-designed layout widths;
   reload restores the shared default layout.
+- **APPROVED / LOCKED CUSTOMER DELIVERY ACTION PRESENTATION — owner ruling 2026-08-14.**
+  A Sales Order has no universal action owner and the Register gains no permanent `Owner` column.
+  When `Customer Delivery` is empty, that cell may render:
+  ```text
+  ⚠ No delivery date
+  [SH] Ask customer for a delivery date
+  ```
+  The first line is the fact. `[SH]` is a structured avatar chip for the action's resolved
+  `Responsible Salesperson` owner rule; hover/focus exposes `Shasha`, and the avatar is never part
+  of the action sentence. The existing `SO No` and `Customer` columns are not repeated. Do not add
+  `Save the agreed date` unless the Register actually owns that write door. If the Register remains
+  reference-only, it may show only `⚠ No delivery date`; the full action stays in Sales Order
+  detail / Work Engine. Register, My Work and Team Work read the same structured action contract
+  and change only presentation density.
+- **There is no standalone Register scope dropdown** such as `Not delivered` / `All orders`.
+  The Sales Order truth/register opens on every non-cancelled order and every narrowing happens
+  through the shared global Search or the matching column's filter. A second scope control would
+  duplicate those filter doors and silently turn the Register into a work queue.
+- **The approved default columns fit cleanly without horizontal scrolling.** The Register does
+  not open in 2990's always-overflow state. Horizontal scrolling begins only after the operator
+  uses `Columns` to add enough optional columns to exceed the available width. From that point the
+  listing may continue horizontally for every added governed column; default columns never shrink
+  to absorb the additions and there is no arbitrary optional-column limit.
+- **The Sales Order row right-click menu copies 2990's menu capability and grouping:** `Edit` ·
+  `View` · `Preview` · `Print` · divider · `Issue delivery order` ·
+  `Copy to new Sales Order` · divider · `Cancel SO`. Each item acts on that one Sales Order.
+  Permission- or state-ineligible items do not render. `Issue delivery order` is a door into the
+  owning governed workflow and its existing goods, money, date and slot gates; the Register does
+  not gain a second writer. `Cancel SO` uses the Customer Order's governed cancellation path and
+  never means hard delete.
 
 ### WHAT SALES ORDER OWNS
 ```
@@ -137,17 +167,103 @@ Nothing survives merely because it is already there.**
 **Current authority path:** `CLAUDE.md` → this MASTER → `docs/ui/MASTER.md` when UI detail is
 needed. There is no build queue, handover, checkpoint, cutover spec, or separate Stage 3 law.
 
+**Sales Order Plan / Design restart boundary.** A fresh planning chat does not continue from the
+last local Sales Order question. It first applies the Constitution's OWNER-APPROVED OBJECT / DOMAIN
+ARCHITECTURE COMPLETENESS LAW to the whole relevant Sales Order lifecycle, resumes one capability
+matrix and unnumbered dependency roadmap, and traces consequences through Purchasing, Receiving,
+Stock / Unit, Delivery / DO, Payment / Finance, Claims, Issue Tracker, Work, permissions, audit and
+versioned customer documents. It may call a decision **NEXT** only after that pass proves why it is
+next. The approved Register and amendment/revision truths below are baselines, not questions for
+Jess to approve again. No planning pass licenses Sales Order/Register/UI/application implementation
+or an invented Card number.
+
 **Built and closed:** Stage 1 register/read-only workspace (`182d1cae`); Stage 2 create/edit and
 append-only revision engine (`2a6a5e9e`); Stage 3 cards 3.0–3.5 through the amendment spine and
 `base_contractual_hash` (`8e8224dd`). Stage 3 runs continuously between approved cards, with a
 separate commit and fresh evidence for each card. Green CI is the floor: exercise each route,
 database function branch, screen at 1440 and 1130, guard negative control, and migration for real.
 
-**The wall:** do not build 3.6 ISSUE, 3.7 ACCEPT, or 3.8 Class-A APPLY. The amendment document's
-visual form and ACCEPT signing mechanism remain undecided; APPLY continues to refuse until both
-exist. Approval is permission to try, acceptance binds the customer to the exact issued document,
-and only APPLY may move the order. An approved request currently has no withdrawal path; that is
-an unresolved business ruling, not an engineering cleanup decision.
+**APPROVED / LOCKED AMENDMENT + REVISION RULE — owner ruling 2026-08-12.** Follow 2990's
+proven operational shape, then strengthen its audit boundary for Carres:
+
+- Editing a Sales Order never asks the customer to sign again. There is no customer-acceptance,
+  customer-signature or customer-issued amendment-document gate.
+- Ordinary staff may view the complete Sales Order but may not directly change its commercial or
+  execution truth. They submit a change request with a reason. A management user — including a
+  Manager or COO — may edit directly or approve / reject a staff request. The exact management
+  role names come from the governed role directory; the UI must not hard-code job-title guesses.
+  Management authority removes the wait for a second approver; it never removes the audit duty:
+  every direct management edit also requires a reason.
+- This authority is the same before and after a Supplier Order. A PO does not decide who may edit;
+  it decides which additional consequences must be checked. When an affected item has entered a
+  Supplier Order, the current Sales Order remains unchanged while Carres coordinates the affected
+  PO / Supplier consequences. Purchasing owns PO / Supplier confirmation and PO revision; Sales
+  Order owns the resulting customer-order revision.
+- **Revision 1 is the immutable original Sales Order.** It is never overwritten or reconstructed
+  from the current row. Every approved or management-applied change creates the next immutable
+  revision and keeps every earlier revision available.
+- The operator can see the revision number, who requested / changed / approved it, when, the
+  reason, and a field-level **Before / After** comparison. The actual PDF for each revision is
+  rendered from that revision's own stored snapshot, never from today's order.
+- A pending or rejected request is not a revision and does not change the Current Sales Order.
+  Only an applied change advances Current to the next revision.
+- **APPROVED / LOCKED APPLY GATE — owner ruling 2026-08-12.** Management approval decides that
+  Carres accepts the commercial change; it does not bypass the modules that must execute its
+  consequences. If no governed downstream fact is affected, approval may apply immediately. If
+  Purchasing / Supplier, Receiving, Stock / Unit allocation, Delivery / DO, Payment / refund or
+  another owning module is affected, approval creates the required owner work and Current remains
+  unchanged. Every required owner must confirm that its consequence is executable. Only after all
+  required confirmations pass does the system apply the amendment once, atomically, and create the
+  next immutable Sales Order revision. A rejection, block or failed confirmation returns the
+  amendment to Management; it creates no partial Sales Order revision and no half-applied customer
+  order. Customer signature is never part of this gate.
+- **APPROVED / LOCKED FULFILMENT CONSEQUENCE — owner ruling 2026-08-12.** Amendment eligibility
+  is per affected item, never all-or-nothing merely because another line is further ahead:
+  - A **Delivered item is historical fact** and can never be changed, removed or replaced through
+    Sales Order Amendment. Customer change, return, exchange, refund or repair after delivery
+    starts the governed Service Case / Delivery Return / Replacement / Payment Refund path. Those
+    records link back to the Sales Order; they never rewrite what was sold and delivered. An
+    undelivered sibling line on the same order may still take its own amendment path.
+  - An **undelivered item already ordered from a Supplier** is normally not changeable: the
+    operator's default answer is that the goods have already been ordered. Carres nevertheless
+    keeps an explicit exception request for the rare case that must proceed. It requires a reason,
+    Management approval, and Purchasing / Supplier confirmation that the consequence is executable;
+    Current remains unchanged until the atomic APPLY gate passes. The exception is never a casual
+    direct edit and never silently rewrites the PO.
+  - A **Unit ID / stock allocation is Stock-owned execution truth.** Ordinary staff and the Sales
+    Order edit / amendment surface may read it but may never choose, release, replace or rewrite it.
+    When an affected undelivered item already has a Unit allocation, Management approval creates a
+    Stock-owner confirmation. While the request waits, the existing Unit remains reserved and a
+    replacement Unit is not prematurely consumed. Final APPLY is one atomic outcome: release the
+    old Unit, create the new immutable Sales Order revision, and allocate a Unit that satisfies the
+    approved new specification. If Stock cannot confirm a suitable allocation, the amendment
+    returns to Management and none of those three changes occurs.
+  - A **Delivery Order / booking is Delivery-owned execution truth.** Customer contact corrections
+    that do not affect delivery need no Delivery confirmation. A change to delivery address,
+    Customer Delivery date, item, quantity, physical specification or load requires Delivery-owner
+    confirmation whenever a DO or booking exists. The existing DO / booking remains current while
+    the request waits; Sales Order never edits it directly. Final APPLY creates the new Sales Order
+    revision and instructs Delivery to revise / reissue its own DO or booking through Delivery's
+    governed path. Once the affected goods are loaded or the trip has departed, Sales Order
+    Amendment is no longer available: the event is handled as a Delivery Exception, without
+    rewriting the original order or delivery record.
+  - **Price and payment never become Operation edit fields.** Selling price originates in the
+    Sales Portal and changes only through the governed Management path. Payment / Finance owns
+    receipt verification, payment truth, invoice, credit, debit and refund consequences. Operation
+    sees no price by default, follows the outstanding amount, uploads the customer's receipt and is
+    then done; the submission becomes visible to Finance. An amendment that changes value creates
+    Finance consequence work but does not wait merely for routine verification and does not let
+    Sales Order rewrite `Paid`, the ledger or an invoice. Outstanding or Finance silence never
+    blocks amendment APPLY or delivery. Only an explicit Finance-owned `payment not received /
+    payment exception` may hold delivery until Finance clears it.
+
+**The implementation wall has changed:** the already-built amendment spine still reflects the
+superseded customer-acceptance model. Do not build its former 3.6 ISSUE, 3.7 customer ACCEPT or
+3.8 Class-A APPLY sequence. Before amendment application can be implemented, replace that model
+with the approved Management-decision → affected-owner-confirmation → atomic-APPLY boundary above,
+define the exact consequence/owner matrix, and provide a withdrawal / rejection path. Current code
+may record a proposal but must continue to refuse APPLY until that replacement workflow is
+governed and built.
 
 **Current approved card — Sales Order production cutover, then stop:**
 1. Make the new Sales Order register the official Sales Orders navigation entry.
@@ -1778,8 +1894,9 @@ working days before the date (**1 today**) · the checklist adds driver name, dr
 vehicle number and lift/registration requirements **for condominiums**.
 
 **`Issue delivery order`** — trigger: customer-confirmed date **AND** slot **AND** core goods
-ready **AND** the payment condition passed — **all four. The action appears only when it can
-actually be done.** The SYSTEM produces the document; **nobody writes one by hand**, and the
+ready **AND no active Finance payment exception**. Outstanding or a receipt waiting for routine
+Finance verification is not an exception and does not block this action. The SYSTEM produces the
+document; **nobody writes one by hand**, and the
 number is the locked `DO-DDMMYY-NNNN` scheme seeded on the order id, so a reprint matches the
 signed original.
 
@@ -1830,29 +1947,19 @@ three different questions and each pointed at a column nobody wrote.
 Trigger: outstanding > RM 0 · completion: outstanding = RM 0 ·
 **survives delivery** — a delivered order that still owes keeps this action and its red dot.
 
-### THE GATES — different from display order
+### DELIVERY GATES — different from display order
 
 **A gate REFUSES an action. Display order only decides what is read first.**
 
-**Issuing the delivery order is the HARD gate**, not agreeing a date: a date can be agreed while
-the goods and the money are still coming. Issuing is refused unless every goods line is reserved
-to this order (accessories pass automatically), **the money is collected**, and the date is not
-a Sunday or a Malaysian public holiday.
+**Issuing the delivery order is gated by executable delivery facts**, not by an outstanding
+calculation: every core goods line is reserved to this order (accessories pass automatically), the
+date is not a Sunday or Malaysian public holiday, and Finance has not explicitly recorded
+`payment not received / payment exception`. Operation's uploaded receipt, routine Finance review
+and any remaining outstanding amount do not create a hold by themselves.
 
-**An unpaid storage fee is part of the money, and there is no softer rule for it.**
-`orderMoney` returns `holding` beside `outstanding` and `holds` beside `owing`, because
-**a release must lift the HOLD without forgiving the MONEY.**
-
-**The emergency override — the only way past it.** **The manager approves it, nobody else.**
-Two outcomes, and the approver picks one out loud:
-- **released, fee still owed** — the goods go, the money action stays open. **This is the
-  default; an override must never quietly forgive money.**
-- **released and waived** — written off with a reason. `storage_fee_override = 0` already means
-  *owes no storage fee*, so `approved` means RELEASED, not FORGIVEN, and the figure written off
-  stays on the record.
-
-**Operations is told by the work itself** — the moment the override is granted, the order's top
-action changes from collecting to delivering. **No separate alert engine.**
+**Storage money remains owed until Finance waives or settles it, but owing and holding are no
+longer synonyms.** Only an explicit Finance payment exception can hold delivery. Waiving money
+and clearing a hold are separate Finance records; neither is inferred from Operation activity.
 
 **AGREEING a date is softer than ISSUING.** It WARNS about goods, money and the calendar so
 nobody promises a day the goods cannot make, but it refuses only two things:
@@ -1912,8 +2019,9 @@ so.** Audited 2026-08-06 by tracing every write the list and the drawer make.
 | the action engine | **THE OWNER** | nothing stored — derived | an action closes when its own outcome is recorded |
 | delay planning | **THE OWNER** | `ops_order_control.delay_decision*` (0304/0305) | the decision + the supplier date it was about |
 | storage hold and its release | **THE OWNER** | `ops_order_control.storage_*` | `storage_waiver_status` + `storage_fee_override` |
-| the money GATE and the arithmetic | **THE OWNER** | `orders.paid` | `outstanding = 0` |
-| collecting the money | **a trigger** | `order_payments` — [`../payment/MASTER.md`](../payment/MASTER.md) | **0 rows: the ledger has no reader; `orders.paid` is the truth** |
+| outstanding money summary | **a SUMMARY / trigger** | Money In — [`../payment/MASTER.md`](../payment/MASTER.md) | Finance-owned payment truth |
+| delivery payment exception | **a SUMMARY / gate input** | Money In — [`../payment/MASTER.md`](../payment/MASTER.md) | Finance explicitly opens or clears the exception |
+| following outstanding + uploading receipt | **a trigger** | `order_payments` — [`../payment/MASTER.md`](../payment/MASTER.md) | submitted to Finance; Operation does not verify it |
 | buying the goods | **a SUMMARY, and a broken one** | `purchase_orders` — [`../purchasing/MASTER.md`](../purchasing/MASTER.md) | the PO exists · `received_qty` |
 | receiving the goods | **a SUMMARY** — the count is read, never written (D2) | `warehouse_receipts` · `receiving_events` — Purchasing | a posted Receiving Session |
 | reserving / releasing a unit | **a trigger** | `ops_stock_items` — [`../stock/MASTER.md`](../stock/MASTER.md) | the unit's status + `reserved_ref` |

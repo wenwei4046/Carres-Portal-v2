@@ -318,23 +318,156 @@ never a source of business truth.
 If the chat is told **“Register Template — continue from repo governance”**, it must:
 
 1. Read `CLAUDE.md` → `docs/ERP-ARCHITECTURE.md` → this UI MASTER → the target module MASTER.
-2. State **ALREADY APPROVED · GENUINELY UNRESOLVED · THIS SESSION'S SINGLE DECISION SURFACE**.
+2. Apply `CLAUDE.md`'s object/domain completeness law before calling any local Register question
+   the next unresolved decision. State **ALREADY APPROVED · OBJECT COVERAGE / CONSEQUENCES ·
+   GENUINELY UNRESOLVED · THIS SESSION'S SINGLE DECISION SURFACE**.
 3. Preserve settled architecture and the §6.4 rulings without re-researching or reopening them.
-4. For the missing Register-template decision named in step 2, proactively conduct scoped research
+4. For the missing Register-template decision proven by step 2, proactively conduct scoped research
    using the relevant governed references — `grid-findings`, Linear, Shopify, AutoCount, 2990,
    current Carres UI and other mature ERP patterns when useful. Exclude unrelated pages and history;
    derive the common patterns and real trade-offs from the evidence.
-5. Present the smallest missing decision as **one evidence-based Carres recommendation** for Jess's
+5. Preserve UI Dictionary / IA first, proposal preflight and Carres semantics before references.
+   The action contract carries **owner rule + resolved owner + action + source object + governed
+   working date/calendar** as structured facts. The presentation never flattens all of them into
+   one repeated sentence; §6.6 governs density by surface.
+6. Present the smallest missing decision as **one evidence-based Carres recommendation** for Jess's
    approval, not arbitrary A/B/C layouts. Do not restart with a portal-wide survey, a new status
    model or implementation.
 
-**Current unresolved Register-template surface:** reusable filter/overflow behaviour beyond the
-locked §6.4 width law. Default-column hierarchy and whether selection is permanent remain
-page-owned and are recorded in the target module MASTER; governed template widths, a clean/readable
-default set, optional-column overflow, and the chooser's WHAT-not-width boundary are **APPROVED /
-LOCKED** in §6.4. Future Register-plan chats continue to the next unresolved layout decision and
-may not ask Jess to choose this width behaviour again. The target module MASTER may narrow this
-list; it may not silently broaden the session beyond the single decision surface declared at entry.
+## APPROVED / LOCKED · REGISTER FILTER STATE + OPTIONAL-COLUMN OVERFLOW — owner ruling 2026-08-12
+
+Every Register keeps one global `Search` above the listing and offers a column-matched filter on
+each filterable data column. Search answers the case where the operator does not know which column
+holds the words; the column filter gives precise narrowing once the fact is known. Filters combine
+with **AND between columns** and **OR between selected values in one column**.
+
+The filter control matches the fact it narrows:
+
+```
+date                 governed date presets + Between
+number / money / qty minimum + maximum
+SO / document code   type-to-find distinct values
+enum / name          searchable multi-select values
+```
+
+A filtered column always shows an active indicator in its header. The Register does not add a
+second permanent toolbar: only while Search or a column filter is active, one compact removable
+filter band appears below the control band. It names every active narrowing and ends with
+`Clear filters`, for example:
+
+```
+Customer: Umi ×   Ordered: This week ×                         Clear filters
+```
+
+Hiding a filtered optional column does **not** silently remove its filter. The filter continues to
+apply; the active-filter band continues to name it; and the `Columns` chooser marks that column
+`Filtered`. The operator can clear it from the band or show the column again. An invisible filter
+with no visible disclosure is forbidden.
+
+`Columns` decides only **WHAT** optional facts are visible. It does not resize, reorder, pin,
+group or save a layout. Approved default columns remain first and in the owning module's governed
+order. Optional columns appear after them in one governed template order. Reload restores the
+shared default columns and clears Search and column filters; no personal width, order, visibility
+or filter layout is remembered.
+
+When optional columns exceed the available width, only the listing region scrolls horizontally.
+Header, rows, read-only expansion and footer totals share one horizontal scroll position. Search,
+the active-filter band, `Columns` and `Export` remain fixed outside that scroll. A Register may not
+create a second nested horizontal scrollbar, and an open filter/column overlay may not be clipped
+by the listing scroller.
+
+`Clear filters` clears Search and every column filter. It does not change visible columns,
+selection or a page-owned scope. A filtered empty result explains the state and offers the same
+exit: `No {records} match these filters.` + `Clear filters`, using the owning module's governed
+record word.
+
+**Upgrade trigger:** if observed operators must repeatedly rebuild the same factual narrowing to
+perform stable daily work, add a governed named shared view. That evidence does not license
+personal column-width/order memory.
+
+**Current unresolved Register-template surface:** none inside reusable filter/overflow behaviour.
+Default-column hierarchy, initial scope, optional factual columns, selection actions, context
+actions, page-owned primary actions and footer summaries remain page-owned decisions in the target
+module MASTER. Future Register-plan chats continue with the target module's next single unresolved
+decision and may not ask Jess to choose this filter/overflow behaviour again.
+
+## APPROVED / LOCKED · STRUCTURED ACTION + OWNER PRESENTATION — owner ruling 2026-08-14
+
+> **Action has an Owner. Sales Order does not have one universal Owner.**
+
+One business object may raise several actions and every action may resolve through a different
+owner rule. The UI may not create one permanent `Owner` column for a Sales Order, and it may not
+degrade a structured owner into ordinary action text such as `Tan Qu Qu · Ask customer…`.
+
+The shared presentation contract is:
+
+```
+object identity       row/card header or its governed Register column
+fact or problem       first semantic line
+resolved owner        structured avatar / metadata, outside the sentence
+action                second semantic line; action only
+completion fact       authoritative owner-module fact, not copied prose
+due                    derived through the governed calendar law
+cover                  normal owner + today's acting cover, both retained as evidence
+```
+
+### Register
+
+The Register does not repeat facts that already own columns. In Sales Orders, `SO No` and
+`Customer` remain in their columns. Customer Delivery may render:
+
+```
+⚠ No delivery date
+[SH] Ask customer for a delivery date
+```
+
+`[SH]` is an independent avatar chip, never sentence text. Hover/focus exposes `Shasha`. Do not
+append `Save the agreed date` unless staff can actually complete that result from the Register.
+When the Register is reference-only, it may render only `⚠ No delivery date`; the full action
+belongs to Sales Order detail / Work Engine.
+
+### My Work
+
+The user already knows the work is theirs, so the list does not repeat their own avatar on every
+row. It shows object identity, fact/problem and action. Owner context appears only for cover,
+handover or another exceptional ownership condition.
+
+```
+TODAY
+
+SO-1318
+No delivery date
+Ask customer for a delivery date
+```
+
+### Team Work
+
+Owner identity belongs to the grouping header, not every row:
+
+```
+[SH] Shasha
+8 open · 2 overdue
+
+SO-1318
+No delivery date
+Ask customer for a delivery date
+```
+
+The next person is the next group. Per-row owner metadata appears only when the row's owner differs
+from its group, or cover/handover evidence must be explained.
+
+### Cover
+
+Roster and buddy-cover law resolve today's acting person automatically without overwriting normal
+ownership:
+
+```
+Normal owner: [SH] Shasha
+Today's cover: [YJ] Yu Jun
+```
+
+Work Engine shows today's work to Yu Jun and preserves both identities. Register, My Work and Team
+Work consume the same action contract; only their presentation density changes.
 
 ---
 
