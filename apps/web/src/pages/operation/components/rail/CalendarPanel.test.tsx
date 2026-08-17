@@ -24,6 +24,7 @@ vi.mock("@/lib/queries", () => ({
 }));
 
 import CalendarPanel from "./CalendarPanel";
+import { fmtDate } from "@/lib/fmt-date";
 
 // 2026-07-27 is a Monday — so "This week" runs Mon 27 Jul → Sat 1 Aug.
 const TODAY = "2026-07-27";
@@ -101,7 +102,7 @@ describe("CalendarPanel — the day comes from the BOOKING, never the promise", 
     h.orders = [confirmed(TOMORROW, { so: 1207, delivery_date: TODAY })];
     render(<CalendarPanel />);
     expect(within(day(TODAY)!).getByText("No dated events this day.")).toBeTruthy();
-    fireEvent.click(screen.getByText("Tomorrow"));
+    fireEvent.click(screen.getByTestId("calendar-range-tomorrow"));
     expect(within(day(TOMORROW)!).getByText("SO-1207")).toBeTruthy();
   });
 
@@ -231,5 +232,49 @@ describe("CalendarPanel — banned words never reach the screen", () => {
     const { container } = render(<CalendarPanel />);
     expect(container.textContent).not.toMatch(/Unscheduled|Not booked/i);
     expect(container.textContent).not.toMatch(/\bPOD\b|Proof of Delivery/i);
+  });
+});
+
+describe("CalendarPanel — NO RELATIVE DATE WORDS (owner ruling 2026-08-15)", () => {
+  it("the two single-day chips name their actual day", () => {
+    render(<CalendarPanel />);
+    // 2026-07-27 is a Monday; 07-28 the Tuesday after it.
+    expect(screen.getByTestId("calendar-range-today").textContent).toContain("Mon, 27 Jul");
+    expect(screen.getByTestId("calendar-range-tomorrow").textContent).toContain("Tue, 28 Jul");
+  });
+
+  it("`This week` stays — a span is not a day and no date can spell it", () => {
+    render(<CalendarPanel />);
+    expect(screen.getByTestId("calendar-range-week").textContent).toContain("This week");
+  });
+
+  it("a single-day chip needs NO hover — its face carries the ruled date", () => {
+    // THE YEAR RULE (owner ruling 2026-08-15) put the full ruled date on the
+    // chip itself. A hover could then only repeat it or say less, and a
+    // tooltip that says less than the thing it explains is a defect.
+    render(<CalendarPanel />);
+    const chip = screen.getByTestId("calendar-range-today");
+    expect(chip.getAttribute("title")).toBeNull();
+    expect(chip.textContent).toContain(fmtDate(TODAY));
+  });
+
+  it("a SPAN chip keeps its hover — `This week` names no date", () => {
+    render(<CalendarPanel />);
+    expect(screen.getByTestId("calendar-range-week").getAttribute("title")).toMatch(/ – /);
+  });
+
+  it("the day heading prints the weekday + date, never `TODAY ·`", () => {
+    h.orders = [confirmed(TODAY, { so: 1207 })];
+    render(<CalendarPanel />);
+    expect(within(day(TODAY)!).getByText(fmtDate(TODAY))).toBeTruthy();
+  });
+
+  it("`Today` and `Tomorrow` appear nowhere on the panel", () => {
+    h.orders = [confirmed(TODAY, { so: 1207 }), confirmed(TOMORROW, { so: 1210 })];
+    const { container } = render(<CalendarPanel />);
+    fireEvent.click(screen.getByTestId("calendar-range-week"));
+    expect(container.textContent).not.toMatch(/\bToday\b|\bTomorrow\b/);
+    // `ETA today` rode the Receiving line and was false on any other day.
+    expect(container.textContent).not.toMatch(/\bETA\b/);
   });
 });

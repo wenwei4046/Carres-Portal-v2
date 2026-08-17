@@ -38,6 +38,25 @@ async function makeJwt(role: string, dealerId: string | null) {
 const DEALER_A = "00000000-0000-0000-0000-000000000d01";
 const DEALER_B = "00000000-0000-0000-0000-000000000d02";
 
+/**
+ * ⛔ OWNER RULING 2026-08-15 — a new Sales Order is never dateless, so no
+ * fixture may reach this door with `dateTbd: true` any more. The fixtures that
+ * used TBD were not testing TBD: they used it to duck the lead-time floor. A
+ * date far past any configurable floor does the same job and states the truth.
+ */
+const isoIn = (days: number): string => {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+};
+const DATED_DELIVERY = {
+  date: isoIn(400),
+  proceedDate: isoIn(0),
+  dateTbd: false,
+  floor: 1,
+  hasLift: false,
+};
+
 function makeOrderRow(overrides: Partial<Record<string, unknown>> = {}) {
   return {
     id: "11111111-1111-1111-1111-111111111111",
@@ -182,7 +201,7 @@ function buildSbForCreate(opts: {
    *  server-side lead-time validator. Defaults to empty (fail-open). Pass
    *  e.g. `[{ product_models: { category: "mattress" } }]` to make the
    *  validator reject any date closer than the earliest-sell number. */
-  productSkuCategoryRows?: Array<{ product_models: { category: string } | null }>;
+  productSkuCategoryRows?: Array<{ sku?: string; product_models: { category: string } | null }>;
   /** P1 (0303) — `purchasing_settings` row 1; `null` exercises fail-open. */
   purchasingSettingsRow?: unknown;
 }) {
@@ -373,10 +392,9 @@ function buildSbForCreatePwp(opts: {
  *  The mattress trigger unlocks the bedframe reward under the configured rule. */
 function pwpClaimBody(over: Record<string, unknown> = {}) {
   return validCreateBody({
-    // TBD delivery date — skips the server lead-time floor (the configured mock
-    // returns a product_skus category join, which would otherwise gate a fixed
-    // date against today + the 14d mattress / bedframe lead).
-    delivery: { date: null, proceedDate: null, dateTbd: true, floor: 1, hasLift: false },
+    // A date far past the lead-time floor — the configured mock returns a
+    // product_skus category join, which gates a near date.
+    delivery: DATED_DELIVERY,
     lines: [
       { sku: "MATT-1", qty: 1, attrs: null, unitPrice: 1500 },
       {
@@ -1593,7 +1611,7 @@ describe("POST /api/orders", () => {
     const jwt = await makeJwt("dealer", DEALER_A);
     // A plain order: the mattress trigger, NO coded reward line (claimedPwpCodes=0).
     const body = validCreateBody({
-      delivery: { date: null, proceedDate: null, dateTbd: true, floor: 1, hasLift: false },
+      delivery: DATED_DELIVERY,
       lines: [{ sku: "MATT-1", qty: 1, attrs: null, unitPrice: 1500 }],
     });
     const res = await app.fetch(
@@ -1628,7 +1646,7 @@ describe("POST /api/orders", () => {
     vi.mocked(userClient).mockReturnValue(sb);
     const jwt = await makeJwt("dealer", DEALER_A);
     const body = validCreateBody({
-      delivery: { date: null, proceedDate: null, dateTbd: true, floor: 1, hasLift: false },
+      delivery: DATED_DELIVERY,
       lines: [{ sku: "MATT-1", qty: 1, attrs: null, unitPrice: 1500 }],
     });
     const res = await app.fetch(
@@ -1671,7 +1689,7 @@ describe("POST /api/orders", () => {
     vi.mocked(userClient).mockReturnValue(sb);
     const jwt = await makeJwt("dealer", DEALER_A);
     const body = validCreateBody({
-      delivery: { date: null, proceedDate: null, dateTbd: true, floor: 1, hasLift: false },
+      delivery: DATED_DELIVERY,
       lines: [{ sku: "MATT-1", qty: 1, attrs: null, unitPrice: 1500 }],
     });
     const res = await app.fetch(
@@ -1951,18 +1969,16 @@ describe("POST /api/orders", () => {
       expect(sb._rpcCalls.filter((c: { name: string }) => c.name === "create_order")).toHaveLength(1);
     });
 
-    it("skips lead-time check when delivery.date is null (TBD path)", async () => {
+    /**
+     * ⛔ CUSTOMER DELIVERY IS MANDATORY AT ORDER ENTRY — owner ruling
+     * 2026-08-15 (Jess). This test used to prove the OPPOSITE: that a dateless
+     * order sailed through and the floor was re-checked later at
+     * `POST /:id/date`. That door still exists for the legacy rows that
+     * predate the ruling; this one refuses to mint another.
+     */
+    it("refuses a dateless order — the promise is made at entry, never later", async () => {
       const sb = buildSbForCreate({
         rpcResult: { id: NEW_ORDER_ID, so: 1043, placed_at: "2026-05-22T00:00:00Z" },
-        fetchedRow: makeOrderRow({
-          id: NEW_ORDER_ID,
-          delivery_date: null,
-          delivery_date_tbd: true,
-          signature_url: `orders-attachments/${DEALER_A}/wiz/signature.png`,
-          terms_accepted: true,
-        }),
-        // Even if catalog says mattress, TBD bypasses — gate runs again at
-        // POST /:id/date when dealer confirms a real date.
         productSkuCategoryRows: [{ product_models: { category: "mattress" } }],
       });
       vi.mocked(userClient).mockReturnValue(sb);
@@ -1972,7 +1988,144 @@ describe("POST /api/orders", () => {
           method: "POST",
           headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
           body: JSON.stringify(
-            validCreateBody({ delivery: { date: null, proceedDate: null, dateTbd: true, floor: 1, hasLift: false } }),
+            validCreateBody({
+              delivery: { date: null, proceedDate: null, dateTbd: true, floor: 1, hasLift: false },
+            }),
+          ),
+        }),
+        env,
+      );
+      expect(res.status).toBe(400);
+      expect(await res.text()).toContain("Ask the customer for the date");
+      expect(sb._rpcCalls).toHaveLength(0);
+    });
+
+    it("refuses a dateless order sent WITHOUT the retired flag either", async () => {
+      const sb = buildSbForCreate({
+        rpcResult: { id: NEW_ORDER_ID, so: 1044, placed_at: "2026-05-22T00:00:00Z" },
+      });
+      vi.mocked(userClient).mockReturnValue(sb);
+      const jwt = await makeJwt("dealer", DEALER_A);
+      const res = await app.fetch(
+        new Request("http://t/api/orders", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+          body: JSON.stringify(
+            validCreateBody({
+              delivery: { date: null, proceedDate: null, dateTbd: false, floor: 1, hasLift: false },
+            }),
+          ),
+        }),
+        env,
+      );
+      expect(res.status).toBe(400);
+      expect(sb._rpcCalls).toHaveLength(0);
+    });
+  });
+
+  /**
+   * ⛔ A SALES ORDER MUST CONTAIN GOODS — owner ruling 2026-08-15.
+   *
+   * The Guarantee attachment law generalised: standalone service is a Service
+   * Case and belongs to the Service channel. The gate is POSITIVE-recognition
+   * only, so the "unknown SKU still sells" half is pinned too — otherwise a
+   * legacy or not-yet-catalogued line silently kills a real order.
+   */
+  describe("goods gate", () => {
+    const serviceOnly = () =>
+      validCreateBody({ lines: [{ sku: "SVC-DISPOSE-MATTRESS", qty: 1, attrs: null, unitPrice: 80 }] });
+
+    it("refuses 422 goods_required when every line is a service", async () => {
+      const sb = buildSbForCreate({
+        productSkuCategoryRows: [
+          { sku: "SVC-DISPOSE-MATTRESS", product_models: { category: "service" } },
+        ],
+      });
+      vi.mocked(userClient).mockReturnValue(sb);
+      const jwt = await makeJwt("dealer", DEALER_A);
+      const res = await app.fetch(
+        new Request("http://t/api/orders", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+          body: JSON.stringify(serviceOnly()),
+        }),
+        env,
+      );
+      expect(res.status).toBe(422);
+      const body = (await res.json()) as { code: string; message: string };
+      expect(body.code).toBe("goods_required");
+      expect(body.message).toContain("must contain a product");
+      expect(sb._rpcCalls).toHaveLength(0);
+    });
+
+    it("refuses a guarantee sold on its own", async () => {
+      const sb = buildSbForCreate({
+        productSkuCategoryRows: [
+          { sku: "GRT-MATTRESS-15Y", product_models: { category: "guarantee" } },
+        ],
+      });
+      vi.mocked(userClient).mockReturnValue(sb);
+      const jwt = await makeJwt("dealer", DEALER_A);
+      const res = await app.fetch(
+        new Request("http://t/api/orders", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+          body: JSON.stringify(
+            validCreateBody({ lines: [{ sku: "GRT-MATTRESS-15Y", qty: 1, attrs: null, unitPrice: 150 }] }),
+          ),
+        }),
+        env,
+      );
+      expect(res.status).toBe(422);
+      expect(sb._rpcCalls).toHaveLength(0);
+    });
+
+    it("accepts a service line that rides a product on the same order", async () => {
+      const sb = buildSbForCreate({
+        rpcResult: { id: NEW_ORDER_ID, so: 1045, placed_at: "2026-05-22T00:00:00Z" },
+        fetchedRow: makeOrderRow({ id: NEW_ORDER_ID, so: 1045 }),
+        productSkuCategoryRows: [
+          { sku: "mattress:carres-classic:queen", product_models: { category: "mattress" } },
+          { sku: "SVC-DISPOSE-MATTRESS", product_models: { category: "service" } },
+        ],
+      });
+      vi.mocked(userClient).mockReturnValue(sb);
+      const jwt = await makeJwt("dealer", DEALER_A);
+      const res = await app.fetch(
+        new Request("http://t/api/orders", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+          body: JSON.stringify(
+            validCreateBody({
+              delivery: DATED_DELIVERY,
+              lines: [
+                { sku: "mattress:carres-classic:queen", qty: 1, attrs: null, unitPrice: 1500 },
+                { sku: "SVC-DISPOSE-MATTRESS", qty: 1, attrs: null, unitPrice: 80 },
+              ],
+            }),
+          ),
+        }),
+        env,
+      );
+      expect(res.status).toBe(201);
+    });
+
+    it("lets a SKU the catalog cannot resolve through — nothing is refused by elimination", async () => {
+      const sb = buildSbForCreate({
+        rpcResult: { id: NEW_ORDER_ID, so: 1046, placed_at: "2026-05-22T00:00:00Z" },
+        fetchedRow: makeOrderRow({ id: NEW_ORDER_ID, so: 1046 }),
+        productSkuCategoryRows: [
+          { sku: "SVC-DISPOSE-MATTRESS", product_models: { category: "service" } },
+        ],
+      });
+      vi.mocked(userClient).mockReturnValue(sb);
+      const jwt = await makeJwt("dealer", DEALER_A);
+      const res = await app.fetch(
+        new Request("http://t/api/orders", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+          body: JSON.stringify(
+            validCreateBody({ lines: [{ sku: "SOME-LEGACY-CODE", qty: 1, attrs: null, unitPrice: 900 }] }),
           ),
         }),
         env,
@@ -1996,7 +2149,7 @@ function buildSbForProceed(opts: {
   /** Used by the server-side lead-time validator (POST /:id/date and
    *  PATCH /:id with delivery.date). The validator first fetches the
    *  order's lines, then joins product_skus → product_models.category. */
-  productSkuCategoryRows?: Array<{ product_models: { category: string } | null }>;
+  productSkuCategoryRows?: Array<{ sku?: string; product_models: { category: string } | null }>;
   /** Optional SKU list returned by the order_lines fetch in
    *  `getOrderSkus`. Empty array (default) means the lead-time validator
    *  short-circuits at the "no SKUs" branch (fail-open). */
@@ -4176,7 +4329,7 @@ function sofaTables(over: Partial<Record<string, SofaTableData>> = {}): Record<s
  *  skipped — keeps the mock focused on the recompute path. */
 function buildOrderBody(unitPrice: number, sofaBuildOver: Record<string, unknown> = {}) {
   return validCreateBody({
-    delivery: { date: null, proceedDate: null, dateTbd: true, floor: 1, hasLift: false },
+    delivery: DATED_DELIVERY,
     lines: [
       {
         sku: SOFA_REP_SKU,
@@ -4498,7 +4651,7 @@ describe("POST /api/orders — sofa build recompute + explode (Phase 5)", () => 
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
         // validCreateBody = a normal mattress line (attrs: null), TBD delivery.
         body: JSON.stringify(
-          validCreateBody({ delivery: { date: null, proceedDate: null, dateTbd: true, floor: 1, hasLift: false } }),
+          validCreateBody({ delivery: DATED_DELIVERY }),
         ),
       }),
       env,
@@ -4581,7 +4734,7 @@ describe("POST /api/orders — sofa build recompute + explode (Phase 5)", () => 
 describe("POST /api/orders — internal role places on behalf of a picked dealer (Option A)", () => {
   const NEW_ID = "11111111-1111-1111-1111-111111111111";
   const rpcOk = { id: NEW_ID, so: 1401, placed_at: "2026-06-25T00:00:00Z" };
-  const tbd = { delivery: { date: null, proceedDate: null, dateTbd: true, floor: 1, hasLift: false } };
+  const dated = { delivery: DATED_DELIVERY };
   const mkFetched = (dealerId: string) => ({
     ...makeOrderRow({ id: NEW_ID, so: 1401, dealer_id: dealerId, paid: "750" }),
     order_lines: [
@@ -4600,7 +4753,7 @@ describe("POST /api/orders — internal role places on behalf of a picked dealer
         method: "POST",
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
         // dealer A tries to attribute the order to dealer B via the body → must be ignored.
-        body: JSON.stringify(validCreateBody({ ...tbd, dealerId: DEALER_B })),
+        body: JSON.stringify(validCreateBody({ ...dated, dealerId: DEALER_B })),
       }),
       env,
     );
@@ -4619,7 +4772,7 @@ describe("POST /api/orders — internal role places on behalf of a picked dealer
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
         body: JSON.stringify(
           validCreateBody({
-            ...tbd,
+            ...dated,
             dealerId: DEALER_B,
             signaturePath: `orders-attachments/${DEALER_B}/wiz/signature.png`,
           }),
@@ -4640,7 +4793,7 @@ describe("POST /api/orders — internal role places on behalf of a picked dealer
       new Request("http://t/api/orders", {
         method: "POST",
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify(validCreateBody({ ...tbd })),
+        body: JSON.stringify(validCreateBody({ ...dated })),
       }),
       env,
     );
@@ -4658,7 +4811,7 @@ describe("POST /api/orders — internal role places on behalf of a picked dealer
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
         body: JSON.stringify(
           validCreateBody({
-            ...tbd,
+            ...dated,
             dealerId: DEALER_B,
             // signature lives under DEALER_A's folder but the order is for DEALER_B.
             signaturePath: `orders-attachments/${DEALER_A}/wiz/signature.png`,
@@ -4696,7 +4849,7 @@ describe("POST /api/orders — option picks recompute (0201/0202 wiring)", () =>
 
   function bedframeOptionsBody(unitPrice: number, optionsTotal: number) {
     return validCreateBody({
-      delivery: { date: null, proceedDate: null, dateTbd: true, floor: 1, hasLift: false },
+      delivery: DATED_DELIVERY,
       lines: [
         {
           sku: "BF-KAYU-Q",

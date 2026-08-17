@@ -34,6 +34,106 @@ Carres sells a **guarantee package** on top of the manufacturer warranty.
 v1 product: **Mattress Guarantee — RM150 · 15 years · one-for-one replacement.**
 If the mattress fails inside the window we do **not** repair it — we hand over a new mattress.
 
+### PAID GUARANTEE AND LEGACY ORDERS — OWNER-RULED 2026-08-14
+
+Under the current sale model, the customer receives the 15-Year one-for-one Mattress Guarantee
+only when the Sales Order contains the separately purchased RM150 Guarantee attached to that
+specific mattress unit.
+
+An older order may predate that sellable Guarantee line. Absence of an RM150 line on such an
+order is not enough to approve or reject a claim. The system first reads the order/delivery date
+and applies the policy version that governed that sale. Every eligibility result snapshots:
+
+- policy/terms version and effective-date range;
+- order and delivery date used;
+- whether entitlement came from a paid Guarantee line or a legacy rule;
+- covered mattress unit;
+- decision, reason, actor and time.
+
+The paid-policy cutover is **2026-08-01**:
+
+- Sales Orders dated on or before **2026-07-31** use the Legacy Mattress Guarantee policy and
+  do not require an RM150 Guarantee line.
+- Sales Orders dated on or after **2026-08-01** receive the 15-Year one-for-one Guarantee only
+  when the RM150 Guarantee was purchased and attached to that mattress unit.
+
+The Sales Order date selects the policy version; the actual Delivery date starts its coverage
+clock. The cutover is configured once, so staff never type or guess it per Case. A later terms
+change never rewrites an older customer's rights.
+
+### MATTRESS CLAIM THRESHOLD — OWNER-RULED 2026-08-14
+
+The current-business Mattress Guarantee covers a permanent body indentation **greater than
+2 cm**, measured with no weight on the mattress and with the mattress correctly supported.
+`2 cm` exactly does not pass; the rule is `> 2 cm`.
+
+- Discomfort, firmness/softness preference, adjustment difficulty and a body impression of
+  `2 cm` or less do not qualify through the Guarantee. They may qualify through the separate
+  current-business 100-Day Mattress Free Trial below.
+- Operation first obtains standard measurement evidence remotely: full mattress, support/base,
+  straight reference across the surface and a readable perpendicular depth measurement with no
+  person or object loading the mattress.
+- Clear evidence over 2 cm proceeds as a Guarantee claim. If the evidence is genuinely disputed,
+  the Supplier may inspect on site; Carres staff do not perform warranty inspection visits.
+- A social-media threat or post escalates response ownership and urgency, never the measurement
+  threshold or remedy entitlement.
+
+### CURRENT-BUSINESS 100-DAY MATTRESS FREE TRIAL — OWNER-RULED 2026-08-14
+
+This Trial is separate from the 15-Year Guarantee. It starts on the actual mattress delivery
+date and permits **one exchange only**, never a refund.
+
+- Applies to mattresses only; accessories are excluded.
+- Proof of purchase is required.
+- The mattress must remain in good condition and free from stains, bed bugs, saliva,
+  customer-caused damage and natural-disaster damage.
+- Minimum collection/delivery transport fee is RM250 and may increase by location.
+- Exchange is for the same model or a higher model. A lower model gives no price-difference
+  refund; a higher model requires the customer to pay the difference.
+- A comfort complaint within 100 days uses this Trial; a covered defect uses the Guarantee.
+
+### FUTURE SUBSCRIPTION IS A DIFFERENT ENTITLEMENT
+
+The future mattress-subscription business does not inherit the current sale model's 100-Day
+Trial or any refund route. Subscription incidents use their own Claim policy and lifecycle.
+Every Case resolves entitlement from the product/plan and terms version effective for that
+customer's contract; a later policy change never rewrites an earlier sale's rights.
+
+### TCF SOFA WARRANTY — RESOLVED FROM SIGNED BUSINESS TERMS
+
+The TCF Sofa policy is selected from the delivered item and its terms version:
+
+- Lifetime: internal solid-wood frame, inner support structure and foundation components under
+  normal household use.
+- Three years from Delivery: seat sagging `> 2 cm`, stitching defects and recliner/mechanism
+  failure under normal use.
+- Covered manufacturing defects include structural assembly and factory-construction deformity.
+- TCF chooses repair or replacement of the affected component after technical evaluation.
+- Exterior legs/accessories/decorative trims, natural disasters, stains/odour, cuts/burns,
+  misuse, improper cleaning/storage and normal wear such as cushion softening, fading or pilling
+  are excluded.
+- Proof of purchase, clear photo/video and usage/condition details are required. Minimum
+  collection/delivery transport fee is RM250 and may increase by location. Published processing
+  window is four months. Replacement parts do not restart or extend the original period.
+
+### BEDFRAME WARRANTY — RESOLVED FROM SIGNED BUSINESS TERMS
+
+- Five years from actual Delivery.
+- Covers structural components affected by wood borer/termite/insects only when not caused by
+  the customer's environment or storage, plus factory structural/assembly defects affecting
+  safety, function or durability.
+- Excludes natural disasters, stains/odour, scratches/dents/cuts/burns, customer misuse or poor
+  installation, incorrect use, overloading, uneven flooring and normal wear.
+- Proof of purchase, clear photo/video, usage/placement information and evidence against misuse
+  or improper storage are required.
+- Carres chooses repair or replacement after technical evaluation. Minimum collection/delivery
+  transport fee is RM250 and may increase by location. Published processing window is three
+  months. Repair/replacement does not restart or extend the original period.
+
+For both policies, a Service Case records the complaint and evidence, then the Entitlement engine
+returns `eligible`, `not eligible` or `evidence required` with the exact policy reason. Staff do
+not read and interpret the PDF afresh for each customer.
+
 Why it is its own SKU category and not an accessory or a service SKU:
 
 - it is not goods (no PO, no supplier, no stock, no delivery leg) and not labour either —

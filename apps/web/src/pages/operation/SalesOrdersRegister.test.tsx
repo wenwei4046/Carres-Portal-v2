@@ -8,11 +8,12 @@
  * here fails: the hook would never see the term.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { operationOrderListRow } from "@/lib/queries";
 import SalesOrdersRegister from "./SalesOrdersRegister";
+import { fmtDate } from "@/lib/fmt-date";
 
 let listHookState: {
   data: { orders: operationOrderListRow[] } | undefined;
@@ -22,15 +23,30 @@ let listHookState: {
   refetch: () => void;
 };
 
+let expansionHookState: {
+  data: {
+    lines: Array<{
+      lineId: string;
+      sku: string;
+      unitIds: string[];
+      deliverTo: Array<{ name: string; qty: number }>;
+    }>;
+  } | undefined;
+  isLoading: boolean;
+  isError: boolean;
+};
+
 /* A spy AROUND the hook: the component's calls — and the filters it passes —
  * are the assertion surface. */
 const useOperationOrdersSpy = vi.fn((..._args: unknown[]) => listHookState);
+const useSalesOrderExpansionSpy = vi.fn((..._args: unknown[]) => expansionHookState);
 
 vi.mock("@/lib/queries", async () => {
   const actual = await vi.importActual<typeof import("@/lib/queries")>("@/lib/queries");
   return {
     ...actual,
     useOperationOrders: (...args: unknown[]) => useOperationOrdersSpy(...args),
+    useSalesOrderExpansion: (...args: unknown[]) => useSalesOrderExpansionSpy(...args),
   };
 });
 
@@ -87,6 +103,7 @@ function LocationProbe() {
 
 beforeEach(() => {
   useOperationOrdersSpy.mockClear();
+  useSalesOrderExpansionSpy.mockClear();
   window.localStorage.clear();
   listHookState = {
     data: { orders: [order({})] },
@@ -95,6 +112,7 @@ beforeEach(() => {
     error: null,
     refetch: vi.fn(),
   };
+  expansionHookState = { data: { lines: [] }, isLoading: false, isError: false };
 });
 
 describe("FIX 1 · the register asks the SERVER", () => {
@@ -107,7 +125,8 @@ describe("FIX 1 · the register asks the SERVER", () => {
 
   it("the typed term reaches useOperationOrders as { search } — the API is asked, not just the loaded rows filtered", async () => {
     mount();
-    const box = screen.getByPlaceholderText("SO number, customer, phone or item…");
+    fireEvent.click(screen.getByTestId("search-icon"));
+    const box = screen.getByPlaceholderText("Search sales orders…");
     fireEvent.change(box, { target: { value: "  Umi  " } });
     /* The engine debounces 150ms and emits the TRIMMED term; the register
      * must re-call the hook with it. Client-only search would leave every
@@ -123,7 +142,8 @@ describe("FIX 1 · the register asks the SERVER", () => {
 
   it("clearing the box returns the hook to the unfiltered population", async () => {
     mount();
-    const box = screen.getByPlaceholderText("SO number, customer, phone or item…");
+    fireEvent.click(screen.getByTestId("search-icon"));
+    const box = screen.getByPlaceholderText("Search sales orders…");
     fireEvent.change(box, { target: { value: "Umi" } });
     await waitFor(() => {
       expect(
@@ -149,17 +169,305 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     expect(screen.queryByText("Sales Order")).not.toBeInTheDocument();
   });
 
-  it("renders exactly one work toolbar and one Search", () => {
+  it("the Destination Header is 50px, wordmark-only, at the governed 24px (§6.7)", () => {
+    mount();
+    const word = screen.getByTestId("sales-orders-destination-header-module-word");
+    expect(word).toHaveTextContent("Sales Orders");
+    /* The icon is gone: the word alone carries the identity, so nothing else
+     * may sit inside the nameplate. */
+    expect(word.querySelector("svg")).toBeNull();
+    expect(word).toHaveClass("text-page");
+    expect(screen.getByTestId("sales-orders-destination-header")).toHaveClass("h-[50px]");
+  });
+
+  it("Showroom drops the house name — every showroom is ours (§6.7)", () => {
+    listHookState.data = { orders: [order({
+      outlets: { name: "Carres Maluri Cheras" },
+    })] };
+    mount();
+    expect(screen.getByText("Maluri Cheras")).toBeInTheDocument();
+    expect(screen.queryByText("Carres Maluri Cheras")).not.toBeInTheDocument();
+  });
+
+  it("renders exactly one work toolbar, and Search rests as an icon (§6.7)", () => {
     mount();
     expect(screen.getAllByTestId("work-toolbar")).toHaveLength(1);
+    /* §6.7 — Search rests as an icon and expands on click. At rest there is no
+     * searchbox at all; one click produces exactly one. */
+    expect(screen.queryAllByRole("searchbox")).toHaveLength(0);
+    fireEvent.click(screen.getByTestId("search-icon"));
     expect(screen.getAllByRole("searchbox")).toHaveLength(1);
     expect(screen.queryByRole("button", { name: "Filters" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Export" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Columns" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "New Sales Order" })).toBeInTheDocument();
+    /* §6.7 — Row 1 carries global utilities only. The one primary create action
+     * lives on the LEFT of Row 2. Reversing either half is the defect. */
+    expect(
+      within(screen.getByTestId("work-toolbar")).getByRole("button", {
+        name: "New Sales Order",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("sales-orders-destination-header")).queryByRole("button", {
+        name: "New Sales Order",
+      }),
+    ).not.toBeInTheDocument();
     expect(screen.queryByText("current view")).not.toBeInTheDocument();
     expect(screen.queryByText(/\d+\/\d+/)).not.toBeInTheDocument();
     expect(screen.queryByText("Not delivered")).not.toBeInTheDocument();
+  });
+
+  it("Export is icon-only and its menu offers Excel, PDF and Print (§6.7)", () => {
+    mount();
+    const exportBtn = screen.getByRole("button", { name: "Export" });
+    /* Icon-only: the accessible name comes from aria-label, so the word must
+     * NOT also be rendered as text — otherwise it is not icon-only. */
+    expect(exportBtn).not.toHaveTextContent("Export");
+    expect(exportBtn).toHaveAttribute("aria-haspopup", "menu");
+    fireEvent.click(exportBtn);
+    expect(screen.getByRole("menuitem", { name: "Excel" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "PDF" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Print" })).toBeInTheDocument();
+  });
+
+  it("ticking rows offers the REAL sales orders, not a picture of the list (§6.7)", () => {
+    mount();
+    /* Normal state carries the list outputs only — no document action is
+     * offered for a selection that does not exist yet. */
+    expect(screen.queryByRole("button", { name: /Print \d+ sales order/ })).not.toBeInTheDocument();
+    /* Re-query after each tick: selection REPLACES the toolbar, so the
+     * select-all box leaves the DOM and a stale snapshot holds detached nodes. */
+    const rowBoxes = () => screen.getAllByRole("checkbox").slice(-2);
+    fireEvent.click(rowBoxes()[0]!);
+    /* Selection replaces the toolbar in place and prints the truthful count. */
+    expect(screen.getByTestId("selection-bar")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Print 1 sales order" })).toBeInTheDocument();
+    /* Excel stays scoped to the same selection beside it — the selection bar
+     * offers list output AND document output, both counting the same rows. */
+    expect(screen.getByRole("button", { name: /Export Excel \(1\)/ })).toBeInTheDocument();
+  });
+
+  it("a customer who already answered is not work to do — the 8 read differently from the 3", () => {
+    listHookState.data = { orders: [order({
+      delivery_date: null,
+      delivery_date_tbd: true,
+      customer_name: "Kimmy",
+      salespersons: { name: "Shasha" },
+    })] };
+    mount();
+    /* The customer WAS asked. No warning, and no instruction to ask again —
+     * printing `Confirm delivery date` here is the wrong attribution this
+     * ruling corrects (docs/orders/MASTER.md · THE THREE DELIVERY DATES). */
+    expect(screen.getByText("To be confirmed")).toBeInTheDocument();
+    expect(screen.queryByText("No delivery date")).not.toBeInTheDocument();
+    expect(screen.queryByText("Confirm delivery date")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("attention-warning")).not.toBeInTheDocument();
+    /* The full governed sentence, the party and the phone stay reachable. */
+    const hover = screen.getByTitle(/Delivery date to be confirmed/);
+    expect(hover).toHaveAttribute("title", expect.stringContaining("Kimmy"));
+    expect(hover).toHaveAttribute("title", expect.stringContaining("Shasha"));
+  });
+
+  it("shows a governed missing Customer Delivery exception instead of a passive empty value", () => {
+    listHookState.data = { orders: [order({
+      delivery_date: null,
+      delivery_date_tbd: false,
+      customer_name: "Kimmy",
+      salespersons: { name: "Shasha" },
+    })] };
+    mount();
+    const exception = screen.getByText("No delivery date");
+    expect(exception).toHaveAttribute("data-attention", "warning");
+    /* The cell prints ONE clause that fits the governed 148px column whole;
+       who must act, whose phone and what to record ride the hover. */
+    expect(screen.getByText("Confirm delivery date")).toBeInTheDocument();
+    const cell = exception.closest("span[title]");
+    expect(cell).toHaveAttribute(
+      "title",
+      [
+        "Shasha · Kimmy · 019-3478913",
+        "Ask which delivery date the customer agrees to.",
+        "Record the agreed Customer Delivery date.",
+      ].join("\n"),
+    );
+    expect(cell).toHaveTextContent("Confirm delivery date");
+    expect(screen.queryByText("No date yet")).not.toBeInTheDocument();
+  });
+
+  /* ⭐ THE TWO-LINE GRAMMAR IS 13 / 11 — owner ruling 2026-08-15, held here so
+     the sizes cannot drift back. ui/MASTER.md §5 locks the RANKS (fact above
+     action, body above supporting); this asserts the tokens that carry them. */
+  it("ranks the guidance cell 13 / 11 — body semibold over label regular", () => {
+    listHookState.data = { orders: [order({
+      delivery_date: null,
+      delivery_date_tbd: false,
+      customer_name: "Kimmy",
+      salespersons: { name: "Shasha" },
+    })] };
+    mount();
+
+    // Line 1 — the FACT. Governed body 13 (inherited from the row) at
+    // semibold, in the warning ink the §5 lock reserves for it.
+    const problem = screen.getByText("No delivery date");
+    expect(problem.className).toContain("font-semibold");
+    expect(problem.className).not.toContain("text-meta");
+    expect(problem.className).not.toContain("text-label");
+
+    // Line 2 — the ACTION. `text-label` is 11px, and `font-normal` overrides
+    // that token's own 500 down to regular weight, exactly as ruled.
+    const action = screen.getByText("Confirm delivery date");
+    expect(action.className).toContain("text-label");
+    expect(action.className).toContain("font-normal");
+    // The retired size, named so a revert is caught rather than merely absent.
+    expect(action.className).not.toContain("text-meta");
+  });
+
+  /* ⭐ CUSTOMER NAME — CAPITALIZE UP ONLY, owner ruling 2026-08-15. */
+  it("capitalizes a lowercase customer name and leaves existing capitals alone", () => {
+    listHookState.data = {
+      orders: [
+        order({ id: "a", so: 1, customer_name: "jimmy" }),
+        order({ id: "b", so: 2, customer_name: "mei emi" }),
+        order({ id: "c", so: 3, customer_name: "KJ NG" }),
+        order({ id: "d", so: 4, customer_name: "LIM KUAN YANG" }),
+      ],
+    };
+    mount();
+    expect(screen.getByText("Jimmy")).toBeInTheDocument();
+    expect(screen.getByText("Mei Emi")).toBeInTheDocument();
+    // Initials and an all-capitals name survive untouched — the rule raises a
+    // first letter and never lowers one.
+    expect(screen.getByText("KJ NG")).toBeInTheDocument();
+    expect(screen.getByText("LIM KUAN YANG")).toBeInTheDocument();
+    expect(screen.queryByText("Kj Ng")).not.toBeInTheDocument();
+    expect(screen.queryByText("Lim Kuan Yang")).not.toBeInTheDocument();
+    // Display only — nothing is written back to the record.
+    expect(listHookState.data.orders.map((o) => o.customer_name)).toEqual([
+      "jimmy", "mei emi", "KJ NG", "LIM KUAN YANG",
+    ]);
+  });
+
+  /* ⭐ THE YEAR RULE — owner ruling 2026-08-15. */
+  it("prints a current-year date without its year and an off-year date with it", () => {
+    const thisYear = new Date().getFullYear();
+    listHookState.data = {
+      orders: [
+        order({ id: "a", so: 1, delivery_date: `${thisYear}-08-12`, delivery_date_tbd: false }),
+        order({ id: "b", so: 2, delivery_date: `${thisYear + 1}-01-15`, delivery_date_tbd: false }),
+      ],
+    };
+    mount();
+    expect(screen.getByText(fmtDate(`${thisYear}-08-12`))).toBeInTheDocument();
+    expect(fmtDate(`${thisYear}-08-12`)).not.toMatch(/\d{2}$/);
+    expect(screen.getByText(fmtDate(`${thisYear + 1}-01-15`))).toBeInTheDocument();
+    expect(fmtDate(`${thisYear + 1}-01-15`)).toMatch(/ \d{2}$/);
+  });
+
+  it("collapses duplicate city and state into one concise locality", () => {
+    listHookState.data = { orders: [order({
+      customer_address: "12 Long Street, Kuala Lumpur, Kuala Lumpur",
+      customer_address_city: "Kuala Lumpur",
+      customer_address_state: "Kuala Lumpur",
+    })] };
+    mount();
+    expect(screen.getByText("Kuala Lumpur")).toBeInTheDocument();
+    expect(screen.queryByText("Kuala Lumpur, Kuala Lumpur")).not.toBeInTheDocument();
+    expect(screen.queryByText("12 Long Street, Kuala Lumpur, Kuala Lumpur")).not.toBeInTheDocument();
+  });
+
+  it("summarises filtered ordered quantities by governed category in the fixed footer", () => {
+    listHookState.data = {
+      orders: [
+        order({
+          order_lines: [
+            { sku: "B1201S-K", qty: 2, unit_price: 2499, label: "B1201S · King" },
+            { sku: "Essential Memory Pillow(L)", qty: 4, unit_price: 99, label: "Pillow" },
+            { sku: "Microfiber Waterproof Mattress Protector-K", qty: 3, unit_price: 129, label: "Mattress protector" },
+          ],
+        }),
+      ],
+    };
+    mount();
+    const footer = screen.getByTestId("grid-footer");
+    expect(footer).toHaveTextContent("1 order");
+    expect(footer).toHaveTextContent("Mattress 2");
+    expect(footer).toHaveTextContent("Pillow 4");
+    /* The governed word, never the AutoCount sheet's `M.P` abbreviation. */
+    expect(footer).toHaveTextContent("Mattress protector 3");
+    expect(footer).not.toHaveTextContent("M.P");
+    expect(footer).not.toHaveTextContent("Reset layout");
+    expect(footer).not.toHaveTextContent("rows");
+  });
+
+  /**
+   * ⭐ THE FOOTER COUNTS EVERYTHING IT SEES, IN THE DICTIONARY'S WORDS.
+   *
+   * Owner ruling 2026-08-15. The tally used to be filtered through the same
+   * array that ordered it, so any word outside that list was silently DROPPED
+   * — an unrecognised accessory vanished from a count that claims to describe
+   * the filtered result. A footer that under-counts is worse than one that
+   * abbreviates: it is a number the operator trusts and cannot reproduce.
+   */
+  it("counts an unrecognised line as `Other goods` instead of dropping it, and prints no raw SKU word", () => {
+    listHookState.data = {
+      orders: [
+        order({
+          order_lines: [
+            { sku: "B1201S-K", qty: 1, unit_price: 2499, label: "B1201S · King" },
+            // Nothing recognises these two — the old whitelist dropped both.
+            { sku: "M.P/QUEEN", qty: 2, unit_price: 129, label: "M.P" },
+            { sku: "Leg 4\"", qty: 5, unit_price: 20, label: "Leg" },
+          ],
+        }),
+      ],
+    };
+    mount();
+    const footer = screen.getByTestId("grid-footer");
+    expect(footer).toHaveTextContent("Mattress 1");
+    /* `M.P/QUEEN` IS positively recognised as a protector — the governed word
+       prints and the sheet's abbreviation never does. */
+    expect(footer).toHaveTextContent("Mattress protector 2");
+    expect(footer).toHaveTextContent("Other goods 5");
+    expect(footer).not.toHaveTextContent("M.P");
+    expect(footer).not.toHaveTextContent("Leg");
+  });
+
+  /**
+   * ⭐ AN ABSENCE IS QUIETER THAN A FACT — owner ruling 2026-08-15.
+   * The words are unchanged; only their weight moves, so search, filter, sort
+   * and Export still read the same string.
+   */
+  it("mutes `Not recorded` in the document columns while a real PO number stays full ink", () => {
+    listHookState.data = {
+      orders: [order({ po_numbers: ["PO-2041"], do_number: null })],
+    };
+    mount();
+    const absences = document.querySelectorAll('[data-absence="true"]');
+    expect(absences.length).toBeGreaterThan(0);
+    for (const el of absences) expect(el.className).toContain("text-kit-slate-9");
+    // The real document is a link, never a muted absence.
+    expect(screen.getByText("PO-2041").closest("[data-absence]")).toBeNull();
+  });
+
+  /* The re-ruled EIGHTH default column, read-only, no new writer. */
+  it("shows Showroom as a default column between Delivery Location and PO No", () => {
+    listHookState.data = { orders: [order({ outlets: { name: "Carres Kelana Jaya" } })] };
+    mount();
+    const headers = [...screen.getByTestId("grid-header").querySelectorAll("th")].map((th) =>
+      (th.textContent ?? "").trim(),
+    );
+    const business = headers.filter(Boolean);
+    expect(business.map((h) => h.replace(/[AV]$/, "").trim())).toEqual([
+      "SO No",
+      "Ordered",
+      "Customer Delivery",
+      "Customer",
+      "Delivery Location",
+      "Showroom",
+      "PO No",
+      "DO No",
+    ]);
+    expect(screen.getByText("Kelana Jaya")).toBeInTheDocument();
   });
 
   it("shows only the customer name in the default cell while retaining phone search context", () => {
@@ -169,28 +477,82 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     expect(customer).not.toHaveTextContent("019-3478913");
   });
 
-  it("groups expanded goods under their real uppercase category", () => {
+  it("renders the locked six-column goods table with Stock Unit IDs and Purchasing Deliver To", () => {
     listHookState.data = {
       orders: [
         order({
           order_lines: [
             {
+              id: "line-1",
               sku: "B1201S-K",
-              qty: 1,
+              qty: 11,
               unit_price: 2499,
               label: "B1201S · King",
-              attrs: { category: "mattress", firmness: "medium" },
+              attrs: {
+                category: "mattress",
+                firmness: "medium",
+                colour: "Sand",
+                fabric_code: "CG-012",
+                x: 60,
+                y: 192.5,
+                rot: 0,
+                cell_index: 1,
+                sofa_build_key: "internal-builder-uuid",
+              },
             },
           ],
         }),
       ],
     };
+    expansionHookState.data = {
+      lines: [{
+        lineId: "line-1",
+        sku: "B1201S-K",
+        unitIds: ["id-001", "id-002"],
+        deliverTo: [
+          { name: "Carres Klang", qty: 10 },
+          { name: "AL Sungai Buloh", qty: 1 },
+        ],
+      }],
+    };
     mount();
     fireEvent.click(screen.getByRole("button", { name: "Expand row" }));
-    expect(screen.getByRole("heading", { name: "MATTRESS" })).toBeInTheDocument();
-    expect(screen.queryByText("Other Goods")).not.toBeInTheDocument();
-    expect(screen.getByText(/firmness: medium/i)).toBeInTheDocument();
-    expect(screen.getByText("Qty 1")).toBeInTheDocument();
+    const table = screen.getByRole("table", { name: "Goods on SO-1303" });
+    expect(table).toBeInTheDocument();
+    expect(within(table).getAllByRole("columnheader").map((cell) => cell.textContent)).toEqual([
+      "Category", "Unit ID", "Deliver To", "SKU", "Qty", "Item",
+    ]);
+    const row = screen.getByTestId("expanded-good-B1201S-K");
+    expect(row).toHaveTextContent("Mattress");
+    expect(row).toHaveTextContent("id-001");
+    expect(row).toHaveTextContent("id-002");
+    expect(row).toHaveTextContent("B1201S-K");
+    expect(row).toHaveTextContent("11");
+    expect(row).toHaveTextContent("B1201S · King");
+    expect(row).toHaveTextContent("Firmness: medium");
+    expect(row).toHaveTextContent("Colour: Sand");
+    expect(row).toHaveTextContent("Fabric code: CG-012");
+    expect(row).toHaveTextContent("Carres Klang ×10");
+    expect(row).toHaveTextContent("AL Sungai Buloh ×1");
+    expect(row).not.toHaveTextContent("X: 60");
+    expect(row).not.toHaveTextContent("Cell index");
+    expect(row).not.toHaveTextContent("internal-builder-uuid");
+    expect(screen.queryByText(/current location/i)).not.toBeInTheDocument();
+  });
+
+  it("omits destination quantity for one route and shows it only for a split", () => {
+    listHookState.data = { orders: [order({ order_lines: [
+      { id: "line-1", sku: "B1201S-K", qty: 1, unit_price: 2499, label: "B1201S · King" },
+    ] })] };
+    expansionHookState.data = { lines: [{
+      lineId: "line-1", sku: "B1201S-K", unitIds: [],
+      deliverTo: [{ name: "Carres Klang", qty: 1 }],
+    }] };
+    mount();
+    fireEvent.click(screen.getByRole("button", { name: "Expand row" }));
+    const row = screen.getByTestId("expanded-good-B1201S-K");
+    expect(row).toHaveTextContent("Carres Klang");
+    expect(row).not.toHaveTextContent("Carres Klang ×1");
   });
 
   it("classifies legacy item codes before falling back to Other Goods", () => {
@@ -198,15 +560,101 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
       orders: [
         order({
           order_lines: [
-            { sku: "B1201S-K", qty: 1, unit_price: 2499, label: "B1201S · King", attrs: {} },
+            { id: "line-1", sku: "B1201S-K", qty: 1, unit_price: 2499, label: "B1201S · King", attrs: {} },
           ],
         }),
       ],
     };
     mount();
     fireEvent.click(screen.getByRole("button", { name: "Expand row" }));
-    expect(screen.getByRole("heading", { name: "MATTRESS" })).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "OTHER GOODS" })).not.toBeInTheDocument();
+    expect(screen.getByText("Mattress")).toBeInTheDocument();
+    expect(screen.getByText("Not allocated")).toBeInTheDocument();
+    expect(screen.queryByText(/other goods/i)).not.toBeInTheDocument();
+  });
+
+  /**
+   * ⭐ THE CHILD BOX BEGINS AT `SO No` — owner ruling 2026-08-15.
+   *
+   * The indent is the parent-child link, and it is the TABLE's own column
+   * layout that draws it: one real EMPTY cell per gutter column, then the box
+   * spanning the data columns with no padding of its own. A computed
+   * `padding-left` was tried and measured wrong — `width` on a `<td>` is a
+   * hint, and this grid stretches its columns to fill the frame, so the 30px
+   * ☐ and 32px ▸ render 41 and 43 at 1440 and a 62px padding lands 22px short.
+   */
+  it("starts the expansion at the first data column, with the gutter left empty", () => {
+    mount();
+    fireEvent.click(screen.getByRole("button", { name: "Expand row" }));
+    const gutter = screen.getAllByTestId(/^grid-expansion-gutter-/);
+    expect(gutter.map((c) => c.dataset.testid)).toEqual([
+      "grid-expansion-gutter-__select__",
+      "grid-expansion-gutter-__expand__",
+    ]);
+    for (const cell of gutter) expect(cell).toBeEmptyDOMElement();
+    /* Eight default business columns; the gutter is not one of them, and the
+       box's right edge is therefore the parent table's. */
+    expect(screen.getByTestId("grid-expansion-cell")).toHaveAttribute("colspan", "8");
+    /* Air above and below, NOTHING left or right — horizontal padding is the
+       very thing the gutter cells replaced (owner correction 2026-08-15). */
+    expect(screen.getByTestId("grid-expansion-cell")).toHaveStyle({
+      paddingTop: "12px",
+      paddingBottom: "12px",
+      paddingLeft: "0px",
+      paddingRight: "0px",
+    });
+  });
+
+  /** The child of a record is its own object, and the frame is what says so. */
+  it("draws the child table as a bordered box, not a continuation of the sheet", () => {
+    mount();
+    fireEvent.click(screen.getByRole("button", { name: "Expand row" }));
+    const box = screen.getByTestId("goods-mini-table");
+    expect(box.className).toContain("rounded-control");
+    expect(box.className).toContain("border-base-200");
+    expect(box.className).not.toContain("border-y");
+  });
+
+  /**
+   * ⭐ TWO TYPE LEVELS, AND A REGISTER SELECTS NOTHING (owner rulings
+   * 2026-08-15). The header is the parent header's own 11px grey; every value
+   * is 13px `text-body`; and no child row on a TRUTH register may carry a
+   * checkbox — the parent row's tick already scopes Export, and a second tick
+   * inside the box would claim the register can act on one line.
+   */
+  it("prints the child header at 11px with no checkbox, and every value at 13px", () => {
+    mount();
+    fireEvent.click(screen.getByRole("button", { name: "Expand row" }));
+    const goods = screen.getByRole("table", { name: "Goods on SO-1303" });
+    for (const header of within(goods).getAllByRole("columnheader")) {
+      expect(header.className).toContain("text-label");
+      expect(header.className).toContain("text-base-500");
+    }
+    expect(within(goods).queryByRole("checkbox")).not.toBeInTheDocument();
+    expect(within(goods).getAllByRole("rowgroup")[1].className).toContain("text-body");
+  });
+
+  /** An absence keeps its word and loses its weight — inside the box too. */
+  it("mutes the governed absences in the child table", () => {
+    listHookState.data = { orders: [order({ order_lines: [
+      { id: "line-1", sku: "B1201S-K", qty: 1, unit_price: 2499, label: "B1201S · King" },
+    ] })] };
+    expansionHookState.data = { lines: [] };
+    mount();
+    fireEvent.click(screen.getByRole("button", { name: "Expand row" }));
+    const goods = screen.getByRole("table", { name: "Goods on SO-1303" });
+    expect(within(goods).getByText("Not allocated")).toHaveAttribute("data-absence", "true");
+    expect(within(goods).getByText("Not recorded")).toHaveAttribute("data-absence", "true");
+  });
+
+  it("uses a dash for Service Unit ID and routing instead of inventing a non-applicable state", () => {
+    listHookState.data = {
+      orders: [order({ order_lines: [], order_addons: [{ addon_key: "disposal_service", qty: 1, unit_price: 0 }] })],
+    };
+    mount();
+    fireEvent.click(screen.getByRole("button", { name: "Expand row" }));
+    const goods = screen.getByRole("table", { name: "Goods on SO-1303" });
+    expect(goods).not.toHaveTextContent("Not applicable");
+    expect(within(goods).getAllByText("—")).toHaveLength(2);
   });
 
   it("keeps loading inside the work surface instead of adding an outer band", () => {

@@ -50,7 +50,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { Search, Columns3, RotateCcw, Filter, Download } from "lucide-react";
+import { Search, Columns3, RotateCcw, Filter, Download, ChevronDown, Printer } from "lucide-react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
 import { SkeletonRows } from "./Skeleton";
@@ -182,13 +182,37 @@ export type DataGridProps<T> = {
   /** Reference-toolbar slots. Start renders before Search; End renders after
       Filters / Export / Columns. The legacy `toolbar` slot is unchanged. */
   toolbarStart?: ReactNode;
+  /** Outputs valid ONLY for the exact selection — MASTER.md:588. The label
+   *  receives the count so the button prints the truthful number. */
+  selectionActions?: Array<{ label: (n: number) => string; onClick: (rows: never[]) => void }>;
   toolbarEnd?: ReactNode;
+  /** Fixed informational footer. Receives the filtered result and, when
+      present, the selected rows that remain in that result. */
+  statusSummary?: (filteredRows: T[], selectedRows: T[]) => ReactNode;
   /** Additional read-only outputs shown beside the built-in Excel export. */
   outputActions?: Array<{ label: string; onClick: () => void }>;
   /** controlled focus for the "Find" button — bump to focus the search box */
   focusSearchNonce?: number;
   /** bump to collapse every expanded drill-down row ("Collapse all") */
   collapseAllNonce?: number;
+  /**
+   * ⭐ STICKY IDENTITY — owner ruling 2026-08-15 (Chai). OPTIONAL, default OFF.
+   *
+   * When optional columns widen the sheet past its frame, the grid scrolls
+   * sideways and the row loses the only thing that says WHICH record it is.
+   * With this on, the control gutter (selection + expand) and the FIRST data
+   * column pin to the left edge and the rest of the sheet slides under them.
+   *
+   * It is an ENGINE capability, not a page hack: any register that scrolls
+   * horizontally has the same problem, and one implementation is the only way
+   * two of them cannot disagree. The default stays OFF so no signature moved
+   * and no unwired page changed — an unwired power's absence is asserted by a
+   * test (`docs/ui/MASTER.md` §4).
+   *
+   * The FIRST data column is pinned, not a named one: the engine does not know
+   * what a `SO No` is, and the identity column is whatever the page put first.
+   */
+  stickyIdentity?: boolean;
   /** show "Drag a column header here to group by that column" banner */
   groupBanner?: boolean;
   emptyMessage?: string;
@@ -361,9 +385,12 @@ function DataGridInner<T>({
   toolbar,
   toolbarStart,
   toolbarEnd,
+  selectionActions,
+  statusSummary,
   outputActions,
   focusSearchNonce,
   collapseAllNonce,
+  stickyIdentity = false,
   groupBanner = true,
   emptyMessage = "No data.",
   isLoading = false,
@@ -416,6 +443,7 @@ function DataGridInner<T>({
      discoverable toolbar button + popover with a per-column checkbox + Reset
      link, matching houzs-erp/src/pages/SalesOrderPage.tsx lines 576-624. */
   const [columnsMenuOpen, setColumnsMenuOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const [outputMenuOpen, setOutputMenuOpen] = useState(false);
   /* The Columns popover is fixed-positioned (not absolute) so it escapes the
      grid card's `overflow: hidden`, which otherwise clips the dropdown when the
@@ -425,6 +453,8 @@ function DataGridInner<T>({
      scroll (the operator scrolling the column list) from an OUTSIDE scroll
      (the page/grid moving, which should dismiss the detached fixed popover). */
   const columnsMenuRef = useRef<HTMLDivElement>(null);
+  const outputBtnRef = useRef<HTMLButtonElement>(null);
+  const [outputMenuPos, setOutputMenuPos] = useState<{ top: number; right: number } | null>(null);
   const [columnsMenuPos, setColumnsMenuPos] = useState<{ top: number; right: number } | null>(
     null,
   );
@@ -739,6 +769,68 @@ function DataGridInner<T>({
     }
     return synthetic.length ? [...synthetic, ...base] : base;
   }, [columns, layout.order, effectiveHidden, expandable, selectable]);
+
+  /**
+   * ⭐ STICKY IDENTITY — which columns pin, and how far from the left edge.
+   *
+   * The pinned block is the control gutter plus the FIRST data column. Its
+   * offsets are cumulative and read the SAME width source the cells do
+   * (`layout.widths` first, the column's own width second), so a resized or
+   * reordered identity column keeps the block correct instead of leaving a
+   * gap the rows slide through. Empty when the capability is off, which is
+   * what keeps every other register byte-identical.
+   */
+  const pinnedLefts = useMemo(() => {
+    const m = new Map<string, number>();
+    if (!stickyIdentity) return m;
+    let left = 0;
+    for (const col of visibleColumns) {
+      m.set(col.key, left);
+      left += Number(layout.widths[col.key] ?? col.width ?? 140);
+      // Stop AFTER the first real data column — the identity, not the record.
+      if (!col.key.startsWith("__")) break;
+    }
+    return m;
+  }, [stickyIdentity, visibleColumns, layout.widths]);
+  /** The last pinned column carries the edge that says where the block ends. */
+  const pinnedEdgeKey = useMemo(() => {
+    const keys = [...pinnedLefts.keys()];
+    return keys.length ? keys[keys.length - 1] : null;
+  }, [pinnedLefts]);
+  /** Both a `<th>` and a `<td>` need the same two decisions — one helper. */
+  const pinStyle = (key: string): CSSProperties =>
+    pinnedLefts.has(key) ? { left: pinnedLefts.get(key) } : {};
+  const pinClass = (key: string): string =>
+    pinnedLefts.has(key)
+      ? ` ${styles.stickyCell}${key === pinnedEdgeKey ? ` ${styles.stickyEdge}` : ""}`
+      : "";
+
+  /**
+   * ⭐ THE CHILD BOX BEGINS WHERE THE RECORD BEGINS — owner ruling 2026-08-15.
+   *
+   * An expansion used to start at whatever padding the calling page happened
+   * to write, which on Sales Orders was 40px against a 62px gutter: the child
+   * table's left edge landed inside the `▸` column, two pixels of nothing on
+   * either side of nowhere. The indent is not decoration — the EMPTY ☐ and ▸
+   * cells beside the child rows are the parent-child link, and they only read
+   * as one when the box starts exactly at the first data column.
+   *
+   * SO THE TABLE ALIGNS IT, NOT A NUMBER. The expansion row now carries one
+   * REAL empty cell per gutter column and spans the data columns with the
+   * rest; the browser's own column layout then puts the box's left edge on the
+   * first data column's left edge exactly. A computed `padding-left` cannot:
+   * `width` on a `<td>` is a HINT, and this grid's columns stretch to fill the
+   * frame — measured live at 1440, the 30px ☐ and 32px ▸ render 41px and 43px,
+   * so a 62px padding lands 22px short of `SO No`. Nothing is measured here,
+   * so nothing can drift when a column is resized, hidden or reordered.
+   *
+   * (Law 13: an alignment every register needs is an engine capability, never
+   * a page-local hack — `docs/ui/MASTER.md` §4.)
+   */
+  const expansionGutter = useMemo(
+    () => visibleColumns.filter((c) => c.key.startsWith("__")).map((c) => c.key),
+    [visibleColumns],
+  );
 
   /* The Columns pill counts DATA columns only — the synthetic __select__ /
      __expand__ columns are chrome, not catalog (2990 subtracted only the
@@ -1074,7 +1166,6 @@ function DataGridInner<T>({
     const w = Math.max(60, Math.min(420, Math.round(max * 7.5 + 20)));
     setLayout((l) => ({ ...l, widths: { ...l.widths, [key]: w } }));
   };
-  const resetLayout = () => setLayout(() => DEFAULT_LAYOUT);
 
   /* ── Export to Excel (system-wide via DataGrid) ───────────────────────
      Exports exactly what the operator sees: the post-filter + post-search +
@@ -1084,11 +1175,12 @@ function DataGridInner<T>({
      view, the selection bar passes the selected rows. Cells render ReactNode,
      so we derive a text value per cell. xlsx is dynamic-imported (mirrors the
      pdf generators) to keep it out of the main bundle. */
-  const exportRows = useCallback(
-    async (whichRows: T[]) => {
-      if (whichRows.length === 0) return;
-      const cols = visibleColumns.filter((c) => !c.key.startsWith("__"));
-      if (cols.length === 0) return;
+  /* One derivation, two outputs. Excel and PDF disagreeing about a cell is the
+     defect this shape exists to make impossible. */
+  const deriveTable = useCallback(
+    (whichRows: T[]): { headers: string[]; rows: string[][]; stem: string } => {
+      const cols =
+        whichRows.length === 0 ? [] : visibleColumns.filter((c) => !c.key.startsWith("__"));
       // Header for a column in the sheet: an explicit exportLabel (used by pure
       // icon/checkbox columns whose on-screen label is blank) else the on-screen
       // label. Falls back to the column key so a blank header never leaves an
@@ -1116,23 +1208,6 @@ function DataGridInner<T>({
         for (const c of cols) o[header(c)] = cellText(c, row);
         return o;
       });
-      const XLSX = await import("xlsx");
-      const ws = XLSX.utils.json_to_sheet(data, { header: cols.map((c) => header(c)) });
-      // Auto-size each column to its widest cell (header included) so the sheet is
-      // legible instead of squished into one default width (Wei Siang 2026-06-20
-      // "很乱很难看"). Capped so a stray long value can't blow a column out.
-      ws["!cols"] = cols.map((c) => {
-        const h = header(c);
-        let w = h.length;
-        for (const o of data) w = Math.max(w, String(o[h] ?? "").length);
-        return { wch: Math.min(60, Math.max(8, w + 2)) };
-      });
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
-      // Filename: prefer the caller's human exportName ("Purchase Orders"); else
-      // clean the storageKey down to something legible (strip dg-/pr-g- prefixes,
-      // -v1 / layout suffixes, dashes→spaces). A YYYY-MM-DD date is appended so
-      // repeated exports are self-dating and don't silently overwrite.
       const stem =
         (exportName && exportName.trim()) ||
         (storageKey || "export")
@@ -1144,10 +1219,67 @@ function DataGridInner<T>({
           .replace(/\s+/g, " ")
           .trim() ||
         `export-${whichRows.length}`;
+      return {
+        headers: cols.map((c) => header(c)),
+        rows: data.map((o) => cols.map((c) => String(o[header(c)] ?? ""))),
+        stem,
+      };
+    },
+    [visibleColumns, storageKey, exportName],
+  );
+
+  const exportRows = useCallback(
+    async (whichRows: T[]) => {
+      if (whichRows.length === 0) return;
+      const { headers, rows, stem } = deriveTable(whichRows);
+      if (headers.length === 0) return;
+      const data = rows.map((r) => {
+        const o: Record<string, string> = {};
+        headers.forEach((h, i) => { o[h] = r[i] ?? ""; });
+        return o;
+      });
+      const cols = headers;
+      const XLSX = await import("xlsx");
+      const ws = XLSX.utils.json_to_sheet(data, { header: cols });
+      // Auto-size each column to its widest cell (header included) so the sheet is
+      // legible instead of squished into one default width (Wei Siang 2026-06-20
+      // "很乱很难看"). Capped so a stray long value can't blow a column out.
+      ws["!cols"] = cols.map((h) => {
+        let w = h.length;
+        for (const o of data) w = Math.max(w, String(o[h] ?? "").length);
+        return { wch: Math.min(60, Math.max(8, w + 2)) };
+      });
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
+      // Filename: prefer the caller's human exportName ("Purchase Orders"); else
+      // clean the storageKey down to something legible (strip dg-/pr-g- prefixes,
+      // -v1 / layout suffixes, dashes→spaces). A YYYY-MM-DD date is appended so
+      // repeated exports are self-dating and don't silently overwrite.
       const stamp = new Date().toISOString().slice(0, 10);
       XLSX.writeFile(wb, `${stem} ${stamp}.xlsx`);
     },
-    [visibleColumns, storageKey, exportName],
+    [deriveTable],
+  );
+
+  /** The current view as a PDF — same derived cells, opened in a new tab so the
+   *  operator can read it before deciding to save or print it. */
+  const exportPdfRows = useCallback(
+    async (whichRows: T[]) => {
+      if (whichRows.length === 0) return;
+      const { headers, rows, stem } = deriveTable(whichRows);
+      if (headers.length === 0) return;
+      const { renderRegisterListPdf } = await import("@/lib/pdf/render");
+      const blob = await renderRegisterListPdf({
+        title: stem,
+        headers,
+        rows,
+        printedAt: new Date().toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" }),
+      });
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank");
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    },
+    [deriveTable],
   );
 
   // ── Sort handlers ─────────────────────────────────────────────────
@@ -1250,8 +1382,8 @@ function DataGridInner<T>({
               return (
                 <td
                   key={col.key}
-                  className={styles.td}
-                  style={{ width: w, maxWidth: w, padding: "4px 6px", textAlign: "center" }}
+                  className={`${styles.td}${pinClass(col.key)}`}
+                  style={{ width: w, maxWidth: w, padding: "4px 6px", textAlign: "center", ...pinStyle(col.key) }}
                   onClick={(e) => e.stopPropagation()}
                 >
                   <input
@@ -1267,8 +1399,8 @@ function DataGridInner<T>({
               return (
                 <td
                   key={col.key}
-                  className={styles.td}
-                  style={{ width: w, maxWidth: w, padding: "4px 6px", textAlign: "center" }}
+                  className={`${styles.td}${pinClass(col.key)}`}
+                  style={{ width: w, maxWidth: w, padding: "4px 6px", textAlign: "center", ...pinStyle(col.key) }}
                 >
                   <button
                     type="button"
@@ -1305,8 +1437,8 @@ function DataGridInner<T>({
             return (
               <td
                 key={col.key}
-                className={`${styles.td} ${col.align === "right" ? styles.tdAlignRight : ""}`}
-                style={{ width: w, maxWidth: w }}
+                className={`${styles.td} ${col.align === "right" ? styles.tdAlignRight : ""}${pinClass(col.key)}`}
+                style={{ width: w, maxWidth: w, ...pinStyle(col.key) }}
               >
                 {isEmpty ? (col.key.startsWith("__") ? null : "—") : content}
               </td>
@@ -1315,7 +1447,25 @@ function DataGridInner<T>({
         </tr>
         {isExpanded && expandable && (
           <tr className={styles.tr} style={{ background: "var(--c-cream)" }}>
-            <td colSpan={visibleColumns.length} style={{ padding: 0, borderTop: "1px solid var(--line)" }}>
+            {/* The gutter, kept EMPTY beside the child rows — the indent IS
+                the parent-child link (owner ruling 2026-08-15). */}
+            {expansionGutter.map((key) => (
+              <td
+                key={key}
+                data-testid={`grid-expansion-gutter-${key}`}
+                style={{ padding: 0, borderTop: "1px solid var(--line)" }}
+              />
+            ))}
+            <td
+              colSpan={visibleColumns.length - expansionGutter.length}
+              data-testid="grid-expansion-cell"
+              /* ⭐ VERTICAL ONLY (owner correction 2026-08-15). The child is a
+                 separate object and needs air above and below it to read as
+                 one — but HORIZONTAL padding is exactly what the gutter cells
+                 replaced, so it stays at zero: the left edge is the first data
+                 column's, the right edge is the parent table's. */
+              style={{ padding: "12px 0", borderTop: "1px solid var(--line)" }}
+            >
               {expandable.renderExpansion(row)}
             </td>
           </tr>
@@ -1335,20 +1485,43 @@ function DataGridInner<T>({
           2990 kept it right — that is the one composition change the laws
           mandate), then the caller's actions, then Export + Columns pinned
           right (LAWS 3 + 4). */}
+      {!(selectable && selectedVisibleRows.length > 0) ? (
       <div className={styles.toolbar} data-testid={isReference ? "work-toolbar" : undefined}>
         {isReference && toolbarStart}
+        {isReference && <div className={styles.toolbarSpacer} />}
         {!embedded && (
-          <div className={styles.searchWrap}>
-            <Search {...ICON} aria-hidden />
-            <input
-              ref={searchRef}
-              className={styles.searchInput}
-              type="search"
-              placeholder={searchPlaceholder}
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
+          isReference && !searchOpen && !search ? (
+            <button
+              type="button"
+              aria-label="Search"
+              title="Search"
+              data-testid="search-icon"
+              className={styles.toolbarIcon}
+              onClick={() => setSearchOpen(true)}
+            >
+              <Search {...ICON} aria-hidden />
+            </button>
+          ) : (
+            <div className={styles.searchWrap}>
+              <Search {...ICON} aria-hidden />
+              <input
+                ref={searchRef}
+                className={styles.searchInput}
+                type="search"
+                placeholder={searchPlaceholder}
+                value={search}
+                autoFocus={isReference && searchOpen}
+                onChange={(e) => setSearch(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") {
+                    setSearch("");
+                    setSearchOpen(false);
+                  }
+                }}
+                onBlur={() => { if (!search) setSearchOpen(false); }}
+              />
+            </div>
+          )
         )}
         {isReference ? null : toolbar}
         {!isReference && <div className={styles.toolbarSpacer} />}
@@ -1383,18 +1556,41 @@ function DataGridInner<T>({
             2026-06-19). Wording says the scope out loud (REGISTER LAW 3). */}
         <div className={styles.columnsAnchor}>
           <button
+            ref={outputBtnRef}
             type="button"
-            className={`${styles.toolbarPill} ${outputMenuOpen ? styles.toolbarPillOn : ""}`}
-            onClick={() => setOutputMenuOpen((open) => !open)}
+            aria-label="Export"
+            title="Export"
+            className={`${styles.toolbarPill} ${isReference ? styles.toolbarPillIconCaret : ""} ${outputMenuOpen ? styles.toolbarPillOn : ""}`}
+            onClick={() => setOutputMenuOpen((open) => {
+              const next = !open;
+              if (next && outputBtnRef.current) {
+                const r = outputBtnRef.current.getBoundingClientRect();
+                setOutputMenuPos({ top: r.bottom + 4, right: window.innerWidth - r.right });
+              }
+              return next;
+            })}
             disabled={sortedRows.length === 0}
             aria-haspopup="menu"
             aria-expanded={outputMenuOpen}
           >
             <Download size={14} strokeWidth={1.75} aria-hidden />
-            <span>Export</span>
+            {!isReference && (
+              <>
+                <span>Export</span>
+                <ChevronDown size={12} strokeWidth={2} aria-hidden />
+              </>
+            )}
           </button>
           {outputMenuOpen && (
-            <div className={styles.columnsMenu} role="menu">
+            <div
+              className={styles.columnsMenu}
+              role="menu"
+              style={
+                outputMenuPos
+                  ? { position: "fixed", top: outputMenuPos.top, right: outputMenuPos.right }
+                  : undefined
+              }
+            >
               <button
                 type="button"
                 className={styles.filterLauncherItem}
@@ -1404,7 +1600,18 @@ function DataGridInner<T>({
                   void exportRows(sortedRows);
                 }}
               >
-                Export Excel
+                Excel
+              </button>
+              <button
+                type="button"
+                className={styles.filterLauncherItem}
+                role="menuitem"
+                onClick={() => {
+                  setOutputMenuOpen(false);
+                  void exportPdfRows(sortedRows);
+                }}
+              >
+                PDF
               </button>
               {(outputActions ?? []).map((action) => (
                 <button
@@ -1427,7 +1634,9 @@ function DataGridInner<T>({
           <button
             ref={columnsBtnRef}
             type="button"
-            className={`${styles.toolbarPill} ${columnsMenuOpen ? styles.toolbarPillOn : ""}`}
+            aria-label="Columns"
+            title="Columns"
+            className={`${styles.toolbarPill} ${isReference ? styles.toolbarPillIconOnly : ""} ${columnsMenuOpen ? styles.toolbarPillOn : ""}`}
             onClick={(e) => {
               e.stopPropagation();
               setColumnsMenuOpen((v) => {
@@ -1441,7 +1650,7 @@ function DataGridInner<T>({
             }}
           >
             <Columns3 size={14} strokeWidth={1.75} aria-hidden />
-            <span>Columns</span>
+            {!isReference && <span>Columns</span>}
           </button>
           {columnsMenuOpen && (
             <>
@@ -1509,12 +1718,8 @@ function DataGridInner<T>({
         </div>
         {isReference && toolbarEnd}
       </div>
-
-      {/* RG-2 selection bar (Law 13 — extended once, every register gets it):
-          exists ONLY while ticked rows are visible under the current filters.
-          Its export writes the SELECTED rows; the toolbar's stays the view. */}
-      {selectable && selectedVisibleRows.length > 0 && (
-        <div className={styles.selectionBar} data-testid="selection-bar">
+      ) : (
+        <div className={`${styles.toolbar} ${styles.selectionBar}`} data-testid="selection-bar">
           <span className={styles.selectionCount}>{selectedVisibleRows.length} selected</span>
           <button
             type="button"
@@ -1533,6 +1738,17 @@ function DataGridInner<T>({
             <Download size={14} strokeWidth={1.75} aria-hidden />
             <span>Export Excel ({selectedVisibleRows.length})</span>
           </button>
+          {(selectionActions ?? []).map((a) => (
+            <button
+              key={a.label(0)}
+              type="button"
+              className={styles.toolbarPill}
+              onClick={() => a.onClick(selectedVisibleRows as never[])}
+            >
+              <Printer size={14} strokeWidth={1.75} aria-hidden />
+              <span>{a.label(selectedVisibleRows.length)}</span>
+            </button>
+          ))}
         </div>
       )}
 
@@ -1579,7 +1795,11 @@ function DataGridInner<T>({
             <tr>
               {visibleColumns.map((col) => {
                 const w = layout.widths[col.key] ?? col.width ?? 140;
-                const style: CSSProperties = { width: w, minWidth: col.minWidth ?? 40 };
+                const style: CSSProperties = {
+                  width: w,
+                  minWidth: col.minWidth ?? 40,
+                  ...pinStyle(col.key),
+                };
                 const isSorted = layout.sort?.key === col.key;
                 const arrow = isSorted ? (layout.sort!.dir === "asc" ? "A" : "V") : "";
                 if (col.key === "__select__" && selectable) {
@@ -1587,7 +1807,7 @@ function DataGridInner<T>({
                   const allSel = keys.length > 0 && keys.every((k) => selectable.selectedKeys.has(k));
                   const someSel = !allSel && keys.some((k) => selectable.selectedKeys.has(k));
                   return (
-                    <th key={col.key} className={styles.th} style={style}>
+                    <th key={col.key} className={`${styles.th}${pinClass(col.key)}`} style={style}>
                       <span className={styles.thInner}>
                         <input
                           type="checkbox"
@@ -1607,7 +1827,7 @@ function DataGridInner<T>({
                     key={col.key}
                     className={`${styles.th} ${col.align === "right" ? styles.thAlignRight : ""} ${
                       dropTarget === col.key ? styles.thDragOver : ""
-                    }`}
+                    }${pinClass(col.key)}`}
                     style={style}
                     draggable
                     onDragStart={(e) => onDragStartHeader(e, col.key)}
@@ -1732,12 +1952,11 @@ function DataGridInner<T>({
           "N of M rows / Reset layout" line reads as heavy chrome. */}
       {!embedded && (
         <div className={styles.statusLine} data-testid={isReference ? "grid-footer" : undefined}>
-          <span>{isLoading ? "Loading…" : `${filteredRows.length} of ${rows.length} rows`}</span>
-          <span>
-            <button className={styles.tbarBtn} onClick={resetLayout} title="Reset column layout">
-              Reset layout
-            </button>
-          </span>
+          {isLoading
+            ? <span>Loading…</span>
+            : statusSummary
+              ? statusSummary(sortedRows, selectedVisibleRows)
+              : <span>{`${filteredRows.length} of ${rows.length} rows`}</span>}
         </div>
       )}
 

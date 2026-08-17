@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   monthKeyMYT,
+  grnDutyMonth,
   isPoDayMYT,
   nextPoDayMYT,
   poUrgentBypass,
@@ -130,5 +131,43 @@ describe("canRaisePo", () => {
   });
   it("dormant (no holder) → everyone can — a missing feature never blocks work", () => {
     expect(canRaisePo(null, OTHER, "operation", "liching@carres.com", isOpsManager)).toBe(true);
+  });
+});
+
+/**
+ * GRN duty reaches FORWARD, not back (built 2026-08-15).
+ *
+ * `purchasing/MASTER.md` §2.2 locks the two-duty rota: read its table down a
+ * column and July's GRN holder is Yu Jun, who is AUGUST's PO holder. The Team
+ * panel and `work-engine.ts` both described this as "offset−1" and the panel
+ * implemented it by looking at the PREVIOUS month — a month the API's roster
+ * (which starts at the current one) never contains, so `GRN DUTY` read
+ * `Not assigned` every month from the day it shipped.
+ */
+describe("grnDutyMonth — the receiver is the NEXT month's PO holder", () => {
+  it("steps forward one month", () => {
+    expect(grnDutyMonth("2026-07")).toBe("2026-08");
+    expect(grnDutyMonth("2026-08")).toBe("2026-09");
+  });
+
+  it("crosses the year end", () => {
+    expect(grnDutyMonth("2026-12")).toBe("2027-01");
+  });
+
+  it("pads a single-digit month so the key still sorts as a string", () => {
+    expect(grnDutyMonth("2026-09")).toBe("2026-10");
+    expect(grnDutyMonth("2027-01")).toBe("2027-02");
+  });
+
+  it("matches the locked rota table: Jul PO Shasha → Jul GRN = Aug PO Yu Jun", () => {
+    const rota: Record<string, string> = {
+      "2026-07": "Shasha",
+      "2026-08": "Yu Jun",
+      "2026-09": "Khor Yee",
+    };
+    expect(rota[grnDutyMonth("2026-07")]).toBe("Yu Jun");
+    expect(rota[grnDutyMonth("2026-08")]).toBe("Khor Yee");
+    // And the receiver is never the month's own PO holder.
+    expect(rota[grnDutyMonth("2026-07")]).not.toBe(rota["2026-07"]);
   });
 });

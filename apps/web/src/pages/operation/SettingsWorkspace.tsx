@@ -15,30 +15,34 @@
 import { NavLink, Navigate, Route, Routes } from "react-router-dom";
 import OperationPurchasingSettings from "./OperationPurchasingSettings";
 import SalesOrderSettings from "./SalesOrderSettings";
+import IssueTrackerSettings from "./IssueTrackerSettings";
 
 const SECTIONS = [
-  { slug: "sales-orders", label: "Sales Orders" },
-  { slug: "purchasing", label: "Purchasing" },
+  { slug: "sales-orders", group: "Sales Orders", label: "Sales Order Settings" },
+  { slug: "purchasing", group: "Purchasing", label: "Purchasing Settings" },
+  { slug: "issue-tracker", group: "Issue Tracker", label: "Issue Tracker Settings" },
 ] as const;
 
 export default function SettingsWorkspace() {
   return (
-    <div className="flex h-full min-h-0" data-testid="settings-workspace">
-      <nav className="w-56 shrink-0 border-r border-base-200 bg-white py-4">
-        <div className="px-4 pb-2 text-label text-base-500">System Settings</div>
+    <div className="flex h-full min-h-0 bg-base-50" data-testid="settings-workspace">
+      <nav className="m-5 mr-0 w-[280px] shrink-0 self-start rounded-card border border-base-200 bg-white p-3 shadow-sm" aria-label="Settings sections">
+        <div className="px-3 pb-2 pt-1 text-label uppercase tracking-[0.16em] text-base-500">Settings</div>
         {SECTIONS.map((s) => (
+          <div key={s.slug}>
+            <div data-settings-group className="px-3 pb-1 pt-3 text-label uppercase tracking-[0.16em] text-base-500">{s.group}</div>
           <NavLink
-            key={s.slug}
             to={`/operation/settings/${s.slug}`}
             className={({ isActive }) =>
-              `block px-4 py-1.5 text-body ${
-                isActive ? "text-base-900 font-medium" : "text-base-600 hover:text-base-900"
+              `flex w-full items-center justify-between rounded-control px-3 py-2 text-left text-body transition-colors ${
+                isActive ? "bg-base-900 font-medium text-white" : "text-base-800 hover:bg-base-50"
               }`
             }
             data-testid={`settings-section-${s.slug}`}
           >
             {s.label}
           </NavLink>
+          </div>
         ))}
       </nav>
 
@@ -47,6 +51,7 @@ export default function SettingsWorkspace() {
           <Route index element={<Navigate to="sales-orders" replace />} />
           <Route path="sales-orders" element={<SalesOrderSettings />} />
           <Route path="purchasing" element={<OperationPurchasingSettings embedded />} />
+          <Route path="issue-tracker" element={<IssueTrackerSettings />} />
         </Routes>
       </div>
     </div>

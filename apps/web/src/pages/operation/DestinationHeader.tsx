@@ -1,4 +1,4 @@
-import { ClipboardList } from "lucide-react";
+import type { ReactNode } from "react";
 import ModuleHeader from "./components/ModuleHeader";
 
 /**
@@ -9,14 +9,14 @@ import ModuleHeader from "./components/ModuleHeader";
  * composition supplies only the destination identity. No duplicate tab or
  * second title is rendered underneath it.
  */
-export default function DestinationHeader() {
+export default function DestinationHeader({ right }: { right?: ReactNode }) {
   return (
     <ModuleHeader
       testId="sales-orders-destination-header"
-      icon={ClipboardList}
       word="Sales Orders"
       docTitle="Sales Orders — Carres"
-      renderedHeight44
+      destinationHeader
+      right={right}
     />
   );
 }

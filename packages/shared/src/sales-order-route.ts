@@ -1,54 +1,205 @@
 /**
- * Sales Order Route — a read-only projection of facts owned elsewhere.
+ * Sales Order Route — ONE NODE MAP, and no second surface.
  *
- * This module deliberately has no workflow state and no writer. It keeps each
- * applicable obligation independent, permits simultaneous goods positions,
- * and emits owner links for every document/fact it names.
+ * ⭐ OWNER RULING 2026-08-16 (`docs/cards/CARD-2026-08-16-order-route-node-map.md`).
+ * This OVERWRITES the two-layer `ORDER TRACKS + GOODS ROUTES + DELIVERY RELEASE`
+ * stack: three section cards asked the operator to assemble the order in their
+ * head. The route is now one connected map — white node cards joined by
+ * connectors, three routes leaving the Sales Order at once, converging on the
+ * Delivery Order gate.
+ *
+ * ```
+ * SO
+ * ├── Goods            forks per goods line and per source quantity
+ * ├── Delivery         LOGISTICS → DELIVERY DATE
+ * ├── Money            MONEY
+ * └── Loan             rendered ONLY when a loan is out
+ *
+ * Goods + Logistics + Delivery Date + Money → DELIVERY ORDER → DELIVER → PHOTO
+ * ```
+ *
+ * ⭐ THE MONEY REQUIREMENT — OWNER RULING 2026-08-16, decision B. The card's
+ * §9 proposed dropping money from the gate and blocking only on a
+ * "Finance-recorded payment exception". Three current MASTERs and the shipped
+ * engine say otherwise — `docs/orders/MASTER.md` §8 ("the money is collected"),
+ * §7 (the payment condition is one of four triggers),
+ * `docs/payment/MASTER.md` §6 ("issuing the DO is the hard gate"), and
+ * `order-actions.ts` `deliveryHeldOnMoney`, which withholds
+ * `issue_delivery_order` outright while money holds. A gate that counted three
+ * met requirements while the server refused the DO would be the screen telling
+ * a lie (Architecture Law D). Money therefore stays a requirement and is drawn
+ * in the card's plain-sentence voice; the Finance-exception mechanism the card
+ * describes does not exist in this repository and none was invented here.
+ *
+ * TWO RULES THIS FILE STILL HOLDS, UNCHANGED BY THE REDRAW:
+ *
+ * 1. **A `✓` costs real completion evidence.** A node is complete only when it
+ *    can name its document, its labelled date and the door to the object that
+ *    owns it. Nothing is ticked because the next thing started.
+ * 2. **The balance fact and the release decision are TWO facts.** A manager
+ *    release lifts the HOLD; it never erases or hides the outstanding amount
+ *    (`orderMoney` separates `holding` from `outstanding` — §8).
+ *
+ * The canvas computes nothing of its own and stores nothing: every line is a
+ * fact some other module owns. Dates travel as ISO with their MEANING attached
+ * (`Issued: 2026-08-13`); the page spells them through the one date format.
  */
 
-import type { SalesOrderAllocation } from "./sales-order-allocation";
+import { deliveryGroupOf, type DeliveryGroupKey } from "./delivery-groups";
+import { fmtMoney } from "./money-format";
+import type { AllocationUnit, SalesOrderAllocation } from "./sales-order-allocation";
 import { normalizeSkuKey } from "./sku-code";
 
-export type SalesOrderRouteLaneKey = "goods" | "delivery" | "money" | "loan" | "other";
-export type SalesOrderRouteFactState = "complete" | "current" | "attention" | "clear";
+/* ─────────────────────────────────────────────────────────────────────────────
+ * The vocabulary of a node.
+ * ──────────────────────────────────────────────────────────────────────────── */
 
-export interface SalesOrderRouteDocument {
-  id: string;
-  kind: "Sales Order" | "Revision" | "Purchase Order" | "Supplier DO" | "Receiving Record" | "Delivery Order" | "Invoice" | "Loan Note" | "Supplier Claim" | "Service Case";
-  number: string;
+/**
+ * `complete` green · `current` blue border + owner chip · `waiting` grey ·
+ * `blocked` amber · `future` grey DASHED — a step the work has not reached.
+ *
+ * State is never colour alone (card §12): complete also carries `✓`, current
+ * also carries its chip, future also carries the dashed border, blocked also
+ * carries `⚠` and says why in words.
+ */
+export type NodeMark = "complete" | "current" | "waiting" | "blocked" | "future";
+
+/** Which of the routes leaving the Sales Order this node belongs to. */
+export type RouteBranchKey = "root" | "goods" | "delivery" | "money" | "loan" | "gate" | "tail";
+
+export type RouteNodeKind =
+  | "sales-order"
+  | "purchasing"
+  | "supplier"
+  | "receiving"
+  | "stock"
+  | "logistics"
+  | "delivery-date"
+  | "money"
+  | "delivery-order"
+  | "deliver"
+  | "delivery-photo"
+  | "loan"
+  | "cancelled";
+
+export interface RouteDoor {
+  /** The governed door word, e.g. `Open PO-2048 →`. */
+  label: string;
   href: string;
-  detail?: string | null;
 }
 
-export interface SalesOrderRouteFact {
+/**
+ * Who the action line belongs to. The route never derives duty and never knows
+ * a staff name — the page resolves the holder from the Work Engine roster
+ * (card §7), buddy cover included.
+ */
+export type StationOwnerKey =
+  | "purchasing"
+  | "receiving"
+  | "stock"
+  | "delivery"
+  | "sales"
+  | "payment";
+
+export interface NodeAction {
+  ownerKey: StationOwnerKey;
+  /** The act, in the governed voice: `Confirm the ready date`. */
+  label: string;
+}
+
+/** One plain sentence on the gate, GitHub-checks style. */
+export interface GateRequirement {
+  id: GateRequirementId;
+  met: boolean;
+  /** `Goods not ready (0 of 1)` · `RM 1,249.00 still to collect` */
+  text: string;
+}
+
+export type GateRequirementId = "goods" | "logistics" | "appointment" | "money" | "refused-day";
+
+export interface RouteNode {
   id: string;
+  kind: RouteNodeKind;
+  branch: RouteBranchKey;
+  /** `PURCHASING` · `DELIVERY ORDER` — the node's one heading. */
   title: string;
-  detail: string | null;
-  state: SalesOrderRouteFactState;
-  owner: string;
-  href: string | null;
-  occurredAt: string | null;
+  mark: NodeMark;
+  /** The fact lines, in reading order. Complete nodes carry their evidence
+   *  here; everything else carries its plain-sentence status. */
+  lines: string[];
+  /** The gate's requirement list. Empty on every other node. */
+  requirements: GateRequirement[];
+  action: NodeAction | null;
+  door: RouteDoor | null;
+  /** One per route, up to three at once — never a fourth (card §13). */
+  current: boolean;
+  /* Geometry, computed here so the connectors are testable without a DOM. */
+  x: number;
+  y: number;
+  w: number;
+  h: number;
 }
 
-export interface SalesOrderRouteGroup {
+export interface RoutePoint {
+  x: number;
+  y: number;
+}
+
+export interface RouteEdge {
   id: string;
-  title: string;
-  facts: SalesOrderRouteFact[];
+  from: string;
+  to: string;
+  /** Completed segments solid; a path the work has not walked is dashed. */
+  style: "solid" | "dashed";
+  /** Small grey text sitting ON the line — `goods` · `collect back`. */
+  labelLines: string[];
+  /** The orthogonal elbow, ready for one `<polyline>`. */
+  points: RoutePoint[];
+  labelAt: RoutePoint | null;
 }
 
-export interface SalesOrderRouteLane {
-  key: SalesOrderRouteLaneKey;
-  title: "Goods" | "Delivery" | "Money" | "Loan" | "Other Commitments";
-  groups: SalesOrderRouteGroup[];
+/** An open Service Case / Supplier Claim. NEVER a node on the map: a node is a
+ *  stage every Sales Order passes through and an exception is not one. Kept as
+ *  a conditional strip beside the canvas so the capability §0.1 approved is not
+ *  lost in the redraw. */
+export interface LinkedProblem {
+  id: string;
+  /** `SC-1031 · Investigation in progress` */
+  title: string;
+  door: RouteDoor;
 }
+
+export interface SalesOrderRouteMap {
+  orderId: string;
+  soNumber: string;
+  customerName: string | null;
+  nodes: RouteNode[];
+  edges: RouteEdge[];
+  linkedProblems: LinkedProblem[];
+  /** The drawn bounding box — the page fits THIS to the viewport on load. */
+  width: number;
+  height: number;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * The input — every field is a fact somebody else owns.
+ * ──────────────────────────────────────────────────────────────────────────── */
 
 export interface RoutePurchaseOrder {
   id: string;
-  /** An owner-derived phrase such as "In production at supplier". */
-  currentFact: string;
-  etaDate: string | null;
-  supplierDoNumber: string | null;
+  /** `purchase_orders.placed_at` — the day the PO was issued. */
+  issuedAt: string | null;
+  /** `purchase_orders.expected_ready_date` — what the SUPPLIER confirmed.
+   *  Null means the supplier has not confirmed; it is never guessed. */
+  expectedReadyDate: string | null;
   lines: ReadonlyArray<{ sku: string; qty: number; receivedQty: number }>;
+}
+
+export interface RouteReceivingRecord {
+  id: string;
+  recordNo: string;
+  poId: string;
+  receivedAt: string | null;
 }
 
 export interface RouteDeliveryAttempt {
@@ -61,371 +212,938 @@ export interface RouteDeliveryAttempt {
   recordedAt: string | null;
 }
 
+/** `ops_sofa_loans` — an INDEPENDENT obligation (Card 6). The real goods
+ *  arriving does not close it, and it never blocks the delivery. */
 export interface RouteLoan {
   id: string;
+  /** What is out: the borrowed label, else the loaned unit's SKU. */
   label: string;
-  status: "on_loan" | "returned";
-  source: "warehouse" | "supplier";
-  loanNoteNo: string | null;
-  loanedAt: string | null;
-  returnedAt: string | null;
-  returnedToSupplierAt: string | null;
+  qty: number;
+  returned: boolean;
+}
+
+export interface RouteDeliveryPhoto {
+  /** `ops_order_control.delivery_photos[].at` */
+  at: string | null;
+  /** The uploader, already resolved to a name by the page. */
+  by: string | null;
+}
+
+export interface RouteLinkedCase {
+  id: string;
+  caseNo: string;
+  /** Already translated by its owning module — no internal enum reaches here. */
+  statusLabel: string | null;
+  closed: boolean;
+}
+
+export interface RouteLinkedClaim {
+  id: string;
+  claimNo: string;
+  statusLabel: string | null;
+  closed: boolean;
 }
 
 export interface SalesOrderRouteInput {
   order: {
     id: string;
     so: number;
-    placedAt: string;
+    customerName: string | null;
+    /** `orders.placed_at` — printed as `Ordered:`. */
+    placedAt: string | null;
+    /** The customer's promise — printed as `Customer requested:`. */
     deliveryDate: string | null;
-    doNumber: string | null;
-    dispatchedAt: string | null;
     deliveredAt: string | null;
-    invoiceNo: string | null;
   };
-  revisions: ReadonlyArray<number>;
-  /** Friendly product names keyed by the committed SKU. The SKU remains the
-   * matching identity; the route speaks the customer-facing product name. */
+  /** Friendly product names keyed by the committed SKU. */
   lineLabels?: Readonly<Record<string, string>>;
+  /** Purchasing's own Deliver To answer per SKU, including quantity splits.
+   *  Sales Order stores neither the destination nor its split. */
+  lineDestinations?: Readonly<Record<string, ReadonlyArray<{ name: string; qty: number }>>>;
+  /** Lines a governed Revision removed. The route always reflects the CURRENT
+   *  effective Revision; a cancelled line states its outcome and stops. */
+  cancelledLines?: ReadonlyArray<{ sku: string; label?: string | null; qty: number; revision: number }>;
   allocation: SalesOrderAllocation;
   purchaseOrders: ReadonlyArray<RoutePurchaseOrder>;
-  receivingRecords: ReadonlyArray<{
-    id: string;
-    recordNo: string;
-    poId: string;
-    supplierDoNumber: string | null;
-    status: string;
-    receivedAt: string | null;
-  }>;
+  receivingRecords: ReadonlyArray<RouteReceivingRecord>;
   delivery: {
-    booking: { date: string | null; slot: string | null; partnerName: string | null } | null;
+    /** The company currently assigned to carry this order — Delivery's own
+     *  answer (`booking-brief.assignedLogistics`), never inferred. */
+    logistics: { partnerName: string | null } | null;
+    booking: {
+      confirmedDate: string | null;
+      slot: string | null;
+      /** The delivery groups THIS trip carries. Null = the whole order. */
+      scope: ReadonlyArray<DeliveryGroupKey> | null;
+    } | null;
     attempts: ReadonlyArray<RouteDeliveryAttempt>;
+    /** `ops_order_control.delivery_photos` (0280). */
+    photos?: ReadonlyArray<RouteDeliveryPhoto>;
   };
-  money: { known: boolean; total: number | null; paid: number; outstanding: number };
-  refunds: ReadonlyArray<{
-    id: string;
-    amount: number;
-    status: "requested" | "approved" | "rejected" | "paid";
-    requestedAt: string | null;
-  }>;
-  loans: ReadonlyArray<RouteLoan>;
-  cases: ReadonlyArray<{
-    id: string;
-    caseNo: string;
-    closed: boolean;
-    openedAt: string | null;
-  }>;
-  claims: ReadonlyArray<{
-    id: string;
-    claimNo: string;
-    poId: string;
-    status: string;
-    reportedAt: string | null;
-  }>;
-  work: ReadonlyArray<{
-    id: string;
-    module: string;
-    title: string;
-    state: "open" | "closed";
-    createdAt: string | null;
-  }>;
+  /** Straight from `orderMoney` — this module never recomputes the number. */
+  money: {
+    known: boolean;
+    outstanding: number;
+    /** `holds` false with `outstanding` above zero IS a manager release. */
+    holds: boolean;
+  };
+  loans?: ReadonlyArray<RouteLoan>;
+  cases: ReadonlyArray<RouteLinkedCase>;
+  claims: ReadonlyArray<RouteLinkedClaim>;
+  /** Malaysian public holidays as `YYYY-MM-DD`. A confirmed date landing on one
+   *  — or on a Sunday — is a refused delivery day (§8). */
+  publicHolidays?: ReadonlyArray<string>;
 }
 
-export interface SalesOrderRoute {
-  orderId: string;
-  soNumber: string;
-  documents: SalesOrderRouteDocument[];
-  lanes: SalesOrderRouteLane[];
-  currentPositions: string[];
-  noActionRequired: boolean;
+/* ─────────────────────────────────────────────────────────────────────────────
+ * Doors — one spelling per destination.
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+const poHref = (poId: string) => `/operation/procurement?po=${encodeURIComponent(poId)}`;
+const purchasingHref = "/operation?tab=purchase";
+const receivingHref = (recordId: string) =>
+  `/operation?tab=receiving&receipt=${encodeURIComponent(recordId)}`;
+const stockHref = "/operation?tab=stock-onhand";
+const deliveryHref = (orderId: string) =>
+  `/operation?tab=delivery&order=${encodeURIComponent(orderId)}`;
+const paymentsHref = (so: number) => `/operation?tab=payments&so=${so}`;
+const caseHref = (caseId: string) =>
+  `/operation?tab=service-notes&case=${encodeURIComponent(caseId)}`;
+const claimHref = (claimId: string) =>
+  `/operation?tab=claims&claim=${encodeURIComponent(claimId)}`;
+const door = (label: string, href: string): RouteDoor => ({ label, href });
+const open = (what: string, href: string): RouteDoor => door(`Open ${what} →`, href);
+
+const units = (n: number) => `${n} ${n === 1 ? "Unit" : "Units"}`;
+/** `fmtMoney` already carries `RM` — the ONE money spelling, not a second one. */
+const ringgit = (n: number) => fmtMoney(n);
+
+/** A date never ships bare — its meaning travels with it. */
+const dated = (label: string, iso: string | null) => (iso ? `${label}: ${iso}` : null);
+
+const skuKey = (sku: string) => normalizeSkuKey(sku) || sku;
+
+const unitQty = (unit: AllocationUnit) =>
+  Number.isFinite(unit.qty) && unit.qty > 0 ? Math.floor(unit.qty) : 1;
+
+const unitNames = (list: ReadonlyArray<AllocationUnit>) =>
+  list.map((unit) => unit.unitCode ?? unit.id).join(" · ");
+
+const truthy = (list: ReadonlyArray<string | null | undefined>): string[] =>
+  list.filter((line): line is string => Boolean(line && line.trim().length > 0));
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * Geometry. Fixed node width, height derived from content, so a connector can
+ * be computed — and asserted — without rendering anything.
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+export const NODE_W = 208;
+const COL_GAP = 32;
+const PITCH = NODE_W + COL_GAP;
+const PAD = 28;
+/** Room under the Sales Order for the fan-out labels (`goods`, `delivery`…). */
+const FANOUT_GAP = 72;
+const ROW_GAP = 30;
+const GATE_GAP = 56;
+
+/* These MUST match the box the page draws (`SalesOrderRoute.tsx`), or a
+   connector would stop short of its node. `text-body` is 13/18 and
+   `text-label` is 11/14 — the governed scale, not numbers chosen here. */
+const TITLE_H = 20;
+const LINE_H = 18;
+const REQ_H = 16;
+const ACTION_H = 22;
+const DOOR_H = 18;
+const BOX_PAD = 22;
+
+function nodeHeight(node: {
+  lines: string[];
+  requirements: GateRequirement[];
+  action: NodeAction | null;
+  door: RouteDoor | null;
+}): number {
+  return (
+    BOX_PAD +
+    TITLE_H +
+    node.lines.length * LINE_H +
+    node.requirements.length * REQ_H +
+    (node.action ? ACTION_H : 0) +
+    (node.door ? DOOR_H : 0)
+  );
 }
 
-const money = (value: number) =>
-  new Intl.NumberFormat("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
-
-const fact = (
-  id: string,
-  title: string,
-  state: SalesOrderRouteFactState,
-  owner: string,
-  href: string | null,
-  detail: string | null = null,
-  occurredAt: string | null = null,
-): SalesOrderRouteFact => ({ id, title, detail, state, owner, href, occurredAt });
-
-function poMatchesSku(po: RoutePurchaseOrder, sku: string) {
-  const key = normalizeSkuKey(sku) || sku;
-  return po.lines.filter((line) => (normalizeSkuKey(line.sku) || line.sku) === key);
+/** The org-chart elbow: down out of the source, across, down into the target. */
+function elbow(from: RouteNode, to: RouteNode): RoutePoint[] {
+  const x1 = from.x + from.w / 2;
+  const y1 = from.y + from.h;
+  const x2 = to.x + to.w / 2;
+  const y2 = to.y;
+  if (x1 === x2) return [{ x: x1, y: y1 }, { x: x2, y: y2 }];
+  const midY = y1 + (y2 - y1) / 2;
+  return [
+    { x: x1, y: y1 },
+    { x: x1, y: midY },
+    { x: x2, y: midY },
+    { x: x2, y: y2 },
+  ];
 }
 
-function goodsLane(input: SalesOrderRouteInput): { lane: SalesOrderRouteLane; positions: string[]; clear: boolean } {
-  const positions: string[] = [];
-  let clear = true;
-  const groups = input.allocation.lines.map((line) => {
-    const label = input.lineLabels?.[line.sku]?.trim() || line.sku;
-    const facts: SalesOrderRouteFact[] = [];
-    const words: string[] = [];
+/* ─────────────────────────────────────────────────────────────────────────────
+ * Node drafting. A branch is a vertical chain; the chain decides which of its
+ * nodes is the head (the position being worked) and which are still future.
+ * ──────────────────────────────────────────────────────────────────────────── */
 
-    for (const unit of line.soldUnits) {
-      const unitName = unit.unitCode ?? unit.id;
-      facts.push(fact(
-        `sold:${unit.id}`,
-        `Delivered · Unit ${unitName}`,
-        "complete",
-        "Stock",
-        "/operation?tab=stock-onhand",
-        unit.poNo ? `From ${unit.poNo}` : null,
-        unit.soldAt ?? null,
-      ));
-    }
-    if (line.soldQty > 0) words.push("Delivered");
+interface NodeDraft {
+  id: string;
+  kind: RouteNodeKind;
+  title: string;
+  complete: boolean;
+  blocked?: boolean;
+  lines: (string | null | undefined)[];
+  requirements?: GateRequirement[];
+  action?: NodeAction | null;
+  door?: RouteDoor | null;
+}
 
-    for (const unit of line.reservedUnits) {
-      const unitName = unit.unitCode ?? unit.id;
-      facts.push(fact(
-        `reserved:${unit.id}`,
-        `At Carres · Unit ${unitName}`,
-        "current",
-        "Stock",
-        "/operation?tab=stock-onhand",
-        unit.poNo ? `From ${unit.poNo}` : null,
-        unit.dateIn,
-      ));
-    }
-    if (line.reservedQty > 0) {
-      words.push("At Carres");
-      clear = false;
-    }
+interface Branch {
+  key: RouteBranchKey;
+  drafts: NodeDraft[];
+  /** The small grey caption on the edge leaving the Sales Order. */
+  labelLines: string[];
+  /** Loan hangs off DELIVER, not off the gate. */
+  joins: "gate" | "deliver" | "none";
+}
 
-    let remaining = line.outstandingQty;
-    for (const po of input.purchaseOrders) {
-      if (remaining <= 0) break;
-      const matching = poMatchesSku(po, line.sku);
-      const openOnPo = matching.reduce(
-        (sum, row) => sum + Math.max(0, Number(row.qty) - Number(row.receivedQty)),
-        0,
-      );
-      if (openOnPo <= 0) continue;
-      const qty = Math.min(remaining, openOnPo);
-      facts.push(fact(
-        `po:${po.id}:${line.sku}`,
-        `${po.currentFact} · ${po.id}`,
-        "current",
-        "Purchasing",
-        `/operation/procurement?po=${encodeURIComponent(po.id)}`,
-        `${qty} unit(s)${po.etaDate ? ` · Expected ${po.etaDate}` : ""}`,
-      ));
-      if (!words.includes(po.currentFact)) words.push(po.currentFact);
-      remaining -= qty;
-      clear = false;
-    }
-
-    if (remaining > 0) {
-      facts.push(fact(
-        `unassigned:${line.sku}`,
-        `Route not yet assigned · ${remaining}`,
-        "attention",
-        "Purchasing",
-        "/operation?tab=purchase",
-      ));
-      words.push("Route not yet assigned");
-      clear = false;
-    }
-
-    positions.push(`${label} · ${words.join(" / ") || "No recorded position"}`);
-    return { id: line.sku, title: `${label} · ${line.committedQty}`, facts };
+/**
+ * THE ONE PLACE A CHAIN'S POSITION IS DECIDED. The first node that is not
+ * complete is where the work stands; every node after it is a path the work has
+ * not walked yet, and says so with a dashed border rather than a dash.
+ */
+function sealChain(
+  drafts: NodeDraft[],
+  branch: RouteBranchKey,
+  ownsCurrent: boolean,
+): { nodes: RouteNode[]; hasHead: boolean } {
+  let headTaken = false;
+  const nodes = drafts.map((draft) => {
+    const isHead = !draft.complete && !headTaken;
+    if (isHead) headTaken = true;
+    const isCurrent = isHead && ownsCurrent;
+    const mark: NodeMark = draft.complete
+      ? "complete"
+      : draft.blocked
+        ? "blocked"
+        : isCurrent
+          ? "current"
+          : isHead
+            ? "waiting"
+            : "future";
+    const lines = truthy(draft.lines);
+    const requirements = draft.requirements ?? [];
+    /* An action belongs to the position being worked, not to a queue of nodes
+       nobody has reached. */
+    const action = isCurrent ? (draft.action ?? null) : null;
+    const doorway = draft.door ?? null;
+    const node: RouteNode = {
+      id: draft.id,
+      kind: draft.kind,
+      branch,
+      title: draft.title,
+      mark,
+      lines,
+      requirements,
+      action,
+      door: doorway,
+      current: isCurrent,
+      x: 0,
+      y: 0,
+      w: NODE_W,
+      h: 0,
+    };
+    node.h = nodeHeight({ lines, requirements, action, door: doorway });
+    return node;
   });
+  return { nodes, hasHead: headTaken };
+}
 
-  if (input.allocation.unmatchedUnits.length > 0) {
-    clear = false;
-    groups.push({
-      id: "unmatched",
-      title: "Units outside the current order lines",
-      facts: input.allocation.unmatchedUnits.map((unit) => fact(
-        `unmatched:${unit.id}`,
-        `Unit ${unit.unitCode ?? unit.id} · ${unit.status === "sold" ? "Delivered" : "Reserved"}`,
-        "attention",
-        "Stock",
-        "/operation?tab=stock-onhand",
-        unit.sku,
-      )),
+/* ─────────────────────────────────────────────────────────────────────────────
+ * Goods.
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+interface LineFacts {
+  sku: string;
+  label: string;
+  committedQty: number;
+  reservedUnits: AllocationUnit[];
+  soldUnits: AllocationUnit[];
+  reservedQty: number;
+  soldQty: number;
+  outstandingQty: number;
+}
+
+interface PurchaseSlice {
+  po: RoutePurchaseOrder;
+  qty: number;
+  orderedQty: number;
+  receivedQty: number;
+}
+
+/**
+ * How much of this line each matching PO covers, in PO order.
+ *
+ * The cover is the PO's ORDERED quantity, not what is still open on it. A PO
+ * whose goods arrived but whose Units nobody has created yet is still this
+ * line's route — dropping it the moment `received` caught up with `qty` made
+ * the whole branch vanish at exactly the step where the work sits. Units that
+ * DID reach the register have already lowered `outstandingQty`, so this cannot
+ * double-count.
+ */
+function purchaseSlices(line: LineFacts, pos: ReadonlyArray<RoutePurchaseOrder>): {
+  slices: PurchaseSlice[];
+  unassignedQty: number;
+} {
+  const key = skuKey(line.sku);
+  let remaining = line.outstandingQty;
+  const slices: PurchaseSlice[] = [];
+  for (const po of pos) {
+    if (remaining <= 0) break;
+    const matching = po.lines.filter((row) => skuKey(row.sku) === key);
+    if (matching.length === 0) continue;
+    const orderedQty = matching.reduce((sum, row) => sum + Math.max(0, Number(row.qty)), 0);
+    const receivedQty = matching.reduce((sum, row) => sum + Math.max(0, Number(row.receivedQty)), 0);
+    if (orderedQty <= 0) continue;
+    const qty = Math.min(remaining, orderedQty);
+    slices.push({ po, qty, orderedQty, receivedQty });
+    remaining -= qty;
+  }
+  return { slices, unassignedQty: Math.max(0, remaining) };
+}
+
+/** PURCHASING → SUPPLIER → RECEIVING for one Purchase Order. */
+function purchaseChain(
+  slice: PurchaseSlice,
+  receiving: ReadonlyArray<RouteReceivingRecord>,
+): NodeDraft[] {
+  const { po, orderedQty, receivedQty } = slice;
+  const record = receiving.find((row) => row.poId === po.id && row.receivedAt) ?? null;
+  return [
+    {
+      id: `${po.id}:purchasing`,
+      kind: "purchasing",
+      title: "PURCHASING",
+      complete: true,
+      lines: [po.id, dated("Issued", po.issuedAt)],
+      door: open(po.id, poHref(po.id)),
+    },
+    {
+      id: `${po.id}:supplier`,
+      kind: "supplier",
+      title: "SUPPLIER",
+      complete: Boolean(po.expectedReadyDate),
+      lines: [po.expectedReadyDate ? dated("Estimated ready", po.expectedReadyDate) : "Ready date not confirmed"],
+      action: { ownerKey: "purchasing", label: "Confirm ready date" },
+      door: open(po.id, poHref(po.id)),
+    },
+    {
+      id: `${po.id}:receiving`,
+      kind: "receiving",
+      title: "RECEIVING",
+      complete: orderedQty > 0 && receivedQty >= orderedQty && Boolean(record),
+      lines: record
+        ? [record.recordNo, dated("Received", record.receivedAt)]
+        : [
+            receivedQty > 0 && receivedQty < orderedQty
+              ? `${receivedQty} of ${orderedQty} received`
+              : "Not received yet",
+          ],
+      action: { ownerKey: "receiving", label: "Check in" },
+      door: record ? open(record.recordNo, receivingHref(record.id)) : null,
+    },
+  ];
+}
+
+/** The quantity no Purchase Order covers — the whole chain is still ahead. */
+function unassignedChain(line: LineFacts): NodeDraft[] {
+  return [
+    {
+      id: `${line.sku}:unassigned:purchasing`,
+      kind: "purchasing",
+      title: "PURCHASING",
+      complete: false,
+      blocked: true,
+      lines: ["No Purchase Order yet"],
+      action: { ownerKey: "purchasing", label: "Issue PO" },
+      door: open("Purchasing", purchasingHref),
+    },
+    {
+      id: `${line.sku}:unassigned:supplier`,
+      kind: "supplier",
+      title: "SUPPLIER",
+      complete: false,
+      lines: ["Ready date not confirmed"],
+    },
+    {
+      id: `${line.sku}:unassigned:receiving`,
+      kind: "receiving",
+      title: "RECEIVING",
+      complete: false,
+      lines: ["Not received yet"],
+    },
+  ];
+}
+
+/** The STOCK truth of one goods line — its own fork off the Sales Order. */
+function stockDraft(line: LineFacts, destination: string | null): NodeDraft {
+  const readyQty = line.reservedQty + line.soldQty;
+  const allReady = readyQty >= line.committedQty && line.committedQty > 0;
+  const codes = unitNames([...line.reservedUnits, ...line.soldUnits]);
+  return {
+    id: `${line.sku}:stock`,
+    kind: "stock",
+    title: "STOCK",
+    complete: allReady,
+    lines: allReady
+      ? [`${units(line.committedQty)} ready`, codes || null, destination]
+      : [`${readyQty} of ${line.committedQty} Units ready`, "Waiting for purchase"],
+    action: { ownerKey: "stock", label: "Create the Units" },
+    door: open("Stock", stockHref),
+  };
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * Delivery, money, loan.
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+function logisticsDraft(input: SalesOrderRouteInput): NodeDraft {
+  const name = input.delivery.logistics?.partnerName?.trim() || null;
+  return {
+    id: "logistics",
+    kind: "logistics",
+    title: "LOGISTICS",
+    complete: Boolean(name),
+    lines: name
+      ? [name]
+      : ["No logistics chosen yet", dated("Due", input.order.deliveryDate)],
+    action: { ownerKey: "delivery", label: "Assign logistics" },
+    door: open("Delivery", deliveryHref(input.order.id)),
+  };
+}
+
+function deliveryDateDraft(input: SalesOrderRouteInput): NodeDraft {
+  const booking = input.delivery.booking;
+  const confirmed = booking?.confirmedDate ?? null;
+  return {
+    id: "delivery-date",
+    kind: "delivery-date",
+    title: "DELIVERY DATE",
+    complete: Boolean(confirmed && booking?.slot),
+    lines: confirmed
+      ? [dated("Delivery appointment", confirmed), booking?.slot ?? "Slot not confirmed"]
+      : ["Date + slot not confirmed", dated("Customer requested", input.order.deliveryDate)],
+    action: { ownerKey: "sales", label: "Confirm delivery date" },
+    door: open("Delivery", deliveryHref(input.order.id)),
+  };
+}
+
+function moneyDraft(input: SalesOrderRouteInput): NodeDraft {
+  const payments = open("Payments", paymentsHref(input.order.so));
+  const action: NodeAction = { ownerKey: "payment", label: "Collect" };
+  if (!input.money.known) {
+    return {
+      id: "money",
+      kind: "money",
+      title: "MONEY",
+      complete: false,
+      lines: ["No price yet", "Money does not hold this delivery"],
+      door: payments,
+    };
+  }
+  if (input.money.outstanding <= 0) {
+    return {
+      id: "money",
+      kind: "money",
+      title: "MONEY",
+      complete: true,
+      lines: ["Paid in full"],
+      door: payments,
+    };
+  }
+  /* ⭐ TWO FACTS, NEVER ONE. A manager release lifts the HOLD; the amount the
+     customer still owes stays on the screen and stays on the worklist. */
+  if (!input.money.holds) {
+    return {
+      id: "money",
+      kind: "money",
+      title: "MONEY",
+      complete: true,
+      lines: [`${ringgit(input.money.outstanding)} still to collect`, "Manager release recorded"],
+      action,
+      door: payments,
+    };
+  }
+  return {
+    id: "money",
+    kind: "money",
+    title: "MONEY",
+    complete: false,
+    lines: [`${ringgit(input.money.outstanding)} still to collect`],
+    action,
+    door: payments,
+  };
+}
+
+/** Amber while the item is out. It never blocks the DO and never blocks the
+ *  delivery — it is an independent obligation (Card 6, card §8). */
+function loanDrafts(input: SalesOrderRouteInput): NodeDraft[] {
+  const out = (input.loans ?? []).filter((loan) => !loan.returned);
+  if (out.length === 0) return [];
+  return out.map((loan) => ({
+    id: `loan:${loan.id}`,
+    kind: "loan" as const,
+    title: "LOAN",
+    complete: false,
+    blocked: true,
+    lines: [
+      `${loan.qty} ${loan.label} on loan to customer`,
+      input.order.deliveredAt ? "Loan not collected back" : "Collect back on delivery day",
+    ],
+    action: { ownerKey: "delivery" as const, label: "Collect the loan item" },
+    door: open("Delivery", deliveryHref(input.order.id)),
+  }));
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * The gate. Read-only, and the SYSTEM issues the document — no Release button
+ * exists anywhere in this module.
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+const WEEKDAY_SUNDAY = 0;
+
+/** A confirmed date on a Sunday or a Malaysian public holiday is refused (§8). */
+function refusedDayLine(
+  confirmed: string | null,
+  holidays: ReadonlyArray<string>,
+): string | null {
+  if (!confirmed) return null;
+  if (holidays.includes(confirmed)) return "Date falls on a public holiday — pick another day";
+  const day = new Date(`${confirmed}T00:00:00Z`);
+  if (Number.isNaN(day.getTime())) return null;
+  return day.getUTCDay() === WEEKDAY_SUNDAY ? "Date falls on a Sunday — pick another day" : null;
+}
+
+interface GoodsTotals {
+  committedQty: number;
+  readyQty: number;
+  soldQty: number;
+}
+
+function goodsTotals(lines: LineFacts[]): GoodsTotals {
+  return {
+    committedQty: lines.reduce((sum, line) => sum + line.committedQty, 0),
+    readyQty: lines.reduce((sum, line) => sum + line.reservedQty + line.soldQty, 0),
+    soldQty: lines.reduce((sum, line) => sum + line.soldQty, 0),
+  };
+}
+
+function goodsRequirement(
+  lines: LineFacts[],
+  totals: GoodsTotals,
+  input: SalesOrderRouteInput,
+): GateRequirement {
+  const scope = input.delivery.booking?.scope ?? null;
+
+  /* A met goods requirement on PARTIAL goods is allowed ONLY when an explicit
+     partial-delivery scope exists — and then the scope is DISPLAYED, never
+     implied. */
+  if (scope && scope.length > 0) {
+    const inScope = lines.filter((line) => {
+      const group = deliveryGroupOf(line.sku);
+      return group != null && scope.includes(group);
+    });
+    if (inScope.length > 0 && inScope.length < lines.length) {
+      const scopeCommitted = inScope.reduce((sum, line) => sum + line.committedQty, 0);
+      const scopeReady = inScope.reduce((sum, line) => sum + line.reservedQty + line.soldQty, 0);
+      const remaining = totals.committedQty - scopeCommitted;
+      if (scopeReady >= scopeCommitted && scopeCommitted > 0) {
+        return {
+          id: "goods",
+          met: true,
+          text: `Goods ready for this delivery (${units(scopeCommitted)} in, ${units(remaining)} still open)`,
+        };
+      }
+    }
+  }
+
+  if (totals.committedQty === 0) {
+    return { id: "goods", met: true, text: "No goods on this order" };
+  }
+  if (totals.readyQty >= totals.committedQty) {
+    return { id: "goods", met: true, text: `Goods ready (${units(totals.committedQty)})` };
+  }
+  return {
+    id: "goods",
+    met: false,
+    text: `Goods not ready (${totals.readyQty} of ${totals.committedQty})`,
+  };
+}
+
+/**
+ * ⭐ MONEY IS A GATE REQUIREMENT — owner ruling 2026-08-16, decision B.
+ * `holds` is the ONE predicate `order-actions.ts` asks before it will offer
+ * `issue_delivery_order`; the gate asks the same one so the map and the engine
+ * can never disagree. A manager release meets the requirement and still prints
+ * what the customer owes.
+ */
+function moneyRequirement(input: SalesOrderRouteInput): GateRequirement {
+  if (!input.money.known) {
+    return { id: "money", met: true, text: "No price yet — money does not hold this delivery" };
+  }
+  if (input.money.holds) {
+    return {
+      id: "money",
+      met: false,
+      text: `${ringgit(input.money.outstanding)} still to collect`,
+    };
+  }
+  if (input.money.outstanding > 0) {
+    return {
+      id: "money",
+      met: true,
+      text: `Manager release recorded — ${ringgit(input.money.outstanding)} remains to collect`,
+    };
+  }
+  return { id: "money", met: true, text: "Paid in full" };
+}
+
+function gateRequirements(
+  lines: LineFacts[],
+  totals: GoodsTotals,
+  input: SalesOrderRouteInput,
+): GateRequirement[] {
+  const booking = input.delivery.booking;
+  const confirmed = booking?.confirmedDate ?? null;
+  const logisticsName = input.delivery.logistics?.partnerName?.trim() || null;
+  const list: GateRequirement[] = [
+    goodsRequirement(lines, totals, input),
+    {
+      id: "logistics",
+      met: Boolean(logisticsName),
+      text: logisticsName ? `Logistics chosen (${logisticsName})` : "No logistics chosen",
+    },
+    {
+      id: "appointment",
+      met: Boolean(confirmed && booking?.slot),
+      text: confirmed && booking?.slot ? "Date + slot confirmed" : "Date + slot not confirmed",
+    },
+    moneyRequirement(input),
+  ];
+  const refused = refusedDayLine(confirmed, input.publicHolidays ?? []);
+  if (refused) list.push({ id: "refused-day", met: false, text: refused });
+  return list;
+}
+
+function gateDraft(requirements: GateRequirement[], doNumber: string | null): NodeDraft {
+  const met = requirements.filter((r) => r.met).length;
+  const total = requirements.length;
+  const ready = met === total;
+  return {
+    id: "delivery-order",
+    kind: "delivery-order",
+    title: "DELIVERY ORDER",
+    complete: ready && Boolean(doNumber),
+    blocked: false,
+    lines:
+      ready && doNumber
+        ? [doNumber, "Delivery order issued"]
+        : [
+            ready ? "READY FOR DELIVERY" : "NOT READY FOR DELIVERY",
+            `${met} of ${total} requirements met`,
+          ],
+    requirements: ready && doNumber ? [] : requirements,
+    /* The system issues the document. There is no Release button, no Approve
+       button and no manual bypass anywhere in this module (§7, card §9). */
+    door: null,
+  };
+}
+
+function deliverDraft(input: SalesOrderRouteInput): NodeDraft {
+  const attempts = input.delivery.attempts;
+  const delivered =
+    attempts.some((a) => a.result === "delivered") || Boolean(input.order.deliveredAt);
+  const lastFailed = [...attempts].reverse().find((a) => a.result !== "delivered");
+  const confirmed = input.delivery.booking?.confirmedDate ?? null;
+  if (delivered) {
+    const done = attempts.find((a) => a.result === "delivered") ?? null;
+    return {
+      id: "deliver",
+      kind: "deliver",
+      title: "DELIVER",
+      complete: true,
+      lines: ["Delivered", dated("Delivered", done?.recordedAt ?? input.order.deliveredAt)],
+      door: open("Delivery", deliveryHref(input.order.id)),
+    };
+  }
+  if (lastFailed) {
+    return {
+      id: "deliver",
+      kind: "deliver",
+      title: "DELIVER",
+      complete: false,
+      blocked: true,
+      lines: [
+        `Delivery ${lastFailed.attemptNo} not completed`,
+        lastFailed.reason ?? "No reason recorded",
+      ],
+      action: { ownerKey: "delivery", label: "Arrange new delivery date" },
+      door: open("Delivery", deliveryHref(input.order.id)),
+    };
+  }
+  return {
+    id: "deliver",
+    kind: "deliver",
+    title: "DELIVER",
+    complete: false,
+    lines: confirmed ? ["Not delivered yet", dated("Scheduled", confirmed)] : ["Not delivered yet"],
+    door: open("Delivery", deliveryHref(input.order.id)),
+  };
+}
+
+function photoDraft(input: SalesOrderRouteInput): NodeDraft {
+  const photo = (input.delivery.photos ?? [])[0] ?? null;
+  return {
+    id: "delivery-photo",
+    kind: "delivery-photo",
+    title: "DELIVERY PHOTO",
+    complete: Boolean(photo),
+    lines: photo
+      ? [photo.by ? `Uploaded by ${photo.by}` : "Uploaded", dated("Uploaded", photo.at)]
+      : ["No delivery photo yet"],
+    action: { ownerKey: "delivery", label: "Upload delivery photo" },
+    door: open("Delivery", deliveryHref(input.order.id)),
+  };
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * The resolver — branches, then geometry, then connectors.
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+export function resolveSalesOrderRoute(input: SalesOrderRouteInput): SalesOrderRouteMap {
+  const soNumber = `SO-${input.order.so}`;
+  const lines: LineFacts[] = input.allocation.lines.map((line) => ({
+    sku: line.sku,
+    label: input.lineLabels?.[line.sku]?.trim() || line.sku,
+    committedQty: line.committedQty,
+    reservedUnits: [...line.reservedUnits],
+    soldUnits: [...line.soldUnits],
+    reservedQty: line.reservedQty,
+    soldQty: line.soldQty,
+    outstandingQty: line.outstandingQty,
+  }));
+
+  /* ── the branches, left to right ─────────────────────────────────────── */
+  const branches: Branch[] = [];
+
+  for (const line of lines) {
+    const destinations = input.lineDestinations?.[line.sku] ?? [];
+    const destination = destinations.length === 1 ? destinations[0]!.name : null;
+    const { slices, unassignedQty } = purchaseSlices(line, input.purchaseOrders);
+    const caption = `${line.label} · Qty ${line.committedQty}`;
+    const buying = slices.length > 0 || unassignedQty > 0;
+
+    for (const slice of slices) {
+      branches.push({
+        key: "goods",
+        drafts: purchaseChain(slice, input.receivingRecords),
+        labelLines: ["goods", caption, `${slice.qty} to buy from factory`],
+        joins: "gate",
+      });
+    }
+    if (unassignedQty > 0) {
+      branches.push({
+        key: "goods",
+        drafts: unassignedChain(line),
+        labelLines: ["goods", caption, `${unassignedQty} to buy from factory`],
+        joins: "gate",
+      });
+    }
+    branches.push({
+      key: "goods",
+      drafts: [stockDraft(line, destination)],
+      labelLines: buying ? ["goods", "(same line)"] : ["goods", caption],
+      joins: "gate",
     });
   }
 
-  return { lane: { key: "goods", title: "Goods", groups }, positions, clear };
-}
-
-function deliveryLane(input: SalesOrderRouteInput): { lane: SalesOrderRouteLane; clear: boolean } {
-  const deliveryHref = `/operation?tab=delivery&order=${encodeURIComponent(input.order.id)}`;
-  const attempts = input.delivery.attempts.map((attempt) => {
-    const word = attempt.result === "delivered" ? "Delivered" : "Not Delivered";
-    const detail = [attempt.doNumber, attempt.scheduledDate, attempt.reason].filter(Boolean).join(" · ") || null;
-    return fact(
-      `delivery:${attempt.id}`,
-      `Delivery ${attempt.attemptNo} · ${word}`,
-      attempt.result === "delivered" ? "complete" : "attention",
-      "Delivery",
-      deliveryHref,
-      detail,
-      attempt.recordedAt,
-    );
-  });
-  const lastAttempt = input.delivery.attempts[input.delivery.attempts.length - 1];
-  if (input.delivery.booking && lastAttempt?.result !== "delivered") {
-    const booking = input.delivery.booking;
-    attempts.push(fact(
-      "delivery:booking",
-      attempts.length > 0 ? "Next delivery · Scheduled" : "Delivery · Scheduled",
-      "current",
-      "Delivery",
-      deliveryHref,
-      [booking.date, booking.slot, booking.partnerName].filter(Boolean).join(" · ") || null,
-      booking.date,
-    ));
-  }
-  if (attempts.length === 0) {
-    attempts.push(fact(
-      "delivery:unassigned",
-      "Delivery not yet scheduled",
-      "attention",
-      "Delivery",
-      deliveryHref,
-      input.order.deliveryDate ? `Customer promised ${input.order.deliveryDate}` : null,
-    ));
-  }
-  const clear = input.delivery.attempts.some((attempt) => attempt.result === "delivered") || !!input.order.deliveredAt;
-  return { lane: { key: "delivery", title: "Delivery", groups: [{ id: "delivery", title: "Delivery", facts: attempts }] }, clear };
-}
-
-function moneyLane(input: SalesOrderRouteInput): { lane: SalesOrderRouteLane; clear: boolean } {
-  const incoming = input.money.known && input.money.outstanding > 0
-    ? fact("money:in", `RM ${money(input.money.outstanding)} owed by customer`, "attention", "Finance", "/finance/ar", `Paid RM ${money(input.money.paid)}`)
-    : fact("money:in", input.money.known ? "Customer payment clear" : "Customer balance not recorded", input.money.known ? "clear" : "current", "Finance", "/finance/ar");
-  const refundFacts = input.refunds.map((refund) => fact(
-    `refund:${refund.id}`,
-    refund.status === "approved"
-      ? `RM ${money(refund.amount)} approved refund not paid`
-      : `RM ${money(refund.amount)} refund · ${refund.status[0]!.toUpperCase()}${refund.status.slice(1)}`,
-    refund.status === "requested" || refund.status === "approved" ? "attention" : "complete",
-    "Finance",
-    "/finance/ar",
-    null,
-    refund.requestedAt,
-  ));
-  const refundOpen = input.refunds.some((refund) => refund.status === "requested" || refund.status === "approved");
-  return {
-    lane: {
-      key: "money",
-      title: "Money",
-      groups: [
-        { id: "money-in", title: "Customer to Carres", facts: [incoming] },
-        { id: "money-out", title: "Carres to customer", facts: refundFacts.length > 0 ? refundFacts : [fact("refund:none", "No refund obligation", "clear", "Finance", "/finance/ar")] },
+  /* A cancelled line keeps its place in the story and states its outcome. It
+     has no chain: there is no route to walk. */
+  for (const cancelled of input.cancelledLines ?? []) {
+    branches.push({
+      key: "goods",
+      drafts: [
+        {
+          id: `cancelled:${cancelled.sku}`,
+          kind: "cancelled",
+          title: "CANCELLED",
+          complete: true,
+          lines: [
+            `${cancelled.label?.trim() || cancelled.sku} · Qty ${cancelled.qty}`,
+            `Cancelled · Rev ${cancelled.revision}`,
+          ],
+        },
       ],
-    },
-    clear: (!input.money.known || input.money.outstanding <= 0) && !refundOpen,
-  };
-}
+      labelLines: ["goods"],
+      joins: "none",
+    });
+  }
 
-function loanLane(input: SalesOrderRouteInput): { lane: SalesOrderRouteLane; clear: boolean } {
-  const facts = input.loans.map((loan) => {
-    const supplierReturnOpen = loan.source === "supplier" && !loan.returnedToSupplierAt;
-    const title = loan.status === "on_loan"
-      ? "With customer"
-      : supplierReturnOpen ? "Returned by customer · supplier return open" : "Returned";
-    return fact(
-      `loan:${loan.id}`,
-      title,
-      loan.status === "on_loan" || supplierReturnOpen ? "attention" : "complete",
-      "Loan",
-      `/operation/orders/so/${encodeURIComponent(input.order.id)}?route=1#loan`,
-      [loan.label, loan.loanNoteNo].filter(Boolean).join(" · ") || null,
-      loan.returnedAt ?? loan.loanedAt,
-    );
+  branches.push({
+    key: "delivery",
+    drafts: [logisticsDraft(input), deliveryDateDraft(input)],
+    labelLines: ["delivery"],
+    joins: "gate",
   });
-  const clear = input.loans.every((loan) => loan.status === "returned" && (loan.source !== "supplier" || !!loan.returnedToSupplierAt));
-  return {
-    lane: { key: "loan", title: "Loan", groups: [{ id: "loan", title: "Loan", facts: facts.length > 0 ? facts : [fact("loan:none", "No loan obligation", "clear", "Loan", null)] }] },
-    clear,
-  };
-}
+  branches.push({
+    key: "money",
+    drafts: [moneyDraft(input)],
+    labelLines: ["money"],
+    joins: "gate",
+  });
+  for (const loan of loanDrafts(input)) {
+    branches.push({ key: "loan", drafts: [loan], labelLines: ["loan"], joins: "deliver" });
+  }
 
-function otherLane(input: SalesOrderRouteInput): { lane: SalesOrderRouteLane; clear: boolean } {
-  const claimFacts = input.claims.map((item) => fact(
-    `claim:${item.id}`,
-    `${item.claimNo} · ${item.status === "closed" ? "Closed" : "Open"}`,
-    item.status === "closed" ? "complete" : "attention",
-    "Claims",
-    `/operation?tab=claims&claim=${encodeURIComponent(item.id)}`,
-    item.poId,
-    item.reportedAt,
-  ));
-  const caseFacts = input.cases.map((item) => fact(
-    `case:${item.id}`,
-    `${item.caseNo} · ${item.closed ? "Closed" : "Open"}`,
-    item.closed ? "complete" : "attention",
-    "Service Cases",
-    `/operation?tab=service-notes&case=${encodeURIComponent(item.id)}`,
-    null,
-    item.openedAt,
-  ));
-  const workFacts = input.work.map((item) => fact(
-    `work:${item.id}`,
-    `${item.title} · ${item.state === "closed" ? "Closed" : "Open"}`,
-    item.state === "closed" ? "complete" : "attention",
-    item.module,
-    "/operation?tab=work",
-    null,
-    item.createdAt,
-  ));
-  return {
-    lane: {
-      key: "other",
-      title: "Other Commitments",
-      groups: [
-        { id: "claims", title: "Claims", facts: claimFacts.length > 0 ? claimFacts : [fact("claim:none", "No supplier claim", "clear", "Claims", "/operation?tab=claims")] },
-        { id: "cases", title: "Cases", facts: caseFacts.length > 0 ? caseFacts : [fact("case:none", "No service case", "clear", "Service Cases", "/operation?tab=service-notes")] },
-        { id: "work", title: "Work", facts: workFacts.length > 0 ? workFacts : [fact("work:none", "No open owner work", "clear", "Work", "/operation?tab=work")] },
-      ],
-    },
-    clear: input.claims.every((item) => item.status === "closed") && input.cases.every((item) => item.closed) && input.work.every((item) => item.state === "closed"),
-  };
-}
+  /* ── CURRENT: one per route, up to three, never a fourth. Loan is an
+     obligation, not a position, so it never takes one. ─────────────────── */
+  const currentTaken: Partial<Record<RouteBranchKey, boolean>> = {};
+  const sealed = branches.map((branch) => {
+    const eligible = branch.key === "goods" || branch.key === "delivery" || branch.key === "money";
+    const mayOwn = eligible && !currentTaken[branch.key];
+    const { nodes, hasHead } = sealChain(branch.drafts, branch.key, mayOwn);
+    if (mayOwn && hasHead) currentTaken[branch.key] = true;
+    return { branch, nodes };
+  });
 
-function documents(input: SalesOrderRouteInput): SalesOrderRouteDocument[] {
-  const orderHref = `/operation/orders/so/${encodeURIComponent(input.order.id)}`;
-  const docs: SalesOrderRouteDocument[] = [{ id: "so", kind: "Sales Order", number: `SO-${input.order.so}`, href: orderHref }];
-  for (const revision of input.revisions) docs.push({ id: `rev:${revision}`, kind: "Revision", number: `Rev ${revision}`, href: `${orderHref}?revision=${revision}` });
-  for (const po of input.purchaseOrders) {
-    const href = `/operation/procurement?po=${encodeURIComponent(po.id)}`;
-    docs.push({ id: `po:${po.id}`, kind: "Purchase Order", number: po.id, href, detail: po.currentFact });
-    if (po.supplierDoNumber) docs.push({ id: `supplier-do:${po.id}`, kind: "Supplier DO", number: po.supplierDoNumber, href });
-    for (const record of input.receivingRecords.filter((item) => item.poId === po.id)) {
-      const receivingHref = `/operation?tab=receiving&receipt=${encodeURIComponent(record.id)}`;
-      if (record.supplierDoNumber && record.supplierDoNumber !== po.supplierDoNumber)
-        docs.push({ id: `supplier-do:${record.id}`, kind: "Supplier DO", number: record.supplierDoNumber, href: receivingHref });
-      docs.push({ id: `grn:${record.id}`, kind: "Receiving Record", number: record.recordNo, href: receivingHref, detail: record.status });
+  /* ── geometry ────────────────────────────────────────────────────────── */
+  const columns = sealed.length;
+  const spanW = columns > 0 ? columns * PITCH - COL_GAP : NODE_W;
+  const centreX = PAD + spanW / 2;
+
+  const totals = goodsTotals(lines);
+  const requirements = gateRequirements(lines, totals, input);
+  const doNumber = [...input.delivery.attempts].reverse().find((a) => a.doNumber)?.doNumber ?? null;
+
+  const originDraft: NodeDraft = {
+    id: "sales-order",
+    kind: "sales-order",
+    title: "SALES ORDER",
+    complete: true,
+    lines: [soNumber, dated("Ordered", input.order.placedAt)],
+    /* Order Route already sits inside this Sales Order object. A door back to
+       the same object is circular navigation, not useful evidence (§0.1). */
+    door: null,
+  };
+  const { nodes: originNodes } = sealChain([originDraft], "root", false);
+  const origin = originNodes[0]!;
+  origin.x = centreX - NODE_W / 2;
+  origin.y = PAD;
+
+  const branchTop = origin.y + origin.h + FANOUT_GAP;
+  let deepest = branchTop;
+  sealed.forEach(({ nodes }, index) => {
+    let y = branchTop;
+    for (const node of nodes) {
+      node.x = PAD + index * PITCH;
+      node.y = y;
+      y += node.h + ROW_GAP;
     }
-  }
-  if (input.order.doNumber) docs.push({ id: "delivery-order", kind: "Delivery Order", number: input.order.doNumber, href: `/operation?tab=delivery&order=${encodeURIComponent(input.order.id)}` });
-  if (input.order.invoiceNo) docs.push({ id: "invoice", kind: "Invoice", number: input.order.invoiceNo, href: `/finance/invoices?order=${encodeURIComponent(input.order.id)}` });
-  for (const loan of input.loans) if (loan.loanNoteNo) docs.push({ id: `loan-note:${loan.id}`, kind: "Loan Note", number: loan.loanNoteNo, href: `${orderHref}?route=1#loan` });
-  for (const item of input.claims) docs.push({ id: `claim:${item.id}`, kind: "Supplier Claim", number: item.claimNo, href: `/operation?tab=claims&claim=${encodeURIComponent(item.id)}` });
-  for (const item of input.cases) docs.push({ id: `case:${item.id}`, kind: "Service Case", number: item.caseNo, href: `/operation?tab=service-notes&case=${encodeURIComponent(item.id)}` });
-  return docs;
-}
+    deepest = Math.max(deepest, y - ROW_GAP);
+  });
 
-export function resolveSalesOrderRoute(input: SalesOrderRouteInput): SalesOrderRoute {
-  const goods = goodsLane(input);
-  const delivery = deliveryLane(input);
-  const moneyResult = moneyLane(input);
-  const loan = loanLane(input);
-  const other = otherLane(input);
+  const { nodes: gateNodes } = sealChain([gateDraft(requirements, doNumber)], "gate", false);
+  const gate = gateNodes[0]!;
+  gate.x = centreX - NODE_W / 2;
+  gate.y = deepest + GATE_GAP;
+
+  const { nodes: tailNodes } = sealChain(
+    [deliverDraft(input), photoDraft(input)],
+    "tail",
+    false,
+  );
+  let tailY = gate.y + gate.h + ROW_GAP;
+  for (const node of tailNodes) {
+    node.x = centreX - NODE_W / 2;
+    node.y = tailY;
+    tailY += node.h + ROW_GAP;
+  }
+  const deliver = tailNodes[0]!;
+  const photo = tailNodes[1]!;
+
+  const nodes: RouteNode[] = [origin, ...sealed.flatMap((s) => s.nodes), gate, ...tailNodes];
+
+  /* ── connectors ──────────────────────────────────────────────────────── */
+  const edges: RouteEdge[] = [];
+  const segment = (from: RouteNode, to: RouteNode, labelLines: string[], forceDashed = false) => {
+    const points = elbow(from, to);
+    const style: RouteEdge["style"] =
+      forceDashed || from.mark !== "complete" ? "dashed" : "solid";
+    const drop = points[points.length - 1]!;
+    edges.push({
+      id: `${from.id}→${to.id}`,
+      from: from.id,
+      to: to.id,
+      style,
+      labelLines,
+      points,
+      labelAt: labelLines.length > 0 ? { x: drop.x, y: to.y - 10 } : null,
+    });
+  };
+
+  for (const { branch, nodes: chain } of sealed) {
+    /* The Sales Order is the ONLY start node: goods, delivery and money leave
+       it simultaneously. */
+    segment(origin, chain[0]!, branch.labelLines);
+    for (let i = 0; i < chain.length - 1; i += 1) segment(chain[i]!, chain[i + 1]!, []);
+    const tailNode = chain[chain.length - 1]!;
+    if (branch.joins === "gate") segment(tailNode, gate, []);
+    if (branch.joins === "deliver") segment(tailNode, deliver, ["collect back"], true);
+  }
+
+  segment(gate, deliver, []);
+  segment(deliver, photo, []);
+  /* The last node has no trailing line. */
+
+  const width = PAD * 2 + spanW;
+  const height = photo.y + photo.h + PAD;
+
+  const linkedProblems: LinkedProblem[] = [
+    ...input.cases
+      .filter((item) => !item.closed)
+      .map((item) => ({
+        id: `case:${item.id}`,
+        title: [item.caseNo, item.statusLabel].filter(Boolean).join(" · "),
+        door: open(item.caseNo, caseHref(item.id)),
+      })),
+    ...input.claims
+      .filter((item) => !item.closed)
+      .map((item) => ({
+        id: `claim:${item.id}`,
+        title: [item.claimNo, item.statusLabel].filter(Boolean).join(" · "),
+        door: open(item.claimNo, claimHref(item.id)),
+      })),
+  ];
+
+  /* `unmatchedUnits` is a Stock-register discrepancy, not a step on the route;
+     it stays out of the map and is reported by the Stock register itself. */
+  void input.allocation.unmatchedUnits.reduce((sum, unit) => sum + unitQty(unit), 0);
+
   return {
     orderId: input.order.id,
-    soNumber: `SO-${input.order.so}`,
-    documents: documents(input),
-    lanes: [goods.lane, delivery.lane, moneyResult.lane, loan.lane, other.lane],
-    currentPositions: goods.positions,
-    noActionRequired: goods.clear && delivery.clear && moneyResult.clear && loan.clear && other.clear,
+    soNumber,
+    customerName: input.order.customerName,
+    nodes,
+    edges,
+    linkedProblems,
+    width,
+    height,
   };
 }

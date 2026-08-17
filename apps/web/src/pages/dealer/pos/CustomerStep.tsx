@@ -5,6 +5,9 @@ import {
   isShowroom,
   minDeliveryDateISO,
   resolveFormTab,
+  BUILDING_TYPE_OPTIONS,
+  CUSTOMER_GENDER_OPTIONS,
+  CUSTOMER_RACE_OPTIONS,
   storeNoun,
   type CatalogResponse,
   type CustomField,
@@ -18,7 +21,7 @@ import { composeAddress } from "@/data/malaysia-postcodes";
 import { useStaffSession } from "@/lib/staff";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
 import { useCustomerSearch, useCustomerTypeProbe, type CustomerSearchHit } from "@/lib/queries";
-import { step2FirstDisposalIssue, step3DateValid, type WizardDraft } from "../new-order/draft";
+import { cartGoodsIssue, step2FirstDisposalIssue, step3DateValid, type WizardDraft } from "../new-order/draft";
 import Step3Delivery from "../new-order/Step3Delivery";
 import BirthdayWheelField from "./date-keyin/BirthdayWheelField";
 import AddonsPanel, { offerableAddons } from "./AddonsPanel";
@@ -26,11 +29,14 @@ import StairCarryFields from "./StairCarryFields";
 import OrderSummaryRail from "./OrderSummaryRail";
 import { customerPatchFromHit, RELATIONSHIPS } from "./customer-autofill";
 
-/** MY-standard demographic option lists (0200 — feed Sales analysis). */
-const RACE_OPTIONS = ["Malay", "Chinese", "Indian", "Other"] as const;
-const GENDER_OPTIONS = ["Female", "Male"] as const;
-/** Delivery-address building types (Loo 2026-07-19). */
-const BUILDING_TYPES = ["Landed", "Condo", "Apartment", "Office", "Retail", "Other"] as const;
+/** MY-standard demographic option lists (0200 — feed Sales analysis) and the
+ *  delivery-address building types (Loo 2026-07-19). All three moved to
+ *  `@carres/shared` on 2026-08-15: the Sales Order object page corrects the
+ *  same fields and must offer the same choices, and two lists is how one of
+ *  them grows an option the other has never heard of. */
+const RACE_OPTIONS = CUSTOMER_RACE_OPTIONS;
+const GENDER_OPTIONS = CUSTOMER_GENDER_OPTIONS;
+const BUILDING_TYPES = BUILDING_TYPE_OPTIONS;
 
 const PHONE_RE = /^[0-9-+\s]{8,}/;
 const EMAIL_RE = /^\S+@\S+\.\S+$/;
@@ -282,6 +288,10 @@ export default function CustomerStep({
     return (
       step3DateValid(draft, minLeadDays) &&
       step2FirstDisposalIssue(draft) === null &&
+      /* ⛔ A SALES ORDER MUST CONTAIN GOODS (owner ruling 2026-08-15) — the
+         cart drawer refuses it first; the last gate before CONFIRM refuses it
+         again for a cart edited after the drawer closed. */
+      cartGoodsIssue(draft, catalog) === null &&
       customsValid(targetTab)
     );
   }

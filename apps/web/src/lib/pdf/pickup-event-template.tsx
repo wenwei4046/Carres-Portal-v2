@@ -17,6 +17,7 @@
  */
 
 import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
+import { displayCustomerName } from "@/lib/customer-name";
 import { NOTO_SANS_SC_FAMILY } from "./fonts/noto";
 import { DocHeader } from "./letterhead";
 import type { PickupEventPrintPayload } from "@/lib/queries";
@@ -210,7 +211,7 @@ export function PickupEventTemplate(data: PickupEventPrintPayload) {
           <View key={t.thread_id} style={styles.threadBlock}>
             <View style={styles.threadHeader}>
               <Text style={styles.threadDl}>SO-{t.order_dl}</Text>
-              <Text style={styles.threadCustomer}>{t.customer_name}</Text>
+              <Text style={styles.threadCustomer}>{displayCustomerName(t.customer_name)}</Text>
               <Text style={styles.threadEta}>
                 ETA: {t.customer_delivery_date ?? "—"}
               </Text>

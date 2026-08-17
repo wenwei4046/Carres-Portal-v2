@@ -187,7 +187,11 @@ export const MODULE_WORK_RULES: readonly WorkRule[] = [
     key: "receiving.check_in",
     module: "receiving",
     trigger: "goods have an arrival promise and no posted Receiving Session covers them",
-    owner: "the month's GRN-duty holder (ops_po_duty offset−1; never the PO holder)",
+    // `offset−1` used to stand here with no direction, and it was read
+    // backwards where it mattered. The rota reaches FORWARD: GRN duty for a
+    // month is the NEXT month's `ops_po_duty` row (`grnDutyMonth`) — see
+    // `purchasing/MASTER.md` §2.2, whose table is the evidence.
+    owner: "the month's GRN-duty holder (ops_po_duty, the FOLLOWING month; never the PO holder)",
     action: "Check in",
     dueRule: "the promised arrival day",
     completionFact: "a posted Receiving Session (warehouse_receipts + receiving_events 'posted')",
@@ -224,33 +228,34 @@ export interface WorkItem {
   broken: boolean;
   /** The ACTUAL working day, ISO. Null = this step has no anchor yet. */
   dueIso: IsoDate | null;
-  /** `Thu 6 Aug` — the rail law: weekday + date, one format, never a bare
-   *  Today/Tomorrow. */
-  dueLabel: string | null;
   /** Working days past the ORIGINAL due (0 = not late). The due never moves. */
   workingDaysLate: number;
 }
 
-/** `Thu 6 Aug` — the ONE spelling for a work due date (Loo 2026-08-06's rail
- *  law). en-GB gives `Thu, 6 Aug` — the comma is dropped to match the frozen
- *  rails. */
-export function workDayLabel(iso: IsoDate | null): string | null {
-  if (!iso) return null;
-  const d = new Date(`${iso}T00:00:00`);
-  if (Number.isNaN(d.getTime())) return null;
-  const wd = d.toLocaleDateString("en-GB", { weekday: "short" });
-  const day = d.getDate();
-  const mon = d.toLocaleDateString("en-GB", { month: "short" });
-  return `${wd} ${day} ${mon}`;
-}
+/*
+ * `workDayLabel` is DELETED (THE YEAR RULE, owner ruling 2026-08-15), and with
+ * it `WorkItem.dueLabel` and `WorkDayGroup.label`.
+ *
+ * It was a FIFTH date spelling, and every property of it was wrong once the
+ * rule was written down. It reached for `toLocaleDateString`, which
+ * COPY-STANDARD bans outright. It dropped the comma, so a Work row and a
+ * Register cell named one day two ways. And it printed NO year, ever — which
+ * looks identical to the new rule until the work is due in another year, at
+ * which point the heading hides the single fact that makes it urgent.
+ *
+ * The fix is the one this repository already made when it deleted `dayWord()`:
+ * **a business engine hands its caller DAYS and no words.** `WorkDayGroup`
+ * carries `dayIso` (null = the anchorless group) and the screen spells it
+ * through the one formatter. There is nothing left here for a date to be
+ * spelled wrongly in.
+ */
 
 // ─── Card 10 — the surface's grouping, one rule ──────────────────────────────
 
 export interface WorkDayGroup<T extends WorkItem = WorkItem> {
-  /** ISO day, or null for the no-anchor group (always LAST). */
+  /** ISO day, or null for the no-anchor group (always LAST). The screen
+   *  spells it — `fmtDate(dayIso)`, or the ruled words `No date` when null. */
   dayIso: IsoDate | null;
-  /** `Mon 17 Aug`, or the ruled words `No date` for anchorless work. */
-  label: string;
   items: T[];
   late: number;
 }
@@ -282,7 +287,6 @@ export function groupWorkItemsByDay<T extends WorkItem>(
     const arr = sortItems(byDay.get(day)!);
     return {
       dayIso: day,
-      label: workDayLabel(day) ?? day,
       items: arr,
       late: arr.filter((i) => i.workingDaysLate > 0).length,
     };
@@ -290,7 +294,6 @@ export function groupWorkItemsByDay<T extends WorkItem>(
   if (dateless.length > 0) {
     groups.push({
       dayIso: null,
-      label: "No date",
       items: sortItems(dateless),
       late: 0,
     });
@@ -386,7 +389,6 @@ export function workItemsForOrder(
       locked: !!a.locked,
       broken: !!a.broken,
       dueIso,
-      dueLabel: workDayLabel(dueIso),
       workingDaysLate: late,
     };
   });

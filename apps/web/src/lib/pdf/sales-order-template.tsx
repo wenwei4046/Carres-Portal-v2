@@ -27,6 +27,7 @@
  */
 
 import { Document, Image, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
+import { displayCustomerName } from "@/lib/customer-name";
 import { lineConfigBits } from "../../pages/dealer/new-order/special-addons-picker";
 import { NOTO_SANS_SC_FAMILY } from "./fonts/noto";
 import { CARRES_COMPANY } from "./letterhead";
@@ -406,8 +407,8 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
         <View
           style={styles.header}
           fixed
-          render={({ pageNumber }) =>
-            pageNumber === 1 ? (
+          render={({ subPageNumber }) =>
+            subPageNumber === 1 ? (
               <View>
                 <View style={styles.headerRow}>
                   {/* Left column is WIDTH-BOUNDED (flex + padding) so the
@@ -465,7 +466,7 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
             <Text style={styles.blockLabel}>Bill To</Text>
             <View style={{ marginTop: mm(1.5) }}>
               {([
-                ["Name", customer.name],
+                ["Name", displayCustomerName(customer.name)],
                 ["Address", customer.address],
                 ["Tel", customer.phone],
                 ["Email", customer.email],
@@ -683,7 +684,7 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
         <View style={styles.totalsZone} wrap={false}>
           <View style={styles.signBox}>
             {signed && signature_url ? <Image src={signature_url} style={styles.signImage} /> : null}
-            <Text style={styles.signCaption}>Customer Signature · {customer.name}</Text>
+            <Text style={styles.signCaption}>Customer Signature · {displayCustomerName(customer.name)}</Text>
           </View>
           <View style={styles.totalsBlock}>
             <View style={styles.totalsRow}>
@@ -737,7 +738,9 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
             <Text style={styles.footerCenter}>Computer-generated document · No company signature required.</Text>
             <Text
               style={styles.footerPage}
-              render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`}
+              render={({ subPageNumber, subPageTotalPages }) =>
+                `Page ${subPageNumber} of ${subPageTotalPages}`
+              }
             />
           </View>
         </View>

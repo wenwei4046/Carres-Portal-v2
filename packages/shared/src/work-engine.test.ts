@@ -6,7 +6,6 @@ import {
   ORDER_WORK_RULES,
   WORK_RULES,
   groupWorkItemsByDay,
-  workDayLabel,
   workItemsForOrder,
   type WorkItem,
 } from "./work-engine";
@@ -87,13 +86,19 @@ describe("workItemsForOrder — WHO + ACTION + actual working day", () => {
     expect(assign.soRef).toBe("SO-1318");
     // Thu 2026-08-20 − 3 working days (Mon–Sat) = Mon 17 Aug.
     expect(assign.dueIso).toBe("2026-08-17");
-    expect(assign.dueLabel).toBe("Mon 17 Aug");
     expect(assign.workingDaysLate).toBe(0);
   });
 
-  it("never prints a bare Today/Tomorrow — the label is weekday + date", () => {
-    expect(workDayLabel("2026-08-11")).toBe("Tue 11 Aug");
-    expect(workDayLabel(null)).toBeNull();
+  it("hands the caller a DAY and no word — the engine spells no dates", async () => {
+    // THE YEAR RULE (owner ruling 2026-08-15) deleted `workDayLabel`, the
+    // engine's own fifth date spelling. A business engine that cannot format a
+    // date cannot format one wrongly; the screen calls the one formatter.
+    const engine = await import("./work-engine");
+    expect("workDayLabel" in engine).toBe(false);
+    const open = openOrderActions(baseSignals);
+    for (const i of workItemsForOrder(open, ctx, "2026-08-11", HOLS)) {
+      expect("dueLabel" in i).toBe(false);
+    }
   });
 
   it("late work keeps its ORIGINAL due date with working days late", () => {
@@ -151,17 +156,16 @@ describe("workItemsForOrder — WHO + ACTION + actual working day", () => {
       locked: false,
       broken: false,
       dueIso: "2026-08-17",
-      dueLabel: "Mon 17 Aug",
       workingDaysLate: 0,
       ...over,
     });
     const groups = groupWorkItemsByDay([
-      mk({ soRef: "SO-3", dueIso: "2026-08-18", dueLabel: "Tue 18 Aug" }),
-      mk({ soRef: "SO-2", dueIso: null, dueLabel: null }),
+      mk({ soRef: "SO-3", dueIso: "2026-08-18" }),
+      mk({ soRef: "SO-2", dueIso: null }),
       mk({ soRef: "SO-1", workingDaysLate: 2 }),
       mk({ soRef: "SO-9", broken: true }),
     ]);
-    expect(groups.map((g) => g.label)).toEqual(["Mon 17 Aug", "Tue 18 Aug", "No date"]);
+    expect(groups.map((g) => g.dayIso)).toEqual(["2026-08-17", "2026-08-18", null]);
     // Within Mon 17: the broken commitment leads.
     expect(groups[0].items.map((i) => i.soRef)).toEqual(["SO-9", "SO-1"]);
     expect(groups[0].late).toBe(1);

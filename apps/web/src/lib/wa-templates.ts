@@ -18,22 +18,25 @@
  *    customer for the final slot; if the customer asks about delivery, ops
  *    replies with the partner's contact.
  *  - {salutation} = the optional preferred-name/title field when set, else the
- *    Title-Cased customer name. NEVER auto-infer Mr/Ms.
+ *    customer name through the ONE display rule. NEVER auto-infer Mr/Ms.
+ */
+import { displayCustomerName } from "@/lib/customer-name";
+
+/*
+ * `titleCaseName` is DELETED — owner ruling 2026-08-15.
+ *
+ * It lowercased the tail of every word to soften `LEE WEI YANG` into
+ * `Lee Wei Yang`, which reads well until the name is initials: it also turned
+ * `KJ NG` into `Kj Ng`, and a WhatsApp message addressed to `Kj` is addressed
+ * to nobody. The owner ruled that a greeting obeys the same capitalize-up rule
+ * as the screen. `displayCustomerName` is the one entry point, and this
+ * function is deleted rather than re-pointed at it, because a second name for
+ * one rule is how two rules come back.
  */
 
-/** "LEE WEI YANG" → "Lee Wei Yang". Leaves CJK and mixed tokens intact. */
-export function titleCaseName(name: string): string {
-  return name
-    .trim()
-    .split(/\s+/)
-    .map((w) =>
-      /^[A-Za-z]/.test(w) ? w.charAt(0).toUpperCase() + w.slice(1).toLowerCase() : w,
-    )
-    .join(" ");
-}
-
 /** The customer salutation: the optional preferred-name/title field if set,
- *  else Title-Case of the customer name. Never auto-infers Mr/Ms. */
+ *  else the customer name through the ONE display rule (capitalize up only —
+ *  `@/lib/customer-name`). Never auto-infers Mr/Ms. */
 export function salutationOf(
   preferred: string | null | undefined,
   customerName: string | null | undefined,
@@ -41,7 +44,7 @@ export function salutationOf(
   const p = (preferred ?? "").trim();
   if (p) return p;
   const n = (customerName ?? "").trim();
-  return n ? titleCaseName(n) : "there";
+  return n ? displayCustomerName(n) : "there";
 }
 
 /** RM figure for templates — thousands-separated, no currency prefix

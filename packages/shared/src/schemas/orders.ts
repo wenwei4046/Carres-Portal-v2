@@ -229,9 +229,15 @@ export const createOrderInputSchema = z.object({
   }),
   delivery: z.object({
     date: z.string().nullable(),
-    // Phase 11.1 — proceed date pairs with `date` (both-or-neither via
-    // `dateTbd`) and must be <= `date`. Cross-field rules in the superRefine.
+    // Phase 11.1 — proceed date pairs with `date` and must be <= `date`.
+    // Cross-field rules in the superRefine.
     proceedDate: z.string().nullable(),
+    /** ⛔ OWNER RULING 2026-08-15 — a NEW Sales Order may never be dateless.
+     *  The field stays on the wire (existing callers keep their shape) but the
+     *  superRefine refuses `true`: if the date is not confirmed with the
+     *  customer, Operation must not receive the order. Legacy rows that
+     *  already carry `delivery_date_tbd = TRUE` are untouched — this door
+     *  creates orders, it does not rewrite them. */
     dateTbd: z.boolean(),
     floor: z.number().int().min(1).max(MAX_DELIVERY_FLOOR),
     hasLift: z.boolean(),
@@ -297,20 +303,30 @@ export const createOrderInputSchema = z.object({
     .strict()
     .optional(),
 }).superRefine((data, ctx) => {
-  // Phase 11.1 — Proceed date pairs with Delivery date. When the order is NOT
-  // marked TBD, both dates are required and proceed date must be on/before the
-  // delivery date (you can't start building after you promised delivery). ISO
-  // YYYY-MM-DD strings compare lexicographically, so a plain `>` is correct.
-  if (!data.delivery.dateTbd) {
-    if (!data.delivery.date) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["delivery", "date"], message: "delivery date is required unless marked TBD" });
-    }
-    if (!data.delivery.proceedDate) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["delivery", "proceedDate"], message: "proceed date is required unless marked TBD" });
-    }
-    if (data.delivery.date && data.delivery.proceedDate && data.delivery.proceedDate > data.delivery.date) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["delivery", "proceedDate"], message: "proceed date must be on or before the delivery date" });
-    }
+  /* ⛔ OWNER RULING 2026-08-15 — CUSTOMER DELIVERY IS MANDATORY AT ORDER ENTRY.
+     The wizard's "Confirm later" option is gone; this is the server half of the
+     same rule, so a curl or a stale tab cannot file a dateless order either.
+     The date is a PROMISE (`docs/orders/MASTER.md` — THE THREE DELIVERY DATES),
+     and a promise nobody made is not a fact Operation can work from. */
+  if (data.delivery.dateTbd) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["delivery", "dateTbd"],
+      message: "Delivery date is required. Ask the customer for the date before you save the order.",
+    });
+  }
+  // Phase 11.1 — Proceed date pairs with Delivery date: both are required and
+  // proceed date must be on/before the delivery date (you can't start building
+  // after you promised delivery). ISO YYYY-MM-DD strings compare
+  // lexicographically, so a plain `>` is correct.
+  if (!data.delivery.date) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["delivery", "date"], message: "Delivery date is required. Ask the customer for the date before you save the order." });
+  }
+  if (!data.delivery.proceedDate) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["delivery", "proceedDate"], message: "Proceed date is required. Choose the day production should start." });
+  }
+  if (data.delivery.date && data.delivery.proceedDate && data.delivery.proceedDate > data.delivery.date) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["delivery", "proceedDate"], message: "proceed date must be on or before the delivery date" });
   }
   // 0219 — the per-method approval-code requirement is CONFIG-DRIVEN now
   // (order_entry_config.approvalCodeRequired), so it's enforced in the route
@@ -453,6 +469,7 @@ export const topUpOrderInputSchema = z.object({
   /** Storage paths for receipt photos, validated by the route to live inside
    *  the caller's dealer folder. Up to 4 (proto matches that cap). */
   photoPaths: z.array(z.string()).max(4),
+  idempotencyKey: z.string().uuid().optional(),
 });
 export type TopUpOrderInput = z.infer<typeof topUpOrderInputSchema>;
 

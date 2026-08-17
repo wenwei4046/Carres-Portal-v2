@@ -212,6 +212,74 @@ describe("PortalSidebar — Commission is ONE HR entry (Loo 2026-07-27)", () => 
  * time — the reason the temporary door is `/operation/old-orders` and not a
  * `/operation/orders/...` sub-path, which `startsWith` would light twice.
  */
+/**
+ * ⭐ PORTAL NAVIGATION ACTIVE COLOUR — APPROVED / LOCKED (`docs/ui/MASTER.md`).
+ *
+ * "I am on this page" is SELECTION, so it wears the governed blue treatment:
+ * a `kit-blue-9` active line + a `kit-blue-3` wash. It may never be the flame
+ * `primary`, because red in Carres already means ONE thing — late / act now —
+ * and an operator who sees the same red for "this row is overdue" and "this is
+ * the page you are on" can no longer tell them apart. The grey `base-100` wash
+ * this replaced was not a selection colour either.
+ *
+ * These tests are the guard: they fail the moment `primary` or `base-100`
+ * returns to the active row, at either nav level.
+ */
+describe("PortalSidebar — active nav is governed blue, never flame", () => {
+  beforeEach(() => {
+    mockRole = "operation";
+  });
+
+  const activeRow = () =>
+    screen.getByText("Sales Orders").closest("a") as HTMLAnchorElement;
+
+  it("the expanded active row wears the blue-3 selection wash", () => {
+    renderAt("/operation/orders");
+    expect(activeRow().className).toContain("bg-kit-blue-3");
+  });
+
+  it("the expanded active row carries a blue-9 line and a blue-9 icon", () => {
+    renderAt("/operation/orders");
+    const row = activeRow();
+    expect(row.querySelector(".bg-kit-blue-9")).not.toBeNull();
+    expect(row.querySelector(".text-kit-blue-9")).not.toBeNull();
+  });
+
+  it("no flame and no grey wash survives anywhere in the active row", () => {
+    renderAt("/operation/orders");
+    const row = activeRow();
+    expect(row.className).not.toContain("bg-primary");
+    expect(row.className).not.toContain("bg-base-100");
+    expect(row.querySelector(".bg-primary")).toBeNull();
+    expect(row.querySelector(".text-primary")).toBeNull();
+  });
+
+  it("an INACTIVE row wears no selection colour at all", () => {
+    renderAt("/operation/orders");
+    const old = screen
+      .getByText("Old Orders (temporary)")
+      .closest("a") as HTMLAnchorElement;
+    expect(old.className).not.toContain("bg-kit-blue-3");
+    expect(old.querySelector(".bg-kit-blue-9")).toBeNull();
+    expect(old.querySelector(".text-kit-blue-9")).toBeNull();
+  });
+
+  it("the COLLAPSED icon rail lights blue too — same law, smaller rail", () => {
+    localStorage.setItem("ops-sidebar-collapsed", "1");
+    try {
+      renderAt("/operation/orders");
+      const icon = screen.getByTitle("Sales Orders") as HTMLAnchorElement;
+      expect(icon.className).toContain("bg-kit-blue-3");
+      expect(icon.querySelector(".bg-kit-blue-9")).not.toBeNull();
+      expect(icon.querySelector(".text-kit-blue-9")).not.toBeNull();
+      expect(icon.className).not.toContain("bg-base-100");
+      expect(icon.querySelector(".text-primary")).toBeNull();
+    } finally {
+      localStorage.removeItem("ops-sidebar-collapsed");
+    }
+  });
+});
+
 describe("PortalSidebar — the Sales Order cutover's two doors", () => {
   beforeEach(() => {
     mockRole = "operation";

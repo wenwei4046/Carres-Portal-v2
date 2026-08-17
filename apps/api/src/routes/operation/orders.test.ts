@@ -1881,6 +1881,64 @@ describe("POST /api/operation/orders/:id/save", () => {
     ]);
   });
 
+  /* 0354 — the object page's form IS the Sales Portal's form (owner ruling
+     2026-08-15), so the door must accept every question the portal asks. A
+     `.strict()` schema that had never heard of `customer_race` turned a field
+     the operator could SEE into a field they could never fix. */
+  it("accepts the rest of what the Sales Portal asks", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: { revision: 3, changed: [] }, error: null });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc, from: vi.fn() } as any);
+    const jwt = await makeJwt("operation");
+    const header = {
+      customer_race: "Chinese",
+      customer_gender: "Female",
+      customer_birthday: "1990-04-02",
+      customer_address_unknown: false,
+      customer_billing_same: true,
+      delivery_stair_items: 2,
+      entry_fields: { building_type: "Condo", referral: null },
+    };
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/${ORDER_ID}/save`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ header }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    expect(rpc).toHaveBeenCalledWith("sales_order_save_revision", {
+      p_order_id: ORDER_ID,
+      p_header: header,
+      p_lines: null,
+      p_change: null,
+    });
+  });
+
+  it("still refuses attribution at the API boundary", async () => {
+    const rpc = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("operation");
+    for (const header of [
+      { salesperson_id: "00000000-0000-0000-0000-0000000000a1" },
+      { outlet_id: "00000000-0000-0000-0000-0000000000a2" },
+      { dealer_id: "00000000-0000-0000-0000-0000000000a3" },
+    ]) {
+      const res = await app.fetch(
+        new Request(`http://t/api/operation/orders/${ORDER_ID}/save`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ header }),
+        }),
+        env,
+      );
+      expect(res.status).toBe(422);
+    }
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
   it("refuses contractual items at the API boundary", async () => {
     const rpc = vi.fn();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -2168,6 +2226,57 @@ describe("GET /api/operation/orders/:id/commitment", () => {
     expect(body.commitment.lines[0].sku).toBe("MODEL-A");
     expect(body.commitment.lineage[1].changeType).toBe("staff_correction");
     expect(body.commitment.lineage[1].changes.length).toBeGreaterThan(0);
+  });
+});
+
+describe("GET /api/operation/orders/:id/expansion", () => {
+  it("projects Stock Unit IDs and Purchasing line destinations without a Sales Order destination field", async () => {
+    const ORDER_ID = "00000000-0000-0000-0000-000000000a01";
+    const rows: Record<string, unknown> = {
+      orders: { so: 1303 },
+      order_lines: [{ id: "line-1", sku: "B1201S-K", qty: 11 }],
+      order_supplier_threads: [{ order_line_id: "line-1", po_id: "PO-2032" }],
+      purchasing_destinations: [
+        { id: "klang", name: "Carres Klang", is_default: true },
+        { id: "al", name: "AL Sungai Buloh", is_default: false },
+      ],
+      purchase_orders: [{ id: "PO-2032", destination_id: "klang" }],
+      purchase_order_lines: [
+        { po_id: "PO-2032", sku: "B1201S-K", qty: 10, destination_id: null },
+        { po_id: "PO-2032", sku: "B1201S-K", qty: 1, destination_id: "al" },
+      ],
+      ops_stock_items: [
+        { unit_code: "id-001", sku: "B1201S-K" },
+        { unit_code: "id-002", sku: "B1201S-K" },
+      ],
+    };
+    const from = vi.fn((table: string) => {
+      const data = rows[table];
+      const chain: Record<string, unknown> = {};
+      for (const method of ["eq", "in", "or"]) chain[method] = vi.fn(() => chain);
+      chain.maybeSingle = vi.fn().mockResolvedValue({ data, error: null });
+      chain.then = (resolve: (value: unknown) => unknown) => resolve({ data, error: null });
+      return { select: vi.fn(() => chain) };
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ from } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(new Request(`http://t/api/operation/orders/${ORDER_ID}/expansion`, {
+      headers: { Authorization: `Bearer ${jwt}` },
+    }), env);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      defaultDeliverTo: "Carres Klang",
+      lines: [{
+        lineId: "line-1",
+        sku: "B1201S-K",
+        unitIds: ["id-001", "id-002"],
+        deliverTo: [
+          { name: "Carres Klang", qty: 10 },
+          { name: "AL Sungai Buloh", qty: 1 },
+        ],
+      }],
+    });
   });
 });
 

@@ -15,6 +15,7 @@ import {
   type AwaitingStockShortageResponse,
   type CancelOrderInput,
   type CatalogResponse,
+  type JumpSearchResponse,
   type ProductModelDto,
   type ProductSkuDto,
   type SofaFabricDto,
@@ -482,6 +483,10 @@ export const qk = {
      *  `SetThresholdDialog` invalidates this key on save so the tile
      *  re-derives. */
     stockAlerts: () => ["operation", "stock-alerts"] as const,
+    /** `Jump to…` document lookup, keyed by the typed query. Read-only and
+     *  navigate-only: nothing invalidates it, because nothing it returns can
+     *  be written from the surface that shows it. */
+    jump: (q: string) => ["operation", "jump", q] as const,
     /** R2 — the supplier-claim queue. Invalidated by a receive, because a
      *  receive is the thing that opens claims. */
     supplierClaims: (status: string) =>
@@ -2811,6 +2816,7 @@ export interface operationOrderListRow {
   /** Compact line embed for the 货品 items summary (control table only).
    *  `unit_price` (C5) lets the row compute what the order is worth. */
   order_lines?: {
+    id?: string;
     sku: string;
     qty: number;
     unit_price?: number | string | null;
@@ -2912,6 +2918,27 @@ export interface operationOrderListRow {
    *  single object, or null when no overlay row exists yet. Defensively also
    *  typed as an array in case PostgREST resolves the relation as to-many. */
   ops_order_control?: opsRemarkEmbed | opsRemarkEmbed[] | null;
+}
+
+export interface SalesOrderExpansionResponse {
+  defaultDeliverTo: string | null;
+  lines: Array<{
+    lineId: string;
+    sku: string;
+    unitIds: string[];
+    deliverTo: Array<{ name: string; qty: number }>;
+  }>;
+}
+
+/** Read-only fan-in for the SO register disclosure. Stock owns Unit ID;
+ * Purchasing owns Deliver To. The Sales Order stores neither fact. */
+export function useSalesOrderExpansion(orderId: string | null) {
+  return useQuery({
+    queryKey: ["operation", "orders", orderId, "expansion"],
+    queryFn: () => apiFetch<SalesOrderExpansionResponse>(`/api/operation/orders/${orderId}/expansion`),
+    enabled: Boolean(orderId),
+    staleTime: 30_000,
+  });
 }
 export interface opsRemarkEmbed {
   // Optional (C2): the list no longer renders these remark fields in-row, and
@@ -3029,6 +3056,15 @@ export interface operationOrderDetailOrder {
    *  `fields.building_type` (delivery-address building type). Optional so
    *  older detail fixtures keep typechecking. */
   entry_data?: Record<string, unknown> | null;
+  /** 0200 — the demographics the Sales Portal asks for. The Sales Order object
+   *  page renders and corrects them (owner ruling 2026-08-15); optional so
+   *  older detail fixtures keep typechecking. */
+  customer_race?: string | null;
+  customer_gender?: string | null;
+  customer_birthday?: string | null;
+  /** 0104 — how many items the salesperson says need carrying up the stairs.
+   *  Null = every item (the legacy "auto" meaning). */
+  delivery_stair_items?: number | null;
   delivery_date: string | null;
   delivery_date_tbd: boolean;
   /** Phase 11.1 (migration 0165) — salesperson-entered planned production-start
@@ -3142,6 +3178,15 @@ export interface operationOrderDetailPo {
   so: number | null;
   so_refs: number[] | null;
   eta_date: string | null;
+  /** The day the PO was ISSUED (`purchase_orders.placed_at`). The Order Route
+   *  prints it as `Issued:` — a `✓` may never show a bare date. Optional so a
+   *  browser on this build against an older Worker degrades to the number
+   *  alone rather than crashing. */
+  placed_at?: string | null;
+  /** What the SUPPLIER confirmed (`expected_ready_date`), printed as
+   *  `Estimated ready:`. Null means nobody has confirmed it — the Route says
+   *  so rather than guessing from the arrival estimate. */
+  expected_ready_date?: string | null;
   /** J1 — the supplier's signed DO object in the `delivery-orders` bucket
    *  (column since 0030). Optional: a browser on this build talking to a
    *  pre-J1 Worker simply sees no supplier-DO row instead of crashing. */
@@ -3163,6 +3208,12 @@ export interface operationOrderDetailResponse {
    *  assignment instead of order-level `delivery_partner_id`, since per design
    *  spec §CQ1 option (b) the customer-leg LP lives on the thread now. */
   threads: operationOrderThreadRow[];
+  /** 2026-08-16 (ORDER ROUTE NODE MAP) — the read-only overlay facts the map
+   *  needs. Deliberately NOT folded into `order`: the workspace EDIT form
+   *  seeds its draft from that object. `null` = no overlay row (UNKNOWN). */
+  control?: {
+    delivery_photos?: { path: string; at: string; by: string | null }[] | null;
+  } | null;
 }
 
 /** Row in GET /api/operation/pos. `purchase_order_lines(...)` is the embedded
@@ -3965,6 +4016,34 @@ export function useWarehouseReceiptReviewMutation(
   });
 }
 
+/**
+ * `Jump to…` document lookup — GET /api/operation/jump?q=
+ * (ui/MASTER `JUMP TO… INTERACTION`, APPROVED / LOCKED 2026-08-11).
+ *
+ * Governed document numbers only (SO · PO · GRN · INV), permission-filtered by
+ * the database before the browser ever sees a row. Destinations are NOT here:
+ * they are resolved locally from the portal nav, so an empty box costs nothing
+ * and typing a destination name never leaves the tab.
+ *
+ * Disabled while the box is empty. `keepPreviousData` holds the last list in
+ * place between keystrokes so the surface does not blink to `No results` and
+ * back on every character.
+ */
+export function useJumpSearch(
+  q: string,
+  opts?: Partial<UseQueryOptions<JumpSearchResponse>>,
+) {
+  return useQuery({
+    queryKey: qk.operation.jump(q),
+    queryFn: () =>
+      apiFetch<JumpSearchResponse>(`/api/operation/jump?q=${encodeURIComponent(q)}`),
+    enabled: q.trim().length > 0,
+    placeholderData: keepPreviousData,
+    staleTime: 30_000,
+    ...opts,
+  });
+}
+
 export function useOperationSuppliers(
   opts?: Partial<UseQueryOptions<SuppliersListResponse>>,
 ) {
@@ -4689,6 +4768,9 @@ export interface SalesOrderAmendment {
   stale: boolean;
   proposed_snapshot: Record<string, unknown>;
   submitted_at: string;
+  /** 0354 — the day the CUSTOMER asked, as the operator was told it. Null on
+   *  a goods proposal and on every amendment written before the field. */
+  customer_asked_on?: string | null;
 }
 
 export function useSalesOrderAmendment(
@@ -4793,13 +4875,20 @@ export function useDecideSalesOrderAmendment(
   });
 }
 
+export interface SubmitAmendmentInput {
+  proposed: AmendmentProposal;
+  reason: string;
+  /** 0354 — `Amend date (from customer)`. Omitted by the goods proposal. */
+  customerAskedOn?: string | null;
+}
+
 export function useSubmitSalesOrderAmendment(
   orderId: string,
   opts?: Partial<
     UseMutationOptions<
       { id: string; base_revision: number; base_contractual_hash: string },
       ApiError,
-      { proposed: AmendmentProposal; reason: string }
+      SubmitAmendmentInput
     >
   >,
 ) {
@@ -4807,7 +4896,7 @@ export function useSubmitSalesOrderAmendment(
   return useMutation<
     { id: string; base_revision: number; base_contractual_hash: string },
     ApiError,
-    { proposed: AmendmentProposal; reason: string }
+    SubmitAmendmentInput
   >({
     mutationFn: (input) =>
       apiFetch<{ id: string; base_revision: number; base_contractual_hash: string }>(

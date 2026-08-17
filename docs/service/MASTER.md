@@ -5,7 +5,7 @@
 
 | I am working on | Read |
 |---|---|
-| anything | **§1** |
+| anything | **§1 · §1.1** |
 | filing a complaint | **§2 Intake** |
 | the follow-ups | **§3** |
 | the deadline | **§4** |
@@ -16,8 +16,25 @@
 # §1 · Overview
 
 ### MISSION
-A customer has a problem **after** the goods were delivered. Take it, prove it, drive it to a
-finish, and finish when the CUSTOMER says it is finished.
+A customer-affecting problem needs coordinated follow-up. Record it once where it is discovered,
+preserve the evidence, route each owner its Work, generate the necessary execution documents, and
+finish only when the customer and required outcomes are complete.
+
+### FIRST-DAY OPERATOR LAW — OWNER-RULED 2026-08-14
+
+Service Case must not depend on experienced staff remembering policy or document names. A staff
+member on their first working day must be able to complete the next correct action from the page.
+
+- Never begin with a blank form or ask the operator to choose Claim/Return/Refund document type.
+- Ask one factual question at a time in plain words; product, date, answer and entitlement decide
+  the next question.
+- Every Work item states `Do this now`, why, who/what it concerns, due date, required evidence and
+  the exact completion fact.
+- Show approved call/WhatsApp wording beside the action; staff do not improvise policy promises.
+- Status is derived from completed facts and cannot be advanced by choosing a dropdown.
+- An unavailable action explains the missing fact and provides the door to obtain it.
+- Policy thresholds, terms versions, fees and required documents are system rules, not staff
+  memory.
 
 ### WHAT IS ON SCREEN TODAY
 `OperationServiceCases.tsx` **369 lines** · `OperationServiceNotes.tsx` **293 lines** ·
@@ -25,10 +42,129 @@ finish, and finish when the CUSTOMER says it is finished.
 **Live: ONE case on file**, opened 2026-06-16, before the intake wizard existed.
 
 ### THE BOUNDARY THAT MATTERS
-**A service case is NOT a supplier claim.** A claim is keyed to a PO LINE; a customer complaint
-has no PO. **A fault found after receiving has no supplier-claim route at all today** — it is a
-service case, and changing that means settling Stock's entry rule and the refurbish door in the
-same change.
+**The Service Case is the parent problem record; it is not a replacement for transactional
+documents.** Supplier Claim, Warehouse Work, Delivery Work and Finance Work are role-specific
+workstreams under the Case. Purchase Return, Delivery Return, replacement Delivery Order,
+refund and credit/debit note remain the owning modules' formal stock, custody or money records.
+Staff never create one merely because they are trying to report a problem.
+
+## §1.1 · One intake, many in-context doors
+
+**Owner-ruling, 2026-08-14.** Staff report a problem from the record already in front of them:
+
+| Where the problem is found | Intake door | What the system carries into the Case |
+|---|---|---|
+| Customer / Sales Order | `Report Problem` | customer, order, affected lines and promise |
+| Delivery Order / Delivery event | `Report Problem` | DO, visit/result, Logistics Partner, custody and proof |
+| Warehouse Work / stock item | `Report Problem` | warehouse, unit/batch, location and current custody |
+| PO / Receiving | `Report Problem` | supplier, PO line, receipt, SKU/batch and rejected quantity |
+| Invoice / Payment / Refund | `Report Problem` | customer-money record and the disputed amount/status |
+| No source document can be found | `Service Cases → New Case` | manually captured party/item facts, followed by later linking |
+
+Every door calls the same Case intake authority. It opens a new Case or links the source to an
+existing Case after duplicate matching when customer remedy/communication is required. A pure
+internal SOP, key-in, system, staff or process failure with no customer-resolution route becomes
+an Operational Issue instead; an owning-module exception remains with its factual owner. One
+incident may link both records when an internal failure also harmed a customer. The operator
+reports facts and evidence; the operator
+does **not** choose `Supplier Claim`, `Purchase Return`, `Delivery Return` or `Refund` as the
+intake type.
+
+**Department destinations are Work views, not duplicate registers:**
+
+- `Purchasing → Supplier Claims` shows Case workstreams assigned to Purchasing.
+- Delivery Work shows Case workstreams requiring arrangement, collection, return or proof.
+- Warehouse Work shows Case workstreams requiring inspection, repair, packing, quarantine,
+  handover or returned-goods receipt.
+- Finance Work shows Case workstreams requiring refund, collection adjustment or supplier
+  credit/debit evidence.
+
+Updates made in a department view write back to the same Case timeline and evidence set. No team
+rekeys the complaint, pictures, video, item or history.
+
+### DOCUMENT DECISION AND PRINT CONTROL
+
+The system derives documents from an approved outcome plus execution facts. Examples:
+
+| Confirmed execution fact | Owning document/action |
+|---|---|
+| Customer goods physically return to Carres | Delivery Return / customer collection record |
+| Replacement goods leave Carres | replacement Delivery Order |
+| Goods physically return to supplier | Purchase Return |
+| Customer money is reversed or compensated | Finance refund / credit record |
+| Supplier owes Carres money | Supplier Claim completed with external credit/debit-note evidence |
+| Inspection, repair, packing or transport only | Work instruction; no stock/money document |
+
+The Case `Documents` panel is the operator's one checklist. For every derived document it states
+`Waiting for decision`, `Ready to issue`, `Print required`, `Send electronically`, `Printed`,
+`Signed/acknowledged` or `Not required`, together with who needs it and when. Staff do not have to
+remember which document to print. A printable Visual Service Note remains the shared work aid;
+it carries key images and a QR/link to the full evidence, while role-specific copies reveal only
+the information that Warehouse, Logistics or Supplier needs.
+
+### NO CARRES ON-SITE INSPECTION — OWNER-RULED 2026-08-14
+
+Carres staff do not visit a customer's home to inspect a warranty complaint. There is no
+`Warranty Inspection`, `Carres On-site Inspection` or generic technician-visit stage in the
+Service Case lifecycle.
+
+- Operation triages remotely from the customer's WhatsApp description, photos and video.
+- When evidence indicates a supplier/manufacturing fault and an on-site visit is necessary, the
+  Supplier owns and performs that visit; Purchasing coordinates it as Supplier Claim Work.
+- When the problem concerns assembly or installation, the responsible Logistics Partner owns and
+  performs the correction; Delivery coordinates it as Delivery Work.
+- Warehouse inspects only when the goods physically reach a Carres warehouse. That receipt and
+  inspection never backdate or substitute for a customer-site event.
+- If remote evidence cannot establish the route, Operation obtains better customer evidence or
+  arranges collection under an approved remedy. It does not create a warranty-inspection visit.
+
+### PUBLIC / SOCIAL ESCALATION DOES NOT CHANGE ENTITLEMENT — OWNER-RULED 2026-08-14
+
+A customer threatening or posting on Facebook, Instagram, TikTok, Google Reviews or another
+public channel remains in the same Service Case. Staff append the screenshot/link, channel,
+published time and exact allegation as evidence, then mark `Public escalation` so the Case gains
+an urgent manager-owned communication Work item and one authorised spokesperson.
+
+The escalation changes response speed, visibility and approval level. It does not turn an
+ineligible complaint into a Mattress Guarantee, does not waive the `> 2 cm` threshold and does
+not authorise exchange, compensation or refund. The current-business 100-Day Mattress Trial is
+evaluated separately and permits one exchange, never a refund. Any goodwill exception is recorded as
+an approved commercial exception, separate from `Guarantee eligible`, with approver, reason and
+cost. Staff never ask a customer to remove a post as a condition of handling the Case.
+
+### SUBSCRIPTION SERVICE BOUNDARY — OWNER-RULED 2026-08-14
+
+Routine Subscription benefits do not become Service Cases. Three planned third-party cleaning
+visits per year are Entitlement-backed Service Visits. The customer or Operation books them from
+the Subscription; the appointed partner receives Work and records completion proof.
+
+Open or link a Service Case only when the normal service fails or becomes disputed: no response,
+missed appointment, rejected/poor cleaning, damage, partner conduct, exhausted entitlement
+dispute or repeated rescheduling. A paid extra cleaning creates a top-up sale plus entitlement.
+A higher-model request creates a Subscription Upgrade with the necessary money, collection,
+delivery and asset records. A related Case may explain why, but never substitutes for those
+transactions.
+
+### CONDITION-GATED CUSTOMER COLLECTION — OWNER-RULED 2026-08-14
+
+A 100-Day Trial or other condition-dependent return is not sent straight to Logistics. Collection
+has two independent gates:
+
+1. **Pre-collection approval:** Operation obtains current, dated photos of all surfaces, sides,
+   label and packaging/readiness. The system checks the policy's condition exclusions. No approved
+   evidence means no collection booking.
+2. **Doorstep acceptance before loading:** Logistics follows the same visual checklist, takes
+   time-stamped photos and records each condition fact before touching/loading the item.
+
+Logistics may record `Do not collect — condition failed` using governed reason codes (stain,
+liquid/odour, bed bugs/pest evidence, saliva/unsanitary, tear/burn/cut, customer damage, wrong
+item or unsafe/unwrapped transport). This is authority to refuse custody, not authority to make
+the commercial eligibility decision or argue policy with the customer. The item stays with the
+customer; Operation receives urgent Work, reviews the evidence and sends the formal outcome.
+
+Once Logistics accepts and loads the item, custody transfers and the doorstep condition record is
+sealed. Warehouse still records its own later receipt/condition; it never rewrites the doorstep
+fact. Any potentially contaminated item accepted in error goes to quarantine, never free stock.
 
 ---
 

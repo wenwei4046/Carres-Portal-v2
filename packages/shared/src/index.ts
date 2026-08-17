@@ -1,24 +1,40 @@
 export const SHARED_VERSION = "0.0.0" as const;
 
+export * from "./issue-tracker";
+
 export {
   resolveSalesOrderRoute,
+  NODE_W as ROUTE_NODE_W,
+  type GateRequirement,
+  type GateRequirementId,
+  type LinkedProblem,
+  type NodeAction,
+  type NodeMark,
+  type RouteBranchKey,
   type RouteDeliveryAttempt,
+  type RouteDeliveryPhoto,
+  type RouteDoor,
+  type RouteEdge,
+  type RouteLinkedCase,
+  type RouteLinkedClaim,
   type RouteLoan,
+  type RouteNode,
+  type RouteNodeKind,
+  type RoutePoint,
   type RoutePurchaseOrder,
-  type SalesOrderRoute,
-  type SalesOrderRouteDocument,
-  type SalesOrderRouteFact,
-  type SalesOrderRouteFactState,
-  type SalesOrderRouteGroup,
+  type RouteReceivingRecord,
   type SalesOrderRouteInput,
-  type SalesOrderRouteLane,
-  type SalesOrderRouteLaneKey,
+  type SalesOrderRouteMap,
+  type StationOwnerKey,
 } from "./sales-order-route";
 
 export {
   MAX_DELIVERY_FLOOR,
   EARLIEST_SELL_GATED_CATEGORIES,
   maxLeadDaysFor,
+  // Owner ruling 2026-08-15 — a Sales Order must contain goods.
+  ATTACHED_ONLY_CATEGORIES,
+  cartHasGoods,
   minDeliveryDateISO,
   // 0169-0173 — Product & Maintenance rebuild.
   PRODUCT_CATEGORIES,
@@ -1151,14 +1167,15 @@ export {
 } from "./schemas/delivery-partner-rules";
 
 // T10 · Delivery calendar — the ONE rule that decides which day an order's
-// truck sits on (the D1 booking, never the promised date), the Today /
-// Tomorrow / This week ranges, and the carrier's load on a day (T9 rules).
+// truck sits on (the D1 booking, never the promised date), the three day
+// ranges, and the carrier's load on a day (T9 rules). The ranges carry DAYS
+// and no word: `dayWord` was deleted by the no-relative-dates ruling (owner,
+// 2026-08-15) and a caller prints the actual weekday + date through `fmtDate`.
 export {
   bookingDayOf,
   carrierDayLoads,
   carrierDayNote,
   daysInRange,
-  dayWord,
   deliveryRange,
   DELIVERY_RANGE_KEYS,
   inRange,
@@ -1184,6 +1201,7 @@ export {
 
 export {
   monthKeyMYT,
+  grnDutyMonth,
   isPoDayMYT,
   poUrgentBypass,
   opsPoDutySchema,
@@ -2374,6 +2392,23 @@ export * from "./store-kind";
 // scheme: PREFIX-DDMMYY-NNNN, tail derived per-order (never a counter).
 export { docNumber, docTail, amendmentSuffix, type DocNumberInput } from "./doc-number";
 
+// `Jump to…` — the ONE global navigate-only command surface (ui/MASTER,
+// APPROVED / LOCKED 2026-08-11). The PURE half: how a typed query is read, and
+// the shape of a document result. Shared so the Worker's lookup and the
+// browser's surface cannot disagree about the locked result contract.
+export {
+  JUMP_DOC_TYPES,
+  JUMP_DOC_LABEL,
+  parseJumpQuery,
+  numericPrefixRanges,
+  grnDateFromQuery,
+  rankJumpDocuments,
+  type JumpDocType,
+  type JumpDocumentResult,
+  type JumpSearchResponse,
+  type ParsedJumpQuery,
+} from "./jump-to";
+
 // Rental + Service Plan base (0247-0249) — customers, service packages, rental
 // plans, agreements/billings, the rented-asset registry + the service
 // entitlement/visit engine. The PURE plan math (visit cadence + contract value
@@ -2521,6 +2556,10 @@ export {
 export * from "./schemas/hr-team";
 export * from "./sales-order-classification";
 export * from "./sales-order-commitment";
+// ONE FIELD CONTRACT — the choices the Sales Portal offers and the emergency
+// contact's three-fields-⇄-one-column codec, shared with the object page so the
+// two surfaces cannot drift (owner ruling 2026-08-15).
+export * from "./sales-order-form";
 // CARD 2 — unit/stock allocation truth: the one arithmetic for "which real
 // Units are reserved/sold to this SO, and what is still unallocated".
 export * from "./sales-order-allocation";
@@ -2531,6 +2570,14 @@ export * from "./booking-brief";
 // CARD 4 — the collection clock: T−3 · T−2 · T−1 (final deadline) on working
 // days before the delivery, one arithmetic for every surface that presses.
 export * from "./collection-clock";
+
+/**
+ * The Finance exception — the ONE money blocker (owner ruling 2026-08-16,
+ * `docs/orders/MASTER.md` §8). Slice 1 of the money-gate correction: the
+ * blocker exists before Slice 3 removes the balance from the gate, so the
+ * delivery order is never briefly ungated.
+ */
+export * from "./finance-exception";
 // CARD 5 — delivery attempts: every vehicle run leaves a record; a failure is
 // ONE exception (Reason Library + where the goods are), units move with reality.
 export * from "./schemas/delivery-attempt";

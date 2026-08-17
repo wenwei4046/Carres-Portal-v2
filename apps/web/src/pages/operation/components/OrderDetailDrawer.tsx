@@ -116,6 +116,7 @@ import {
 } from "@/lib/queries";
 import { cjkClassName } from "@/lib/cjk";
 import { fmtDate, fmtDateShort } from "@/lib/fmt-date";
+import { displayCustomerName } from "@/lib/customer-name";
 import { orderStatusPill } from "@/lib/status-pill";
 import { locationForAddress } from "@/lib/region";
 import { lineReadiness, readinessCounts } from "@/lib/line-readiness";
@@ -129,7 +130,6 @@ import {
   buildSupplierReminder,
   rmAmount,
   salutationOf,
-  titleCaseName,
 } from "@/lib/wa-templates";
 import {
   lineCategory,
@@ -703,9 +703,11 @@ function PanelMenu({
 
 /** Tiny status counter for a panel header — tighter than the full `.pill` so up
  *  to three fit on one header row. Colours track the locked stock vocab. */
-/** "23 Aug" — the chip's day-month form (Loo's D1 chip spec: no year, no
- *  weekday; the full "24 Aug 26" date-law form stays on the card rows). */
-const dayMon = (iso: string) => fmtDateShort(iso).replace(/\s\d{2}$/, "");
+/* `dayMon` is DELETED (owner ruling 2026-08-15). Loo's D1 chip spec — day and
+ * month, no year, no weekday — was implemented by regexing the year back off
+ * `fmtDateShort`. THE YEAR RULE means `fmtDateShort` already answers "23 Aug"
+ * for a current-year date, and answers "15 Jan 27" for the one case where the
+ * regex was hiding the fact that mattered. The chips call it directly. */
 
 /** Chip form of a time slot: "Afternoon (12pm–3pm)" → "12pm–3pm"; free text
  *  passes through unchanged. */
@@ -2340,7 +2342,7 @@ function DrawerBody({
   if (balanceOwing) {
     chaseRows.push({
       key: "customer",
-      label: order.customer_name ? titleCaseName(order.customer_name) : "Customer",
+      label: order.customer_name ? displayCustomerName(order.customer_name) : "Customer",
       sub: `${RM(moneyOutstanding)} outstanding`,
       urgency: balanceGate === "hold" ? "overdue" : "attention",
       onAct: (tone) => copyChase("customer", tone),
@@ -4064,7 +4066,7 @@ function DrawerBody({
                   )
                     return (
                       <MiniBadge tone="ready">
-                        confirmed {dayMon(form.control.confirmed_date)}
+                        confirmed {fmtDateShort(form.control.confirmed_date)}
                         {form.control.confirmed_time_slot
                           ? ` · ${shortSlot(form.control.confirmed_time_slot)}`
                           : ""}
@@ -4074,7 +4076,7 @@ function DrawerBody({
                   if (eta)
                     return (
                       <MiniBadge tone="waiting">
-                        not confirmed · logistics said {dayMon(eta)}
+                        not confirmed · logistics said {fmtDateShort(eta)}
                       </MiniBadge>
                     );
                   // C1 (Jess 2026-07-27): T1 banned "Unscheduled" and this badge
@@ -4652,7 +4654,7 @@ function CustomerIdentityCard({
     return (
       <div
         className="kpi-box grid place-items-center py-2"
-        title={`${order.customer_name ? titleCaseName(order.customer_name) : "—"} · #${order.so} · ${statusWord}`}
+        title={`${order.customer_name ? displayCustomerName(order.customer_name) : "—"} · #${order.so} · ${statusWord}`}
       >
         <span className="size-[34px] rounded-full grid place-items-center shrink-0 bg-base-100 text-base-500">
           <User size={18} strokeWidth={2} aria-hidden="true" />
@@ -4671,7 +4673,7 @@ function CustomerIdentityCard({
             className={`block text-body font-semibold leading-tight ${cjkClassName(order.customer_name ?? "")}`}
             title={order.customer_name ?? undefined}
           >
-            {order.customer_name ? titleCaseName(order.customer_name) : "—"}
+            {order.customer_name ? displayCustomerName(order.customer_name) : "—"}
           </span>
           <span className="mt-0.5 flex items-center gap-1.5 min-w-0 flex-wrap">
             {/* The ONE black element on the page — the order id badge. */}

@@ -69,6 +69,34 @@ therefore proved by test and by rolled-back production transactions, **not by da
   would overstate AR and contract value would double-count the billing schedule.
 - **Credit approval replaces the 50% deposit** in the proceed gate.
 
+### SUBSCRIPTION SERVICE, CLEANING AND UPGRADES — OWNER-RULED 2026-08-14
+
+The future mattress Subscription owns the contract, enrolled model, tracked asset, monthly money,
+term, included benefits and permitted changes. Its standard cleaning benefit is **three visits
+per subscription year**, performed by an appointed third-party cleaning partner.
+
+The objects remain separate:
+
+- `rental_agreements` / Subscription owns what the customer contracted for.
+- `service_entitlements` owns the three annual visit credits and their validity.
+- `service_visits` owns each due/scheduled/completed cleaning appointment, assigned partner,
+  result, before/after proof and customer acknowledgement.
+- Service Case owns only an exception: missed/failed/poor cleaning, damage, complaint, disputed
+  eligibility, partner conduct, repeated inability to arrange or another issue needing follow-up.
+
+A routine cleaning request opens the customer's Subscription and books the next entitled Visit;
+it does not open a Case. Completion consumes one visit only on accepted completion evidence, not
+when an appointment is merely scheduled.
+
+Extra cleaning is a paid top-up service: it creates a sale/payment and an additional entitlement,
+then follows the same Visit engine. A move to a higher model is a governed Subscription Upgrade,
+not a Service Case remedy: quote and acceptance → price/monthly-fee change → old-asset collection
+→ new-asset Delivery Order → asset and contract history. If the request arose from a complaint,
+the Case links to that Upgrade but does not own its money, asset movement or amended contract.
+
+The future Subscription has its own Claim policy and does not inherit the current outright-sale
+100-Day Trial or refund path.
+
 ---
 
 # §3 · Approved Evolution

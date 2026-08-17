@@ -1,6 +1,7 @@
 import { maxLeadDaysFor } from "@carres/shared";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { loadPurchasingNumbers } from "./purchasing-settings";
+import { skuCategories } from "./sku-categories";
 
 export interface LeadTimeViolation {
   code: "lead_time_violation";
@@ -33,24 +34,8 @@ export async function maxLeadDaysForSkus(
   } catch {
     return 0;
   }
-  const { data, error } = await sb
-    .from("product_skus")
-    .select("sku, product_models(category)")
-    .in("sku", skus);
-  if (error) return 0;
-  const cats = new Set<string>();
-  for (const row of (data ?? []) as Array<{
-    product_models: { category: string } | { category: string }[] | null;
-  }>) {
-    const pm = row.product_models;
-    if (!pm) continue;
-    // PostgREST 1:1 embed returns object; some clients return array of 1.
-    if (Array.isArray(pm)) {
-      for (const m of pm) if (m?.category) cats.add(m.category);
-    } else if (pm.category) {
-      cats.add(pm.category);
-    }
-  }
+  // ONE catalog read, shared with the goods gate (`sku-categories.ts`).
+  const cats = new Set((await skuCategories(sb, skus)).values());
   return maxLeadDaysFor([...cats], earliestSellDays);
 }
 

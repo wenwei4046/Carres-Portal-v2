@@ -11,7 +11,6 @@ import {
   itemsBlock,
   rmAmount,
   salutationOf,
-  titleCaseName,
   waEncode,
 } from "./wa-templates";
 
@@ -36,13 +35,26 @@ describe("wa-templates (two-tone locked copy, 2026-07-13)", () => {
     expect(rmAmount(1234567.4)).toBe("1,234,567");
   });
 
-  it("salutation — preferred field wins; else Title-Case name; NEVER auto Mr/Ms", () => {
+  it("salutation — preferred field wins; else the ONE name rule; NEVER auto Mr/Ms", () => {
     expect(salutationOf("Ms Lee", "LEE WEI YANG")).toBe("Ms Lee");
-    expect(salutationOf("", "LEE WEI YANG")).toBe("Lee Wei Yang");
     expect(salutationOf(null, null)).toBe("there");
-    expect(titleCaseName("LEE WEI YANG")).toBe("Lee Wei Yang");
     // no auto-inferred title anywhere
     expect(salutationOf(null, "LEE WEI YANG")).not.toMatch(/\b(Mr|Ms|Mrs)\b/);
+  });
+
+  /* ⭐ CAPITALIZE UP ONLY reaches the greeting too — owner ruling 2026-08-15. */
+  it("greets with the capitalize-up rule, and never rewrites initials", () => {
+    // The defect the ruling names: the old `titleCaseName` lowercased the tail,
+    // so a message to KJ NG was addressed to `Kj` — to nobody.
+    expect(salutationOf("", "KJ NG")).toBe("KJ NG");
+    expect(salutationOf(null, "kj ng")).toBe("Kj Ng");
+    expect(salutationOf("", "LEE WEI YANG")).toBe("LEE WEI YANG");
+    expect(salutationOf(null, "lee wei yang")).toBe("Lee Wei Yang");
+  });
+
+  it("has no second name-casing entry point left", async () => {
+    const mod = await import("./wa-templates");
+    expect("titleCaseName" in mod).toBe(false);
   });
 
   it("customer Reminder — exact locked copy, multi-line, no delivery date", () => {

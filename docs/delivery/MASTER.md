@@ -1,278 +1,418 @@
 # DELIVERY — MASTER
 
-> **The only Delivery document.** Overwrite it when re-ruled; Git is the archive.
-> This operating model was owner-approved 2026-08-14 after the PR #769 Blueprint-before-Cards pass.
-> Current implementation may lag this target; absence in code does not reopen approved truth.
+> **The only Delivery authority.** Overwrite it when re-ruled; Git is the archive.
+> Owner-approved top-to-toe Blueprint, 2026-08-14. Current implementation may lag this target;
+> existing code, old Cards or legacy write doors do not regain authority by existing.
 
-## 1 · Mission, ownership and boundary
+## 1 · Mission and ownership
 
-**MISSION** — turn the Customer Order's delivery commitment into a customer-confirmed booking,
-a controlled Delivery Order, a factual Delivery Visit, delivery photos, and a clean finish,
-another delivery or cross-module handover.
+Delivery turns Sales Order goods that may be delivered into a controlled Delivery Order, a clear
+Warehouse-to-Logistics handover, a factual delivery history, accepted proof and either completion
+or an explicit next action.
 
-**DELIVERY OWNS**
+Delivery owns Logistics Partner identity/rules and assignment, Delivery Orders, delivery
+arrangements, each actual delivery event and item result, delivery proof, delivery problems,
+goods-location observations, Delivery Work and append-only history.
 
-- Logistics Partner identity/rules, assignment and append-only assignment history;
-- the one derived carrier+date grouping and capacity view; it is not yet a first-class trip;
-- Delivery Orders: number, issued scope snapshot, print/reprint and close/replacement history;
-- Delivery Visits, item results, delivery problems, goods-location observations and delivery photos;
-- Delivery actions and their completion evidence.
-
-**DELIVERY READS / LINKS — NEVER WRITES A DUPLICATE**
-
-| Truth | Owner |
+| Truth read or linked by Delivery | Owner |
 |---|---|
-| customer commitment, confirmed delivery date and time slot | Customer Order |
-| ordered goods and permitted split/customer agreement | Customer Order |
-| physical unit, readiness, custody, handover and return receipt | Stock / Warehouse |
-| payment, outstanding and receipt | Money In |
-| delivery money hold/release decision | Customer Order |
-| supplier/PO ETA | Purchasing |
-| product category and photo rule source | Catalog |
-| remedy, replacement, refund, compensation and claims | owning downstream module |
-| logistics claim/payment | Finance |
+| commercial order, promised customer date, ordered goods and permitted commercial split | Sales Orders |
+| physical stock, readiness, location, Warehouse work, handover and return receipt | Stock / Warehouse |
+| payment, outstanding and receipt | Finance / Money In |
+| payment-based delivery hold | Sales Orders |
+| supplier and PO ETA | Purchasing |
+| product/category and minimum photo rule source | Catalog |
+| repair, replacement, refund, compensation, claim or complaint | owning downstream module |
 
-Delivery records what happened and creates/links the correct handover. It never decides refund,
-replacement, compensation, supplier liability or stock correction. A manager lifting a delivery
-money hold never forgives the debt.
+Delivery never creates a second commercial-order, stock, money, Service or Guarantee editor. It
+records what happened and links the owner that must decide a remedy.
 
-## 2 · Current operating model
+### CONDITION-GATED SERVICE COLLECTION
 
-### 2.1 NETS now
+For a Service Case collection whose entitlement depends on item condition, Delivery may arrange
+only after the Case carries approved pre-collection condition evidence. The Logistics Work screen
+then requires a doorstep check before loading: required photos, governed condition answers and
+customer/item match.
 
-For Klang Valley, **NETS Logistics is the current default and main Logistics Partner**.
+- Pass → `Accept collection`; custody transfers only when the item is loaded and acknowledged.
+- Fail → `Do not collect — condition failed`; select factual reason, capture evidence and leave
+  the item with the customer. Operation decides and communicates the policy outcome.
+- Logistics never promises refund/exchange, waives a condition, or debates eligibility.
+- A potentially contaminated item accepted in error is marked for Warehouse quarantine.
+
+## 2 · Current Carres operating model
+
+- **NETS Logistics is Klang Valley's current default and main Logistics Partner.**
+- Issuing a Klang Valley Delivery Order auto-assigns NETS. NETS is responsible immediately and
+  does not click Accept.
+- NETS contacts the customer and arranges the delivery date/time. Operations may record the facts
+  on NETS' behalf until direct portal use is mature.
+- NETS uses **Cannot Deliver** only when it cannot perform the arrangement. A reason and actual
+  reply/report evidence are required. Operations decides whether to keep NETS with a new date,
+  correct information, hold/cancel the arrangement or assign another Logistics Partner.
+- AL, TT, Teow and other partners without portal access are assigned manually. The portal prepares
+  WhatsApp/email content; Operations uploads the partner's actual reply before recording Confirmed
+  or Rejected. Prepared, copied, opened or sent never means confirmed.
+- One active Delivery Order has one active Logistics Partner. A permitted split uses separate
+  Delivery Orders/scopes and may use different partners.
+- Default coverage is configurable and audited, never hard-coded to NETS. Future Carres may assign
+  any partner, but current routine Klang Valley operation remains NETS-first.
+
+Current flow:
 
 ```
-credible fulfilment route
-→ auto-assign NETS Logistics
-→ NETS is responsible without an Accept click
-→ NETS contacts the customer and obtains confirmed date + time slot
-→ Operations records on NETS' behalf while the partner portal is immature
-→ later NETS records the same facts directly
+goods may be arranged
+→ Issue Delivery Order
+→ Klang Valley auto-assigns NETS
+→ NETS contacts customer; NETS or Operations records arrangement
+→ Warehouse prepares goods
+→ Warehouse hands over; Logistics confirms receipt
+→ actual delivery occurs
+→ Record Delivery Result + item results + goods location + proof
+→ proof accepted and obligation completes, or explicit next Work begins
 ```
 
-NETS reports only when it cannot deliver: `Cannot deliver on this date` or `Cannot deliver this
-order`, with governed reason. The first keeps NETS eligible while Operations chooses another date
-or partner; the second closes the active assignment. Either creates `Operations to assign another
-Logistics Partner`. Operations chooses the replacement; there is no silent automatic reassignment.
+## 3 · Delivery Order and goods scope
 
-Different deliveries may use different partners. One active Delivery Order / Delivery Visit has
-exactly one active Logistics Partner. A permitted split may use different partners only through
-separate scopes, Delivery Orders and Delivery Visits.
+A Delivery Order is Carres' formal authority for a Warehouse to hand specified goods to a named
+Logistics Partner for delivery to a customer. It is not proof of Warehouse handover and is never
+proof of delivery.
 
-### 2.2 Current lifecycle
+Each DO stores a stable number, source Sales Order, customer/contact/address, Warehouse, Logistics
+Partner, customer-contact owner, planned and confirmed date, time window, ETA, goods/quantities,
+site and handling requirements, release restrictions, Warehouse status, latest result, proof,
+problems and history.
+
+- One Sales Order may have multiple DOs for different goods, Warehouses, dates or Partners.
+- Bed-set goods remain inseparable. Sofa may travel separately only with customer agreement.
+  Accessories do not block core large goods.
+- The issue preview states **This delivery** and **Remaining after this delivery**, with the reason.
+- ⛔ **SUPERSEDED 2026-08-16 — *"Issue Delivery Order is the only employee act"*.** The owner ruled
+  that **the system issues the DO when its requirements are met**; it is no longer an employee act.
+  The rest of that sentence stands and is reinforced: **never use Release or free-form Create DO**,
+  and there is **no Release button and no Approve button** on this path (§15's dictionary entry
+  `Release → Issue Delivery Order` is unchanged and still binding). The money half of the
+  requirements also changed: **outstanding money no longer blocks the DO, and an OPEN Finance
+  exception is the only money blocker.** A Finance exception is an explicit Finance-created record
+  linked to the SO, with creator, reason, status, timestamps and clear evidence; **only Finance
+  creates or clears it**, `OPEN` blocks this gate and `CLEARED` removes the block. The full ruling
+  lives once in [`../orders/MASTER.md`](../orders/MASTER.md) §8, which owns the gate — Delivery
+  READS it and may never write it. Delivery remains the writer of the document and the owner of the
+  carrier, the trip derivation and the proof.
+  🔴 **IMPLEMENTATION REQUIRED — NOT BUILT, and NOT APPROVED.** The node map shipped
+  (PR #825) and its canvas already states that the system issues the DO with no Release or Approve
+  button — but **neither automatic issuance nor the Finance exception exists in code**, and the
+  shipped gate still counts money. The correction slice is
+  [`../cards/CARD-2026-08-16-money-gate-correction.md`](../cards/CARD-2026-08-16-money-gate-correction.md),
+  `STATUS: QUEUED · IMPLEMENTATION: NOT APPROVED`. What runs today still requires the employee act
+  and still refuses on money. **Do not describe the new rules as implemented.**
+- Issue rechecks permitted goods, split, Warehouse, address and applicable hold rules atomically,
+  snapshots the scope and assigns the next owner. It does not create an actual delivery event.
+  **These rechecks survive system issuance unchanged** — what changed is who triggers the act, not
+  what the act verifies.
+- Reprint retains the number and logs the event. Once handed to Logistics, a DO is never deleted;
+  cancellation, replacement or correction preserves the original history.
+
+## 4 · Warehouse and Logistics are separate
+
+NETS Warehouse and NETS Logistics remain separate duties and business identities even when one
+legal company supplies both.
+
+Warehouse owns Picking, Checking, Packing, Ready for Handover, physical handover, returned-goods
+receipt, quantity, condition and location. Logistics owns customer contact, arrangement, driver or
+team, transport, Logistics receipt, ETA, Delivery Result and delivery proof.
 
 ```
-delivery obligation
-→ default NETS assignment
-→ preferred/provisional booking
-→ NETS obtains customer-confirmed date + time slot + evidence
-→ Issue delivery order conditions pass
-→ Operations issues Delivery Order
-→ Warehouse prepares and hands goods over
-→ Logistics confirms custody and departs
-→ Logistics updates arrival time
-→ Delivery Result + item results + goods location
-→ delivery photos uploaded and checked
-→ finish / arrange another delivery / hand over a linked case
+Need Preparation → Picking → Checking → Packing → Ready for Handover
+→ Handed Over → Received by Logistics
 ```
 
-Planning and partner assignment may occur before goods are ready. A call alone never completes the
-booking action. Confirmed means the customer's date **and** time slot with evidence.
+Ready for Handover is not handover. Handed Over is not Logistics receipt. Logistics receipt is not
+delivery. On return, a Logistics report never substitutes for the Warehouse's actual receipt.
 
-Before `Issue delivery order`, all must pass atomically:
+Handover records goods/quantity, both parties, actual receiver, time, vehicle when known and
+signature/photo/reply proof. A discrepancy creates investigation Work without overwriting either
+party's original fact.
 
-1. customer-confirmed date and time slot;
-2. the released core goods are ready/reserved and grouping rules pass;
-3. the Customer Order money condition passes;
-4. the delivery date is permitted.
+One personal login may hold Warehouse, Logistics or both duties and switch between **Warehouse
+Work** and **Logistics Work** without logging out. Every event records person, company and active
+duty. No shared company login is allowed. Even when one authorised person performs both sides, the
+events and evidence remain separate.
 
-Sunday is refused. Partner working days, closed dates, notice and ordinary capacity warn unless a
-governed rule explicitly makes them a hard stop. Public-holiday handling follows the governed
-calendar/policy and retains any required acknowledgement.
+## 5 · Customer contact, date, time and ETA
 
-## 3 · Goods scope and Delivery Order
+Every contact task names its purpose. Never show generic **Contact Customer** or **Follow Up**.
+Allowed purposes include Confirm Delivery Date, Confirm Delivery Time, Confirm Customer
+Availability, Confirm Delivery Address, Confirm Site Access, Confirm Receiver, Obtain Missing
+Information, Confirm New Delivery Date after Failed Delivery and Confirm Cancellation.
 
-- Bed-set goods remain inseparable.
-- Sofa may travel separately only with customer agreement.
-- Accessories do not block core large goods.
-- The scope preview states `This delivery` and `Remaining after this delivery` with the real reason.
-- Delivery reads Stock readiness/reservation and never edits a duplicate.
+Each contact record stores purpose, contact owner, channel, person contacted, actual time, result,
+reply/evidence, recorder and explicit next action. Results include Confirmed, No Answer, Asked to
+Call Again, Requested Another Date, Contact Details Incorrect, Customer Refused Delivery and
+Waiting for Customer Reply.
 
-`Issue delivery order` is the one employee word and act. There is no free `Create DO`, bulk issue,
-or editable Sales Order clone. Issuing rechecks every condition, creates a stable DO number, saves
-the released snapshot and creates the current Delivery Visit atomically.
+- **Promised delivery date** is Sales Orders' customer commitment.
+- **Confirmed Delivery Date** is the agreed operational day.
+- **Time Window** is the agreed range.
+- **ETA** is Logistics' later estimated arrival and never rewrites the confirmed date/window.
+- All Delivery grouping and due displays use actual weekday + date, for example **Monday, 17 Aug
+  2026**. Delivery UI does not group work as Today or Tomorrow.
 
-Reprint keeps the number and logs the event. A replacement requires the previous active DO to close
-with reason, creates a new number and Delivery Visit, and never inherits old photos, problem or
-driver notes.
+The current NETS portal presents only DO, customer, area, goods summary, requested date and special
+requirements, then simple fields for Confirmed Delivery Date, Time Window, ETA, contact result,
+note and reply screenshot. Its actions are **Save Delivery Arrangement** and **Cannot Deliver**.
+Operations proxy records state `Recorded by [person] on behalf of NETS`, source, reporter, reported
+time, recorded time and original evidence.
 
-## 4 · Warehouse and Logistics separation
+## 6 · Actual delivery, results and proof
 
-NETS Warehouse and NETS Logistics are separate duties and business identities even if supplied by
-one legal company. Warehouse owns physical readiness, unit/location, handover and return receipt;
-Logistics owns customer contact, vehicle/driver, transport, Delivery Result and photos.
+The formal append-only object for one actual trip to the customer is **Delivery Visit**. It is a
+system, permission and audit term. Employee navigation and page sections use **Delivery History**;
+the employee action is **Record Delivery Result** and an entry title reads, for example,
+`Delivery on Monday, 17 Aug 2026`. Employees never create a Delivery Visit directly.
 
-Warehouse handover and Logistics custody acceptance are two events. Logistics departure cannot
-stand in for warehouse handover. On return, Logistics reports goods returned and Warehouse records
-what it actually received, condition and location. A difference creates investigation work; neither
-side's original fact is overwritten.
-
-One individual login may hold Warehouse, Logistics or both duties and switch workspace without
-logging out. Each employee has an individual identity—no shared company credential. Every event
-records person, company and duty. Even when one authorised person performs both steps, the two
-events remain separate.
-
-## 5 · Delivery Visit, result and photos
-
-Employee UI uses **Delivery Visit**, never `Attempt`; internal implementation may retain
-`delivery_attempt`.
-
-Each actual customer visit is append-only and stores DO, date, partner, driver/vehicle snapshot,
-arrival-time history, actual times, Delivery Result, item results, problem, goods location, photos
-and linked cases. Current work reads the latest active visit; old visits remain read-only history.
+A Delivery Visit exists only when delivery actually proceeds. Advance rescheduling, cancellation,
+waiting for a reply, Partner rejection and Warehouse-not-ready are arrangement events, not visits.
+Each actual event stores DO, Partner, driver/team, vehicle when known, planned and actual times,
+item results, observed problem, goods location, proof, recorder and proxy provenance.
 
 Employee results are:
 
-- `Delivered`
-- `Some items delivered`
-- `Not delivered`
+- **Delivered** — all scoped goods delivered;
+- **Partially Delivered** — some goods/quantity delivered and every remainder accounted for;
+- **Failed Delivery** — actual delivery proceeded but did not complete delivery.
 
-Every item receives its own result. Every undelivered item must state its current location. Field
-staff record the observable problem, not blame or remedy. Operations may later append Root Cause.
+**Rescheduled** and **Delivery Cancelled** are arrangement states, not actual Delivery Results.
 
-Photos bind to the Delivery Visit. The required set derives from the goods actually delivered and
-Catalog category rules: signed Delivery Order plus governed completion photos. Logistics uploads;
-Operations checks and may require re-upload. Finance reads eligibility and does not re-check photos.
-Delivered is not finished while required photos remain missing or unchecked.
+Delivered requires actual time, receiver, delivered goods/quantity and governed signature/photos.
+Until proof is complete and accepted, show **Delivered — Proof Required**; after acceptance show
+**Delivered — Complete**.
 
-## 6 · Problems, another delivery and handover
+Partially Delivered preserves delivered goods and requires failed quantity, reason, goods location,
+proof and next Work for every remainder. Failed Delivery requires reason, explanation, affected
+goods, actual time where applicable, goods location, reporter, proof and an explicit next action.
+No bare Failed Delivery may be saved or closed.
 
-Never show generic `Delivery Exception` or `Customer Refused Delivery`. Show the real problem.
+Proof is bound to the exact event it proves: Logistics confirmation, customer confirmation,
+Warehouse handover, Delivered, Failed Delivery, return or correction. Operations reviews delivery
+proof as **Proof Accepted**, **More Proof Required** or **Proof Rejected**, with a reason. A sent
+message is never reply evidence. Saved delivery facts are corrected through an append-only
+Correction containing old value, new value, reason, person, time and approval where governed.
 
-| Observed problem | Next route |
-|---|---|
-| Customer not available / asked for another date | arrange another delivery / confirm new date |
-| Vehicle breakdown | continue if customer accepts; otherwise arrange another delivery |
-| NETS cannot deliver | Operations assigns another Logistics Partner |
-| Product does not match Customer Order | create/link Product Issue case |
-| Product damaged during delivery | create/link Service Case |
-| Warehouse picking error | open/link Warehouse investigation |
+## 7 · Failed Delivery reasons and next Work
 
-Another delivery closes the factual current visit and DO, preserves delivered items, returns only
-remaining obligation to booking/readiness, and issues a new DO after all current conditions pass.
-Customer confirmation is re-obtained only when the arrangement changes and it is actually needed.
+The reason dictionary is grouped, versioned and historical records retain their original value.
 
-Closing locks Delivery facts. A later complaint creates a new linked owning case and never reopens
-or rewrites Delivery history.
+- **Customer:** not present; could not be contacted; refused; requested change at arrival; payment
+  not ready; information incorrect.
+- **Location:** address incorrect/incomplete; access unavailable; lift unavailable; item cannot fit;
+  security refusal; unsafe condition.
+- **Goods:** damaged; wrong; missing; incorrect quantity; incomplete; not acceptable to customer.
+- **Warehouse / preparation:** goods not ready; wrong goods loaded; missing during loading;
+  documents missing; handover delayed.
+- **Logistics:** vehicle problem; insufficient capacity; late; did not attend; insufficient team or
+  equipment; transport damage.
+- **Carres / Order:** wrong date or information; should not have been arranged; payment/approval
+  problem; unclear instruction.
+- **External:** severe weather; road disruption; government/building restriction.
+- **Other:** explanation required.
 
-## 7 · Information architecture and UI
+The record also states whether goods remain with Logistics, returned to Warehouse, remain with the
+customer or are unknown. The next action is concrete: Confirm New Delivery Date, Confirm Delivery
+Address, Confirm Customer Availability, Obtain Correct Contact Details, Confirm Site Access,
+Return Goods to Warehouse, Inspect Returned Goods, Arrange Replacement Goods, Assign Another
+Logistics Partner, Keep NETS and Change Date, Correct Delivery Information, Obtain Missing Delivery
+Proof, Confirm Delivery Cancellation or Management Review.
 
-The ERP sidebar has one `Delivery` destination under Supply Chain. No top-level Fleet, Trips,
-Regions, Delivery Returns or Delivery Settings destinations.
+Every problem has one primary owner, due time, evidence and next action. Recording Failed Delivery
+automatically creates the appropriate Work. A problem closes only when its fact, reason, affected
+goods, location, evidence and completed/cancelled next action are present. Creating another task
+does not itself close the problem. Field staff record observable facts; an authorised reviewer may
+append Root Cause later without rewriting the observation.
 
-Routes:
+## 8 · Information architecture and templates
 
-- **Delivery Work** — default operational home;
-- **Delivery Register** — all delivery obligations;
-- **Delivery Orders Register** — document lookup/audit;
-- **Delivery Workspace** — one obligation, DO and visit chain;
-- central **Reports → Delivery**;
-- central **Settings → Delivery**.
+The ERP sidebar has one **Delivery** destination under Supply Chain. It applies the governed Shell,
+Register and Object Detail Templates and does not invent another UI system.
 
-All pages apply the governed Shell Template. Registers apply the Register Template; truth-register
-selection scopes output only and never bulk Issue/Deliver/Close/Assign/Confirm.
+Delivery navigation:
 
-Delivery Register defaults: `SO · Customer commitment · Confirmed booking · Customer · Area ·
-Logistics Partner · DO · Current action · Current problem`; expansion shows goods obligation only.
+1. **Delivery Work** — actionable operational home;
+2. **Delivery Orders** — formal DO truth Register;
+3. **Schedule** — Week, Day and List by actual date;
+4. **Delivery History** — actual delivery results Register;
+5. **Exceptions** — problem, owner and explicit next action;
+6. **Partners** — Partner coverage, capability, contact and access;
+7. central **Settings → Delivery**;
+8. central **Reports → Delivery**.
 
-Delivery Orders Register defaults: `DO · Issued · Delivery date & slot · Customer · SO · Logistics
-Partner · Delivery Visit · Result · Delivery photos`; it never edits commercial or money truth.
+There is no separate Delivery dashboard, Fleet, Trips, Regions or Delivery Returns destination.
+KPI cards do not precede the work/Register.
 
-Delivery Workspace follows Object Detail order:
+**Delivery Orders defaults:** `DO No · Delivery Date · Customer · Delivery Location · Goods ·
+Warehouse · Logistics Partner · Warehouse Status · Delivery Status · Latest Result`. Expansion is
+goods-only. Optional columns include SO, Time Window, ETA, contact owner, confirmation, handover,
+proof, open problem and updated time.
 
-1. Identity: Customer · SO · Customer commitment · Outstanding;
-2. Current Action, always visible;
-3. Current Issues only when real;
-4. Progress: Plan → Confirm delivery date → Issue delivery order → Deliver → Check delivery photos → Finish;
-5. Booking · Goods · Logistics Partner · Delivery Order · Warehouse handover · Current Delivery ·
-   Delivery Photos · Route/Linked Cases · Delivery History;
-6. append-only Activity.
+**Delivery Work defaults:** `Due · Work · DO No · Customer · Delivery Date · Warehouse · Logistics
+Partner · Owner · Waiting Since · Priority`. Every row presents one current primary action.
 
-No employee UI uses `Release`, `Attempt`, `POD`, `Pending`, `At Risk` or a generic `Exception`.
-Use `Issue delivery order`, `Delivery Visit`, `Delivery Result`, `Delivery History`, `Delivery
-Photo` and `Signed Delivery Order`.
+**Delivery History defaults:** `Delivery Date · DO No · Customer · Logistics Partner · Result ·
+Failed Delivery Reason · Goods · Proof Status · Recorded By`.
 
-All scheduling/grouping/work due displays use actual `weekday + date`, never Today, Tomorrow,
-Next 3 Days or Next 7 Days. The Calendar reads only Booking; provisional dates are visibly
-provisional and excluded from confirmed counts/capacity.
+**Exceptions defaults:** `Opened · Problem · DO No · Customer · Affected Goods · Goods Location ·
+Owner · Next Action · Due · Status`.
 
-## 8 · Work, Quick Rail and NETS portal
+**Partners defaults:** `Logistics Partner · Service Area · Default Role · Contact Method · Portal
+Access · Capacity Status · Active · Confirmation Performance`.
 
-Delivery facts generate one ERP Work set. My Work and Team Work are filters over it. Completion is
-the business fact, never a Done checkbox. Quick Rail My Work, Calendar and Activity are previews
-that deep-link to the owner and never store duplicate truth.
+Registers have one Search, direct column filters, Columns, Export and governed saved personal
+views. Selection in a truth Register scopes output only; it never bulk Issues, Delivers, Closes,
+Assigns or Confirms. Exports obey data permissions.
 
-NETS Logistics portal is mobile-first and shows assigned deliveries grouped by actual weekday/date.
-Each record exposes one current action: confirm delivery date, update arrival time, record Delivery
-Result or upload Delivery Photo. Low-frequency doors are `Cannot deliver on this date/order`.
+## 9 · Delivery Order object
 
-Arrival fields are distinct: Planned Arrival Time, append-only Revised Arrival Time and Actual
-Arrival Time. They never rewrite the customer-confirmed slot. Exceeding the slot raises truthful
-work; only a new customer confirmation changes Booking.
+The object header has one back destination, persistent `DO number · customer` identity, governed
+actions, More and Print. Applicable views are:
 
-Operations uses the same action forms on behalf of NETS until direct use is mature. Every proxy
-record stores business party, reported by, recorded by, source, reported time, recorded time and
-original evidence where needed.
+- **Delivery Order** — current customer, address, Warehouse, Partner, contact owner, arrangement,
+  goods, site requirements, restrictions and current facts;
+- **Delivery History** — every actual delivery event and result;
+- **Warehouse** — preparation, handover and return facts owned by Warehouse;
+- **Evidence** — confirmation, handover, delivery, failure, return and correction proof;
+- **Exceptions** — open and historical problems with owner and next action;
+- **History** — append-only audit of every object change and proxy record;
+- **Related** — links to Sales Order, customer, Warehouse, stock, Finance, Service, Guarantee,
+  returns/replacements and related DOs.
 
-WhatsApp is communication, not the evidence store. Google Sheet may remain during separately
-authorised cutover validation but must not remain a second long-term authority.
+Delivery History is actual delivery execution. History is the complete audit trail; they are not
+the same view. Cross-module links open the owner and never create a duplicate editor.
 
-For AL, TT, Teow or another Partner without portal access, Settings marks assignment confirmation
-required. The portal prepares governed WhatsApp/email text and may copy/open the channel, attach the
-DO and retain communication history. Prepared/copied/opened/sent never means accepted, booked or
-delivered. Operations uploads the Partner's reply screenshot/email and records the concrete answer
-on the Partner's behalf; that reply evidence alone may complete Partner confirmation, customer-date
-confirmation or a reported Delivery Result. Message content exposes only the minimum delivery data.
-Future messaging/email/Open APIs must call these same governed actions with authenticated Partner,
-idempotency and verified provenance; they never write a derived status directly.
+## 10 · Daily operator journey, Work and Quick Rail
 
-## 9 · Settings, permissions and reports
+Operations starts in Delivery Work and prioritises Failed Delivery action, commitment risk,
+Warehouse delay, Logistics reply, missing proof, overdue return and then routine confirmation.
+From issue through arrangement, Warehouse preparation, handover, delivery day, result, proof and
+return, every row states one concrete next action and one owner.
 
-Central Delivery Settings owns Logistics Partners/default coverage rules, areas, working calendars,
-capacity, drivers/vehicles, problem and Root Cause dictionaries, photo requirements, time slots,
-site rules and portal access. Rules are audited/versioned; historical visits retain the rule/value
-used at the time. NETS default is configurable, not hard-coded.
+On delivery day, Schedule/Work shows actual date/time, DO, customer, address, Partner, Warehouse,
+goods, special requirements and current progress. Missing ETA creates **Obtain Delivery ETA**.
+End-of-day control finds DOs without results, Delivered records without accepted proof, Failed
+Delivery without next Work, goods still with Logistics, unconfirmed Warehouse returns and future
+arrangements without owners.
 
-Permission is separate for view, record, record-on-behalf, review, correct, configure and export.
-NETS Logistics sees only its assigned deliveries and minimum customer data. NETS Warehouse sees
-only warehouse work. A person with both duties switches workspace. Partner users never see customer
-money, other partners, commercial terms, Root Cause decisions or photo approval.
+- **My Work Quick Rail** previews the current person's owned Delivery actions and deep-links to the
+  owner; it is not another work store.
+- **Team Quick Rail** shows duty coverage for Operations, Warehouse, proof review, problem manager
+  and NETS coordination.
+- **Calendar Quick Rail** shows the person's confirmed deliveries, handover deadlines, Failed
+  Delivery follow-up and return due dates using actual weekday + date.
+- **Activity Quick Rail** shows append-only assignment, arrangement, handover, result, proof and
+  correction events; it never completes work.
 
-Central Reports owns commitment performance, booking confirmation, DO control, Delivery Results,
-problem vs Root Cause, photo timeliness/rejection, partner performance, capacity by actual date,
-Warehouse handover/returns and closure. Every measure declares its source date/fact and coverage;
-old visits count only where the report definition calls for history, never as current work.
+Alerts are reserved for Cannot Deliver, overdue Partner confirmation, Warehouse risk, missing
+result, Failed Delivery, missing/rejected proof, overdue return or a commitment without an
+arrangement. Routine ETA change is Activity unless it creates a real breach.
 
-## 10 · Current truth versus intentional future options
+## 11 · Settings
 
-**CURRENT:** NETS is Klang Valley default/main Logistics Partner; NETS deals with the customer;
-Operations records on behalf until NETS direct portal use is mature; other partners are assigned by
-Operations only when NETS cannot deliver.
+Central Delivery Settings uses readable summaries first and an explicit focused Edit context. It
+owns audited/versioned:
+
+- default Logistics assignment by area/postcode and unresolved-address handling;
+- customer-contact responsibility and record-on-behalf policy;
+- per-Partner Portal/WhatsApp/email/API confirmation method, deadline, proof and rejection reasons;
+- Warehouse preparation, checking, handover and return requirements;
+- minimum proof by result, Partner and goods type;
+- Failed Delivery reason, required proof, suggested next action and default owner;
+- confirmation, preparation, result, proof, problem and return due/escalation times;
+- Partner Portal Warehouse/Logistics roles, data visibility, record/upload/reject/export/API access;
+- DO numbering and document/print/signature rules;
+- correction and approval rules for reassignment, dates, results, exceptional proof, refusal,
+  cancellation after handover and quantity.
+
+Per-DO dates/Partner/ETA, single-event handling, personal Columns and personal Saved Views are not
+Settings. Historical objects retain the rule/version used when their event occurred.
+
+## 12 · Reports
+
+Central Reports owns Delivery Commitment Performance, First Delivery Success, Failed Delivery
+Analysis, Logistics Partner Performance, Warehouse Performance, Delivery Proof Control, Schedule
+and Capacity, Customer Contact Performance, Return-to-Warehouse Control and Exception Ageing.
+
+Every measure declares source fact, date basis, coverage and drill-through. First-delivery success
+counts only actual delivery events, not advance rescheduling/cancellation. NETS has no acceptance-
+speed KPI because NETS is responsible without Accept; measure its contact/confirmation timeliness,
+Cannot Deliver rate, result timeliness and proof instead. Warehouse and Logistics performance stay
+separate even when both are NETS. Observed reason and reviewed Root Cause stay separate. Old events
+enter historical measures only and never become current work.
+
+## 13 · Permissions and external boundary
+
+Permissions separate view, record, record-on-behalf, review, correct, approve, configure and export.
+
+- Operations may issue, arrange, proxy-record, upload replies, assign after Cannot Deliver, manage
+  problems and request proof; it may not impersonate Warehouse or silently rewrite results.
+- Delivery Manager additionally approves governed reassignment, exceptional proof, corrections,
+  refusal closure and rule changes.
+- Warehouse roles see and record only preparation, handover and returns for their Warehouse.
+- NETS Logistics sees only assigned deliveries and minimum customer/handling data; it may arrange,
+  update ETA, record results/proof and use Cannot Deliver. It never sees money, other Partners or
+  commercial terms and cannot reassign.
+- Sales, Finance and Service read the facts relevant to their ownership and act only in their own
+  module.
+- AL, TT, Teow and other no-portal Partners are represented only through truthful Operations proxy
+  records with actual reply/report evidence.
+
+WhatsApp/email preparation records target and content but never confirms a business fact. Phone
+records state that a person recorded a call; governed high-risk facts may require additional proof
+or approval. Every uploaded file names the event it proves.
+
+Future Partner APIs use authenticated Partner scope, assignment checks, idempotency, original
+external reference, received time, governed state transitions, proof rules and append-only audit.
+They call the same business actions and never write a derived status directly.
+
+## 14 · Current versus intentional future
+
+**CURRENT:** NETS is Klang Valley default/main; NETS contacts the customer; Operations may record
+on its behalf; other Partners are assigned manually only when needed; partner+date grouping is a
+derived schedule.
 
 **NOT CURRENT OPERATING TRUTH:** customer self-scheduling, Carres central customer scheduling,
-automatic partner recommendation/allocation, routine multi-partner Klang Valley operation, Partner
-Dispatch Board, route optimisation, formal lorry/Dispatch Run, per-trip cost or loading manifest.
+automatic Partner recommendation/allocation, routine multi-Partner Klang Valley operation, route
+optimisation, formal lorry/Dispatch Run, loading manifest, ordered stops or per-trip cost.
 
-The architecture does not bind Booking to NETS, so those capabilities can be reconsidered later.
-A first-class Dispatch Run/Trip is admitted only when a vehicle-level fact actually exists—own-fleet
-dispatch, ordered stops, signed loading manifest or per-trip cost. Until then partner+date grouping
-remains a derived view.
+The model is Partner-neutral, so Carres can later assign any Logistics Partner and enable customer
+confirmation, Portal or API without replacing the DO/history/proof model. A first-class Dispatch
+Run/Trip is admitted only when a real vehicle-level fact exists: own-fleet dispatch, ordered stops,
+signed loading manifest or per-trip cost.
 
-## 11 · Approved target versus measured implementation
+## 15 · UI dictionary and whole-domain closure
 
-This MASTER is the approved operating target. Existing `OperationDelivery`, shared queue/calendar,
-booking, DO, Delivery Visit/unit-result, photo and carrier-capacity code is measured evidence and may
-cover only part of it. Legacy Order-owned or compatibility write doors do not regain authority by
-existing in code. Application reconciliation and external cutover require later separately governed
-work; this Plan approval itself changes neither production nor partner operations.
+| Do not use in employee Delivery UI | Governed wording |
+|---|---|
+| Release | Issue Delivery Order |
+| Attempt / Create Delivery Visit | Record Delivery Result / Delivery History |
+| Not Delivered | Failed Delivery |
+| Contact Customer / Follow Up | the exact confirmation or information purpose |
+| Carrier | Logistics Partner |
+| Accept for NETS default assignment | Assigned to NETS |
+| Reject button | Cannot Deliver |
+| POD | Delivery Proof or the concrete proof name |
+| Today / Tomorrow | actual weekday + date |
+
+The formal audit object remains Delivery Visit; employee navigation remains Delivery History.
+Delivered, Delivered — Proof Required, Delivered — Complete, Partially Delivered and Failed
+Delivery have the meanings governed above. Rescheduled and Delivery Cancelled are arrangement
+states. `Recorded on behalf of` always names the true Partner and Carres recorder.
+
+The Blueprint covers DO splits, multiple Warehouses/Partners/dates, NETS default/rejection,
+no-portal confirmation, customer arrangement, Warehouse preparation and handover, Logistics
+receipt, actual delivery and partial/failure results, proof review, goods custody and return,
+correction/audit, Work, Schedule, Quick Rail, Settings, Reports, permissions, Portal/API and every
+cross-module owner. Automatic allocation, vehicle routing and customer self-scheduling are
+explicitly excluded from current truth rather than deferred blind spots.
+
+**PLAN MISSION COMPLETE.** The complete Blueprint has been owner-reviewed and no unresolved Owner
+Decision remains. This MASTER persists the approved operating model only. It does not authorise
+Cards, implementation sequencing, migration or build work.

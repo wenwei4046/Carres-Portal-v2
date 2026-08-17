@@ -1,99 +1,492 @@
 # PAYMENT — MASTER
 
-> **The only Payment document.** Overwritten when re-ruled; never versioned.
-> **You read `CLAUDE.md` and this file.**
+> **APPROVED / LOCKED by Jess, 2026-08-14.** This is the only Payment document and the complete
+> owner-approved Payment Blueprint. Current implementation may lag this target; code absence does
+> not reopen it. Overwrite this file when the owner re-rules it; never create another version.
 >
-> **The money ARITHMETIC and the delivery GATE live in
-> [`../orders/MASTER.md`](../orders/MASTER.md) §8, because they decide whether goods move.**
-> This file owns the **collections DESK** — the screen where somebody chases the money.
+> Read `CLAUDE.md` → `ERP-ARCHITECTURE.md` → this MASTER. The Customer Order money gate remains in
+> [`../orders/MASTER.md`](../orders/MASTER.md) §8 because it decides whether goods move.
 
 ---
 
-# §1 · Overview
+## 1 · Mission, ownership and boundary
 
-### MISSION
-**Do not chase money for goods you cannot deliver.** The desk answers *who do I call today, and
-what do I say* — stock-aware, in the order that will actually collect.
+Payment is **customer money / Money In**. It answers:
 
-### THE RULE THE WHOLE DESK IS BUILT ON
-**催钱前先看货.** An order whose goods are not ready is not a collection call; it is a waiting
-row, and it is separated on screen rather than mixed in.
+> What has the customer paid, what is still owed in either direction, and what must the Payment
+> operator do next?
 
-### WHAT IS ON SCREEN TODAY
-`apps/web/src/pages/operation/OperationPayments.tsx`, **1,568 lines** ·
-route `/operation?tab=payments` · *measured 2026-08-05 from its size, route and the shared
-modules it imports; **not read line by line.***
+**催钱前先看货.** Do not call a customer for money before knowing whether Carres can answer the
+customer's delivery question.
 
+Payment owns:
+
+- incoming customer payment records and allocation;
+- outstanding arithmetic;
+- receipts and customer invoices;
+- collection work, contact observations and promise-to-pay;
+- storage charges, collection and waiver;
+- customer refund obligations and actual refund payment;
+- customer-money bank-match evidence and exceptions.
+
+Payment does not own:
+
+- customer order value, revision or cancellation — Sales Orders;
+- delivery hold/release — Sales Orders;
+- stock readiness/location — Stock;
+- delivery booking/DO/proof — Sales Orders/Delivery under their ruled split;
+- Catalog category — Catalog;
+- supplier bills, supplier payments or AP — Finance / Money Out;
+- PO, Receiving or Supplier Claim facts — their owning modules;
+- Rental agreement/billing truth — Rental;
+- P&L, COGS, GL, tax or enterprise cash management — Finance/Reports.
+
+Supplier AP appearing in the older `/finance` implementation does not broaden Payment. Purchasing
+supplies PO/Receiving/Claim summaries to Finance but never writes money. Payment remains the one
+locked Finance navigation destination for customer money.
+
+---
+
+## 2 · One object model
+
+```text
+Customer Order + immutable revision
+        │
+        ├── Invoice / charge document ── immutable issue/void lineage
+        │
+        ├── Payment ── amount · direction=in · method · paid date · source
+        │      ├── Allocation(s) to order/invoice/storage charge
+        │      ├── Receipt snapshot
+        │      └── Bank match(es) — verification evidence
+        │
+        ├── Storage charge ── trigger witness · rate snapshot · calculated amount
+        │      └── Waiver decision — amount · reason · manager · time
+        │
+        └── Refund obligation ── reason · source revision · approval · amount
+               └── Refund payment ── direction=out · evidence · bank match
 ```
-QUEUES     Collect · Waiting stock · Stock late · Storage running
-FACET      the MONEY state — Overdue · Unpaid · Partial · Paid · No price yet,
-           DERIVED, never keyed (0347)
-ROW        the order, the party, the figure, the balance-due date, and when it
-           was last spoken to
-EXPAND     record a payment (mints a receipt number) · history ·
-           promise-to-pay · Receipt PDF · Invoice PDF
-CHASE      a WhatsApp popover with a pre-call brief
+
+Manual collection, Stripe, Rental billing and future providers are adapters into one canonical
+Payment posting service. Each preserves source and an idempotency key. No adapter independently
+updates `orders.paid`, creates a second payment truth or mints a second receipt identity.
+
+The target replaces the overlapping customer-money parts of the old operational desk and broad
+Finance application with one owner. Useful capabilities move; duplicate customer-money records,
+forms and writers retire through a governed migration. Nothing here authorises deletion or cutover.
+
+---
+
+## 3 · Frozen money rules
+
+- **ONE arithmetic, many readers.** No screen computes outstanding independently.
+- The current compatible rule is:
+  `outstanding = priced lines + add-ons + chargeable storage − canonical money received`.
+- `null` and zero are different. Unknown value says `No price yet`; unknown warns and never blocks.
+- **ONE payment writer.** Posting, allocation, receipt identity and activity are one transaction.
+- Direct ledger writes are closed. Provider/top-up paths must converge through the same service.
+- **A void is a stamp, never deletion.** It reverses only the contribution the payment made.
+- A voided or reversed payment is not money. Every reader asks one shared predicate.
+- Payment state is derived, never typed: `No price yet · Unpaid · Partial · Paid`, with due/late
+  presentation supplied separately by the collection clock.
+- Money uses one formatter: `RM 1,250.50`, always two decimals. Never `$`, `MYR` in row text,
+  rounded figures or duplicated `RM`.
+- A payment leaves `payment.received`/`payment.voided` evidence on its Order in the same transaction.
+- Delivered does not mean paid. Collection and refund obligations survive delivery.
+- Completion in both directions means the customer owes Carres zero and Carres owes the customer
+  zero. An approved unpaid refund remains open until actual refund payment is recorded.
+- A credit note may correct/apply a document amount; it never silently converts an approved refund
+  into future customer credit. Customer credit is not part of the approved model.
+
+---
+
+## 4 · Normal incoming-money lifecycle
+
+1. Sales Orders creates or revises the commercial obligation.
+2. Payment derives outstanding from the current obligation and canonical prior postings.
+3. When delivery becomes credible, the shared collection clock raises T−3/T−2 attention and the
+   T−1 final deadline.
+4. Payment shows stock/delivery summaries so the operator knows whether calling is useful.
+5. The operator records the actual amount, paid date, method, reference/evidence and allocation.
+6. The server atomically creates payment, allocations, receipt identity and activity.
+7. At outstanding zero, collection work closes. Sales Orders independently evaluates its gate.
+8. A bank/provider match later adds verification evidence; it never creates a second payment.
+
+### Partial, overpaid and unallocated money
+
+- **Partial:** allocate the received amount and keep the remainder/action visible.
+- **Overpayment:** hold the excess as an unapplied customer balance and raise
+  `Allocate or refund RM {amount} for {customer}`. Never hide it as negative outstanding.
+- **Unidentified/unallocated:** record only when bank/provider evidence proves money arrived; keep
+  it visible until fully allocated or refunded.
+- **Wrong allocation:** reverse the allocation with reason and reallocate the same real payment;
+  do not void money that genuinely arrived.
+- **Duplicate posting:** reject by idempotency; suspected duplicates enter an exception queue.
+
+### Void, returned payment and chargeback
+
+- A mistaken internal posting is manager-voided with reason; payment and receipt remain visible.
+- A returned payment/chargeback is a linked reversal event, never edit/delete.
+- The shared arithmetic reopens outstanding and Work raises collection again.
+- Unmatching bank evidence reverses only the match; it does not erase the payment.
+
+---
+
+## 5 · Collection clock, contact and Work
+
+Payment uses the portal-wide structured Action contract in `docs/ACTION-FLOW-STANDARD.md`.
+Payment supplies each action's trigger, Payment-specific owner rule, completion fact and due rule;
+the Work Engine resolves the person and roster/buddy cover. Payment never invents a universal
+Sales Order owner and never writes the resolved staff name into the action sentence. Register,
+My Work and Team Work use the same action facts at different display densities.
+
+The one collection clock is `delivery − 1 working day`, Mon–Sat plus Malaysian public holidays,
+anchored on customer-confirmed date, else promised date; no anchor means no clock.
+
+- T−3/T−2 = attention.
+- T−1 = deadline because logistics commonly requests the DO the evening before.
+- A promise-to-pay is the customer's word; the collection deadline is Carres' business rule.
+  They remain two facts. A promise changes presentation, never erases overdue work.
+- `Collect RM {amount} from {customer}` triggers when known outstanding > 0 and completes only at
+  outstanding = 0 or a governed reversal of the obligation.
+- The same action survives delivery and appears in Work, which deep-links to Payments.
+- No Done button: Payment's structured completion fact closes Work.
+- One customer receives one grouped reminder/message, never one per order.
+- `Chase` is banned visible copy. Use the governed `Remind`/`Call` vocabulary.
+- The portal records only what it observed. Opening/copying WhatsApp is not proof of send/receipt.
+
+Work definitions:
+
+| Trigger | Owner | Action | Due | Completion |
+|---|---|---|---|---|
+| Outstanding > 0 in collection window | Payment duty | `Collect RM {amount} from {customer}` | shared working-date clock | outstanding = 0 |
+| Promise date reached and still owing | Payment duty | same collection action, late | promised weekday/date | outstanding = 0 |
+| Approved refund unpaid | Payment duty | `Refund RM {amount} to {customer}` | governed due date; absent one, same working day | refund payment recorded |
+| Unallocated receipt | Payment duty | `Allocate RM {amount} from {payer}` | receipt date | fully allocated/refunded |
+| Unmatched bank line | finance-control duty | `Match bank payment RM {amount}` | import date | fully matched/classified |
+| Suspected duplicate/return | manager | `Review payment RM {amount}` | observed date | distinct/voided/reversed |
+
+---
+
+## 6 · Delivery release and storage
+
+The delivery money gate belongs to Sales Orders, not Payment.
+
+- ⛔ **SUPERSEDED 2026-08-16 — *"issuing the DO is the hard gate"*.** The owner ruled that
+  **outstanding money does not block the DO** and that **a Finance exception is the only money
+  blocker**. Agreeing a date may still warn about money.
+- ⛔ **SUPERSEDED 2026-08-16 — *"A manager may release delivery while money remains owed."*** With no
+  money gate there is nothing to release, and the owner ruled **no Release button and no Approve
+  button**. **The companion rule survives in full and is the half that matters: RELEASE NEVER
+  FORGIVES MONEY.** Goods moving has never meant money forgiven — and it means it even less now that
+  goods move by default. Collection work stays open on a delivered order that still owes, and the
+  **waiver is untouched**: writing off a receivable remains a money decision, manager-gated, owned
+  here, with amount, reason, actor and time. A waiver is not a release and never was.
+- **Payment's own ownership is unchanged by all of this.** Payment supplies the ONE outstanding
+  answer and owns the one arithmetic; Sales Orders owns the delivery gate and decides what blocks
+  goods. That boundary did not move — what moved is Sales Orders' answer.
+- **`Finance exception` — defined by the owner 2026-08-16, and Finance owns it.** An explicit
+  Finance-created record linked to the Sales Order, carrying **creator · reason · status ·
+  timestamps · clear evidence**. **Only Finance may create it and only Finance may clear it.**
+  `OPEN` blocks the DO gate; `CLEARED` removes the block. It is the ONE money blocker — an
+  outstanding balance of any size or age does not block, and neither does an uncollected storage
+  fee. **It is a decision, never a derived state:** it may not be computed from a balance, or the
+  gate this ruling removed grows back under another word. The governing ruling lives once in
+  [`../orders/MASTER.md`](../orders/MASTER.md) §8, which owns the gate; this MASTER does not
+  restate it.
+- 🔴 **IMPLEMENTATION REQUIRED — NOT BUILT.** No table, RPC, route, permission or UI for the Finance
+  exception exists in this repository. **Do not describe it as implemented**, and do not treat its
+  absence as permission to keep the retired money gate. `deliveryOrderIssueGate` still refuses on an
+  unpaid balance today, and the shipped node-map gate still counts a `money` requirement
+  (decision B, superseded); documentation states the target and code is unchanged. The correction
+  slice is
+  [`../cards/CARD-2026-08-16-money-gate-correction.md`](../cards/CARD-2026-08-16-money-gate-correction.md),
+  `STATUS: QUEUED · IMPLEMENTATION: NOT APPROVED`.
+- **THE T−1 COLLECTION CLOCK IS KEPT — owner ruling 2026-08-16.** The shared clock
+  (T−3/T−2 attention, T−1 deadline, delivery week + Malaysian public holidays) survives unchanged.
+  What retires is only its old justification — that the DO door refused while money held. **A
+  balance has a due date because it is owed, not because it holds goods.** Collection work runs
+  **independently of the delivery**: money is no longer a DO requirement unless an OPEN Finance
+  exception exists, and collection still survives delivery on an order that has been delivered and
+  still owes.
+- Operations sees the resulting Work change; no duplicate alert/status is created.
+
+Storage is split by record:
+
+- Sales Orders owns trigger and hold from the customer promise.
+- Stock supplies physical witness only.
+- Catalog supplies product category; SKU-prefix guessing is forbidden.
+- Payment owns effective-dated rates, one calculation, charge snapshot, collection and waiver.
+- A manager may release the hold while leaving the fee owed, or separately waive some/all with
+  amount, reason, actor and time.
+- A waiver preserves what would otherwise have been owed; editing an arbitrary row amount is not
+  a waiver.
+
+---
+
+## 7 · Receipts, invoices, documents and History
+
+- A receipt number is unique, minted once and reprints the same immutable snapshot.
+- A voided payment retains a visibly voided receipt record and cannot print as live money.
+- A customer invoice is issued/voided/reprinted through one Payment-owned door.
+- Issued invoice versions are immutable; correction uses explicit void/credit lineage.
+- Every invoice/receipt links to its source SO revision and canonical transaction IDs.
+- A customer statement derives from canonical obligations, payments, refunds and unapplied balances
+  for a selected date range.
+- Order Route may show Invoice → Payment/Receipt → Refund read-only and links to Payment.
+
+Payment History is one append-only timeline covering:
+
+- payment posting and allocation/reallocation;
+- receipt/invoice issue and void;
+- observed contact/channel-open and promise-to-pay;
+- bank match/unmatch and import batch;
+- void, reversal and chargeback;
+- storage charge/waiver;
+- refund request, decision and payment.
+
+Orders reads only its related subset and never gains a Payment form.
+
+---
+
+## 8 · Refund lifecycle
+
+1. A governed Sales Order change/cancel or approved remedy creates one refund obligation with
+   source, reason, amount and immutable commercial lineage.
+2. A manager approves or rejects it. Approval does not mean paid.
+3. Approved refunds appear in Payments → Refunds with customer payment details and evidence.
+4. Payment duty records the actual outgoing payment/reference/evidence.
+5. The server marks the obligation paid and writes Order activity in one transaction.
+6. Bank reconciliation later verifies the outgoing payment.
+7. Sales Order completion remains open until refund payment is recorded.
+
+`order_refunds` is the target customer-refund authority. The older generic refund/credit forms may
+not create parallel customer debts. Refund records are never copied or deleted.
+
+---
+
+## 9 · Bank verification and exceptions
+
+```text
+Upload statement file
+→ validate bank/account/period/opening/closing totals
+→ reject exact duplicate import hash
+→ immutable import batch + bank lines
+→ suggest matches by reference + amount + customer + date
+→ review exact, split, combined and unmatched cases
+→ apply matches
+→ keep exception queues until resolved
 ```
 
-### API + DATA
-Reads the Orders feed and `ops_order_control`. Money truth: **`orders.paid`**.
-One shared rule: `packages/shared/src/order-money.ts`. Money spelling:
-`packages/shared/src/money-format.ts`. The collection clock (T−3 · T−2 · T−1):
-`packages/shared/src/collection-clock.ts`. Ledger validity:
-`isLivePayment` — the ONE predicate.
+Three axes remain separate:
+
+- Payment: `Recorded · Voided · Reversed`.
+- Bank evidence: `Not checked · Matched · Exception`.
+- Obligation: derived `No price yet · Unpaid · Partial · Paid · Refund owed`.
+
+Under the approved Carres rule, governed payment recording changes money truth and the order gate.
+Bank matching is later control/evidence, not a second settlement definition.
+
+Required exception journeys:
+
+- unmatched/partially matched bank line;
+- duplicate import or duplicate payment;
+- unallocated/overpaid money;
+- wrong-order allocation;
+- returned payment/chargeback;
+- disputed payment/reference;
+- failed refund;
+- receipt/invoice numbering collision;
+- unknown order value.
+
+No difference disappears through a tolerance. Any future write-off requires its own governed amount,
+reason, approver and evidence.
 
 ---
 
-# §2 · Frozen rules
+## 10 · Information architecture and UI
 
-- **ONE money rule, four readers** — the ladder's lock, the row pill, the drawer strip and this
-  desk. Before it existed, three surfaces asked three different questions and each pointed at a
-  column nobody wrote: the ladder read a NULL, the gate summed an empty ledger and refused a
-  fully-paid order, and this desk computed RM 0 owing for everybody.
-- **ONE money spelling, asserted by IDENTITY.** `rm` re-exports `fmtMoney`; the test asserts
-  they are the same function, not that they agree. **Two implementations that merely agree is
-  the arrangement under which a third, rounding one grows unnoticed** — which is exactly how
-  `Collect RM RM 11,246.00` reached 28 live rows and how `RM 1,251` printed for a ledger holding
-  RM 1,250.50.
-- **`null` and zero are different answers.** An unpriced order names no figure; an order owing
-  nothing says `RM 0.00`.
-- **ONE PAYMENT WRITER** — `payment_record` (0343). The ledger row and the `orders.paid` move
-  are one transaction, so the figure every gate reads moves the moment the desk records the
-  money. The direct PostgREST write door is closed; a raw-create deposit is recorded as a
-  MIRROR (`counted_in_paid = false`) because it is already inside `orders.paid`.
-- **A VOID IS A STAMP** — principal only, never a delete, and it reverses exactly the
-  contribution the record made. **A voided row is therefore not money** (0347): every reader
-  asks `isLivePayment`, and `summarizePayments` — the ONE roll-up — skips it. The row stays on
-  screen, struck through and labelled `Voided`, with no receipt to print.
-- **THE MONEY STATE IS DERIVED, NEVER KEYED** (0347). `Overdue · Unpaid · Partial · Paid ·
-  No price yet` come from `orderMoney` and the collection clock. The hand-typed
-  `payment_status` dropdown is retired: measured on production, ONE row of 88 carried the
-  column while 25 orders had money in, and a typed `Paid` on an order owing RM 5,000 was one
-  click from lying to the desk. The column keeps its data and loses its authority.
-- **The collection clock is ONE arithmetic** — due = delivery − 1 working day (Mon–Sat + MY
-  holidays), anchored on the customer's confirmed day, else the promised date, silent with no
-  anchor. `t3`/`t2` are attention; **`t1` is the deadline**, because logistics ask for the DO
-  the evening before and the DO door refuses while money holds. The Work engine consumes the
-  same module — two consumers, never two clocks.
-- **The promise-to-pay reuses `balance_due_date`.** No new column. It is the CUSTOMER's word;
-  the clock above is the BUSINESS deadline. Both print, and they are not the same fact.
-- **Recording a payment mints a receipt number** from the portal's own
-  `PREFIX-DDMMYY-NNNN` scheme (`RC-…`), seeded on `{orderId}:{seq}` so a reprint matches the
-  original. **It is unique in the database** (0347) and the route retries on collision — the
-  seed is `count + 1`, so two payments recorded in one instant would otherwise mint one number.
-- **Money leaves a trace on the ORDER** — `payment.received` / `payment.voided` in the order's
-  own activity, written inside the same transaction as the money, carrying the figure.
-- **`Chase` is a banned word portal-wide.** The action is `Call {customer} — …`; the stored
-  column `last_chased_at` is spelt on screen as **`Message copied {when}`**, and the send path
-  copies the message on BOTH branches so the sentence is true of what the portal actually
-  watched.
+Locked destination: Sidebar → Finance → **Payments**.
+
+One Payments page owns four page-level jobs:
+
+1. **Collect** — primary daily customer-balance Register, stock-aware and work-ordered.
+2. **Refunds** — customer refund obligations and payment.
+3. **Bank matching** — statement imports, matches and exceptions.
+4. **History** — all canonical customer-money transactions and documents.
+
+Reports and Settings remain central destinations:
+
+- Payment's report shortcut opens central Reports filtered to Payment.
+- Payment's gear opens central Settings → Payments.
+
+There is no second Finance dashboard, AR, Order Payments or Invoices destination. Useful functions
+relocate into Collect, History, object detail and central Reports. Supplier AP, P&L and Rental
+approval never become hidden Payment subpages.
+
+### Collect Register
+
+Apply the governed Register Template:
+
+- Header `Payments`, freshness and admitted actions; no duplicate breadcrumb/title.
+- Search, filters, columns and export.
+- `To collect` and `All` scopes.
+- Useful facts: collection due/late, goods ready/waiting/late, money state, region and PIC.
+- Core columns: Customer · Order · Current Action · Outstanding · Collection Due · Promise to Pay ·
+  Goods · Customer Delivery · Last Contact.
+- Footer: visible count, exact outstanding total and separate `No price yet` count.
+- Expansion/detail: obligation breakdown, timeline, documents, contact brief and one posting form.
+
+Waiting/late stock is read-only context. Payment links to the owning module and never contacts the
+supplier or edits stock.
+
+### Payment object detail
+
+Apply the Object Detail Template:
+
+- identity, amount/direction and factual state;
+- customer, SO, invoice/charge, paid date, method, source/reference and allocation;
+- immutable receipt/invoice documents;
+- bank match/batch or explicit exception;
+- append-only history;
+- related Order, refund/storage charge, Work and Issue Tracker links.
 
 ---
 
-# §3 · Approved Evolution
+## 11 · Daily operator journey
 
-| What | Why it is not built |
+### Morning
+
+1. Open Payments → Collect; actionable balances appear in risk/date order.
+2. Read amount, goods readiness, customer delivery and last contact without another page.
+3. Open a row, use the pre-call brief and governed customer contact action.
+4. Record only confirmed money through the one posting door; receipt is immediately available.
+
+### During the day
+
+5. Process approved refunds in Refunds.
+6. Allocate unallocated money and review returned/duplicate exceptions.
+7. Import a statement when received; accept reviewed matches and resolve exceptions.
+
+### Close
+
+8. Confirm no overdue collection/refund or unexplained bank exception lacks an owner.
+9. Open central Reports → Payment for daily totals and open exceptions.
+
+---
+
+## 12 · Permissions
+
+Duty, not email, determines permission.
+
+| Capability | Duty |
 |---|---|
-| **The storage-waiver lever on this desk** | Approved; the manager decision and its two named outcomes already exist on the order. |
-| **A collection-velocity figure** | Approved as a review number. Blocked by the same rule the stock review follows: **a figure withholds itself until the records can back it.** |
-| **Bulk remind** | Approved, and it must obey the portal's message law: ONE message per counterparty, never one per order. |
+| View customer money | Payment duty/principal; relevant cross-module views read-only |
+| Record and allocate payment | Payment duty |
+| Contact customer / record observed channel-open | Payment duty |
+| Set promise-to-pay | Payment duty |
+| Issue invoice / reprint receipt | Payment duty under document rules |
+| Void payment / waive charge / approve refund | manager/principal duty |
+| Pay approved refund | Payment duty; separate requester/approver where practical |
+| Import/match bank statement | finance-control duty |
+| Change Payment settings | principal/authorised settings duty |
+
+Server-side permission is mandatory. Existing broad role checks are implementation evidence, not the
+final duty model.
+
+---
+
+## 13 · Settings
+
+Central Settings → Payments owns:
+
+- active collection methods and required evidence;
+- receipt/invoice number formats and templates;
+- effective-dated storage rates and Catalog category mapping;
+- bank accounts and statement-import formats;
+- reconciliation suggestion rules with audit; exact amount is the default;
+- refund payment methods and evidence;
+- customer statement/contact templates under Copy authority.
+
+Historical transactions snapshot applicable settings. Editing configuration changes future use only.
+Sales Order checkout may read admitted payment-method choices but does not own Money In configuration.
+
+---
+
+## 14 · Reports and export
+
+Central Reports → Payment provides:
+
+- outstanding by due/aging, customer, PIC, region and delivery readiness;
+- collection due/late and promise-to-pay kept/missed;
+- money received by date, method and source, with voids/reversals separate;
+- storage charged, collected and waived with reason/approver;
+- refund obligations approved/paid/late;
+- bank imports matched/unmatched/duplicate/returned;
+- customer statement and stable transaction export;
+- collection velocity only when complete history supports it; withhold rather than fabricate.
+
+Payment does not report P&L, COGS, supplier AP or top-SKU profitability.
+
+---
+
+## 15 · Current implementation versus approved target
+
+### Built / verified in repository
+
+- operational collections desk with queue/facets and stock-aware context;
+- shared `orderMoney`, exact formatter and T−3/T−2/T−1 clock;
+- `payment_record`/`payment_void`, direct-ledger write closure and receipt uniqueness;
+- canonical `_customer_payment_post` transaction used by operational/manual Payment, Sales/POS
+  top-up, Finance AR receipt and customer Stripe checkout, with source idempotency, one allocation,
+  one receipt identity and one Order activity event;
+- legacy generic customer-order receipt history migrated into the canonical ledger; new generic
+  `payments` writes for incoming customer-order money are refused;
+- derived money states and void-aware readers;
+- payment history, promise-to-pay, receipt PDF, invoice download and WhatsApp brief;
+- order refund request/decision/paid lifecycle and derived SO completion;
+- older Finance AR/AP/payments/invoices/refunds/reconciliation/reports implementation.
+
+### Approved target / not complete
+
+- migration/retirement of duplicate customer-money writers/tables/forms;
+- explicit unallocated/overpayment/reallocation/return/chargeback records;
+- immutable bank import batches linked to canonical Payment objects;
+- one Payment History and object detail;
+- storage category from Catalog and Payment-owned effective rates/waiver;
+- one Payments page with Collect/Refunds/Bank matching/History;
+- duty permissions, central Payment Settings and truthful Payment Reports;
+- bulk reminders grouped one message per customer;
+- collection velocity only after sufficient evidence.
+
+Implementation absence does not reopen approved business truth. Old Finance/AP code is preserved as
+measured evidence but does not change Payment's customer-money boundary.
+
+---
+
+## 16 · Intentional rejects and external boundary
+
+- No second customer-money Finance application.
+- No typed `Paid` status or second outstanding arithmetic.
+- No duplicate payment/refund writer.
+- No payment deletion, copied transaction or mutable issued document.
+- No bank match silently creating money recorded elsewhere.
+- No supplier AP, P&L, COGS, GL or tax engine inside Payment.
+- No future customer credit inferred from an old credit-note form.
+- No customer portal/payment provider until separately planned and authorised.
+- No external message, bank transfer, production migration, partner invitation or cutover from PLAN.
+
+---
+
+## 17 · Plan completion state
+
+**PLAN MISSION COMPLETE.** The complete customer-money domain has been authority-resolved,
+whole-domain audited, benchmarked against available 2990 evidence and mature ERP patterns,
+owner-reviewed, approved and persisted here as the one current truth.
+
+Locked operating model: Payment is customer Money In; one canonical posting/allocation model; one
+outstanding arithmetic; one Payments workspace; receipts/invoices/refunds/storage/bank evidence and
+exceptions preserve immutable lineage; Sales Orders owns the delivery gate; supplier AP stays
+outside Payment.
+
+Only after this state may dependency-ordered, unnumbered build scopes be derived. No official Card
+number or implementation status is created by this MASTER update.

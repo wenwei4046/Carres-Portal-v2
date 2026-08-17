@@ -104,7 +104,9 @@ export default function DialogFrame({
 
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
-      <Dialog.Portal>
+      <DialogContainerProvider>
+        {(setContainer) => (
+          <Dialog.Portal>
         {/* The scrim. §3 has no row for one — reported to the kit rather than
          *  settled here — so it is the primary-text step at 40%, which is the
          *  nearest thing the law does name. */}
@@ -115,8 +117,6 @@ export default function DialogFrame({
         {/* D0.5b.1 — publishing the content node is what lets a Select, a
          *  Popover or a DatePicker opened INSIDE this dialog render above it,
          *  without touching §4.4's ladder. See `dialog-container`. */}
-        <DialogContainerProvider>
-          {(setContainer) => (
         <Dialog.Content
           ref={setContainer}
           data-kit={kind}
@@ -151,9 +151,9 @@ export default function DialogFrame({
             </footer>
           )}
         </Dialog.Content>
-          )}
-        </DialogContainerProvider>
-      </Dialog.Portal>
+          </Dialog.Portal>
+        )}
+      </DialogContainerProvider>
     </Dialog.Root>
   );
 }

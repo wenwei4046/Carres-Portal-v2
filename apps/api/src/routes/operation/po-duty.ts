@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import {
+  grnDutyMonth,
   monthKeyMYT,
   pickNextDutyHolder,
   updateOpsPoDutyInput,
@@ -33,27 +34,52 @@ function requireOperationOrPrincipal(
   }
 }
 
+type DutyRow = { month: string; user_id: string; assigned_by: string | null };
+
 /** Resolve (and lazily fill) the CURRENT month's duty row. Shared by GET here
  *  and the pos.ts create-PO gate. Returns null when dormant (missing table /
  *  empty pool / no row could be created). */
 export async function resolveCurrentPoDuty(
   sb: ReturnType<typeof userClient>,
-): Promise<{ month: string; user_id: string; assigned_by: string | null } | null> {
+): Promise<DutyRow | null> {
+  return resolveDutyMonth(sb, monthKeyMYT());
+}
+
+/**
+ * Resolve (and lazily fill) ONE month of the rota.
+ *
+ * Generalised 2026-08-15 from the current-month-only version. The GRN duty
+ * holder is the NEXT month's row of this same rota (`grnDutyMonth` — the
+ * locked offset-1 duty model), so the Team panel's `GRN DUTY` row needs the
+ * identical machinery pointed at a different month. **One rota, one
+ * auto-assignment, no second store** (`purchasing/MASTER.md` §2.2).
+ *
+ * `excludeUserId` keeps segregation of duties: the person who ORDERS never
+ * RECEIVES, so the GRN month never auto-fills with the current PO holder —
+ * unless they are the only assignable person left, in which case one person
+ * genuinely does both and saying so is more honest than showing nobody.
+ */
+export async function resolveDutyMonth(
+  sb: ReturnType<typeof userClient>,
+  month: string,
+  excludeUserId?: string | null,
+): Promise<DutyRow | null> {
   // The doc above promises "dormant, never block" — so a THROW has to degrade
   // exactly like an error RESULT does. Without this, an unexpected client
   // shape turns a dormant OPTIONAL feature into a 500 on the PO create path,
   // which is the precise opposite of what this gate is for.
   try {
-    return await resolveCurrentPoDutyImpl(sb);
+    return await resolveDutyMonthImpl(sb, month, excludeUserId ?? null);
   } catch {
     return null;
   }
 }
 
-async function resolveCurrentPoDutyImpl(
+async function resolveDutyMonthImpl(
   sb: ReturnType<typeof userClient>,
-): Promise<{ month: string; user_id: string; assigned_by: string | null } | null> {
-  const month = monthKeyMYT();
+  month: string,
+  excludeUserId: string | null,
+): Promise<DutyRow | null> {
   const cur = await sb
     .from("ops_po_duty")
     .select("month, user_id, assigned_by")
@@ -61,7 +87,7 @@ async function resolveCurrentPoDutyImpl(
     .maybeSingle();
   // Relation missing (pre-0236 DB) or any read error → dormant, never block.
   if (cur.error) return null;
-  if (cur.data) return cur.data as { month: string; user_id: string; assigned_by: string | null };
+  if (cur.data) return cur.data as DutyRow;
 
   // Lazy auto-fill: rotation over the assignment pool (fewest months served,
   // deterministic — see pickNextDutyHolder). Pool = ops_staff_settings rows
@@ -80,9 +106,15 @@ async function resolveCurrentPoDutyImpl(
   const poolIds = (settings.data ?? [])
     .map((s) => s.user_id as string)
     .filter((id) => activeIds.has(id));
+  // Segregation of duties, but never at the cost of showing nobody: the
+  // exclusion applies only while somebody else can actually take the duty.
+  const eligible =
+    excludeUserId && poolIds.length > 1
+      ? poolIds.filter((id) => id !== excludeUserId)
+      : poolIds;
   const picked = pickNextDutyHolder(
     (history.data ?? []) as { month: string; user_id: string }[],
-    poolIds,
+    eligible,
   );
   if (!picked) return null;
 
@@ -97,7 +129,7 @@ async function resolveCurrentPoDutyImpl(
     .eq("month", month)
     .maybeSingle();
   if (after.error || !after.data) return null;
-  return after.data as { month: string; user_id: string; assigned_by: string | null };
+  return after.data as DutyRow;
 }
 
 // GET / — this month's holder, enriched with email/name for the UI badge.
@@ -108,10 +140,19 @@ poDutyRouter.get("/", async (c) => {
 
   const duty = await resolveCurrentPoDuty(sb);
   const month = monthKeyMYT();
+  const grnMonth = grnDutyMonth(month);
   if (!duty) {
-    const body: OpsPoDutyResponse = { month, holder: null };
+    const body: OpsPoDutyResponse = { month, holder: null, grnMonth, grnHolder: null };
     return c.json(body);
   }
+
+  // GRN DUTY (purchasing/MASTER.md §2.2, approved 2026-08-06 · built
+  // 2026-08-15). The receiver is the NEXT month's row of this same rota, so
+  // the person who ordered never receives. It is auto-assigned through the
+  // identical rotation — the panel used to derive it on the client from a
+  // roster that starts at the current month, so it looked backwards, found
+  // nothing and printed `Not assigned` every single month.
+  const grn = await resolveDutyMonth(sb, grnMonth, duty.user_id);
 
   // DUTY board roster (Jess 2026-07-19): this month + every future month
   // already written (0236 seeds Jul/Aug/Sep) — the whole team sees the
@@ -123,7 +164,11 @@ poDutyRouter.get("/", async (c) => {
     .order("month")
     .limit(6);
   const rows = (rosterRows.data ?? []) as { month: string; user_id: string }[];
-  const ids = [...new Set([duty.user_id, ...rows.map((r) => r.user_id)])];
+  const ids = [
+    ...new Set(
+      [duty.user_id, grn?.user_id, ...rows.map((r) => r.user_id)].filter(Boolean) as string[],
+    ),
+  ];
   const users = await sb.from("app_users").select("id, email, name").in("id", ids);
   const byId = new Map(
     (users.data ?? []).map((u) => [
@@ -133,6 +178,7 @@ poDutyRouter.get("/", async (c) => {
   );
 
   const holderUser = byId.get(duty.user_id);
+  const grnUser = grn ? byId.get(grn.user_id) : undefined;
   const body: OpsPoDutyResponse = {
     month: duty.month,
     holder: {
@@ -141,6 +187,15 @@ poDutyRouter.get("/", async (c) => {
       name: holderUser?.name ?? null,
       assignedBy: duty.assigned_by,
     },
+    grnMonth,
+    grnHolder: grn
+      ? {
+          userId: grn.user_id,
+          email: grnUser?.email ?? "",
+          name: grnUser?.name ?? null,
+          assignedBy: grn.assigned_by,
+        }
+      : null,
     roster: rows.map((r) => ({
       month: r.month,
       userId: r.user_id,

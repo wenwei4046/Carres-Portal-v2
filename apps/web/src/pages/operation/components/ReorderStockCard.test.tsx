@@ -24,7 +24,7 @@ const PILLOW = "Essential Memory Pillow(L)";
 
 function row(over: Partial<OpsReorderRow> & { sku: string }): OpsReorderRow {
   return {
-    kind: "M.P",
+    kind: "Mattress protector",
     onHand: 0,
     reserved: 0,
     incoming: 0,

@@ -43,7 +43,7 @@
 // around the one the engine already draws.
 import { useCallback, useMemo, useState } from "react";
 import { Plus } from "lucide-react";
-import { lineClass } from "@carres/shared";
+import { accShort, lineClass, lineKind } from "@carres/shared";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import {
@@ -54,20 +54,45 @@ import {
 import Money from "@/components/Money";
 import { apiFetch, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { renderDoPdf, renderSalesOrderPdf } from "@/lib/pdf/render";
+import { renderCombinedSalesOrderPdf, renderDoPdf, renderSalesOrderPdf } from "@/lib/pdf/render";
 import type { DoTemplateData, SalesOrderTemplateData } from "@/lib/pdf/types";
-import { useOperationOrders } from "@/lib/queries";
+import { useOperationOrders, useSalesOrderExpansion } from "@/lib/queries";
 import CancelSalesOrderDialog from "./CancelSalesOrderDialog";
 import DestinationHeader from "./DestinationHeader";
+import GoodsMiniTable, { categoryWord, type GoodsMiniLine } from "./components/GoodsMiniTable";
+import { lineConfigBits } from "../dealer/new-order/special-addons-picker";
 import { isRental, lineName, type MoneyState } from "./sales-order-facts";
+import {
+  deliveryDateToBeConfirmedGuidance,
+  missingDeliveryDateGuidance,
+} from "./sales-order-guidance";
 import {
   buildRegisterRow,
   defaultOnFor,
   moneyText,
+  MUTED_ABSENCES,
   REGISTER_FIELDS,
   type RegisterField,
   type RegisterRow,
 } from "./sales-order-columns";
+
+/**
+ * ⭐ AN ABSENCE IS QUIETER THAN A FACT — owner ruling 2026-08-15 (Chai).
+ *
+ * `Not recorded` / `Not given` keep their words — a blank may never carry two
+ * meanings — and lose their weight. A `PO No` column of eight absences and two
+ * real documents used to read as ten facts; muted, the two documents are the
+ * only things the eye lands on. Everything else prints exactly as before, so
+ * this is presentation, not a second string.
+ */
+function absenceAware(text: string) {
+  if (!MUTED_ABSENCES.has(text)) return text;
+  return (
+    <span className="text-kit-slate-9" data-absence="true">
+      {text}
+    </span>
+  );
+}
 
 /** ONE cell, ONE fact. A money state is a number or a sentence, never nothing. */
 function moneyCell(state: MoneyState) {
@@ -103,7 +128,7 @@ function toGridColumn(
     sortable: true,
     defaultHidden: !defaultOnFor(f, role),
     chooserGroup: f.group,
-    accessor: (r) => f.text(r),
+    accessor: (r) => absenceAware(f.text(r)),
     searchValue: (r) => f.text(r),
     filterValue: (r) => f.text(r),
     ...(f.sortBy
@@ -154,7 +179,7 @@ function toGridColumn(
       ...base,
       accessor: (r) =>
         r.poNumbers.length === 0 ? (
-          f.text(r)
+          absenceAware(f.text(r))
         ) : (
           <span className="inline-flex gap-1.5">
             {r.poNumbers.map((po) => (
@@ -190,7 +215,7 @@ function toGridColumn(
             {r.o.do_number}
           </button>
         ) : (
-          f.text(r)
+          absenceAware(f.text(r))
         ),
     };
   }
@@ -210,6 +235,63 @@ function toGridColumn(
       searchValue: (r) => `${r.customer} ${r.phone} ${r.phoneDigits}`,
       filterValue: (r) => r.customer,
       exportValue: (r) => (r.phone ? `${r.customer} · ${r.phone}` : r.customer),
+    };
+  }
+  if (f.key === "customer_delivery") {
+    return {
+      ...base,
+      accessor: (r) => {
+        if (r.customerDelivery) return f.text(r);
+        /* THE 8 vs THE 3 — owner ruling 2026-08-15, docs/orders/MASTER.md.
+           `delivery_date_tbd` already records that the customer WAS asked and
+           answered *not yet*; the screen was discarding it and printing the
+           same warning on all eleven. A customer who has answered is not work
+           to do, so this reads as a plain fact: one line, no action clause and
+           no amber — amber is reserved for the three nobody has asked. */
+        if (r.o.delivery_date_tbd) {
+          const tbd = deliveryDateToBeConfirmedGuidance({
+            customer: r.customer,
+            salesperson: r.o.salespersons?.name,
+            phone: r.phone,
+          });
+          return (
+            <span className="block min-w-0 truncate text-base-600" title={tbd.detail}>
+              {tbd.fact}
+            </span>
+          );
+        }
+        const guidance = missingDeliveryDateGuidance({
+          so: r.so,
+          customer: r.customer,
+          salesperson: r.o.salespersons?.name,
+          phone: r.phone,
+        });
+        /* FACT first, then ONE clause that fits the governed 148px whole.
+           Who must act, whose phone to call, what to ask and what to write
+           down ride the hover (`guidance.detail`) and the Sales Order
+           workspace panel — they are not cell-sized facts, and the expand
+           has exactly one job (CLAUDE.md §2: the order's own goods).
+
+           ⭐ 13 / 11 — owner ruling 2026-08-15. Line 1 keeps the governed body
+           13 semibold; line 2 moves from `text-meta` (12) to `text-label` (11)
+           at regular weight. One point of separation was not enough to read as
+           a second RANK — the two lines looked like one wrapped sentence, and
+           the whole point of the grammar is that the eye takes the fact first
+           and the instruction second. the colour token is unchanged, and
+           `text-base-600` measures 8.6:1 on the white row — so the quieter line
+           stays well clear of the §5 lock's accessible contrast floor at the
+           smaller size rather than being rescued by it. */
+        return (
+          <span className="block min-w-0" title={guidance.detail}>
+            <span data-attention="warning" className="block truncate font-semibold text-kit-amber-11">
+              {guidance.problem}
+            </span>
+            <span className="block truncate text-label font-normal text-base-600">
+              {guidance.action}
+            </span>
+          </span>
+        );
+      },
     };
   }
   if (f.key === "phone") {
@@ -242,54 +324,92 @@ function toGridColumn(
  * ▸ EXPAND HAS EXACTLY ONE JOB (CLAUDE.md §2): the order's own lines, each
  * with its name, quantity and price — a fixed sub-table, not a second grid
  * engine. The reader who needs more opens the document.
+ *
+ * The BOX is `GoodsMiniTable`, written once and shared; this function's whole
+ * job is turning one order into the strings that box prints. A truth register
+ * passes no `selection`, so the ☑ column does not exist here (owner ruling
+ * 2026-08-15: a register selects nothing).
  */
 function ExpandedLines({ row }: { row: RegisterRow }) {
   const lines = row.o.order_lines ?? [];
   const addons = row.o.order_addons ?? [];
+  const expansion = useSalesOrderExpansion(row.o.id);
   if (lines.length === 0 && addons.length === 0) {
-    return <div className="px-10 py-2 text-meta text-base-500">No items on this order</div>;
+    return <div className="px-2 py-2 text-body text-base-500">No items on this order</div>;
   }
   const categoryOf = (line: (typeof lines)[number]) => {
     const fromAttrs = typeof line.attrs?.category === "string" ? line.attrs.category : "";
     const fromSku = line.sku.includes(":") ? line.sku.split(":", 1)[0] : "";
     const classified = lineClass(line.sku);
     const classifiedLabel = classified === "acc" ? "Accessory" : classified === "unknown" ? "Other goods" : classified;
-    const category = fromAttrs || fromSku || classifiedLabel;
-    return category.replace(/[_-]+/g, " ").toUpperCase();
+    return categoryWord(fromAttrs || fromSku || classifiedLabel);
   };
-  const configOf = (line: (typeof lines)[number]) =>
-    Object.entries(line.attrs ?? {})
-      .filter(([key, value]) => key !== "category" && value != null && value !== "")
-      .map(([key, value]) => `${key.replace(/[_-]+/g, " ")}: ${String(value)}`)
-      .join(" · ");
-  const grouped = new Map<string, typeof lines>();
-  for (const line of lines) grouped.set(categoryOf(line), [...(grouped.get(categoryOf(line)) ?? []), line]);
+  const configOf = (line: (typeof lines)[number]) => {
+    const attrs = line.attrs ?? {};
+    const facts = lineConfigBits(attrs);
+    // The register is an operational identification surface, not a raw attrs
+    // inspector. Keep only governed, human-readable product facts here; sofa
+    // builder coordinates/keys and pricing metadata remain with their owners.
+    const operationalFacts: Record<string, string> = {
+      size: "Size",
+      firmness: "Firmness",
+      colour: "Colour",
+      fabric_code: "Fabric code",
+      seat_height: "Seat height",
+      sofa_height: "Sofa height",
+      configuration: "Configuration",
+      sofa_configuration: "Sofa configuration",
+    };
+    for (const [key, label] of Object.entries(operationalFacts)) {
+      const value = attrs[key];
+      if (value == null || value === "" || typeof value === "object") continue;
+      facts.push(`${label}: ${String(value)}`);
+    }
+    return facts;
+  };
+  const factsByLine = new Map((expansion.data?.lines ?? []).map((l) => [l.lineId, l]));
+  /* The goods lines, then the services — the same order the document prints. */
+  const miniLines: GoodsMiniLine[] = [
+    ...lines.map((line, index): GoodsMiniLine => {
+      const fact = factsByLine.get(line.id ?? "");
+      const detail = configOf(line);
+      return {
+        key: line.id ?? `${line.sku}-${index}`,
+        testId: `expanded-good-${line.sku}`,
+        category: categoryOf(line),
+        unitIds: fact?.unitIds ?? [],
+        unitAbsence: "Not allocated",
+        /* A single destination prints its name alone; only a SPLIT earns the
+           quantity, because `×1` on a one-route line is noise. */
+        deliverTo: (fact?.deliverTo ?? []).map((d) =>
+          (fact?.deliverTo.length ?? 0) > 1 ? `${d.name} ×${d.qty}` : d.name,
+        ),
+        deliverToAbsence: expansion.isLoading ? "Loading…" : "Not recorded",
+        sku: line.sku,
+        qty: line.qty,
+        item: lineName(line),
+        ...(detail.length ? { itemDetail: detail.join(" · ") } : {}),
+        selectable: true,
+      };
+    }),
+    /* A Service buys nothing from a factory and allocates no Unit — the
+       dash is the shipped ruling here, not an invented `Not applicable`. */
+    ...addons.map((addon, index): GoodsMiniLine => ({
+      key: `addon-${index}`,
+      category: "Service",
+      unitIds: [],
+      unitAbsence: "—",
+      deliverTo: [],
+      deliverToAbsence: "—",
+      sku: addon.addon_key ?? "",
+      qty: addon.qty,
+      item: addon.addon_key?.replace(/[_-]+/g, " ") ?? "Add-on",
+      selectable: false,
+    })),
+  ];
   return (
-    <div className="ml-10 space-y-2 py-2 pr-6 text-body" data-testid="row-expansion">
-      {[...grouped.entries()].map(([category, categoryLines]) => (
-        <section key={category}>
-          <h3 className="text-label font-semibold text-base-500">{category}</h3>
-          {categoryLines.map((line, index) => (
-            <div key={`${line.sku}-${index}`} className="grid grid-cols-[150px_minmax(240px,1fr)_60px] gap-3 py-0.5">
-              <span className="font-mono text-meta">{line.sku}</span>
-              <span>{lineName(line)}{configOf(line) ? ` · ${configOf(line)}` : ""}</span>
-              <span className="text-right tabular-nums">Qty {line.qty}</span>
-            </div>
-          ))}
-        </section>
-      ))}
-      {addons.length > 0 ? (
-        <section>
-          <h3 className="text-label font-semibold text-base-500">ACCESSORY</h3>
-          {addons.map((addon, index) => (
-            <div key={index} className="grid grid-cols-[150px_minmax(240px,1fr)_60px] gap-3 py-0.5">
-              <span className="font-mono text-meta">{addon.addon_key ?? "Add-on"}</span>
-              <span>{addon.addon_key?.replace(/[_-]+/g, " ") ?? "Add-on"}</span>
-              <span className="text-right tabular-nums">Qty {addon.qty}</span>
-            </div>
-          ))}
-        </section>
-      ) : null}
+    <div data-testid="row-expansion">
+      <GoodsMiniTable label={`Goods on SO-${row.o.so}`} lines={miniLines} />
     </div>
   );
 }
@@ -300,6 +420,33 @@ function ExpandedLines({ row }: { row: RegisterRow }) {
  * server-side (`/sales-order-data`, RLS-scoped); the browser renders and
  * opens the blob. READ-ONLY: nothing is written anywhere.
  */
+/**
+ * The batch behind `Print N sales orders` — the 2990 shape, in Carres terms:
+ * the operator ticks rows and gets the REAL documents, not a picture of the
+ * list. Each order's data is assembled server-side under RLS exactly as the
+ * single-order print does, so a row the user may not read cannot enter the
+ * file; the browser then renders one PDF carrying one governed page per order.
+ * READ-ONLY.
+ */
+async function printSalesOrders(rows: Array<{ id: string; so: number }>): Promise<void> {
+  if (rows.length === 0) return;
+  try {
+    const bundles: SalesOrderTemplateData[] = [];
+    for (const r of rows) {
+      bundles.push(
+        await apiFetch<SalesOrderTemplateData>(`/api/orders/${r.id}/sales-order-data`),
+      );
+    }
+    const blob = await renderCombinedSalesOrderPdf(bundles);
+    const url = URL.createObjectURL(blob);
+    window.open(url, "_blank");
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  } catch (error) {
+    const message = error instanceof ApiError ? error.message : String(error);
+    toast.error(`Printing ${rows.length} sales orders failed: ${message}`);
+  }
+}
+
 async function openSalesOrderPdf(orderId: string, so: number): Promise<void> {
   try {
     const data = await apiFetch<SalesOrderTemplateData>(
@@ -370,8 +517,11 @@ export default function SalesOrdersRegister() {
     () => REGISTER_FIELDS.map((f) => toGridColumn(f, role, navigate)),
     [navigate, role],
   );
-  /* v2 intentionally resets the superseded nine-column Stage A layout. */
-  const storageKey = `carres.salesOrders.register.v2.${role ?? "anon"}`;
+  /* The version resets a SUPERSEDED default. v2 dropped Stage A's nine
+     columns; v3 is the owner's eight (2026-08-15) — without the bump a
+     returning browser would replay its saved seven-column order and the
+     re-ruled default would never paint on the one machine that matters. */
+  const storageKey = `carres.salesOrders.register.v3.${role ?? "anon"}`;
 
   /* ── SELECTION — the REGISTER LAW's clause: ticks feed Export and nothing
      else. Header checkbox = select all visible / clear (the engine says which). */
@@ -388,12 +538,12 @@ export default function SalesOrdersRegister() {
   }, []);
 
   /* ROW OPENS A FULL PAGE (closed ruling — the panel is superseded).
-     Double-click and the menu's Open both land on the workspace VIEW route;
-     Edit lands on the same route with `?edit=1`, which Stage 1's workspace
-     reads as nothing (read-only stage) and Stage 2 wires to the form. */
+     ⛔ `?edit=1` IS RETIRED — owner ruling 2026-08-15. The object page has one
+     state with its fields already editable, so there is no second URL to send
+     the operator to: View and Edit are the same destination, and the menu keeps
+     both words only because 2990's operators reach for both. */
   const openWorkspace = useCallback(
-    (r: RegisterRow, edit?: boolean) =>
-      navigate(`/operation/orders/so/${r.id}${edit ? "?edit=1" : ""}`),
+    (r: RegisterRow) => navigate(`/operation/orders/so/${r.id}`),
     [navigate],
   );
   const onRowDoubleClick = useCallback((r: RegisterRow) => openWorkspace(r), [openWorkspace]);
@@ -403,7 +553,7 @@ export default function SalesOrdersRegister() {
   const contextMenu = useCallback(
     (r: RegisterRow): DataGridContextMenuItem[] => [
       { label: "View", onClick: () => openWorkspace(r) },
-      { label: "Edit", onClick: () => openWorkspace(r, true) },
+      { label: "Edit", onClick: () => openWorkspace(r) },
       { label: "Preview PDF", onClick: () => void openSalesOrderPdf(r.id, r.so) },
       { label: "Print PDF", onClick: () => void openSalesOrderPdf(r.id, r.so) },
       {
@@ -446,7 +596,8 @@ export default function SalesOrdersRegister() {
         />
       )}
 
-      <div className="flex min-h-0 flex-1 flex-col p-3 pt-4" data-testid="register-column">
+      {/* 8px outer frame gap — REGISTER STATUS FOOTER law, docs/ui/MASTER.md. */}
+      <div className="flex min-h-0 flex-1 flex-col p-2" data-testid="register-column">
         {isError ? (
           <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 bg-white">
             <p className="text-body text-base-700">The register could not be loaded</p>
@@ -469,14 +620,25 @@ export default function SalesOrdersRegister() {
             storageKey={storageKey}
             rowKey={(r) => r.id}
             exportName="Sales Orders"
-            searchPlaceholder="SO number, customer, phone or item…"
+            /* The search box is a governed 200px at EVERY width (REGISTER LAW
+               2), so the old four-item placeholder clipped to `SO number,
+               custome…` on a narrow window and on a wide one alike — it was
+               never a breakpoint problem. A placeholder that fits is the fix;
+               the search itself still matches SO number, customer, phone and
+               item, and the ▽ per-column filters say so column by column. */
+            searchPlaceholder="Search sales orders…"
             isLoading={isLoading}
             emptyMessage={rows.length === 0 ? "No orders yet" : "No matching sales orders."}
             groupBanner={false}
+            /* Optional columns may widen the sheet (MASTER §0.1), so the row's
+               identity pins: ☐ · ▸ · SO No stay against the left edge while
+               the rest scrolls under them. An engine capability, never a
+               page-local hack (`docs/ui/MASTER.md` §4). */
+            stickyIdentity
             chooserGroupOrder={[
               "Document",
               "Customer",
-              "Source",
+              "Sales ownership",
               "Items",
               "Money",
               "Dates",
@@ -493,22 +655,112 @@ export default function SalesOrdersRegister() {
               onToggleAll: toggleAll,
             }}
             outputActions={[{ label: "Print", onClick: () => window.print() }]}
-            toolbarEnd={
-              /* STAGE 2 — the office birth door. Everyone who can open this
-                 page (operation / principal) may use it; normal orders are
-                 still born in the Sales Portal. */
+            selectionActions={[
+              {
+                label: (n) => `Print ${n} sales order${n === 1 ? "" : "s"}`,
+                onClick: (picked) => {
+                  void printSalesOrders(picked as unknown as RegisterRow[]);
+                },
+              },
+            ]}
+            toolbarStart={
               <button
                 type="button"
                 data-testid="new-sales-order"
                 onClick={() => navigate("/operation/orders/so/new")}
-                className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-control bg-base-900 px-3 text-meta font-semibold text-white hover:bg-base-700"
+                className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-full bg-kit-blue-9 px-3 text-meta font-semibold text-white hover:opacity-90"
               >
                 <Plus size={14} strokeWidth={2.25} /> New Sales Order
               </button>
             }
+            statusSummary={(filtered, selectedRows) => (
+              <RegisterResultSummary
+                filtered={filtered}
+                selected={selectedRows}
+                total={rows.length}
+              />
+            )}
           />
         )}
       </div>
     </div>
   );
+}
+
+/**
+ * ⭐ THE FOOTER SPEAKS THE DICTIONARY, AND IT COUNTS EVERYTHING IT SEES.
+ *
+ * Owner ruling 2026-08-15: no unruled abbreviation may print here. The old
+ * shape had TWO defects and only one of them was the abbreviation:
+ *
+ * · `accShort`'s fallback capitalises the SKU's first word, so a line nothing
+ *   recognised could print a supplier's code — `M.P`, `Leg`, `Mp001`. The
+ *   words below are the ONLY ones that reach the screen, so an unruled string
+ *   is now impossible by construction rather than by luck.
+ * · the previous ORDER array was ALSO the filter, so any label outside it was
+ *   silently DROPPED — a `Disposal` line and every unrecognised accessory
+ *   vanished from a tally that claims to describe the filtered result. A
+ *   footer that under-counts is worse than one that abbreviates: it is a
+ *   number the operator trusts and cannot reproduce.
+ *
+ * Anything not positively recognised is `Other goods` — governed, honest, and
+ * still counted.
+ */
+const FOOTER_WORDS = [
+  "Mattress",
+  "Bedframe",
+  "Sofa",
+  "Pillow",
+  "Mattress protector",
+  "Topper",
+  "Footrest",
+  "Service",
+  "Other goods",
+] as const;
+
+function footerWord(sku: string): (typeof FOOTER_WORDS)[number] {
+  if (lineKind(sku) === "service") return "Service";
+  const cls = lineClass(sku);
+  if (cls === "mattress") return "Mattress";
+  if (cls === "bedframe") return "Bedframe";
+  if (cls === "sofa") return "Sofa";
+  const short = accShort(sku);
+  return (FOOTER_WORDS as readonly string[]).includes(short)
+    ? (short as (typeof FOOTER_WORDS)[number])
+    : "Other goods";
+}
+
+function RegisterResultSummary({
+  filtered,
+  selected,
+  total,
+}: {
+  filtered: RegisterRow[];
+  selected: RegisterRow[];
+  total: number;
+}) {
+  const scope = selected.length > 0 ? selected : filtered;
+  const counts = new Map<string, number>();
+  for (const row of scope) {
+    for (const line of row.o.order_lines ?? []) {
+      counts.set(footerWord(line.sku), (counts.get(footerWord(line.sku)) ?? 0) + Number(line.qty || 0));
+    }
+    for (const addon of row.o.order_addons ?? []) {
+      counts.set("Service", (counts.get("Service") ?? 0) + Number(addon.qty || 0));
+    }
+  }
+  const orderWord = scope.length === 1 ? "order" : "orders";
+  const countWord = selected.length > 0
+    ? `${selected.length} selected ${orderWord}`
+    : filtered.length === total
+      ? `${filtered.length} ${orderWord}`
+      : `${filtered.length} of ${total} orders`;
+  const parts = FOOTER_WORDS.filter((label) => (counts.get(label) ?? 0) > 0).map(
+    (label) => `${label} ${counts.get(label)}`,
+  );
+  /* One unwrapped line by law (REGISTER STATUS FOOTER), so a long tally on a
+     narrow window truncates instead of pushing a second row into the frame —
+     and the full sentence rides the title. */
+  const line = [countWord, ...parts].join(" · ");
+  return <span className="block truncate" title={line}>{line}</span>;
 }

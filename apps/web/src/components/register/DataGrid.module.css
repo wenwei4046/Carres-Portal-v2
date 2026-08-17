@@ -69,11 +69,27 @@
   flex: none;
 }
 
-/* Sales Orders Reference Implementation · Stage A. Geometry only: the
-   engine and every capability remain shared. This opt-in keeps the serious
-   register baseline off frozen callers and does not create a global 32px law. */
+/* Sales Orders Reference Implementation. Geometry only: the engine and every
+   capability remain shared. REGISTER TABLE DENSITY LAW + REGISTER STATUS
+   FOOTER (docs/ui/MASTER.md) own these numbers — rendered 36px header on
+   text-label (11/14), 38px single-line parent row on text-body (13/18), 32px
+   fixed status footer. The earlier 31/33/22px high-density copy came from
+   2990's AutoCount-style ledger grid, not from 2990's readable listing
+   geometry, and no longer authors this destination.
+
+   The opt-in stays because it names an intent, not because it is shielding
+   other pages. MEASURED 2026-08-14: this stylesheet reaches exactly one screen
+   — DataGrid.module.css is imported only by components/register/DataGrid.tsx,
+   which is imported only by pages/operation/SalesOrdersRegister.tsx. The
+   frozen Purchasing pages (To Order, Purchase Orders, Receiving, Supplier
+   Claim) render components/data-grid/DataGrid.tsx, a different component on
+   Tailwind classes at 40px rows, and never load this file at all. So `.root`
+   is not a shared base with those pages; do not plan a change around that
+   belief without re-measuring the import graph.
+
+   No px font-size literal lives in this scope: the sizes are the `.root`
+   token aliases, never a token redefined to a different value. */
 .rootReference {
-  --fs-12: 11px;
   border: 1px solid var(--line);
 }
 .rootReference .toolbar {
@@ -86,23 +102,31 @@
 }
 .rootReference .th {
   box-sizing: border-box;
-  height: 31px;
+  height: 36px;
   padding: 0 8px;
-  font-size: 10px;
+  font-size: var(--fs-11);
+  line-height: 14px;
   font-weight: 700;
 }
 .rootReference .td {
   box-sizing: border-box;
-  height: 33px;
+  height: 38px;
   padding: 0 8px;
-  font-size: 11px;
-  line-height: 16px;
+  font-size: var(--fs-13);
+  line-height: 18px;
 }
+/* Always present, fixed to the table frame, never scrolls with the rows and
+   never gives its height back when space is tight — hence flex: none. The
+   summary is one unwrapped line, so the footer costs 32px and not a row. */
 .rootReference .statusLine {
   box-sizing: border-box;
-  height: 22px;
-  min-height: 22px;
+  flex: none;
+  height: 32px;
+  min-height: 32px;
   padding: 0 12px;
+  letter-spacing: 0;
+  text-transform: none;
+  white-space: nowrap;
 }
 
 /* ── Toolbar ─────────────────────────────────────────────────────── */
@@ -179,12 +203,12 @@
   cursor: not-allowed;
 }
 .toolbarPillOn {
-  background: var(--c-ink);
-  color: var(--c-paper);
-  border-color: var(--c-ink);
+  background: var(--c-cream);
+  color: var(--c-ink);
+  border-color: var(--fg-soft);
 }
 .toolbarPillOn:hover {
-  background: var(--c-ink);
+  background: var(--c-cream);
 }
 .toolbarPillBadge {
   display: inline-flex;
@@ -203,8 +227,8 @@
   font-variant-numeric: tabular-nums;
 }
 .toolbarPillOn .toolbarPillBadge {
-  background: rgba(255, 255, 255, 0.25);
-  color: var(--c-paper);
+  background: var(--line);
+  color: var(--c-ink);
 }
 .columnsMenuBackdrop {
   position: fixed;
@@ -364,7 +388,7 @@ div:first-child > .columnsMenuGroup {
   gap: var(--space-2);
   padding: 4px var(--space-3);
   border-bottom: 1px solid var(--line);
-  background: rgba(196, 77, 43, 0.06);
+  background: var(--kit-blue-3, #e8f3ff);
 }
 .selectionCount {
   font-family: var(--font-button);
@@ -548,7 +572,7 @@ div:first-child > .columnsMenuGroup {
   background: var(--c-cream);
 }
 .trSelected {
-  background: rgba(196, 77, 43, 0.1) !important;
+  background: var(--kit-blue-3, #e8f3ff) !important;
   font-weight: 600;
 }
 .tr:last-child {
@@ -577,6 +601,40 @@ div:first-child > .columnsMenuGroup {
 }
 .tdMuted {
   color: var(--fg-muted);
+}
+
+/* ── STICKY IDENTITY (owner ruling 2026-08-15) ─────────────────────────────
+   When optional columns widen the sheet, the control gutter and the FIRST
+   data column stay against the left edge and the rest slides under them. A
+   row that scrolls sideways must never stop saying WHICH record it is.
+
+   Two things make it work and both are easy to get wrong:
+   · a sticky cell needs its OWN opaque fill, or the scrolled columns show
+     through it — so hover and selection are repainted here as well, or the
+     pinned block would be the one part of the row that never highlights;
+   · `.thead` is already sticky at z-index 2, so the pinned HEADER cells must
+     outrank it (3) while the pinned BODY cells sit below it (1) — otherwise
+     the corner cell either scrolls away vertically or covers the header. */
+.stickyCell {
+  position: sticky;
+  z-index: 1;
+  background: var(--c-paper);
+}
+.thead .stickyCell {
+  z-index: 3;
+  background: var(--c-cream);
+}
+.tr:hover .stickyCell {
+  background: var(--c-cream);
+}
+.trSelected .stickyCell {
+  background: var(--kit-blue-3, #e8f3ff);
+}
+/* The block's right edge, drawn as a shadow rather than a border so it does
+   not change any column's box and cannot shave a control (§5.1's rule about
+   the control gutter). */
+.stickyEdge {
+  box-shadow: 1px 0 0 0 var(--line);
 }
 .tdNumeric {
   font-variant-numeric: tabular-nums;
@@ -733,4 +791,36 @@ div:first-child > .columnsMenuGroup {
   text-transform: uppercase;
   color: var(--fg-muted);
   min-height: 22px;
+}
+
+/* §6.7 Register shell (owner ruling 2026-08-15) — the Work Toolbar's right side.
+   Search rests as an icon and expands leftward; Columns is icon-only. Both keep
+   the toolbar's own 6px control shape so they read as one family. */
+.toolbarIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  box-sizing: border-box;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--c-paper);
+  color: var(--fg-muted);
+  cursor: pointer;
+  padding: 0;
+}
+.toolbarIcon:hover { background: var(--c-cream); color: var(--c-ink); }
+.toolbarPillIconOnly {
+  width: 28px;
+  padding: 0;
+  justify-content: center;
+}
+
+/* Export at rest on the reference Register: icon + caret, no word. The caret
+   stays because a control that opens a menu must say so. */
+.toolbarPillIconCaret {
+  padding: 0 4px;
+  gap: 1px;
+  justify-content: center;
 }

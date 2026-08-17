@@ -37,6 +37,37 @@ export function maxLeadDaysFor(
   return gated ? Math.max(0, Math.trunc(earliestSellDays)) : 0;
 }
 
+/**
+ * THE CATEGORIES THAT ARE SOLD ON TOP OF SOMETHING ELSE, NEVER ON THEIR OWN.
+ *
+ * `docs/guarantee/MASTER.md` already says it for one of them — *"a guarantee
+ * only sells attached to the item it covers"*. The owner ruling of 2026-08-15
+ * generalises it to the whole cart: **a Sales Order must contain goods.** A
+ * service with no product on the same order is not a sale, it is a Service
+ * Case, and it belongs to the Service channel.
+ */
+export const ATTACHED_ONLY_CATEGORIES = ["service", "guarantee"] as const;
+
+/**
+ * True when the cart's resolved `product_models.category` values contain at
+ * least one goods line.
+ *
+ * **An unrecognised category counts as GOODS.** Only a line we can POSITIVELY
+ * identify as service or guarantee may be refused, so a legacy, imported or
+ * not-yet-catalogued SKU never blocks a real sale — the same positive-
+ * recognition rule `line-category.ts` applies to accessories.
+ *
+ * An EMPTY cart is not the goods gate's business (the schema's `min(1)` owns
+ * it) and reports `false` here only so a caller cannot read "no lines" as
+ * "goods present".
+ */
+export function cartHasGoods(
+  categories: readonly (string | null | undefined)[],
+): boolean {
+  const attached = ATTACHED_ONLY_CATEGORIES as readonly string[];
+  return categories.some((c) => !c || !attached.includes(c));
+}
+
 /** Formats `today + n days` as an ISO yyyy-mm-dd string. Used by the wizard
  *  Step 3 date picker's `min` attribute + the validity checks in draft.ts. */
 export function minDeliveryDateISO(leadDays: number, today: Date = new Date()): string {

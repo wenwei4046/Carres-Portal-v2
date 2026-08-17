@@ -28,38 +28,16 @@
  * recompute.
  */
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Lock } from "lucide-react";
-import {
-  deliveryQueueLeads,
-  groupWorkItemsByDay,
-  isOpsManager,
-  myHolidaySet,
-  orderActionLine,
-  workItemsForOrder,
-  type OpsStaffMember,
-  type WorkItem,
-} from "@carres/shared";
+import { groupWorkItemsByDay, isOpsManager } from "@carres/shared";
 import { cjkClassName } from "@/lib/cjk";
+import { fmtDate } from "@/lib/fmt-date";
 import { personLabel } from "@/lib/staff-avatar";
 import ListPageShell from "@/components/ListPageShell";
-import {
-  useDeliveryPartners,
-  useOperationOrders,
-  useOperationStaff,
-  useOperationStock,
-  usePurchasingSettings,
-} from "@/lib/queries";
+import { useOperationStaff } from "@/lib/queries";
 import { useAuth } from "@/lib/auth";
-import {
-  logisticStateOf,
-  moneyOf,
-  openActionsOf,
-  ovlOf,
-  ownerOf,
-  stockReadiness,
-  todayIso,
-} from "./OperationOrdersControl";
+import { ownerWorkloads, useOpenWorkSet } from "./use-open-work";
 
 type ViewKey = "mine" | "team";
 
@@ -71,116 +49,40 @@ const TONE_DOT: Record<string, string> = {
   neutral: "bg-base-300",
 };
 
-interface WorkRow extends WorkItem {
-  /** The party-named row line — the SAME words the Orders list prints. */
-  line: string;
-  customer: string | null;
-  ownerId: string | null;
-}
-
 export default function OperationWork() {
   const navigate = useNavigate();
-  const ordersQ = useOperationOrders();
+  const [params] = useSearchParams();
   const staffQ = useOperationStaff();
-  const stockQ = useOperationStock();
-  const partnersQ = useDeliveryPartners();
-  const settingsQ = usePurchasingSettings();
 
   const authRole = useAuth((s) => s.role);
   const authEmail = useAuth((s) => s.user?.email ?? null);
   const myDuties = staffQ.data?.myDuties;
   const isManager = isOpsManager(authRole, authEmail, myDuties);
 
-  // §2.2 OWNER SCOPE — a starting view, never a wall. Initialised once from
-  // the role; the operator may switch at any time.
-  const [view, setView] = useState<ViewKey | null>(null);
+  /** The ONE open work set — every order, through the one signal mapping,
+   *  composed by Card 9. Completed orders contribute only what their engines
+   *  still hold open (the photo, the money that survives delivery). Shared
+   *  with the Quick Rail's Team panel so the two cannot disagree. */
+  const { items: allItems, staff, loading } = useOpenWorkSet();
+
+  // The rail deep-links into a person's work: `?tab=work&scope=team&owner=…`.
+  // A link is a STARTING view exactly as the role default is — the operator
+  // may switch the moment they land, so the URL seeds state and never owns it.
+  const linkedScope = params.get("scope");
+  const linkedOwner = params.get("owner");
+  const [view, setView] = useState<ViewKey | null>(
+    linkedScope === "team" ? "team" : linkedScope === "mine" ? "mine" : null,
+  );
   const activeView: ViewKey = view ?? (isManager ? "team" : "mine");
-  const [ownerFilter, setOwnerFilter] = useState<Set<string>>(new Set());
+  const [ownerFilter, setOwnerFilter] = useState<Set<string>>(
+    linkedOwner ? new Set([linkedOwner]) : new Set(),
+  );
 
-  const orders = useMemo(() => ordersQ.data?.orders ?? [], [ordersQ.data]);
-  const staff = useMemo(() => staffQ.data?.staff ?? [], [staffQ.data]);
-  const partners = useMemo(() => partnersQ.data?.partners ?? [], [partnersQ.data]);
-
-  const staffById = useMemo(() => {
-    const m = new Map<string, OpsStaffMember>();
-    for (const s of staff) m.set(s.user_id, s);
-    return m;
-  }, [staff]);
   const myUserId = useMemo(() => {
     if (!authEmail) return null;
     const me = staff.find((s) => s.email.toLowerCase() === authEmail.toLowerCase());
     return me?.user_id ?? null;
   }, [staff, authEmail]);
-
-  const partnerNameById = useMemo(() => {
-    const m = new Map<string, string>();
-    for (const p of partners) m.set(p.id, p.name);
-    return m;
-  }, [partners]);
-
-  const availableBySku = useMemo(() => {
-    const rows = stockQ.data?.skus ?? [];
-    if (rows.length === 0) return undefined;
-    const m = new Map<string, number>();
-    for (const s of rows) m.set(s.sku, s.available);
-    return m;
-  }, [stockQ.data]);
-
-  const holidayOpts = useMemo(() => ({ holidays: myHolidaySet() }), []);
-  const queueLeads = useMemo(
-    () => (settingsQ.data ? deliveryQueueLeads(settingsQ.data) : undefined),
-    [settingsQ.data],
-  );
-  const today = todayIso();
-
-  /** The ONE open work set — every order, through the one signal mapping,
-   *  composed by Card 9. Completed orders contribute only what their engines
-   *  still hold open (the photo, the money that survives delivery). */
-  const allItems = useMemo(() => {
-    const out: WorkRow[] = [];
-    for (const o of orders) {
-      const lines = (o.order_lines ?? []).map((l) => ({ sku: l.sku, qty: l.qty }));
-      const open = openActionsOf(o, stockReadiness(o, availableBySku), lines);
-      if (open.length === 0) continue;
-      const ovl = ovlOf(o);
-      const ownerId = ownerOf(o);
-      const ownerMember = ownerId ? staffById.get(ownerId) : undefined;
-      const items = workItemsForOrder(
-        open,
-        {
-          orderId: o.id,
-          so: o.so,
-          picName: ownerMember ? personLabel(ownerMember.name, ownerMember.email) : null,
-          promisedDateIso: o.delivery_date_tbd ? null : o.delivery_date ?? null,
-          confirmedDateIso: ovl?.confirmed_date ?? null,
-          deliveredAtIso: o.delivered_at ?? null,
-          delayDetectedAtIso: ovl?.delay_detected_at ?? null,
-          delayDecisionAtIso: ovl?.delay_decision_at ?? null,
-        },
-        today,
-        holidayOpts,
-        queueLeads,
-      );
-      const state = logisticStateOf(o, partnerNameById);
-      const money = moneyOf(o);
-      for (const it of items) {
-        out.push({
-          ...it,
-          line: orderActionLine(it.ruleKey as Parameters<typeof orderActionLine>[0], {
-            logistics: state.partner,
-            customer: o.customer_name,
-            amount: money.known ? money.outstanding : null,
-          }),
-          customer: o.customer_name ?? null,
-          ownerId,
-        });
-      }
-    }
-    return out;
-  }, [
-    orders, availableBySku, staffById, partnerNameById,
-    holidayOpts, queueLeads, today,
-  ]);
 
   /** My Work / Team Work — two filters, one set. */
   const visible = useMemo(() => {
@@ -193,22 +95,14 @@ export default function OperationWork() {
 
   const groups = useMemo(() => groupWorkItemsByDay(visible), [visible]);
 
-  /** Owner chips (Team view) — counts of open items per person, from the SAME
-   *  set. Visibility, never a ranking. */
-  const ownerCounts = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const i of allItems) {
-      if (i.ownerId) m.set(i.ownerId, (m.get(i.ownerId) ?? 0) + 1);
-    }
-    return [...m.entries()]
-      .map(([id, n]) => ({ id, n, member: staffById.get(id) }))
-      .filter((x) => x.member)
-      .sort((a, b) =>
-        personLabel(a.member!.name, a.member!.email).localeCompare(
-          personLabel(b.member!.name, b.member!.email),
-        ),
-      );
-  }, [allItems, staffById]);
+  /** Owner chips (Team view) — each person's `open · overdue` from the SAME
+   *  set the rail's Team panel previews. Visibility, never a ranking.
+   *  `ui/MASTER.md` §5 (2026-08-14) locks the group summary as
+   *  `open · overdue`; the chip prints exactly that pair. */
+  const ownerCounts = useMemo(
+    () => ownerWorkloads(allItems, staff).filter((w) => w.open > 0),
+    [allItems, staff],
+  );
 
   const toggleOwner = (id: string) =>
     setOwnerFilter((prev) => {
@@ -218,15 +112,16 @@ export default function OperationWork() {
       return n;
     });
 
-  const loading = ordersQ.isLoading || staffQ.isLoading;
-
   return (
     <ListPageShell
       title="Work"
       testId="operation-work"
       titleRight={
+        // `open · overdue` — the ONE tally spelling (ui/MASTER.md §5, locked
+        // 2026-08-14). It read `late` here while the rail read `overdue`, and
+        // one number with two words is how two screens come to disagree.
         <span className="text-label text-base-400">
-          {visible.length} open · {visible.filter((i) => i.workingDaysLate > 0).length} late
+          {visible.length} open · {visible.filter((i) => i.workingDaysLate > 0).length} overdue
         </span>
       }
       toolbar={
@@ -256,20 +151,21 @@ export default function OperationWork() {
           </div>
           {activeView === "team" && (
             <div className="flex items-center gap-1.5 flex-wrap">
-              {ownerCounts.map(({ id, n, member }) => (
+              {ownerCounts.map(({ userId, open, overdue, member }) => (
                 <button
-                  key={id}
+                  key={userId}
                   type="button"
-                  data-testid={`work-owner-${id}`}
-                  onClick={() => toggleOwner(id)}
+                  data-testid={`work-owner-${userId}`}
+                  onClick={() => toggleOwner(userId)}
                   className={`px-2 py-1 rounded-full text-label border ${
-                    ownerFilter.has(id)
+                    ownerFilter.has(userId)
                       ? "border-base-900 bg-base-900 text-white"
                       : "border-base-200 bg-white text-base-600 hover:bg-base-50"
                   }`}
-                  title={member!.email}
+                  title={member.email}
                 >
-                  {personLabel(member!.name, member!.email)} · {n}
+                  {personLabel(member.name, member.email)} · {open} open
+                  {overdue > 0 ? ` · ${overdue} overdue` : ""}
                 </button>
               ))}
             </div>
@@ -290,10 +186,12 @@ export default function OperationWork() {
           groups.map((g) => (
             <section key={g.dayIso ?? "none"} className="mb-5" data-testid={`work-day-${g.dayIso ?? "none"}`}>
               <h2 className="text-label font-semibold text-base-500 uppercase tracking-wide mb-1.5">
-                {g.label}
+                {/* The engine hands a DAY; the screen spells it, through the
+                    one formatter (THE YEAR RULE, owner ruling 2026-08-15). */}
+                {g.dayIso ? fmtDate(g.dayIso) : "No date"}
                 <span className="ml-2 font-normal normal-case text-base-400">
                   {g.items.length}
-                  {g.late > 0 && <span className="text-danger"> · {g.late} late</span>}
+                  {g.late > 0 && <span className="text-danger"> · {g.late} overdue</span>}
                 </span>
               </h2>
               <div className="border border-base-200 rounded-md divide-y divide-base-100 bg-white">

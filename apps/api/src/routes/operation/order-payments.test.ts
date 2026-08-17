@@ -212,7 +212,7 @@ describe("POST /:id/payments", () => {
       new Request(`http://t/api/operation/orders/${ORDER_ID}/payments`, {
         method: "POST",
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ amount: 1500, paidOn: "2026-06-26", method: "bank", kind: "deposit" }),
+        body: JSON.stringify({ amount: 1500, paidOn: "2026-06-26", method: "bank", kind: "deposit", idempotencyKey: "00000000-0000-4000-8000-000000000052" }),
       }),
       env,
     );
@@ -230,6 +230,7 @@ describe("POST /:id/payments", () => {
       p_method: "bank",
       p_kind: "deposit",
       p_counts_toward_paid: true,
+      p_idempotency_key: "00000000-0000-4000-8000-000000000052",
     });
     // The receipt is the LOCKED document scheme: RC-DDMMYY-NNNN, seeded on
     // {orderId}:{seq} (seq = 3 here) — deterministic, so a reprint matches.

@@ -30,6 +30,7 @@ import {
   UserCheck,
   History,
   ListTodo,
+  CircleAlert,
   type LucideIcon,
 } from "lucide-react";
 import type { Role } from "@carres/shared/domain";
@@ -140,6 +141,7 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       // worked out*. The page writes nothing; a row opens the owning module's
       // workspace.
       { key: "work", label: "Work", icon: ListTodo, section: "Workspace" },
+      { key: "issue-tracker", label: "Issue Tracker", icon: CircleAlert, path: "/operation/issues", section: "Workspace" },
       // ⭐ THE TEMPORARY DOOR (SALES-ORDER-CUTOVER, owner 2026-08-10).
       //
       // The old Orders control table is NOT deleted and NOT hidden — it keeps

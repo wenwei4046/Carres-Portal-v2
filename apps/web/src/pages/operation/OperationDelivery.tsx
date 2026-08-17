@@ -5,7 +5,6 @@ import {
   carrierDayLoads,
   carrierDayNote,
   daysInRange,
-  dayWord,
   deliveryDueState,
   deliveryGroupLabel,
   deliveryRange,
@@ -39,6 +38,7 @@ import {
 } from "@/lib/queries";
 import { orderBookingDay, orderControlOf } from "@/lib/order-booking";
 import { fmtDate } from "@/lib/fmt-date";
+import { displayCustomerName } from "@/lib/customer-name";
 import { cjkClassName } from "@/lib/cjk";
 import { locationForAddress } from "@/lib/region";
 import ListPageShell, { type ActiveChip } from "@/components/ListPageShell";
@@ -296,7 +296,7 @@ export default function OperationDelivery() {
         // one already state `confirmed 27 Jul · 12pm–3pm`.
         line: orderActionLine(next.key, {
           logistics: state.partner,
-          customer: o.customer_name,
+          customer: displayCustomerName(o.customer_name),
           // C11 — the RAW number; the words module prints it to the cent.
           amount: money.known ? money.outstanding : null,
         }),
@@ -724,7 +724,7 @@ function QueueRow({
         </span>
       </div>
       <div className={`mt-0.5 text-body text-base-700 truncate ${cjkClassName(o.customer_name)}`}>
-        {o.customer_name || "—"}
+        {displayCustomerName(o.customer_name) || "—"}
       </div>
       <div className="mt-0.5 flex items-center gap-1.5 text-meta text-base-500">
         <span className="truncate">{row.logisticsName?.trim() || NO_LOGISTICS_LABEL}</span>
@@ -804,7 +804,7 @@ function CalendarPane({
       arr.push({
         orderId: o.id,
         so: o.so,
-        customer: o.customer_name,
+        customer: displayCustomerName(o.customer_name),
         partnerId: p.id,
         partnerName: p.name,
         kind: booking.kind,
@@ -852,13 +852,24 @@ function CalendarPane({
               key={key}
               type="button"
               onClick={() => onRange(key)}
+              /* A SPAN still needs its hover — `This week` names no date.
+                 A single-day chip does NOT: THE YEAR RULE (owner ruling
+                 2026-08-15) put the full ruled date on the chip face, so a
+                 hover could only ever repeat it or, worse, say less. */
+              title={
+                r.fromIso === r.toIso
+                  ? undefined
+                  : `${fmtDate(r.fromIso)} – ${fmtDate(r.toIso)}`
+              }
               className={`flex-1 flex items-center justify-center gap-1 rounded-lg px-2 py-1 text-meta font-semibold transition-colors ${
                 range === key
                   ? "bg-base-900 text-white"
                   : "bg-white text-base-500 border border-base-200 hover:bg-hovertint"
               }`}
             >
-              <span>{r.label}</span>
+              <span className="truncate">
+                {key === "week" ? "This week" : fmtDate(r.fromIso)}
+              </span>
               {n > 0 && <span className="tabular-nums">{n}</span>}
             </button>
           );
@@ -877,12 +888,14 @@ function CalendarPane({
           // On a multi-day range an empty day is noise; on ONE day it is the
           // answer, and must still be said out loud.
           if (days.length > 1 && dayEmpty(day)) return null;
-          const word = dayWord(day, today);
           const loads = carrierDayLoads(deliveries, day, rulesByPartner);
           return (
             <div key={day} data-testid={`delivery-day-${day}`}>
+              {/* NO RELATIVE DATE WORDS (owner ruling 2026-08-15, and already
+                  the delivery execution words of 2026-08-14): a schedule group
+                  names its actual weekday + date. */}
               <div className="text-label uppercase tracking-[0.05em] text-base-500 mb-2">
-                {word ? `${word} · ${fmtDate(day)}` : fmtDate(day)}
+                {fmtDate(day)}
               </div>
               {deliveries.length === 0 ? (
                 <div className="text-meta text-base-400 text-center py-3">
@@ -975,7 +988,7 @@ function CalendarPane({
                           SO-{o.so}
                         </div>
                         <div className="text-label text-base-500 truncate">
-                          Call {o.customer_name?.trim() || "the customer"} — book delivery date
+                          Call {displayCustomerName(o.customer_name?.trim()) || "the customer"} — book delivery date
                         </div>
                       </div>
                     </button>
@@ -1052,7 +1065,7 @@ function DeliveryDetail({
         <div className="min-w-0">
           <div className="font-mono text-strong font-semibold text-base-900">SO-{o.so}</div>
           <div className={`text-body text-base-700 truncate ${cjkClassName(o.customer_name)}`}>
-            {o.customer_name || "—"}
+            {displayCustomerName(o.customer_name) || "—"}
           </div>
           {o.customer_address && (
             <div className="text-meta text-base-500 mt-0.5">{o.customer_address}</div>

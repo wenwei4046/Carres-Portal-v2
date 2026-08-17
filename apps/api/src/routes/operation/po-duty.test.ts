@@ -7,6 +7,7 @@ import {
   type JWK,
   type KeyLike,
 } from "jose";
+import { grnDutyMonth, monthKeyMYT } from "@carres/shared";
 import app from "../../index";
 import { _setJwksForTesting } from "../../middleware/auth";
 
@@ -227,6 +228,109 @@ describe("GET /api/operation/po-duty", () => {
     const body = (await res.json()) as { holder: { userId: string } | null };
     expect(body.holder?.userId).toBe(HOLDER);
     expect(sb.upserts.some((u) => u.table === "ops_po_duty")).toBe(true);
+  });
+});
+
+/**
+ * GRN DUTY — the receiver is the NEXT month's row of the SAME rota
+ * (`purchasing/MASTER.md` §2.2, approved 2026-08-06 · built 2026-08-15).
+ *
+ * The Team panel used to derive this on the client by reaching BACKWARDS
+ * through a roster the API only ever fills forwards, so `GRN DUTY` printed
+ * `Not assigned` every month. Resolving it server-side, through the same
+ * rotation PO duty uses, is what makes the row always name a holder.
+ */
+describe("GET /api/operation/po-duty — GRN duty", () => {
+  it("names the NEXT month's rota holder, and says which month that is", async () => {
+    const sb = makeSb({
+      ops_po_duty: {
+        single: [
+          { data: { month: "2026-07", user_id: HOLDER, assigned_by: null }, error: null },
+          // The GRN month's row already exists — no rotation needed.
+          { data: { month: "2026-08", user_id: OTHER, assigned_by: null }, error: null },
+        ],
+      },
+      app_users: {
+        list: {
+          data: [
+            { id: HOLDER, email: "shasha@carres.com", name: "Shasha" },
+            { id: OTHER, email: "yujun@carres.com", name: "Yu Jun" },
+          ],
+          error: null,
+        },
+      },
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const jwt = await makeJwt("operation");
+    const res = await req("/api/operation/po-duty", "GET", jwt);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      month: string;
+      grnMonth: string;
+      holder: { userId: string };
+      grnHolder: { userId: string; name: string | null } | null;
+    };
+    // The rota's own table: July's PO holder issues, August's receives.
+    expect(body.grnMonth).toBe(grnDutyMonth(monthKeyMYT()));
+    expect(body.grnHolder).toMatchObject({ userId: OTHER, name: "Yu Jun" });
+    // Segregation of duties: the person who orders never receives.
+    expect(body.grnHolder?.userId).not.toBe(body.holder.userId);
+  });
+
+  it("auto-assigns the GRN month when the rota has no row for it yet", async () => {
+    const sb = makeSb({
+      ops_po_duty: {
+        single: [
+          { data: { month: "2026-07", user_id: HOLDER, assigned_by: null }, error: null },
+          // GRN month: nothing written yet → rotation fills it …
+          { data: null, error: null },
+          // … and the re-read converges on the row just upserted.
+          { data: { month: "2026-08", user_id: OTHER, assigned_by: null }, error: null },
+        ],
+        list: { data: [{ month: "2026-07", user_id: HOLDER }], error: null },
+      },
+      ops_staff_settings: {
+        list: { data: [{ user_id: HOLDER }, { user_id: OTHER }], error: null },
+      },
+      app_users: {
+        list: {
+          data: [
+            { id: HOLDER, email: "shasha@carres.com", name: "Shasha", status: "active" },
+            { id: OTHER, email: "yujun@carres.com", name: "Yu Jun", status: "active" },
+          ],
+          error: null,
+        },
+      },
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const jwt = await makeJwt("operation");
+    const res = await req("/api/operation/po-duty", "GET", jwt);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { grnHolder: { userId: string } | null };
+    // The current PO holder is EXCLUDED while somebody else can take it.
+    expect(body.grnHolder?.userId).toBe(OTHER);
+    const grnUpsert = sb.upserts.find(
+      (u) => (u.payload as { month?: string }).month === grnDutyMonth(monthKeyMYT()),
+    );
+    expect(grnUpsert).toBeTruthy();
+    expect((grnUpsert!.payload as { user_id: string }).user_id).toBe(OTHER);
+  });
+
+  it("stays dormant rather than blocking when the whole duty layer is missing", async () => {
+    vi.mocked(userClient).mockReturnValue(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      makeSb({
+        ops_po_duty: {
+          single: [{ data: null, error: { code: "42P01", message: "missing" } }],
+        },
+      }) as any,
+    );
+    const jwt = await makeJwt("operation");
+    const res = await req("/api/operation/po-duty", "GET", jwt);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ holder: null, grnHolder: null });
   });
 });
 

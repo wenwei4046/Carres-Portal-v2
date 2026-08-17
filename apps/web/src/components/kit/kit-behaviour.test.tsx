@@ -32,6 +32,7 @@ import Tabs from "./Tabs";
 import Toast from "./Toast";
 import Tooltip from "./Tooltip";
 import { Z_LADDER } from "./overlay-layer";
+import { fmtDate } from "@/lib/fmt-date";
 
 /**
  * The two primitives open on different events, and it matters in a test.
@@ -383,7 +384,11 @@ describe("Checkbox", () => {
 describe("DatePicker", () => {
   it("prints the canonical §2.4 date, never the locale's", () => {
     render(<DatePicker id="d" label="Delivery date" value="2026-07-19" onChange={() => {}} />);
-    expect(screen.getByText("Sun, 19 Jul 26")).toBeInTheDocument();
+    // Through `fmtDate`, never a literal: THE YEAR RULE (owner ruling
+    // 2026-08-15) makes the year conditional, so a hard-coded spelling would
+    // be asserting the wrong thing for half of every year.
+    expect(screen.getByText(fmtDate("2026-07-19"))).toBeInTheDocument();
+    expect(fmtDate("2026-07-19")).toMatch(/^Sun, 19 Jul( 26)?$/);
   });
 
   it("shows the placeholder when there is no date, and says so in the placeholder's own ink", () => {

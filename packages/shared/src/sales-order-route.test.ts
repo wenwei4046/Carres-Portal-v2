@@ -1,237 +1,638 @@
 import { describe, expect, it } from "vitest";
-import { resolveSalesOrderRoute, type SalesOrderRouteInput } from "./sales-order-route";
+import {
+  resolveSalesOrderRoute,
+  type RouteNode,
+  type RoutePurchaseOrder,
+  type SalesOrderRouteInput,
+  type SalesOrderRouteMap,
+} from "./sales-order-route";
+import type { AllocationUnit } from "./sales-order-allocation";
 
-const input = (): SalesOrderRouteInput => ({
-  order: {
-    id: "order-1",
-    so: 1318,
-    placedAt: "2026-08-01T03:00:00Z",
-    deliveryDate: "2026-08-20",
-    doNumber: "DO-130826-0031",
-    dispatchedAt: "2026-08-13T02:00:00Z",
-    deliveredAt: null,
-    invoiceNo: "INV-1318",
-  },
-  revisions: [1, 2],
-  lineLabels: { "BED-A": "Cloud Bed", "SOFA-B": "Haven Sofa" },
-  allocation: {
-    orderId: "order-1",
-    soRef: "SO-1318",
-    lines: [
-      {
-        sku: "BED-A",
-        committedQty: 1,
-        reservedUnits: [],
-        soldUnits: [{
-          id: "unit-bed",
-          unitCode: "id-bed000001",
-          sku: "BED-A",
-          status: "sold",
-          condition: "new",
-          warehouseId: "wh-1",
-          poNo: "PO-8001",
-          qty: 1,
-          dateIn: "2026-08-10",
-          soldAt: "2026-08-13T04:00:00Z",
-        }],
-        reservedQty: 0,
-        soldQty: 1,
-        outstandingQty: 0,
-      },
-      {
-        sku: "SOFA-B",
-        committedQty: 2,
-        reservedUnits: [{
-          id: "unit-sofa",
-          unitCode: "id-sofa00001",
-          sku: "SOFA-B",
-          status: "reserved",
-          condition: "new",
-          warehouseId: "wh-2",
-          poNo: "PO-8002",
-          qty: 1,
-          dateIn: "2026-08-12",
-        }],
-        soldUnits: [],
-        reservedQty: 1,
-        soldQty: 0,
-        outstandingQty: 1,
-      },
-    ],
-    unmatchedUnits: [],
-    totals: { committedQty: 3, reservedQty: 1, soldQty: 1, outstandingQty: 1 },
-  },
-  purchaseOrders: [
-    {
-      id: "PO-8001",
-      currentFact: "Fully received",
-      etaDate: "2026-08-10",
-      supplierDoNumber: "SDO-81",
-      lines: [{ sku: "BED-A", qty: 1, receivedQty: 1 }],
-    },
-    {
-      id: "PO-8002",
-      currentFact: "In production at supplier",
-      etaDate: "2026-08-18",
-      supplierDoNumber: null,
-      lines: [{ sku: "SOFA-B", qty: 2, receivedQty: 1 }],
-    },
-  ],
-  receivingRecords: [],
-  delivery: {
-    booking: { date: "2026-08-15", slot: "10:00–12:00", partnerName: "Amy Logistics" },
-    attempts: [
-      {
-        id: "attempt-1",
-        attemptNo: 1,
-        result: "failed",
-        reason: "Customer unavailable",
-        doNumber: "DO-130826-0031",
-        scheduledDate: "2026-08-13",
-        recordedAt: "2026-08-13T05:00:00Z",
-      },
-    ],
-  },
-  money: { known: true, total: 4500, paid: 3000, outstanding: 1500 },
-  refunds: [{ id: "refund-1", amount: 200, status: "approved", requestedAt: "2026-08-12" }],
-  loans: [{
-    id: "loan-1",
-    label: "Display sofa",
-    status: "returned",
-    source: "supplier",
-    loanNoteNo: "LN-91",
-    loanedAt: "2026-08-02",
-    returnedAt: "2026-08-09",
-    returnedToSupplierAt: null,
-  }],
-  cases: [{ id: "case-1", caseNo: "SC2608-01", closed: false, openedAt: "2026-08-11" }],
-  claims: [],
-  work: [{ id: "work-1", module: "purchasing", title: "Review PO quantity", state: "open", createdAt: "2026-08-12" }],
+/* ─────────────────────────────────────────────────────────────────────────────
+ * Fixtures. Every scenario in the owner's card is built from these helpers so a
+ * test reads as the situation it describes.
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+const unit = (over: Partial<AllocationUnit> & { id: string }): AllocationUnit => ({
+  unitCode: null,
+  sku: "BED-A",
+  status: "reserved",
+  condition: "new",
+  warehouseId: "wh-1",
+  poNo: null,
+  qty: 1,
+  dateIn: "2026-08-12",
+  ...over,
 });
 
-describe("resolveSalesOrderRoute", () => {
-  it("keeps split fulfilment as simultaneous goods positions", () => {
-    const route = resolveSalesOrderRoute(input());
-    const goods = route.lanes.find((lane) => lane.key === "goods")!;
+const line = (over: Partial<SalesOrderRouteInput["allocation"]["lines"][number]> & { sku: string }) => ({
+  committedQty: 1,
+  reservedUnits: [],
+  soldUnits: [],
+  reservedQty: 0,
+  soldQty: 0,
+  outstandingQty: 0,
+  ...over,
+});
 
-    expect(goods.groups.map((group) => group.title)).toEqual(["Cloud Bed · 1", "Haven Sofa · 2"]);
-    expect(goods.groups[0]!.facts.map((fact) => fact.title)).toEqual([
-      "Delivered · Unit id-bed000001",
-    ]);
-    expect(goods.groups[1]!.facts.map((fact) => fact.title)).toEqual([
-      "At Carres · Unit id-sofa00001",
-      "In production at supplier · PO-8002",
-    ]);
-    expect(route.currentPositions).toEqual([
-      "Cloud Bed · Delivered",
-      "Haven Sofa · At Carres / In production at supplier",
+const po = (over: Partial<RoutePurchaseOrder> & { id: string }): RoutePurchaseOrder => ({
+  issuedAt: "2026-08-13",
+  expectedReadyDate: null,
+  lines: [],
+  ...over,
+});
+
+function input(over: Partial<SalesOrderRouteInput> = {}): SalesOrderRouteInput {
+  return {
+    order: {
+      id: "order-1",
+      so: 1319,
+      customerName: "LIM KUAN YANG",
+      placedAt: "2026-08-12",
+      deliveryDate: "2026-09-24",
+      deliveredAt: null,
+    },
+    lineLabels: { B1201S: "B1201S · King" },
+    lineDestinations: {},
+    cancelledLines: [],
+    allocation: {
+      orderId: "order-1",
+      soRef: "SO-1319",
+      lines: [
+        line({
+          sku: "B1201S",
+          committedQty: 3,
+          reservedUnits: [unit({ id: "u1", unitCode: "UNT-8821", sku: "B1201S" })],
+          reservedQty: 1,
+          outstandingQty: 2,
+        }),
+      ],
+      unmatchedUnits: [],
+      totals: { committedQty: 3, reservedQty: 1, soldQty: 0, outstandingQty: 2 },
+    },
+    purchaseOrders: [po({ id: "PO-2048", lines: [{ sku: "B1201S", qty: 2, receivedQty: 0 }] })],
+    receivingRecords: [],
+    delivery: { logistics: null, booking: null, attempts: [] },
+    money: { known: true, outstanding: 1249, holds: true },
+    loans: [],
+    cases: [],
+    claims: [],
+    ...over,
+  };
+}
+
+const node = (map: SalesOrderRouteMap, id: string): RouteNode =>
+  map.nodes.find((n) => n.id === id)!;
+const kinds = (map: SalesOrderRouteMap, kind: string) =>
+  map.nodes.filter((n) => n.kind === kind);
+const edge = (map: SalesOrderRouteMap, from: string, to: string) =>
+  map.edges.find((e) => e.from === from && e.to === to);
+const requirement = (map: SalesOrderRouteMap, id: string) =>
+  node(map, "delivery-order").requirements.find((r) => r.id === id);
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * THE MAP IS ONE GRAPH — the Sales Order is its only root.
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+describe("the node map", () => {
+  it("has no stacked-layer shape left on it — one node list, one edge list", () => {
+    const map = resolveSalesOrderRoute(input());
+    expect(map).not.toHaveProperty("tracks");
+    expect(map).not.toHaveProperty("goodsRoutes");
+    expect(map).not.toHaveProperty("release");
+    expect(map).not.toHaveProperty("status");
+    expect(Array.isArray(map.nodes)).toBe(true);
+    expect(Array.isArray(map.edges)).toBe(true);
+  });
+
+  it("makes SALES ORDER the only root, and goods + delivery + money leave it at once", () => {
+    const map = resolveSalesOrderRoute(input());
+    const roots = map.nodes.filter((n) => !map.edges.some((e) => e.to === n.id));
+    expect(roots.map((n) => n.id)).toEqual(["sales-order"]);
+
+    const leaving = map.edges.filter((e) => e.from === "sales-order");
+    const branches = new Set(leaving.map((e) => node(map, e.to).branch));
+    expect(branches).toEqual(new Set(["goods", "delivery", "money"]));
+    /* Simultaneously: every one of them starts at the same y. */
+    const tops = new Set(leaving.map((e) => node(map, e.to).y));
+    expect(tops.size).toBe(1);
+  });
+
+  it("carries the SO number and its labelled ordered date, and no circular door", () => {
+    const so = node(resolveSalesOrderRoute(input()), "sales-order");
+    expect(so.lines).toEqual(["SO-1319", "Ordered: 2026-08-12"]);
+    expect(so.door).toBeNull();
+    expect(so.mark).toBe("complete");
+  });
+
+  it("draws every node inside the reported bounding box", () => {
+    const map = resolveSalesOrderRoute(input());
+    for (const n of map.nodes) {
+      expect(n.x).toBeGreaterThanOrEqual(0);
+      expect(n.y).toBeGreaterThanOrEqual(0);
+      expect(n.x + n.w).toBeLessThanOrEqual(map.width);
+      expect(n.y + n.h).toBeLessThanOrEqual(map.height);
+      expect(n.h).toBeGreaterThan(0);
+    }
+  });
+});
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * GOODS — one fork per line and per source quantity.
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+describe("goods forks", () => {
+  it("gives the purchase chain PURCHASING → SUPPLIER → RECEIVING, and STOCK its own fork", () => {
+    const map = resolveSalesOrderRoute(input());
+    expect(edge(map, "sales-order", "PO-2048:purchasing")).toBeDefined();
+    expect(edge(map, "PO-2048:purchasing", "PO-2048:supplier")).toBeDefined();
+    expect(edge(map, "PO-2048:supplier", "PO-2048:receiving")).toBeDefined();
+    /* STOCK is the same line's other fork, straight off the Sales Order. */
+    expect(edge(map, "sales-order", "B1201S:stock")).toBeDefined();
+    expect(edge(map, "sales-order", "B1201S:stock")!.labelLines).toEqual(["goods", "(same line)"]);
+  });
+
+  it("forks once per Purchase Order, and each fork is drawn in its own column", () => {
+    const map = resolveSalesOrderRoute(
+      input({
+        purchaseOrders: [
+          po({ id: "PO-1", lines: [{ sku: "B1201S", qty: 1, receivedQty: 0 }] }),
+          po({ id: "PO-2", lines: [{ sku: "B1201S", qty: 1, receivedQty: 0 }] }),
+        ],
+      }),
+    );
+    expect(edge(map, "sales-order", "PO-1:purchasing")).toBeDefined();
+    expect(edge(map, "sales-order", "PO-2:purchasing")).toBeDefined();
+    expect(node(map, "PO-1:purchasing").x).not.toBe(node(map, "PO-2:purchasing").x);
+  });
+
+  it("still walks the whole chain for a quantity no Purchase Order covers", () => {
+    const map = resolveSalesOrderRoute(input({ purchaseOrders: [] }));
+    const purchasing = node(map, "B1201S:unassigned:purchasing");
+    expect(purchasing.lines).toContain("No Purchase Order yet");
+    expect(purchasing.action).toEqual({
+      ownerKey: "purchasing",
+      label: "Issue PO",
+    });
+    /* The steps behind it are a path the work has not walked — dashed, not absent. */
+    expect(node(map, "B1201S:unassigned:supplier").mark).toBe("future");
+    expect(node(map, "B1201S:unassigned:receiving").mark).toBe("future");
+    expect(edge(map, "B1201S:unassigned:purchasing", "B1201S:unassigned:supplier")!.style).toBe(
+      "dashed",
+    );
+  });
+
+  it("keeps a PO whose goods arrived on the map instead of vanishing at the STOCK step", () => {
+    const map = resolveSalesOrderRoute(
+      input({
+        purchaseOrders: [po({ id: "PO-2048", lines: [{ sku: "B1201S", qty: 2, receivedQty: 2 }] })],
+        receivingRecords: [
+          { id: "r1", recordNo: "GRN-77", poId: "PO-2048", receivedAt: "2026-08-20" },
+        ],
+      }),
+    );
+    const receiving = node(map, "PO-2048:receiving");
+    expect(receiving.mark).toBe("complete");
+    expect(receiving.lines).toEqual(["GRN-77", "Received: 2026-08-20"]);
+  });
+
+  it("states a cancelled line's outcome and gives it no chain and no gate edge", () => {
+    const map = resolveSalesOrderRoute(
+      input({ cancelledLines: [{ sku: "OLD", label: "Old sofa", qty: 1, revision: 3 }] }),
+    );
+    const cancelled = node(map, "cancelled:OLD");
+    expect(cancelled.lines).toEqual(["Old sofa · Qty 1", "Cancelled · Rev 3"]);
+    expect(edge(map, "cancelled:OLD", "delivery-order")).toBeUndefined();
+  });
+});
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * CURRENT — one per route, up to three, never a fourth.
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+describe("CURRENT", () => {
+  it("marks exactly one node per route and no more than three in total", () => {
+    const map = resolveSalesOrderRoute(input());
+    const current = map.nodes.filter((n) => n.current);
+    expect(current.length).toBeLessThanOrEqual(3);
+    expect(current.map((n) => n.branch).sort()).toEqual(["delivery", "goods", "money"]);
+    /* One per route — never two on the same one. */
+    expect(new Set(current.map((n) => n.branch)).size).toBe(current.length);
+  });
+
+  it("puts goods CURRENT on the first unfinished step and leaves the other fork waiting", () => {
+    const map = resolveSalesOrderRoute(input());
+    expect(node(map, "PO-2048:purchasing").mark).toBe("complete");
+    expect(node(map, "PO-2048:supplier").current).toBe(true);
+    expect(node(map, "PO-2048:supplier").mark).toBe("current");
+    expect(node(map, "PO-2048:receiving").mark).toBe("future");
+    expect(node(map, "B1201S:stock").current).toBe(false);
+    expect(node(map, "B1201S:stock").mark).toBe("waiting");
+  });
+
+  it("never lets a fourth route take a CURRENT — a loan is an obligation, not a position", () => {
+    const map = resolveSalesOrderRoute(
+      input({ loans: [{ id: "L1", label: "sofa", qty: 1, returned: false }] }),
+    );
+    expect(map.nodes.filter((n) => n.current).length).toBe(3);
+    expect(node(map, "loan:L1").current).toBe(false);
+  });
+
+  it("gives the action only to the position being worked", () => {
+    const map = resolveSalesOrderRoute(input());
+    expect(node(map, "PO-2048:supplier").action).toEqual({
+      ownerKey: "purchasing",
+      label: "Confirm ready date",
+    });
+    /* A node nobody has reached carries no instruction. */
+    expect(node(map, "PO-2048:receiving").action).toBeNull();
+  });
+});
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * LOAN — conditional, amber, and it never blocks anything.
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+describe("LOAN", () => {
+  it("is absent from a clean order", () => {
+    expect(kinds(resolveSalesOrderRoute(input()), "loan")).toHaveLength(0);
+  });
+
+  it("renders amber and joins DELIVER with a dashed `collect back` edge", () => {
+    const map = resolveSalesOrderRoute(
+      input({ loans: [{ id: "L1", label: "sofa", qty: 1, returned: false }] }),
+    );
+    const loan = node(map, "loan:L1");
+    expect(loan.mark).toBe("blocked");
+    expect(loan.lines).toEqual(["1 sofa on loan to customer", "Collect back on delivery day"]);
+    const link = edge(map, "loan:L1", "deliver")!;
+    expect(link.style).toBe("dashed");
+    expect(link.labelLines).toEqual(["collect back"]);
+    /* It never joins the gate — it may not hold a delivery. */
+    expect(edge(map, "loan:L1", "delivery-order")).toBeUndefined();
+  });
+
+  it("disappears once the item is collected back", () => {
+    const map = resolveSalesOrderRoute(
+      input({ loans: [{ id: "L1", label: "sofa", qty: 1, returned: true }] }),
+    );
+    expect(kinds(map, "loan")).toHaveLength(0);
+  });
+});
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * THE GATE. Read-only, system-issued, and money is one of its requirements —
+ * owner ruling 2026-08-16, decision B.
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+describe("the DELIVERY ORDER gate", () => {
+  it("lists every missing requirement in plain sentences with the met count", () => {
+    const map = resolveSalesOrderRoute(input());
+    const gate = node(map, "delivery-order");
+    expect(gate.lines).toEqual(["NOT READY FOR DELIVERY", "0 of 4 requirements met"]);
+    expect(gate.requirements.map((r) => r.text)).toEqual([
+      "Goods not ready (1 of 3)",
+      "No logistics chosen",
+      "Date + slot not confirmed",
+      "RM 1,249.00 still to collect",
     ]);
   });
 
-  it("builds clickable document lineage without inventing sent or received evidence", () => {
-    const route = resolveSalesOrderRoute(input());
-    expect(route.documents.map((doc) => [doc.kind, doc.number, doc.href])).toEqual([
-      ["Sales Order", "SO-1318", "/operation/orders/so/order-1"],
-      ["Revision", "Rev 1", "/operation/orders/so/order-1?revision=1"],
-      ["Revision", "Rev 2", "/operation/orders/so/order-1?revision=2"],
-      ["Purchase Order", "PO-8001", "/operation/procurement?po=PO-8001"],
-      ["Supplier DO", "SDO-81", "/operation/procurement?po=PO-8001"],
-      ["Purchase Order", "PO-8002", "/operation/procurement?po=PO-8002"],
-      ["Delivery Order", "DO-130826-0031", "/operation?tab=delivery&order=order-1"],
-      ["Invoice", "INV-1318", "/finance/invoices?order=order-1"],
-      ["Loan Note", "LN-91", "/operation/orders/so/order-1?route=1#loan"],
-      ["Service Case", "SC2608-01", "/operation?tab=service-notes&case=case-1"],
-    ]);
-    expect(route.documents.every((doc) => !/sent|received by customer/i.test(doc.detail ?? ""))).toBe(true);
+  it("never grows a Release or Approve control in any state", () => {
+    for (const map of [
+      resolveSalesOrderRoute(input()),
+      resolveSalesOrderRoute(input({ money: { known: true, outstanding: 0, holds: false } })),
+    ]) {
+      const gate = node(map, "delivery-order");
+      expect(gate.door).toBeNull();
+      const words = JSON.stringify(map).toLowerCase();
+      expect(words).not.toContain("release button");
+      expect(words).not.toContain("approve");
+    }
   });
 
-  it("keeps delivery runs, both money directions, loan return, cases and owner work independent", () => {
-    const route = resolveSalesOrderRoute(input());
-    const lane = (key: string) => route.lanes.find((item) => item.key === key)!;
-
-    expect(lane("delivery").groups[0]!.facts.map((fact) => fact.title)).toEqual([
-      "Delivery 1 · Not Delivered",
-      "Next delivery · Scheduled",
-    ]);
-    expect(lane("delivery").groups[0]!.facts[0]!.detail).toContain("Customer unavailable");
-    expect(lane("money").groups.flatMap((group) => group.facts.map((fact) => fact.title))).toEqual([
-      "RM 1,500.00 owed by customer",
-      "RM 200.00 approved refund not paid",
-    ]);
-    expect(lane("loan").groups[0]!.facts[0]!.title).toBe("Returned by customer · supplier return open");
-    expect(lane("other").groups.filter((group) => group.id !== "claims").flatMap((group) => group.facts.map((fact) => fact.title))).toEqual([
-      "SC2608-01 · Open",
-      "Review PO quantity · Open",
-    ]);
-    expect(route.noActionRequired).toBe(false);
+  it("⭐ keeps MONEY a requirement — the map may not say releasable while the engine refuses", () => {
+    /* `holds` is the same predicate `order-actions.deliveryHeldOnMoney` asks
+       before it will offer `issue_delivery_order` (docs/orders/MASTER.md §8). */
+    const map = resolveSalesOrderRoute(input());
+    expect(requirement(map, "money")).toEqual({
+      id: "money",
+      met: false,
+      text: "RM 1,249.00 still to collect",
+    });
   });
 
-  it("includes real receiving and supplier-claim documents with owner links", () => {
-    const facts = input();
-    facts.receivingRecords = [{
-      id: "receipt-1",
-      recordNo: "GRN-120826-4491",
-      poId: "PO-8002",
-      supplierDoNumber: "SDO-92",
-      status: "Posted",
-      receivedAt: "2026-08-12",
-    }];
-    facts.claims = [{
-      id: "claim-1",
-      claimNo: "CL-109",
-      poId: "PO-8002",
-      status: "open",
-      reportedAt: "2026-08-12",
-    }];
-    const route = resolveSalesOrderRoute(facts);
-    expect(route.documents).toEqual(expect.arrayContaining([
-      expect.objectContaining({ kind: "Supplier DO", number: "SDO-92", href: "/operation?tab=receiving&receipt=receipt-1" }),
-      expect.objectContaining({ kind: "Receiving Record", number: "GRN-120826-4491", href: "/operation?tab=receiving&receipt=receipt-1" }),
-      expect.objectContaining({ kind: "Supplier Claim", number: "CL-109", href: "/operation?tab=claims&claim=claim-1" }),
-    ]));
-    const other = route.lanes.find((lane) => lane.key === "other")!;
-    expect(other.groups[0]!.facts[0]!.title).toBe("CL-109 · Open");
-    expect(route.noActionRequired).toBe(false);
+  it("⭐ counts a manager release as met and STILL prints what the customer owes", () => {
+    const map = resolveSalesOrderRoute(
+      input({ money: { known: true, outstanding: 1249, holds: false } }),
+    );
+    const money = requirement(map, "money")!;
+    expect(money.met).toBe(true);
+    expect(money.text).toContain("Manager release recorded");
+    expect(money.text).toContain("RM 1,249.00");
   });
 
-  it("states unassigned goods plainly and reports no action only when every applicable obligation is clear", () => {
-    const facts = input();
-    facts.allocation.lines = [{
-      sku: "MATTRESS-C",
-      committedQty: 1,
-      reservedUnits: [],
-      soldUnits: [],
-      reservedQty: 0,
-      soldQty: 0,
-      outstandingQty: 1,
-    }];
-    facts.allocation.totals = { committedQty: 1, reservedQty: 0, soldQty: 0, outstandingQty: 1 };
-    facts.purchaseOrders = [];
-    let route = resolveSalesOrderRoute(facts);
-    expect(route.lanes[0]!.groups[0]!.facts[0]!.title).toBe("Route not yet assigned · 1");
-    expect(route.noActionRequired).toBe(false);
+  it("lets an unpriced order through — a number nobody knows may not hold the goods", () => {
+    const map = resolveSalesOrderRoute(
+      input({ money: { known: false, outstanding: 0, holds: false } }),
+    );
+    expect(requirement(map, "money")!.met).toBe(true);
+  });
 
-    facts.allocation.lines[0] = {
-      ...facts.allocation.lines[0]!,
-      soldUnits: [{
-        id: "u1", unitCode: "id-1", sku: "MATTRESS-C", status: "sold", condition: "new",
-        warehouseId: null, poNo: null, qty: 1, dateIn: null, soldAt: "2026-08-13",
-      }],
-      soldQty: 1,
-      outstandingQty: 0,
-    };
-    facts.allocation.totals = { committedQty: 1, reservedQty: 0, soldQty: 1, outstandingQty: 0 };
-    facts.delivery.attempts = [{
-      id: "d", attemptNo: 1, result: "delivered", reason: null, doNumber: "DO-1",
-      scheduledDate: "2026-08-13", recordedAt: "2026-08-13",
-    }];
-    facts.money = { known: true, total: 4500, paid: 4500, outstanding: 0 };
-    facts.refunds = [{ id: "r", amount: 200, status: "paid", requestedAt: "2026-08-12" }];
-    facts.loans = [{ ...facts.loans[0]!, returnedToSupplierAt: "2026-08-12" }];
-    facts.cases = [{ ...facts.cases[0]!, closed: true }];
-    facts.work = [{ ...facts.work[0]!, state: "closed" }];
+  it("names a refused delivery day instead of failing silently", () => {
+    /* 2026-09-06 is a Sunday. */
+    const map = resolveSalesOrderRoute(
+      input({
+        delivery: {
+          logistics: { partnerName: "NETS" },
+          booking: { confirmedDate: "2026-09-06", slot: "12pm–3pm", scope: null },
+          attempts: [],
+        },
+      }),
+    );
+    expect(requirement(map, "refused-day")).toEqual({
+      id: "refused-day",
+      met: false,
+      text: "Date falls on a Sunday — pick another day",
+    });
+  });
 
-    route = resolveSalesOrderRoute(facts);
-    expect(route.noActionRequired).toBe(true);
+  it("names a Malaysian public holiday the same way", () => {
+    const map = resolveSalesOrderRoute(
+      input({
+        delivery: {
+          logistics: { partnerName: "NETS" },
+          booking: { confirmedDate: "2026-01-01", slot: "12pm–3pm", scope: null },
+          attempts: [],
+        },
+        publicHolidays: ["2026-01-01"],
+      }),
+    );
+    expect(requirement(map, "refused-day")!.text).toBe(
+      "Date falls on a public holiday — pick another day",
+    );
+  });
+
+  it("adds no refused-day line on an ordinary working day", () => {
+    const map = resolveSalesOrderRoute(
+      input({
+        delivery: {
+          logistics: { partnerName: "NETS" },
+          booking: { confirmedDate: "2026-09-24", slot: "12pm–3pm", scope: null },
+          attempts: [],
+        },
+      }),
+    );
+    expect(requirement(map, "refused-day")).toBeUndefined();
+  });
+
+  it("shows the DO number and turns green once the system has issued it", () => {
+    const map = resolveSalesOrderRoute(
+      input({
+        allocation: {
+          orderId: "order-1",
+          soRef: "SO-1319",
+          lines: [
+            line({
+              sku: "B1201S",
+              committedQty: 1,
+              reservedUnits: [unit({ id: "u1", unitCode: "UNT-8821", sku: "B1201S" })],
+              reservedQty: 1,
+              outstandingQty: 0,
+            }),
+          ],
+          unmatchedUnits: [],
+          totals: { committedQty: 1, reservedQty: 1, soldQty: 0, outstandingQty: 0 },
+        },
+        purchaseOrders: [],
+        delivery: {
+          logistics: { partnerName: "NETS" },
+          booking: { confirmedDate: "2026-09-24", slot: "12pm–3pm", scope: null },
+          attempts: [
+            {
+              id: "a1",
+              attemptNo: 1,
+              result: "delivered",
+              reason: null,
+              doNumber: "DO-240926-0031",
+              scheduledDate: "2026-09-24",
+              recordedAt: "2026-09-24",
+            },
+          ],
+        },
+        money: { known: true, outstanding: 0, holds: false },
+      }),
+    );
+    const gate = node(map, "delivery-order");
+    expect(gate.mark).toBe("complete");
+    expect(gate.lines).toEqual(["DO-240926-0031", "Delivery order issued"]);
+    expect(gate.requirements).toEqual([]);
+  });
+});
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * THE TAIL — DELIVER then DELIVERY PHOTO, and the last node has no line out.
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+describe("the tail after the gate", () => {
+  it("hangs DELIVER and DELIVERY PHOTO below the gate in a straight line", () => {
+    const map = resolveSalesOrderRoute(input());
+    expect(edge(map, "delivery-order", "deliver")).toBeDefined();
+    expect(edge(map, "deliver", "delivery-photo")).toBeDefined();
+    const gate = node(map, "delivery-order");
+    const deliver = node(map, "deliver");
+    const photo = node(map, "delivery-photo");
+    expect(deliver.x).toBe(gate.x);
+    expect(photo.x).toBe(gate.x);
+    expect(deliver.y).toBeGreaterThan(gate.y);
+    expect(photo.y).toBeGreaterThan(deliver.y);
+  });
+
+  it("leaves the last node with no trailing line", () => {
+    const map = resolveSalesOrderRoute(input());
+    expect(map.edges.filter((e) => e.from === "delivery-photo")).toHaveLength(0);
+  });
+
+  it("says what is missing, why and who does what next", () => {
+    const map = resolveSalesOrderRoute(input());
+    expect(node(map, "delivery-photo").lines).toEqual(["No delivery photo yet"]);
+    for (const banned of ["No data", "No results", "Not available"]) {
+      expect(JSON.stringify(map)).not.toContain(banned);
+    }
+  });
+
+  it("names the uploader and the day once the photo is on file", () => {
+    const map = resolveSalesOrderRoute(
+      input({
+        delivery: {
+          logistics: null,
+          booking: null,
+          attempts: [],
+          photos: [{ at: "2026-09-28", by: "Shasha" }],
+        },
+      }),
+    );
+    const photo = node(map, "delivery-photo");
+    expect(photo.mark).toBe("complete");
+    expect(photo.lines).toEqual(["Uploaded by Shasha", "Uploaded: 2026-09-28"]);
+  });
+});
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * CONNECTORS — the geometry the page draws, asserted without a DOM.
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+describe("connectors", () => {
+  it("leaves the bottom of its source and lands on the top of its target", () => {
+    const map = resolveSalesOrderRoute(input());
+    for (const e of map.edges) {
+      const from = node(map, e.from);
+      const to = node(map, e.to);
+      const first = e.points[0]!;
+      const last = e.points[e.points.length - 1]!;
+      expect(first).toEqual({ x: from.x + from.w / 2, y: from.y + from.h });
+      expect(last).toEqual({ x: to.x + to.w / 2, y: to.y });
+    }
+  });
+
+  it("draws every segment orthogonally — each step is either vertical or horizontal", () => {
+    const map = resolveSalesOrderRoute(input());
+    for (const e of map.edges) {
+      for (let i = 0; i < e.points.length - 1; i += 1) {
+        const a = e.points[i]!;
+        const b = e.points[i + 1]!;
+        expect(a.x === b.x || a.y === b.y).toBe(true);
+      }
+    }
+  });
+
+  it("draws a walked segment solid and an unwalked one dashed", () => {
+    const map = resolveSalesOrderRoute(input());
+    /* PURCHASING is done, so the step out of it has been walked. */
+    expect(edge(map, "PO-2048:purchasing", "PO-2048:supplier")!.style).toBe("solid");
+    /* SUPPLIER has not answered, so what follows is still a future path. */
+    expect(edge(map, "PO-2048:supplier", "PO-2048:receiving")!.style).toBe("dashed");
+  });
+
+  it("names the route on the edge leaving the Sales Order, and nowhere else", () => {
+    const map = resolveSalesOrderRoute(input());
+    expect(edge(map, "sales-order", "logistics")!.labelLines).toEqual(["delivery"]);
+    expect(edge(map, "sales-order", "money")!.labelLines).toEqual(["money"]);
+    expect(edge(map, "sales-order", "PO-2048:purchasing")!.labelLines).toEqual([
+      "goods",
+      "B1201S · King · Qty 3",
+      "2 to buy from factory",
+    ]);
+    expect(edge(map, "PO-2048:purchasing", "PO-2048:supplier")!.labelLines).toEqual([]);
+  });
+
+  it("converges every goods fork, the delivery date and the money on the one gate", () => {
+    const map = resolveSalesOrderRoute(input());
+    const into = map.edges.filter((e) => e.to === "delivery-order").map((e) => e.from);
+    expect(into.sort()).toEqual(["B1201S:stock", "PO-2048:receiving", "delivery-date", "money"]);
+  });
+
+  it("never lets two nodes overlap, however many forks the order has", () => {
+    const map = resolveSalesOrderRoute(
+      input({
+        lineLabels: { B1201S: "B1201S · King", SOFA9: "Sofa 3-seater" },
+        allocation: {
+          orderId: "order-1",
+          soRef: "SO-1319",
+          lines: [
+            line({ sku: "B1201S", committedQty: 2, outstandingQty: 2 }),
+            line({ sku: "SOFA9", committedQty: 1, outstandingQty: 1 }),
+          ],
+          unmatchedUnits: [],
+          totals: { committedQty: 3, reservedQty: 0, soldQty: 0, outstandingQty: 3 },
+        },
+        purchaseOrders: [
+          po({ id: "PO-2048", lines: [{ sku: "B1201S", qty: 2, receivedQty: 0 }] }),
+          po({ id: "PO-2051", lines: [{ sku: "SOFA9", qty: 1, receivedQty: 0 }] }),
+        ],
+        loans: [{ id: "L1", label: "sofa", qty: 1, returned: false }],
+      }),
+    );
+    for (let i = 0; i < map.nodes.length; i += 1) {
+      for (let j = i + 1; j < map.nodes.length; j += 1) {
+        const a = map.nodes[i]!;
+        const b = map.nodes[j]!;
+        const hit =
+          a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+        expect(hit, `${a.id} overlaps ${b.id}`).toBe(false);
+      }
+    }
+  });
+
+  it("leaves the fan-out room for its tallest label stack", () => {
+    const map = resolveSalesOrderRoute(input());
+    const so = node(map, "sales-order");
+    const firstBranchTop = Math.min(
+      ...map.nodes.filter((n) => n.branch !== "root").map((n) => n.y),
+    );
+    const tallest = Math.max(...map.edges.map((e) => e.labelLines.length));
+    expect(firstBranchTop - (so.y + so.h)).toBeGreaterThan(tallest * 12 + 10);
+  });
+
+  it("connects every node to the graph — no orphan is ever drawn", () => {
+    const map = resolveSalesOrderRoute(
+      input({ loans: [{ id: "L1", label: "sofa", qty: 1, returned: false }] }),
+    );
+    for (const n of map.nodes) {
+      if (n.id === "sales-order") continue;
+      const joined = map.edges.some((e) => e.to === n.id || e.from === n.id);
+      expect(joined, `${n.id} is not joined to the map`).toBe(true);
+    }
+  });
+});
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * DOORS — every node opens the module that owns its fact.
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+describe("doors", () => {
+  it("opens the owning module from every node that has an owner elsewhere", () => {
+    const map = resolveSalesOrderRoute(input());
+    expect(node(map, "PO-2048:purchasing").door).toEqual({
+      label: "Open PO-2048 →",
+      href: "/operation/procurement?po=PO-2048",
+    });
+    expect(node(map, "B1201S:stock").door).toEqual({
+      label: "Open Stock →",
+      href: "/operation?tab=stock-onhand",
+    });
+    expect(node(map, "logistics").door).toEqual({
+      label: "Open Delivery →",
+      href: "/operation?tab=delivery&order=order-1",
+    });
+    expect(node(map, "money").door).toEqual({
+      label: "Open Payments →",
+      href: "/operation?tab=payments&so=1319",
+    });
+  });
+});
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * LINKED PROBLEMS — beside the map, never a node on it.
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+describe("linked problems", () => {
+  it("keeps an open case off the graph and on its own strip", () => {
+    const map = resolveSalesOrderRoute(
+      input({
+        cases: [{ id: "c1", caseNo: "SC-1031", statusLabel: "Investigation in progress", closed: false }],
+      }),
+    );
+    expect(map.linkedProblems).toHaveLength(1);
+    expect(map.linkedProblems[0]!.title).toBe("SC-1031 · Investigation in progress");
+    /* Service is never a stage every Sales Order passes through. */
+    expect(map.nodes.some((n) => n.id.includes("c1"))).toBe(false);
+  });
+
+  it("does not render a closed exception — a closed case is not a problem", () => {
+    const map = resolveSalesOrderRoute(
+      input({ cases: [{ id: "c1", caseNo: "SC-1031", statusLabel: "Closed", closed: true }] }),
+    );
+    expect(map.linkedProblems).toHaveLength(0);
   });
 });

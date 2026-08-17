@@ -53,8 +53,8 @@ const ELSEWHERE: Array<{ what: string; owner: string }> = [
 
 export default function SalesOrderSettings() {
   return (
-    <div className="px-9 py-8 pb-14 max-w-[880px]" data-testid="sales-order-settings">
-      <div className="mb-6">
+    <div className="max-w-[1040px] px-9 py-8 pb-14" data-testid="sales-order-settings">
+      <div className="mb-5">
         <div className="kicker">Sales Orders</div>
         <h1 className="text-page font-display mt-1.5 text-base-900">Sales Order Settings</h1>
         <p className="text-body text-base-600 mt-1">
@@ -65,8 +65,8 @@ export default function SalesOrderSettings() {
 
       <OrderEntryPage embedded />
 
-      <div className="mt-10 border-t border-base-200 pt-4" data-testid="settings-elsewhere">
-        <div className="label mb-1.5">Not set here</div>
+      <div className="mt-6 rounded-card border border-base-200 bg-white p-5" data-testid="settings-elsewhere">
+        <div className="text-strong font-display text-base-900">Not set here</div>
         <p className="text-meta text-base-500 mb-2">
           These lists also appear on a Sales Order, but each one belongs to the module that keeps
           it. Change it there and every screen follows.

@@ -253,6 +253,41 @@ describe("STAGE 3 · 3.5 — the amendment spine, and the wall past it", () => {
     expect(calls.map((c) => c.name)).toEqual(["sales_order_submit_amendment"]);
   });
 
+  /* 0354 — `AMEND DELIVERY DATE` names the day the CUSTOMER asked, which is
+     not `submitted_at`: a change phoned in on Monday and typed on Thursday is
+     a Monday request. It reaches the RPC as its own argument, never folded
+     into the reason sentence. */
+  it("SUBMIT carries the day the customer asked, as its own argument", async () => {
+    const { res, calls } = await call(`/${ORDER_ID}/amendment`, "operation", {
+      proposed: { delivery_date: "2026-09-24", delivery_date_tbd: false },
+      reason: "Customer moving house",
+      customerAskedOn: "2026-08-11",
+    });
+    expect(res.status).toBe(201);
+    expect(calls[0]!.args).toMatchObject({
+      p_reason: "Customer moving house",
+      p_customer_asked_on: "2026-08-11",
+    });
+  });
+
+  it("SUBMIT passes a null asked-on when nobody typed one", async () => {
+    const { calls } = await call(`/${ORDER_ID}/amendment`, "operation", {
+      proposed: { lines: [{ sku: "B1201S-K", qty: 3, unit_price: 2499 }] },
+      reason: "Customer wants one more",
+    });
+    expect(calls[0]!.args).toMatchObject({ p_customer_asked_on: null });
+  });
+
+  it("refuses a malformed asked-on before the database", async () => {
+    const { res, calls } = await call(`/${ORDER_ID}/amendment`, "operation", {
+      proposed: { delivery_date: "2026-09-24" },
+      reason: "Customer moving house",
+      customerAskedOn: "11 Aug 2026",
+    });
+    expect(res.status).toBe(422);
+    expect(calls).toHaveLength(0);
+  });
+
   it("refuses a proposal carrying a CLASS B field — corrections are not amendments", async () => {
     const { res, calls } = await call(`/${ORDER_ID}/amendment`, "operation", {
       proposed: { customer_phone: "0123" },

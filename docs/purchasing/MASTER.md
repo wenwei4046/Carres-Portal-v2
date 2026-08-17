@@ -306,7 +306,7 @@ Orders and Report all run it. To Order runs the same shell with a launcher rail.
 | claim lifecycle, asks, answers, close gates | `packages/shared/src/supplier-claim.ts` |
 | quarantine outcomes + status mapping | `packages/shared/src/stock-hold.ts` |
 | the engine's numbers | `packages/shared/src/purchasing-settings.ts` + `purchasing_settings` |
-| who is on PO duty this month | `ops_po_duty` → `GET /operation/po-duty` → `useOperationPoDuty()` |
+| who is on PO duty this month, **and who is on GRN duty** | `ops_po_duty` → `GET /operation/po-duty` → `useOperationPoDuty()`. ONE rota, ONE endpoint: the response carries `holder`, `grnHolder` and `grnMonth`, and `grnDutyMonth()` (`packages/shared`) is the only place the offset is computed |
 | the rail recipe · the facet row | `components/rail/workspace-rail.tsx` · `components/FacetRow.tsx` |
 
 > **`org_duties` does NOT hold the PO-duty holder.** Its six keys are `ops_manager` ·
@@ -324,9 +324,37 @@ Aug     Yu Jun                    Khor Yee              Shasha
 Sep     Khor Yee                  Shasha                Yu Jun
 ```
 
-- **GRN duty is COMPUTED — the next month's PO holder from the same rota (offset-1). No
-  second table, no second API.** The person who ordered never receives (segregation of
-  duties). Urgent orders may bypass the rotation; a manager may override (`DutySelect`).
+- **GRN duty is COMPUTED — the NEXT month's PO holder from the same rota. No second table,
+  no second API.** Read the table down a column: July's GRN holder is Yu Jun, who is
+  *August's* PO holder. The person who ordered never receives (segregation of duties).
+  Urgent orders may bypass the rotation; a manager may override.
+
+  > **⚠️ "offset-1" IS AMBIGUOUS AND IT COST A YEAR OF EMPTY ROWS. The arithmetic reaches
+  > FORWARD.** This line used to read "offset-1" with no direction, and two readers took it
+  > backwards: `work-engine.ts` recorded *"`ops_po_duty` offset−1"*, and the Team panel
+  > implemented it as the PREVIOUS month. The API's roster is `gte(month, current)` — it only
+  > ever contains this month and later — so the panel looked for a month that was never in the
+  > payload, found nothing, and printed `Not assigned` **every single month from the day the
+  > row shipped**. The direction is now a named function, `grnDutyMonth()`, and the rota
+  > table above is its test.
+
+- **GRN DUTY IS AUTO-ASSIGNED AND EDITABLE — owner ruling 2026-08-15, BUILT.** The row must
+  always name a current holder.
+  - **Auto-assignment reuses the PO machinery unchanged** — `resolveDutyMonth()` pointed at
+    `grnDutyMonth(thisMonth)`, filling a missing month lazily through `pickNextDutyHolder`
+    (fewest months served, deterministic, so two sessions converge). It is resolved on the
+    SERVER, not derived on the client, because the client cannot see a month the payload omits.
+  - **Segregation of duties never costs the row its holder.** The current PO holder is excluded
+    from the GRN pick **only while somebody else can take it**. With one assignable person left,
+    that person genuinely holds both and saying so is more honest than showing nobody.
+  - **The edit door is on the Team panel**, gated by the `po_duty_editor` duty (Jess's own key —
+    STRICTER than manager; the shared `operation@` login must not rewrite the rota). It writes
+    the GRN month's row through the existing `PUT /operation/po-duty`, and **it names that month
+    on screen**: because duty is derived from one rota, changing the receiver also changes who
+    issues POs then. That is the locked model, not a side effect to hide.
+  - **`Not assigned` may appear ONLY when no assignable staff exists**, and it must then say
+    where to fix it (`Add someone to the assignment pool in Settings.`). A dead-end absence is
+    a defect.
 - **BUDDY COVER.** The member with NO duty this month covers EITHER duty. **The absence
   signal and the cutoff are the Orders pool's own law** (`staff.ts`, Jess round-3 —
   reused, never respelt): before 10:00 MYT late ≠ absent; from 10:00 with no heartbeat
@@ -336,8 +364,8 @@ Sep     Khor Yee                  Shasha                Yu Jun
   of hands. Both absent → the remaining member does both and the Team panel says so to a
   manager. **Nothing is reassigned in data: duty is DERIVED, so cover changes the answer
   to "who, today?", never a row.**
-- **WHERE IDENTITY SHOWS (Loo, 2026-08-06): the Team panel is the ONE home.** It already
-  states `PO DUTY` and **must gain a `GRN DUTY` row (not built — §10)**. A page never
+- **WHERE IDENTITY SHOWS (Loo, 2026-08-06): the Team panel is the ONE home.** It states
+  `PO DUTY` and `GRN DUTY` — **both BUILT and both always named, 2026-08-15**. A page never
   repeats a duty block and no rail carries a duty chip. A per-row avatar circle appears
   ONLY where rows can carry DIFFERENT names — Claims (owner = the month it was opened).
   To Order and the supplier calls carry no per-row identity: the whole surface belongs to
@@ -674,6 +702,54 @@ historical `operation_issue_pos_for_order(uuid)` function without deleting legac
 - **The September switch** — Nice Future stops supplying; a new mattress supplier takes over on
   the subscription model. Sofa and bedframe unchanged.
 
+### ⛔ THE CHILD MINI-TABLE ON THIS TAB — NOT ADOPTED, AND THE OWNER MUST RULE
+
+**Status: OPEN OWNER DECISION, 2026-08-15. Nothing below is law.** The Expand Mini-Table card
+ruled the shared child mini-table (`docs/orders/MASTER.md` §0.1 — THE CHILD MINI-TABLE) onto BOTH
+the Sales Orders Register and this tab, with the ☑ capability switched on here. **The Register half
+is built and shipped. This half is not**, and the reason is measured, not preferred.
+
+**WHAT THE CARD ASSUMES.** That this tab is a grid of customer ORDERS, each with a `▸` that opens
+its goods. **It is not.** This tab is a flat grid of BUILDS — one row per piece of goods to buy —
+clustered under a white order line, and its `▸` opens the row's two ACTS (`Reserve` ·
+`Cancel Purchase`), not a table. Adopting the card literally means rebuilding the grid into
+order-rows plus expansions.
+
+**THREE OF THE CARD'S FOUR SELECTION RULES ALREADY HOLD HERE, AND THE FOURTH CANNOT OCCUR.**
+
+| Card §4 rule | This tab today |
+|---|---|
+| every purchasable line has its own checkbox | ✅ selection is BUILD-level and frozen that way |
+| the parent switch cycles `☐ none · ▣ partial · ☑ all` | ✅ `groupSelState` / `groupSelToggle` |
+| the action bar counts selected LINES, never orders | ✅ the toolbar's selection state |
+| a Service line shows `—` and select-all skips it | **cannot occur** — a service never becomes purchase demand, so this tab has no service rows |
+
+**WHAT ADOPTING IT WOULD COST, MEASURED.** The ruled child columns are
+`Category | Unit ID | Deliver To | SKU | Qty | Item`. On this tab:
+
+- **TWO OF THE SIX WOULD BE PERMANENTLY EMPTY.** `Unit ID` reads Stock's allocation and
+  `Deliver To` reads the PO/PO-line result (`GET /api/operation/orders/:id/expansion`). A row a
+  buyer can still ACT on is by definition a row with no purchase order and no allocated unit — a
+  row that has both is a RECEIPT and cannot be ticked. So every actionable line would print
+  `Not allocated` and a constant default destination. **`CLAUDE.md` §10: empty fields do not reach
+  the screen.**
+- **FOUR DECISION COLUMNS WOULD LEAVE THE SCAN PATH.** `Supplier · Ready Stock · On PO · PO No.`
+  are not among the ruled six. `Ready Stock` and `On PO` exist precisely because *a fact is
+  scanned, an act is chosen* (T1.1 · T3 above) — burying them inside a disclosure re-creates the
+  defect those two cards were written to close.
+- **THE SCAN ITSELF WOULD BECOME A CLICK.** The buyer's morning is *tick everything due today*.
+  Order-rows plus expansions turns one pass down a sheet into one expand per order.
+
+**RECOMMENDATION (Carres, evidence-based): KEEP this tab's grid; the ruling stands unchanged on the
+Sales Orders Register.** The shared component carries the ☑ capability and is tested, so the day a
+page genuinely needs a goods child table with line selection — `Manual Purchase`'s create
+workspace is the likely one — it switches on rather than being rebuilt.
+
+**WHAT WOULD OVERTURN IT (the falsifier):** either (a) the owner's intent is the grid restructure
+itself, in which case the four buyer columns need a ruled home before any code moves, or (b)
+`Unit ID` and `Deliver To` gain a pre-purchase meaning on this tab — a planned destination on the
+demand row rather than a PO result — which is a Purchasing business change, not a presentation one.
+
 ---
 
 # §4 · Purchase Orders
@@ -786,6 +862,24 @@ RIGHT 400px  WORKING HEADER → REFERENCE LAYER → SUPPLIER FOLLOW-UP →
 
 Tables: `purchase_orders` **24** · `purchase_order_lines` **38** · `po_history` **23** ·
 `po_sends` **3** · `po_revisions` **2** · `po_supplier_promises` **6**
+
+### Deliver To — owner-locked operating rule (2026-08-14)
+
+`Deliver To` is Purchasing's authoritative instruction, at PO level with a PO-line override.
+It is not Warehouse's current physical Unit location and must not be copied onto Sales Orders.
+
+- Default: `Carres Klang` from the governed destination registry.
+- Batch Purchase / before Issue PO: Operations may change Deliver To directly. A SKU quantity
+  may split, for example `Carres Klang ×10 / AL Sungai Buloh ×1`; the split remains lines on the
+  same supplier PO.
+- After Issue PO but before the PO is sent to the supplier: Operations may change it directly;
+  the append-only PO History records the change.
+- After any supplier send: it may still change, but never silently. Preserve the previous
+  instruction, mint/record the changed revision, and require supplier update/recommunication so
+  Activity proves which revision was re-sent. A plain overwrite is not an accepted completion.
+- Every read resolves `coalesce(purchase_order_lines.destination_id,
+  purchase_orders.destination_id)`. The Sales Order expansion is a read-only projection of that
+  Purchasing result; it has no destination writer or duplicate destination column.
 
 **`GET /operation/pos` already ships every promise per PO** (`promises`, read since 0310 for the
 date history), which is why provenance needed **no migration and no new wire field** — the
@@ -1188,13 +1282,18 @@ resolution list.
 changes when the month rolls over, because the person who spoke to the factory is the person
 who knows the case. **DERIVED from `ops_po_duty`, never an `assigned_to` column.**
 
-**Where a claim can be born:** ONE engine, and the long-term architecture is two entrances
-(Receiving · Service Cases), which is how SAP, Oracle and Dynamics all do it. **TODAY only
-Receiving exists**, and that is a ruling with a stated price: 0299's guard allows
-`incoming → on_hold` and no other entry, so **a fault found a week after receiving has no
-supplier-claim route at all** — it is a service case. **If that changes, the entry rule and the
-refurbish door must be settled in the SAME change**, or the refurbish path hands a held unit
-back to the pool with no claim ever answered.
+**Where a claim is born:** Supplier Claims has no independent intake. Staff use `Report Problem`
+on PO/Receiving or any other source record; the one Service Case authority opens or links the
+Case and creates a Supplier Claim workstream when supplier responsibility is in scope.
+`Purchasing → Supplier Claims` is the Purchasing work view of those workstreams. It is where
+Purchasing asks the supplier, records the answer, obtains external credit/debit-note evidence and
+finishes its work; it never asks Purchasing to rekey the original problem or choose whether a
+Case should exist.
+
+**Implementation gap:** today's receiving path and 0299 transition guard still embody the older
+receiving-only entrance. The Service Case completion build must change the claim entry rule and
+the refurbish door in the same migration, so a held/refurbished unit cannot return to the free
+pool while its claim is unanswered.
 
 ### THE PANEL LOO FROZE, 2026-08-05 — three of six built, 2026-08-06
 
@@ -1437,10 +1536,10 @@ I do*). **The operator's answer was the thing that went missing.**
 | **`Refund` as a claim resolution** | **Approved as a concept, blocked on business meaning** — supplier credit note? cash? AP offset? Hidden until Loo rules it. **Do not guess and do not delete it.** |
 | **`Repaired` · `Disposed` as item outcomes** | Approved. Needs a migration: 0299's transition guard admits exactly three destinations. |
 | **Carres Execution as a real field** | Frozen (five options, §6). Not built. |
-| **A second claim entrance from Service Cases** | Approved as the long-term architecture. **The entry rule and the refurbish door must be settled in the SAME change.** |
+| **One Service Case intake feeding Supplier Claim work** | Approved architecture. Not live: replace the receiving-only claim creation path and settle the entry rule plus refurbish door in the SAME change. |
 | **`DecisionGuideCard`** | Approved as a **portal-wide kit component**, not a Claims feature. One card under the selector, updating live: title → 1–2 sentences → max 3 `Typical examples` → max 3 `What happens next`. **Never a hover tooltip for business guidance** (users do not discover them; mobile cannot hover; staff stop reading after the first week). **Content from a configuration object, never hard-coded in the component.** Next homes: `Deliver To` · `Receiving Method` · `Purpose` · `Delivery Status` · `Payment Result`. |
 | **The September supplier switch** | Approved. Nice Future stops; a subscription-model mattress supplier takes over. |
 | **PO revisions** | **RULED OUT, not deferred.** A sent PO is never edited. |
 | **The Working Calendar** | Approved 2026-08-06. Public holidays live in code (`packages/shared/src/my-holidays.ts`) and a manager cannot edit them — but the real fact is *"is Carres working that day?"*, which only the office can answer (a gazetted holiday can be a working day, and the company can close on an ordinary one). Settings gains ONE company calendar: the official list auto-loads each year, a manager marks a day working / adds a closure, audited like every Settings number. **Every engine — order-by, the CALLS calendar, delivery arithmetic — reads this ONE calendar.** Until built, `myHolidaySet()` stands. |
 | **`View Flow`** | Approved 2026-08-06 — **the ONE function worth porting from AutoCount's PO-register menu** (2990s' `RelationshipMap` is the worked example): one click shows the whole chain SO → PO → Receiving → Claim for a document. Everything else on that menu was reviewed with Loo the same day and is either already here or REJECTED: blank `New` (bypasses PURCHASING DEMAND, the single entry) · `Edit` (a sent PO is never edited) · `Delete` (red line — `Cancel` keeps the record) · AP/invoice transfers (Purchasing never touches money). |
-| **Team panel `GRN DUTY` row** | Approved 2026-08-06 — the panel states PO duty and must state GRN duty too (§2.2). One home for identity; no page repeats it. |
+| ~~**Team panel `GRN DUTY` row**~~ | **DONE 2026-08-15.** The row states an auto-assigned holder and carries an edit door for the `po_duty_editor`; the rota reaches FORWARD one month. The ruling now lives in §2.2 where the duty model is, not here. |

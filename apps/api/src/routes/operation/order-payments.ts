@@ -100,6 +100,7 @@ orderPaymentsRouter.post("/:id/payments", async (c) => {
     reference: parsed.data.reference,
     note: parsed.data.note,
     receiptUrl: parsed.data.receiptUrl,
+    idempotencyKey: parsed.data.idempotencyKey,
   });
   if (error) {
     const m = mapPgError(error);
@@ -617,6 +618,7 @@ async function recordPayment(
     reference?: string | null;
     note?: string | null;
     receiptUrl?: string | null;
+    idempotencyKey?: string;
   },
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<{ data: any; error: any }> {
@@ -635,6 +637,7 @@ async function recordPayment(
       p_receipt_url: args.receiptUrl ?? null,
       p_receipt_no: receiptNo,
       p_counts_toward_paid: true,
+      p_idempotency_key: args.idempotencyKey ?? receiptNo,
     });
     // 23505 = the receipt number is taken. Anything else is the caller's answer.
     if (!last.error || last.error.code !== "23505") return last;

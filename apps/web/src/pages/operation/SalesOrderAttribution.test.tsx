@@ -19,6 +19,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
+import { useAuth } from "@/lib/auth";
 import type { AttributionRequest } from "@/lib/queries";
 import SalesOrderAttribution from "./SalesOrderAttribution";
 
@@ -76,6 +77,10 @@ const pending: AttributionRequest = {
 
 beforeEach(() => {
   liveRequest = null;
+  /* ⭐ READ-ONLY FOR OPERATION — owner ruling 2026-08-15. The door belongs to
+     the roles GATE 3 lets decide it; the default here is one of them so the
+     verb tests below still reach the form. */
+  useAuth.setState({ role: "principal" });
   submitMutate.mockReset();
   decideMutate.mockReset();
   applyMutate.mockReset();
@@ -85,11 +90,29 @@ beforeEach(() => {
 describe("no live request — one way in, and it is a request", () => {
   it("offers the request, and says why editing is not the way", () => {
     draw();
-    expect(screen.getByTestId("attribution-open")).toBeTruthy();
+    expect(screen.getByTestId("attribution-open").textContent).toBe(
+      "Change salesperson — needs approval",
+    );
     expect(screen.queryByTestId("attribution-request")).toBeNull();
-    /* The sentence is the point: an operator who reads "they change by
-     * approval, not by editing" does not go hunting for a picker in Edit. */
-    expect(screen.getByText(/change by approval, not by editing/i)).toBeTruthy();
+    expect(screen.getByText("Sales ownership changes only after approval.")).toBeTruthy();
+  });
+
+  /* Who gets PAID is not an Operation correction (owner ruling 2026-08-15).
+     The fact stays on screen; the door does not. */
+  it("hides the door from Operation and still states the fact", () => {
+    useAuth.setState({ role: "operation" });
+    draw();
+    expect(screen.queryByTestId("attribution-open")).toBeNull();
+    expect(screen.getByText("Sales ownership changes only after approval.")).toBeTruthy();
+  });
+
+  /* A pending change is TRUTH, not an action — everyone sees it. */
+  it("still shows a live request to Operation", () => {
+    useAuth.setState({ role: "operation" });
+    liveRequest = pending;
+    draw();
+    expect(screen.getByTestId("attribution-request")).toBeTruthy();
+    expect(screen.queryByTestId("attribution-open")).toBeNull();
   });
 
   it("will not send without a reason, and sends only the field that moved", () => {

@@ -82,13 +82,25 @@ export const TONES: readonly OrderActionTone[] = ["danger", "warning", "info", "
 
 /* ─────────────────────────────────────────────────────────────────────────
  * §4.2 Radius — four, frozen.
+ *
+ * ⭐ A PILL IS A CAPSULE — owner ruling 2026-08-15 (Chai), re-ruling §4.
+ *
+ * The 4px row used to claim three uses and only one of them was honest. A
+ * "pill" at 4px is a rounded rectangle, and it sat beside search and the pill
+ * toolbar buttons, which have been fully rounded since Jess ruled the capsule
+ * language on 2026-08-01. The 4px row now names the ONE control that really
+ * wants it — the checkbox — and every pill and small tag joins `rounded-full`.
+ *
+ * `rounded-pill` KEEPS ITS NAME on purpose. §0: a label is presentation, an
+ * identifier is a contract, and renaming this class would be a breaking change
+ * across the Tailwind config, this record and the source scan for no gain.
  * ──────────────────────────────────────────────────────────────────────── */
 
 export const RADII = [
-  { px: 4, className: "rounded-pill", use: "pill · small tag · checkbox" },
+  { px: 4, className: "rounded-pill", use: "checkbox" },
   { px: 6, className: "rounded-control", use: "button · input · dropdown" },
   { px: 10, className: "rounded-card", use: "card · panel · modal · drawer" },
-  { px: null, className: "rounded-full", use: "avatar · status dot" },
+  { px: null, className: "rounded-full", use: "pill · small tag · avatar · status dot" },
 ] as const;
 
 /* ─────────────────────────────────────────────────────────────────────────

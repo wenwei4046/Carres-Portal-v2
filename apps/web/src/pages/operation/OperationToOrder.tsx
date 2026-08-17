@@ -108,6 +108,7 @@ import {
   rangeValue,
 } from "@/lib/excel-date-filter";
 import { fmtDate, fmtDateShort } from "@/lib/fmt-date";
+import { displayCustomerName } from "@/lib/customer-name";
 import { qk } from "@/lib/queries";
 import CreatePurchaseDialog, { type Destination } from "./CreatePurchaseDialog";
 import PurchasingTabs from "./PurchasingTabs";
@@ -270,23 +271,18 @@ function clockLabel(ms: number): string {
 }
 
 /**
- * `Fri 7 Aug` — a rail day row's word (Loo, 2026-08-06: weekday + date on
- * EVERY row, one format; never a bare weekday, never Today/Tomorrow). The
- * full spelling stays on the hover (`countWord`). Composed from the portal's
- * own two date spellings — the weekday off `fmtDate`, the day+month off
- * `fmtDateShort` less its year — so no third date format is invented.
+ * `Fri, 7 Aug` — a rail day row's word. `railDayLabel` is DELETED (owner ruling
+ * 2026-08-15): it composed a no-year date by slicing the weekday off `fmtDate`
+ * and regexing the year off `fmtDateShort`, which is a fourth date spelling
+ * built out of two others. THE YEAR RULE makes the no-year form the formatter's
+ * own answer, so the rail calls `fmtDate` like everything else.
  */
-function railDayLabel(iso: string): string {
-  return `${fmtDate(iso).slice(0, 3)} ${fmtDateShort(iso).replace(/ \d{2}$/, "")}`;
-}
-
-/** `mee yee` → `Mee Yee`, `PETER` → `Peter` — display only, the record keeps
- *  what was typed. */
-function properCase(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/(^|[\s\-\/])([a-z])/g, (_m, sep, ch) => sep + ch.toUpperCase());
-}
+/* `properCase` is DELETED (owner ruling 2026-08-15). It lowercased the whole
+ * string before raising each word, so `KJ NG` came out `Kj Ng` and
+ * `LIM KUAN YANG` came out `Lim Kuan Yang` — a customer's initials rewritten
+ * by a page-local copy of a rule that now has ONE home. See
+ * `@/lib/customer-name`: capitalize UP only, never down.
+ */
 
 /**
  * P12 — the `purchase_demands` row behind a grid row, or `null`.
@@ -1257,7 +1253,7 @@ export default function OperationToOrder() {
     const vals = [...new Set(base.map((r) => r.customer ?? F_NONE))].sort();
     return vals.map((v) => ({
       value: v,
-      label: v === F_NONE ? "—" : properCase(v),
+      label: v === F_NONE ? "—" : displayCustomerName(v),
     }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inView, colFilters]);
@@ -1795,8 +1791,8 @@ export default function OperationToOrder() {
             </span>
           ) : null
         ) : r.customer ? (
-          <span className="block truncate text-kit-slate-12" title={properCase(r.customer)}>
-            {properCase(r.customer)}
+          <span className="block truncate text-kit-slate-12" title={displayCustomerName(r.customer)}>
+            {displayCustomerName(r.customer)}
           </span>
         ) : null,
       },
@@ -1847,7 +1843,7 @@ export default function OperationToOrder() {
           partly || (g && g.pos.length > 0) ? (
             <span className="flex items-center gap-2 min-w-0">
               {partly ? (
-                <span className="shrink-0 rounded-pill bg-kit-amber-3 px-2 py-0.5 text-label text-kit-amber-11">
+                <span className="shrink-0 rounded-full bg-kit-amber-3 px-2 py-0.5 text-label text-kit-amber-11">
                   {W.partlyOrdered}
                 </span>
               ) : null}
@@ -1934,7 +1930,7 @@ export default function OperationToOrder() {
               active={viewSet.has(day)}
               onClick={() => toggleView(day)}
               testId={`to-order-day-${day}`}
-              name={railDayLabel(day)}
+              name={fmtDate(day)}
               count={String(timeCounts.get(day)?.size ?? 0)}
               countWord={`${ordersHeadline(timeCounts.get(day)?.size ?? 0)} · ${fmtDate(day)}`}
             />
