@@ -2570,6 +2570,14 @@ export * from "./booking-brief";
 // CARD 4 — the collection clock: T−3 · T−2 · T−1 (final deadline) on working
 // days before the delivery, one arithmetic for every surface that presses.
 export * from "./collection-clock";
+
+/**
+ * The Finance exception — the ONE money blocker (owner ruling 2026-08-16,
+ * `docs/orders/MASTER.md` §8). Slice 1 of the money-gate correction: the
+ * blocker exists before Slice 3 removes the balance from the gate, so the
+ * delivery order is never briefly ungated.
+ */
+export * from "./finance-exception";
 // CARD 5 — delivery attempts: every vehicle run leaves a record; a failure is
 // ONE exception (Reason Library + where the goods are), units move with reality.
 export * from "./schemas/delivery-attempt";
