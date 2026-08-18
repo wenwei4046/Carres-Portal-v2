@@ -5521,6 +5521,96 @@ export function useIssueDeliveryOrder(
   });
 }
 
+/** The Delivery Orders REGISTER + the DO object page (blueprint card
+ *  2026-08-16). Read-only document truth: rows from `ops_delivery_orders`
+ *  (0356) plus the attempt facts the ONE shared status arithmetic
+ *  (`deliveryOrderStatusOf`) derives from. A register finds documents — no
+ *  owner, no action, no due date rides these hooks. */
+export interface DeliveryOrderRow {
+  id: string;
+  order_id?: string;
+  do_number: string;
+  issued_at: string;
+  trip_groups: string[] | null;
+  delivery_date: string | null;
+  time_slot: string | null;
+  logistics_partner: string | null;
+  voided_at: string | null;
+  void_reason: "order_cancelled" | "rescheduled" | null;
+  orders: {
+    id: string;
+    so: number;
+    customer_name: string | null;
+    customer_address_city?: string | null;
+    customer_address_state?: string | null;
+  };
+}
+export interface DeliveryOrderAttemptRow {
+  do_number: string | null;
+  result: "delivered" | "partial" | "failed";
+  reason_key: string | null;
+  note?: string | null;
+  where_goods?: string | null;
+  recorded_at: string;
+  recorded_by?: string | null;
+}
+export interface DeliveryOrdersRegisterPayload {
+  deliveryOrders: DeliveryOrderRow[];
+  attempts: DeliveryOrderAttemptRow[];
+}
+export function useDeliveryOrdersRegister(opts?: { orderId?: string }) {
+  const scope = opts?.orderId ?? "all";
+  return useQuery<DeliveryOrdersRegisterPayload, ApiError>({
+    queryKey: ["operation", "delivery-orders", scope],
+    queryFn: () =>
+      apiFetch<DeliveryOrdersRegisterPayload>(
+        opts?.orderId
+          ? `/api/operation/delivery-orders?order=${opts.orderId}`
+          : "/api/operation/delivery-orders",
+      ),
+    staleTime: 30_000,
+  });
+}
+
+export interface DeliveryOrderDetailPayload {
+  deliveryOrder: DeliveryOrderRow & {
+    order_id: string;
+    orders: DeliveryOrderRow["orders"] & {
+      customer_phone: string | null;
+      customer_emergency: string | null;
+      customer_address: string | null;
+      pod_url: string | null;
+      pod_uploaded_at: string | null;
+      pod_signature_url: string | null;
+      pod_signed_by: string | null;
+      pod_signed_at: string | null;
+      do_number: string | null;
+      order_lines: Array<{ sku: string; qty: number }>;
+    };
+  };
+  attempts: DeliveryOrderAttemptRow[];
+  lineDescriptions: Record<string, string>;
+  loans: Array<{
+    id: string;
+    item_id: string | null;
+    do_number: string | null;
+    status: "on_loan" | "returned";
+    loaned_at: string | null;
+    returned_at: string | null;
+    loan_note_no: string | null;
+  }>;
+}
+export function useDeliveryOrder(idOrNumber: string | null) {
+  return useQuery<DeliveryOrderDetailPayload, ApiError>({
+    queryKey: ["operation", "delivery-orders", "detail", idOrNumber],
+    queryFn: () =>
+      apiFetch<DeliveryOrderDetailPayload>(
+        `/api/operation/delivery-orders/${encodeURIComponent(idOrNumber ?? "")}`,
+      ),
+    enabled: Boolean(idOrNumber),
+  });
+}
+
 /** C8 — record the Delay planning decision (Jess 2026-07-27, migration 0304).
  *
  *  The supplier named a date later than the one we sold. Operations answers one

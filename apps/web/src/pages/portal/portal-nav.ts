@@ -13,6 +13,7 @@ import {
   ArrowDownLeft,
   ArrowUpRight,
   FileText,
+  PackageCheck,
   Undo2,
   Scale,
   BarChart3,
@@ -132,6 +133,20 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         icon: ClipboardList,
         path: "/operation/orders",
         badge: "orders",
+        section: "Sales",
+      },
+      // Delivery Orders (blueprint card, owner ruling 2026-08-16) — the DO
+      // REGISTER under SALES: which documents exist. The system issues them;
+      // the Delivery work page (Supply Chain) stays the execution view.
+      {
+        key: "delivery-orders",
+        label: "Delivery Orders",
+        // PackageCheck — a checked parcel: the issued delivery document. NOT
+        // FileText (Finance's Invoices already wears it in the same rail) and
+        // NOT Route (the Delivery work page's face) — two doors sharing one
+        // icon read as the same page.
+        icon: PackageCheck,
+        path: "/operation/delivery-orders",
         section: "Sales",
       },
       // Work (SO V2 CARD 10, owner ruling 2026-08-11) — My Work / Team Work:

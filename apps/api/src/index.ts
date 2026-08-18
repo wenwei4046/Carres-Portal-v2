@@ -38,6 +38,7 @@ import procurementTabsRouter from "./routes/operation/procurement-tabs";
 import dispatchCustomerLegRouter from "./routes/operation/dispatch-customer-leg";
 import deliveryChainRouter from "./routes/operation/delivery-chain";
 import orderControlRouter from "./routes/operation/order-control";
+import deliveryOrdersRouter from "./routes/operation/delivery-orders";
 import purchaseRouter from "./routes/operation/purchase";
 import toOrderRouter from "./routes/operation/to-order";
 import purchasingSettingsRouter from "./routes/operation/purchasing-settings";
@@ -190,6 +191,7 @@ api.route("/operation/orders", resumeDispatchRouter);
 api.route("/operation/orders", deliveryChainRouter);
 // 0159 P2 control overlay — GET + PUT /:id/control
 api.route("/operation/orders", orderControlRouter);
+api.route("/operation/delivery-orders", deliveryOrdersRouter);
 // 0184 balance job — payment ledger + storage collect / waiver / delivery gate
 api.route("/operation/orders", orderPaymentsRouter);
 // 0223 Stripe online collection — POST/GET /orders/:id/stripe/checkout[/:sid]

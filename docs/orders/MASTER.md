@@ -4072,6 +4072,19 @@ With this, every slice of
 is delivered and production-verified; that card carries the execution record and the Order Route
 decision-A programme is **closed**.
 
+### THE DELIVERY ORDER BECOMES A DOCUMENT WITH A REGISTER — blueprint card 2026-08-16 · SLICE 1 BUILT
+
+The DO stopped being a bare column: `ops_delivery_orders` (0356) holds one row per trip's
+document, materialised by ONE trigger on `orders.do_number` so every mint path produces the row.
+The **Delivery Orders Register lives under SALES** beside this register, its rows open the **DO
+object page**, and document numbers are doors both ways — the SO register's `DO No` cell and the
+Order Route's issued gate node open the DO object; the DO page's `Open SO-{n} →` returns.
+**docs/delivery/MASTER.md owns the document model** (status arithmetic, void law, failure-keeps-
+its-exception); this MASTER keeps only the gate. Two Law-D repairs rode the slice: the canvas
+gate now prints the number from `orders.do_number` (it used to read attempts alone, so a
+system-issued DO with no run showed a ready gate with no number), and the ISSUED gate node gained
+the door its own complete-node anatomy law requires — a door to the document, never a control.
+
 **AGREEING a date is softer than ISSUING.** It WARNS about goods, money and the calendar so
 nobody promises a day the goods cannot make, but it refuses only two things:
 **Sunday and Malaysian public holidays** (no company runs), and **a missing building type**

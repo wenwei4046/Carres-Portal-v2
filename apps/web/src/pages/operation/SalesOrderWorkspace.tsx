@@ -1219,6 +1219,10 @@ export default function SalesOrderWorkspace() {
         receivedAt: record.goods_received_at,
       })),
       delivery: {
+        /* The document's own number (0356/Law D) — the gate stops depending on
+           an attempt existing before it can print the number the system
+           already minted. */
+        doNumber: detail.order.do_number ?? null,
         /* Delivery's own answer about who carries this order — the LOGISTICS
            node never infers a company from the region default. */
         logistics: facts.brief.assignedLogistics

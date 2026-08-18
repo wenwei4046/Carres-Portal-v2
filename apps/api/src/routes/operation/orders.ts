@@ -1700,13 +1700,46 @@ operationOrdersRouter.get("/:id/print-do-data", requireOperation, async (c) => {
   // never once have worked. The document is now produced by pressing
   // `Issue delivery order` once the customer's date is confirmed, which is what
   // this sentence says.
-  if (!order.do_number) {
+  // Blueprint card 2026-08-16 — a REPRINT names its document. `?do_number=`
+  // asks for one specific document of this order (the DO object page's Print);
+  // it must exist in the DO register (0356) for THIS order, so a stray number
+  // cannot borrow another order's goods. Without the param the behaviour is
+  // unchanged: the order's current document prints.
+  const requestedDo = c.req.query("do_number") ?? null;
+  let printDoNumber: string | null = order.do_number ?? null;
+  let printIssuedAt: string | null = null;
+  if (requestedDo) {
+    const { data: doRow, error: doErr } = await sb
+      .from("ops_delivery_orders")
+      .select("do_number, issued_at")
+      .eq("order_id", id)
+      .eq("do_number", requestedDo)
+      .maybeSingle();
+    if (doErr) {
+      const m = mapPgError(doErr);
+      return c.json(m.body, m.status);
+    }
+    if (!doRow) {
+      return c.json(
+        {
+          error: "not_found",
+          code: "do_not_found",
+          message: "That delivery order does not belong to this Sales Order.",
+        },
+        404,
+      );
+    }
+    printDoNumber = doRow.do_number as string;
+    printIssuedAt = (doRow.issued_at as string | null) ?? null;
+  }
+
+  if (!printDoNumber) {
     return c.json(
       {
         error: "rule_violation",
         code: "do_missing",
         message:
-          "No delivery order for this trip yet — press Issue delivery order first.",
+          "No delivery order for this trip yet — the system issues it when the goods, logistics and date are ready.",
       },
       422,
     );
@@ -1746,8 +1779,11 @@ operationOrdersRouter.get("/:id/print-do-data", requireOperation, async (c) => {
   // Map DB rows → DoTemplateData. Currency values are MYR major units (per types.ts contract).
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const ord: any = order;
-  // Issue date: prefer delivered_at (when DO was attached), fall back to placed_at. ISO yyyy-mm-dd.
-  const issueIso = ord.delivered_at ?? ord.placed_at ?? new Date().toISOString();
+  // Issue date: the DOCUMENT's own issue stamp when a specific document was
+  // asked for (0356); else prefer delivered_at (when DO was attached), fall
+  // back to placed_at. ISO yyyy-mm-dd.
+  const issueIso =
+    printIssuedAt ?? ord.delivered_at ?? ord.placed_at ?? new Date().toISOString();
   const issueDate = String(issueIso).slice(0, 10);
 
   const dealerRow = ord.dealers ?? null;
@@ -1768,7 +1804,7 @@ operationOrdersRouter.get("/:id/print-do-data", requireOperation, async (c) => {
   const dealerContact: string | null = dealerContactParts.length > 0 ? dealerContactParts.join(" · ") : null;
 
   const templateData: DoTemplateData = {
-    do_number: String(ord.do_number),
+    do_number: String(printDoNumber),
     issue_date: issueDate,
     order_id: String(ord.id),
     // Order code shown to dealer = `SO-${so}` (matches existing UI conventions).

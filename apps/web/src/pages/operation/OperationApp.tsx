@@ -31,6 +31,8 @@ import OperationDashboard from "./OperationDashboard";
 // named in the cutover card — revert + redeploy the previous Pages build.
 import OperationOrdersControl from "./OperationOrdersControl";
 import SalesOrdersRegister from "./SalesOrdersRegister";
+import DeliveryOrdersRegister from "./DeliveryOrdersRegister";
+import DeliveryOrderPage from "./DeliveryOrderPage";
 import SalesOrderWorkspace from "./SalesOrderWorkspace";
 import SettingsWorkspace from "./SettingsWorkspace";
 // T11 (2026-07-27) — the Delivery module: the ONE new sidebar item in the
@@ -149,12 +151,23 @@ export default function OperationApp() {
   // sub-path: `startsWith` would then light BOTH sidebar items at once, and a
   // door that shares the new register's prefix reads as part of it.
   const isOldOrdersUrl = location.pathname.startsWith("/operation/old-orders");
+  // The Delivery Orders register + DO object page (blueprint card 2026-08-16).
+  // Its own prefix, NOT `/operation/orders/…`, for the same sidebar-lighting
+  // reason as old-orders above.
+  const isDeliveryOrdersUrl = location.pathname.startsWith(
+    "/operation/delivery-orders",
+  );
+  // Only the REGISTER hands scroll ownership to its grid; the DO object page
+  // scrolls like a normal page.
+  const isDeliveryOrdersRegisterUrl =
+    location.pathname === "/operation/delivery-orders";
   /* The one Settings Workspace is its own route, not a module tab — the
      Page Header gear is the ERP's single Settings entry (ui/MASTER.md). */
   const isSettingsUrl = location.pathname.startsWith("/operation/settings");
   const isIssuesUrl = location.pathname.startsWith("/operation/issues");
   const isUrlDriven =
-    isProcurementUrl || isToOrderUrl || isOrdersUrl || isOldOrdersUrl || isSettingsUrl || isIssuesUrl;
+    isProcurementUrl || isToOrderUrl || isOrdersUrl || isOldOrdersUrl ||
+    isDeliveryOrdersUrl || isSettingsUrl || isIssuesUrl;
 
   const [tab, setTab] = useState<string>("dashboard");
   // Sidebar collapse moved into PortalSidebar (Unified Internal Portal,
@@ -191,6 +204,7 @@ export default function OperationApp() {
       || isToOrderUrl
       || isOrdersUrl
       || isOldOrdersUrl
+      || isDeliveryOrdersUrl
       || isSettingsUrl
       || isIssuesUrl
     )
@@ -199,7 +213,7 @@ export default function OperationApp() {
     setWarehousePrefill((p) => (urlTab === "warehouse" ? p : undefined));
     setTab(urlTab);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [urlTab, isProcurementUrl, isToOrderUrl, isOrdersUrl, isOldOrdersUrl, isSettingsUrl, isIssuesUrl]);
+  }, [urlTab, isProcurementUrl, isToOrderUrl, isOrdersUrl, isOldOrdersUrl, isDeliveryOrdersUrl, isSettingsUrl, isIssuesUrl]);
 
   // When the URL leaves a URL-driven section (e.g. user navigated via Back
   // to `/operation`), make sure the local tab state has a sensible value so
@@ -294,6 +308,7 @@ export default function OperationApp() {
             Receiving — Jess 2026-07-22, Q9 Option B — one clean top row, not
             two, so the module tab bar is the only chrome). */}
         {!isOrdersUrl &&
+          !isDeliveryOrdersUrl &&
           !isOldOrdersUrl &&
           !isProcurementUrl &&
           !isToOrderUrl &&
@@ -304,7 +319,9 @@ export default function OperationApp() {
           tab !== "purchasing-settings" && <GlobalTopBar />}
         <div
           className={`flex-1 min-h-0 ${
-            isSalesOrdersRegisterUrl ? "overflow-hidden" : "overflow-auto"
+            isSalesOrdersRegisterUrl || isDeliveryOrdersRegisterUrl
+              ? "overflow-hidden"
+              : "overflow-auto"
           }`}
           data-testid={isSalesOrdersRegisterUrl ? "sales-orders-work-surface" : undefined}
         >
@@ -344,6 +361,11 @@ export default function OperationApp() {
               element={<TabbedProcurementShell />}
             />
             <Route path="orders" element={<SalesOrdersRegister />} />
+            {/* The Delivery Orders register + the DO object page (blueprint
+                card 2026-08-16). `:doId` accepts the row id or the document
+                number itself, so `DO-…` anywhere in the portal is a door. */}
+            <Route path="delivery-orders" element={<DeliveryOrdersRegister />} />
+            <Route path="delivery-orders/:doId" element={<DeliveryOrderPage />} />
             {/* STAGE 1 — the workspace route the register's rows open.
                 STAGE 2 — `so/new` is the office birth door ([+ New Sales
                 Order]); static `new` outranks `:orderId`. Declared before

@@ -60,6 +60,14 @@ export const DELIVERY_REASONS = [
   // site
   { key: "condo_approval_required", label: "Condo approval required", category: "site", responsibility: "external" },
   { key: "lift_booking_required", label: "Lift booking required", category: "site", responsibility: "external" },
+  // the Delivery Order blueprint's remaining exception reasons (owner-approved
+  // card, 2026-08-16) — the DO register's `Delivery exception` carries ONE of
+  // these, from THIS library, never a second word list. Responsibility still
+  // follows the category by the law above.
+  { key: "goods_damaged", label: "Goods damaged", category: "stock", responsibility: "carres" },
+  { key: "wrong_goods", label: "Wrong goods", category: "stock", responsibility: "carres" },
+  { key: "photo_missing", label: "Delivery photo missing", category: "logistic", responsibility: "carres" },
+  { key: "loan_not_collected", label: "Loan not collected back", category: "logistic", responsibility: "carres" },
 ] as const satisfies readonly DeliveryReason[];
 
 export type DeliveryReasonKey = (typeof DELIVERY_REASONS)[number]["key"];
