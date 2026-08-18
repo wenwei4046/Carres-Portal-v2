@@ -22,7 +22,7 @@ const deliveryOrdersRouter = new Hono<AppEnv>();
 
 /** The order fields the register's columns print — nothing more. */
 const ORDER_EMBED =
-  "orders!inner(id, so, customer_name, customer_address_city, customer_address_state)";
+  "orders!inner(id, so, customer_name, customer_address_city, customer_address_state, delivery_date, delivery_date_tbd)";
 
 deliveryOrdersRouter.get("/", requireOperationOrPrincipal, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
@@ -85,7 +85,8 @@ deliveryOrdersRouter.get("/:id", requireOperationOrPrincipal, async (c) => {
        logistics_partner, voided_at, void_reason,
        orders!inner(id, so, customer_name, customer_phone, customer_emergency,
          customer_address, customer_address_city, customer_address_state,
-         pod_url, pod_uploaded_at, pod_signature_url, pod_signed_by, pod_signed_at,
+         do_file_path, do_uploaded_at,
+         pod_signature_url, pod_signed_by, pod_signed_at,
          do_number,
          order_lines(sku, qty))`,
     );

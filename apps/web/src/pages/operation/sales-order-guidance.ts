@@ -24,27 +24,18 @@
  * "never show generic `Contact Customer` or `Follow Up`; name the purpose".
  */
 export interface SalesOrderGuidance {
-  /** The FACT — what is true right now. Matches `NO_DATE_YET`. */
+  /** The FACT — what is true right now. Matches `NO_DATE_YET`. Since the
+   *  owner ruling of 2026-08-18 this is the ONLY thing a register cell
+   *  prints: registers list documents, and the action lives in My Work /
+   *  Team Work / the Order Route. The workspace's seven-answer banner was
+   *  DELETED by the same ruling (it lectured instead of working), so the
+   *  seven per-field strings left with it. */
   problem: string;
-  /** The ACTION, in one clause the 148px cell prints WHOLE. */
-  action: string;
-  /** The same facts in full, for the cell's `title` hover. Newline-separated:
-   *  browsers render a multi-line tooltip and the operator gets who, whose
-   *  phone, what to ask and what to write down without leaving the row. */
+  /** Who · whose phone · what to ask · what to record — the cell's `title`
+   *  hover. Newline-separated: browsers render a multi-line tooltip. */
   detail: string;
-  why: string;
-  owner: string;
-  contact: string;
-  ask: string;
-  use: string;
-  record: string;
-  next: string;
 }
 
-/** The cell clause. A CONSTANT on purpose: a name interpolated here makes the
- *  string as long as the longest customer name, which is how it started
- *  truncating. The party is named in `detail` and in the workspace panel. */
-const CONFIRM_DELIVERY_DATE = "Confirm delivery date";
 
 /**
  * The customer WAS asked and answered *not yet*. That is a different fact from
@@ -88,19 +79,10 @@ export function missingDeliveryDateGuidance(input: {
 }): SalesOrderGuidance {
   const owner = input.salesperson?.trim() || "Sales";
   const phone = input.phone?.trim() || "Phone not recorded";
-  const contact = `${input.customer} · ${phone}`;
   const ask = "Ask which delivery date the customer agrees to.";
   const record = "Record the agreed Customer Delivery date.";
   return {
     problem: "No delivery date",
-    action: CONFIRM_DELIVERY_DATE,
-    detail: `${owner} · ${contact}\n${ask}\n${record}`,
-    why: "The customer delivery commitment is not recorded.",
-    owner,
-    contact,
-    ask,
-    use: "Use the customer delivery confirmation message.",
-    record,
-    next: "Delivery can plan from the recorded customer date.",
+    detail: `${owner} · ${input.customer} · ${phone}\n${ask}\n${record}`,
   };
 }

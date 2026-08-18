@@ -278,9 +278,11 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     mount();
     const exception = screen.getByText("No delivery date");
     expect(exception).toHaveAttribute("data-attention", "warning");
-    /* The cell prints ONE clause that fits the governed 148px column whole;
-       who must act, whose phone and what to record ride the hover. */
-    expect(screen.getByText("Confirm delivery date")).toBeInTheDocument();
+    /* ⭐ THE FACT ALONE — owner ruling 2026-08-18: a register lists documents;
+       actions live in My Work / Team Work / the Order Route. The instruction
+       clause left the cell; who must act, whose phone and what to record
+       still ride the hover. */
+    expect(screen.queryByText("Confirm delivery date")).toBeNull();
     const cell = exception.closest("span[title]");
     expect(cell).toHaveAttribute(
       "title",
@@ -290,14 +292,15 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
         "Record the agreed Customer Delivery date.",
       ].join("\n"),
     );
-    expect(cell).toHaveTextContent("Confirm delivery date");
     expect(screen.queryByText("No date yet")).not.toBeInTheDocument();
   });
 
-  /* ⭐ THE TWO-LINE GRAMMAR IS 13 / 11 — owner ruling 2026-08-15, held here so
-     the sizes cannot drift back. ui/MASTER.md §5 locks the RANKS (fact above
-     action, body above supporting); this asserts the tokens that carry them. */
-  it("ranks the guidance cell 13 / 11 — body semibold over label regular", () => {
+  /* ⭐ THE CELL IS THE FACT ALONE — owner ruling 2026-08-18 (supersedes the
+     in-cell 13/11 action pair of 2026-08-15). The fact keeps the governed
+     body rank and the warning ink; NO action clause renders in any register
+     cell. The two-line grammar lives on where actions live — My Work / Team
+     Work / the Order Route. */
+  it("the guidance cell is the FACT alone — no action sentence in a register cell", () => {
     listHookState.data = { orders: [order({
       delivery_date: null,
       delivery_date_tbd: false,
@@ -306,20 +309,15 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     })] };
     mount();
 
-    // Line 1 — the FACT. Governed body 13 (inherited from the row) at
-    // semibold, in the warning ink the §5 lock reserves for it.
+    // The FACT. Governed body 13 (inherited from the row) at semibold, in
+    // the warning ink reserved for it.
     const problem = screen.getByText("No delivery date");
     expect(problem.className).toContain("font-semibold");
     expect(problem.className).not.toContain("text-meta");
     expect(problem.className).not.toContain("text-label");
 
-    // Line 2 — the ACTION. `text-label` is 11px, and `font-normal` overrides
-    // that token's own 500 down to regular weight, exactly as ruled.
-    const action = screen.getByText("Confirm delivery date");
-    expect(action.className).toContain("text-label");
-    expect(action.className).toContain("font-normal");
-    // The retired size, named so a revert is caught rather than merely absent.
-    expect(action.className).not.toContain("text-meta");
+    // The ACTION clause is GONE from the cell — named, so a revert is caught.
+    expect(screen.queryByText("Confirm delivery date")).toBeNull();
   });
 
   /* ⭐ CUSTOMER NAME — CAPITALIZE UP ONLY, owner ruling 2026-08-15. */

@@ -114,7 +114,6 @@ import SalesOrderRoute from "./SalesOrderRoute";
 import SalesOrderTabs from "./SalesOrderTabs";
 import { lineName } from "./sales-order-facts";
 import { lineConfigBits } from "../dealer/new-order/special-addons-picker";
-import { missingDeliveryDateGuidance } from "./sales-order-guidance";
 import { copySalesOrderDraft } from "./sales-order-copy";
 
 /* pdf.js worker ships inside the package — nothing fetched from a CDN. */
@@ -1427,17 +1426,6 @@ export default function SalesOrderWorkspace() {
   );
 
   const soWord = isNew ? "New Sales Order" : order ? `SO-${order.so}` : "Sales Order";
-  /* Same ruling as the Register: a customer who answered *not yet* is not work
-     to do, so the panel does not raise the confirm action for them either
-     (docs/orders/MASTER.md · THE THREE DELIVERY DATES, 2026-08-15). */
-  const missingDateAction = order && !order.delivery_date && !order.delivery_date_tbd
-    ? missingDeliveryDateGuidance({
-        so: order.so,
-        customer: displayCustomerName(order.customer_name),
-        salesperson: order.salespersons?.name,
-        phone: order.customer_phone,
-      })
-    : null;
 
   const customerBuiltins = tab("customer").builtins;
   const emergencyEnabled = tab("emergency").builtins["emergency"]?.enabled !== false;
@@ -1472,32 +1460,6 @@ export default function SalesOrderWorkspace() {
         <div className="px-1 text-meta text-base-500">
           Customer reference {(order?.source_ref ?? []).join(" · ")}
         </div>
-      )}
-
-      {missingDateAction && mode === "object" && (
-        <details open className="rounded-card border border-kit-slate-5 bg-kit-amber-3 p-3">
-          <summary className="cursor-pointer list-none">
-            <span className="block text-body font-semibold text-kit-amber-11">{missingDateAction.problem}</span>
-            {/* 13 / 11 — the governed two-line grammar (ui/MASTER.md §5). */}
-            <span className="block text-label font-normal text-base-600">{missingDateAction.action}</span>
-          </summary>
-          <dl className="mt-3 grid gap-2 border-t border-kit-slate-5 pt-3 sm:grid-cols-2">
-            {[
-              ["Why", missingDateAction.why],
-              ["Who must act", missingDateAction.owner],
-              ["Who to contact", missingDateAction.contact],
-              ["What to ask", missingDateAction.ask],
-              ["What to use", missingDateAction.use],
-              ["What to record", missingDateAction.record],
-              ["What happens next", missingDateAction.next],
-            ].map(([label, value]) => (
-              <div key={label}>
-                <dt className="text-label font-semibold text-base-600">{label}</dt>
-                <dd className="mt-0.5 text-body text-base-900">{value}</dd>
-              </div>
-            ))}
-          </dl>
-        </details>
       )}
 
       {/* ① CUSTOMER */}

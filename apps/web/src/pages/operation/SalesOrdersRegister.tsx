@@ -271,28 +271,17 @@ function toGridColumn(
           salesperson: r.o.salespersons?.name,
           phone: r.phone,
         });
-        /* FACT first, then ONE clause that fits the governed 148px whole.
-           Who must act, whose phone to call, what to ask and what to write
-           down ride the hover (`guidance.detail`) and the Sales Order
-           workspace panel — they are not cell-sized facts, and the expand
-           has exactly one job (CLAUDE.md §2: the order's own goods).
-
-           ⭐ 13 / 11 — owner ruling 2026-08-15. Line 1 keeps the governed body
-           13 semibold; line 2 moves from `text-meta` (12) to `text-label` (11)
-           at regular weight. One point of separation was not enough to read as
-           a second RANK — the two lines looked like one wrapped sentence, and
-           the whole point of the grammar is that the eye takes the fact first
-           and the instruction second. the colour token is unchanged, and
-           `text-base-600` measures 8.6:1 on the white row — so the quieter line
-           stays well clear of the §5 lock's accessible contrast floor at the
-           smaller size rather than being rescued by it. */
+        /* ⭐ THE FACT ALONE — owner ruling 2026-08-18, and it OVERWRITES the
+           two-line action guidance that used to render here: a register lists
+           documents; actions live in My Work / Team Work / the Order Route.
+           The amber problem line stays because it is a FACT about the row
+           (nobody has asked this customer), and the full who/phone/ask detail
+           still rides the hover and the workspace panel — what leaves the
+           cell is the instruction clause. */
         return (
           <span className="block min-w-0" title={guidance.detail}>
             <span data-attention="warning" className="block truncate font-semibold text-kit-amber-11">
               {guidance.problem}
-            </span>
-            <span className="block truncate text-label font-normal text-base-600">
-              {guidance.action}
             </span>
           </span>
         );
@@ -508,10 +497,12 @@ export default function SalesOrdersRegister() {
     [navigate, role],
   );
   /* The version resets a SUPERSEDED default. v2 dropped Stage A's nine
-     columns; v3 is the owner's eight (2026-08-15) — without the bump a
-     returning browser would replay its saved seven-column order and the
-     re-ruled default would never paint on the one machine that matters. */
-  const storageKey = `carres.salesOrders.register.v3.${role ?? "anon"}`;
+     columns; v3 was the owner's eight (2026-08-15); v4 (owner ruling
+     2026-08-18) retires the duplicate `Promised` column and brings every
+     saved layout back to the ruled eight — a browser that had hidden
+     `DO No` or opened `Promised` would otherwise replay that layout
+     forever on the one machine that matters. */
+  const storageKey = `carres.salesOrders.register.v4.${role ?? "anon"}`;
 
   /* ── SELECTION — the REGISTER LAW's clause: ticks feed Export and nothing
      else. Header checkbox = select all visible / clear (the engine says which). */
