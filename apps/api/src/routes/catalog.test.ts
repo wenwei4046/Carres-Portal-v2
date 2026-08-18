@@ -3454,6 +3454,13 @@ describe("0179 — sofa combo pricing (GET bundle + principal-gated CRUD)", () =
 
 // ---------------------------------------------------------------------------
 // 2990s Products parity Phase 1 — POST /api/catalog/import-skus
+//
+// 0357 moved the WRITES into one catalog_import_skus RPC. What the route still
+// owns — and what these tests cover — is the reads, every rejection reason, the
+// payload it hands to Postgres, and how per-row results zip back to file line
+// numbers. What the SQL owns (find-or-create the model, absent-key-means-
+// preserve, in-order last-wins) is proved by the migration's own verification,
+// not here: a mock that re-implemented it would only be testing itself.
 // ---------------------------------------------------------------------------
 
 describe("POST /api/catalog/import-skus", () => {
@@ -3463,21 +3470,72 @@ describe("POST /api/catalog/import-skus", () => {
     failed: number;
     failures: { row: number; key: string; reason: string }[];
   };
+  type ImportPayload = {
+    models: { category: string; model_key: string; name: string; sizes: string[] }[];
+    rows: Record<string, unknown>[];
+  };
+  type RpcReply = { data: unknown; error: { message: string } | null };
 
-  async function importAs(
-    role: string,
-    rows: unknown[],
-    opts: {
-      reads?: Record<string, unknown>;
-      records?: { table: string; op: "insert" | "update"; body: unknown }[];
-      inserted?: unknown[];
-    } = {},
-  ) {
-    vi.mocked(userClient).mockReturnValue(
-      scriptedSb({ reads: opts.reads ?? {}, records: opts.records, inserted: opts.inserted }),
-    );
+  /**
+   * A mock shaped like the route's actual traffic: three read chains and one
+   * `.rpc`. It records every `.from(table)` so a test can assert the subrequest
+   * COUNT, which is the whole point of 0357.
+   */
+  function importSb(opts: {
+    models?: unknown[];
+    skus?: unknown[];
+    suppliers?: unknown[];
+    rpc?: (payload: ImportPayload) => RpcReply;
+  }) {
+    const reads: Record<string, unknown[]> = {
+      product_models: opts.models ?? [],
+      product_skus: opts.skus ?? [],
+      suppliers: opts.suppliers ?? [],
+    };
+    const fromCalls: string[] = [];
+    const rpcCalls: { name: string; payload: ImportPayload }[] = [];
+    const mk = (table: string) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const chain: any = {};
+      chain.select = () => chain;
+      chain.in = () => chain;
+      chain.order = () => chain;
+      chain.then = (resolve: (v: { data: unknown; error: null }) => unknown) =>
+        resolve({ data: reads[table] ?? [], error: null });
+      return chain;
+    };
+    const sb = {
+      from: (table: string) => {
+        fromCalls.push(table);
+        return mk(table);
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      rpc: async (name: string, args: any) => {
+        const payload = args.p_payload as ImportPayload;
+        rpcCalls.push({ name, payload });
+        return opts.rpc
+          ? opts.rpc(payload)
+          : {
+              data: {
+                created_models: payload.models.length,
+                rows: payload.rows.map(() => ({ result: "inserted" })),
+              },
+              error: null,
+            };
+      },
+      _from: fromCalls,
+      _rpc: rpcCalls,
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return sb as any;
+  }
+
+  type ImportSb = ReturnType<typeof importSb>;
+
+  async function importAs(role: string, rows: unknown[], sb: ImportSb = importSb({})) {
+    vi.mocked(userClient).mockReturnValue(sb);
     const jwt = await makeJwt(role, role === "dealer" ? DEALER_ID : null);
-    return app.fetch(
+    const res = await app.fetch(
       new Request("http://t/api/catalog/import-skus", {
         method: "POST",
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
@@ -3485,6 +3543,7 @@ describe("POST /api/catalog/import-skus", () => {
       }),
       env,
     );
+    return { res, sb };
   }
 
   const baseRow = (over: Record<string, unknown> = {}) => ({
@@ -3496,155 +3555,277 @@ describe("POST /api/catalog/import-skus", () => {
     ...over,
   });
 
+  const OHANA = { id: "sup-ohana", slug: "hookka", name: "Ohana", cat_covered: ["sofa", "bedframe"] };
+  const sent = (sb: ImportSb) => sb._rpc[0].payload as ImportPayload;
+
   it("403s a dealer (internal only)", async () => {
-    const res = await importAs("dealer", [baseRow()]);
+    const { res } = await importAs("dealer", [baseRow()]);
     expect(res.status).toBe(403);
   });
 
   it("403s a non-principal that imports a price (0175 lock)", async () => {
-    const res = await importAs("operation", [baseRow({ price: 1899 })]);
+    const { res } = await importAs("operation", [baseRow({ price: 1899 })]);
     expect(res.status).toBe(403);
     expect(((await res.json()) as { code?: string }).code).toBe("import_pricing_principal_only");
   });
 
-  it("operation imports UNPRICED structure → creates model + sku", async () => {
-    const records: { table: string; op: string; body: unknown }[] = [];
-    const res = await importAs("operation", [baseRow()], {
-      reads: { suppliers__list: [{ id: "sup-ohana", slug: "hookka", name: "Ohana", cat_covered: ["sofa", "bedframe"] }] },
-      records: records as never,
-    });
+  // ---- 0357: the reason this endpoint was rewritten ------------------------
+  // The Workers Free plan hard-caps ONE invocation at 50 subrequests, and every
+  // supabase-js call is one. The old loop spent 3 + one INSERT per new model +
+  // one write per row, so a 40-row file introducing 8 models hit 51 and the
+  // overflow came back as ~455 identical "failed" reasons. This is the guard.
+  it("spends a CONSTANT four subrequests — 120 rows across 30 models is still one write call", async () => {
+    const rows = Array.from({ length: 120 }, (_, i) =>
+      baseRow({
+        model: `Model ${i % 30}`,
+        modelKey: `model-${i % 30}`,
+        variant: `V${i}`,
+      }),
+    );
+    const { res, sb } = await importAs("operation", rows, importSb({ suppliers: [OHANA] }));
     expect(res.status).toBe(200);
-    const body = (await res.json()) as ImportResult;
-    expect(body).toMatchObject({ upserted: 1, createdModels: 1, failed: 0 });
-    const modelIns = records.find((r) => r.table === "product_models" && r.op === "insert");
-    expect(modelIns?.body).toMatchObject({ category: "sofa", model_key: "booqit", name: "Booqit" });
-    const skuIns = records.find((r) => r.table === "product_skus" && r.op === "insert");
-    expect(skuIns?.body).toMatchObject({ sku: "BOOQIT-1S", variant: "1S", price: 0, cost: null, supplier_id: "sup-ohana" });
+    expect((await res.json()) as ImportResult).toMatchObject({ upserted: 120, failed: 0 });
+    // Three reads and exactly one write call — not 3 + 30 + 120.
+    expect(sb._from).toEqual(["suppliers", "product_models", "product_skus"]);
+    expect(sb._rpc).toHaveLength(1);
+    expect(sb._rpc[0].name).toBe("catalog_import_skus");
+    expect(sent(sb).rows).toHaveLength(120);
+    expect(sent(sb).models).toHaveLength(30);
   });
 
-  it("principal imports a priced sku (price reaches the insert body)", async () => {
-    const records: { table: string; op: string; body: unknown }[] = [];
-    const res = await importAs("principal", [baseRow({ price: 1899, cost: 900 })], {
-      reads: { suppliers__list: [{ id: "sup-ohana", slug: "hookka", name: "Ohana", cat_covered: ["sofa"] }] },
-      records: records as never,
-    });
+  it("operation imports UNPRICED structure → the model and the row reach the batch", async () => {
+    const { res, sb } = await importAs("operation", [baseRow()], importSb({ suppliers: [OHANA] }));
     expect(res.status).toBe(200);
-    const skuIns = records.find((r) => r.table === "product_skus" && r.op === "insert");
-    expect(skuIns?.body).toMatchObject({ price: 1899, cost: 900 });
+    expect((await res.json()) as ImportResult).toMatchObject({
+      upserted: 1,
+      createdModels: 1,
+      failed: 0,
+    });
+    expect(sent(sb).models[0]).toMatchObject({
+      category: "sofa",
+      model_key: "booqit",
+      name: "Booqit",
+      sizes: ["1S"], // seeds allowed_options.sizes on create
+    });
+    expect(sent(sb).rows[0]).toMatchObject({
+      sku: "BOOQIT-1S",
+      variant: "1S",
+      supplier_id: "sup-ohana",
+    });
   });
 
-  it("updates an existing sku and preserves blank fields (no price key in patch)", async () => {
-    const records: { table: string; op: string; body: unknown }[] = [];
-    const res = await importAs("operation", [baseRow({ description: "Updated blurb" })], {
-      reads: {
-        product_models__list: [{ id: "m-booqit", category: "sofa", model_key: "booqit" }],
-        product_skus__list: [{ id: "s-booqit-1s", sku: "BOOQIT-1S", model_id: "m-booqit" }],
-      },
-      records: records as never,
-    });
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as ImportResult;
-    expect(body).toMatchObject({ upserted: 1, createdModels: 0, failed: 0 });
-    const skuUpd = records.find((r) => r.table === "product_skus" && r.op === "update");
-    expect(skuUpd?.body).toMatchObject({ variant: "1S", description: "Updated blurb" });
-    expect(skuUpd?.body).not.toHaveProperty("price");
-    expect(skuUpd?.body).not.toHaveProperty("cost");
-    // no new model created, no insert on product_skus
-    expect(records.find((r) => r.op === "insert")).toBeUndefined();
-  });
-
-  it("preserves variant_kind on update when the column is omitted", async () => {
-    const records: { table: string; op: string; body: unknown }[] = [];
-    // Existing SKU is a 'preset'; the import row omits variant_kind entirely.
-    const res = await importAs(
-      "operation",
-      [{ model: "Booqit", modelKey: "booqit", category: "sofa", variant: "1S" }], // no variantKind
-      {
-        reads: {
-          product_models__list: [{ id: "m-booqit", category: "sofa", model_key: "booqit" }],
-          product_skus__list: [{ id: "s-booqit-1s", sku: "BOOQIT-1S", model_id: "m-booqit" }],
-        },
-        records: records as never,
-      },
+  it("principal imports a priced sku (price + cost reach the batch row)", async () => {
+    const { res, sb } = await importAs(
+      "principal",
+      [baseRow({ price: 1899, cost: 900 })],
+      importSb({ suppliers: [OHANA] }),
     );
     expect(res.status).toBe(200);
-    const skuUpd = records.find((r) => r.table === "product_skus" && r.op === "update");
-    // blank variant_kind must NOT be written — it would silently re-type the SKU.
-    expect(skuUpd?.body).not.toHaveProperty("variant_kind");
+    expect(sent(sb).rows[0]).toMatchObject({ price: 1899, cost: 900 });
+  });
+
+  // Blank cells are dropped upstream so an export → edit → re-import round-trip
+  // cannot zero a price. The key must be ABSENT, not null: the RPC reads
+  // absence as "keep the stored value".
+  it("an update omits the keys the file left blank — it never sends null", async () => {
+    const { res, sb } = await importAs(
+      "operation",
+      [baseRow({ description: "Updated blurb" })],
+      importSb({
+        models: [{ id: "m-booqit", category: "sofa", model_key: "booqit" }],
+        skus: [{ sku: "BOOQIT-1S", model_id: "m-booqit" }],
+        rpc: (p) => ({
+          data: { created_models: 0, rows: p.rows.map(() => ({ result: "updated" })) },
+          error: null,
+        }),
+      }),
+    );
+    expect(res.status).toBe(200);
+    expect((await res.json()) as ImportResult).toMatchObject({
+      upserted: 1,
+      createdModels: 0,
+      failed: 0,
+    });
+    const row = sent(sb).rows[0];
+    expect(row).toMatchObject({ variant: "1S", description: "Updated blurb" });
+    expect(row).not.toHaveProperty("price");
+    expect(row).not.toHaveProperty("cost");
+  });
+
+  it("preserves variant_kind when the column is omitted (never re-types a preset SKU)", async () => {
+    const { sb } = await importAs(
+      "operation",
+      [{ model: "Booqit", modelKey: "booqit", category: "sofa", variant: "1S" }], // no variantKind
+      importSb({
+        models: [{ id: "m-booqit", category: "sofa", model_key: "booqit" }],
+        skus: [{ sku: "BOOQIT-1S", model_id: "m-booqit" }],
+      }),
+    );
+    expect(sent(sb).rows[0]).not.toHaveProperty("variant_kind");
+  });
+
+  it("an existing sku with no supplier column does not need a covering supplier", async () => {
+    // This is why the product_skus read survived the rewrite: editing a
+    // description must not demand a supplier for the category.
+    const { res, sb } = await importAs(
+      "operation",
+      [baseRow({ description: "Just a blurb" })],
+      importSb({
+        models: [{ id: "m-booqit", category: "sofa", model_key: "booqit" }],
+        skus: [{ sku: "BOOQIT-1S", model_id: "m-booqit" }],
+        suppliers: [], // nobody covers 'sofa'
+      }),
+    );
+    expect(res.status).toBe(200);
+    expect((await res.json()) as ImportResult).toMatchObject({ failed: 0 });
+    expect(sent(sb).rows[0]).toMatchObject({ supplier_id: null, supplier_explicit: false });
   });
 
   it("fails a row whose derived code already belongs to a different model (cross-category collision)", async () => {
-    const res = await importAs(
+    const { res, sb } = await importAs(
       "operation",
       [{ model: "Booqit", modelKey: "booqit", category: "mattress", variant: "1S" }],
-      {
-        reads: {
-          // mattress 'booqit' model exists; the BOOQIT-1S code already lives under a SOFA model.
-          product_models__list: [{ id: "m-mattress", category: "mattress", model_key: "booqit" }],
-          product_skus__list: [{ id: "s-sofa", sku: "BOOQIT-1S", model_id: "m-sofa" }],
-        },
-      },
+      importSb({
+        // mattress 'booqit' model exists; the BOOQIT-1S code already lives under a SOFA model.
+        models: [{ id: "m-mattress", category: "mattress", model_key: "booqit" }],
+        skus: [{ sku: "BOOQIT-1S", model_id: "m-sofa" }],
+      }),
     );
     expect(res.status).toBe(200);
     const body = (await res.json()) as ImportResult;
     expect(body.upserted).toBe(0);
     expect(body.failed).toBe(1);
     expect(body.failures[0].reason.toLowerCase()).toContain("already belongs");
+    // Rejected before the write — the batch never sees it.
+    expect(sent(sb).rows).toHaveLength(0);
+  });
+
+  it("a code under a model this very file is creating is also a collision", async () => {
+    const { res } = await importAs(
+      "operation",
+      [baseRow({ category: "bedframe" })], // no bedframe 'booqit' model exists yet
+      importSb({ models: [], skus: [{ sku: "BOOQIT-1S", model_id: "m-sofa" }], suppliers: [OHANA] }),
+    );
+    const body = (await res.json()) as ImportResult;
+    expect(body.failed).toBe(1);
+    expect(body.failures[0].reason.toLowerCase()).toContain("already belongs");
   });
 
   it("resolves the supplier by NAME (not just slug), case-insensitively", async () => {
-    const records: { table: string; op: string; body: unknown }[] = [];
-    await importAs(
+    const { sb } = await importAs(
       "operation",
       [{ model: "Akka", modelKey: "akka", category: "mattress", variant: "K", supplier: "NICE FUTURE" }],
-      {
-        reads: { suppliers__list: [{ id: "sup-nf", slug: "nice-future", name: "Nice Future", cat_covered: ["mattress"] }] },
-        records: records as never,
-      },
+      importSb({
+        suppliers: [{ id: "sup-nf", slug: "nice-future", name: "Nice Future", cat_covered: ["mattress"] }],
+      }),
     );
-    const skuIns = records.find((r) => r.table === "product_skus" && r.op === "insert");
-    expect(skuIns?.body).toMatchObject({ supplier_id: "sup-nf" });
+    expect(sent(sb).rows[0]).toMatchObject({ supplier_id: "sup-nf", supplier_explicit: true });
   });
 
   it("auto-resolves the supplier by category for a new sku", async () => {
-    const records: { table: string; op: string; body: unknown }[] = [];
-    await importAs("operation", [baseRow({ model: "Akka", modelKey: "akka", category: "mattress", variant: "K" })], {
-      reads: { suppliers__list: [{ id: "sup-nf", slug: "nice-future", name: "Nice Future", cat_covered: ["mattress"] }] },
-      records: records as never,
-    });
-    const skuIns = records.find((r) => r.table === "product_skus" && r.op === "insert");
-    expect(skuIns?.body).toMatchObject({ supplier_id: "sup-nf" });
+    const { sb } = await importAs(
+      "operation",
+      [baseRow({ model: "Akka", modelKey: "akka", category: "mattress", variant: "K" })],
+      importSb({
+        suppliers: [{ id: "sup-nf", slug: "nice-future", name: "Nice Future", cat_covered: ["mattress"] }],
+      }),
+    );
+    // Auto-resolved, but NOT explicit — an update must not overwrite a stored supplier.
+    expect(sent(sb).rows[0]).toMatchObject({ supplier_id: "sup-nf", supplier_explicit: false });
   });
 
   it("a new accessory sku carries a null supplier (supplierless)", async () => {
-    const records: { table: string; op: string; body: unknown }[] = [];
-    await importAs("operation", [baseRow({ model: "Pillow", modelKey: "pillow", category: "accessory", variant: "STD" })], {
-      reads: { suppliers__list: [] },
-      records: records as never,
-    });
-    const skuIns = records.find((r) => r.table === "product_skus" && r.op === "insert");
-    expect(skuIns?.body).toMatchObject({ supplier_id: null });
+    const { sb } = await importAs(
+      "operation",
+      [baseRow({ model: "Pillow", modelKey: "pillow", category: "accessory", variant: "STD" })],
+      importSb({ suppliers: [] }),
+    );
+    expect(sent(sb).rows[0]).toMatchObject({ supplier_id: null });
   });
 
   it("fails a row with an unknown explicit supplier (others still process)", async () => {
-    const res = await importAs("principal", [baseRow({ supplier: "ghost-co" })], {
-      reads: { suppliers__list: [{ id: "sup-ohana", slug: "hookka", name: "Ohana", cat_covered: ["sofa"] }] },
-    });
+    const { res, sb } = await importAs(
+      "principal",
+      [baseRow({ supplier: "ghost-co" }), baseRow({ variant: "2S" })],
+      importSb({ suppliers: [OHANA] }),
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as ImportResult;
+    expect(body.upserted).toBe(1);
+    expect(body.failed).toBe(1);
+    expect(body.failures[0]).toMatchObject({ row: 1, key: "BOOQIT-1S" });
+    expect(body.failures[0].reason.toLowerCase()).toContain("supplier");
+    // Only the good row was sent, and the ORDER of what is sent is preserved.
+    expect(sent(sb).rows.map((r) => r.sku)).toEqual(["BOOQIT-2S"]);
+  });
+
+  it("zips a per-row error from the batch back to the right FILE row", async () => {
+    const { res } = await importAs(
+      "principal",
+      [baseRow({ variant: "1S" }), baseRow({ variant: "2S" }), baseRow({ variant: "3S" })],
+      importSb({
+        suppliers: [OHANA],
+        rpc: (p) => ({
+          data: {
+            created_models: 1,
+            rows: p.rows.map((r) =>
+              r.sku === "BOOQIT-2S"
+                ? { result: "error", error: "value too long for type character varying" }
+                : { result: "inserted" },
+            ),
+          },
+          error: null,
+        }),
+      }),
+    );
+    const body = (await res.json()) as ImportResult;
+    expect(body.upserted).toBe(2);
+    expect(body.failed).toBe(1);
+    expect(body.failures[0]).toMatchObject({ row: 2, key: "BOOQIT-2S" });
+    expect(body.failures[0].reason).toMatch(/too long/);
+  });
+
+  // Reporting every sent row beats a 500: the import is a transaction, so if the
+  // call itself failed nothing was written, and the operator needs to see that
+  // rather than a blank page.
+  it("reports every sent row when the batch call itself fails", async () => {
+    const { res } = await importAs(
+      "principal",
+      [baseRow({ variant: "1S" }), baseRow({ variant: "2S" })],
+      importSb({
+        suppliers: [OHANA],
+        rpc: () => ({ data: null, error: { message: "forbidden: catalog import is internal only" } }),
+      }),
+    );
     expect(res.status).toBe(200);
     const body = (await res.json()) as ImportResult;
     expect(body.upserted).toBe(0);
-    expect(body.failed).toBe(1);
-    expect(body.failures[0].reason.toLowerCase()).toContain("supplier");
+    expect(body.failed).toBe(2);
+    expect(body.failures.map((f) => f.row)).toEqual([1, 2]);
+    expect(body.failures[0].reason).toMatch(/internal only/);
+  });
+
+  it("sends a duplicated code once per row, in file order (the RPC merges last-wins)", async () => {
+    const { sb } = await importAs(
+      "principal",
+      [baseRow({ price: 100, description: "X" }), baseRow({ price: 200 })],
+      importSb({ suppliers: [OHANA] }),
+    );
+    const rows = sent(sb).rows;
+    expect(rows.map((r) => r.sku)).toEqual(["BOOQIT-1S", "BOOQIT-1S"]);
+    expect(rows[0]).toMatchObject({ price: 100, description: "X" });
+    expect(rows[1]).toMatchObject({ price: 200 });
+    expect(rows[1]).not.toHaveProperty("description"); // absent = keep "X"
   });
 
   it("422s a batch over 500 rows", async () => {
     const rows = Array.from({ length: 501 }, () => baseRow());
-    const res = await importAs("operation", rows);
+    const { res } = await importAs("operation", rows);
     expect(res.status).toBe(422);
   });
 
   it("422s an empty batch", async () => {
-    const res = await importAs("operation", []);
+    const { res } = await importAs("operation", []);
     expect(res.status).toBe(422);
   });
 });

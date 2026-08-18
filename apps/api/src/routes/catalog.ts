@@ -989,8 +989,13 @@ catalogRouter.delete("/skus/:id", async (c) => {
 //
 // Gating: internalOnly to run at all; principal-only the moment ANY row carries
 // a price/cost (mirrors the 0175 lock — the DB trigger is still the real boundary
-// since we forward the user JWT). Reads are batched; writes are per-row for
-// granular reporting. userClient/RLS only — never service_role.
+// since we forward the user JWT). userClient/RLS only — never service_role.
+//
+// COST: a CONSTANT 4 Cloudflare subrequests — three batched reads and one
+// catalog_import_skus call (migration 0357) — no matter how many rows the file
+// carries. It used to be 3 + one INSERT per new model + one write per row, which
+// crossed the Workers Free-plan cap of 50 at around 45 rows and then reported
+// the overflow as several hundred identical spreadsheet errors.
 catalogRouter.post("/import-skus", async (c) => {
   internalOnly(c);
   const parsed = await parseJsonBody(c, skuImportInput);
@@ -1010,67 +1015,12 @@ catalogRouter.post("/import-skus", async (c) => {
   }
 
   const sb = userClient(c.env, c.var.auth.jwt);
-  const failures: SkuImportFailure[] = [];
   const rowKey = (r: SkuImportRow) => deriveSkuCode(r.modelKey, r.variant);
+  // One slot per submitted row. A row that fails anywhere fills its own slot, so
+  // the failures come back in file order however they were discovered.
+  const failureByRow: (SkuImportFailure | null)[] = rows.map(() => null);
 
-  // ---- (1) Resolve models by (category, model_key); create the missing ones --
-  const modelComposite = (category: string, modelKey: string) => `${category}::${modelKey}`;
-  const wantedModelKeys = Array.from(new Set(rows.map((r) => r.modelKey)));
-  const { data: existingModels, error: modelsErr } = await sb
-    .from("product_models")
-    .select("id, category, model_key")
-    .in("model_key", wantedModelKeys);
-  if (modelsErr) {
-    const m = mapPgError(modelsErr);
-    return c.json(m.body, m.status);
-  }
-  const modelIdByComposite = new Map<string, string>();
-  for (const row of existingModels ?? []) {
-    const mr = row as { id: string; category: string; model_key: string };
-    modelIdByComposite.set(modelComposite(mr.category, mr.model_key), mr.id);
-  }
-
-  // Gather the distinct models we still need to create (name from the first row;
-  // allowed_options.sizes seeded from the row's size variants for Modular parity).
-  const toCreate = new Map<string, { category: string; modelKey: string; name: string; sizes: Set<string> }>();
-  for (const r of rows) {
-    const comp = modelComposite(r.category, r.modelKey);
-    if (modelIdByComposite.has(comp)) continue;
-    let entry = toCreate.get(comp);
-    if (!entry) {
-      entry = { category: r.category, modelKey: r.modelKey, name: r.model, sizes: new Set() };
-      toCreate.set(comp, entry);
-    }
-    if (r.variantKind === "size") entry.sizes.add(r.variant);
-  }
-  let createdModels = 0;
-  for (const [comp, entry] of toCreate) {
-    const allowedOptions = entry.sizes.size > 0 ? { sizes: Array.from(entry.sizes) } : {};
-    const { data: created, error: createErr } = await sb
-      .from("product_models")
-      .insert({
-        category: entry.category,
-        model_key: entry.modelKey,
-        name: entry.name,
-        allowed_options: allowedOptions,
-      })
-      .select("id")
-      .single();
-    if (createErr || !created) {
-      // Every row that needed this model fails (with the same reason).
-      const reason = createErr ? mapPgError(createErr).body.message ?? createErr.message : "model create failed";
-      rows.forEach((r, i) => {
-        if (modelComposite(r.category, r.modelKey) === comp) {
-          failures.push({ row: i + 1, key: rowKey(r), reason: `model "${entry.modelKey}": ${reason}` });
-        }
-      });
-      continue;
-    }
-    modelIdByComposite.set(comp, (created as { id: string }).id);
-    createdModels += 1;
-  }
-
-  // ---- (2) Supplier resolution maps (load all suppliers once) ----------------
+  // ---- (1) Supplier resolution maps (load all suppliers once) ----------------
   // .order(slug) so category auto-resolve (first-wins) is deterministic if two
   // suppliers ever cover the same category.
   const { data: suppliers, error: supErr } = await sb
@@ -1093,6 +1043,26 @@ catalogRouter.post("/import-skus", async (c) => {
     }
   }
 
+  // ---- (2) Resolve models by (category, model_key) ---------------------------
+  // Read-only here. CREATING the missing ones is the RPC's job — it is a write,
+  // and it was one subrequest each. This map answers a different question: which
+  // model does a code belong to TODAY, for the collision check below.
+  const modelComposite = (category: string, modelKey: string) => `${category}::${modelKey}`;
+  const wantedModelKeys = Array.from(new Set(rows.map((r) => r.modelKey)));
+  const { data: existingModels, error: modelsErr } = await sb
+    .from("product_models")
+    .select("id, category, model_key")
+    .in("model_key", wantedModelKeys);
+  if (modelsErr) {
+    const m = mapPgError(modelsErr);
+    return c.json(m.body, m.status);
+  }
+  const modelIdByComposite = new Map<string, string>();
+  for (const row of existingModels ?? []) {
+    const mr = row as { id: string; category: string; model_key: string };
+    modelIdByComposite.set(modelComposite(mr.category, mr.model_key), mr.id);
+  }
+
   // ---- (3) Preload existing SKUs by derived code -----------------------------
   // Carry model_id so a code that already belongs to a DIFFERENT model (a
   // cross-category {MODEL_KEY}-{variant} collision) is rejected, never silently
@@ -1100,117 +1070,169 @@ catalogRouter.post("/import-skus", async (c) => {
   const wantedCodes = Array.from(new Set(rows.map(rowKey)));
   const { data: existingSkus, error: skusErr } = await sb
     .from("product_skus")
-    .select("id, sku, model_id")
+    .select("sku, model_id")
     .in("sku", wantedCodes);
   if (skusErr) {
     const m = mapPgError(skusErr);
     return c.json(m.body, m.status);
   }
-  const skuByCode = new Map<string, { id: string; modelId: string }>();
+  const skuByCode = new Map<string, { modelId: string }>();
   for (const row of existingSkus ?? []) {
-    const sr = row as { id: string; sku: string; model_id: string };
-    skuByCode.set(sr.sku, { id: sr.id, modelId: sr.model_id });
+    const sr = row as { sku: string; model_id: string };
+    skuByCode.set(sr.sku, { modelId: sr.model_id });
   }
 
-  // ---- (4) Per-row upsert (insert new / update existing, blank = preserve) ----
-  const failedRowKeys = new Set(failures.map((f) => f.key));
-  let upserted = 0;
+  // ---- (4) The distinct models the file names --------------------------------
+  // Name comes from the first row that mentions the model; allowed_options.sizes
+  // is seeded from that model's size variants (Modular parity). The RPC creates
+  // only the ones that turn out to be missing.
+  const models = new Map<string, { category: string; model_key: string; name: string; sizes: Set<string> }>();
+  for (const r of rows) {
+    const comp = modelComposite(r.category, r.modelKey);
+    let entry = models.get(comp);
+    if (!entry) {
+      entry = { category: r.category, model_key: r.modelKey, name: r.model, sizes: new Set() };
+      models.set(comp, entry);
+    }
+    if (r.variantKind === "size") entry.sizes.add(r.variant);
+  }
+
+  // ---- (5) Build the batch — every rejection reason is settled here ----------
+  type ImportPayloadRow = Record<string, unknown> & { sku: string };
+  const payloadRows: ImportPayloadRow[] = [];
+  const sourceRowOf: number[] = []; // payload index -> submitted row index
+  // Codes an EARLIER row in this same file will have inserted by the time the
+  // RPC reaches this one. Separate from skuByCode, which is the pre-batch
+  // snapshot the collision check must use.
+  const insertedInBatch = new Set<string>();
+
   for (let i = 0; i < rows.length; i++) {
     const r = rows[i];
     const code = rowKey(r);
-    // Skip rows whose model could not be created above.
-    if (failedRowKeys.has(code) && !modelIdByComposite.has(modelComposite(r.category, r.modelKey))) {
-      continue;
-    }
-    const modelId = modelIdByComposite.get(modelComposite(r.category, r.modelKey));
-    if (!modelId) continue; // already recorded as a failure during model create
+    const comp = modelComposite(r.category, r.modelKey);
 
     // A code that already exists under a DIFFERENT model means a cross-category
     // collision (same {MODEL_KEY}-{variant}, different category). Fail the row
-    // rather than clobber an unrelated SKU.
-    const existing = skuByCode.get(code);
-    if (existing && existing.modelId !== modelId) {
-      failures.push({
+    // rather than clobber an unrelated SKU. An undefined model id means this
+    // file is CREATING that model, so any pre-existing code is by definition
+    // somebody else's.
+    const collidesWith = skuByCode.get(code);
+    const knownModelId = modelIdByComposite.get(comp);
+    if (collidesWith && (knownModelId === undefined || collidesWith.modelId !== knownModelId)) {
+      failureByRow[i] = {
         row: i + 1,
         key: code,
         reason: `code ${code} already belongs to another model — pick a distinct model_key`,
-      });
+      };
       continue;
     }
-    const existingId = existing?.id;
+    const willExist = skuByCode.has(code) || insertedInBatch.has(code);
 
     // Supplier: an explicit column always resolves (and is written on either
     // path). A NEW sku in a supplier-bearing category must resolve one (else the
     // row fails). An UPDATE with no explicit supplier preserves the stored one —
     // so we don't require a covering supplier just to edit a price/description.
     let supplierId: string | null = null;
+    let supplierExplicit = false;
     if (r.supplier) {
       const found = supBySlug.get(r.supplier.toLowerCase()) ?? supByName.get(r.supplier.toLowerCase());
       if (!found) {
-        failures.push({ row: i + 1, key: code, reason: `supplier "${r.supplier}" not found` });
+        failureByRow[i] = { row: i + 1, key: code, reason: `supplier "${r.supplier}" not found` };
         continue;
       }
       supplierId = found;
-    } else if (!existingId && !SUPPLIERLESS_CATEGORIES.has(r.category)) {
+      supplierExplicit = true;
+    } else if (!willExist && !SUPPLIERLESS_CATEGORIES.has(r.category)) {
       const auto = supByCategory.get(r.category);
       if (!auto) {
-        failures.push({ row: i + 1, key: code, reason: `no supplier covers ${r.category}` });
+        failureByRow[i] = { row: i + 1, key: code, reason: `no supplier covers ${r.category}` };
         continue;
       }
       supplierId = auto;
     }
 
-    if (existingId) {
-      // UPDATE — only present fields (blank cells were omitted upstream so they
-      // preserve the stored value). variant_kind is written ONLY when the row
-      // carried one, so a file that omits the column never re-types an existing
-      // preset/part SKU to 'size'. Never touch sku / model_id.
-      const patch: Record<string, unknown> = { variant: r.variant };
-      if (r.variantKind !== undefined) patch.variant_kind = r.variantKind;
-      if (r.price !== undefined) patch.price = r.price;
-      if (r.cost !== undefined) patch.cost = r.cost;
-      if (r.description !== undefined) patch.description = r.description;
-      if (r.posActive !== undefined) patch.pos_active = r.posActive;
-      if (r.supplier) patch.supplier_id = supplierId;
-      const { error } = await sb.from("product_skus").update(patch).eq("id", existingId);
-      if (error) {
-        failures.push({ row: i + 1, key: code, reason: mapPgError(error).body.message ?? error.message });
-      } else {
-        upserted += 1;
-      }
-    } else {
-      // INSERT — omitted price -> 0, omitted cost -> null, omitted pos_active -> true.
-      const { data: inserted, error } = await sb
-        .from("product_skus")
-        .insert({
-          model_id: modelId,
-          sku: code,
-          variant: r.variant,
-          // Omitted variant_kind defaults to 'size' on a fresh insert.
-          variant_kind: r.variantKind ?? "size",
-          price: r.price ?? 0,
-          cost: r.cost ?? null,
-          supplier_id: supplierId,
-          description: r.description ?? null,
-          pos_active: r.posActive ?? true,
-        })
-        .select("id")
-        .single();
-      if (error || !inserted) {
-        failures.push({
-          row: i + 1,
-          key: code,
-          reason: error ? mapPgError(error).body.message ?? error.message : "insert failed",
-        });
-      } else {
-        upserted += 1;
-        // A later duplicate (model_key, variant) in the same batch now updates
-        // this freshly inserted row (last-wins) instead of colliding.
-        skuByCode.set(code, { id: (inserted as { id: string }).id, modelId });
-      }
-    }
+    const p: ImportPayloadRow = {
+      category: r.category,
+      model_key: r.modelKey,
+      sku: code,
+      variant: r.variant,
+      supplier_id: supplierId,
+      supplier_explicit: supplierExplicit,
+    };
+    // An OMITTED key means PRESERVE — on this side and in the RPC. Never send a
+    // null: a blank cell was dropped upstream so a round-trip cannot zero a
+    // price or re-type a preset SKU to 'size'.
+    if (r.variantKind !== undefined) p.variant_kind = r.variantKind;
+    if (r.price !== undefined) p.price = r.price;
+    if (r.cost !== undefined) p.cost = r.cost;
+    if (r.description !== undefined) p.description = r.description;
+    if (r.posActive !== undefined) p.pos_active = r.posActive;
+
+    payloadRows.push(p);
+    sourceRowOf.push(i);
+    // A later duplicate of this code in the same file is an UPDATE by the time
+    // the RPC reaches it, so it no longer needs a covering supplier — mirroring
+    // the in-order last-wins merge the RPC performs.
+    insertedInBatch.add(code);
   }
 
+  // ---- (6) ONE call: create the models, then upsert every row in order -------
+  // Order is the contract. The RPC walks `rows` as sent, inside one transaction,
+  // so a duplicated code merges last-wins with the earlier row's fields intact.
+  // A concurrent pool would break that and would not reduce the subrequest count
+  // — which is the thing that was actually broken.
+  let upserted = 0;
+  let createdModels = 0;
+  const { data: batch, error: batchErr } = await sb.rpc("catalog_import_skus", {
+    p_payload: {
+      models: Array.from(models.values()).map((m) => ({
+        category: m.category,
+        model_key: m.model_key,
+        name: m.name,
+        sizes: Array.from(m.sizes),
+      })),
+      rows: payloadRows,
+    },
+  });
+
+  const failAllSent = (reason: string) => {
+    sourceRowOf.forEach((src, k) => {
+      failureByRow[src] = { row: src + 1, key: payloadRows[k].sku, reason };
+    });
+  };
+
+  if (batchErr) {
+    // The batch itself failed (role gate, transport). Report every row that
+    // reached it, rather than 500-ing an import that wrote nothing.
+    failAllSent(mapPgError(batchErr).body.message ?? batchErr.message);
+  } else {
+    const res = (batch ?? {}) as {
+      created_models?: number;
+      rows?: { result: string; error?: string | null }[];
+    };
+    createdModels = res.created_models ?? 0;
+    const results = res.rows ?? [];
+    sourceRowOf.forEach((src, k) => {
+      const d = results[k];
+      if (!d) {
+        failureByRow[src] = {
+          row: src + 1,
+          key: payloadRows[k].sku,
+          reason: "no result returned for this row",
+        };
+      } else if (d.result === "error") {
+        failureByRow[src] = {
+          row: src + 1,
+          key: payloadRows[k].sku,
+          reason: d.error ?? "import failed",
+        };
+      } else {
+        upserted += 1;
+      }
+    });
+  }
+
+  const failures = failureByRow.filter((f): f is SkuImportFailure => f !== null);
   return c.json({
     upserted,
     createdModels,
