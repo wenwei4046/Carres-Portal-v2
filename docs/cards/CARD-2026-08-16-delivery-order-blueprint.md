@@ -2,6 +2,16 @@ STATUS: EXECUTED
 DATE: 2026-08-16
 PR: #840 (Slices 1+2 — DO document model 0356 · Delivery Orders Register · DO object page) · #841 (Slice 3 — every door issues · rebooked trip = new document · cancel voids, 0357) · #842 (Slice 4 — Owner Engine two-line display · Team Work per staff · two new acts)
 IMPLEMENTATION: APPROVED — owner verified all sections 2026-08-16, build straight to production.
+FIX PR (2026-08-18, owner walk defects): #843 — the DO object page 500'd on
+two orders columns that never existed in production (pod_url/pod_uploaded_at
+→ the real do_file_path/do_uploaded_at); DO register re-ruled to the owner's
+eight columns (DO No · DO date · SO No · Customer · Customer Delivery ·
+Delivery date · Delivery Location · Status, Created chooser-only, Created
+pill grey); SO register duplicate Promised column deleted + layout storage
+reset so DO No returns on every machine + the missing-date cell is the fact
+alone; the SO object page's seven-answer guidance banner DELETED (owner
+ruling 2026-08-18 — the amber field note and the owned Work action say it
+once).
 EXECUTION RECORD (2026-08-18): all four scopes shipped; migrations 0356 + 0357
 applied in production through the governed path (rolled-back verification, then
 exact-file apply). Supersedes PR #838 (race-losing duplicate of #835 — its

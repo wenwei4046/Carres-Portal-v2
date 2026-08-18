@@ -5532,6 +5532,10 @@ export interface DeliveryOrderRow {
     customer_name: string | null;
     customer_address_city?: string | null;
     customer_address_state?: string | null;
+    /** The SO's customer promise — the register's `Customer Delivery` column
+     *  (owner column ruling 2026-08-18). */
+    delivery_date?: string | null;
+    delivery_date_tbd?: boolean | null;
   };
 }
 export interface DeliveryOrderAttemptRow {
@@ -5568,8 +5572,11 @@ export interface DeliveryOrderDetailPayload {
       customer_phone: string | null;
       customer_emergency: string | null;
       customer_address: string | null;
-      pod_url: string | null;
-      pod_uploaded_at: string | null;
+      /** The signed DO on file (0087) — production's real proof columns; the
+       *  pod_url/pod_uploaded_at pair named earlier never existed on orders,
+       *  and naming them 500'd the whole select (the dead-page defect). */
+      do_file_path: string | null;
+      do_uploaded_at: string | null;
       pod_signature_url: string | null;
       pod_signed_by: string | null;
       pod_signed_at: string | null;

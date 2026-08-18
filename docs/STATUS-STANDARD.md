@@ -76,7 +76,7 @@ never hand-keyed:
 
 | Status | Tone | Derived from |
 |---|---|---|
-| Created | info (blue) | document exists, no delivery run recorded |
+| Created | neutral (grey) — owner column ruling 2026-08-18 | document exists, no delivery run recorded |
 | Out for delivery | info (blue) | REGISTERED, NOT YET DERIVABLE — awaits the warehouse→logistics handover fact (`delivery/MASTER.md` §4); never derived from the calendar |
 | Delivered | success (green) | latest `delivery_attempts` result for this number = delivered |
 | Delivery exception | warning (amber) | latest result = partial/failed · carries its ONE T4 reason on the quieter second line |

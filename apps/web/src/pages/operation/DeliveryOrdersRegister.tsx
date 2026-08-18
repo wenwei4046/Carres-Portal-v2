@@ -27,11 +27,14 @@ import { conciseLocality } from "./sales-order-columns";
  * docs/ui/MASTER.md §6.7; docs/delivery/MASTER.md §8).
  *
  * A register finds documents. It shows NO owner, NO avatar and NO action
- * sentence — work lives in My Work / Team Work. The columns are the card's
- * ruled seven: DO No · SO No · Customer · Delivery date · Location · Status ·
- * Created. Status is the ONE shared arithmetic (`deliveryOrderStatusOf`) over
- * the void stamp and the attempt history — nothing on this page computes a
- * second version of it.
+ * sentence — work lives in My Work / Team Work. The columns are the owner's
+ * ruled eight (2026-08-18): DO No · DO date · SO No · Customer ·
+ * Customer Delivery · Delivery date · Delivery Location · Status — with
+ * `Created` and the rest available in the chooser, off by default. DO No and
+ * SO No are mono links (DO No opens the document, SO No the source order).
+ * Status is the ONE shared arithmetic (`deliveryOrderStatusOf`) over the void
+ * stamp and the attempt history — nothing on this page computes a second
+ * version of it.
  *
  * There is deliberately NO create button on Row 2: the SYSTEM issues a DO when
  * a trip's requirements are met (orders MASTER §8) — no Release, no Approve,
@@ -45,6 +48,9 @@ interface DoRegisterRow {
   orderId: string;
   so: number;
   customer: string;
+  /** The SO's promise to the customer (owner column ruling 2026-08-18). */
+  customerDelivery: string | null;
+  /** This trip's confirmed date. */
   deliveryDate: string | null;
   timeSlot: string | null;
   location: string;
@@ -52,8 +58,10 @@ interface DoRegisterRow {
   issuedAt: string;
 }
 
+/** Owner column ruling 2026-08-18: Created GREY · Out for delivery BLUE ·
+ *  Delivered GREEN · Delivery exception AMBER (+ its reason, small line 2). */
 const STATUS_TONE: Record<DeliveryOrderStatus["kind"], OrderActionTone> = {
-  created: "info",
+  created: "neutral",
   out_for_delivery: "info",
   delivered: "success",
   exception: "warning",
@@ -79,6 +87,7 @@ function buildRow(
     orderId: r.orders.id,
     so: r.orders.so,
     customer: displayCustomerName(r.orders.customer_name ?? "") || "No customer name",
+    customerDelivery: r.orders.delivery_date_tbd ? null : (r.orders.delivery_date ?? null),
     deliveryDate: r.delivery_date,
     timeSlot: r.time_slot,
     location: conciseLocality(
@@ -122,7 +131,7 @@ export default function DeliveryOrdersRegister() {
         accessor: (r) => (
           <button
             type="button"
-            className="font-medium text-blue-700 underline-offset-2 hover:underline"
+            className="font-mono font-medium text-blue-700 underline-offset-2 hover:underline"
             onClick={(event) => {
               event.stopPropagation();
               openDeliveryOrder(r);
@@ -135,15 +144,30 @@ export default function DeliveryOrdersRegister() {
         filterValue: (r) => r.doNumber,
       },
       {
+        /* `DO date` = the day the system issued this document (owner column
+           ruling 2026-08-18). */
+        key: "do_date",
+        label: "DO date",
+        width: 113,
+        sortable: true,
+        chooserGroup: "Dates",
+        filterType: "date",
+        dateValue: (r) => r.issuedAt,
+        accessor: (r) => fmtDate(r.issuedAt),
+        searchValue: (r) => fmtDate(r.issuedAt),
+        filterValue: (r) => fmtDate(r.issuedAt),
+        sortFn: (a, b) => a.issuedAt.localeCompare(b.issuedAt),
+      },
+      {
         key: "so",
         label: "SO No",
-        width: 85,
+        width: 90,
         sortable: true,
         chooserGroup: "Document",
         accessor: (r) => (
           <button
             type="button"
-            className="font-medium text-blue-700 underline-offset-2 hover:underline"
+            className="font-mono font-medium text-blue-700 underline-offset-2 hover:underline"
             onClick={(event) => {
               event.stopPropagation();
               navigate(`/operation/orders/so/${r.orderId}`);
@@ -169,6 +193,31 @@ export default function DeliveryOrdersRegister() {
         ),
         searchValue: (r) => r.customer,
         filterValue: (r) => r.customer,
+      },
+      {
+        /* `Customer Delivery` = the date promised to the customer, from the
+           SO — the same fact and label as the Sales Orders register. */
+        key: "customer_delivery",
+        label: "Customer Delivery",
+        width: 148,
+        sortable: true,
+        chooserGroup: "Dates",
+        filterType: "date",
+        dateValue: (r) => r.customerDelivery,
+        accessor: (r) =>
+          r.customerDelivery ? (
+            fmtDate(r.customerDelivery)
+          ) : (
+            <span className="text-kit-slate-9" data-absence="true">
+              No delivery date
+            </span>
+          ),
+        searchValue: (r) =>
+          r.customerDelivery ? fmtDate(r.customerDelivery) : "No delivery date",
+        filterValue: (r) =>
+          r.customerDelivery ? fmtDate(r.customerDelivery) : "No delivery date",
+        sortFn: (a, b) =>
+          (a.customerDelivery ?? "").localeCompare(b.customerDelivery ?? ""),
       },
       {
         key: "delivery_date",
@@ -197,7 +246,7 @@ export default function DeliveryOrdersRegister() {
       },
       {
         key: "location",
-        label: "Location",
+        label: "Delivery Location",
         width: 200,
         sortable: true,
         chooserGroup: "Customer",
@@ -233,10 +282,13 @@ export default function DeliveryOrdersRegister() {
         filterValue: (r) => r.status.label,
       },
       {
+        /* Available in the chooser, OFF by default (owner ruling 2026-08-18):
+           `DO date` already answers when the document was issued. */
         key: "created",
         label: "Created",
         width: 113,
         sortable: true,
+        defaultHidden: true,
         chooserGroup: "Dates",
         filterType: "date",
         dateValue: (r) => r.issuedAt,
@@ -283,7 +335,7 @@ export default function DeliveryOrdersRegister() {
             appearance="reference"
             rows={rows}
             columns={columns}
-            storageKey="carres.deliveryOrders.register.v1"
+            storageKey="carres.deliveryOrders.register.v2"
             rowKey={(r) => r.id}
             exportName="Delivery Orders"
             searchPlaceholder="Search delivery orders…"
