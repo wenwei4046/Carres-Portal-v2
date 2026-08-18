@@ -21,7 +21,9 @@ import Panel from "@/components/kit/Panel";
 import StatusPill from "@/components/kit/StatusPill";
 import Loading from "@/components/kit/Loading";
 import { useDeliveryOrder, useDeliveryPhotos } from "@/lib/queries";
+import { personInitials, avatarColor } from "@/lib/staff-avatar";
 import SalesOrderTabs from "./SalesOrderTabs";
+import { useOpenWorkSet, type WorkRow } from "./use-open-work";
 
 /**
  * THE DELIVERY ORDER OBJECT PAGE — read-only facts + doors
@@ -91,6 +93,30 @@ export default function DeliveryOrderPage() {
   const photos = useDeliveryPhotos(d?.order_id ?? "", {
     enabled: Boolean(d?.order_id),
   });
+
+  // Card §7 — the document's ACTION LINES with their owners: the delivery-
+  // track items of THIS order, from the ONE composed work set (never a second
+  // engine). The owner chip is the resolved person's initials; a duty with no
+  // roster holder yet shows its duty word (the canvas's measured-boundary
+  // rule). The 200-row list cap means an old order may fall outside the set —
+  // then no lines render, and the Work page remains the authority.
+  const workSet = useOpenWorkSet();
+  const DELIVERY_KEYS = new Set([
+    "assign_logistics",
+    "confirm_delivery_date",
+    "deliver_today",
+    "upload_delivery_photo",
+    "arrange_new_delivery_date",
+    "collect_loan_item",
+  ]);
+  const actionLines = useMemo(
+    () =>
+      workSet.items.filter(
+        (i) => i.orderId === (d?.order_id ?? "") && DELIVERY_KEYS.has(i.ruleKey),
+      ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [workSet.items, d?.order_id],
+  );
 
   // THIS TRIP's lines (card §2): trip_groups NULL = the whole order; a split
   // trip carries its groups' lines. Derived through the ONE shared module the
@@ -314,6 +340,47 @@ export default function DeliveryOrderPage() {
                     <span className="text-label text-base-600">
                       Recorded: {fmtDate(a.recorded_at)}
                       {a.note ? ` · ${a.note}` : ""}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {actionLines.length > 0 && (
+              <ul className="mt-3 flex flex-col gap-2 border-t border-base-200 pt-2" data-testid="do-action-lines">
+                {actionLines.map((i: WorkRow) => (
+                  <li key={`${i.orderId}:${i.ruleKey}`} className="flex items-center gap-2">
+                    {i.ownerId ? (
+                      <span
+                        aria-hidden="true"
+                        className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[9px] font-semibold"
+                        style={{
+                          backgroundColor: avatarColor(i.ownerId).bg,
+                          color: avatarColor(i.ownerId).fg,
+                        }}
+                        title={i.ownerName ?? undefined}
+                      >
+                        {personInitials(i.ownerName, "")}
+                      </span>
+                    ) : (
+                      <span className="shrink-0 rounded-full border border-base-200 px-1.5 text-[9px] font-semibold text-base-500">
+                        {i.ownerDuty ?? "No owner yet"}
+                      </span>
+                    )}
+                    <span className="min-w-0">
+                      <span className="block truncate text-body font-semibold text-base-900">
+                        {i.action}
+                      </span>
+                      <span
+                        className={`block truncate text-label font-normal ${
+                          i.workingDaysLate > 0 ? "text-danger" : "text-base-600"
+                        }`}
+                      >
+                        {i.workingDaysLate > 0 && i.dueIso
+                          ? `Late — was due ${fmtDate(i.dueIso)}`
+                          : i.dueIso
+                            ? `due ${fmtDate(i.dueIso)}`
+                            : i.soRef}
+                      </span>
                     </span>
                   </li>
                 ))}

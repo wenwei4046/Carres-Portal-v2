@@ -1,7 +1,19 @@
-STATUS: QUEUED
+STATUS: EXECUTED
 DATE: 2026-08-16
-PR: pending
-IMPLEMENTATION: APPROVED — owner verified all sections 2026-08-16, build straight to production
+PR: #840 (Slices 1+2 — DO document model 0356 · Delivery Orders Register · DO object page) · #841 (Slice 3 — every door issues · rebooked trip = new document · cancel voids, 0357) · #842 (Slice 4 — Owner Engine two-line display · Team Work per staff · two new acts)
+IMPLEMENTATION: APPROVED — owner verified all sections 2026-08-16, build straight to production.
+EXECUTION RECORD (2026-08-18): all four scopes shipped; migrations 0356 + 0357
+applied in production through the governed path (rolled-back verification, then
+exact-file apply). Supersedes PR #838 (race-losing duplicate of #835 — its
+sound structure adopted with credit in #841). `Issue PO` won the known conflict:
+`Raise the Purchase Order` never existed in shipped code, only in two
+historical card documents. Boundaries reported, not hidden: `Out for delivery`
+is registered vocabulary awaiting the warehouse→logistics handover fact;
+"Delivery owner notified" is satisfied by the work surfaces (orders MASTER §8:
+no separate alert engine); Delivery staff / Finance duties have no roster fact
+yet, so their items carry the duty word until the roster exists; per-trip
+driver/vehicle facts do not exist (partner_fleet is per-partner) and render
+governed absences.
 
 # DELIVERY ORDER — COMPLETE BLUEPRINT (one card, the remaining Sales Order scope)
 

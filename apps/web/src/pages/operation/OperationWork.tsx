@@ -1,31 +1,33 @@
 /**
- * OperationWork — SO V2 CARD 10 · My Work / Team Work (owner ruling
- * 2026-08-11; built under the Production UI Execution ruling of the same day:
- * proactive design judgment, asynchronous owner review — docs/ui/MASTER.md
- * §1.1).
+ * OperationWork — My Work / Team Work (SO V2 Card 10, owner ruling 2026-08-11;
+ * display re-ruled by the DELIVERY ORDER BLUEPRINT card §7, owner-approved
+ * 2026-08-16 — the Owner Engine two-line grammar).
  *
  * **TWO FILTERS over the ONE open work set — never two datasets, never
- * another dashboard.** This page is ASSEMBLY, exactly as Delivery was:
+ * another dashboard.** This page is ASSEMBLY:
  *
- *   WHAT is open   ← the same `openActionsOf` the Orders list runs (one
- *                    signal mapping — the two surfaces structurally cannot
- *                    disagree)
- *   WHO + WHEN     ← Card 9's `workItemsForOrder` (the PIC · each key's ONE
- *                    shipped clock · weekday+date words · working-days-late
- *                    over a due that never moves)
- *   GROUPING       ← `groupWorkItemsByDay` — days ascend, broken first,
- *                    `No date` last
+ *   WHAT is open   ← the same `openActionsOf` the Orders list runs, plus the
+ *                    card's two composed facts (loan out · Finance exception)
+ *   WHO + WHEN     ← Card 9's `workItemsForOrder` (one clock per key ·
+ *                    working-days-late over a due that never moves)
  *
- * OWNER SCOPE (§2.2, the identical starting-view law): a NON-MANAGER lands on
- * My Work; a MANAGER lands on Team Work. The toggle is a STARTING VIEW, never
- * an access restriction — anyone may switch. Team Work makes responsibility
- * visible without KPI cards: owner chips filter, they never rank people.
+ * THE TWO-LINE GRAMMAR (card §7, sizes 13/11 — ui/MASTER.md §5):
+ *   line 1  the SHORT action sentence — the dictionary's own QUEUE word,
+ *           which IS the registered display of the act (one mapping, no
+ *           second definition)
+ *   line 2  names · document numbers · the due date — `due Wed, 20 Aug`,
+ *           or `Late — was due Mon, 18 Aug`. Never stuffed into line 1.
  *
- * The page WRITES NOTHING. Opening a row goes to the owning module's
- * existing workspace — an order action opens the Sales Order Workspace.
- * There is no Done button anywhere on this surface, structurally: an item
- * leaves when its module records the completion fact and the engines
- * recompute.
+ * MY WORK shows only the signed-in person's actions (the scope answers who —
+ * no repeated avatar). TEAM WORK groups per staff: avatar · full name ·
+ * `{n} actions to do` · `{n} late` · the action list. Never a bare count word
+ * — every count says WHAT it counts (card §7, supersedes the 2026-08-14
+ * `open · overdue` tally). An item whose duty has no roster holder yet groups
+ * under its DUTY word — never a hand-picked person, never the PIC borrowed
+ * for another module's work.
+ *
+ * The page WRITES NOTHING. A row is a door to the Sales Order Workspace.
+ * There is no Done button anywhere, structurally.
  */
 import { useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -33,11 +35,11 @@ import { Lock } from "lucide-react";
 import { groupWorkItemsByDay, isOpsManager } from "@carres/shared";
 import { cjkClassName } from "@/lib/cjk";
 import { fmtDate } from "@/lib/fmt-date";
-import { personLabel } from "@/lib/staff-avatar";
+import { avatarColor, personInitials, personLabel } from "@/lib/staff-avatar";
 import ListPageShell from "@/components/ListPageShell";
 import { useOperationStaff } from "@/lib/queries";
 import { useAuth } from "@/lib/auth";
-import { ownerWorkloads, useOpenWorkSet } from "./use-open-work";
+import { useOpenWorkSet, type WorkRow } from "./use-open-work";
 
 type ViewKey = "mine" | "team";
 
@@ -49,6 +51,58 @@ const TONE_DOT: Record<string, string> = {
   neutral: "bg-base-300",
 };
 
+/** Line 2 — names · document numbers · due date, in the quieter rank. */
+function supportingLine(i: WorkRow): string {
+  const parts: string[] = [];
+  if (i.customer) parts.push(i.customer);
+  parts.push(i.soRef);
+  if (i.workingDaysLate > 0 && i.dueIso) {
+    parts.push(`Late — was due ${fmtDate(i.dueIso)}`);
+  } else if (i.dueIso) {
+    parts.push(`due ${fmtDate(i.dueIso)}`);
+  }
+  return parts.join(" · ");
+}
+
+function WorkRowButton({
+  item,
+  onOpen,
+}: {
+  item: WorkRow;
+  onOpen: (i: WorkRow) => void;
+}) {
+  return (
+    <button
+      type="button"
+      data-testid={`work-row-${item.soRef}-${item.ruleKey}`}
+      onClick={() => onOpen(item)}
+      className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-base-50"
+    >
+      <span
+        aria-hidden="true"
+        className={`h-2 w-2 rounded-full shrink-0 ${TONE_DOT[item.broken ? "danger" : item.tone] ?? "bg-base-300"}`}
+      />
+      <span className="flex-1 min-w-0">
+        {/* Line 1 — the short action sentence: the dictionary's queue word. */}
+        <span className={`${cjkClassName(item.action)} text-body font-semibold text-base-900 block truncate`}>
+          {item.locked && (
+            <Lock size={11} strokeWidth={2.5} className="inline mr-1 -mt-0.5" aria-label="Held by Finance" />
+          )}
+          {item.action}
+        </span>
+        {/* Line 2 — names · numbers · the due date, 11px regular. */}
+        <span
+          className={`block truncate text-label font-normal ${
+            item.workingDaysLate > 0 ? "text-danger" : "text-base-600"
+          }`}
+        >
+          {supportingLine(item)}
+        </span>
+      </span>
+    </button>
+  );
+}
+
 export default function OperationWork() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
@@ -59,24 +113,16 @@ export default function OperationWork() {
   const myDuties = staffQ.data?.myDuties;
   const isManager = isOpsManager(authRole, authEmail, myDuties);
 
-  /** The ONE open work set — every order, through the one signal mapping,
-   *  composed by Card 9. Completed orders contribute only what their engines
-   *  still hold open (the photo, the money that survives delivery). Shared
-   *  with the Quick Rail's Team panel so the two cannot disagree. */
-  const { items: allItems, staff, loading } = useOpenWorkSet();
+  const { items: allItems, staff, staffById, loading } = useOpenWorkSet();
 
   // The rail deep-links into a person's work: `?tab=work&scope=team&owner=…`.
-  // A link is a STARTING view exactly as the role default is — the operator
-  // may switch the moment they land, so the URL seeds state and never owns it.
   const linkedScope = params.get("scope");
   const linkedOwner = params.get("owner");
   const [view, setView] = useState<ViewKey | null>(
     linkedScope === "team" ? "team" : linkedScope === "mine" ? "mine" : null,
   );
   const activeView: ViewKey = view ?? (isManager ? "team" : "mine");
-  const [ownerFilter, setOwnerFilter] = useState<Set<string>>(
-    linkedOwner ? new Set([linkedOwner]) : new Set(),
-  );
+  const [ownerFocus, setOwnerFocus] = useState<string | null>(linkedOwner);
 
   const myUserId = useMemo(() => {
     if (!authEmail) return null;
@@ -84,49 +130,66 @@ export default function OperationWork() {
     return me?.user_id ?? null;
   }, [staff, authEmail]);
 
-  /** My Work / Team Work — two filters, one set. */
-  const visible = useMemo(() => {
-    if (activeView === "mine") {
-      return myUserId ? allItems.filter((i) => i.ownerId === myUserId) : [];
+  /** My Work — only the signed-in person's actions. */
+  const mine = useMemo(
+    () => (myUserId ? allItems.filter((i) => i.ownerId === myUserId) : []),
+    [allItems, myUserId],
+  );
+  const myGroups = useMemo(() => groupWorkItemsByDay(mine), [mine]);
+
+  /** Team Work — grouped per staff (card §7). An item whose duty has no
+   *  roster holder yet groups under its DUTY word. */
+  const teamGroups = useMemo(() => {
+    const byOwner = new Map<string, WorkRow[]>();
+    for (const i of allItems) {
+      const key = i.ownerId ?? `duty:${i.ownerDuty ?? "No owner yet"}`;
+      const list = byOwner.get(key) ?? [];
+      list.push(i);
+      byOwner.set(key, list);
     }
-    if (ownerFilter.size === 0) return allItems;
-    return allItems.filter((i) => i.ownerId != null && ownerFilter.has(i.ownerId));
-  }, [allItems, activeView, myUserId, ownerFilter]);
+    const groups = [...byOwner.entries()].map(([key, items]) => {
+      const person = key.startsWith("duty:") ? null : staffById.get(key) ?? null;
+      const dutyWord = key.startsWith("duty:") ? key.slice(5) : null;
+      return {
+        key,
+        person,
+        userId: person ? key : null,
+        name: person ? personLabel(person.name, person.email) : dutyWord ?? "No owner yet",
+        items: [...items].sort((a, b) =>
+          (a.dueIso ?? "9999").localeCompare(b.dueIso ?? "9999"),
+        ),
+        late: items.filter((i) => i.workingDaysLate > 0).length,
+      };
+    });
+    // People first (by printed name — coverage, never a ranking), duties last.
+    return groups.sort((a, b) =>
+      a.person && !b.person ? -1 : !a.person && b.person ? 1 : a.name.localeCompare(b.name),
+    );
+  }, [allItems, staffById]);
 
-  const groups = useMemo(() => groupWorkItemsByDay(visible), [visible]);
-
-  /** Owner chips (Team view) — each person's `open · overdue` from the SAME
-   *  set the rail's Team panel previews. Visibility, never a ranking.
-   *  `ui/MASTER.md` §5 (2026-08-14) locks the group summary as
-   *  `open · overdue`; the chip prints exactly that pair. */
-  const ownerCounts = useMemo(
-    () => ownerWorkloads(allItems, staff).filter((w) => w.open > 0),
-    [allItems, staff],
+  const visibleTeamGroups = useMemo(
+    () => (ownerFocus ? teamGroups.filter((g) => g.userId === ownerFocus) : teamGroups),
+    [teamGroups, ownerFocus],
   );
 
-  const toggleOwner = (id: string) =>
-    setOwnerFilter((prev) => {
-      const n = new Set(prev);
-      if (n.has(id)) n.delete(id);
-      else n.add(id);
-      return n;
-    });
+  const visible = activeView === "mine" ? mine : allItems;
+  const lateCount = visible.filter((i) => i.workingDaysLate > 0).length;
+
+  const openRow = (i: WorkRow) => navigate(`/operation/orders/so/${i.orderId}`);
 
   return (
     <ListPageShell
       title="Work"
       testId="operation-work"
       titleRight={
-        // `open · overdue` — the ONE tally spelling (ui/MASTER.md §5, locked
-        // 2026-08-14). It read `late` here while the rail read `overdue`, and
-        // one number with two words is how two screens come to disagree.
+        // Every count says WHAT it counts (card §7 — supersedes `open · overdue`).
         <span className="text-label text-base-400">
-          {visible.length} open · {visible.filter((i) => i.workingDaysLate > 0).length} overdue
+          {visible.length} action{visible.length === 1 ? "" : "s"} to do
+          {lateCount > 0 ? ` · ${lateCount} late` : ""}
         </span>
       }
       toolbar={
         <div className="flex items-center gap-2 flex-wrap">
-          {/* The starting-view toggle — §2.2's law verbatim: a default, never a wall. */}
           <div className="inline-flex rounded-md border border-base-200 overflow-hidden">
             {(
               [
@@ -138,7 +201,10 @@ export default function OperationWork() {
                 key={k}
                 type="button"
                 data-testid={`work-view-${k}`}
-                onClick={() => setView(k)}
+                onClick={() => {
+                  setView(k);
+                  if (k === "mine") setOwnerFocus(null);
+                }}
                 className={`px-3 py-1.5 text-body ${
                   activeView === k
                     ? "bg-base-900 text-white font-semibold"
@@ -149,26 +215,18 @@ export default function OperationWork() {
               </button>
             ))}
           </div>
-          {activeView === "team" && (
-            <div className="flex items-center gap-1.5 flex-wrap">
-              {ownerCounts.map(({ userId, open, overdue, member }) => (
-                <button
-                  key={userId}
-                  type="button"
-                  data-testid={`work-owner-${userId}`}
-                  onClick={() => toggleOwner(userId)}
-                  className={`px-2 py-1 rounded-full text-label border ${
-                    ownerFilter.has(userId)
-                      ? "border-base-900 bg-base-900 text-white"
-                      : "border-base-200 bg-white text-base-600 hover:bg-base-50"
-                  }`}
-                  title={member.email}
-                >
-                  {personLabel(member.name, member.email)} · {open} open
-                  {overdue > 0 ? ` · ${overdue} overdue` : ""}
-                </button>
-              ))}
-            </div>
+          {activeView === "team" && ownerFocus && (
+            <button
+              type="button"
+              data-testid="work-owner-clear"
+              onClick={() => setOwnerFocus(null)}
+              className="px-2 py-1 rounded-full text-label border border-base-900 bg-base-900 text-white"
+            >
+              {staffById.get(ownerFocus)
+                ? personLabel(staffById.get(ownerFocus)!.name, staffById.get(ownerFocus)!.email)
+                : "One person"}{" "}
+              · Clear
+            </button>
           )}
         </div>
       }
@@ -176,60 +234,60 @@ export default function OperationWork() {
       <div className="h-full overflow-y-auto px-5 py-4" data-testid="work-list">
         {loading ? (
           <div className="text-body text-base-400 py-8">Loading…</div>
-        ) : groups.length === 0 ? (
+        ) : activeView === "mine" ? (
+          myGroups.length === 0 ? (
+            <div className="text-body text-base-400 py-8" data-testid="work-empty">
+              {!myUserId
+                ? "Your account is not in the staff list yet — switch to Team Work."
+                : "No open work — every track is clear."}
+            </div>
+          ) : (
+            myGroups.map((g) => (
+              <section key={g.dayIso ?? "none"} className="mb-5" data-testid={`work-day-${g.dayIso ?? "none"}`}>
+                <h2 className="text-label font-semibold text-base-500 uppercase tracking-wide mb-1.5">
+                  {g.dayIso ? fmtDate(g.dayIso) : "No date"}
+                  <span className="ml-2 font-normal normal-case text-base-400">
+                    {g.items.length} action{g.items.length === 1 ? "" : "s"} to do
+                    {g.late > 0 && <span className="text-danger"> · {g.late} late</span>}
+                  </span>
+                </h2>
+                <div className="border border-base-200 rounded-md divide-y divide-base-100 bg-white">
+                  {g.items.map((i) => (
+                    <WorkRowButton key={`${i.orderId}:${i.ruleKey}`} item={i as WorkRow} onOpen={openRow} />
+                  ))}
+                </div>
+              </section>
+            ))
+          )
+        ) : visibleTeamGroups.length === 0 ? (
           <div className="text-body text-base-400 py-8" data-testid="work-empty">
-            {activeView === "mine" && !myUserId
-              ? "Your account is not in the staff list yet — switch to Team Work."
-              : "No open work — every track is clear."}
+            No open work — every track is clear.
           </div>
         ) : (
-          groups.map((g) => (
-            <section key={g.dayIso ?? "none"} className="mb-5" data-testid={`work-day-${g.dayIso ?? "none"}`}>
-              <h2 className="text-label font-semibold text-base-500 uppercase tracking-wide mb-1.5">
-                {/* The engine hands a DAY; the screen spells it, through the
-                    one formatter (THE YEAR RULE, owner ruling 2026-08-15). */}
-                {g.dayIso ? fmtDate(g.dayIso) : "No date"}
-                <span className="ml-2 font-normal normal-case text-base-400">
-                  {g.items.length}
-                  {g.late > 0 && <span className="text-danger"> · {g.late} overdue</span>}
+          visibleTeamGroups.map((g) => (
+            <section key={g.key} className="mb-5" data-testid={`work-owner-group-${g.key}`}>
+              <h2 className="flex items-center gap-2 mb-1.5">
+                {g.person ? (
+                  <span
+                    aria-hidden="true"
+                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold"
+                    style={{
+                      backgroundColor: avatarColor(g.userId!).bg,
+                      color: avatarColor(g.userId!).fg,
+                    }}
+                  >
+                    {personInitials(g.person.name, g.person.email)}
+                  </span>
+                ) : null}
+                <span className="text-body font-semibold text-base-900">{g.name}</span>
+                <span className="text-label font-normal text-base-400">
+                  {g.items.length} action{g.items.length === 1 ? "" : "s"} to do
+                  {g.late > 0 && <span className="text-danger"> · {g.late} late</span>}
                 </span>
               </h2>
               <div className="border border-base-200 rounded-md divide-y divide-base-100 bg-white">
                 {g.items.map((i) => (
-                  <button
-                    key={`${i.orderId}:${i.ruleKey}`}
-                    type="button"
-                    data-testid={`work-row-${i.soRef}-${i.ruleKey}`}
-                    onClick={() => navigate(`/operation/orders/so/${i.orderId}`)}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-base-50"
-                  >
-                    <span
-                      aria-hidden="true"
-                      className={`h-2 w-2 rounded-full shrink-0 ${TONE_DOT[i.broken ? "danger" : i.tone] ?? "bg-base-300"}`}
-                    />
-                    <span className="flex-1 min-w-0">
-                      <span className={`${cjkClassName(i.line)} text-body text-base-900 block truncate`}>
-                        {i.locked && (
-                          <Lock size={11} strokeWidth={2.5} className="inline mr-1 -mt-0.5" aria-label="Held on money" />
-                        )}
-                        {i.line}
-                      </span>
-                      <span className="text-label text-base-400">
-                        <span className="font-mono">{i.soRef}</span>
-                        {i.customer ? ` · ${i.customer}` : ""}
-                      </span>
-                    </span>
-                    {activeView === "team" && (
-                      <span className="text-label text-base-500 shrink-0">
-                        {i.ownerName ?? "Unassigned"}
-                      </span>
-                    )}
-                    {i.workingDaysLate > 0 && (
-                      <span className="text-label text-danger font-semibold shrink-0">
-                        {i.workingDaysLate} working day{i.workingDaysLate === 1 ? "" : "s"} late
-                      </span>
-                    )}
-                  </button>
+                  <WorkRowButton key={`${i.orderId}:${i.ruleKey}`} item={i} onOpen={openRow} />
                 ))}
               </div>
             </section>

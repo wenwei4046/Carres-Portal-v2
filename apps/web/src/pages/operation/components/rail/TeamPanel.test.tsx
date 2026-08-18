@@ -150,16 +150,16 @@ describe("TeamPanel — per-person workload preview", () => {
       workItem(YUJUN),
     ];
     view();
-    expect(screen.getByTestId(`team-workload-${SHASHA}`).textContent).toContain("2 open");
-    expect(screen.getByTestId(`team-workload-${SHASHA}`).textContent).toContain("1 overdue");
-    expect(screen.getByTestId(`team-workload-${YUJUN}`).textContent).toContain("1 open");
+    expect(screen.getByTestId(`team-workload-${SHASHA}`).textContent).toContain("2 actions to do");
+    expect(screen.getByTestId(`team-workload-${SHASHA}`).textContent).toContain("1 late");
+    expect(screen.getByTestId(`team-workload-${YUJUN}`).textContent).toContain("1 action to do");
   });
 
   it("shows a person with a clear desk rather than hiding them", () => {
     h.work = [workItem(SHASHA)];
     view();
     const row = screen.getByTestId(`team-workload-${YUJUN}`);
-    expect(row.textContent).toContain("0 open");
+    expect(row.textContent).toContain("0 actions to do");
     expect(row.textContent).not.toContain("overdue");
   });
 

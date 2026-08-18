@@ -169,11 +169,11 @@ describe("OperationWork — two filters over the one open work set", () => {
     expect(screen.getByTestId("work-row-SO-1201-assign_logistics")).toBeInTheDocument();
     expect(screen.queryByTestId("work-row-SO-1202-assign_logistics")).toBeNull();
     // Grouped under a weekday+date header — never a bare Today.
-    // 2026-08-05 (Wed) − 3 working days on the Mon–Sat week = Sat 1 Aug.
-    // Spelled by the ONE formatter since the 2026-08-15 year ruling deleted
-    // the engine's own `workDayLabel`, which dropped this comma.
-    expect(screen.getByTestId("work-day-2026-08-01")).toHaveTextContent(
-      fmtDate("2026-08-01"),
+    // Owner re-ruling 2026-08-16 (blueprint card §7): `Assign logistics` is
+    // due within the ORDER day for a stock-source order with no PO — the
+    // fixture's placed_at, 1 Jul. Spelled by the ONE formatter.
+    expect(screen.getByTestId("work-day-2026-07-01")).toHaveTextContent(
+      fmtDate("2026-07-01"),
     );
   });
 
@@ -192,12 +192,14 @@ describe("OperationWork — two filters over the one open work set", () => {
     fireEvent.click(screen.getByTestId("work-view-team"));
     expect(screen.getByTestId("work-row-SO-1201-assign_logistics")).toBeInTheDocument();
     expect(screen.getByTestId("work-row-SO-1202-assign_logistics")).toBeInTheDocument();
-    // Scope to Yu Jun only.
-    fireEvent.click(screen.getByTestId(`work-owner-${OTHER_UID}`));
-    expect(screen.queryByTestId("work-row-SO-1201-assign_logistics")).toBeNull();
-    expect(screen.getByTestId("work-row-SO-1202-assign_logistics")).toBeInTheDocument();
-    // The row names its owner in Team view.
-    expect(screen.getByTestId("work-row-SO-1202-assign_logistics")).toHaveTextContent("Yu Jun");
+    // Blueprint card §7 — Team Work groups PER STAFF: the group header carries
+    // the full name and the counts that say WHAT they count.
+    const yuJun = screen.getByTestId(`work-owner-group-${OTHER_UID}`);
+    expect(yuJun).toHaveTextContent("Yu Jun");
+    expect(yuJun).toHaveTextContent("1 action to do");
+    // The person's own list holds their item; identity is the GROUP'S, so the
+    // row does not repeat it (ui/MASTER.md §5).
+    expect(yuJun.querySelector('[data-testid="work-row-SO-1202-assign_logistics"]')).toBeTruthy();
   });
 
   it("a manager lands on Team Work — the §2.2 starting view, not a wall", () => {
@@ -263,22 +265,25 @@ describe("OperationWork — the rail deep-links into a person's work", () => {
       ],
     };
     wrap(<OperationWork />, `/operation?tab=work&scope=team&owner=${OTHER_UID}`);
-    fireEvent.click(screen.getByTestId(`work-owner-${OTHER_UID}`));
+    fireEvent.click(screen.getByTestId("work-owner-clear"));
     expect(screen.getByTestId("work-row-SO-1201-assign_logistics")).toBeInTheDocument();
   });
 
   it("`scope=team` alone lands a non-manager on Team Work", () => {
     listState.data = { orders: [makeRow({ id: "a", so: 1201 })] };
     wrap(<OperationWork />, "/operation?tab=work&scope=team");
-    // The Team-only owner chips are what proves the view, not the rows.
-    expect(screen.getByTestId(`work-owner-${OP_UID}`)).toBeInTheDocument();
+    // The Team-only per-staff groups are what proves the view, not the rows.
+    expect(screen.getByTestId(`work-owner-group-${OP_UID}`)).toBeInTheDocument();
   });
 
-  it("an owner chip prints the ONE ruled tally — `open · overdue`, never `late`", () => {
+  it("every count says WHAT it counts — `{n} actions to do` / `{n} late`, never a bare `open` (card §7)", () => {
     listState.data = { orders: [makeRow({ id: "a", so: 1201 })] };
     wrap(<OperationWork />, "/operation?tab=work&scope=team");
-    expect(screen.getByTestId(`work-owner-${OP_UID}`).textContent).toContain("open");
+    const group = screen.getByTestId(`work-owner-group-${OP_UID}`);
+    expect(group.textContent).toContain("1 action to do");
     const shell = screen.getByTestId("operation-work");
-    expect(shell.textContent).not.toMatch(/\d+ late\b/);
+    // the 2026-08-14 `open · overdue` tally is SUPERSEDED by the card
+    expect(shell.textContent).not.toMatch(/\d+ open\b/);
+    expect(shell.textContent).not.toMatch(/\d+ overdue\b/);
   });
 });

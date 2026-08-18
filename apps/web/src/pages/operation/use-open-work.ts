@@ -113,10 +113,15 @@ export function useOpenWorkSet(): OpenWorkSet {
     for (const o of orders) {
       const lines = (o.order_lines ?? []).map((l) => ({ sku: l.sku, qty: l.qty }));
       const open = openActionsOf(o, stockReadiness(o, availableBySku), lines);
-      if (open.length === 0) continue;
       const ovl = ovlOf(o);
       const ownerId = ownerOf(o);
       const ownerMember = ownerId ? staffById.get(ownerId) : undefined;
+      // Blueprint card §7 — the two composed Work facts + the Assign-logistics
+      // due anchor (the EARLIEST PO's issue day; stock-source: the order day).
+      const poIssueDays = (o.order_supplier_threads ?? [])
+        .map((t) => t.purchase_orders?.placed_at ?? null)
+        .filter((d): d is string => Boolean(d))
+        .sort();
       const workItems = workItemsForOrder(
         open,
         {
@@ -128,11 +133,20 @@ export function useOpenWorkSet(): OpenWorkSet {
           deliveredAtIso: o.delivered_at ?? null,
           delayDetectedAtIso: ovl?.delay_detected_at ?? null,
           delayDecisionAtIso: ovl?.delay_decision_at ?? null,
+          poIssuedAtIso: poIssueDays[0] ?? null,
+          placedAtIso: o.placed_at ?? null,
+          financeExceptionHolds: (o.order_finance_exceptions ?? []).some(
+            (e) => e.status === "open",
+          ),
+          loanOutstanding: (o.ops_sofa_loans ?? []).some(
+            (l) => l.status === "on_loan",
+          ),
         },
         today,
         holidayOpts,
         queueLeads,
       );
+      if (workItems.length === 0) continue;
       const state = logisticStateOf(o, partnerNameById);
       const money = moneyOf(o);
       for (const it of workItems) {

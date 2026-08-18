@@ -2763,6 +2763,9 @@ export interface operationOrderThreadRow {
   request_for_delivery_at: string | null;
   partner_accepted_at: string | null;
   partner_rejected_at: string | null;
+  /** Blueprint card §7 (2026-08-16) — the PO's issue day anchors the
+   *  `Assign logistics` due (within the day the PO is issued). */
+  purchase_orders?: { placed_at: string | null } | null;
 }
 
 /** Row in GET /api/operation/orders. Embedded `dealers(name)` is a PostgREST
@@ -2909,6 +2912,12 @@ export interface operationOrderListRow {
    *  yet (pre-confirm-proceed orders); the FE treats `[]` as "no thread state
    *  available" and omits the LP pill. */
   order_supplier_threads: operationOrderThreadRow[];
+  /** Blueprint card §7 (2026-08-16) — the two composed Work facts: an OPEN
+   *  Finance exception (0355) and a loan still out (0209/0217). Optional so an
+   *  older Worker that does not select them raises nothing (UNKNOWN never
+   *  accuses). */
+  order_finance_exceptions?: { status: "open" | "cleared" }[];
+  ops_sofa_loans?: { status: "on_loan" | "returned" }[];
   /** Phase B (migration 0138) — latest annotation snippet for kanban card.
    *  PostgREST returns all annotations; card picks newest by created_at. */
   order_annotations: { content: string; tag: string | null; created_at: string }[];

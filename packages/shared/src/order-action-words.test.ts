@@ -31,6 +31,9 @@ const EVERY_KEY: OrderActionKey[] = [
   "upload_delivery_photo",
   "delivering",
   "collect",
+  // the blueprint card's two composed Work acts (owner-approved 2026-08-16)
+  "collect_loan_item",
+  "resolve_payment_exception",
   "done",
 ];
 
