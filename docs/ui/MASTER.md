@@ -440,10 +440,13 @@ directory only and said so.*
   do not repeat that group identity unless the row is shown outside the group. **The count words
   are `{n} actions to do · {n} late`** (owner ruling 2026-08-16, blueprint card §7 — supersedes
   this section's earlier `open · overdue` pair): every count says WHAT it counts.
-- A Register warning, Current Action or Work row uses two visual lines when both fact and action
-  are needed. **Line 1** is the fact/problem in governed body size and medium/semibold emphasis.
-  **Line 2** is the next action in the governed smaller supporting size, regular weight and quieter
-  but readable colour. It is not metadata and may not fall below the accessible contrast floor.
+- A Current Action or Work row uses two visual lines when both fact and action are needed.
+  **Line 1** is the fact/problem in governed body size and medium/semibold emphasis. **Line 2**
+  is the next action in the governed smaller supporting size, regular weight and quieter but
+  readable colour. It is not metadata and may not fall below the accessible contrast floor.
+  **A REGISTER CELL carries the FACT alone — owner ruling 2026-08-18:** registers list
+  documents; the action clause renders only where actions live (My Work · Team Work · the Order
+  Route · detail panels), never in a register cell.
 - **THE SIZES ARE 13 / 11 — owner ruling 2026-08-15 (Chai).** Line 1 is `text-body` (13, semibold).
   Line 2 is **`text-label` (11) at `font-normal`**, moved down from `text-meta` (12). One point of
   separation was not enough to read as a second RANK: at 13/12 the two lines looked like one
@@ -452,10 +455,10 @@ directory only and said so.*
   weight is an explicit `font-normal` — the size alone would have left line 2 heavier than line 1
   relative to its size. The colour token does not change: `text-base-600` measures 8.6:1 on the
   white row, so the quieter line stays well clear of this section's contrast floor at the smaller
-  size rather than being rescued by it. Applies wherever the grammar renders — Register guidance
-  cells, Work rows, the Quick Rail's Work peek, Current Action blocks. Held by
-  `SalesOrdersRegister.test.tsx`, which asserts both tokens and names the retired one, so a revert
-  fails rather than merely passing unnoticed.
+  size rather than being rescued by it. Applies wherever the grammar renders — Work rows,
+  the Quick Rail's Work peek, Current Action blocks (a register cell carries the fact alone since
+  the 2026-08-18 owner ruling). `SalesOrdersRegister.test.tsx` now asserts the fact-only cell and
+  names the retired action clause, so a revert fails rather than merely passing unnoticed.
 - Do not repeat context already supplied by the row: SO number stays in SO No, customer stays in
   Customer, and owner stays in the avatar/group. At medium desktop, truncate the supporting line
   with a discoverable full value; never blend both lines into one clipped sentence.

@@ -99,7 +99,6 @@ export interface RegisterRow {
   customer: string;
   phone: string;
   items: string;
-  promised: string | null;
   ordered: string;
   customerDelivery: string | null;
   deliveryLocation: string;
@@ -125,7 +124,6 @@ export function buildRegisterRow(o: operationOrderListRow): RegisterRow {
     customer: displayCustomerName(o.customer_name),
     phone,
     items: itemsSummary(o),
-    promised: o.delivery_date_tbd ? null : (o.delivery_date ?? null),
     ordered: o.placed_at,
     customerDelivery: o.delivery_date_tbd ? null : (o.delivery_date ?? null),
     deliveryLocation: conciseLocality(o.customer_address_city, o.customer_address_state),
@@ -241,9 +239,10 @@ export const REGISTER_FIELDS: readonly RegisterField[] = [
       : r.balance.kind === "settled" ? 0
       : null,
     footerSum: (r) => amountOf(r.balance) },
-  { key: "promised", label: "Promised", width: "113px", group: "Dates",
-    text: (r) => date(r.promised, NO_DATE_YET), sortBy: (r) => r.promised ?? "",
-    kind: "date", iso: (r) => r.promised },
+  /* `Promised` is DELETED (owner ruling 2026-08-18): it derived from exactly
+     the same fact as `Customer Delivery` (`orders.delivery_date` under the
+     same tbd guard), so opening it printed one date twice under two labels —
+     ONE customer date column is the law. */
   { key: "dealer", label: "Dealer", width: "160px", group: "Sales ownership",
     text: (r) => r.o.dealers?.name || NOT_RECORDED },
 

@@ -553,8 +553,10 @@ query.**
   for it.
 - **An absence is quieter than a fact.** `Not recorded` / `Not given` keep their words — a blank
   may never carry two meanings — and render in the secondary token so real document numbers stand
-  out. `No delivery date` is deliberately excluded: it is not a quiet absence but the head of a
-  governed two-line action.
+  out. `No delivery date` is deliberately excluded from the MUTED treatment: it is a
+  warning FACT, printed in the amber problem ink — and since the owner ruling of 2026-08-18 it
+  carries NO action clause (a register lists documents; the act lives in My Work / Team Work /
+  the Order Route).
 - **Identity survives horizontal scroll.** When optional columns widen the sheet, the selection,
   expand and `SO No` columns pin to the left edge. Built as a capability of the register ENGINE, not
   as a page-local hack — see the correction recorded in `docs/ui/MASTER.md` §4.
@@ -788,12 +790,13 @@ gate proves the code does what its tests say; only the walk proves it does what 
 
 ## Guided operations and Service Case boundary — CLOSED / PRODUCTION-VERIFIED 2026-08-14
 
-- A missing Customer Delivery date uses the governed two-line action grammar in the Register:
-  the fact first, then the concrete confirmation act and required recorded result. SO number,
-  customer and resolved salesperson stay in their structural fields/avatar and are not repeated
-  in the action sentence. The Sales Order detail expands the same derived fact into
-  Why, Who must act, Who to contact, What to ask, What to use, What to record and What happens
-  next. The guidance stores no second action or delivery truth.
+- ⭐ **RE-RULED 2026-08-18 (owner): the Register cell carries the FACT ALONE.** A missing
+  Customer Delivery date prints the amber fact (`No delivery date`) with no action clause —
+  **a register lists documents; actions live in My Work / Team Work / the Order Route.** This
+  overwrites the 2026-08-14 in-cell two-line action pair under the MASTER OVERWRITE LAW. The
+  who/phone/ask detail still rides the cell's hover, and the Sales Order detail still expands
+  the same derived fact into Why, Who must act, Who to contact, What to ask, What to use, What
+  to record and What happens next. The guidance stores no second action or delivery truth.
 - `Report a problem` is the one Sales Order entrance for a customer, product, delivery or
   installation problem. It pre-links the current SO/customer/items into the canonical Service
   Case guided intake and preserves that writer's evidence, permission and follow-up contract.
