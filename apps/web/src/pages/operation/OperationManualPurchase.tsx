@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   DEMAND_PURPOSES,
   DEMAND_PURPOSE_DEFAULT,
+  MANUAL_PURCHASE_STATUS_WORDS,
   MANUAL_PURCHASE_WORDS as MW,
   TO_ORDER_WORDS as W,
   manualPurchaseStatusOf,
@@ -31,6 +32,8 @@ import {
   useAlreadyOnPo,
   useCreatePurchaseRequest,
   useCreatePurchaseRequestLine,
+  useDecidePurchaseRequest,
+  useManualPurchaseDetail,
   useManualPurchaseRegister,
   type ManualPurchaseRegisterPayload,
   type PurchaseRequestLineRow,
@@ -135,7 +138,9 @@ function buildRows(data: ManualPurchaseRegisterPayload): RequestRegisterRow[] {
 }
 
 export default function OperationManualPurchase() {
-  const [mode, setMode] = useState<"register" | "create">("register");
+  const [mode, setMode] = useState<"register" | "create" | { detail: string }>(
+    "register",
+  );
   const q = useManualPurchaseRegister();
 
   const rows = useMemo(
@@ -174,7 +179,18 @@ export default function OperationManualPurchase() {
         label: MW.colRef,
         width: 110,
         sortable: true,
-        accessor: (r) => <span className="font-mono font-medium">{r.reqNo}</span>,
+        accessor: (r) => (
+          <button
+            type="button"
+            className="font-mono font-medium text-blue-700 underline-offset-2 hover:underline"
+            onClick={(event) => {
+              event.stopPropagation();
+              setMode({ detail: r.id });
+            }}
+          >
+            {r.reqNo}
+          </button>
+        ),
         searchValue: (r) => r.reqNo,
         filterValue: (r) => r.reqNo,
       },
@@ -285,6 +301,21 @@ export default function OperationManualPurchase() {
     );
   }
 
+  if (typeof mode === "object") {
+    return (
+      <div className="flex h-full min-h-0 flex-col">
+        <PurchasingTabs />
+        <RequestDetail
+          id={mode.detail}
+          onBack={() => {
+            setMode("register");
+            void q.refetch();
+          }}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-full min-h-0 flex-col">
       <PurchasingTabs />
@@ -315,6 +346,7 @@ export default function OperationManualPurchase() {
             }
             groupBanner={false}
             stickyIdentity
+            onRowDoubleClick={(r) => setMode({ detail: r.id })}
             statusSummary={(shown) => {
               const word = shown.length === 1 ? "request" : "requests";
               const line =
@@ -873,5 +905,290 @@ function LinePicker({
       loading={loading}
       empty={null}
     />
+  );
+}
+
+/* ── The object detail — ONE SCROLL, no tabs (ui/MASTER §4.1; card §8) ────── */
+
+/**
+ * One request, read top to bottom: the facts the card rules (raised by ·
+ * what · how many · deliver to · needed by · WHY, never blank), then
+ * `WHAT WE ALREADY HAVE` per line, then — for the APPROVER only — the money
+ * and the decision. The same screen renders for both roles minus the money,
+ * never a permission error.
+ *
+ * The Approve control pre-fills `still needed`, NOT what was asked (card §4):
+ * an approver who has to do the subtraction will not do it. Cutting is not
+ * refusing. `Refuse` cannot be submitted without a reason.
+ */
+function RequestDetail({ id, onBack }: { id: string; onBack: () => void }) {
+  const q = useManualPurchaseDetail(id);
+  const pick = useQuery({
+    queryKey: ["to-order", "pick-items"],
+    queryFn: () =>
+      apiFetch<{ items: DemandPickItem[] }>(
+        "/api/operation/purchase/to-order/demand/pick-items",
+      ),
+    staleTime: 60_000,
+  });
+  const decide = useDecidePurchaseRequest();
+
+  /** The approver's per-line numbers — seeded from `still needed` once the
+   *  stock facts land; the human may override before approving. */
+  const [cuts, setCuts] = useState<Record<string, string>>({});
+  const [refusing, setRefusing] = useState(false);
+  const [refuseReason, setRefuseReason] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  if (q.isLoading || !q.data) {
+    return (
+      <div className="flex min-h-0 flex-1 items-center justify-center text-meta text-base-500">
+        {q.isError ? (q.error as Error).message : "Loading…"}
+      </div>
+    );
+  }
+
+  const { request, lines, destinations, users, canApprove } = q.data;
+  const destName = destinations.find((d) => d.id === request.destination_id)?.name ?? "";
+  const raisedBy = users.find((u) => u.id === request.created_by)?.name ?? "";
+  const freeOf = (sku: string) =>
+    pick.data?.items.find((i) => i.sku === sku)?.free ?? 0;
+
+  const status = manualPurchaseStatusOf({
+    approvalRequired: request.approval_required,
+    approvedAt: request.approved_at,
+    refusedAt: request.refused_at,
+    refuseReason: request.refuse_reason,
+    lines: lines.map((l) => ({
+      qty: l.qty,
+      issuedQty: l.issued_qty,
+      remainingQty: l.remaining_qty,
+      cancelledAt: l.cancelled_at,
+      poId: l.po_id,
+    })),
+  });
+  const undecided = request.approved_at === null && request.refused_at === null;
+  const showDecision = canApprove && request.approval_required && undecided;
+
+  async function submitDecision(decision: "approve" | "refuse") {
+    setError(null);
+    try {
+      await decide.mutateAsync({
+        id,
+        decision,
+        reason: decision === "refuse" ? refuseReason.trim() : null,
+        cuts:
+          decision === "approve"
+            ? lines
+                .filter((l) => l.cancelled_at === null)
+                .map((l) => ({ id: l.id, qty: Number(cuts[l.id] ?? l.qty) }))
+                .filter((c) => Number.isInteger(c.qty) && c.qty >= 0)
+            : null,
+      });
+      onBack();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "The decision was not recorded");
+    }
+  }
+
+  return (
+    <div
+      className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto p-4"
+      data-testid="mp-detail"
+    >
+      <div className="flex items-center justify-between">
+        <h2 className="text-body font-semibold text-base-900">
+          <span className="font-mono">{request.req_no}</span>
+          <span className="pl-3">
+            <StatusPill tone={STATUS_TONE[status.kind]}>{status.label}</StatusPill>
+          </span>
+        </h2>
+        <Button variant="ghost" onClick={onBack}>
+          Back
+        </Button>
+      </div>
+
+      {status.reasonLabel ? (
+        <p className="text-meta text-base-700" data-testid="mp-detail-refuse-reason">
+          {status.reasonLabel}
+        </p>
+      ) : null}
+
+      {/* The facts, in the card's own order. */}
+      <dl className="grid max-w-[720px] grid-cols-2 gap-x-6 gap-y-2 text-body">
+        <div>
+          <dt className="text-meta text-kit-slate-11">{MW.raisedBy}</dt>
+          <dd className="text-base-900">{raisedBy}</dd>
+        </div>
+        <div>
+          <dt className="text-meta text-kit-slate-11">{MW.needFor}</dt>
+          <dd className="text-base-900">{purposeLabelOf(request.purpose)}</dd>
+        </div>
+        <div>
+          <dt className="text-meta text-kit-slate-11">{MW.deliverTo}</dt>
+          <dd className="text-base-900">{destName}</dd>
+        </div>
+        <div>
+          <dt className="text-meta text-kit-slate-11">{MW.neededBy}</dt>
+          <dd className="text-base-900">
+            {request.required_by ? fmtDate(request.required_by) : null}
+          </dd>
+        </div>
+        <div className="col-span-2">
+          <dt className="text-meta text-kit-slate-11">{MW.why}</dt>
+          <dd className="text-base-900" data-testid="mp-detail-why">
+            {request.why}
+          </dd>
+        </div>
+      </dl>
+
+      {/* The lines, each with WHAT WE ALREADY HAVE — and, for the approver,
+          the money and the pre-filled still-needed control. */}
+      <div className="flex max-w-[900px] flex-col gap-3">
+        <h3 className="text-label font-semibold uppercase tracking-[0.14em] text-base-500">
+          {MW.items}
+        </h3>
+        {lines.map((l, i) => {
+          const free = freeOf(l.sku);
+          return (
+            <div key={l.id} className="flex flex-col gap-1 border-b border-base-100 pb-3">
+              <div className="flex items-center gap-3">
+                <span className="font-mono text-body text-base-900">{l.sku}</span>
+                <span className="text-meta text-base-600">× {l.qty}</span>
+                {l.remark ? (
+                  <span className="text-meta text-base-600">· {l.remark}</span>
+                ) : null}
+                {l.cancelled_at ? (
+                  <span className="text-meta text-base-500">
+                    {MANUAL_PURCHASE_STATUS_WORDS.not_going_ahead}
+                    {l.cancel_reason ? ` — ${l.cancel_reason}` : ""}
+                  </span>
+                ) : null}
+                {"unit_cost" in l && l.unit_cost != null ? (
+                  /* THE MONEY — approver only; the server omits the key for
+                     everyone else, so nothing here can leak it. */
+                  <span
+                    className="ml-auto tabular-nums text-meta text-base-700"
+                    data-testid={`mp-detail-cost-${i}`}
+                  >
+                    RM {Number(l.unit_cost).toLocaleString()} × {l.qty}
+                  </span>
+                ) : null}
+              </div>
+
+              {l.cancelled_at === null ? (
+                <AlreadyHave sku={l.sku} free={free} qty={l.qty} index={i} />
+              ) : null}
+
+              {showDecision && l.cancelled_at === null ? (
+                <StillNeededControl
+                  line={l}
+                  free={free}
+                  value={cuts[l.id]}
+                  onChange={(v) => setCuts((c) => ({ ...c, [l.id]: v }))}
+                  index={i}
+                />
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
+
+      {error ? (
+        <p className="text-meta text-kit-red-11" data-testid="mp-decide-error">
+          {error}
+        </p>
+      ) : null}
+
+      {showDecision ? (
+        <div className="flex max-w-[900px] items-center gap-3" data-testid="mp-decision">
+          <Button
+            variant="primary"
+            loading={decide.isPending}
+            onClick={() => void submitDecision("approve")}
+            data-testid="mp-approve"
+          >
+            Approve
+          </Button>
+          {refusing ? (
+            <span className="flex flex-1 items-center gap-2">
+              <Input
+                id="mp-refuse-reason"
+                aria-label="Refuse reason"
+                placeholder="Why is this not going ahead?"
+                value={refuseReason}
+                onChange={(e) => setRefuseReason(e.target.value)}
+                data-testid="mp-refuse-reason"
+              />
+              {/* The reason is REQUIRED — without it a refused request is
+                  simply never touched again (card §4). */}
+              <Button
+                variant="ghost"
+                disabled={refuseReason.trim().length === 0 || decide.isPending}
+                onClick={() => void submitDecision("refuse")}
+                data-testid="mp-refuse-submit"
+              >
+                Refuse
+              </Button>
+            </span>
+          ) : (
+            <Button
+              variant="ghost"
+              onClick={() => setRefusing(true)}
+              data-testid="mp-refuse"
+            >
+              Refuse
+            </Button>
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * The approver's quantity — PRE-FILLED with `still needed`, never with what
+ * was asked (card §4, `purchasing/MASTER.md`): an approver who has to do the
+ * subtraction will not do it. The seed lands once the already-on-PO read
+ * answers; a human edit afterwards is theirs and is not overwritten.
+ */
+function StillNeededControl({
+  line,
+  free,
+  value,
+  onChange,
+  index,
+}: {
+  line: { id: string; sku: string; qty: number };
+  free: number;
+  value: string | undefined;
+  onChange: (v: string) => void;
+  index: number;
+}) {
+  const onPo = useAlreadyOnPo(line.sku);
+  const still = stillNeededOf(line.qty, free, onPo.data?.alreadyOnPo ?? 0);
+  const seeded = value !== undefined;
+  useEffect(() => {
+    if (!seeded && onPo.data) onChange(String(still));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onPo.data]);
+  return (
+    <div className="flex items-center gap-2 text-meta">
+      <label htmlFor={`mp-cut-${index}`} className="text-kit-slate-11">
+        Approve
+      </label>
+      <span className="w-[64px]">
+        <Input
+          id={`mp-cut-${index}`}
+          aria-label={`Approve quantity for ${line.sku}`}
+          value={value ?? ""}
+          onChange={(e) => onChange(e.target.value)}
+          data-testid={`mp-cut-${index}`}
+        />
+      </span>
+      <span className="text-base-600">
+        of {line.qty} asked — {MW.stillNeeded} {still}
+      </span>
+    </div>
   );
 }

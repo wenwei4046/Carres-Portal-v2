@@ -264,6 +264,16 @@ slice ships the manual lane's own Issue — pulling them out earlier would make
 an approved request unissuable, and an operator regression is not a slice
 boundary. §1's grid split therefore lands with §6, not before it.
 
+**Slice 2 — IMPLEMENTED 2026-08-19** (migration `0360`):
+`purchasing_decide_request` — one door, approve or refuse, gated by the SAME
+`purchasing_settings_gate` the card names for the approver; a refusal's reason
+REQUIRED in SQL; cuts validated per line, atomic, `already_decided` guarded.
+The object detail (ui/MASTER §4.1 — ONE SCROLL, no tabs) opens from the Ref
+door: facts in the card's order · `WHAT WE ALREADY HAVE` per line · money for
+the approver ONLY (the server omits the key for everyone else — the same
+screen renders minus the money, never a permission error) · the Approve
+control pre-filled with `still needed` · Refuse with its required reason.
+
 ## STILL LOCKED — do not touch
 
 The SO Batch Purchase grid, its hierarchy and its sofa-by-SO rule · the engine

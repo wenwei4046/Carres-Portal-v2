@@ -111,7 +111,23 @@ const REGISTER = {
   destinations: [{ id: KLANG, name: "HOUZS Balakong" }],
   suppliers: [{ id: "s1", name: "Ohana" }],
   users: [{ id: "u1", name: "Siti" }],
+  canApprove: false,
 };
+
+/** The detail payload — swapped per test to flip the approver gate. */
+let DETAIL: Record<string, unknown> = {};
+function seedDetail(canApprove: boolean) {
+  DETAIL = {
+    request: REGISTER.requests[0],
+    lines: REGISTER.lines
+      .filter((l) => l.request_id === REQ1)
+      .map((l) => (canApprove ? { ...l, unit_cost: 850 } : l)),
+    destinations: REGISTER.destinations,
+    suppliers: REGISTER.suppliers,
+    users: REGISTER.users,
+    canApprove,
+  };
+}
 
 const PICK = {
   items: [
@@ -136,6 +152,7 @@ const PICK = {
 };
 
 function respond(url: string): unknown {
+  if (url.includes("/purchasing/requests/detail/")) return DETAIL;
   if (url.includes("/purchasing/requests/already-have")) {
     return { sku: "5539-2NA", alreadyOnPo: 1, firstPo: { id: "PO-2041", eta: "2026-08-22" } };
   }
@@ -407,5 +424,83 @@ describe("the ONE status arithmetic (Law D)", () => {
     expect(stillNeededOf(3, 2, 1)).toBe(0);
     expect(stillNeededOf(5, 1, 1)).toBe(3);
     expect(stillNeededOf(1, 9, 9)).toBe(0);
+  });
+});
+
+/**
+ * SLICE 2 — the approval (card §4 · §8; ui/MASTER §4.1).
+ *
+ * One scroll, no tabs. Money for the APPROVER only — the server omits the
+ * key for everyone else, and the same screen renders minus the money. The
+ * Approve control pre-fills `still needed`, never the asked quantity, and
+ * `Refuse` cannot be submitted without a reason.
+ */
+describe("the object detail and the decision (slice 2)", () => {
+  async function openDetail(canApprove: boolean) {
+    seedDetail(canApprove);
+    await loaded();
+    fireEvent.click(screen.getByText("REQ-0001", { selector: "button" }));
+    await screen.findByTestId("mp-detail");
+  }
+
+  it("opens from the Ref door and reads top to bottom — the why is on screen", async () => {
+    await openDetail(false);
+    expect(screen.getByTestId("mp-detail-why").textContent).toContain(
+      "Balakong floor sofa",
+    );
+    // ONE SCROLL — no tab strip inside the detail.
+    expect(screen.queryByRole("tablist")).toBeNull();
+  });
+
+  it("money renders for the approver only — same screen, minus the money", async () => {
+    await openDetail(false);
+    expect(screen.queryByTestId("mp-detail-cost-0")).toBeNull();
+    expect(screen.getByTestId("mp-detail").textContent).not.toContain("RM ");
+  });
+
+  it("the approver sees the money and the decision", async () => {
+    await openDetail(true);
+    expect(screen.getByTestId("mp-detail-cost-0").textContent).toContain("RM 850");
+    expect(screen.getByTestId("mp-approve")).toBeInTheDocument();
+  });
+
+  it("the Approve control pre-fills `still needed`, not the asked quantity", async () => {
+    await openDetail(true);
+    // qty 1 · free 2 · already on PO 1 → still needed 0 — the pre-fill the
+    // card demands, because an approver who must subtract will not.
+    await waitFor(() =>
+      expect((screen.getByTestId("mp-cut-0") as HTMLInputElement).value).toBe("0"),
+    );
+  });
+
+  it("Refuse cannot be submitted without a reason", async () => {
+    await openDetail(true);
+    fireEvent.click(screen.getByTestId("mp-refuse"));
+    expect(screen.getByTestId("mp-refuse-submit")).toBeDisabled();
+    fireEvent.change(screen.getByTestId("mp-refuse-reason"), {
+      target: { value: "a unit in Klang can move instead" },
+    });
+    expect(screen.getByTestId("mp-refuse-submit")).toBeEnabled();
+  });
+
+  it("approving posts the cuts through the one decide door", async () => {
+    await openDetail(true);
+    await waitFor(() =>
+      expect((screen.getByTestId("mp-cut-0") as HTMLInputElement).value).toBe("0"),
+    );
+    fireEvent.click(screen.getByTestId("mp-approve"));
+    await waitFor(() => {
+      const post = apiFetch.mock.calls.find((c) => String(c[0]).includes("/decide"));
+      expect(post).toBeTruthy();
+      const sent = JSON.parse(String((post![1] as RequestInit).body));
+      expect(sent.decision).toBe("approve");
+      expect(sent.cuts).toEqual([{ id: "l1", qty: 0 }]);
+    });
+  });
+
+  it("an operator without the gate sees no decision controls at all", async () => {
+    await openDetail(false);
+    expect(screen.queryByTestId("mp-decision")).toBeNull();
+    expect(screen.queryByTestId("mp-approve")).toBeNull();
   });
 });
