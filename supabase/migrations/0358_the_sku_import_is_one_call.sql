@@ -34,8 +34,11 @@
 -- one bad record is reported without aborting the batch.
 --
 -- This migration does the same for the catalog. After it the route spends a
--- CONSTANT 3 subrequests — two batched reads plus this call — whether the file
--- carries 10 rows or 500.
+-- CONSTANT 4 subrequests — three batched reads plus this call — whether the
+-- file carries 10 rows or 500. The product_models read stayed on the
+-- TypeScript side deliberately: it is what lets the cross-model collision
+-- check keep its unit test and keep every operator-facing reason in one
+-- language. 4 against a cap of 50 is not the problem; the `+ M + W` was.
 --
 -- ORDER IS THE CONTRACT. The loop walks `rows` IN INPUT ORDER and re-reads
 -- product_skus by code on every iteration. Because it is one transaction,
@@ -270,7 +273,7 @@ end;
 $$;
 
 comment on function public.catalog_import_skus(jsonb) is
-  'Batch SKU import: find-or-create the models, then upsert every row in input order inside ONE transaction. Holds POST /api/catalog/import-skus at a constant 3 Cloudflare subrequests instead of 3 + models + rows, which truncated files past ~45 rows against the 50-subrequest cap. SECURITY INVOKER on purpose — RLS (0002) and the principal-only price trigger (0175) remain the boundaries.';
+  'Batch SKU import: find-or-create the models, then upsert every row in input order inside ONE transaction. Holds POST /api/catalog/import-skus at a constant 4 Cloudflare subrequests instead of 3 + models + rows, which truncated files past ~45 rows against the 50-subrequest cap. SECURITY INVOKER on purpose — RLS (0002) and the principal-only price trigger (0175) remain the boundaries.';
 
 revoke all on function public.catalog_import_skus(jsonb) from public;
 grant execute on function public.catalog_import_skus(jsonb) to authenticated;
