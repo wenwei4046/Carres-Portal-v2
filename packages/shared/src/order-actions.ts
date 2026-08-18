@@ -304,13 +304,13 @@ export function orderIsDelivering(s: OrderActionSignals): boolean {
   if (s.completed || !s.goodsReady || !s.hasLogistics || !s.bookingConfirmed)
     return false;
   if (s.financeExceptionHolds ?? false) return false;
-  // C7 — everything is arranged EXCEPT the paper the logistics company asks for
-  // the evening before. That is a real act by a real human, so it is an action
-  // and this is not the quiet fact yet. UNKNOWN (null) stays the fact: absent
-  // signal, absent claim. The date condition mirrors the action's own trigger
-  // exactly — refusing the fact where no action is raised would leave the row
-  // printing `Done` on an order that is nothing of the sort.
-  if (s.deliveryOrderIssued === false && s.confirmedDateIso) return false;
+  // C7 withheld the fact while the paper was a human's pending act. SLICE 2
+  // removed the act itself — the SYSTEM issues the document at the door that
+  // completes the gate — so an all-arranged order with the number still
+  // landing is the transient it always was, and `Delivering` is the truth
+  // again (C3's original rule). A Finance hold still refuses the fact above;
+  // a goods gap raises its own goods action; and a calendar-refused date is
+  // named by the route canvas's gate, which owns that narration.
   // A confirmed date that is today or past is not "still ahead" — those are
   // `Deliver today` and the broken-run escalation, both real actions.
   return !(s.confirmedDateIso && s.confirmedDateIso <= s.todayIso);
@@ -369,24 +369,19 @@ function deliveryAction(s: OrderActionSignals): OrderOpenAction | null {
       return action("deliver_today", "delivery", "info");
   }
 
-  // C7 — the delivery order. Its trigger is `docs/ORDERS-WORKING-FLOW.md` §3's
-  // four conditions, and every one of them is already TRUE by the time control
-  // reaches this line, which is why the test below reads so short:
-  //   · a customer-confirmed date AND slot — 0277's CHECK makes the slot ride
-  //     the date, and `bookingConfirmed` was required above;
-  //   · core goods ready — the one condition the delivery track does NOT
-  //     require of its earlier rungs (you assign a company for goods still in
-  //     production), so it is asked here explicitly;
-  //   · no Finance hold — `deliveryHeldOnFinanceException` returned above on
-  //     a held order, and it holds exactly when the goods are ready, so
-  //     reaching here WITH `goodsReady` means Finance is not holding. Money
-  //     itself stopped being a condition here under decision A: an order that
-  //     still owes gets its paper, and `collect` stays open beside it.
-  // Ranked in Law 4's rung 4 behind the call that produces the date, and it
-  // deliberately sits AFTER the date split: on the day itself `Deliver today`
-  // is rung 1 and must lead, and the delivery act carries the document anyway.
-  if (s.goodsReady && s.deliveryOrderIssued === false && s.confirmedDateIso)
-    return action("issue_delivery_order", "delivery", "info");
+  // C7 → SLICE 2 — the delivery order is NO LONGER A PERSON'S ACTION. The
+  // owner ruling (`docs/orders/MASTER.md` §8) is that the SYSTEM issues the
+  // document the moment every requirement is met — no Release button, no
+  // Approve button, no manual bypass in any state — and the server does
+  // exactly that at the door that completes the gate (booking confirm ·
+  // stock reserve · finance clear). An order that reaches this line with the
+  // paper still missing is either mid-issuance (transient) or gate-refused
+  // for a reason another surface already names (goods raise their own goods
+  // action; a Finance hold locks the money track; a calendar-refused date is
+  // narrated by the route canvas's gate) — raising a button here would put a
+  // press back on a step nobody performs. The row prints C3's quiet
+  // `Delivering` fact instead, exactly as it did before the paper was a
+  // human's act.
 
   // Everything arranged for a future day: NOT an action (C3, Jess 2026-07-27).
   // There is nothing for a human to do until the day, so the row prints the

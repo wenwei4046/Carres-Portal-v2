@@ -2392,11 +2392,12 @@ describe("nextActionOf (C2)", () => {
     expect(openActionsOf(o, { state: "ready" }, [])).toEqual([]);
   });
 
-  it("⭐ ready + carrier + confirmed + owing balance → the document leads, Collect open and UNLOCKED (decision A)", () => {
+  it("⭐ ready + carrier + confirmed + owing balance → Collect leads, open and UNLOCKED (decision A + Slice 2)", () => {
     // Until 2026-08-16 this exact shape read `Collect, locked: true` — the
-    // balance held the delivery. Decision A retired that: money no longer
-    // stands between the goods and the truck, so the paper is the next act
-    // and the collection rides beside it as an ordinary open action.
+    // balance held the delivery. Decision A retired that lock, and Slice 2
+    // then retired the press: the SYSTEM issues the paper at the door that
+    // completes the gate, so the collection is the one act a person still
+    // owes here, and it rides as an ordinary open action.
     const o = makeRow({
       id: "x",
       so: 1,
@@ -2404,7 +2405,7 @@ describe("nextActionOf (C2)", () => {
       ops_order_control: { ...BOOKED, balance: 2248 },
     });
     expect(nextActionOf(o, { state: "ready" }, [])).toMatchObject({
-      key: "issue_delivery_order",
+      key: "collect",
     });
     const collect = openActionsOf(o, { state: "ready" }, []).find((a) => a.key === "collect");
     expect(collect).toBeTruthy();
@@ -2586,23 +2587,20 @@ describe("nextActionOf (C2)", () => {
     expect(openActionsOf(o, { state: "ready" }, [])).toEqual([]);
   });
 
-  // ── C7 · the last act before the truck (Jess 2026-07-27) ──
-  it("arranged, paid, and NO delivery order yet → Issue delivery order", () => {
-    // Before C7 this row sat in no queue at all and read `Delivering`. It has
-    // one thing left to do, and it is the paper logistics asks for the evening
-    // before — which used to be typed by hand, after dispatch.
+  // ── C7 → SLICE 2 · the last act before the truck is NOBODY'S act ──
+  it("⭐ arranged and NO delivery order yet → the quiet fact, never a press (Slice 2)", () => {
+    // C7 made this row a one-press action. The owner ruling
+    // (`docs/orders/MASTER.md` §8) then removed the press itself: the SYSTEM
+    // issues the document at the door that completes the gate, so the row is
+    // C3's quiet `Delivering` fact again and no queue asks a person for it.
     const o = makeRow({
       id: "x",
       so: 1,
       ops_assigned_logistic: "p1",
       ops_order_control: { ...BOOKED },
     });
-    expect(nextActionOf(o, { state: "ready" }, []).label).toBe(
-      "Issue delivery order",
-    );
-    expect(openActionsOf(o, { state: "ready" }, []).map((a) => a.key)).toEqual([
-      "issue_delivery_order",
-    ]);
+    expect(nextActionOf(o, { state: "ready" }, []).label).toBe("Delivering");
+    expect(openActionsOf(o, { state: "ready" }, [])).toEqual([]);
   });
 
   it("⭐ Deliver today beats an owing balance (decision A retired PayHold-on-money)", () => {

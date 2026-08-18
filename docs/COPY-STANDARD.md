@@ -1649,6 +1649,7 @@ others. The status set is the document's own lifecycle — registered here and i
 | A voided document | **Cancelled** + `Order cancelled` / `Rescheduled` | Deleted · Void · Removed |
 | No date on the document | **No delivery date yet** | — · TBC · N/A |
 | The register's empty state | **No delivery orders yet — the system issues one when a trip's goods, logistics and date are ready. The Order Route on each Sales Order shows what is still open.** | No data · No results |
+| An order's row before the document exists (drawer / detail) | **No delivery order yet — the system issues it when the goods, logistics and date are ready** | — · Not issued · a button |
 | The reprint promise (Print hover) | **Reprint carries the same number** | Duplicate · Copy |
 
 The T4 Reason Library gained the card's four remaining exception reasons —

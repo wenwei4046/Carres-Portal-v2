@@ -5460,6 +5460,11 @@ export interface ConfirmBookingResult {
    *  delivery order, agreeing a date only warns. Optional: an older Worker
    *  simply does not send it. */
   gateWarnings?: string[];
+  /** SLICE 2 — set when this confirmation completed the delivery-order gate
+   *  and the SYSTEM issued (or found) the document. Optional and nullable: an
+   *  older Worker does not send it, and a confirmation that leaves a
+   *  requirement open sends null. */
+  deliveryOrder?: { do_number: string | null; issued: boolean } | null;
 }
 
 /** D1 booking confirm (migration 0277) — record the CUSTOMER's confirmed date
@@ -5488,38 +5493,13 @@ export function useConfirmBooking(
   });
 }
 
-/** C7 — the delivery order issues itself (Jess 2026-07-27).
- *
- *  One press: the SYSTEM produces the document and stamps the order's DO
- *  number, using the LOCKED numbering scheme. The server holds the hard gate
- *  (`docs/ORDERS-WORKING-FLOW.md` §5) — goods reserved, money collected, the
- *  date not a Sunday or a public holiday — and a 422 carries the plain-English
- *  reason. Idempotent: pressing twice returns the number already on file
- *  (`issued: false`), never a second document for one trip. */
-export interface IssueDeliveryOrderResult {
-  order: { id: string; do_number: string | null };
-  /** true = this press minted it · false = it already existed. */
-  issued: boolean;
-}
-export function useIssueDeliveryOrder(
-  orderId: string,
-  opts?: Partial<UseMutationOptions<IssueDeliveryOrderResult, ApiError, void>>,
-) {
-  const qc = useQueryClient();
-  return useMutation<IssueDeliveryOrderResult, ApiError, void>({
-    mutationFn: () =>
-      apiFetch<IssueDeliveryOrderResult>(
-        `/api/operation/orders/${orderId}/delivery-order`,
-        { method: "POST", body: "{}" },
-      ),
-    ...opts,
-    onSuccess: async (...args) => {
-      await qc.invalidateQueries({ queryKey: qk.operation.orderControl(orderId), exact: true });
-      await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
-      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
-    },
-  });
-}
+/* SLICE 2 — `useIssueDeliveryOrder` is DELETED. The system issues the
+ * document itself the moment every requirement is met (`docs/orders/MASTER.md`
+ * §8: no Release button, no Approve button, no manual bypass in any state);
+ * the server hooks the act onto the doors that complete the gate, and the
+ * confirm mutation above already invalidates the order queries, so the number
+ * appears without a press. The POST endpoint remains server-side as an
+ * idempotent backstop, deliberately unwired from any button. */
 
 /** The Delivery Orders REGISTER + the DO object page (blueprint card
  *  2026-08-16). Read-only document truth: rows from `ops_delivery_orders`

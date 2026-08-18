@@ -3,8 +3,8 @@ import { SignJWT, createLocalJWKSet, exportJWK, generateKeyPair, type JWK, type 
 import app from "../../index";
 import { _setJwksForTesting } from "../../middleware/auth";
 
-vi.mock("../../lib/supabase", () => ({ userClient: vi.fn() }));
-import { userClient } from "../../lib/supabase";
+vi.mock("../../lib/supabase", () => ({ userClient: vi.fn(), adminClient: vi.fn() }));
+import { adminClient, userClient } from "../../lib/supabase";
 
 const env = {
   SUPABASE_URL: "https://t.x",
@@ -37,6 +37,7 @@ beforeAll(async () => {
 beforeEach(() => {
   _setJwksForTesting(createLocalJWKSet({ keys: [publicJwk] }));
   vi.mocked(userClient).mockReset();
+  vi.mocked(adminClient).mockReset();
 });
 
 afterAll(() => _setJwksForTesting(null));
@@ -206,25 +207,6 @@ describe("clearing costs evidence", () => {
       p_evidence: "Bank confirmed — ref 8821",
     });
   });
-
-  it("⭐ Slice 2 — the clear is a gate flip: the response carries the auto-issue result, fail-soft", async () => {
-    /* The cleared row names its order, so the route hands it to the SYSTEM's
-       delivery-order issue (owner ruling 2026-08-16, rule 12). This mock has
-       no bookable context, so the courtesy MISSES — and the clear must still
-       succeed with `autoDeliveryOrder: null`, because an automatic step never
-       turns a successful clear into an error. */
-    mockSb({
-      rpcRow: { ...OPEN_ROW, status: "cleared", clear_evidence: "Bank confirmed — ref 8821" },
-    });
-    const res = await call(`/${EXC_ID}/clear`, "finance", {
-      method: "POST",
-      body: { evidence: "Bank confirmed — ref 8821" },
-    });
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as { status: string; autoDeliveryOrder: string | null };
-    expect(body.status).toBe("cleared");
-    expect(body.autoDeliveryOrder).toBeNull();
-  });
 });
 
 describe("opening costs a reason", () => {
@@ -270,5 +252,142 @@ describe("the RPC's own refusals survive the route", () => {
       body: { evidence: "Bank confirmed" },
     });
     expect(res.status).toBeGreaterThanOrEqual(400);
+  });
+});
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * SLICE 2 — CLEARING THE HOLD MAY COMPLETE THE GATE, AND THEN THE SYSTEM
+ * ISSUES THE DOCUMENT. The attempt runs on the ADMIN client: Finance may clear
+ * its exception, but the system — not the finance user — writes the document.
+ * FAIL-SOFT: an issuance hiccup never undoes the clear Finance just recorded.
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+type Result = { data: unknown; error: unknown };
+
+function issueTableMock(read: Result) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const b: any = {
+    select: vi.fn(() => b),
+    eq: vi.fn(() => b),
+    is: vi.fn(() => b),
+    maybeSingle: vi.fn().mockResolvedValue(read),
+    single: vi.fn().mockResolvedValue(read),
+    then: (res: (v: Result) => unknown, rej?: (e: unknown) => unknown) =>
+      Promise.resolve(read).then(res, rej),
+  };
+  return b;
+}
+
+function issueOrdersMock(read: Result, afterUpdate: Result) {
+  let updated = false;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const b: any = {
+    select: vi.fn(() => b),
+    eq: vi.fn(() => b),
+    is: vi.fn(() => b),
+    update: vi.fn(() => {
+      updated = true;
+      return b;
+    }),
+    maybeSingle: vi.fn(() => Promise.resolve(updated ? afterUpdate : read)),
+    then: (res: (v: Result) => unknown, rej?: (e: unknown) => unknown) =>
+      Promise.resolve(updated ? afterUpdate : read).then(res, rej),
+  };
+  return b;
+}
+
+describe("Slice 2 — a clear that completes the gate issues the delivery order", () => {
+  const MATTRESS = "mattress:FirmCare-K";
+  const CLEARED_ROW = {
+    ...OPEN_ROW,
+    status: "cleared",
+    cleared_at: "2026-08-17T03:00:00Z",
+    clear_evidence: "Bank confirmed — ref 8821",
+  };
+
+  function adminTables(over?: { doNumber?: string | null }) {
+    return {
+      orders: issueOrdersMock(
+        {
+          data: { id: ORDER_ID, so: 1234, paid: 0, do_number: over?.doNumber ?? null },
+          error: null,
+        },
+        { data: { id: ORDER_ID, do_number: "DO-170826-1234" }, error: null },
+      ),
+      order_lines: issueTableMock({
+        data: [{ sku: MATTRESS, qty: 1, unit_price: 2500 }],
+        error: null,
+      }),
+      order_addons: issueTableMock({ data: [], error: null }),
+      ops_order_control: issueTableMock({
+        data: {
+          line_received: { [MATTRESS]: 1 },
+          balance: null,
+          booking_stage: "confirmed",
+          confirmed_date: "2026-08-24",
+          confirmed_time_slot: "Afternoon (12pm–3pm)",
+          booking_groups: null,
+        },
+        error: null,
+      }),
+      ops_stock_items: issueTableMock({ data: [], error: null }),
+      order_finance_exceptions: issueTableMock({ data: [CLEARED_ROW], error: null }),
+      ops_delivery_orders: issueTableMock({ data: [], error: null }),
+    };
+  }
+
+  function mockAdmin(tables: Record<string, unknown>) {
+    const from = vi.fn((t: string) => {
+      const b = tables[t];
+      if (!b) throw new Error(`unmocked table ${t}`);
+      return b;
+    });
+    const rpc = vi.fn().mockResolvedValue({ data: null, error: null });
+    vi.mocked(adminClient).mockReturnValue({ from, rpc } as never);
+    return { from, rpc };
+  }
+
+  it("⭐ the SYSTEM issues on the admin client after the clear — no press, no release button", async () => {
+    mockSb({ rpcRow: CLEARED_ROW });
+    const t = adminTables();
+    mockAdmin(t);
+    const res = await call(`/${EXC_ID}/clear`, "finance", {
+      method: "POST",
+      body: { evidence: "Bank confirmed — ref 8821" },
+    });
+    expect(res.status).toBe(200);
+    // The attempt ran as the system, wrote only into an empty column, and
+    // stamped the LOCKED scheme's number.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((t.orders as any).update).toHaveBeenCalledWith({
+      do_number: expect.stringMatching(/^DO-\d{6}-\d{4}$/),
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((t.orders as any).is).toHaveBeenCalledWith("do_number", null);
+  });
+
+  it("an order already carrying its number is left alone — one trip, one document", async () => {
+    mockSb({ rpcRow: CLEARED_ROW });
+    const t = adminTables({ doNumber: "DO-240826-4821" });
+    mockAdmin(t);
+    const res = await call(`/${EXC_ID}/clear`, "finance", {
+      method: "POST",
+      body: { evidence: "Bank confirmed — ref 8821" },
+    });
+    expect(res.status).toBe(200);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((t.orders as any).update).not.toHaveBeenCalled();
+  });
+
+  it("FAIL-SOFT — an issuance hiccup never undoes the clear (admin client absent)", async () => {
+    // adminClient is reset and returns undefined: the attempt throws inside
+    // the hook and is swallowed; the clear itself must still answer 200.
+    mockSb({ rpcRow: CLEARED_ROW });
+    const res = await call(`/${EXC_ID}/clear`, "finance", {
+      method: "POST",
+      body: { evidence: "Bank confirmed — ref 8821" },
+    });
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { status: string }).status).toBe("cleared");
   });
 });

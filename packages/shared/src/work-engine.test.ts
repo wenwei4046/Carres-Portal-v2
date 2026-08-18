@@ -109,7 +109,7 @@ describe("workItemsForOrder — WHO + ACTION + actual working day", () => {
     expect(assign.workingDaysLate).toBe(2); // Tue 18, Wed 19
   });
 
-  it("collect and issue_delivery_order share the ONE T−1 arithmetic", () => {
+  it("collect keeps the ONE T−1 arithmetic — and the delivery order is nobody's work (Slice 2)", () => {
     const s: OrderActionSignals = {
       ...baseSignals,
       hasLogistics: true,
@@ -127,12 +127,25 @@ describe("workItemsForOrder — WHO + ACTION + actual working day", () => {
     );
     const collect = items.find((i) => i.ruleKey === "collect")!;
     expect(collect.dueIso).toBe("2026-08-19");
-    /* Decision A (2026-08-16): a plain balance no longer locks the collect —
-       and it no longer withholds the document either, so BOTH actions are on
-       the list and share the one T−1 due, which is this test's whole title. */
+    /* Decision A (2026-08-16): a plain balance no longer locks the collect.
+       Slice 2 then removed the press itself: the SYSTEM issues the document
+       when every requirement holds, so `issue_delivery_order` may never
+       appear on a person's worklist — My Work and Team Work compose only
+       from what the engine raises, and it no longer raises this. */
     expect(collect.locked).toBeFalsy();
-    const issue = items.find((i) => i.ruleKey === "issue_delivery_order")!;
-    expect(issue.dueIso).toBe("2026-08-19");
+    expect(items.find((i) => i.ruleKey === "issue_delivery_order")).toBeUndefined();
+  });
+
+  it("⭐ the issue_delivery_order rule names no person (Slice 2 — the DONE WHEN)", () => {
+    const rule = ORDER_WORK_RULES.find((r) => r.key === "issue_delivery_order")!;
+    // `docs/cards/CARD-2026-08-16-order-route-implementation-plan.md`:
+    // "work-engine.ts no longer names the PIC as the action owner of a step
+    // nobody performs" — and the trigger's "money passed" died with decision A.
+    expect(rule.owner).not.toContain("PIC");
+    expect(rule.owner).toContain("SYSTEM");
+    expect(rule.trigger).not.toContain("money passed");
+    expect(rule.trigger).toContain("Finance exception");
+    expect(rule.completionFact).toContain("orders.do_number");
   });
 
   it("a step with no anchor has no due and can never be late", () => {
