@@ -3830,11 +3830,13 @@ exist. A date logistics proposed is a fact, not a confirmation** · due: a setta
 working days before the date (**1 today**) · the checklist adds driver name, driver phone,
 vehicle number and lift/registration requirements **for condominiums**.
 
-**`Issue delivery order`** — trigger: customer-confirmed date **AND** slot **AND** core goods
-ready **AND** the payment condition passed — **all four. The action appears only when it can
-actually be done.** The SYSTEM produces the document; **nobody writes one by hand**, and the
-number is the locked `DO-DDMMYY-NNNN` scheme seeded on the order id, so a reprint matches the
-signed original.
+**`Issue delivery order`** — **NOBODY'S ACTION (Slice 2, PR #838).** The SYSTEM issues the
+document the moment the last requirement lands — customer-confirmed date **AND** slot, a working
+calendar day (no Sunday, no Malaysian public holiday), core goods reserved, **no OPEN Finance
+exception** — at whichever door completed the gate: booking confirm, stock reserve, or the
+Finance clear. It never appears on a worklist, the engine never raises it, and there is no
+Release or Approve button in any state. **Nobody writes one by hand**, and the number is the
+locked `DO-DDMMYY-NNNN` scheme seeded on the order id, so a reprint matches the signed original.
 
 **`Deliver today`** — trigger: the confirmed date is today and nothing has been delivered ·
 completion: **Delivered**, or a **Delivery Exception carrying its reason** (customer
@@ -4020,10 +4022,29 @@ Thu 20 Aug, Afternoon), built for the walk through the governed office/Stock/boo
   four-requirement gate; a fresh load of the same orders showed `✓ No Finance hold`. Stale bundle,
   not a regression.
 
-**What remains open, deliberately:** automatic DO issuance is documented above but the act is still
-a person's — that is **Slice 2** of
-[`../cards/CARD-2026-08-16-order-route-implementation-plan.md`](../cards/CARD-2026-08-16-order-route-implementation-plan.md),
-not part of this closure.
+### SLICE 2 · AUTOMATIC DO ISSUANCE — SHIPPED (PR #838) · AWAITING AUTHENTICATED ACCEPTANCE
+
+**The act stopped being a person's.** One issuing path — `attemptDeliveryOrderIssue`
+(`apps/api/src/lib/delivery-order-issue.ts`) — runs at every door that can complete the gate:
+**booking confirm** (`order-control.ts`), **stock reserve** (`ops/stock.ts` `/reserve` +
+`/reserve-item`, `SO-{n}` refs only) and **Finance exception clear** (`finance/exceptions.ts`,
+on the admin client: Finance clears its record; the system, not the finance user, writes the
+document). Every hook is fail-soft — an issuance hiccup never undoes the act that triggered it.
+The manual `POST /:id/delivery-order` remains as an idempotent **backstop**, wired to no button.
+
+What automation did not change: the same `deliveryOrderIssueGate`, the database-level
+idempotence (`.is("do_number", null)`), and the locked `DO-DDMMYY-NNNN` scheme.
+`work-engine.ts` names the SYSTEM as the rule's owner; `order-actions.ts` never raises the key;
+the drawer's row is a fact in both states, and the all-arranged row prints C3's quiet
+`Delivering` fact again.
+
+**Recorded boundary:** the Purchasing-lane reserve doors (To Order's `Reserve`, receiving's
+auto-reserve in `pos.ts`) carry no hook yet — a goods-last order issued through them waits for
+its next event or the backstop. Hooking them belongs to the chat that next opens the Purchasing
+lane; this slice deliberately did not touch Purchasing files.
+
+**Not `PRODUCTION-VERIFIED` until the owner walks it** (Slice 6): an order completing its last
+requirement receives its DO with no press, on the live portal, signed in.
 
 **AGREEING a date is softer than ISSUING.** It WARNS about goods, money and the calendar so
 nobody promises a day the goods cannot make, but it refuses only two things:

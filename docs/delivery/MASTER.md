@@ -99,13 +99,14 @@ problems and history.
   lives once in [`../orders/MASTER.md`](../orders/MASTER.md) §8, which owns the gate — Delivery
   READS it and may never write it. Delivery remains the writer of the document and the owner of the
   carrier, the trip derivation and the proof.
-  🔴 **IMPLEMENTATION REQUIRED — NOT BUILT, and NOT APPROVED.** The node map shipped
-  (PR #825) and its canvas already states that the system issues the DO with no Release or Approve
-  button — but **neither automatic issuance nor the Finance exception exists in code**, and the
-  shipped gate still counts money. The correction slice is
-  [`../cards/CARD-2026-08-16-money-gate-correction.md`](../cards/CARD-2026-08-16-money-gate-correction.md),
-  `STATUS: QUEUED · IMPLEMENTATION: NOT APPROVED`. What runs today still requires the employee act
-  and still refuses on money. **Do not describe the new rules as implemented.**
+  ✅ **BUILT.** The Finance exception record and its Finance-only doors shipped as Slice 1
+  (PR #829, migration 0355); money left the gate and the OPEN-exception blocker took its place as
+  Slice 3 (PR #830, `PRODUCTION-VERIFIED 2026-08-17` — the record lives in
+  [`../orders/MASTER.md`](../orders/MASTER.md) §8); and automatic issuance shipped as Slice 2
+  (PR #838): the SYSTEM issues the DO at whichever door completes the gate — booking confirm,
+  stock reserve, or the Finance clear — with no Release or Approve button and no worklist entry.
+  The manual POST endpoint survives only as an idempotent backstop, wired to no button. Slice 2
+  awaits its authenticated acceptance walk before `PRODUCTION-VERIFIED` may be written.
 - Issue rechecks permitted goods, split, Warehouse, address and applicable hold rules atomically,
   snapshots the scope and assigns the next owner. It does not create an actual delivery event.
   **These rechecks survive system issuance unchanged** — what changed is who triggers the act, not

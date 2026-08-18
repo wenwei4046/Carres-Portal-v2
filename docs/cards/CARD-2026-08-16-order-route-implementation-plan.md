@@ -1,7 +1,7 @@
-STATUS: QUEUED
+STATUS: IN EXECUTION — Slices 1 · 3 production-verified, Slice 2 shipped, 4 open, 5 lands inside each slice, 6 owner-only
 DATE: 2026-08-16
-PR: #827
-IMPLEMENTATION: NOT APPROVED
+PR: #827 (the plan) · #829 (Slice 1) · #830 (Slice 3) · #838 (Slice 2)
+IMPLEMENTATION: APPROVED — owner wrote IMPLEMENT 2026-08-17 (recorded on the money-gate-correction card); Slice 2 executed under the owner's Slice 2 build instruction, 2026-08-18
 
 # ORDER ROUTE — IMPLEMENTATION PLAN (six slices)
 
@@ -91,10 +91,16 @@ Only the role enum and `requireFinance` are reusable.
 
 ---
 
-## SLICE 2 · Automatic DO issuance
+## SLICE 2 · Automatic DO issuance — ✅ SHIPPED (PR #838) · awaiting the Slice 6 walk
 
 **GOAL** — the system issues the Delivery Order when every requirement is met. No Release button, no
 Approve button, no manual bypass in any state.
+
+> **EXECUTED 2026-08-18.** One issuing path (`apps/api/src/lib/delivery-order-issue.ts`), hooked
+> at booking confirm, the Stock-lane reserve doors and the Finance clear; the POST door stays as
+> an idempotent backstop, wired to no button. The three MUST-NOT-CHANGE rules below were kept and
+> are each pinned by a test. Recorded boundary: the Purchasing-lane reserve doors (To Order,
+> receiving auto-reserve) carry no hook — that belongs to the next Purchasing chat.
 
 **FILES TO CHANGE**
 
