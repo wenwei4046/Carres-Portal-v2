@@ -143,7 +143,17 @@ function OwnerChip({ person }: { person: RoutePerson }) {
  * One node.
  * ──────────────────────────────────────────────────────────────────────────── */
 
-function Node({ node, owners }: { node: RouteNode; owners: RouteActionOwners }) {
+function Node({
+  node,
+  owners,
+  onReveal,
+}: {
+  node: RouteNode;
+  owners: RouteActionOwners;
+  /** Slice 4 — the page pans the transformed surface so a focused node is
+   *  visible; the browser cannot do it for a CSS-transformed canvas. */
+  onReveal?: (node: RouteNode) => void;
+}) {
   const navigate = useNavigate();
   const Glyph = MARK_GLYPH[node.mark];
 
@@ -213,6 +223,7 @@ function Node({ node, owners }: { node: RouteNode; owners: RouteActionOwners }) 
       tabIndex={0}
       aria-label={spoken}
       aria-current={node.current ? "step" : undefined}
+      onFocus={() => onReveal?.(node)}
       onKeyDown={(e) => {
         if (node.door && (e.key === "Enter" || e.key === " ")) {
           e.preventDefault();
@@ -422,6 +433,34 @@ export default function SalesOrderRoute({
       scale: Math.min(MAX_SCALE, Math.max(MIN_SCALE, v.scale + dir * STEP)),
     }));
 
+  /** ⭐ Slice 4 — keyboard reachability on a transformed surface. The canvas
+   *  is positioned by CSS transform, so the browser CANNOT scroll a focused
+   *  node into view by itself: a keyboard user tabbing along the route would
+   *  walk off the visible frame and keep going, blind. When focus lands on a
+   *  node outside the frame, pan the view just enough to show it — never
+   *  re-zoom, never re-centre, so a mouse user's hand-placed view is
+   *  disturbed by the minimum a keyboard needs. */
+  const revealNode = useCallback(
+    (node: { x: number; y: number; w: number; h: number }) => {
+      const box = frame.current?.getBoundingClientRect();
+      if (!box || box.width === 0 || box.height === 0) return;
+      setView((v) => {
+        const M = 16; // breathing margin, so a revealed node is not flush on the edge
+        const left = node.x * v.scale + v.tx;
+        const top = node.y * v.scale + v.ty;
+        const right = left + node.w * v.scale;
+        const bottom = top + node.h * v.scale;
+        let { tx, ty } = v;
+        if (left < M) tx += M - left;
+        else if (right > box.width - M) tx -= right - (box.width - M);
+        if (top < M) ty += M - top;
+        else if (bottom > box.height - M) ty -= bottom - (box.height - M);
+        return tx === v.tx && ty === v.ty ? v : { ...v, tx, ty };
+      });
+    },
+    [],
+  );
+
   if (loading) return <Loading label="Opening the order route" />;
 
   return (
@@ -503,7 +542,7 @@ export default function SalesOrderRoute({
           ))}
           <Edges map={route} />
           {route.nodes.map((node) => (
-            <Node key={node.id} node={node} owners={owners} />
+            <Node key={node.id} node={node} owners={owners} onReveal={revealNode} />
           ))}
         </div>
 
