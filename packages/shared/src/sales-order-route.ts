@@ -10,13 +10,23 @@
  *
  * ```
  * SO
- * ├── Goods            forks per goods line and per source quantity
+ * ├── Goods            ONE LANE PER GOODS LINE (owner ruling 2026-08-17):
+ * │                    a caption plate names the line, its purchase chains
+ * │                    hang under the plate (one column per source PO), and
+ * │                    every chain converges on the line's ONE STOCK node
  * ├── Delivery         LOGISTICS → DELIVERY DATE
  * ├── Money            MONEY
  * └── Loan             rendered ONLY when a loan is out
  *
  * Goods + Logistics + Delivery Date + Money → DELIVERY ORDER → DELIVER → PHOTO
  * ```
+ *
+ * ⭐ MULTI-ITEM READABILITY — OWNER RULING 2026-08-17. Route names live on
+ * GROUP BANDS (`GOODS · DELIVERY · MONEY · LOAN`), never as per-edge captions;
+ * a goods line's product name lives on its caption plate, never ON a
+ * connector; groups are separated by a wider gap than columns inside a group.
+ * Colour still belongs to STATE alone — routes are told apart by band and
+ * spacing, not by hue.
  *
  * ⭐ THE MONEY REQUIREMENT IS THE FINANCE EXCEPTION — OWNER RULING 2026-08-16,
  * decision A (`docs/orders/MASTER.md` §8). Outstanding money does not block
@@ -79,7 +89,11 @@ export type RouteNodeKind =
   | "deliver"
   | "delivery-photo"
   | "loan"
-  | "cancelled";
+  | "cancelled"
+  /** The goods line's caption plate — the product name and quantity, drawn as
+   *  a small grey header ABOVE the lane so it never sits on a connector. It is
+   *  not a station: no action, no door, no state of its own. */
+  | "goods-line";
 
 export interface RouteDoor {
   /** The governed door word, e.g. `Open PO-2048 →`. */
@@ -173,12 +187,25 @@ export interface LinkedProblem {
   door: RouteDoor;
 }
 
+/** One route-group header — `GOODS` · `DELIVERY` · `MONEY` · `LOAN` — drawn
+ *  once above its group of columns. The band is where a route says its name;
+ *  edges no longer carry route captions. */
+export interface RouteBand {
+  id: RouteBranchKey;
+  label: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
 export interface SalesOrderRouteMap {
   orderId: string;
   soNumber: string;
   customerName: string | null;
   nodes: RouteNode[];
   edges: RouteEdge[];
+  bands: RouteBand[];
   linkedProblems: LinkedProblem[];
   /** The drawn bounding box — the page fits THIS to the viewport on load. */
   width: number;
@@ -355,8 +382,15 @@ export const NODE_W = 208;
 const COL_GAP = 32;
 const PITCH = NODE_W + COL_GAP;
 const PAD = 28;
-/** Room under the Sales Order for the fan-out labels (`goods`, `delivery`…). */
-const FANOUT_GAP = 72;
+/** Columns INSIDE a group sit COL_GAP apart; GROUPS sit GROUP_GAP apart —
+ *  the wider gap is how GOODS, DELIVERY and MONEY read as three routes
+ *  without inventing a colour (owner ruling 2026-08-17). */
+export const GROUP_GAP = 72;
+/** The group band row: its height, the gap above it (under the Sales Order)
+ *  and the drop from the band to the first node row. */
+const BAND_H = 22;
+const BAND_GAP = 28;
+const BAND_DROP = 18;
 const ROW_GAP = 30;
 const GATE_GAP = 56;
 
@@ -419,13 +453,17 @@ interface NodeDraft {
   door?: RouteDoor | null;
 }
 
-interface Branch {
-  key: RouteBranchKey;
-  drafts: NodeDraft[];
-  /** The small grey caption on the edge leaving the Sales Order. */
-  labelLines: string[];
-  /** Loan hangs off DELIVER, not off the gate. */
-  joins: "gate" | "deliver" | "none";
+/** One goods line, drawn as ONE LANE (owner ruling 2026-08-17): the caption
+ *  plate on top, one purchase-chain column per source PO under it, and the
+ *  line's ONE stock node as the lane's tail — every chain converges on it. */
+interface GoodsLane {
+  /** The caption plate; null only on a cancelled lane. */
+  plate: RouteNode | null;
+  chains: RouteNode[][];
+  stock: RouteNode | null;
+  /** A cancelled line: one node, no chain, no gate edge. */
+  solo: RouteNode | null;
+  w: number;
 }
 
 /**
@@ -945,46 +983,64 @@ export function resolveSalesOrderRoute(input: SalesOrderRouteInput): SalesOrderR
     outstandingQty: line.outstandingQty,
   }));
 
-  /* ── the branches, left to right ─────────────────────────────────────── */
-  const branches: Branch[] = [];
+  /* ── CURRENT: one per route, up to three, never a fourth. Loan is an
+     obligation, not a position, so it never takes one. Seal order is reading
+     order, so the goods CURRENT lands on the first unfinished position. ── */
+  const currentTaken: Partial<Record<RouteBranchKey, boolean>> = {};
+  const seal = (drafts: NodeDraft[], branch: RouteBranchKey): RouteNode[] => {
+    const eligible = branch === "goods" || branch === "delivery" || branch === "money";
+    const mayOwn = eligible && !currentTaken[branch];
+    const { nodes: sealedNodes, hasHead } = sealChain(drafts, branch, mayOwn);
+    if (mayOwn && hasHead) currentTaken[branch] = true;
+    return sealedNodes;
+  };
 
+  /* ── goods: ONE LANE PER LINE. The plate names the line so no product name
+     ever sits on a connector; the chains hang under it; every chain
+     converges on the line's ONE stock node. ────────────────────────────── */
+  const lanes: GoodsLane[] = [];
   for (const line of lines) {
     const destinations = input.lineDestinations?.[line.sku] ?? [];
     const destination = destinations.length === 1 ? destinations[0]!.name : null;
     const { slices, unassignedQty } = purchaseSlices(line, input.purchaseOrders);
-    const caption = `${line.label} · Qty ${line.committedQty}`;
-    const buying = slices.length > 0 || unassignedQty > 0;
 
+    const chains: RouteNode[][] = [];
     for (const slice of slices) {
-      branches.push({
-        key: "goods",
-        drafts: purchaseChain(slice, input.receivingRecords),
-        labelLines: ["goods", caption, `${slice.qty} to buy from factory`],
-        joins: "gate",
-      });
+      chains.push(seal(purchaseChain(slice, input.receivingRecords), "goods"));
     }
-    if (unassignedQty > 0) {
-      branches.push({
-        key: "goods",
-        drafts: unassignedChain(line),
-        labelLines: ["goods", caption, `${unassignedQty} to buy from factory`],
-        joins: "gate",
-      });
-    }
-    branches.push({
-      key: "goods",
-      drafts: [stockDraft(line, destination)],
-      labelLines: buying ? ["goods", "(same line)"] : ["goods", caption],
-      joins: "gate",
-    });
+    if (unassignedQty > 0) chains.push(seal(unassignedChain(line), "goods"));
+    const stock = seal([stockDraft(line, destination)], "goods")[0]!;
+
+    const buyQty = slices.reduce((sum, slice) => sum + slice.qty, 0) + unassignedQty;
+    const { nodes: plateNodes } = sealChain(
+      [
+        {
+          id: `${line.sku}:goods-line`,
+          kind: "goods-line",
+          title: line.label,
+          complete: true,
+          lines: [
+            buyQty > 0
+              ? `Qty ${line.committedQty} · ${buyQty} to buy from factory`
+              : `Qty ${line.committedQty}`,
+          ],
+        },
+      ],
+      "goods",
+      false,
+    );
+    const plate = plateNodes[0]!;
+    const cols = Math.max(1, chains.length);
+    const w = cols * NODE_W + (cols - 1) * COL_GAP;
+    plate.w = w;
+    lanes.push({ plate, chains, stock, solo: null, w });
   }
 
   /* A cancelled line keeps its place in the story and states its outcome. It
      has no chain: there is no route to walk. */
   for (const cancelled of input.cancelledLines ?? []) {
-    branches.push({
-      key: "goods",
-      drafts: [
+    const { nodes: soloNodes } = sealChain(
+      [
         {
           id: `cancelled:${cancelled.sku}`,
           kind: "cancelled",
@@ -996,41 +1052,40 @@ export function resolveSalesOrderRoute(input: SalesOrderRouteInput): SalesOrderR
           ],
         },
       ],
-      labelLines: ["goods"],
-      joins: "none",
+      "goods",
+      false,
+    );
+    lanes.push({ plate: null, chains: [], stock: null, solo: soloNodes[0]!, w: NODE_W });
+  }
+
+  const deliveryChain = seal([logisticsDraft(input), deliveryDateDraft(input)], "delivery");
+  const moneyChain = seal([moneyDraft(input)], "money");
+  const loanNodes = loanDrafts(input).map(
+    (draft) => sealChain([draft], "loan", false).nodes[0]!,
+  );
+
+  /* ── geometry: the bands name the routes, and the wider GROUP_GAP is what
+     separates GOODS from DELIVERY from MONEY — never a colour. ─────────── */
+  const goodsW =
+    lanes.length > 0
+      ? lanes.reduce((sum, lane) => sum + lane.w, 0) + (lanes.length - 1) * COL_GAP
+      : 0;
+  const groups: { key: RouteBranchKey; label: string; w: number }[] = [];
+  if (lanes.length > 0) groups.push({ key: "goods", label: "GOODS", w: goodsW });
+  groups.push({ key: "delivery", label: "DELIVERY", w: NODE_W });
+  groups.push({ key: "money", label: "MONEY", w: NODE_W });
+  if (loanNodes.length > 0) {
+    groups.push({
+      key: "loan",
+      label: "LOAN",
+      w: loanNodes.length * NODE_W + (loanNodes.length - 1) * COL_GAP,
     });
   }
 
-  branches.push({
-    key: "delivery",
-    drafts: [logisticsDraft(input), deliveryDateDraft(input)],
-    labelLines: ["delivery"],
-    joins: "gate",
-  });
-  branches.push({
-    key: "money",
-    drafts: [moneyDraft(input)],
-    labelLines: ["money"],
-    joins: "gate",
-  });
-  for (const loan of loanDrafts(input)) {
-    branches.push({ key: "loan", drafts: [loan], labelLines: ["loan"], joins: "deliver" });
-  }
-
-  /* ── CURRENT: one per route, up to three, never a fourth. Loan is an
-     obligation, not a position, so it never takes one. ─────────────────── */
-  const currentTaken: Partial<Record<RouteBranchKey, boolean>> = {};
-  const sealed = branches.map((branch) => {
-    const eligible = branch.key === "goods" || branch.key === "delivery" || branch.key === "money";
-    const mayOwn = eligible && !currentTaken[branch.key];
-    const { nodes, hasHead } = sealChain(branch.drafts, branch.key, mayOwn);
-    if (mayOwn && hasHead) currentTaken[branch.key] = true;
-    return { branch, nodes };
-  });
-
-  /* ── geometry ────────────────────────────────────────────────────────── */
-  const columns = sealed.length;
-  const spanW = columns > 0 ? columns * PITCH - COL_GAP : NODE_W;
+  const spanW = Math.max(
+    NODE_W,
+    groups.reduce((sum, group) => sum + group.w, 0) + (groups.length - 1) * GROUP_GAP,
+  );
   const centreX = PAD + spanW / 2;
 
   const totals = goodsTotals(lines);
@@ -1052,17 +1107,60 @@ export function resolveSalesOrderRoute(input: SalesOrderRouteInput): SalesOrderR
   origin.x = centreX - NODE_W / 2;
   origin.y = PAD;
 
-  const branchTop = origin.y + origin.h + FANOUT_GAP;
-  let deepest = branchTop;
-  sealed.forEach(({ nodes }, index) => {
-    let y = branchTop;
-    for (const node of nodes) {
-      node.x = PAD + index * PITCH;
-      node.y = y;
-      y += node.h + ROW_GAP;
+  const bandY = origin.y + origin.h + BAND_GAP;
+  const rowTop = bandY + BAND_H + BAND_DROP;
+  const bands: RouteBand[] = [];
+  let deepest = rowTop;
+  let groupX = PAD;
+  for (const group of groups) {
+    bands.push({ id: group.key, label: group.label, x: groupX, y: bandY, w: group.w, h: BAND_H });
+    if (group.key === "goods") {
+      let laneX = groupX;
+      for (const lane of lanes) {
+        if (lane.solo) {
+          lane.solo.x = laneX;
+          lane.solo.y = rowTop;
+          deepest = Math.max(deepest, rowTop + lane.solo.h);
+        } else {
+          const plate = lane.plate!;
+          plate.x = laneX;
+          plate.y = rowTop;
+          const chainTop = rowTop + plate.h + ROW_GAP;
+          let laneBottom = chainTop;
+          lane.chains.forEach((chain, index) => {
+            let y = chainTop;
+            for (const chainNode of chain) {
+              chainNode.x = laneX + index * PITCH;
+              chainNode.y = y;
+              y += chainNode.h + ROW_GAP;
+            }
+            laneBottom = Math.max(laneBottom, y - ROW_GAP);
+          });
+          const stock = lane.stock!;
+          stock.x = laneX + (lane.w - NODE_W) / 2;
+          stock.y = lane.chains.length > 0 ? laneBottom + ROW_GAP : chainTop;
+          deepest = Math.max(deepest, stock.y + stock.h);
+        }
+        laneX += lane.w + COL_GAP;
+      }
+    } else if (group.key === "delivery" || group.key === "money") {
+      const chain = group.key === "delivery" ? deliveryChain : moneyChain;
+      let y = rowTop;
+      for (const chainNode of chain) {
+        chainNode.x = groupX;
+        chainNode.y = y;
+        y += chainNode.h + ROW_GAP;
+      }
+      deepest = Math.max(deepest, y - ROW_GAP);
+    } else {
+      loanNodes.forEach((loanNode, index) => {
+        loanNode.x = groupX + index * PITCH;
+        loanNode.y = rowTop;
+        deepest = Math.max(deepest, rowTop + loanNode.h);
+      });
     }
-    deepest = Math.max(deepest, y - ROW_GAP);
-  });
+    groupX += group.w + GROUP_GAP;
+  }
 
   const { nodes: gateNodes } = sealChain([gateDraft(requirements, doNumber)], "gate", false);
   const gate = gateNodes[0]!;
@@ -1083,7 +1181,17 @@ export function resolveSalesOrderRoute(input: SalesOrderRouteInput): SalesOrderR
   const deliver = tailNodes[0]!;
   const photo = tailNodes[1]!;
 
-  const nodes: RouteNode[] = [origin, ...sealed.flatMap((s) => s.nodes), gate, ...tailNodes];
+  const nodes: RouteNode[] = [
+    origin,
+    ...lanes.flatMap((lane) =>
+      lane.solo ? [lane.solo] : [lane.plate!, ...lane.chains.flat(), lane.stock!],
+    ),
+    ...deliveryChain,
+    ...moneyChain,
+    ...loanNodes,
+    gate,
+    ...tailNodes,
+  ];
 
   /* ── connectors ──────────────────────────────────────────────────────── */
   const edges: RouteEdge[] = [];
@@ -1103,14 +1211,38 @@ export function resolveSalesOrderRoute(input: SalesOrderRouteInput): SalesOrderR
     });
   };
 
-  for (const { branch, nodes: chain } of sealed) {
-    /* The Sales Order is the ONLY start node: goods, delivery and money leave
-       it simultaneously. */
-    segment(origin, chain[0]!, branch.labelLines);
-    for (let i = 0; i < chain.length - 1; i += 1) segment(chain[i]!, chain[i + 1]!, []);
-    const tailNode = chain[chain.length - 1]!;
-    if (branch.joins === "gate") segment(tailNode, gate, []);
-    if (branch.joins === "deliver") segment(tailNode, deliver, ["collect back"], true);
+  /* The Sales Order is the ONLY start node: goods, delivery and money leave
+     it simultaneously. Route names live on the BANDS, so no edge carries a
+     caption — the one edge fact left is the loan's `collect back`. */
+  for (const lane of lanes) {
+    if (lane.solo) {
+      segment(origin, lane.solo, []);
+      continue;
+    }
+    const plate = lane.plate!;
+    const stock = lane.stock!;
+    segment(origin, plate, []);
+    for (const chain of lane.chains) {
+      segment(plate, chain[0]!, []);
+      for (let i = 0; i < chain.length - 1; i += 1) segment(chain[i]!, chain[i + 1]!, []);
+      segment(chain[chain.length - 1]!, stock, []);
+    }
+    if (lane.chains.length === 0) segment(plate, stock, []);
+    segment(stock, gate, []);
+  }
+  segment(origin, deliveryChain[0]!, []);
+  for (let i = 0; i < deliveryChain.length - 1; i += 1) {
+    segment(deliveryChain[i]!, deliveryChain[i + 1]!, []);
+  }
+  segment(deliveryChain[deliveryChain.length - 1]!, gate, []);
+  segment(origin, moneyChain[0]!, []);
+  for (let i = 0; i < moneyChain.length - 1; i += 1) {
+    segment(moneyChain[i]!, moneyChain[i + 1]!, []);
+  }
+  segment(moneyChain[moneyChain.length - 1]!, gate, []);
+  for (const loanNode of loanNodes) {
+    segment(origin, loanNode, []);
+    segment(loanNode, deliver, ["collect back"], true);
   }
 
   segment(gate, deliver, []);
@@ -1147,6 +1279,7 @@ export function resolveSalesOrderRoute(input: SalesOrderRouteInput): SalesOrderR
     customerName: input.order.customerName,
     nodes,
     edges,
+    bands,
     linkedProblems,
     width,
     height,

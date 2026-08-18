@@ -120,6 +120,18 @@ describe("Order Route — one canvas", () => {
     ).toHaveAttribute("data-style", "dashed");
   });
 
+  it("names the routes on group bands and the goods line on its plate — never on a connector", () => {
+    draw();
+    expect(screen.getByTestId("route-band-goods")).toHaveTextContent("GOODS");
+    expect(screen.getByTestId("route-band-delivery")).toHaveTextContent("DELIVERY");
+    expect(screen.getByTestId("route-band-money")).toHaveTextContent("MONEY");
+    const plate = nodeEl("B1201S:goods-line");
+    expect(plate).toHaveTextContent("B1201S · King");
+    expect(plate).toHaveTextContent("Qty 3 · 3 to buy from factory");
+    /* The edge layer draws no caption text at all. */
+    expect(screen.getByTestId("route-edges").querySelectorAll("text")).toHaveLength(0);
+  });
+
   it("fits the whole map with a control the operator can always reach", () => {
     draw();
     expect(screen.getByTestId("route-zoom-out")).toBeInTheDocument();
