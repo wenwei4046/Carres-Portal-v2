@@ -17,7 +17,7 @@
  *    it on the client by looking BACKWARDS through a roster that starts at
  *    the current month, so it found nothing and printed `Not assigned` every
  *    month since it shipped.
- *  · **Per-person workload.** Each staff member's `{n} open · {n} overdue`
+ *  · **Per-person workload.** Each staff member's `{n} actions to do · {n} late`
  *    comes from the ONE governed work engine — literally the same function
  *    Team Work runs — and the row deep-links into that person's Team Work.
  */
@@ -194,9 +194,9 @@ export default function TeamPanel() {
                   {personLabel(w.member.name, w.member.email)}
                 </span>
                 <span className="text-label text-base-500 tabular-nums shrink-0">
-                  {w.open} open
+                  {w.open} action{w.open === 1 ? "" : "s"} to do
                   {w.overdue > 0 && (
-                    <span className="text-danger font-semibold"> · {w.overdue} overdue</span>
+                    <span className="text-danger font-semibold"> · {w.overdue} late</span>
                   )}
                 </span>
                 <ChevronRight size={14} className="text-base-300 shrink-0" />

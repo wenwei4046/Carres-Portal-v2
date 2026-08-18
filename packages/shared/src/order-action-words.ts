@@ -49,6 +49,11 @@ export type OrderActionKey =
   | "upload_delivery_photo"
   | "delivering"
   | "collect"
+  // The blueprint card's two NEW acts (owner-approved 2026-08-16, §7):
+  // the loan comes back on the delivery day, and Finance resolves the one
+  // thing money can do to a delivery.
+  | "collect_loan_item"
+  | "resolve_payment_exception"
   | "done";
 
 /** The real names this order knows. Absent / blank → the role word. */
@@ -282,6 +287,30 @@ const WORDS: readonly OrderActionWord[] = [
       return money ? `${money} from ${who}` : `Collect from ${who}`;
     },
     button: "Record payment",
+    done: null,
+  },
+  {
+    // Blueprint card §7 (2026-08-16) — the loan sofa/mattress comes back on
+    // the delivery day. COPY-STANDARD already registered the generic form
+    // (`Collect the loan item`, 2026-08-16): a loan is not always a sofa.
+    key: "collect_loan_item",
+    queue: "Collect the loan item",
+    line: (p) => `Collect the loan item from ${party(p.customer, "customer")}`,
+    button: "Record loan collected",
+    // null = "not mirrored yet", never "records nothing" (C10's dead-code
+    // rule): a DONE string joins when a surface actually renders it.
+    done: null,
+  },
+  {
+    // Blueprint card §7 (2026-08-16) — an OPEN Finance exception is the ONE
+    // money blocker (decision A), and only Finance clears it. The reason
+    // rides the fact line of whichever surface prints this; the words here
+    // never restate a balance, because the exception is a decision, not a
+    // derived state.
+    key: "resolve_payment_exception",
+    queue: "Resolve the payment exception",
+    line: () => "Resolve the payment exception — Finance clears it with evidence",
+    button: "Open Finance exceptions",
     done: null,
   },
   {

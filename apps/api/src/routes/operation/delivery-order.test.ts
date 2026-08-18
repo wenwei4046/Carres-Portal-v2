@@ -171,6 +171,7 @@ function tables(over?: {
     ops_stock_items: tableMock({ data: [], error: null }),
     // Decision A (0355) — the gate's one money question, read from the owning
     // table. Empty by default: Finance has opened nothing.
+    ops_delivery_orders: tableMock({ data: [], error: null }),
     order_finance_exceptions: tableMock({
       data: over?.financeExceptions ?? [],
       error: null,

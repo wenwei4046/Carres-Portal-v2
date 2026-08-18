@@ -40,6 +40,51 @@ const ctx = {
   delayDecisionAtIso: null,
 };
 
+describe("the blueprint card's two composed Work items (owner-approved 2026-08-16)", () => {
+  it("an OPEN Finance exception composes `Resolve the payment exception` — Finance's duty, due today", () => {
+    const items = workItemsForOrder(
+      [],
+      { ...ctx, financeExceptionHolds: true },
+      "2026-08-18",
+      HOLS,
+    );
+    const item = items.find((i) => i.ruleKey === "resolve_payment_exception")!;
+    expect(item).toBeTruthy();
+    expect(item.action).toBe("Resolve the payment exception");
+    // No finance roster fact exists — the duty word stands, never a
+    // hand-picked person and never the PIC borrowed for Finance's work.
+    expect(item.ownerName).toBeNull();
+    expect(item.ownerDuty).toBe("Finance");
+    expect(item.dueIso).toBe("2026-08-18"); // immediately
+  });
+
+  it("a loan still out on the delivery day composes `Collect the loan item` — Delivery staff's duty", () => {
+    const items = workItemsForOrder(
+      [],
+      { ...ctx, loanOutstanding: true, confirmedDateIso: "2026-08-18" },
+      "2026-08-18",
+      HOLS,
+    );
+    const item = items.find((i) => i.ruleKey === "collect_loan_item")!;
+    expect(item).toBeTruthy();
+    expect(item.ownerName).toBeNull();
+    expect(item.ownerDuty).toBe("Delivery staff");
+    expect(item.dueIso).toBe("2026-08-18"); // the delivery day itself
+  });
+
+  it("neither composes before its fact holds — a loan waits for the delivery day", () => {
+    const quiet = workItemsForOrder([], ctx, "2026-08-18", HOLS);
+    expect(quiet.length).toBe(0);
+    const early = workItemsForOrder(
+      [],
+      { ...ctx, loanOutstanding: true, confirmedDateIso: "2026-08-25" },
+      "2026-08-18",
+      HOLS,
+    );
+    expect(early.find((i) => i.ruleKey === "collect_loan_item")).toBeUndefined();
+  });
+});
+
 describe("WORK_RULES — five parts, or no entry", () => {
   it("every rule names all five parts, and the completion fact is never empty", () => {
     for (const r of WORK_RULES) {
@@ -80,12 +125,18 @@ describe("WORK_RULES — five parts, or no entry", () => {
 describe("workItemsForOrder — WHO + ACTION + actual working day", () => {
   it("composes the engine's open set with the PIC and weekday+date dues", () => {
     const open = openOrderActions(baseSignals); // assign_logistics expected
-    const items = workItemsForOrder(open, ctx, "2026-08-11", HOLS);
+    // Owner re-ruling 2026-08-16 (blueprint card §7, supersedes the
+    // 3-working-days law): due WITHIN THE DAY the PO was issued.
+    const items = workItemsForOrder(
+      open,
+      { ...ctx, poIssuedAtIso: "2026-08-11" },
+      "2026-08-11",
+      HOLS,
+    );
     const assign = items.find((i) => i.ruleKey === "assign_logistics")!;
     expect(assign.ownerName).toBe("Shasha");
     expect(assign.soRef).toBe("SO-1318");
-    // Thu 2026-08-20 − 3 working days (Mon–Sat) = Mon 17 Aug.
-    expect(assign.dueIso).toBe("2026-08-17");
+    expect(assign.dueIso).toBe("2026-08-11"); // the PO's own issue day
     expect(assign.workingDaysLate).toBe(0);
   });
 
@@ -103,13 +154,18 @@ describe("workItemsForOrder — WHO + ACTION + actual working day", () => {
 
   it("late work keeps its ORIGINAL due date with working days late", () => {
     const open = openOrderActions(baseSignals);
-    const items = workItemsForOrder(open, ctx, "2026-08-19", HOLS);
+    const items = workItemsForOrder(
+      open,
+      { ...ctx, poIssuedAtIso: "2026-08-17" },
+      "2026-08-19",
+      HOLS,
+    );
     const assign = items.find((i) => i.ruleKey === "assign_logistics")!;
     expect(assign.dueIso).toBe("2026-08-17"); // unchanged — the due never moves
     expect(assign.workingDaysLate).toBe(2); // Tue 18, Wed 19
   });
 
-  it("collect and issue_delivery_order share the ONE T−1 arithmetic", () => {
+  it("collect keeps the ONE T−1 arithmetic — and the delivery order is nobody's work (Slice 2)", () => {
     const s: OrderActionSignals = {
       ...baseSignals,
       hasLogistics: true,
@@ -127,12 +183,25 @@ describe("workItemsForOrder — WHO + ACTION + actual working day", () => {
     );
     const collect = items.find((i) => i.ruleKey === "collect")!;
     expect(collect.dueIso).toBe("2026-08-19");
-    /* Decision A (2026-08-16): a plain balance no longer locks the collect —
-       and it no longer withholds the document either, so BOTH actions are on
-       the list and share the one T−1 due, which is this test's whole title. */
+    /* Decision A (2026-08-16): a plain balance no longer locks the collect.
+       Slice 2 then removed the press itself: the SYSTEM issues the document
+       when every requirement holds, so `issue_delivery_order` may never
+       appear on a person's worklist — My Work and Team Work compose only
+       from what the engine raises, and it no longer raises this. */
     expect(collect.locked).toBeFalsy();
-    const issue = items.find((i) => i.ruleKey === "issue_delivery_order")!;
-    expect(issue.dueIso).toBe("2026-08-19");
+    expect(items.find((i) => i.ruleKey === "issue_delivery_order")).toBeUndefined();
+  });
+
+  it("⭐ the issue_delivery_order rule names no person (Slice 2 — the DONE WHEN)", () => {
+    const rule = ORDER_WORK_RULES.find((r) => r.key === "issue_delivery_order")!;
+    // `docs/cards/CARD-2026-08-16-order-route-implementation-plan.md`:
+    // "work-engine.ts no longer names the PIC as the action owner of a step
+    // nobody performs" — and the trigger's "money passed" died with decision A.
+    expect(rule.owner).not.toContain("PIC");
+    expect(rule.owner).toContain("SYSTEM");
+    expect(rule.trigger).not.toContain("money passed");
+    expect(rule.trigger).toContain("Finance exception");
+    expect(rule.completionFact).toContain("orders.do_number");
   });
 
   it("a step with no anchor has no due and can never be late", () => {

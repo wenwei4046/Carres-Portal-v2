@@ -3837,7 +3837,10 @@ can see or close. It moves to them the day that portal covers appointments.
 
 **`Assign logistics`** — trigger: the order needs delivering and no company is chosen ·
 completion: **a company is recorded. Never "they accepted"** — assigning is our decision ·
-due: 3 working days before the customer's date.
+due: **WITHIN THE DAY the Purchase Order is issued** (owner re-ruling 2026-08-16, blueprint card
+§7 — supersedes the 3-working-days-before-the-customer-date law); a stock-source order with no
+PO: **within the order day**. Logistics is assigned the moment purchase starts, not near the
+delivery.
 
 **`Call {logistics} — confirm delivery date`** — trigger: logistics assigned but the customer
 has not confirmed BOTH a date and a slot · completion: **a customer-confirmed date AND slot
@@ -3845,11 +3848,16 @@ exist. A date logistics proposed is a fact, not a confirmation** · due: a setta
 working days before the date (**1 today**) · the checklist adds driver name, driver phone,
 vehicle number and lift/registration requirements **for condominiums**.
 
-**`Issue delivery order`** — trigger: customer-confirmed date **AND** slot **AND** core goods
-ready **AND** the payment condition passed — **all four. The action appears only when it can
-actually be done.** The SYSTEM produces the document; **nobody writes one by hand**, and the
-number is the locked `DO-DDMMYY-NNNN` scheme seeded on the order id, so a reprint matches the
-signed original.
+**Issuing the delivery order is NOT a person's action** (owner ruling 2026-08-16, blueprint
+card §3/§7 — this OVERWRITES the four-condition `Issue delivery order` action that ruled here).
+The SYSTEM issues the document at whichever door completes the gate — booking confirm · stock
+reserve · Finance-exception clear — under §8's requirements. **No Issue, Release or Approve
+button exists anywhere, and no worklist raises it as work.** The number stays the locked
+`DO-DDMMYY-NNNN` scheme seeded on the order id (a same-day re-issue for a superseded trip takes
+the scheme's repeat letter, `-B`), so a reprint always matches the signed original. A REBOOKED
+trip is a NEW document (card §6): an un-run document is voided `rescheduled` by the system; a
+failed one keeps its Delivery exception forever and simply stops being the active number; a
+delivered one is untouched history.
 
 **`Deliver today`** — trigger: the confirmed date is today and nothing has been delivered ·
 completion: **Delivered**, or a **Delivery Exception carrying its reason** (customer
@@ -3858,6 +3866,16 @@ refused · lift booking not done · delivery failed). **Every module fails the s
 Exception plus a Reason, never a family of failure words.**
 
 **`Upload delivery photo`** — trigger: delivered, no photo · due: 1 working day after delivery.
+
+**`Collect the loan item`** — NEW, blueprint card §7 (owner-approved 2026-08-16) · trigger: a
+loan item is still out (`ops_sofa_loans`) and the delivery day has arrived · owner: Delivery
+staff · due: the delivery day itself · completion: the loan row reads returned. Composed by the
+Work engine from the loan fact; it never blocks a delivery (Card 6's law is untouched).
+
+**`Resolve the payment exception`** — NEW, blueprint card §7 · trigger: an OPEN Finance
+exception holds the delivery (0355) · owner: the Finance owner — only Finance clears it, with
+evidence · due: immediately · completion: the exception reads cleared. Composed by the Work
+engine; a duty with no roster holder yet shows its duty word, never a borrowed PIC.
 
 ### FROZEN RULES
 - **The slot length comes from the BUILDING TYPE** — condominium, apartment and office take a
@@ -4084,6 +4102,26 @@ its-exception); this MASTER keeps only the gate. Two Law-D repairs rode the slic
 gate now prints the number from `orders.do_number` (it used to read attempts alone, so a
 system-issued DO with no run showed a ready gate with no number), and the ISSUED gate node gained
 the door its own complete-node anatomy law requires — a door to the document, never a control.
+
+### THE LAST PRESS RETIRED + THE REBOOKED TRIP — blueprint card §§3/6/7 · SLICE 3 BUILT
+
+- **Every gate-completing door now attempts issuance through ONE path**
+  (`apps/api/src/lib/delivery-order-issue.ts` + the extracted `booking-context.ts`, Law D):
+  booking confirm · **stock reserve — the door that was missing** · Finance-exception clear. The
+  manual POST endpoint survives as an idempotent BACKSTOP wired to no button.
+- **The engine stopped raising `issue_delivery_order` as work** (`order-actions.ts`): the
+  all-arranged row is C3's quiet `Delivering` fact again, the drawer's Issue button is deleted on
+  both surfaces that mounted it (`useIssueDeliveryOrder` removed), and the work-engine rule names
+  the SYSTEM. The un-issued drawer row reads the governed sentence, and an issued number is a
+  door to the DO object page.
+- **A rebooked trip is a NEW document** (card §6): on a booking confirm that no longer matches
+  the active document, an un-run document is voided `rescheduled` through the ONE void door, a
+  failed one keeps its exception forever, a delivered one is untouched — and in every case the
+  mirror empties so the mint writes the new number (same-day re-issue takes the repeat letter).
+- **A cancelled order voids its un-delivered documents** in the same transaction
+  (`cancel_order`, migration `0357`) — reason + actor + time, delivered documents untouched.
+- This work supersedes PR #838 (the race-losing duplicate of #835); its sound structure —
+  the issue lib, the stock doors, the engine retirement — was adopted and extended here.
 
 **AGREEING a date is softer than ISSUING.** It WARNS about goods, money and the calendar so
 nobody promises a day the goods cannot make, but it refuses only two things:

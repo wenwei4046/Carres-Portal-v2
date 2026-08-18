@@ -133,7 +133,12 @@ number.
   both linked to the Sales Order.
 - **Staff can never delete or void a DO.** Deletion is refused by trigger; the ONE void door
   (`delivery_order_void`) accepts only `order_cancelled` or `rescheduled` and records reason +
-  actor + time. No UI exposes a void control.
+  actor + time. No UI exposes a void control. **BUILT (Slice 3):** the booking-confirm door
+  supersedes a no-longer-matching active document (void `rescheduled` when un-run; a failed one
+  keeps its exception and stops being active; a delivered one is untouched) and the system mints
+  the new document; `cancel_order` (0357) voids un-delivered documents in the cancellation's own
+  transaction. Every gate-completing door — booking confirm · stock reserve · finance clear —
+  attempts issuance through the ONE issuing path; no button exists anywhere.
 
 ## 4 · Warehouse and Logistics are separate
 

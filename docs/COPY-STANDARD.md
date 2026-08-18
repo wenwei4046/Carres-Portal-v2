@@ -1649,6 +1649,7 @@ others. The status set is the document's own lifecycle — registered here and i
 | A voided document | **Cancelled** + `Order cancelled` / `Rescheduled` | Deleted · Void · Removed |
 | No date on the document | **No delivery date yet** | — · TBC · N/A |
 | The register's empty state | **No delivery orders yet — the system issues one when a trip's goods, logistics and date are ready. The Order Route on each Sales Order shows what is still open.** | No data · No results |
+| An order's row before the document exists (drawer / detail) | **No delivery order yet — the system issues it when the goods, logistics and date are ready** | — · Not issued · a button |
 | The reprint promise (Print hover) | **Reprint carries the same number** | Duplicate · Copy |
 
 The T4 Reason Library gained the card's four remaining exception reasons —
@@ -1797,15 +1798,30 @@ weekday+date spelling (`Thu 6 Aug`). Only these strings are the page's own:
 | The sidebar door / page | **Work** | Tasks · To-do · Queue · Dashboard |
 | The two filters over the one set | **My Work · Team Work** | My tasks · Everyone · All work |
 | Work with no anchor date yet | **No date** | Unscheduled · Someday · TBD |
-| The open/overdue tally — page, owner chip and rail row | **{n} open · {n} overdue** | Total · Outstanding · **{n} late** |
+| The tally — page, staff group and rail row | **{n} actions to do · {n} late** | **{n} open · {n} overdue** (superseded) · Total · Outstanding |
+| A row's due date, on line 2 | **due {fmtDate}** (`due Wed, 20 Aug`) | Today · Tomorrow · a bare date |
+| A late row's line 2 | **Late — was due {fmtDate}** (the original due never moves) | Overdue by · Delayed |
 | The clear state | **No open work — every track is clear.** | All done · Empty |
-| Late work, on ONE row | **{n} working days late** (the original due stays printed) | Overdue by · Delayed |
 
-> **`overdue`, not `late`, and this row was corrected 2026-08-15.** `ui/MASTER.md` §5 locked the
-> owner summary as `open · overdue` on 2026-08-14 while this table still ruled `open · late`, so
-> the Work page printed `late` and the Quick Rail printed `overdue` **for the same number**. The
-> newer owner ruling wins and there is now ONE spelling. `{n} working days late` is a different
-> string — it describes ONE row's lateness, not a tally — and is unaffected.
+> **⭐ EVERY COUNT SAYS WHAT IT COUNTS — owner ruling 2026-08-16 (blueprint card §7), and it
+> OVERWRITES the 2026-08-14/15 `open · overdue` tally.** A bare `open` beside a number told a
+> low-English operator nothing; `{n} actions to do · {n} late` says the thing itself. The rail's
+> Team peek and the Work page speak the same pair.
+
+**THE TWO-LINE WORK ROW HAS ONE MAPPING (card §7).** Line 1 is the action's registered SHORT
+display — **the dictionary's own QUEUE word**, no second definition of any act. Line 2 carries
+names · document numbers · the due date, and only line 2 does.
+
+**TWO NEW ACTS — registered by the blueprint card (owner-approved 2026-08-16):**
+
+| Act | Queue / line 1 | Owner rule | Due |
+|---|---|---|---|
+| The loan comes back on the trip | **Collect the loan item** (the 2026-08-16 generic form — a loan is not always a sofa) | Delivery staff | the delivery day itself |
+| Finance lifts the one money blocker | **Resolve the payment exception** | the Finance owner — only Finance clears it, with evidence | immediately |
+
+Neither is ever a button on a register or an object page; they are WORK, composed from the
+module facts (`ops_sofa_loans` · `order_finance_exceptions`) by the Work engine. A duty with no
+roster holder yet shows its DUTY WORD where a name cannot stand — never a hand-picked person.
 
 **System work has NO Done button** — an item leaves when its owning module
 records the completion fact. A human follow-up stays `ops_tasks`, labelled

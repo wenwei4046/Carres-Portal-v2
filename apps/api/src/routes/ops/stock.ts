@@ -37,6 +37,7 @@ import {
   type PoolUseReason,
 } from "@carres/shared";
 import { requireOperationOrPrincipal } from "../../lib/auth-guards";
+import { attemptDeliveryOrderIssue } from "../../lib/delivery-order-issue";
 import { myDuties } from "../../lib/duties";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
@@ -502,6 +503,33 @@ opsStockRouter.put("/reserve-level", requireOperationOrPrincipal, async (c) => {
 // POST actions — thin wrappers over the SECURITY DEFINER RPCs.
 // =====================================================================
 
+/**
+ * SLICE 2 — reserving a unit to a Sales Order may have been the LAST open
+ * requirement on its delivery-order gate, and the ruling says the SYSTEM
+ * issues the document the moment every requirement holds
+ * (`docs/orders/MASTER.md` §8: no Release button, no manual bypass).
+ *
+ * FAIL-SOFT and FIRE-AND-CHECK: an issuance hiccup must never undo or refuse
+ * the reservation the operator just made — the facts persist, and the next
+ * door (or the manual backstop) issues it. Only a `SO-{n}` ref can name an
+ * order; every other ref (loans, partners) has no delivery-order gate.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function attemptIssueForReservedRef(sb: any, ref: string): Promise<void> {
+  const m = /^SO-(\d+)$/.exec(ref.trim());
+  if (!m) return;
+  try {
+    const { data: order } = await sb
+      .from("orders")
+      .select("id")
+      .eq("so", Number(m[1]))
+      .maybeSingle();
+    if (order?.id) await attemptDeliveryOrderIssue(sb, order.id as string);
+  } catch {
+    // Not issued yet — the gate facts persist and the next door tries again.
+  }
+}
+
 // /reserve — take the OLDEST free unit of a SKU (the On-hand box). K4 (0292):
 // the pick rule is unchanged (FIFO, SKIP LOCKED, same warehouse default); what
 // changed is that the reason is written in the same transaction, so the "no
@@ -524,6 +552,7 @@ opsStockRouter.post("/reserve", requireOperationOrPrincipal, async (c) => {
       message: "No matching free unit available for this SKU",
     });
   }
+  await attemptIssueForReservedRef(sb, parsed.ref);
   return c.json({ itemId: data });
 });
 
@@ -551,6 +580,7 @@ opsStockRouter.post("/reserve-item", requireOperationOrPrincipal, async (c) => {
       message: "Unit is no longer free (already reserved / sold / flagged)",
     });
   }
+  await attemptIssueForReservedRef(sb, parsed.ref);
   return c.json({ itemId: data });
 });
 

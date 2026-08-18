@@ -144,22 +144,38 @@ describe("OrderDetailDrawer — no Purchase Order creation door", () => {
  * Same source-scan reasoning as above: these are facts about which branch
  * exists at all, and the drawer is 7,000 lines of branches.
  */
-describe("OrderDetailDrawer — C7, the delivery order", () => {
-  it("renders a delivery-order row, and spells its verb from the dictionary", () => {
+describe("OrderDetailDrawer — C7 → Slice 2, the delivery order", () => {
+  it("⭐ renders a delivery-order row with NO issue control in any state (Slice 2)", () => {
+    // `docs/orders/MASTER.md` §8: the SYSTEM issues the DO when every
+    // requirement is met — no Release button, no Approve button, no manual
+    // bypass. The row is a fact in both states, so the PRESS is gone. The one
+    // click the row keeps is a READ door: the number navigates to the DO
+    // object page (§0.1: a document number opens its authoritative object) —
+    // navigation is not an act, and there is nothing to press before the
+    // number exists.
     expect(SRC).toContain("<DeliveryOrderRow");
-    // The button word is READ, never typed here — so a rename in
-    // COPY-STANDARD's mirror reaches this screen without touching this file.
-    expect(SRC).toMatch(/orderActionButton\("issue_delivery_order"\)/);
-    // Nor is the DONE message typed: the toast asks the same mirror.
-    expect(SRC).toMatch(/orderActionDone\("issue_delivery_order"\)/);
+    expect(SRC).not.toMatch(/orderActionButton\("issue_delivery_order"\)/);
+    expect(SRC).not.toMatch(/useIssueDeliveryOrder/);
+    const i = SRC.indexOf("function DeliveryOrderRow(");
+    expect(i, "DeliveryOrderRow is missing").toBeGreaterThan(-1);
+    const body = SRC.slice(i, SRC.indexOf("\n}", i));
+    expect(body).not.toContain("<Btn");
+    // (the governed absence sentence SAYS "the system issues it", so the scan
+    // bans control surface, not the word)
+    expect(body).not.toMatch(/useIssueDeliveryOrder|mutate|useMutation/);
+    // the only onClick is the navigation door to the document's page
+    expect(body).toContain("/operation/delivery-orders/");
   });
 
   it("the row shows the number as a FACT once it exists — no second press", () => {
     const i = SRC.indexOf("function DeliveryOrderRow(");
     expect(i, "DeliveryOrderRow is missing").toBeGreaterThan(-1);
     const body = SRC.slice(i, i + 1600);
-    // The issued branch has no Btn at all: the document already exists.
+    // The issued branch prints the number as the door to its page; the
+    // unissued branch reads the governed absence SENTENCE (COPY-STANDARD:
+    // an absent value reads as words, never a dash).
     expect(body).toMatch(/doNumber \?/);
+    expect(body).toContain("No delivery order yet");
   });
 
   it("goods and money no longer disable the Confirm button (§5)", () => {
