@@ -992,7 +992,7 @@ catalogRouter.delete("/skus/:id", async (c) => {
 // since we forward the user JWT). userClient/RLS only — never service_role.
 //
 // COST: a CONSTANT 4 Cloudflare subrequests — three batched reads and one
-// catalog_import_skus call (migration 0357) — no matter how many rows the file
+// catalog_import_skus call (migration 0358) — no matter how many rows the file
 // carries. It used to be 3 + one INSERT per new model + one write per row, which
 // crossed the Workers Free-plan cap of 50 at around 45 rows and then reported
 // the overflow as several hundred identical spreadsheet errors.

@@ -1,5 +1,5 @@
 -- =============================================================================
--- 0357_the_sku_import_is_one_call.sql — the SKU import stops running out of
+-- 0358_the_sku_import_is_one_call.sql — the SKU import stops running out of
 -- subrequests halfway through the file.
 -- 2026-08-18
 --
@@ -54,13 +54,20 @@
 -- exactly where they are. A SECURITY DEFINER version would have silently
 -- handed every internal role the principal's pricing rights.
 --
--- ORDERING: 0357. This file was written as 0356 and renumbered — the tracker
--- query caught `0356_a_delivery_order_is_a_document_with_its_own_register`
--- (version 20260818031718) already applied and on `main`, twenty minutes after
--- a fetch that said the tail was 0355. 0357 is the MAX of the tracker tail, the
--- repository tail and every branch at 2026-08-18. That tail goes stale in
--- MINUTES here — re-run the query at the moment you apply, not before
--- (CLAUDE.md §5 red line 7).
+-- ORDERING: 0358 — the THIRD number this file has worn in one hour. Written as
+-- 0356; `0356_a_delivery_order_is_a_document_with_its_own_register` turned up
+-- applied (20260818031718) twenty minutes after a fetch that read the tail as
+-- 0355. Renumbered to 0357; eighteen minutes later
+-- `0357_a_cancelled_order_voids_its_delivery_orders` (20260818033500) turned up
+-- applied too — from `origin/feat/do-auto-complete`, a branch that has not
+-- merged, so `main` alone would never have shown it.
+--
+-- THE NUMBER IS NOT SAFE UNTIL IT IS APPLIED. Do not check the tail, go and do
+-- something else, and come back: check it and apply in the same minute. Prove
+-- the SQL FIRST with the dry run below, which creates the function inside a
+-- transaction and rolls it back — that costs nothing and cares about no number
+-- at all, so the only thing left at apply time is the number itself.
+-- (CLAUDE.md §5 red line 7.)
 -- =============================================================================
 
 create or replace function public.catalog_import_skus(p_payload jsonb)
@@ -281,7 +288,7 @@ begin
     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
    where n.nspname = 'public' and p.proname = 'catalog_import_skus';
   if n_fn <> 1 then
-    raise exception '0357 sanity: catalog_import_skus missing or duplicated (%)', n_fn;
+    raise exception '0358 sanity: catalog_import_skus missing or duplicated (%)', n_fn;
   end if;
 
   -- The whole safety argument rests on this staying INVOKER: as DEFINER it
@@ -291,7 +298,7 @@ begin
     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
    where n.nspname = 'public' and p.proname = 'catalog_import_skus';
   if v_secdef then
-    raise exception '0357 sanity: catalog_import_skus must be SECURITY INVOKER';
+    raise exception '0358 sanity: catalog_import_skus must be SECURITY INVOKER';
   end if;
 
   -- The 0175 price lock must still be on the table this function writes.
@@ -300,10 +307,10 @@ begin
      where tgrelid = 'public.product_skus'::regclass
        and tgname  = 'trg_enforce_sku_price_cost_principal_only'
   ) then
-    raise exception '0357 sanity: the 0175 principal-only price trigger is missing';
+    raise exception '0358 sanity: the 0175 principal-only price trigger is missing';
   end if;
 
-  raise notice '0357 OK: catalog_import_skus added (SECURITY INVOKER); 0175 price trigger intact';
+  raise notice '0358 OK: catalog_import_skus added (SECURITY INVOKER); 0175 price trigger intact';
 end $sanity$;
 
 -- =============================================================================

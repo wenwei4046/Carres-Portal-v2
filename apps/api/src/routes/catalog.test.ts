@@ -3455,7 +3455,7 @@ describe("0179 — sofa combo pricing (GET bundle + principal-gated CRUD)", () =
 // ---------------------------------------------------------------------------
 // 2990s Products parity Phase 1 — POST /api/catalog/import-skus
 //
-// 0357 moved the WRITES into one catalog_import_skus RPC. What the route still
+// 0358 moved the WRITES into one catalog_import_skus RPC. What the route still
 // owns — and what these tests cover — is the reads, every rejection reason, the
 // payload it hands to Postgres, and how per-row results zip back to file line
 // numbers. What the SQL owns (find-or-create the model, absent-key-means-
@@ -3479,7 +3479,7 @@ describe("POST /api/catalog/import-skus", () => {
   /**
    * A mock shaped like the route's actual traffic: three read chains and one
    * `.rpc`. It records every `.from(table)` so a test can assert the subrequest
-   * COUNT, which is the whole point of 0357.
+   * COUNT, which is the whole point of 0358.
    */
   function importSb(opts: {
     models?: unknown[];
@@ -3569,7 +3569,7 @@ describe("POST /api/catalog/import-skus", () => {
     expect(((await res.json()) as { code?: string }).code).toBe("import_pricing_principal_only");
   });
 
-  // ---- 0357: the reason this endpoint was rewritten ------------------------
+  // ---- 0358: the reason this endpoint was rewritten ------------------------
   // The Workers Free plan hard-caps ONE invocation at 50 subrequests, and every
   // supabase-js call is one. The old loop spent 3 + one INSERT per new model +
   // one write per row, so a 40-row file introducing 8 models hit 51 and the
