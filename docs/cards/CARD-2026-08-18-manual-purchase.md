@@ -1,6 +1,6 @@
-STATUS: IN BUILD — slice 1 (create + register + first act) shipped; approval and issue slices follow
+STATUS: EXECUTED — three slices shipped and deployed 2026-08-19; owner walk owed
 DATE: 2026-08-18
-PR: slice 1 on claude/manual-purchase
+PR: #848 (create + register) · #849 (approval) · the issue slice PR carrying this flip
 IMPLEMENTATION: APPROVED — owner ruled the lane with the architect 2026-08-18, build straight to production
 
 # MANUAL PURCHASE — the request, the approval, the order (one card)
@@ -273,6 +273,24 @@ door: facts in the card's order · `WHAT WE ALREADY HAVE` per line · money for
 the approver ONLY (the server omits the key for everyone else — the same
 screen renders minus the money, never a permission error) · the Approve
 control pre-filled with `still needed` · Refuse with its required reason.
+
+**Slice 3 — IMPLEMENTED 2026-08-19** (migration `0361`):
+`purchase_orders.purpose` + `purchase_order_lines.demand_id` — §6's owed
+migration, real. `purchasing_issue_pos_batch` extended IN PLACE (same
+signature, one authority): the payload gains an optional `purpose` per
+document (a customer-lane document with `so_refs` stamps `customer_sales`
+unasked) and `demand_id` per line — validated against the demand's own SKU
+and RECORDED through 0320's door inside the same transaction. The manual
+lane's `POST /issue`: approved requests issue the SAME DAY (no PO-day gate
+anywhere on this lane), grouped inside supplier × category × destination ×
+purpose walls; `Issue as one PO?` merges across requests inside those walls
+and **issuing separately is always available on the same screen**. `Arrived`
+derives from the linked PO line's posted receipt (matched by `demand_id`,
+`(po_id, sku)` fallback) — no button anywhere, asserted. Typed demand LEFT
+the SO Batch Purchase grid in this slice (never unissuable at any moment);
+the 16 grid tests documenting the old contracts retired with a tombstone
+naming each contract's new home, and the P10 typed-row take-from-stock lost
+its button — flagged for its own decision, doors untouched.
 
 ## STILL LOCKED — do not touch
 

@@ -504,3 +504,112 @@ describe("the object detail and the decision (slice 2)", () => {
     expect(screen.queryByTestId("mp-approve")).toBeNull();
   });
 });
+
+/**
+ * SLICE 3 — the issue (card §5 · §6).
+ *
+ * `Arrived` IS NOT A BUTTON anywhere. The consolidation offer is declinable
+ * on the same screen. Issue goes to the one door, same day — the page never
+ * consults a PO day.
+ */
+describe("issue and the observed arrival (slice 3)", () => {
+  function seedReadyDetail() {
+    DETAIL = {
+      request: REGISTER.requests[1], // approval OFF → Ready to order
+      lines: REGISTER.lines.filter((l) => l.request_id === REQ2),
+      destinations: REGISTER.destinations,
+      suppliers: [{ id: "s2", name: "Office Co", kind: "own_logistics" }],
+      users: REGISTER.users,
+      canApprove: false,
+    };
+  }
+
+  it("`Arrived` cannot be set by any control — no such button exists", async () => {
+    seedDetail(true);
+    await loaded();
+    fireEvent.click(screen.getByText("REQ-0001", { selector: "button" }));
+    await screen.findByTestId("mp-detail");
+    expect(screen.queryByText(/^Arrived$/, { selector: "button" })).toBeNull();
+    expect(document.querySelector("[data-testid*='arrived']")).toBeNull();
+  });
+
+  it("a ready request issues through the one door, and no PO-day is consulted", async () => {
+    seedReadyDetail();
+    await loaded();
+    fireEvent.click(screen.getByText("REQ-0002", { selector: "button" }));
+    await screen.findByTestId("mp-issue");
+    fireEvent.click(screen.getByTestId("mp-issue-po"));
+    await waitFor(() => {
+      const post = apiFetch.mock.calls.find((c) =>
+        String(c[0]).endsWith("/purchasing/requests/issue"),
+      );
+      expect(post).toBeTruthy();
+      const sent = JSON.parse(String((post![1] as RequestInit).body));
+      expect(sent.requestIds).toEqual([REQ2]);
+      expect(sent.together).toBe(false);
+    });
+  });
+
+  it("the consolidation offer is declinable on the same screen", async () => {
+    // Make REQ-0001 ready too (approved) and share the supplier with REQ-0002.
+    const approved = {
+      ...REGISTER.requests[0],
+      approved_at: "2026-08-19T05:00:00Z",
+      approved_by: "u1",
+    };
+    const shared = REGISTER.lines.map((l) =>
+      l.request_id === REQ1 ? { ...l, supplier_id: "s2" } : l,
+    );
+    apiFetch.mockImplementation((url: string) => {
+      if (url.includes("/purchasing/requests/detail/")) return Promise.resolve(DETAIL);
+      if (url.includes("/purchasing/requests/already-have")) {
+        return Promise.resolve({ sku: "x", alreadyOnPo: 0, firstPo: null });
+      }
+      if (url.includes("/purchasing/requests")) {
+        return Promise.resolve({ ...REGISTER, requests: [approved, REGISTER.requests[1]], lines: shared });
+      }
+      if (url.includes("pick-items")) return Promise.resolve(PICK);
+      return Promise.resolve({});
+    });
+    DETAIL = {
+      request: approved,
+      lines: shared.filter((l) => l.request_id === REQ1),
+      destinations: REGISTER.destinations,
+      suppliers: [{ id: "s2", name: "Office Co", kind: "own_logistics" }],
+      users: REGISTER.users,
+      canApprove: false,
+    };
+
+    await loaded();
+    fireEvent.click(screen.getByText("REQ-0001", { selector: "button" }));
+    await screen.findByTestId("mp-issue-offer");
+    // BOTH doors live on the same screen — the offer can be declined.
+    expect(screen.getByTestId("mp-issue-together")).toBeInTheDocument();
+    expect(screen.getByTestId("mp-issue-separate")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("mp-issue-separate"));
+    await waitFor(() => {
+      const post = apiFetch.mock.calls.find((c) =>
+        String(c[0]).endsWith("/purchasing/requests/issue"),
+      );
+      expect(post).toBeTruthy();
+      const sent = JSON.parse(String((post![1] as RequestInit).body));
+      expect(sent.together).toBe(false);
+      expect(sent.requestIds).toEqual([REQ1]);
+    });
+  });
+
+  it("a received line derives Arrived through the one arithmetic", () => {
+    expect(
+      manualPurchaseStatusOf({
+        approvalRequired: false,
+        approvedAt: null,
+        refusedAt: null,
+        refuseReason: null,
+        lines: [
+          { qty: 1, issuedQty: 1, remainingQty: 0, cancelledAt: null, poId: "PO-1", received: true },
+        ],
+      }).label,
+    ).toBe("Arrived");
+  });
+});

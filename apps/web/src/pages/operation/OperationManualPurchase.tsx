@@ -33,6 +33,8 @@ import {
   useCreatePurchaseRequest,
   useCreatePurchaseRequestLine,
   useDecidePurchaseRequest,
+  useDeliveryPartners,
+  useIssuePurchaseRequests,
   useManualPurchaseDetail,
   useManualPurchaseRegister,
   type ManualPurchaseRegisterPayload,
@@ -130,6 +132,7 @@ function buildRows(data: ManualPurchaseRegisterPayload): RequestRegisterRow[] {
           remainingQty: l.remaining_qty,
           cancelledAt: l.cancelled_at,
           poId: l.po_id,
+          received: l.received,
         })),
       }),
       createdAt: r.created_at,
@@ -307,6 +310,26 @@ export default function OperationManualPurchase() {
         <PurchasingTabs />
         <RequestDetail
           id={mode.detail}
+          readySiblingIds={(() => {
+            const mine = new Set(
+              (q.data?.lines ?? [])
+                .filter((l) => l.request_id === mode.detail && l.cancelled_at === null)
+                .map((l) => l.supplier_id),
+            );
+            return rows
+              .filter(
+                (r) =>
+                  r.id !== mode.detail &&
+                  r.status.kind === "ready_to_order" &&
+                  (q.data?.lines ?? []).some(
+                    (l) =>
+                      l.request_id === r.id &&
+                      l.cancelled_at === null &&
+                      mine.has(l.supplier_id),
+                  ),
+              )
+              .map((r) => r.id);
+          })()}
           onBack={() => {
             setMode("register");
             void q.refetch();
@@ -921,7 +944,17 @@ function LinePicker({
  * an approver who has to do the subtraction will not do it. Cutting is not
  * refusing. `Refuse` cannot be submitted without a reason.
  */
-function RequestDetail({ id, onBack }: { id: string; onBack: () => void }) {
+function RequestDetail({
+  id,
+  onBack,
+  readySiblingIds,
+}: {
+  id: string;
+  onBack: () => void;
+  /** Other READY requests sharing a supplier with this one — the
+   *  consolidation OFFER's candidates (card §6). */
+  readySiblingIds: string[];
+}) {
   const q = useManualPurchaseDetail(id);
   const pick = useQuery({
     queryKey: ["to-order", "pick-items"],
@@ -932,6 +965,8 @@ function RequestDetail({ id, onBack }: { id: string; onBack: () => void }) {
     staleTime: 60_000,
   });
   const decide = useDecidePurchaseRequest();
+  const issue = useIssuePurchaseRequests();
+  const partnersQ = useDeliveryPartners();
 
   /** The approver's per-line numbers — seeded from `still needed` once the
    *  stock facts land; the human may override before approving. */
@@ -939,6 +974,8 @@ function RequestDetail({ id, onBack }: { id: string; onBack: () => void }) {
   const [refusing, setRefusing] = useState(false);
   const [refuseReason, setRefuseReason] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [partnerId, setPartnerId] = useState<string | undefined>(undefined);
+  const [issueError, setIssueError] = useState<string | null>(null);
 
   if (q.isLoading || !q.data) {
     return (
@@ -965,10 +1002,39 @@ function RequestDetail({ id, onBack }: { id: string; onBack: () => void }) {
       remainingQty: l.remaining_qty,
       cancelledAt: l.cancelled_at,
       poId: l.po_id,
+      received: l.received,
     })),
   });
   const undecided = request.approved_at === null && request.refused_at === null;
   const showDecision = canApprove && request.approval_required && undecided;
+
+  async function submitIssue(together: boolean) {
+    setIssueError(null);
+    if (!q.data) return;
+    const liveSuppliers = new Set(
+      q.data.lines.filter((l) => l.cancelled_at === null).map((l) => l.supplier_id),
+    );
+    const partners: Record<string, string> = {};
+    for (const sp of q.data.suppliers) {
+      if (liveSuppliers.has(sp.id) && sp.kind === "factory_pickup") {
+        if (!partnerId) {
+          setIssueError("Select a procurement partner for this factory-pickup supplier.");
+          return;
+        }
+        partners[sp.id] = partnerId;
+      }
+    }
+    try {
+      await issue.mutateAsync({
+        requestIds: together ? [id, ...readySiblingIds] : [id],
+        together,
+        partners: Object.keys(partners).length > 0 ? partners : null,
+      });
+      onBack();
+    } catch (e) {
+      setIssueError(e instanceof Error ? e.message : "The PO was not issued");
+    }
+  }
 
   async function submitDecision(decision: "approve" | "refuse") {
     setError(null);
@@ -1140,6 +1206,83 @@ function RequestDetail({ id, onBack }: { id: string; onBack: () => void }) {
               Refuse
             </Button>
           )}
+        </div>
+      ) : null}
+
+      {/* ── ISSUE — same day, no PO-day gate; consolidation is an OFFER
+          (card §6): issuing separately is ALWAYS available on the same
+          screen. An offer that cannot be declined is a gate wearing an
+          offer's clothes. */}
+      {status.kind === "ready_to_order" ? (
+        <div className="flex max-w-[900px] flex-col gap-2" data-testid="mp-issue">
+          {(() => {
+            const liveSuppliers = new Set(
+              lines.filter((l) => l.cancelled_at === null).map((l) => l.supplier_id),
+            );
+            const needsPartner = q.data!.suppliers.some(
+              (sp) => liveSuppliers.has(sp.id) && sp.kind === "factory_pickup",
+            );
+            return needsPartner ? (
+              <div className="flex items-center gap-2">
+                <label htmlFor="mp-issue-partner" className="text-meta text-kit-slate-11">
+                  Procurement partner
+                </label>
+                <span className="w-[220px]">
+                  <Select
+                    id="mp-issue-partner"
+                    value={partnerId}
+                    onValueChange={setPartnerId}
+                    options={(partnersQ.data?.partners ?? []).map(
+                      (dp: { id: string; name: string }) => ({
+                        value: dp.id,
+                        label: dp.name,
+                      }),
+                    )}
+                  />
+                </span>
+              </div>
+            ) : null;
+          })()}
+          <div className="flex items-center gap-3">
+            {readySiblingIds.length > 0 ? (
+              <>
+                <span className="text-meta text-base-700" data-testid="mp-issue-offer">
+                  Issue as one PO? {readySiblingIds.length + 1} approved requests share
+                  this supplier.
+                </span>
+                <Button
+                  variant="primary"
+                  loading={issue.isPending}
+                  onClick={() => void submitIssue(true)}
+                  data-testid="mp-issue-together"
+                >
+                  Issue as one PO
+                </Button>
+                <Button
+                  variant="ghost"
+                  disabled={issue.isPending}
+                  onClick={() => void submitIssue(false)}
+                  data-testid="mp-issue-separate"
+                >
+                  Issue separately
+                </Button>
+              </>
+            ) : (
+              <Button
+                variant="primary"
+                loading={issue.isPending}
+                onClick={() => void submitIssue(false)}
+                data-testid="mp-issue-po"
+              >
+                Issue PO
+              </Button>
+            )}
+          </div>
+          {issueError ? (
+            <p className="text-meta text-kit-red-11" data-testid="mp-issue-error">
+              {issueError}
+            </p>
+          ) : null}
         </div>
       ) : null}
     </div>
