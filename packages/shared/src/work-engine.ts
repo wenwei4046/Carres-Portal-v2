@@ -113,11 +113,20 @@ export const ORDER_WORK_RULES: readonly WorkRule[] = [
   {
     key: "issue_delivery_order",
     module: "orders",
-    trigger: "date + slot confirmed · core goods ready · money passed · DO not issued",
-    owner: "the order's PIC",
+    // SLICE 2 (owner ruling, `docs/orders/MASTER.md` §8): "money passed" left
+    // this trigger with decision A, and the PIC left the owner slot with
+    // automation — when every requirement holds, the SYSTEM issues the
+    // document at the door that completed the gate (booking confirm · stock
+    // reserve · finance clear). No Release button, no Approve button, no
+    // manual bypass. The rule stays registered because the five-part
+    // discipline covers every completion fact the engines read — but it is
+    // never raised as a person's work (`order-actions.ts` stopped asking).
+    trigger:
+      "date + slot confirmed · core goods ready · no OPEN Finance exception · DO not issued",
+    owner: "the SYSTEM — issued automatically the moment the last requirement lands",
     action: orderActionQueue("issue_delivery_order"),
     dueRule:
-      "1 working day before the confirmed date (logistics ask for the DO the evening before) — the collection clock's own due arithmetic",
+      "immediate — the same act that completes the gate issues the document",
     completionFact: "the document exists (orders.do_number)",
   },
   {

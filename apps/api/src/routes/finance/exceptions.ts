@@ -2,8 +2,9 @@ import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { financeExceptionClearInput, financeExceptionOpenInput } from "@carres/shared";
 import { requireFinance } from "../../lib/auth-guards";
+import { attemptDeliveryOrderIssue } from "../../lib/delivery-order-issue";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
-import { userClient } from "../../lib/supabase";
+import { adminClient, userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
 /**
@@ -110,6 +111,25 @@ financeExceptionsRouter.post("/:id/clear", requireFinance, async (c) => {
     const m = mapPgError(error);
     return c.json(m.body, m.status);
   }
+
+  // SLICE 2 — clearing the hold may have been the LAST open requirement, and
+  // the ruling says the SYSTEM issues the document the moment they all hold
+  // (`docs/orders/MASTER.md` §8: no Release button, no manual bypass). The
+  // attempt runs on the ADMIN client because Finance may clear its exception
+  // but the system — not the finance user — writes the document; RLS gives
+  // finance no pen on `orders`, and handing it one for this would widen a
+  // write boundary Slice 1 deliberately kept narrow. FAIL-SOFT: an issuance
+  // hiccup must never undo or refuse the clear Finance just recorded.
+  const orderId = (data as { order_id?: string } | null)?.order_id ?? null;
+  if (orderId) {
+    try {
+      await attemptDeliveryOrderIssue(adminClient(c.env), orderId);
+    } catch {
+      // Not issued yet — the facts persist; the next door or the manual
+      // backstop issues it.
+    }
+  }
+
   return c.json(data);
 });
 
