@@ -450,8 +450,16 @@ Fixed phrasings — reuse these, do not invent variants:
 - What is still owed: row `Second trip` → `Sofa still to deliver` +
   `Book second trip`, or `stock not in yet` when it cannot be booked.
 
-**Never** write "partial delivery", "split shipment", "back-order" or
-"consignment" on screen — say what goes and what follows, in furniture words.
+**Never** write "partial delivery", "split shipment" or "back-order" on screen — say what goes
+and what follows, in furniture words.
+
+**`consignment` IS UNBANNED ON THE PURCHASING AXIS, AND STILL BANNED HERE** (Jess, 2026-08-18).
+The ban was written to stop a DELIVERY being described as split; that meaning stays banned, and
+so does the word anywhere near a trip. But Carres genuinely holds supplier-owned furniture, the
+supplier calls it consignment, the agreement says consignment, and inventing a Carres-only word
+would leave staff translating in both directions. **`Consignment Order` · `Consignment Receipt`
+· `Consignment Return`** are the ruled document names. On a UNIT the fact is spelt
+**`Supplier Consignment`**, against **`Carres Owned`**. The word never describes a delivery.
 
 ## The dictionary — every visible word, audited (Jess 2026-07-27)
 
@@ -539,6 +547,45 @@ table are one-to-one, so a queue and a row can never spell one action two ways.
 | `Check in` | `Check in from {supplier}` | `Check in` | `Checked in {n} of {m}` | `No goods arriving today. {supplier}'s next delivery is {date}.` |
 | `Confirm balance delivery date` | `Call {supplier} — confirm balance delivery date` | `Record balance date` | `Balance date recorded` | `Nothing short today.` |
 | `Confirm what happens next` | `Call {supplier} — confirm what happens next` | `Record what happens next` | `Supplier answer recorded` | `No claim is waiting for a supplier answer.` |
+| `Issue consignment order` | `Issue consignment order to {supplier}` | `Issue consignment order` | `Consignment order issued to {supplier}` | `No showroom is waiting for stock.` |
+| `Issue purchase return` | `Issue purchase return to {supplier}` | `Issue purchase return` | `Purchase return issued to {supplier}` | `Nothing is going back.` |
+| `Issue repair order` | `Issue repair order to {supplier}` | `Issue repair order` | `Repair order issued to {supplier}` | `Nothing is out for repair.` |
+| `Confirm collection date` | `Call {supplier} — confirm collection date` | `Record collection date` | `Collection date recorded` | `Nobody is waiting to be collected.` |
+| `Upload delivery note` | `Upload delivery note` | `Upload delivery note` | `Delivery note saved` | `Every receipt has its note.` |
+| `Check quantity difference` | `Check quantity difference` | `Record the correct count` | `Count recorded` | `Every count matches.` |
+| `Close claim` | `Close claim` | `Close claim` | `Claim closed` | `No claim is finished and waiting.` |
+| `Approve the purchase` | `Approve {n} {model} for {purpose}` | `Approve` · `Refuse` | `Approved — {n} {model}` | `Nothing waiting for you.` |
+| `Decide what the customer gets` | `Decide what {customer} gets` | `Save what we are doing` | `Recorded` | `No claim is waiting for a decision.` |
+| `Decide what happens to the item` | `Decide what happens to {unit}` | `Save what happened` | `Recorded` | `No item is waiting.` |
+| `Call about a late order` | `Call {salesperson} — {customer}'s goods will be late` | `Record what the customer decided` | `Customer decision recorded` | `No order is late.` |
+| `Check the SKU` | `Check the SKU with {supplier}` | `Publish the SKU` | `SKU published` | `Every request has its product.` |
+| `Check the supplier` | `Check the supplier for {model}` | `Save the supplier` | `Supplier saved` | `Every model has a supplier.` |
+| `Upload handover proof` | `Upload handover proof` | `Upload handover proof` | `Handover proof saved` | `Every handover has its proof.` |
+
+**SIXTY-FIVE ACTIONS BECAME TWENTY, AND THAT WAS THE POINT** (Jess, 2026-08-18). *(Thirteen was
+this section's first count, taken before all eleven pages had been designed; seven more surfaced
+and the number is corrected here rather than defended.)* A blueprint
+draft named 65 distinct pieces of work across the register rails; 49 of them opened with a verb
+this portal does not have, and most were ONE act wearing four names — `Share PO PDF` ·
+`Share Claim with Supplier` · `Share Return with Supplier` · `Share Repair Order` are one act,
+and the act is **`Issue`**, because a document that has not reached its supplier is not issued
+yet. The merge is the reason the seven verbs are worth defending: **the count fell by 80% and
+nothing was lost.**
+
+**A SHARE IS NOT ITS OWN ACTION — `Issue` ALREADY CARRIES IT** (Jess, 2026-08-18). The row line
+has always read `Issue PO to {supplier}`: getting the document to the factory was never a second
+act, and a document the factory has not seen is not issued. **`Issue` stays open until an operator
+confirms which version went to whom on which channel**, and the button inside the form changes to
+`Record what you sent` — a form button, which needs no verb from the table. The same holds for a
+consignment order, a purchase return and a repair order. *(A separate `Check what was sent` was
+drafted and dropped: `Send` is banned, and stretching `Check` over it would have taught staff that
+`Check` means two different jobs.)*
+
+**`Return` HAS NO PURCHASING ENTRY, AND ITS ABSENCE IS RULED** (Jess, 2026-08-18). Bouncing an
+incomplete request back to whoever raised it was proposed and refused: a salesperson lives on
+the showroom floor, not in a queue, and work handed to them stops moving. **Operations calls
+them, gets the answer on the phone, and records it.** The general form — *the portal never waits
+on somebody who does not work in it* — binds every module.
 
 **SO-scoped Batch Purchase entrance** (2026-08-10):
 
@@ -684,7 +731,7 @@ against.
 
 ### The verb dictionary — portal-wide (locked 2026-07-27)
 
-**SEVEN verbs, seven meanings. Every module uses these; no module invents an eighth.**
+**NINE verbs, nine meanings. Every module uses these; no module invents a tenth.**
 
 *(It was five until 2026-07-28. `Return` was added by Loo's ruling because R6 needed a word
 for "this record goes back to whoever produced it" and reached for `Send back`. **`Prepare`
@@ -692,7 +739,13 @@ was added 2026-07-29 and RETIRED 2026-07-30** with the Purchasing clean restart:
 purchase order is one act again, so the verb has no object left. **`Check` was added by Loo
 on 2026-08-05** — see the row below and the note under the table. **The bar for an eighth is
 the bar `Return` cleared: no existing verb fits, and the alternative is a module inventing
-its own.**)*
+its own.** **`Approve` and `Decide` were added by Jess on 2026-08-18 against that same bar,
+and the reasoning is recorded because it is the test the next one must pass.** Approving a
+purchase is not `Check` — nothing is missing that could be found out; somebody must PERMIT it.
+Choosing what a customer gets is not `Assign` either: **`Assign logistics` reads clearly
+because a party is being attached to a record, and staff already read the word that way — a
+decision between four outcomes attached to nobody is a different act, and one word carrying
+both is how a screen stops being readable.**)*
 
 **They govern WORKLIST ACTIONS, not form buttons.** A button inside a form that stores what
 you just typed is `Save`, and one that abandons it is `Cancel` — those are not actions, they
@@ -772,6 +825,8 @@ resolved at render time from what is on file — never a third blended word cove
 | **Close** | a case or claim is finished and its record is sealed | the record can no longer change |
 | **Return** | a record goes BACK to the party that produced it, for them to act on | the record is with them **and its state says so on their screen** |
 | **Check** | a fact the business needs is MISSING, and somebody must establish it — by any means | the fact is **recorded in the system**. Finding out and not writing it down completes nothing |
+| **Approve** | a person with the authority permits **a purchase nobody's customer ordered** | the answer is recorded, yes or no — and a `Refuse` carries a reason that goes back to whoever asked. **The label always names WHAT is approved; a bare `Approve` is not a label** |
+| **Decide** | Carres CHOOSES between several outcomes that all exist — nothing is being found out, and nobody outside is being asked | the choice is recorded |
 
 ### `Check` vs `Call`, and `Check` vs `Check in` (Loo, 2026-08-05)
 

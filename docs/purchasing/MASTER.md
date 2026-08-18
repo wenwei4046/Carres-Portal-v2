@@ -40,8 +40,8 @@ is the single most expensive defect this document can carry.**
 buyer's module. It does not own goods movement (that is Receiving's warehouse half and
 Stock) and it does not own money (that is Finance).
 
-**TWO WAYS A PO IS BORN, ONE WAY IT LIVES** (Loo, 2026-08-06 — the navigation
-ruling. **APPROVED, NOT YET BUILT**; today's screens are §3–§8's measured
+**TWO WAYS A PO IS BORN, ONE WAY IT LIVES** (Loo, 2026-08-06; the page list rewritten
+by Jess 2026-08-18 — **APPROVED, NOT YET BUILT**; today's screens are §3–§8's measured
 blocks):
 
 ```
@@ -54,14 +54,18 @@ Sales Order  ····read···▶ SO Batch Purchase ─┐
 ```
 Sales        Sales Order         every customer order. SALES owns it.
 
-Purchasing   SO Batch Purchase   only the customer orders PURCHASING still has
-                                 to act on — a filtered purchasing workspace,
-                                 never a second Sales Order page
-             Manual Purchase     purchases nobody's customer asked for:
-                                 Ready Stock · Display · Office · Warranty ·
-                                 Spare Parts · and whatever is added next
-             Purchase Order      every issued PO, whichever lane bore it
-             Receiving · Supplier Claim
+Purchasing   SO Batch Purchase       customer orders PURCHASING still has to act on
+             Manual Purchase         purchases nobody's customer asked for:
+                                     Ready Stock · Display · Office · Spare Parts
+             Purchase Orders         every issued PO, whichever lane bore it
+             Goods Receipts          what physically arrived, one door
+             Supplier Claims         the exception a receiving produced
+             Purchase Returns        goods formally going back to the supplier
+             Repair Orders           a Carres unit out for repair, the SAME unit back
+             Display Requests        what a showroom needs, raised by Sales
+             Consignment Orders      supplier-owned goods placed with Carres
+             Consignment Receipts    a filtered view of Goods Receipts, not a second engine
+             Consignment Returns     the supplier collecting its own goods back
 
 Reports and Settings are PORTAL pages, not Purchasing pages
 (`../ERP-ARCHITECTURE.md` §2.1).
@@ -74,12 +78,28 @@ views of one record or one work surface, so they must not be placed in a shared 
 Purchasing navigation exposes each destination individually through the governed portal
 navigation. A page may not recreate the old `PurchasingTabs` strip as a second navigation.
 
-**PURCHASING SETTINGS ENTRY — APPROVED / LOCKED (Loo, 2026-08-11).** The old Purchasing
-`Settings` tab/word is retired with the tab strip. The Page Header's global Settings gear is the
-one entry: on a Purchasing destination its permission-filtered launcher offers `Purchasing
-Settings` and `All System Settings`, both opening the relevant section of the one full-page
-Settings Workspace. Purchasing navigation, page Toolbars and `…` do not repeat the door. The
-existing manager gate and audit requirements remain authoritative.
+**PURCHASING SETTINGS ENTRY.** The old Purchasing `Settings` tab/word is retired with the tab
+strip (Loo, 2026-08-11 — APPROVED / LOCKED), and the Page Header's global Settings gear remains
+the governed entry into the one full-page Settings Workspace. The SHIPPED rail
+(CARD-2026-08-18-purchasing-sidebar, Jess 2026-08-18) additionally lists `Report` and `Settings`
+below a hairline at the bottom of the module's children — they are PORTAL pages reached from
+here, the hairline is what stops that convenience reading as ownership, and the Settings row
+renders only for a caller the SERVER says may edit. Page Toolbars and `…` still do not repeat
+the door; the manager gate and audit requirements remain authoritative.
+
+**ELEVEN PAGES, AND WHY IT IS NOT FIVE** (Jess, 2026-08-18). The five-page tree was argued
+from information architecture: expose modules, then reveal documents inside them. Jess
+overturned it from the operator's side — **three staff who each do every job cannot be asked
+to remember which workspace hides which document.** A document a human must find again BY NAME
+gets a permanent door. The IA argument survives everywhere else: nothing gets a page because
+it exists, only because somebody looks for it twice.
+
+**TWO PROPOSED PAGES WERE REFUSED, and each refusal is the rule.**
+`My Purchasing Work` — Work is ONE cross-module surface (`../workspace/MASTER.md`); the same
+person receives in September and buys in August, and three module Work pages make them rank
+their own day. `Purchase Demands` — demand already has exactly TWO lanes, and a third surface
+over the same rows becomes a third place to press Issue. It is a Portal report,
+`Outstanding to Buy`, read-only.
 
 **SALES ORDERS IS NOT A PURCHASING TAB** (Loo, 2026-08-06 — his refinement of
 the same day's ruling). Purchasing READS the sales orders; it does not carry
@@ -425,8 +445,170 @@ customer orders**. Purchase Orders MANAGES the documents once they exist.
 > **APPROVED, NOT YET BUILT (Jess, 2026-08-07):** this tab becomes **`SO Batch Purchase`**,
 > and the hand-typed purposes (Ready Stock · Display · Office · Warranty · Spare Parts)
 > leave it for their own tab, **`Manual Purchase`** — with a FULL-PAGE create workspace,
-> never the 600px dialog. **Both lanes issue their own POs** (§1). Everything below
-> describes the single `To Order` tab as it stands today.
+> never the 600px dialog. **Both lanes issue their own POs** (§1). `+ Create Purchase`
+> leaves this rail with them. Everything below describes the single `To Order` tab as it
+> stands today.
+
+> ### ⭐ THE GRID BECOMES A HIERARCHY, AND SOFA GROUPS DIFFERENTLY (Jess, 2026-08-18)
+> **APPROVED, NOT YET BUILT.** Today's grid is FLAT — one row per SO line. Four customers
+> wanting the same beige three-seater are four rows scattered down the list, and the buyer
+> adds them up in their head. **But Carres buys from a FACTORY, not from a sales order**, and
+> every quantity that matters commercially — MOQ, pack, what fills a lorry — is per item.
+> Every mature planning screen groups by item for exactly this reason: SAP's MD04 is per
+> material, Odoo's replenishment is per product, Dynamics' requisition worksheet is per item.
+>
+> **So the grid becomes three levels:**
+> ```
+> Item · Description        Qty Needed · Stock · On PO · To Buy
+>   └─ variant (fabric / colour)
+>        └─ SO No · Customer · Customer Delivery · Qty · Coverage · Supplier
+> ```
+> **`To Buy` is PRINTED, never left as `11 − 3 − 2`** — the same law Receiving already carries
+> for `Outstanding`. **Rows with nothing to buy sink; shortages float to the top, and only a
+> shortage line is selectable.** Every SO line carries a `Coverage` tag saying what holds it
+> up — `stock` · `PO-2041 · 22 Aug` · `SHORT` — so the buyer sees at a glance which promises
+> have nothing behind them.
+>
+> **SOFA IS THE EXCEPTION AND IT GROUPS BY SALES ORDER.** A sofa is sold as a colour-matched
+> SET; two customers' sofas may not be merged onto one PO line because the fabric batch must
+> match within the set. **Selecting any piece selects the whole same-SO set.** 2990s runs
+> exactly this split in production and states the reason in its own header —
+> `apps/backend/src/pages/Mrp.tsx:15-17`: *"A sofa is one PO per SO, so selecting any sofa
+> variant selects the whole same-SO set together."* Mattress, bedframe, pillow and protector
+> group by item; sofa groups by SO. **One page, two groupings, chosen by category.**
+>
+> **The trade-off, stated:** two grouping paths cost more to build than one flat list. The
+> complexity is already in the business — refusing it does not remove it, it moves it into a
+> buyer's head every morning.
+
+> ### ⭐ DERIVE THE DESTINATION AND THE DATE — NEVER ASK THE BUYER (Jess, 2026-08-18)
+> **APPROVED, NOT YET BUILT.** 2990s shipped a "PO Defaults" card asking Expected Delivery and
+> Purchase Location on the batch screen, then DELETED it —
+> `apps/backend/src/pages/PurchaseOrderFromSo.tsx:6-9`: *"REMOVED the 'PO Defaults' card …
+> Those are NOT asked anymore — the server derives each PO line's warehouse from the source
+> SO's Sales Location, and each line's delivery date from the SO line's own delivery date …
+> header expected_at / purchase location are rolled up from the lines server-side."*
+>
+> **The customer's order already says where the goods go and when they are wanted.** Asking a
+> buyer to retype it invites a mismatch between the SO and the PO that nobody can reconcile,
+> and it is work for an answer the system already holds. **The line derives; the header rolls
+> UP from the lines.** A buyer may still change a line, and the change is an exception with a
+> reason — never the default keystroke. **It is an INLINE CELL, never a queue action:** every
+> line always carries a destination, so an action would fire on every PO and be ignored on all
+> but one, and a prompt everybody dismisses daily is a prompt nobody reads on the day it
+> matters. **A change has a consequence the screen must state** — goods landing at `AL` for an
+> order shipping from `Carres` need a stock transfer before the delivery date, and the system
+> says so at the moment of the change rather than letting the warehouse find out on the morning
+> of the run. *(This retires the proposed action `Assign where the goods go` entirely: on the
+> customer lane it is derived, and on Manual Purchase the requester picks it in the form.)*
+>
+> **Grouping is the SERVER's, not the buyer's** — `PurchaseOrderFromSo.tsx:17`: *"Server groups
+> by main supplier and emits one PO per supplier."* Same rule Dynamics states for requisition
+> consolidation: differ on legal entity, vendor or currency and a separate order is created.
+> **The buyer picks WHAT to buy; the system decides how it splits.**
+
+> ### ⭐ MANUAL PURCHASE — THE REQUEST, THE APPROVAL, THE ORDER (Jess, 2026-08-18)
+> **APPROVED, NOT YET BUILT.** 2990s has nothing to copy here: its manual entrance is a BLANK
+> New PO (`PurchaseOrderNew.tsx`), which this module already rejects — a PO with no demand
+> behind it has no reason on the record. The pattern is the Purchase Requisition every mature
+> ERP carries (SAP `ME57` / `ME59N`, Dynamics' purchase requisitions, Oracle's AutoCreate).
+>
+> **Anyone raises it, in six fields:** `Need for` (Ready Stock · Display · Office · Spare Parts)
+> · what · how many · where to · needed by · **why**. `why` may not be blank — it is the
+> sentence the approver reads, and *"restock"* answers nothing.
+>
+> **Before it is submitted the system answers the question first:** free stock, quantity already
+> on an open PO, and what is therefore still needed. Half of these requests are for goods Carres
+> already has or already bought.
+>
+> **Every purpose requires approval** (Settings, §8) and **a customer order requires none — the
+> order IS the authority.** The approver sees the money; the three operators never do.
+>
+> **APPROVED REQUESTS DO NOT WAIT FOR A PO DAY** (Jess, 2026-08-18). Consolidation windows exist
+> to win price and freight from large vendors; a furniture factory charges the same for one
+> order or three, so making a request wait buys nothing and costs days. **PO days stay on the
+> customer lane only**, where they exist to let a factory plan production. Consolidation here is
+> an OFFER, never a gate: several approved requests for one supplier surface together with
+> `Issue as one PO?`, and issuing them separately is always available.
+>
+> ### ⭐ DISPLAY REQUESTS — Sales says what a floor needs; Purchasing decides how (Jess, 2026-08-18)
+> **APPROVED, NOT YET BUILT, AND ENTIRELY NEW.** Measured: `showroom` and `display request` grep
+> ZERO across `apps/web/src` and zero across all eight governing documents; 2990s has no request
+> ahead of its consignment order either. **Nothing exists to copy and nothing exists to unpick.**
+>
+> Today a salesperson notices a tired floor model and WhatsApps somebody. Purchasing cannot see
+> how many of those are open, how long they have waited, or which were quietly dropped.
+>
+> **Five fields, and one of them may be vague on purpose:** which showroom · add / change /
+> remove · which unit now (scan the Unit ID; only for a change or a removal) · **what they want**
+> · why · wanted by. **`what they want` accepts a description and a photo, not only a catalog
+> SKU** — a salesperson says *"the Ohana beige, lower than the one we have"*, and a form that
+> demands a published SKU is a form they abandon for WhatsApp. No SKU on file raises the
+> New SKU work to the month's PO duty, and the request waits on it.
+>
+> **The states are facts a new hire can read, and `Waiting` always names what it waits ON**
+> (`../COPY-STANDARD.md`): `Waiting for Purchasing` · `Waiting for the SKU` · `Ready to order` ·
+> `Ordered` · `On display` · `Not going ahead`. *`Not looked at yet` was written and rejected —
+> it reads as an accusation, and the useful half of it is WHO it waits on.*
+>
+> **`Not going ahead` is a required exit, and it carries a reason.** Purchasing may refuse — the
+> model is discontinued, the price does not justify it, a unit already sitting in Klang can be
+> moved instead. Without the exit, a refused request is simply never touched again, and three
+> months later nobody can say why. **The refusal goes back by PHONE, recorded by Operations** —
+> the portal never parks work with a salesperson and waits.
+>
+> **`On display` is not a tick.** It is three facts: the right Unit ID received, its place
+> recorded, and the showroom's handover signed. A request that can be closed by pressing a button
+> will be closed while the floor is still empty.
+>
+> ### ⭐ THE THREE CONSIGNMENT PAGES — one engine, one ownership fact (Jess, 2026-08-18)
+> **APPROVED, NOT YET BUILT.** 2990s ships ELEVEN consignment pages, and its own header says how:
+> `apps/backend/src/pages/PurchaseConsignmentOrders.tsx:9` is the Purchase Orders page COPIED and
+> the queries re-pointed at `/purchase-consignment-orders`. Two codebases for one screen — a fix
+> lands twice or it lands once and rots. **And measured: no consignment page carries an ownership
+> flag on a line or a unit** (`grep -in "owner" *Consignment*.tsx` returns code comments only).
+> 2990s cannot tell consigned goods from bought goods by looking at them; it tells them apart by
+> which TABLE the paperwork sits in. **That is the failure Carres avoids by putting the fact on
+> the UNIT** (`../stock/MASTER.md` — `ownership`, `carres` or `supplier`).
+>
+> **CONSIGNMENT ORDER = a purchase order plus two things.** Ownership is fixed to the supplier and
+> may not be edited; and when a floor model is being swapped, **the unit coming IN and the unit
+> going BACK ride the same document.** Two documents let the new sofa land while the old one
+> stays, and the position holds two — or the old one leaves and the position stands empty.
+> ```
+> New unit          Ohana 3 Seater · Grey · 1
+> Old unit back     CU-000128 · Beige · on display since 12 Feb 26 · 187 days
+> ```
+> **It creates no payable.** Goods arrive, stand at HOUZS, and Carres owes nothing until one
+> sells — and what happens then is Finance's, not this module's.
+> **No blank create, same as a PO:** the source is an approved Display Request or a claim ruling a
+> swap. Consignment is where "where did this sofa come from" gets lost fastest, and a unit with no
+> source is a unit nobody can pay for correctly.
+>
+> **CONSIGNMENT RECEIPT IS NOT A SECOND RECEIVING ENGINE.** The person at HOUZS counts, checks for
+> damage, photographs and uploads the supplier DO — **identical work whether the sofa is bought or
+> consigned**, and they should not have to know which. The difference is already carried on the
+> unit. **One receipt document, ONE number series;** `Consignment Receipts` is a FILTERED VIEW of
+> Goods Receipts. *(Refused: a `CGRN-` series. It makes staff remember which prefix to look under,
+> and it breaks outright the day one van carries both.)*
+>
+> **CONSIGNMENT RETURN — the supplier takes its own goods back.** It is not a Purchase Return:
+> nothing is owed back, no credit note is chased, because the goods were never Carres'. It carries
+> the same physical law as every other handover — **issuing the document moves no stock; a signed
+> collection note or a handover photo does.** On a swap the return is bound to the incoming
+> Consignment Order so the floor position is never briefly empty or briefly double-booked.
+> **Over-delivery reuses this same collection mechanism** rather than growing a fourth path.
+
+> **A NEW SHOWROOM IS A SETTINGS ROW, MANAGER-GATED — never a field Sales can type into.** The
+> name reaches a supplier's PO and a driver follows the address; it also needs a receiving
+> contact and a ruling on whether goods may land there at all, and Sales owns none of those.
+> Sales picks from the list; the list is maintained where the seven engine numbers are.
+
+> **The order form is 2990s' full-page create form, unchanged** (`PurchaseOrderNew.tsx`:
+> two-column header + inline line table, with the sofa variant block — fabric · gap · divan
+> height · leg height · seat size). **Only the entrance differs:** 2990s starts blank, Carres
+> starts pre-filled from the approved request. **A sofa PO without its fabric and configuration
+> is a factory building the wrong sofa.**
 
 ### WORKFLOW
 The engine computes a plan per PO day and pre-selects exactly its own plan (`orderBy ≤ today`).
@@ -833,10 +1015,14 @@ LEFT 200px   CALLS      — the week's factory calls, a rolling FIVE-office-
                           this page carried is deleted (its own docblock's
                           instruction, done with T2).
 
-CENTRE       NINE frozen columns, ONE fixed set:
+CENTRE       TEN frozen columns, ONE fixed set (Jess, 2026-08-18 — `Receiving`
+             added so a scan answers "how much landed" without opening a row;
+             `SO No.` and `Customer Delivery` stay, they are HOW a row is ranked;
+             a second date column was refused — see the arrival law below):
              PO Issued · Supplier · PO No. · SO No. · Items · Destination ·
-             Customer Delivery · Expected Arrival · Current Action
-             widths 96 · 88 · 83 · 95 · 136 · 135 · 140 · 206 · 192, min-width 1208
+             Customer Delivery · Expected Arrival · Receiving · Current Action
+             widths 96 · 88 · 83 · 95 · 136 · 135 · 140 · 206 · 96 · 192,
+             min-width 1304 (re-measure in a real browser before build)
              default order = RISK TO THE CUSTOMER'S PROMISE
              Current Action on a dateless PO now reads the ENGINE's own
              `Confirm ready date` — a real due underneath the same word, in
@@ -899,12 +1085,24 @@ records it.
   the panel · the ⌄ expands the row and CLOSES the panel · collapsing brings it back on the
   same PO. Two POs on one screen are structurally unrepresentable.
 - **PO-line quantities are RPC-only** (0316). No client may PATCH `received_qty`.
-- **A sent PO is never edited.** More items means a NEW PO; stopping means cancelling the whole
-  PO. There are no revisions to keep.
+- **A sent PO is not overwritten — it is REVISED** (Jess, 2026-08-18, overturning *"a sent PO
+  is never edited · there are no revisions to keep"*). Cancel-and-reissue puts TWO numbers for
+  ONE job in the factory's hands, and a factory reads two numbers as two jobs. A change KEEPS
+  the number and mints `PO-2041 · Version 2`: the prior version is snapshotted, the reason and
+  the author are stored, and the PO drops back to `Issued` until the new version's share is
+  confirmed. **THE FLOOR — no line may be revised BELOW what has already been received;** the
+  excess goes back through a Purchase Return first. (2990s proves both halves in production:
+  `PurchaseOrderDetail.tsx:621` snapshots the prior version into `po_revisions`, and approve-po
+  409s `received_floor` at `:639`.) Adding items is still a NEW PO; stopping is still the whole PO.
 - **The portal never claims it sent anything.** Pressing a channel button records
   `{Channel} opened · Snapshot N` — a click is all the system observed. Print writes no history,
-  moves no status, mints no revision and has no limit.
-- **Communication is not part of the PO lifecycle** — never a status, never a stage.
+  moves no status and has no limit.
+- **A SHARE IS A HUMAN FACT, IN TWO STEPS** (Jess, 2026-08-18). Step one is the click, and it
+  records only the opening. Step two is a question the portal asks and an operator answers:
+  WHICH version, to WHICH supplier, on WHICH channel. **Only the answer is the share.** A press
+  that never became an answer is a PO nobody sent, and the register says so.
+- **Communication is still not a STATUS.** The five Operation Status words are unchanged and
+  none of them is `Ordered`. `PO PDF not shared` is work to do, never a stage.
 - **Row order is risk to the customer's promise**, and clearing a header sort returns to it.
 - **Red is reserved for a date the factory GAVE.** Our own estimate warns amber, greys the
   date, prints `· expected` on the expand, and makes the supplier draft ASK for a date instead
@@ -925,6 +1123,26 @@ records it.
   FACTORY's week, transit on the OFFICE week. The register spelt it a second time without the
   transit leg and under-warned by exactly the day it forgot.
 - **One editing surface per fact.** The expand is the working area; the right panel is Activity.
+- **GROUP BY SUPPLIER, and it is the ONE grouping this register offers** (Jess, 2026-08-18).
+  Collapsing the list to one row per factory is how a buyer prepares a phone call: everything
+  Ohana owes, in one place, one call, no scrolling back. 2990s makes `Supplier` groupable on
+  its own PO register (`apps/backend/src/pages/PurchaseOrders.tsx:122`). Grouping is a VIEW —
+  it re-sorts nothing else, remembers nothing across a reload, and never becomes a saved layout.
+- **`Total` EXISTS AND IS PERMISSIONED, not deleted** (Jess, 2026-08-18, refining *"no money on
+  Purchasing"*). The three operators buy, chase and receive without ever seeing a price — price
+  is not theirs to judge and a number on their screen invites them to judge it. The approver
+  sees it, because approving a purchase without its cost is not approving anything. **The same
+  page shows different columns to different people; permission rides the PERSON, never the
+  page** — which is also how a future purchasing manager gets access without a rebuild.
+
+### WHAT THE 2990s REGISTER SHOWED AND CARRES DOES NOT COPY
+2990s' PO register is a document BOOK; this one is a WORK LIST, and the gap is measurable.
+It carries no `SO No.` and no `Customer Delivery` (`PurchaseOrders.tsx:114-256`), so it cannot
+rank by risk to a customer's promise and falls back to date order. It has no `Current Action`
+column at all. It hides received quantity behind `Transfer To (GRN)`, `defaultHidden: true`
+(`:239`) — the answer to *did it land* is one picker-click away from a buyer who asks it hourly.
+And its Confirm / Edit / Cancel / Convert live on a right-click menu (`GoodsReceivedList.tsx:546`),
+which Register Law 8 forbids outright. **Take the grouping, take the drill-down, leave the rest.**
 
 ### APPROVED EVOLUTION
 *(The CALLS calendar, the `Confirm ready date` queue and "a ready date MOVES the expected
@@ -956,15 +1174,36 @@ links them at the moment of recording; it does not merge them.)*
 Book in what physically arrived, through ONE door that leaves a record.
 
 ### WORKFLOW
-`Read Mode → Start Receiving → Receiving Mode → Save → Posted`. An Office receive opens a
-Receiving Session and writes ONE `posted` event, through the same validator and the same
-receive engine the warehouse uses. **A `submitted` event is deliberately NOT written for the
-Office path** — two people and two acts is the Warehouse; one operator pressing Save once is
-the Office, and an event records what happened in the BUSINESS world, not the steps the system
-walked.
+**THE SESSION IS BORN WITH THE PO, NOT WITH THE TRUCK** (Jess, 2026-08-18, following Odoo,
+Dynamics BC and SAP's inbound delivery). Issuing a PO opens its Receiving Session and mints its
+number in the same act. Nobody presses `Start Receiving`; the operator opens the tab and reads
+*"what is due to land"* — the session is already there, waiting. **A half-counted session keeps
+its number and stays in `To receive` reading `6 of 10`**, which is the whole point: the truck
+that arrives at 17:30 does not have to be finished by 18:00, and tomorrow morning nobody has to
+hunt for what they were doing.
+
+`Session exists → Receiving Mode → Save → Posted`. An Office receive writes ONE `posted` event,
+through the same validator and the same receive engine the warehouse uses. **A `submitted` event
+is deliberately NOT written for the Office path** — one operator pressing Save once is the Office,
+and an event records what happened in the BUSINESS world, not the steps the system walked.
+
+**GOODS THAT LAND AWAY FROM THE OFFICE USE THE WAREHOUSE'S TWO ACTS** (Jess, 2026-08-18). Three
+office staff cannot stand at HOUZS Balakong when a van arrives. Whoever is THERE counts, checks
+condition, photographs and uploads the supplier DO — that is `submitted`. The month's GRN duty
+reads it and posts it. **Segregation survives intact: the person who ordered still never posts
+the receipt.** This is not a new path; it is the warehouse path pointed at a second address.
 
 Damaged or wrong units become `on_hold` at the moment of receipt and stop counting as future
 supply (0299), and a claim is raised automatically (0288's trigger).
+
+**MORE ARRIVED THAN WAS ORDERED — THE DEFAULT IS THE DRIVER TAKES IT BACK** (Jess, 2026-08-18).
+The counter records what is in front of them; the system never blocks the count. Excess is
+refused at the tailgate and never enters stock — the receipt reads the ordered quantity and one
+line records that the supplier over-shipped, so *"how often does this factory over-ship"* stays
+answerable. **Found after the van has gone:** the surplus is marked for the supplier's next
+collection, held out of sellable stock because it is not Carres' goods, and it rides the SAME
+collection mechanism as a consignment return. Purchasing is TOLD, and does not decide — the one
+case that needs a buyer is Carres wanting to KEEP the surplus, which is a commercial conversation.
 
 ### WHAT IS ON SCREEN TODAY
 `OperationReceiving.tsx`, 1036 lines · route `/operation?tab=receiving` · ***measured
@@ -1084,6 +1323,26 @@ payload rather than manufacturing a `submitted` event nobody performed.**
   open calls** — the identical expression `Current Action` and Purchase Orders' `Expected
   Arrival` already read, so one date cannot turn late on two tabs on two different days. **A
   second clock or a second provenance test on this page is a defect, not a refinement.**
+- **THE TWO QUEUES CARRY THE SESSION, NOT THE PO** (Jess, 2026-08-18). Now that a session is
+  born with its order, `To receive` shows `GRN No.` from the first day — `PO Issued` leaves the
+  set, because this queue lists RECEIPTS and the PO has its own register. And **`Received`
+  prints a fraction, `6 / 10`**, so a half-counted truck is legible without opening a row: the
+  van that arrives at 17:30 is finished tomorrow, by whoever is on duty, without anyone hunting.
+  ```
+  To receive       GRN No. · Supplier · PO No. · Items · Goods Arrival ·
+                   Received · Current Action
+  Goods Received   Received · GRN No. · Supplier · PO No. ·
+                   Supplier DO No. · Units · Claim
+  ```
+  **`Claim` is the last column of the posted queue**, adapted from 2990s' `Transfer To (PI / PR)`
+  (`apps/backend/src/pages/GoodsReceivedList.tsx:98`) and re-pointed: the question this business
+  asks of a past delivery is *did that truck cause trouble*, not *was it invoiced* — invoicing is
+  Finance's and never appears here.
+- **✅ THE COMPACT-SET DEFECT DIES WITH THE ALWAYS-OPEN PANE.** Measured 2026-08-06: `Goods
+  Arrival` and `Received` sat outside `COMPACT_KEYS`, so with the workspace pane open — the
+  DEFAULT — this page's two most-read columns rendered for nobody. The listing is now full width
+  until a row is opened (Jess, 2026-08-18), so the compact set stops deciding what a receiver
+  can see.
 - **The receiving ladder is FOUR rungs and the ORDER is the rule:** `fully_received` →
   `receiving_issue` → `partially_received` → `in_transit`. **Live consequence today: PO-2054 is
   3 received of 3 with 1 damaged, so it reads `Fully received` and the damaged unit is
@@ -1155,7 +1414,7 @@ route `/operation?tab=claims` · ***measured 2026-08-06, after layer ③ shipped
 END TO END, and the four columns and one row were counted in production with SQL.***
 
 ```
-LEFT 200px   QUEUES    Confirm what happens next        ← the only queue tile
+LEFT 200px   QUEUES    Confirm what happens next        ← the only queue tile TODAY
              SUPPLIER · PROBLEM
 CENTRE       kit DataTable, eight measured widths 150 · 111 · 181 · 154 · 147 · 194 · 368 · 134
              status picker Open / Closed / All — a STAGE, one is always on
@@ -1164,6 +1423,34 @@ CENTRE       kit DataTable, eight measured widths 150 · 111 · 181 · 154 · 14
                scan the list for
 RIGHT        NOTHING. There is no right panel on this tab.
 ```
+
+> ### ⭐ THE RAIL GAINS THE TWO DECISIONS — the recorded gap, closed (Jess, 2026-08-18)
+> **APPROVED, NOT YET BUILT.** §6's own Approved Evolution says it out loud: **"NOTHING TELLS
+> ANYONE TO PICK A RESOLUTION."** One queue tile exists and it is the phone call. The moment the
+> supplier answers, the claim goes SILENT — the answer is on file, the decision is not made, and
+> no surface anywhere asks anybody to make it. A claim that needs a human decision and raises no
+> action is exactly what Law 7 was written to prevent.
+> ```
+> QUEUES
+>   Confirm what happens next        waiting on the supplier
+>   Decide what we do                the supplier answered; layer ③ is open
+>   Decide what happens to the item  resolution chosen; the unit is still in limbo
+> ```
+> **The two new tiles ARE the two frozen decisions** — `Customer Resolution` (*what are we doing
+> for the customer?*) and `Item Outcome` (*what happened to THIS item?*) — and they are separate
+> tiles for the same reason they are separate fields: **both can be true at once, and a claim can
+> sit waiting on either.** Recording the supplier's answer moves the claim from the first tile to
+> the second by itself, onto the Work day of the duty holder who owns it. **Nobody has to remember
+> to come back.**
+>
+> **No `Resolution` COLUMN is added, and the refusal stands** — the grid already measures 1481px
+> in a 1022px container, and layer ③ is a decision made in the panel, not a fact scanned in a
+> list. The rail answers *how many are waiting on me*; the panel is where the answer is given.
+>
+> **2990s contributes nothing here and the reason is worth recording:** it has no claim object at
+> all — a bad receipt becomes a Purchase Return and the questions *what did the supplier say* and
+> *what did WE decide* have nowhere to live. On this page Carres is a generation ahead, and the
+> only thing to copy is the discipline of not copying.
 
 **The expanded row** — a 2-column grid, and the whole 712-line panel lives inside the kit
 table's `expansion`:
@@ -1278,6 +1565,16 @@ resolution list.
    known about any of them, and a screen may only show what is true right now.
 5. **Consequences are `f(Resolution, Execution)`, never `f(Resolution)`.** Law 2 is the proof.
 
+**⭐ WHO DECIDES, AND THE LINE IS WHOSE MONEY IT IS** (Jess, 2026-08-18). Owning a claim is not
+the same as being allowed to spend on it. **The supplier accepts responsibility → the duty holder
+records the outcome and it is finished** — Ohana saying *"we will replace it"* needs nobody's
+permission; it is Ohana's sofa and Ohana's cost. **The supplier refuses, or the item is to be
+written off → Carres is paying now, and it goes to the approver.** A replacement sofa is thousands
+of ringgit and it is not one operator's call at 5pm on a Friday.
+**This is the SAME line the purchase approval already draws** — a customer's order authorises
+itself; money Carres spends on its own account needs a person with the authority. Staff carry ONE
+sentence, not two rules: **if it comes out of Carres' pocket, it goes to Jess.**
+
 **A claim's owner:** the PO-duty holder **of the month it was OPENED in, forever** — it never
 changes when the month rolls over, because the person who spoke to the factory is the person
 who knows the case. **DERIVED from `ops_po_duty`, never an `assigned_to` column.**
@@ -1368,6 +1665,27 @@ that records it as NOT ruled**, so its absence cannot be read as an oversight.
   `returned_to_supplier` · `written_off` · `back_to_stock`, and `Replace` is the receive engine.
   `Repaired` and `Disposed` are NOT built: 0299's guard admits exactly three destinations, so
   adding them is a migration.
+- **⭐ REPAIR ORDERS — the page that covers the gap between "flagged" and "back"** (Jess,
+  2026-08-18). **APPROVED, NOT YET BUILT.** A repair surface already exists and it is 14 lines:
+  `apps/web/src/pages/operation/OperationOpsRepair.tsx` is a thin wrapper over
+  `OpsStockListView` — *"Units flagged for repair, or in old / damaged condition. Unflag when
+  fixed, or takeout if written off"* — with exactly two actions, `flag-repair` and `takeout`.
+  Stock carries one word for the same thing, `needs_repair` (`../stock/MASTER.md`).
+  **Measured consequence: a unit is flagged and then the record goes silent** — who took it out,
+  which repairer has it, when it was promised back, whether it is chargeable, none of it exists
+  anywhere.
+  **The split, and neither side duplicates the other:** Stock's queue owns *which units are
+  faulty*; a Repair Order owns *the trip out and back*. `RO No · Repairer · Unit ID · Model ·
+  Sent From · Handover · Expected Back · Next Action`. States read as facts —
+  `Not shared with {repairer}` · `Waiting for handover` · `With {repairer}` · `Back, not checked`.
+  **A repair is never a Purchase Return**: ownership does not move, and the SAME Unit ID must
+  come back — a different one stops the receipt, because a repairer substituting a unit is a
+  claim, not a repair.
+  **AND IT NEEDS THE UNHAPPY ENDING.** *"Cannot be repaired"* may not close the order — the sofa
+  is still at the repairer and nobody owns it. The unit comes BACK first, is checked, and only
+  then does a human choose: sell it as damaged, or write it off. Without that path a
+  beyond-repair unit sits in `With {repairer}` forever, which is how a physical asset quietly
+  leaves a business.
 - **The money, and a Finance queue.** `supplier_claims` has 28 columns and not one is money; the
   cost sits in `purchase_order_lines.cost`. **A Finance Action completes on an EXTERNAL EVIDENCE
   reference** — the supplier's credit-note or debit-note number — never a tick-box, which is why
@@ -1428,10 +1746,36 @@ blanks. Every row carries **who changed it, when, and what it was before**.
 `GET /operation/purchasing/settings` · `PUT /number` · `/po-days` · `/production-days` ·
 `/work-week` · table `purchasing_settings` (**1 row**) · migration 0303.
 
+### WHAT SETTINGS HOLDS — the full list (Jess, 2026-08-18)
+```
+production working days     per supplier x category      Ohana sofa 14
+supplier work week          per supplier                 Ohana works Saturday
+order-by buffer             days kept back to arrange the delivery
+PO days                     Mon / Wed / Fri
+company holidays            the one calendar every engine counts on
+
+approval required?          Ready Stock  yes    Display      yes
+                            Office       yes    Spare Parts  yes
+                            a customer order needs none — the order IS the authority
+
+no-answer rounds            3, then the work changes from "call the supplier"
+                            to "tell the salesperson this order is at risk"
+
+unit-tracked categories     sofa yes · bedframe yes · consumables no
+supplier contact channel    the WhatsApp group / email a share actually goes to
+destinations                name · full name · address · receiving contact ·
+                            may goods land here?   ADD A DESTINATION HERE,
+                            never in code — a fourth outlet is a settings row
+```
+
 ### FROZEN RULES
 - **A supplier × category with no number says `Set a number`** and gets no order-by date at all.
   It is never quietly planned on a 7 — a quiet screen must mean *watched and fine*, never
   *nobody looked*.
+- **`approval required?` has no amount, because Purchasing has no money** (Jess, 2026-08-18).
+  It is a switch per PURPOSE, not a threshold: an amount on this screen would make three
+  operators judge prices, and price is not theirs. The approver sees the money; the buyer
+  never does. **A purpose whose switch is off still records WHY it was bought.**
 - **Nothing here has a default parameter.** A fallback is how one file's constant read
   `Mon + Thu` for months after the engine had moved to `Mon/Wed/Fri`.
 
@@ -1539,7 +1883,7 @@ I do*). **The operator's answer was the thing that went missing.**
 | **One Service Case intake feeding Supplier Claim work** | Approved architecture. Not live: replace the receiving-only claim creation path and settle the entry rule plus refurbish door in the SAME change. |
 | **`DecisionGuideCard`** | Approved as a **portal-wide kit component**, not a Claims feature. One card under the selector, updating live: title → 1–2 sentences → max 3 `Typical examples` → max 3 `What happens next`. **Never a hover tooltip for business guidance** (users do not discover them; mobile cannot hover; staff stop reading after the first week). **Content from a configuration object, never hard-coded in the component.** Next homes: `Deliver To` · `Receiving Method` · `Purpose` · `Delivery Status` · `Payment Result`. |
 | **The September supplier switch** | Approved. Nice Future stops; a subscription-model mattress supplier takes over. |
-| **PO revisions** | **RULED OUT, not deferred.** A sent PO is never edited. |
+| **PO revisions** | **RULED IN, 2026-08-18 (Jess), reversing the 2026-08-06 exclusion.** A sent PO keeps its number and mints `Version n+1`; the prior version is snapshotted with its reason and author. The excluded thing was OVERWRITING, and that stays excluded. Floor: no line revises below `received_qty`. |
 | **The Working Calendar** | Approved 2026-08-06. Public holidays live in code (`packages/shared/src/my-holidays.ts`) and a manager cannot edit them — but the real fact is *"is Carres working that day?"*, which only the office can answer (a gazetted holiday can be a working day, and the company can close on an ordinary one). Settings gains ONE company calendar: the official list auto-loads each year, a manager marks a day working / adds a closure, audited like every Settings number. **Every engine — order-by, the CALLS calendar, delivery arithmetic — reads this ONE calendar.** Until built, `myHolidaySet()` stands. |
-| **`View Flow`** | Approved 2026-08-06 — **the ONE function worth porting from AutoCount's PO-register menu** (2990s' `RelationshipMap` is the worked example): one click shows the whole chain SO → PO → Receiving → Claim for a document. Everything else on that menu was reviewed with Loo the same day and is either already here or REJECTED: blank `New` (bypasses PURCHASING DEMAND, the single entry) · `Edit` (a sent PO is never edited) · `Delete` (red line — `Cancel` keeps the record) · AP/invoice transfers (Purchasing never touches money). |
+| **`Order Route`** | Approved 2026-08-06 as `View Flow`; **renamed `Order Route` by Jess 2026-08-18** — the Sales Order canvas and this one draw the SAME chain entered through different doors, and one chain earns one name. **the ONE function worth porting from AutoCount's PO-register menu** (2990s' `RelationshipMap` is the worked example): one click shows SO → PO → Receiving → Claim for a document. Everything else on that menu is either already here or REJECTED: blank `New` (bypasses PURCHASING DEMAND, the single entry) · `Delete` (red line — `Cancel` keeps the record) · AP/invoice transfers (Purchasing never touches money). **`Edit` is no longer on the reject list** — see §4's revision rule. |
 | ~~**Team panel `GRN DUTY` row**~~ | **DONE 2026-08-15.** The row states an auto-assigned holder and carries an edit door for the `po_duty_editor`; the rota reaches FORWARD one month. The ruling now lives in §2.2 where the duty model is, not here. |
