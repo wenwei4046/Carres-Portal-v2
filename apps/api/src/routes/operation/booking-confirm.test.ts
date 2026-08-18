@@ -677,6 +677,8 @@ describe("POST /api/operation/orders/:id/booking/confirm", () => {
         { data: confirmedControl, error: null },
       ),
       order_finance_exceptions: tableMock({ data: financeRows, error: null }),
+      // The repeat-letter lookup (0356): no prior document rows here.
+      ops_delivery_orders: tableMock({ data: [], error: null }),
     });
   }
 
@@ -686,8 +688,12 @@ describe("POST /api/operation/orders/:id/booking/confirm", () => {
     vi.mocked(userClient).mockReturnValue(makeSb(t) as any);
     const res = await post(await makeJwt("operation"), OK_BODY);
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { autoDeliveryOrder: string | null };
-    expect(body.autoDeliveryOrder).toBe("DO-STAMPED");
+    const body = (await res.json()) as {
+      deliveryOrder: { do_number: string; issued: boolean } | null;
+    };
+    // The lib reports the number it MINTED (the locked scheme), and issued=true.
+    expect(body.deliveryOrder?.do_number).toMatch(/^DO-\d{6}-\d{4}$/);
+    expect(body.deliveryOrder?.issued).toBe(true);
     // The mint went through the ONE shared write: an idempotent update guarded
     // on the empty column, never an unconditional set.
     expect(t.orders.update).toHaveBeenCalledWith(
@@ -711,8 +717,8 @@ describe("POST /api/operation/orders/:id/booking/confirm", () => {
     vi.mocked(userClient).mockReturnValue(makeSb(t) as any);
     const res = await post(await makeJwt("operation"), OK_BODY);
     expect(res.status).toBe(200); // the booking is never hostage to the courtesy
-    const body = (await res.json()) as { autoDeliveryOrder: string | null };
-    expect(body.autoDeliveryOrder).toBeNull();
+    const body = (await res.json()) as { deliveryOrder: unknown };
+    expect(body.deliveryOrder).toBeNull();
     expect(t.orders.update).not.toHaveBeenCalled();
   });
 
@@ -723,7 +729,7 @@ describe("POST /api/operation/orders/:id/booking/confirm", () => {
     vi.mocked(userClient).mockReturnValue(makeSb(happyTables()) as any);
     const res = await post(await makeJwt("operation"), OK_BODY);
     expect(res.status).toBe(200);
-    expect(((await res.json()) as { autoDeliveryOrder: string | null }).autoDeliveryOrder).toBeNull();
+    expect(((await res.json()) as { deliveryOrder: unknown }).deliveryOrder).toBeNull();
   });
 
   it("generic PUT /control refuses booking_stage — the one door is the confirm endpoint", async () => {

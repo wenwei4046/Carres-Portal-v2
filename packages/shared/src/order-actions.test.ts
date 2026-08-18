@@ -328,16 +328,23 @@ describe("delivery track", () => {
     expect(keys(sig({ completed: true, photoOnFile: null }))).toEqual([]);
   });
 
-  // ── C7 · the delivery order ───────────────────────────────────────────────
-  // Jess 2026-07-27: logistics ring to say they are delivering tomorrow and an
-  // operator has to produce the paper by hand. Once the customer's date is
-  // confirmed, the SYSTEM produces it and the operator presses one button.
+  // ── C7 → SLICE 2 · the delivery order ─────────────────────────────────────
+  // Jess 2026-07-27 made the system produce the paper on one press; the owner
+  // ruling (`docs/orders/MASTER.md` §8) removed the press itself: the SYSTEM
+  // issues the document the moment every requirement is met — no Release
+  // button, no Approve button, no manual bypass in any state. The engine may
+  // therefore NEVER raise `issue_delivery_order` as a person's action.
 
-  it("arranged, paid, and no delivery order yet → Issue delivery order, not the quiet fact", () => {
+  it("⭐ arranged and no delivery order yet → NOT a person's action (Slice 2); the quiet fact returns", () => {
     const s = sig({ deliveryOrderIssued: false });
-    expect(keys(s)).toEqual(["issue_delivery_order"]);
-    // The fact means "nothing for a human to do". Issuing IS something to do.
-    expect(orderIsDelivering(s)).toBe(false);
+    // Nobody is asked to press anything: the server issues it at the door
+    // that completed the gate, and a gate-refused order is narrated by the
+    // route canvas's requirement lines, not by a button.
+    expect(keys(s)).toEqual([]);
+    // With the human act gone, the all-arranged row is C3's quiet fact again
+    // — the number lands in the same breath as the last requirement, and a
+    // row reading `Done` here would be the real lie.
+    expect(orderIsDelivering(s)).toBe(true);
   });
 
   it("issued → back to the quiet fact, exactly as before C7", () => {
@@ -367,13 +374,15 @@ describe("delivery track", () => {
     expect(openOrderActions(s)[0]).toMatchObject({ key: "collect", locked: true });
   });
 
-  it("⭐ an outstanding balance no longer withholds the document (decision A)", () => {
-    // What used to need a manager's release is now simply the rule: the paper
-    // issues, and the collection rides beside it as an ordinary open action.
+  it("⭐ an outstanding balance no longer withholds the document (decision A + Slice 2)", () => {
+    // What used to need a manager's release is now simply the rule: the
+    // SYSTEM issues the paper, and the collection rides as the one open
+    // action — no press stands between an owing customer and their goods.
     const s = sig({ moneyOwing: true, deliveryOrderIssued: false });
-    expect(keys(s)).toEqual(["issue_delivery_order", "collect"]);
-    // Money still displays last (Law 4), so the row leads with the document.
-    expect(first(s)).toBe("issue_delivery_order");
+    expect(keys(s)).toEqual(["collect"]);
+    expect(first(s)).toBe("collect");
+    // And it is an ordinary collect — no lock without a Finance exception.
+    expect(openOrderActions(s)[0]).not.toMatchObject({ locked: true });
   });
 
   it("on the day itself `Deliver today` leads — rung 1 beats rung 4", () => {

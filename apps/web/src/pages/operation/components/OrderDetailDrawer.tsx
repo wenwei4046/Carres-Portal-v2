@@ -66,7 +66,6 @@ import {
   effectiveGuaranteeStatus,
   deliveryDateGapFact,
   orderActionButton,
-  orderActionDone,
   updateOrderInputSchema,
   type OpsStockListResponse,
   type OpsOrderControl,
@@ -103,7 +102,6 @@ import {
   useVoidPayment,
   useSaveOrderControl,
   useConfirmBooking,
-  useIssueDeliveryOrder,
   usePartnerBookingCheck,
   useSetPartnerDeliveryRules,
   useDeliveryPhotos,
@@ -5031,53 +5029,38 @@ function CompactField({ label, children }: { label: string; children: ReactNode 
  *  base-500 uppercase 11/600 — READABLE, not the washed base-300; value base-900;
  *  36px). Used by the Delivery card. */
 /**
- * C7 — the delivery order, in one row.
+ * C7 → SLICE 2 — the delivery order, in one row, and it is a FACT in both
+ * states now.
  *
- * Not issued → ONE button, and it is the dictionary's own BUTTON word so this
- * file spells no verb. Issued → the number, as a plain fact; there is nothing
- * to press, because the document already exists.
- *
- * **The gate is the server's** (`docs/ORDERS-WORKING-FLOW.md` §5 — goods
- * reserved, money collected, no Sunday or public holiday). This row does not
- * re-implement it: a client-side copy is a second engine, and the two would
- * disagree the first time either changed. So the button stays live and the 422
- * comes back as the sentence that names what is missing.
+ * Issued → the number, plain; the document already exists. Not issued → the
+ * kit's quiet dash: the SYSTEM issues the document itself the moment every
+ * requirement is met (`docs/orders/MASTER.md` §8 — no Release button, no
+ * Approve button, no manual bypass in any state), and the Order Route gate
+ * already names any requirement still open. A button here would put a press
+ * back on a step nobody performs.
  */
-function DeliveryOrderRow({
-  orderId,
-  doNumber,
-}: {
-  orderId: string;
-  doNumber: string | null;
-}) {
-  const issue = useIssueDeliveryOrder(orderId, {
-    // COPY-STANDARD's DONE MESSAGE for this action, read from the dictionary
-    // mirror rather than typed here, plus the number the document carries.
-    onSuccess: (res) =>
-      toast.success(
-        `${orderActionDone("issue_delivery_order")} — ${res.order.do_number}`,
-      ),
-    onError: (e) =>
-      toast.error(
-        e instanceof ApiError ? e.message : "Couldn't issue the delivery order",
-      ),
-  });
+function DeliveryOrderRow({ doNumber }: { doNumber: string | null }) {
+  const navigate = useNavigate();
   return (
     <DRow k="Delivery order">
       {doNumber ? (
-        <span className="font-mono text-body font-semibold text-base-900">
-          {doNumber}
-        </span>
-      ) : (
-        <Btn
-          variant="box"
-          size="sm"
-          disabled={issue.isPending}
-          title="The system writes the delivery order and stamps its number — nobody types one by hand"
-          onClick={() => issue.mutate()}
+        /* The number is a DOOR to the document's own page (§0.1: DO → DO). */
+        <button
+          type="button"
+          className="font-mono text-body font-semibold text-blue-700 underline-offset-2 hover:underline"
+          onClick={() =>
+            navigate(`/operation/delivery-orders/${encodeURIComponent(doNumber)}`)
+          }
         >
-          {orderActionButton("issue_delivery_order")}
-        </Btn>
+          {doNumber}
+        </button>
+      ) : (
+        /* An absent value reads as WORDS, never a dash (COPY-STANDARD
+           2026-08-15) — and the words say who acts next: nobody. */
+        <span className="text-meta text-base-500">
+          No delivery order yet — the system issues it when the goods, logistics
+          and date are ready
+        </span>
       )}
     </DRow>
   );
@@ -5260,7 +5243,7 @@ function BookingBlock({
           now, the moment the customer's date is confirmed, and the SYSTEM
           writes it. The row appears only when there is a trip to paper. */}
       {(confirmed || doNumber) && (
-        <DeliveryOrderRow orderId={orderId} doNumber={doNumber} />
+        <DeliveryOrderRow doNumber={doNumber} />
       )}
       {/* T8 — the second trip. A split order still owes the customer a group;
           this row is the ONLY place that says so, and it stays until that
