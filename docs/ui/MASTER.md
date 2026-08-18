@@ -179,6 +179,76 @@ DetailShell · DialogFrame · FieldFrame · GridToolbar · SectionHeader
   Constitution's design philosophy); an unwired power's ABSENCE is asserted by a test, because a
   power that quietly appears later is the failure that rule exists to stop.
 
+# §4.1 · OBJECT DETAIL — APPROVED / LOCKED, Jess 2026-08-18
+
+### WHY THIS SECTION EXISTS
+**It was missing, and three modules each answered it differently.** Sales Order opens a
+full-screen drawer; Purchase Orders opens a 400px right pane plus a row expand; Supplier Claims
+puts a 712-line panel inside the row expansion and has no right pane at all
+(`w-[400px]` greps zero on that page). `03-page-patterns.md` names a `Detail` pattern in four
+lines — four regions and five hierarchy items — and stops. **Three surfaces for one job is what
+happens when the law is four lines long.**
+
+### THE THREE SURFACES, AND THERE IS NO FOURTH
+```
+INSPECT   inside the list      row expand      ↑↓ moves · Esc closes · read to decide
+WORK      full screen          four regions    the job gets done here
+EDIT      full screen          split           left composes · right shows what leaves Carres
+```
+`00-register-laws.md:7` already rules INSPECT (↑↓, Esc) and Purchasing already models the pair as
+`{ poId, mode }`. This section names them as the complete set. **A fourth way to open one record
+means staff must remember which one can do what, and that memory is the thing this portal exists
+to remove.**
+
+### THE FOUR REGIONS ARE `03-page-patterns.md`'s, UNCHANGED
+```
+Header       which record · what state · ‹ 4 of 69 ›
+Summary      the facts read before anything is done
+Sections     the content
+History      Today · Yesterday · Earlier
+```
+
+### TABS APPEAR ONLY WHERE PARALLEL TRACKS EXIST
+A Sales Order carries EIGHT (`items · delivery · balance · storage · loan · documents · cases ·
+activity`) and earns every one: those things run at the same time and none waits for another. **A
+purchase return has one track — get the goods back.** Eight tabs on it would be one tab and seven
+empty rooms. **One track is one scroll. Several genuinely parallel tracks are tabs.**
+```
+TABS      Purchase Order · Supplier Claim
+NO TABS   Goods Receipt · Purchase Return · Repair Order · Display Request ·
+          Manual Purchase · the three Consignment documents
+```
+
+### THE SPLIT IS AN EDIT MODE, AND ONLY WHERE AN OUTSIDER READS THE RESULT
+**Viewing never splits the screen** (Jess, 2026-08-18). Pressing edit does, and the right half is
+**the document the other party will actually receive**, redrawn as the left half is typed — which
+is the only way an operator can see what a supplier will read without printing it.
+```
+SPLITS       PO · Consignment Order · Purchase Return · Repair Order · Supplier Claim
+NEVER        Goods Receipt · Display Request · Manual Purchase
+```
+Receiving RECORDS what was counted; it composes nothing for anybody. A preview pane there spends
+half a screen on something no one outside will ever read.
+
+### A PANEL'S ACTIONS LIVE IN ITS OWN HEADER ⋮
+Already ruled (Jess, 2026-07-11) and it corrected nine surfaces at once —
+`orders/MASTER.md`: *"every panel's actions live in its header ⋮; the redundant inline button is
+gone."* It binds every object detail in the portal; it is not re-argued per module.
+
+### WHAT IS REMEMBERED, AND WHAT IS NOT
+**Remembered: whether a rail or a panel is collapsed.** Shipped and measured —
+`OrderDetailDrawer.tsx:2000` reads `ops-drawer-rail` from `localStorage`, and panel open/closed
+persists by panel title (`:656-673`).
+**Not remembered: the grid's shape** — width, order, visibility. A test asserts it
+(`OperationOrdersControl.test.tsx:614`: *"persists no column shape"*), and §4's reload-is-the-reset
+rule stands.
+**The line is whether the choice changes what the record MEANS to the next reader.** Collapsing a
+rail is where my eyes are now; re-cutting the columns redefines the table for everyone who opens
+it next. *(Written down because a 2026-08-18 chat read the layout-memory rule, did not read the
+shipped code, and stated the opposite.)*
+
+---
+
 # §5 · The right rail
 
 ### MISSION
