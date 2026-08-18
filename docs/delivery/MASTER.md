@@ -279,12 +279,20 @@ Delivery navigation (the rest is approved target):
 There is no separate Delivery dashboard, Fleet, Trips, Regions or Delivery Returns destination.
 KPI cards do not precede the work/Register.
 
-**Delivery Orders Register defaults — owner ruling 2026-08-16 (blueprint card; OVERWRITES the
-earlier ten-column draft):**
+**Delivery Orders Register defaults — owner column ruling 2026-08-18 (OVERWRITES the 2026-08-16
+seven; same table as Sales Orders — one register engine, same typography, search, filters,
+export and chooser):**
 
 ```
-DO No · SO No · Customer · Delivery date · Location · Status · Created
+DO No · DO date · SO No · Customer · Customer Delivery · Delivery date · Delivery Location · Status
 ```
+
+`DO date` = the day the system issued the document · `Customer Delivery` = the date promised to
+the customer (from the SO) · `Delivery date` = this trip's confirmed date. `Created` and the
+rest stay in the chooser, off by default. `DO No` and `SO No` are mono links — DO No opens the
+document, SO No the source order. Status pills: **Created grey · Out for delivery blue ·
+Delivered green · Delivery exception amber** with its ONE reason as the small second line. One
+row = one trip; a split order shows one row per DO.
 
 Statuses are the document's own: `Created → Out for delivery → Delivered`, plus
 `Delivery exception` carrying its ONE reason, and `Cancelled` for a voided document. There is NO

@@ -54,6 +54,8 @@ const doRow = (over: Partial<DeliveryOrderRow> = {}): DeliveryOrderRow => ({
     customer_name: "IT WALK SLICE2 AUTO",
     customer_address_city: "Klang",
     customer_address_state: "Selangor",
+    delivery_date: "2026-08-25",
+    delivery_date_tbd: false,
   },
   ...over,
 });
@@ -96,31 +98,39 @@ beforeEach(() => {
 });
 
 describe("DeliveryOrdersRegister", () => {
-  it("renders the ruled seven columns and NO owner/avatar/action column", () => {
+  it("renders the owner's ruled eight columns in order, Created off by default, and NO owner/avatar/action column", () => {
     mount([doRow()]);
     for (const label of [
       "DO No",
+      "DO date",
       "SO No",
       "Customer",
+      "Customer Delivery",
       "Delivery date",
-      "Location",
+      "Delivery Location",
       "Status",
-      "Created",
     ]) {
       expect(screen.getAllByText(label).length).toBeGreaterThan(0);
     }
+    // `Created` lives in the chooser, off by default (owner ruling 2026-08-18)
+    // — no column HEADER carries it (the fresh document's STATUS pill still
+    // reads Created, which is a different fact).
+    expect(screen.queryByRole("columnheader", { name: "Created" })).toBeNull();
     for (const banned of ["Owner", "PIC", "Next action", "Assigned"]) {
       expect(screen.queryByText(banned)).toBeNull();
     }
   });
 
-  it("prints the ruled facts: number, SO door, capitalised customer, fmtDate dates, locality", () => {
+  it("prints the ruled facts: number, SO door, capitalised customer, the three dates, locality", () => {
     mount([doRow()]);
     expect(screen.getByText("DO-180826-3035")).toBeTruthy();
     expect(screen.getByText("SO-1322")).toBeTruthy();
     // capitalize-up only: an all-caps name survives unchanged
     expect(screen.getByText("IT WALK SLICE2 AUTO")).toBeTruthy();
-    expect(screen.getByText(new RegExp(fmtDate("2026-08-20")))).toBeTruthy();
+    // DO date (issued) · Customer Delivery (the SO promise) · Delivery date (the trip)
+    expect(screen.getAllByText(new RegExp(fmtDate("2026-08-18"))).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(new RegExp(fmtDate("2026-08-25"))).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(new RegExp(fmtDate("2026-08-20"))).length).toBeGreaterThan(0);
     expect(screen.getByText("Klang, Selangor")).toBeTruthy();
   });
 
@@ -142,8 +152,8 @@ describe("DeliveryOrdersRegister", () => {
         },
       ],
     );
-    // "Created" is also the column header, so the pill makes it two.
-    expect(screen.getAllByText("Created").length).toBeGreaterThan(1);
+    // The Created COLUMN is off by default now, so the pill is the only one.
+    expect(screen.getAllByText("Created").length).toBeGreaterThan(0);
     expect(screen.getByText("Delivery exception")).toBeTruthy();
     expect(screen.getByText("Customer unreachable")).toBeTruthy();
   });

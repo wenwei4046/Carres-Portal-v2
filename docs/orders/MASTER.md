@@ -790,13 +790,16 @@ gate proves the code does what its tests say; only the walk proves it does what 
 
 ## Guided operations and Service Case boundary — CLOSED / PRODUCTION-VERIFIED 2026-08-14
 
-- ⭐ **RE-RULED 2026-08-18 (owner): the Register cell carries the FACT ALONE.** A missing
-  Customer Delivery date prints the amber fact (`No delivery date`) with no action clause —
-  **a register lists documents; actions live in My Work / Team Work / the Order Route.** This
-  overwrites the 2026-08-14 in-cell two-line action pair under the MASTER OVERWRITE LAW. The
-  who/phone/ask detail still rides the cell's hover, and the Sales Order detail still expands
-  the same derived fact into Why, Who must act, Who to contact, What to ask, What to use, What
-  to record and What happens next. The guidance stores no second action or delivery truth.
+- ⭐ **RE-RULED 2026-08-18 (owner): the fact is said ONCE per surface, and never as a lecture.**
+  A missing Customer Delivery date prints the amber fact (`No delivery date`) with no action
+  clause in the Register cell — **a register lists documents; actions live in My Work /
+  Team Work / the Order Route.** The SO object page's seven-answer guidance banner
+  (Why · Who must act · Who to contact · What to ask · What to use · What to record · What
+  happens next) is **DELETED** — it lectured instead of working and said one thing in three
+  places. What survives: the amber field-level note on `Customer Delivery`, the cell's
+  who/phone/ask hover, and the owned action in My Work / Team Work / the Order Route. This
+  overwrites the 2026-08-14 guidance-block ruling under the MASTER OVERWRITE LAW. The guidance
+  stores no second action or delivery truth.
 - `Report a problem` is the one Sales Order entrance for a customer, product, delivery or
   installation problem. It pre-links the current SO/customer/items into the canonical Service
   Case guided intake and preserves that writer's evidence, permission and follow-up contract.

@@ -40,8 +40,10 @@ import { useOpenWorkSet, type WorkRow } from "./use-open-work";
  * a NEW document, linked from the same Sales Order.
  */
 
+/** Owner column ruling 2026-08-18: Created GREY · Out for delivery BLUE ·
+ *  Delivered GREEN · Delivery exception AMBER. */
 const STATUS_TONE: Record<string, OrderActionTone> = {
-  created: "info",
+  created: "neutral",
   out_for_delivery: "info",
   delivered: "success",
   exception: "warning",
@@ -162,9 +164,14 @@ export default function DeliveryOrderPage() {
     );
   }
   if (isError || !d || !order || !status) {
+    const notFound = error instanceof ApiError && error.status === 404;
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2">
-        <p className="text-body text-base-700">This delivery order could not be found</p>
+        <p className="text-body text-base-700">
+          {notFound
+            ? "This delivery order could not be found"
+            : "The delivery order could not be loaded — try again"}
+        </p>
         {(error as Error | undefined)?.message ? (
           <p className="text-meta text-base-500">{(error as Error).message}</p>
         ) : null}
@@ -434,7 +441,7 @@ export default function DeliveryOrderPage() {
 
           {/* SIGNATURE / PROOF */}
           <Panel title="Signature / proof">
-            {order.pod_signed_at || order.pod_signature_url || order.pod_url ? (
+            {order.pod_signed_at || order.pod_signature_url || order.do_file_path ? (
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {order.pod_signed_at ? (
                   <Fact label="Signed">
@@ -442,8 +449,10 @@ export default function DeliveryOrderPage() {
                     {order.pod_signed_by ? ` · ${order.pod_signed_by}` : ""}
                   </Fact>
                 ) : null}
-                {order.pod_uploaded_at ? (
-                  <Fact label="Proof document uploaded">{fmtDate(order.pod_uploaded_at)}</Fact>
+                {order.do_file_path ? (
+                  <Fact label="Signed document on file">
+                    {order.do_uploaded_at ? fmtDate(order.do_uploaded_at) : "Uploaded"}
+                  </Fact>
                 ) : null}
               </div>
             ) : (

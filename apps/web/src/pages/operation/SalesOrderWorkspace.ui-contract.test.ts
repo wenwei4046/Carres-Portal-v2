@@ -309,11 +309,15 @@ describe("Sales Order object template contract", () => {
     expect(workspace).not.toContain('label="Balance"');
   });
 
-  it("expands a missing-date Current Action into the governed seven answers", () => {
-    expect(workspace).toContain("missingDeliveryDateGuidance");
-    for (const label of ["Why", "Who must act", "Who to contact", "What to ask", "What to use", "What to record", "What happens next"]) {
-      expect(workspace).toContain(label);
+  it("carries NO guidance banner — the amber field note and the owned Work action say it once (owner 2026-08-18)", () => {
+    // The seven-answer banner lectured instead of working and said one thing
+    // in three places; it is DELETED, named here so it cannot quietly return.
+    expect(workspace).not.toContain("missingDeliveryDateGuidance");
+    for (const label of ["Who must act", "Who to contact", "What to use", "What happens next"]) {
+      expect(workspace).not.toContain(label);
     }
+    // What survives: the amber field-level note on Customer Delivery.
+    expect(workspace).toContain('>No delivery date</span>');
   });
 
   it("keeps the SO number visible when the header runs out of room", () => {
