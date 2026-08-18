@@ -13,7 +13,12 @@ const render = readFileSync(join(here, "../../lib/pdf/render.ts"), "utf8");
 
 describe("Sales Order object template contract", () => {
   it("keeps one object identity and the exact four-item object navigation", () => {
-    expect(header).toContain('aria-label="Sales Orders"');
+    /* The header is now the SHARED object header (the DO page reuses it with
+       its own back destination — one implementation, Law C). The SO contract
+       survives as the parameterized DEFAULT. */
+    expect(header).toContain('backTo = "/operation/orders"');
+    expect(header).toContain('backLabel = "Sales Orders"');
+    expect(header).toContain("aria-label={backLabel}");
     expect(header).not.toContain("Back to Sales Orders");
     expect(workspace).toContain('const OBJECT_VIEWS = ["Order", "Revisions", "History", "Order Route"]');
     expect(header).not.toContain('word="Sales Order"');

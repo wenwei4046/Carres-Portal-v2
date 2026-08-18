@@ -175,9 +175,10 @@ describe("the keyboard", () => {
     });
     renderJump();
     const input = openSurface();
-    /* `delivery` matches exactly one destination, so the document is the row
-     * after it and one ↓ is what reaches it. */
-    fireEvent.change(input, { target: { value: "delivery" } });
+    /* `payments` matches exactly one destination, so the document is the row
+     * after it and one ↓ is what reaches it. (`delivery` stopped being unique
+     * when the Delivery Orders register joined the sidebar.) */
+    fireEvent.change(input, { target: { value: "payments" } });
     await screen.findByTestId("jump-to-document"); // the debounced lookup lands
     const before = screen.getAllByRole("option");
     expect(before[0]).toHaveAttribute("data-active", "true");
