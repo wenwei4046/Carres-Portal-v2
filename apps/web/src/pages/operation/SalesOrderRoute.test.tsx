@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import {
@@ -305,6 +305,44 @@ describe("Order Route — accessibility", () => {
     expect(nodeEl("PO-2048:purchasing")).toHaveAttribute("data-mark", "complete");
     expect(nodeEl("PO-2048:receiving").className).toContain("border-dashed");
     expect(nodeEl("PO-2048:supplier")).toHaveTextContent("Current");
+  });
+
+  it("⭐ pans a focused off-frame node into view — the browser cannot scroll a transformed canvas", () => {
+    /* Slice 4. The surface is positioned by CSS transform, so tabbing to a
+       node below the frame would otherwise leave a keyboard user working
+       blind. jsdom has no layout, so the frame is given a real box here; the
+       map is taller than it, which puts the tail nodes outside. */
+    const rect = vi
+      .spyOn(HTMLElement.prototype, "getBoundingClientRect")
+      .mockReturnValue({
+        width: 400,
+        height: 300,
+        top: 0,
+        left: 0,
+        right: 400,
+        bottom: 300,
+        x: 0,
+        y: 0,
+        toJSON: () => ({}),
+      } as DOMRect);
+    try {
+      draw();
+      const surface = screen.getByTestId("route-surface");
+      const ty = () =>
+        Number(/translate\([-\d.]+px, ([-\d.]+)px\)/.exec(surface.getAttribute("style") ?? "")?.[1]);
+      const before = ty();
+      fireEvent.focus(nodeEl("delivery-photo")); // the map's bottom-most node
+      const after = ty();
+      /* The view moved UP (content translated negative-ward) just enough to
+         show the node — never a re-zoom, never a re-centre. */
+      expect(after).toBeLessThan(before);
+      /* And a node already in view moves nothing: reveal is minimal. */
+      const settled = ty();
+      fireEvent.focus(nodeEl("delivery-photo"));
+      expect(ty()).toBe(settled);
+    } finally {
+      rect.mockRestore();
+    }
   });
 });
 
