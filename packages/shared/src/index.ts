@@ -1861,6 +1861,16 @@ export {
   type DeliveryOrderIssueInput,
   type DeliveryOrderIssueResult,
 } from "./delivery-order";
+// The DO DOCUMENT status — ONE arithmetic over the void stamp (0356) + the
+// attempt history (0344); nothing stored (blueprint card 2026-08-16).
+export {
+  deliveryOrderStatusOf,
+  DELIVERY_ORDER_STATUS_LABEL,
+  type DeliveryOrderStatus,
+  type DeliveryOrderStatusKind,
+  type DeliveryOrderStatusInput,
+  type DeliveryOrderAttemptFact,
+} from "./delivery-order-status";
 export {
   isWorkingDay,
   addWorkingDays,

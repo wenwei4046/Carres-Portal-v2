@@ -1214,15 +1214,18 @@ to point at one of them and be wrong about the others.
 | A company is chosen | **`Logistics chosen ({name})`** | Assigned · Booked |
 | No agreed day | **`Date + slot not confirmed`** | No booking · Unscheduled · TBC · Appointment not confirmed |
 | An agreed day | **`Date + slot confirmed`** | Booked · Scheduled |
-| Money still holds the delivery | **`RM {amount} still to collect`** | Money release not cleared · Payment outstanding · Unpaid · On hold |
-| A manager released it, money still owed | **`Manager release recorded — RM {amount} remains to collect`** | Waived · Cleared · Approved — a release may never read as forgiveness |
+| Finance is not holding the delivery | **`No Finance hold`** | Money cleared · Paid enough |
+| An OPEN Finance exception holds it | **`Finance is holding this delivery: {reason} — Finance clears it`** | Payment outstanding · Unpaid · On hold · a derived balance sentence |
 | Nobody has priced the order | **`No price yet — money does not hold this delivery`** | RM 0 · Unpriced · — |
 | The agreed day is a Sunday | **`Date falls on a Sunday — pick another day`** | Invalid date · Not a working day |
 | The agreed day is a public holiday | **`Date falls on a public holiday — pick another day`** | Closed · Holiday · Not available |
 
-**⭐ MONEY IS A GATE REQUIREMENT (owner ruling 2026-08-16, decision B).** It is stated as the amount
-the customer owes, never as a release verdict, because the amount is the thing somebody can act on.
-`docs/orders/MASTER.md` § ORDER ROUTE carries the reasoning.
+**⭐ MONEY LEFT THE GATE (owner ruling 2026-08-16, decision A — supersedes decision B).**
+Outstanding money does not block the delivery order; **an OPEN Finance exception is the ONE money
+blocker**, stated with its reason and its owner because Finance is the only party that can clear
+it. The retired `RM {amount} still to collect` gate requirement and the manager-release sentence
+went with the gate they described; the collect ACTION and its amount live on unchanged in the
+worklist. `docs/orders/MASTER.md` §8 carries the ruling.
 
 **THE MISSING-FACT PHRASES — primary-school English, never a dash.** A node nobody has reached says
 what has not happened yet, in the plainest words available:
@@ -1629,6 +1632,30 @@ Fixed phrasings — reuse, never invent a variant:
 
 **Never** write "access restrictions", "site constraints", "delivery window policy" or
 "lift booking required" on screen. Say what the building is and how long the truck has.
+
+## The Delivery Order DOCUMENT words (blueprint card, owner ruling 2026-08-16)
+
+The Delivery Orders Register (SALES sidebar) and the DO object page speak these words and no
+others. The status set is the document's own lifecycle — registered here and in
+`STATUS-STANDARD.md`; the ONE arithmetic is `deliveryOrderStatusOf` in `packages/shared`.
+
+| Meaning | Use exactly | Do NOT use |
+|---|---|---|
+| The sidebar door / register | **Delivery Orders** | DOs · Deliveries · Dispatch |
+| A fresh document, no run yet | **Created** | New · Open · Pending |
+| Goods on the vehicle (awaiting the handover fact — registered, not yet derivable) | **Out for delivery** | In transit · Dispatched · On the way |
+| The trip completed | **Delivered** | Done · Complete · Closed |
+| The trip did not complete | **Delivery exception** + its ONE reason from the T4 Reason Library | Failed · Problem · a second word list |
+| A voided document | **Cancelled** + `Order cancelled` / `Rescheduled` | Deleted · Void · Removed |
+| No date on the document | **No delivery date yet** | — · TBC · N/A |
+| The register's empty state | **No delivery orders yet — the system issues one when a trip's goods, logistics and date are ready. The Order Route on each Sales Order shows what is still open.** | No data · No results |
+| The reprint promise (Print hover) | **Reprint carries the same number** | Duplicate · Copy |
+
+The T4 Reason Library gained the card's four remaining exception reasons —
+`Goods damaged` · `Wrong goods` · `Delivery photo missing` · `Loan not collected back` — in the
+library itself (`delivery-reasons.ts`), never as a second list. **No Release, Approve or Issue
+button exists anywhere on this surface**: the SYSTEM issues the document
+(`../orders/MASTER.md` §8).
 
 ## The Delivery module words (T11, locked with Jess 2026-07-27)
 

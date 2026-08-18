@@ -99,19 +99,41 @@ problems and history.
   lives once in [`../orders/MASTER.md`](../orders/MASTER.md) §8, which owns the gate — Delivery
   READS it and may never write it. Delivery remains the writer of the document and the owner of the
   carrier, the trip derivation and the proof.
-  🔴 **IMPLEMENTATION REQUIRED — NOT BUILT, and NOT APPROVED.** The node map shipped
-  (PR #825) and its canvas already states that the system issues the DO with no Release or Approve
-  button — but **neither automatic issuance nor the Finance exception exists in code**, and the
-  shipped gate still counts money. The correction slice is
-  [`../cards/CARD-2026-08-16-money-gate-correction.md`](../cards/CARD-2026-08-16-money-gate-correction.md),
-  `STATUS: QUEUED · IMPLEMENTATION: NOT APPROVED`. What runs today still requires the employee act
-  and still refuses on money. **Do not describe the new rules as implemented.**
+  ✅ **BUILT AND PRODUCTION-VERIFIED.** The Finance exception record (migration `0355`, PR #829),
+  the decision-A gate re-key (PR #830) and automatic issuance on the booking-confirm and
+  finance-clear doors (PR #835) are live; the authenticated walks are recorded in
+  [`../orders/MASTER.md`](../orders/MASTER.md) §8 (SO-1321 · `DO-170826-5050` issued over an owing
+  balance; SO-1322 · `DO-180826-3035` issued by the system with no press).
 - Issue rechecks permitted goods, split, Warehouse, address and applicable hold rules atomically,
   snapshots the scope and assigns the next owner. It does not create an actual delivery event.
   **These rechecks survive system issuance unchanged** — what changed is who triggers the act, not
   what the act verifies.
 - Reprint retains the number and logs the event. Once handed to Logistics, a DO is never deleted;
   cancellation, replacement or correction preserves the original history.
+
+### THE DO DOCUMENT MODEL — blueprint card, owner-approved 2026-08-16 · BUILT (migration `0356`)
+
+**One delivery TRIP = one DO.** Most orders: one trip, one DO. A split delivery or two
+destinations = one DO per trip, each with its own goods scope. The document rows live in
+`ops_delivery_orders` (0356), materialised by ONE trigger on `orders.do_number` so every existing
+mint path produces the row; a future split-trip door inserts directly and mirrors the active
+number.
+
+- **Numbering** stays the locked `DO-DDMMYY-NNNN` scheme (`docNumber`, seeded on the order id):
+  a retry, refresh or reprint returns the SAME number; a rebooked trip is a NEW document on its
+  own issue date.
+- **Status is DERIVED, never stored** (`deliveryOrderStatusOf`, one arithmetic): the void stamp
+  and the `delivery_attempts` history matched to the document's number decide
+  `Created · Delivered · Delivery exception (+ its ONE reason) · Cancelled`.
+  `Out for delivery` is registered vocabulary awaiting the handover fact (§4's chain is approved
+  target, not built) — it is never derived from the calendar, because a departure nobody recorded
+  is not a fact.
+- **A failed document keeps its Delivery exception + reason FOREVER** — it is never rewritten as
+  Delivered. When a new date is booked the system issues a NEW DO; the old one stays as history,
+  both linked to the Sales Order.
+- **Staff can never delete or void a DO.** Deletion is refused by trigger; the ONE void door
+  (`delivery_order_void`) accepts only `order_cancelled` or `rescheduled` and records reason +
+  actor + time. No UI exposes a void control.
 
 ## 4 · Warehouse and Logistics are separate
 
@@ -232,13 +254,16 @@ append Root Cause later without rewriting the observation.
 
 ## 8 · Information architecture and templates
 
-The ERP sidebar has one **Delivery** destination under Supply Chain. It applies the governed Shell,
-Register and Object Detail Templates and does not invent another UI system.
+**SIDEBAR — owner ruling 2026-08-16 (blueprint card; supersedes the SUPPLY CHAIN draft for the
+DO Register).** The **Delivery Orders Register lives under SALES**, beside Sales Orders — the
+register answers "which documents exist" for the order's own journey. The **Delivery work page
+stays under Supply Chain** as the execution view and writes nothing. Delivery applies the governed
+Shell, Register and Object Detail Templates and does not invent another UI system.
 
-Delivery navigation:
+Delivery navigation (the rest is approved target):
 
-1. **Delivery Work** — actionable operational home;
-2. **Delivery Orders** — formal DO truth Register;
+1. **Delivery Work** — actionable operational home (today: the Delivery page under Supply Chain);
+2. **Delivery Orders** — formal DO truth Register, under SALES · **BUILT**;
 3. **Schedule** — Week, Day and List by actual date;
 4. **Delivery History** — actual delivery results Register;
 5. **Exceptions** — problem, owner and explicit next action;
@@ -249,10 +274,19 @@ Delivery navigation:
 There is no separate Delivery dashboard, Fleet, Trips, Regions or Delivery Returns destination.
 KPI cards do not precede the work/Register.
 
-**Delivery Orders defaults:** `DO No · Delivery Date · Customer · Delivery Location · Goods ·
-Warehouse · Logistics Partner · Warehouse Status · Delivery Status · Latest Result`. Expansion is
-goods-only. Optional columns include SO, Time Window, ETA, contact owner, confirmation, handover,
-proof, open problem and updated time.
+**Delivery Orders Register defaults — owner ruling 2026-08-16 (blueprint card; OVERWRITES the
+earlier ten-column draft):**
+
+```
+DO No · SO No · Customer · Delivery date · Location · Status · Created
+```
+
+Statuses are the document's own: `Created → Out for delivery → Delivered`, plus
+`Delivery exception` carrying its ONE reason, and `Cancelled` for a voided document. There is NO
+`Waiting for goods` status — a DO cannot exist before goods are ready; waiting lives on the Order
+Route. **The register shows NO owner, NO avatar and NO action sentence** — a register finds
+documents; work lives in My Work / Team Work. Rows open the DO object page; document numbers are
+doors (`DO → DO`, `SO → SO`).
 
 **Delivery Work defaults:** `Due · Work · DO No · Customer · Delivery Date · Warehouse · Logistics
 Partner · Owner · Waiting Since · Priority`. Every row presents one current primary action.
@@ -287,6 +321,15 @@ actions, More and Print. Applicable views are:
 
 Delivery History is actual delivery execution. History is the complete audit trail; they are not
 the same view. Cross-module links open the owner and never create a duplicate editor.
+
+**BUILT 2026-08 (blueprint card §5) — the first DO object page**, one read-only page whose blocks
+are, in order: `CUSTOMER · GOODS (this trip's lines only, human words first, SKU mono second) ·
+DELIVERY DETAILS · SOURCE SALES ORDER door · DELIVERY STATUS · DELIVERY PHOTO ·
+SIGNATURE / PROOF · LOAN COLLECTION (only when a loan exists) · HISTORY`, plus header
+`Print` (reprint = same number). Everything renders facts owned by other modules; **the page
+writes nothing.** Driver/vehicle render governed absences until a per-trip fact exists
+(`partner_fleet` is keyed to the partner, not the trip). The multi-view shape above remains the
+approved target this page grows into.
 
 ## 10 · Daily operator journey, Work and Quick Rail
 

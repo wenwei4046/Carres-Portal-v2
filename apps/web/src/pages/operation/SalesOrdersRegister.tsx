@@ -54,8 +54,8 @@ import {
 import Money from "@/components/Money";
 import { apiFetch, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { renderCombinedSalesOrderPdf, renderDoPdf, renderSalesOrderPdf } from "@/lib/pdf/render";
-import type { DoTemplateData, SalesOrderTemplateData } from "@/lib/pdf/types";
+import { renderCombinedSalesOrderPdf, renderSalesOrderPdf } from "@/lib/pdf/render";
+import type { SalesOrderTemplateData } from "@/lib/pdf/types";
 import { useOperationOrders, useSalesOrderExpansion } from "@/lib/queries";
 import CancelSalesOrderDialog from "./CancelSalesOrderDialog";
 import DestinationHeader from "./DestinationHeader";
@@ -202,6 +202,9 @@ function toGridColumn(
   if (f.key === "do_number") {
     return {
       ...base,
+      /* §0.1 — a document number navigates to its AUTHORITATIVE OBJECT:
+         DO → DO. The number used to open the PDF directly; the DO object page
+         (blueprint card 2026-08-16) is the document's home and carries Print. */
       accessor: (r) =>
         r.o.do_number ? (
           <button
@@ -209,7 +212,9 @@ function toGridColumn(
             className="font-medium text-blue-700 underline-offset-2 hover:underline"
             onClick={(event) => {
               event.stopPropagation();
-              void openDeliveryOrderPdf(r.id, r.o.do_number!);
+              navigate(
+                `/operation/delivery-orders/${encodeURIComponent(r.o.do_number!)}`,
+              );
             }}
           >
             {r.o.do_number}
@@ -459,21 +464,6 @@ async function openSalesOrderPdf(orderId: string, so: number): Promise<void> {
   } catch (e) {
     const msg = e instanceof ApiError ? e.message : String(e);
     toast.error(`Sales Order SO-${so} PDF failed: ${msg}`);
-  }
-}
-
-async function openDeliveryOrderPdf(orderId: string, doNumber: string): Promise<void> {
-  try {
-    const data = await apiFetch<DoTemplateData>(
-      `/api/operation/orders/${orderId}/print-do-data`,
-    );
-    const blob = await renderDoPdf(data);
-    const url = URL.createObjectURL(blob);
-    window.open(url, "_blank");
-    setTimeout(() => URL.revokeObjectURL(url), 60_000);
-  } catch (error) {
-    const message = error instanceof ApiError ? error.message : String(error);
-    toast.error(`Delivery Order ${doNumber} PDF failed: ${message}`);
   }
 }
 

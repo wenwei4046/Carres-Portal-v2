@@ -308,6 +308,12 @@ export interface SalesOrderRouteInput {
       scope: ReadonlyArray<DeliveryGroupKey> | null;
     } | null;
     attempts: ReadonlyArray<RouteDeliveryAttempt>;
+    /** The order's issued document number (`orders.do_number`). The gate used
+     *  to read it off the ATTEMPTS alone, so a system-issued DO with no run
+     *  yet showed a ready gate with no number — two sources for one fact
+     *  (Law D). The document's own column is the truth; attempts remain the
+     *  fallback for pre-0356 rows. */
+    doNumber?: string | null;
     /** `ops_order_control.delivery_photos` (0280). */
     photos?: ReadonlyArray<RouteDeliveryPhoto>;
   };
@@ -904,8 +910,14 @@ function gateDraft(requirements: GateRequirement[], doNumber: string | null): No
           ],
     requirements: ready && doNumber ? [] : requirements,
     /* The system issues the document. There is no Release button, no Approve
-       button and no manual bypass anywhere in this module (§7, card §9). */
-    door: null,
+       button and no manual bypass anywhere in this module (§7, card §9). Once
+       ISSUED the node is a complete node, and a complete node's anatomy law
+       requires its door — to the DO object page (blueprint card 2026-08-16),
+       never to a control. */
+    door:
+      ready && doNumber
+        ? open(doNumber, `/operation/delivery-orders/${doNumber}`)
+        : null,
   };
 }
 
@@ -1090,7 +1102,10 @@ export function resolveSalesOrderRoute(input: SalesOrderRouteInput): SalesOrderR
 
   const totals = goodsTotals(lines);
   const requirements = gateRequirements(lines, totals, input);
-  const doNumber = [...input.delivery.attempts].reverse().find((a) => a.doNumber)?.doNumber ?? null;
+  const doNumber =
+    input.delivery.doNumber ??
+    [...input.delivery.attempts].reverse().find((a) => a.doNumber)?.doNumber ??
+    null;
 
   const originDraft: NodeDraft = {
     id: "sales-order",
