@@ -314,13 +314,27 @@ begin
 end $sanity$;
 
 -- =============================================================================
--- VERIFY BEFORE MERGING — run this by hand, as an internal user, in a
--- transaction you ROLL BACK (ENGINEERING.md §5). It is not part of the
--- migration: it writes rows, and a migration never asserts anything about data.
+-- VERIFY BEFORE MERGING (ENGINEERING.md §5). Not part of the migration: it
+-- writes rows, and a migration never asserts anything about data.
 --
--- These four checks are the ONLY proof of the rules that moved out of
--- TypeScript and into SQL. vitest cannot reach them — a mock that re-implemented
--- them would be testing itself.
+-- These checks are the ONLY proof of the rules that moved out of TypeScript and
+-- into SQL. vitest cannot reach them — a mock that re-implemented them would be
+-- testing itself.
+--
+-- HOW TO RUN IT WITHOUT APPLYING ANYTHING. `create function` is transactional in
+-- Postgres, so paste THIS ENTIRE FILE and the checks below into one
+-- `begin; … rollback;`. The function exists for the length of that transaction
+-- and vanishes with it. Nothing is applied, no number is claimed, and the SQL is
+-- fully proved — which is what lets you leave the number until the last minute.
+--
+-- The SQL editor connects as `postgres`, where `auth.uid()` is NULL: is_internal()
+-- returns false, the guard refuses you, and RLS would not apply to the owner
+-- anyway. So each check impersonates a real user:
+--     set local request.jwt.claims = '{"sub":"<app_users.id>"}';
+--     set local role authenticated;
+-- Get the ids from:
+--     select id, email, role from public.app_users
+--      where status = 'active' and role in ('principal','operation','dealer');
 --
 --   begin;
 --
