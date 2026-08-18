@@ -50,6 +50,9 @@ ops_stock_items 135 · units on_hold 0 · ops_stock_pool_usage 0
 | Concern | The ONE home |
 |---|---|
 | the per-unit register | `ops_stock_items` — **the register is the authority, not a rollup** |
+| whose the goods are | `ops_stock_items.ownership` — `carres` or `supplier` + which supplier |
+| the Unit ID | minted by Stock when a purchase or consignment order is CONFIRMED |
+| where it stands, since when | the site and the display-start date, both on the unit |
 | the rolled-up balance | `stock_balances` via `ops_rollup_stock_balances` |
 | quarantine outcomes + status mapping | `packages/shared/src/stock-hold.ts` |
 | pool draw reasons (K4's dated ledger) | `ops_stock_pool_usage` + `POOL_USE_REASONS` |
@@ -68,6 +71,28 @@ ops_stock_items 135 · units on_hold 0 · ops_stock_pool_usage 0
 What is physically in a warehouse right now, per unit.
 
 ### FROZEN RULES
+- **A UNIT IS BORN WITH ITS ORDER, NOT WITH THE TRUCK** (Jess, 2026-08-18). Confirming a
+  purchase or consignment order mints one row per physical piece, `status='incoming'`, so the
+  numbers can go OUT on the order and the supplier can print them on its own label. Carres does
+  not print supplier labels. **`incoming` means ORDERED, never HELD** — this module already paid
+  for forgetting that once (§6: a broken unit sat in `incoming` and both the reorder engine and
+  the ready-stock plan read it as *coming*, inflating supply with goods that would never arrive).
+  Every arithmetic that answers *what can we sell* or *what must we still buy* treats `incoming`
+  as absent.
+- **A UNIT SAYS WHOSE IT IS** (Jess, 2026-08-18). `ownership` is `carres` or `supplier`, and on a
+  supplier row the supplier is named. Without it a consigned sofa standing in a showroom is
+  indistinguishable from one Carres paid for, and nothing can answer what is owed for what.
+  **Ownership never moves on a warehouse action** — not on a transfer, not on a count, not on a
+  status change. Only a Purchasing or Finance record moves it, and selling a `supplier` unit is
+  what tells Finance a payable now exists.
+- **DIFFERENT FABRIC IS DIFFERENT STOCK.** Three beige do not satisfy an order for grey. Whatever
+  the catalog does with variants above, the count below is kept per variant, and every pick reads
+  the count that matches what was actually ordered.
+- **A UNIT KNOWS WHERE IT STANDS AND SINCE WHEN.** The site (`Carres` · `AL` · `HOUZS`, extended in
+  Settings, never in code) and the display-start date, from which *"on display 187 days"* is
+  derived and never stored. **A slot code inside a site was refused** (Jess, 2026-08-18): with one
+  showroom the re-keying costs more than the answer, and a position nobody updates is worse than
+  no position. It becomes a real question at three or four outlets, not before.
 - **Every pick filters `status='free'`**, and the rollup counts only free + reserved.
 - **A record is drawn WHOLE.** A bulk record of N units that would over-reserve is skipped,
   never split — so a 555-unit pillow row reserved for one pillow takes all 555 out of free

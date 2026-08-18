@@ -132,9 +132,15 @@ Sales
 Purchasing
 ├── SO Batch Purchase
 ├── Manual Purchase
-├── Purchase Order
-├── Receiving
-└── Supplier Claim
+├── Purchase Orders
+├── Goods Receipts
+├── Supplier Claims
+├── Purchase Returns
+├── Repair Orders
+├── Display Requests
+├── Consignment Orders
+├── Consignment Receipts
+└── Consignment Returns
 
 Portal
 ├── Reports
@@ -143,6 +149,15 @@ Portal
 
 **This is navigation, not workflow.** How the operator moves between these pages — which one
 feeds which — is the module MASTER's, and it changes when the business changes.
+
+**A DOCUMENT EARNS A DOOR WHEN A HUMAN LOOKS FOR IT BY NAME** (Jess, 2026-08-18). Purchasing's
+five pages became eleven, and the reason is measured rather than stylistic: **Carres runs three
+operations staff who each do every job**, so nothing may depend on remembering which workspace
+hides which document. The old rule — expose modules, reveal documents inside them — still binds
+everywhere the second condition fails. Nothing gets a page because it exists; it gets one because
+somebody has to find it again. Two proposed pages were refused on exactly that test: a module-local
+`Work` page (Work is ONE cross-module surface) and `Purchase Demands` (two lanes already produce
+every demand; a third view becomes a third place to press Issue, and it is a report instead).
 
 ---
 
@@ -268,7 +283,21 @@ count opened).
 ## 3.5 · STOCK
 
 **OWNS**
-- The **per-unit register** — every physical unit, its condition, its warehouse, its status.
+- The **per-unit register** — every physical unit, its **identity**, its **owner**, its
+  condition, its **site**, its status.
+- **The Unit ID itself.** It is minted when a purchase or consignment order is CONFIRMED, not
+  when goods land, so the number can travel out on the order for the supplier to print on its
+  own label. A unit that has a number and no sofa behind it is `incoming`, and **`incoming`
+  means ORDERED, never HELD** — anything computing what is available or what still must be
+  bought reads it as absent. (Jess, 2026-08-18.)
+- **Whose the goods are.** `Carres Owned` or `Supplier Consignment`. Without this one fact a
+  supplier's sofa standing in a Carres showroom cannot be told apart from Carres' own, and the
+  business has no way to say what it owes for. **Only a Purchasing or Finance record moves it;
+  a warehouse action never does.** (Jess, 2026-08-18.)
+- **Where a unit stands and since when** — the site (`Carres` · `AL` · `HOUZS`, and whatever
+  Settings adds) and the date it went on display, from which *"187 days"* is derived. A slot
+  code inside a site was refused: with one showroom the upkeep exceeds the answer, and a
+  position nobody re-keys is worse than none.
 - Reserve · release · take out · quarantine, and the reasons for each.
 - The reorder points and reserve levels.
 

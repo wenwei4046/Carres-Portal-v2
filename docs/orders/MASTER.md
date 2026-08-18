@@ -232,6 +232,14 @@ proven operational shape, then strengthen its audit boundary for Carres:
     direct edit and never silently rewrites the PO.
   - A **Unit ID / stock allocation is Stock-owned execution truth.** Ordinary staff and the Sales
     Order edit / amendment surface may read it but may never choose, release, replace or rewrite it.
+  - **A SALESPERSON MAY NAME A UNIT; ONLY STOCK MAY GRANT IT** (Jess, 2026-08-18). A customer
+    sitting on a floor sofa is buying THAT sofa — its wear, its light-fade, the one they touched —
+    and an order that records only the SKU lets a different unit ship and the customer discover it
+    at the door. So the salesperson SCANS or types the Unit ID off the label: that is a customer
+    fact, not an allocation. **Stock then decides**, and refuses out loud with the reason —
+    `already sold` · `damaged, waiting on the supplier` · `the supplier collects it next week`.
+    Naming is not choosing; the rule above is unchanged, and two salespeople can no longer claim
+    one sofa.
     When an affected undelivered item already has a Unit allocation, Management approval creates a
     Stock-owner confirmation. While the request waits, the existing Unit remains reserved and a
     replacement Unit is not prematurely consumed. Final APPLY is one atomic outcome: release the
