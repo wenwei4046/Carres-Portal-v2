@@ -4035,10 +4035,42 @@ Thu 20 Aug, Afternoon), built for the walk through the governed office/Stock/boo
   four-requirement gate; a fresh load of the same orders showed `✓ No Finance hold`. Stale bundle,
   not a regression.
 
-**What remains open, deliberately:** automatic DO issuance is documented above but the act is still
-a person's — that is **Slice 2** of
-[`../cards/CARD-2026-08-16-order-route-implementation-plan.md`](../cards/CARD-2026-08-16-order-route-implementation-plan.md),
-not part of this closure.
+### SLICE 2 · AUTOMATIC DO ISSUANCE — PRODUCTION-VERIFIED 2026-08-18 · PROGRAMME CLOSED
+
+**The system now issues the Delivery Order; nobody presses Issue.** The booking-confirm and
+finance-clear tails call the same governed issue door — idempotent, `docNumber` scheme unchanged,
+scope still re-verified atomically. The fallback manual door and the work-engine safety net remain.
+
+| PR | Merged as | Scope |
+|---|---|---|
+| #835 | `1826a0f8` | Slice 2 — auto-issue on booking-confirm and on finance-clear; the work engine stops naming the PIC as owner of an act nobody performs |
+| #837 | `0d19337c` · Deploy production run `32088232163` SUCCESS | Slice 4 — a focused node pans itself into view on the transformed canvas; accessibility assertions extended |
+
+**AUTHENTICATED PRODUCTION ACCEPTANCE — walked 2026-08-18 on `erp.carresofficial.com`, PASS.**
+Staged on **SO-1322** (`IT WALK SLICE2 AUTO` · JAGER-SS ×1 · RM 1,500 outstanding · NETS ·
+deliberately no customer delivery date beforehand — the gate does not need one):
+
+- Old Orders drawer → Delivery panel → `Confirm with customer` → **Thu 20 Aug + Afternoon
+  (12pm–3pm)** → `Record confirmation`. The DELIVERY ORDER row filled **by itself** with
+  **`DO-180826-3035`** (recorded 18 Aug 09:47) — no human pressed Issue.
+- Money behaved per decision A: the toast read *"RM 1500.00 outstanding — collection is still
+  open"* and the worklist's next action switched to `Collect RM 1,500.00 …` — collection stayed
+  open while the delivery moved. The journey advanced `✓ Booking → ● Delivery`.
+- Database proof: `orders.do_number = 'DO-180826-3035'` (no upload actor — system-issued);
+  `ops_order_control.booking_stage = 'confirmed'` · `confirmed_date = 2026-08-20` ·
+  `confirmed_time_slot = 'Afternoon (12pm–3pm)'` · partner NETS; `order_finance_exceptions`
+  empty for the order — no OPEN exception, so nothing held.
+
+🟡 **One defect found by the walk, filed as its own follow-up:** the Old Orders drawer's
+CURRENT ISSUES line *"No delivery date confirmed"* and the NETS chase line gate on
+`logistic_eta` alone, so after a customer confirmation they contradict the journey bar —
+two arithmetics for one fact (Law D). Fix = fold the customer-confirmed state into the same
+predicate the journey uses (`OrderDetailDrawer.tsx` ~2327/~2405).
+
+With this, every slice of
+[`../cards/CARD-2026-08-16-order-route-implementation-plan.md`](../cards/CARD-2026-08-16-order-route-implementation-plan.md)
+is delivered and production-verified; that card carries the execution record and the Order Route
+decision-A programme is **closed**.
 
 **AGREEING a date is softer than ISSUING.** It WARNS about goods, money and the calendar so
 nobody promises a day the goods cannot make, but it refuses only two things:

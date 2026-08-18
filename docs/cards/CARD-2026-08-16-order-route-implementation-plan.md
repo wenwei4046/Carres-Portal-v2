@@ -1,7 +1,7 @@
-STATUS: QUEUED
+STATUS: EXECUTED — programme closed 2026-08-18
 DATE: 2026-08-16
-PR: #827
-IMPLEMENTATION: NOT APPROVED
+PR: #827 (plan) · executed via #829 · #830 · #831 · #835 · #837
+IMPLEMENTATION: COMPLETE — all six slices delivered and production-verified (see EXECUTION RECORD at the end)
 
 # ORDER ROUTE — IMPLEMENTATION PLAN (six slices)
 
@@ -318,3 +318,26 @@ exists ships an ungated Delivery Order.
 ✗ deleting the Law-D guard test instead of rewriting it
 ✗ describing the Finance exception, automatic DO issuance or the correction as implemented
 ```
+
+---
+
+## EXECUTION RECORD — programme closed 2026-08-18
+
+The owner wrote `IMPLEMENT`; the boundary above then lifted. Every slice shipped, in dependency
+order, and both acceptance walks passed in authenticated production. Current truth lives in
+`docs/orders/MASTER.md` §8; this record is the card's closure evidence.
+
+| Slice | PR | Merged as | Verified |
+|---|---|---|---|
+| 1 · Finance exception (migration `0355`, Finance-only doors, RLS) | #829 | `06b7d269` | RLS probes as real users — `operation` refused `42501`, `finance` opened/cleared with evidence |
+| 3 · Money gate correction — one predicate across gate / engine / canvas / API; Law-D guard rewritten | #830 | `c737d83d` | Walk 2026-08-17 on SO-1321: `DO-170826-5050` issued over RM 1,500 owing; OPEN exception refused with reason; clear released |
+| Copy fix found by the Slice-3 walk | #831 | `264d44e5` | Old Orders booking hint states collection is open, not blocking |
+| 2 · Automatic DO issuance on booking-confirm + finance-clear tails | #835 | `1826a0f8` | Walk 2026-08-18 on SO-1322: `Record confirmation` (Thu 20 Aug · Afternoon) → **`DO-180826-3035` appeared with no Issue press**; `orders.do_number` written; collection stayed open (decision A) |
+| 4 · Focus-into-view pan + accessibility assertions | #837 | `0d19337c` | Deploy production run `32088232163` SUCCESS on the merge SHA |
+| 5 · Tests | — | inside each slice | Law-D guard rewritten (not deleted); auto-issue idempotence; RLS; a11y assertions |
+| 6 · Authenticated production acceptance | — | — | Both walks recorded in `docs/orders/MASTER.md` §8 |
+
+🟡 Walk-found follow-up (filed, out of this card's scope): the Old Orders drawer's
+*"No delivery date confirmed"* issue line and NETS chase line gate on `logistic_eta` alone and
+contradict the journey bar after a customer confirmation — fold the customer-confirmed state into
+the journey's predicate (`OrderDetailDrawer.tsx` ~2327/~2405).
