@@ -436,8 +436,10 @@ directory only and said so.*
   governed compact avatar/initial chip. The accessible name and hover label expose the full staff
   name. Do not prepend or repeat the name inside every action sentence.
 - **My Work** may omit the current user's repeated avatar because the scope already answers who.
-  **Team Work** groups by owner identity and shows each group's `open · overdue` summary; individual
-  rows do not repeat that group identity unless the row is shown outside the group.
+  **Team Work** groups by owner identity — avatar · full name · the counts — and individual rows
+  do not repeat that group identity unless the row is shown outside the group. **The count words
+  are `{n} actions to do · {n} late`** (owner ruling 2026-08-16, blueprint card §7 — supersedes
+  this section's earlier `open · overdue` pair): every count says WHAT it counts.
 - A Register warning, Current Action or Work row uses two visual lines when both fact and action
   are needed. **Line 1** is the fact/problem in governed body size and medium/semibold emphasis.
   **Line 2** is the next action in the governed smaller supporting size, regular weight and quieter

@@ -3837,7 +3837,10 @@ can see or close. It moves to them the day that portal covers appointments.
 
 **`Assign logistics`** — trigger: the order needs delivering and no company is chosen ·
 completion: **a company is recorded. Never "they accepted"** — assigning is our decision ·
-due: 3 working days before the customer's date.
+due: **WITHIN THE DAY the Purchase Order is issued** (owner re-ruling 2026-08-16, blueprint card
+§7 — supersedes the 3-working-days-before-the-customer-date law); a stock-source order with no
+PO: **within the order day**. Logistics is assigned the moment purchase starts, not near the
+delivery.
 
 **`Call {logistics} — confirm delivery date`** — trigger: logistics assigned but the customer
 has not confirmed BOTH a date and a slot · completion: **a customer-confirmed date AND slot
@@ -3863,6 +3866,16 @@ refused · lift booking not done · delivery failed). **Every module fails the s
 Exception plus a Reason, never a family of failure words.**
 
 **`Upload delivery photo`** — trigger: delivered, no photo · due: 1 working day after delivery.
+
+**`Collect the loan item`** — NEW, blueprint card §7 (owner-approved 2026-08-16) · trigger: a
+loan item is still out (`ops_sofa_loans`) and the delivery day has arrived · owner: Delivery
+staff · due: the delivery day itself · completion: the loan row reads returned. Composed by the
+Work engine from the loan fact; it never blocks a delivery (Card 6's law is untouched).
+
+**`Resolve the payment exception`** — NEW, blueprint card §7 · trigger: an OPEN Finance
+exception holds the delivery (0355) · owner: the Finance owner — only Finance clears it, with
+evidence · due: immediately · completion: the exception reads cleared. Composed by the Work
+engine; a duty with no roster holder yet shows its duty word, never a borrowed PIC.
 
 ### FROZEN RULES
 - **The slot length comes from the BUILDING TYPE** — condominium, apartment and office take a

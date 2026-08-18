@@ -458,6 +458,13 @@ const DISPLAY_RANK: Record<OrderActionKey, number> = {
   // 5 · money — last on purpose, and it is not a demotion: 催钱前先看货. It is
   // always in this list and always in the Owing filter.
   collect: 50,
+  // The blueprint card's two composed WORK items (2026-08-16). The ladder
+  // itself never raises them (one action per track is its law); the Work feed
+  // composes them from module facts. Ranked for map totality and for any
+  // surface that sorts a mixed list: the blocker precedes the collect it
+  // blocks, and the loan collection is the run's own remaining act.
+  collect_loan_item: 12,
+  resolve_payment_exception: 49,
   // FACTS, never raised as actions; ranked only so the map stays total.
   done: 90,
   delivering: 91,
