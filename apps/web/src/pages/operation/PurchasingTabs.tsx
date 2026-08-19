@@ -1,17 +1,7 @@
 import type { ReactNode } from "react";
-import { Link, useLocation } from "react-router-dom";
-import {
-  ClipboardCheck,
-  ShoppingBag,
-  ShoppingCart,
-  PackageCheck,
-  AlertTriangle,
-  BarChart3,
-  Settings,
-  type LucideIcon,
-} from "lucide-react";
+import { useLocation } from "react-router-dom";
+import { ShoppingBag } from "lucide-react";
 import { PO_REPORT_WORDS } from "@carres/shared";
-import { usePurchasingSettings } from "@/lib/queries";
 import ModuleHeader from "./components/ModuleHeader";
 
 /**
@@ -19,34 +9,41 @@ import ModuleHeader from "./components/ModuleHeader";
  * (Shell pattern, Loo 2026-08-02: "壳画头" — the shell draws the header,
  * pages never do).
  *
- * ONE white 44px row, never scrolls, and it is the WHOLE header:
- *   module word · tabs · (page meta slot) · global icons (🔔 ❓ ⚙)
+ * ── THE TAB STRIP IS GONE (Jess, 2026-08-18) ────────────────────────────────
  *
- * Pages render <PurchasingTabs /> as their first child and draw NO header of
- * their own — no breadcrumb strip, no H1, no TopBarIcons. That is the point:
- * a page structurally cannot forget the header, because it never draws one.
+ * Purchasing is approved to hold ELEVEN pages. A 44px tab strip is a good home
+ * for three siblings and a bad home for eleven: it scrolls sideways, it cannot
+ * show a count without shouting, and it cannot group. **The module's pages
+ * moved to the SIDEBAR**, where the existing `Purchasing` rail item now expands
+ * in place (`portal/portal-nav.ts` → `PortalNavChild`).
  *
- * Colour law (Loo 2026-08-02): the header is white, flat and quiet — the only
- * things allowed to speak are the blue active underline and (later) red count
- * badges. No brand colour above the content, ever, except the logo.
+ * A second left column INSIDE the module was refused: the portal rail is
+ * already 232px and a purchasing page already carries a 200px right rail, so a
+ * second column would spend ~430px of a 1440px screen on navigation before the
+ * first column of data. One rail, not two.
  *
- * Tabs:
- *   • To Order        → `/operation?tab=purchase`   (OperationToOrder)
- *   • Purchase Orders → `/operation/procurement`    (TabbedProcurementShell)
- *   • Receiving       → `/operation?tab=receiving`  (OperationReceiving)
- *   • Claims          → `/operation?tab=claims`     (OperationSupplierClaims)
- *   • Settings        → manager-only (server-gated)
+ * **This file stays, and keeps drawing the header** — the shell law is not
+ * being touched and eight pages import it. Only the strip is deleted:
  *
- * The active tab is derived from the current location: the Purchase Orders path
+ *   BEFORE  [🛍] Purchasing │ To Order  Purchase Orders  Receiving  Claims …
+ *   AFTER   [🛍] Purchasing · Receiving
+ *
+ * The nameplate gains the page word, because with the tabs gone the header
+ * would otherwise no longer say which page you are on. The active page is
+ * derived from the location exactly as it always was: the Purchase Orders path
  * wins first (a nested route), otherwise the `?tab=` value selects the rest.
+ * Every route and every `?tab=` value is unchanged — this moved the DOOR, not
+ * the address.
  *
  * The `right` slot is the page-meta slot (freshness stamp / refresh) — it sits
- * BEFORE the global icons so the cluster order is stable on every tab.
+ * BEFORE the global icons so the cluster order is stable on every page.
+ *
+ * Colour law (Loo 2026-08-02): the header is white, flat and quiet.
  *
  * UI-KIT: token classes only (no raw hex), Lucide icons, English copy.
  */
 
-type PurchasingTab =
+type PurchasingPage =
   | "to-order"
   | "purchase-orders"
   | "receiving"
@@ -54,41 +51,22 @@ type PurchasingTab =
   | "purchasing-report"
   | "purchasing-settings";
 
-interface TabDef {
-  key: PurchasingTab;
-  label: string;
-  to: string;
-  icon: LucideIcon;
-}
-
-const TABS: TabDef[] = [
-  { key: "to-order", label: "To Order", to: "/operation?tab=purchase", icon: ClipboardCheck },
-  { key: "purchase-orders", label: "Purchase Orders", to: "/operation/procurement", icon: ShoppingCart },
-  { key: "receiving", label: "Receiving", to: "/operation?tab=receiving", icon: PackageCheck },
-  { key: "claims", label: "Claims", to: "/operation?tab=claims", icon: AlertTriangle },
-  // Q3 (Loo, 2026-08-04) — the "look at the numbers" layer. AutoCount's own
-  // Purchase menu draws this same line: documents in the top half, reports in
-  // the bottom, so the reports sit AFTER the four document tabs and before the
-  // manager-only Settings. The word is `Report`, singular — his own spelling
-  // and AutoCount's own menu word.
-  {
-    key: "purchasing-report",
-    label: PO_REPORT_WORDS.tab,
-    to: "/operation?tab=purchasing-report",
-    icon: BarChart3,
-  },
-  // P1 — the fifth tab of the working flow's §1. Manager-only, so it renders
-  // only for a caller the server says may edit; the RPC gate is what actually
-  // protects the numbers.
-  { key: "purchasing-settings", label: "Settings", to: "/operation?tab=purchasing-settings", icon: Settings },
-];
+/** The page word printed after the nameplate. These are the SIDEBAR's own
+ *  words (`portal-nav.ts`) — a page word is never invented here. */
+const PAGE_WORD: Record<PurchasingPage, string> = {
+  "to-order": "SO Batch Purchase",
+  "purchase-orders": "Purchase Orders",
+  receiving: "Receiving",
+  claims: "Supplier Claims",
+  "purchasing-report": PO_REPORT_WORDS.tab,
+  "purchasing-settings": "Settings",
+};
 
 export default function PurchasingTabs({ right }: { right?: ReactNode } = {}) {
   const location = useLocation();
-  const settingsQ = usePurchasingSettings();
   const onProcurement = location.pathname.startsWith("/operation/procurement");
   const tabParam = new URLSearchParams(location.search).get("tab");
-  const active: PurchasingTab = onProcurement
+  const active: PurchasingPage = onProcurement
     ? "purchase-orders"
     : tabParam === "receiving"
       ? "receiving"
@@ -99,49 +77,16 @@ export default function PurchasingTabs({ right }: { right?: ReactNode } = {}) {
           : tabParam === "purchasing-settings"
             ? "purchasing-settings"
             : "to-order";
-  const canEditSettings = settingsQ.data?.canEdit ?? false;
-  const tabs = TABS.filter((t) => t.key !== "purchasing-settings" || canEditSettings);
-  const activeLabel = TABS.find((t) => t.key === active)?.label ?? "Purchasing";
+  const activeLabel = PAGE_WORD[active];
 
   return (
     <ModuleHeader
       testId="purchasing-tabs"
       icon={ShoppingBag}
       word="Purchasing"
+      page={activeLabel}
       docTitle={`${activeLabel} · Purchasing — Carres`}
       right={right}
-    >
-      <div
-        className="flex gap-1 h-full min-w-0 overflow-x-auto"
-        role="tablist"
-        aria-label="Purchasing"
-      >
-        {tabs.map((t) => {
-          const isActive = t.key === active;
-          return (
-            <Link
-              key={t.key}
-              to={t.to}
-              role="tab"
-              aria-selected={isActive}
-              data-testid={`purchasing-tab-${t.key}`}
-              className={[
-                "relative flex items-center gap-1.5 px-4 h-full whitespace-nowrap text-body transition-colors border-b-2 -mb-px",
-                isActive
-                  ? "border-kit-blue-9 text-base-900 font-semibold"
-                  : "border-transparent text-base-600 font-medium hover:text-base-900",
-              ].join(" ")}
-            >
-              <t.icon
-                size={14}
-                strokeWidth={2}
-                className={isActive ? "text-kit-blue-9" : "text-base-400"}
-              />
-              {t.label}
-            </Link>
-          );
-        })}
-      </div>
-    </ModuleHeader>
+    />
   );
 }

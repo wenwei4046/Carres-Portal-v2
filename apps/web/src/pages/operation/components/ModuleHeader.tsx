@@ -15,6 +15,11 @@ import { TopBarIcons } from "./GlobalTopBar";
  *   dark at the SAME size as the tabs (GitHub's weighting: weight, never
  *   size), no hover, no click. The icon is the module's ONE face, shared with
  *   its sidebar item.
+ * - `page` = the page word, printed after the nameplate as `Purchasing ·
+ *   Receiving`. A module whose pages live in the SIDEBAR (Purchasing, from
+ *   2026-08-18) has no tab strip, so without this the header would no longer
+ *   say which page you are on. Quiet weight — the nameplate is the wall sign
+ *   and the page word is the room, not a second sign.
  * - `children` = the module's tab strip (navigation between sibling pages).
  *   Stage pickers and searches are the PAGE's — they live in the page
  *   toolbar, never here.
@@ -31,6 +36,7 @@ export default function ModuleHeader({
   testId,
   icon: Icon,
   word,
+  page,
   docTitle,
   right,
   children,
@@ -43,6 +49,9 @@ export default function ModuleHeader({
   icon?: LucideIcon;
   /** The module word on the nameplate (an existing sidebar word, never new). */
   word: string;
+  /** The page word, printed `{word} · {page}`. For modules whose pages live in
+   *  the sidebar rather than a tab strip. */
+  page?: string;
   /** document.title while this module is on screen. */
   docTitle: string;
   /** Page-meta slot (freshness stamp / refresh) — before the global icons. */
@@ -78,6 +87,14 @@ export default function ModuleHeader({
         >
           {Icon && <Icon size={15} strokeWidth={2} className="text-base-700" />}
           {word}
+          {page && (
+            <span
+              className="font-medium text-base-600"
+              data-testid={`${testId}-page-word`}
+            >
+              · {page}
+            </span>
+          )}
         </span>
         {children != null && (
           <>

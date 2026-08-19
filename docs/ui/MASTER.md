@@ -371,6 +371,158 @@ DetailShell · DialogFrame · FieldFrame · GridToolbar · SectionHeader
   Constitution's design philosophy); an unwired power's ABSENCE is asserted by a test, because a
   power that quietly appears later is the failure that rule exists to stop.
 
+# §4.1 · OBJECT DETAIL — APPROVED / LOCKED, Jess 2026-08-18
+
+### WHY THIS SECTION EXISTS
+**It was missing, and three modules each answered it differently.** Sales Order opens a
+full-screen drawer; Purchase Orders opens a 400px right pane plus a row expand; Supplier Claims
+puts a 712-line panel inside the row expansion and has no right pane at all
+(`w-[400px]` greps zero on that page). `03-page-patterns.md` names a `Detail` pattern in four
+lines — four regions and five hierarchy items — and stops. **Three surfaces for one job is what
+happens when the law is four lines long.**
+
+### THE THREE SURFACES, AND THERE IS NO FOURTH
+```
+INSPECT   inside the list      row expand      ↑↓ moves · Esc closes · read to decide
+WORK      full screen          four regions    the job gets done here
+EDIT      full screen          split           left composes · right shows what leaves Carres
+```
+`00-register-laws.md:7` already rules INSPECT (↑↓, Esc) and Purchasing already models the pair as
+`{ poId, mode }`. This section names them as the complete set. **A fourth way to open one record
+means staff must remember which one can do what, and that memory is the thing this portal exists
+to remove.**
+
+### THE FOUR REGIONS ARE `03-page-patterns.md`'s, UNCHANGED
+```
+Header       which record · what state · ‹ 4 of 69 ›
+Summary      the facts read before anything is done
+Sections     the content
+History      Today · Yesterday · Earlier
+```
+
+### A TAB EARNS ITS PLACE TWO WAYS, AND ONLY TWO
+*(Corrected the day it was written: the first draft gave one reason, then a Supplier Claim failed
+the test while plainly needing tabs. The rule was incomplete, not the claim.)*
+
+**REASON ONE — genuinely parallel tracks.** A Sales Order carries EIGHT (`items · delivery ·
+balance · storage · loan · documents · cases · activity`) and earns every one: goods, delivery and
+money all move at the same time and none waits for another.
+
+**REASON TWO — reference a human opens rarely but must be able to find.** Versions, History, the
+route map. Not work; evidence. Burying them in the scroll makes the daily page longer for
+something read once a month, and hiding them altogether means somebody re-derives it from
+WhatsApp.
+
+**Everything else is ONE SCROLL.** A purchase return has a single track — get the goods back —
+and eight tabs on it is one tab and seven empty rooms.
+```
+PARALLEL TRACKS      Sales Order (8)
+REFERENCE ONLY       Purchase Order · Supplier Claim
+                       work is the first tab; the rest are Versions / History / Order Route
+ONE SCROLL           Goods Receipt · Purchase Return · Repair Order · Display Request ·
+                       Manual Purchase · the three Consignment documents
+```
+**The test, and it is mechanical: would a staff member open this tab on an ordinary Tuesday?**
+Yes and it runs beside the others → reason one. No, but they would hunt for it when something
+went wrong → reason two. Neither → it is a section in the scroll, not a tab.
+
+### THE SPLIT IS AN EDIT MODE, AND ONLY WHERE AN OUTSIDER READS THE RESULT
+**Viewing never splits the screen** (Jess, 2026-08-18). Pressing edit does, and the right half is
+**the document the other party will actually receive**, redrawn as the left half is typed — which
+is the only way an operator can see what a supplier will read without printing it.
+```
+SPLITS       PO · Consignment Order · Purchase Return · Repair Order · Supplier Claim
+NEVER        Goods Receipt · Display Request · Manual Purchase
+```
+Receiving RECORDS what was counted; it composes nothing for anybody. A preview pane there spends
+half a screen on something no one outside will ever read.
+
+### A PANEL'S ACTIONS LIVE IN ITS OWN HEADER ⋮
+Already ruled (Jess, 2026-07-11) and it corrected nine surfaces at once —
+`orders/MASTER.md`: *"every panel's actions live in its header ⋮; the redundant inline button is
+gone."* It binds every object detail in the portal; it is not re-argued per module.
+
+### WHAT IS REMEMBERED, AND WHAT IS NOT
+**Remembered: whether a rail or a panel is collapsed.** Shipped and measured —
+`OrderDetailDrawer.tsx:2000` reads `ops-drawer-rail` from `localStorage`, and panel open/closed
+persists by panel title (`:656-673`).
+**Not remembered: the grid's shape** — width, order, visibility. A test asserts it
+(`OperationOrdersControl.test.tsx:614`: *"persists no column shape"*), and §4's reload-is-the-reset
+rule stands.
+**The line is whether the choice changes what the record MEANS to the next reader.** Collapsing a
+rail is where my eyes are now; re-cutting the columns redefines the table for everyone who opens
+it next. *(Written down because a 2026-08-18 chat read the layout-memory rule, did not read the
+shipped code, and stated the opposite.)*
+
+---
+
+# §4.2 · MODULE NAVIGATION — APPROVED / SHIPPED, Jess 2026-08-18
+
+### THE PAGES OF A MODULE LIVE IN THE RAIL
+
+A module's sidebar item **expands in place** to list its pages. It does not open a
+second left column, and it does not keep a tab strip once it has more than a
+handful of pages.
+
+```
+▾ Purchasing
+    SO Batch Purchase      4
+    Manual Purchase             Coming soon
+    Purchase Orders        3
+    Receiving              1
+    Supplier Claims
+    …
+    ─────────────────────
+    Report
+    Settings
+```
+
+**Why not a second column.** The portal rail is 232px and a working page already
+carries a 200px right rail (§5). A module rail between them spends ~430px of a
+1440px screen on navigation before the first column of data.
+
+**Why not a tab strip.** A 44px strip is a good home for three siblings and a bad
+home for eleven: it scrolls sideways, it cannot show a count without shouting, and
+it cannot group. **The header row stays** — the shell still draws it (壳画头), and
+the nameplate gains the page word (`Purchasing · Receiving`) so the header still
+says where you are once the strip is gone.
+
+### FROZEN RULES
+
+- **Only the module you are standing in is open.** Same rule the area groups
+  already follow; applied one level down, so nothing new is invented.
+- **The whole map is listed from day one.** An approved page appears before it is
+  built. A map showing four of eleven roads teaches a shape that is about to
+  change under the operator seven more times.
+- **An unbuilt entry is NOT A CONTROL.** A `<span>` with no href, out of the tab
+  order, `aria-disabled`, printing **`Coming soon`** (`COPY-STANDARD.md`). This is
+  what keeps it inside `03-page-patterns.md:149` (*a control that opens nothing is
+  a dead control* — there is no arrow to be dead) while satisfying `:219` (*a
+  deliberately disabled control must say why, on screen*).
+- **Going live is two edits, in that page's own PR:** drop the flag, the span
+  becomes a link. **Nothing is added later and no order is renegotiated**, so the
+  rail never reshuffles under a staff member who has learned it.
+- **A count means rows a human must act on, never how many rows the table holds**,
+  and **nothing is printed at zero.** A zero badge is a daily invitation to check a
+  page with nothing on it.
+- **The parent carries no count of its own.** Summing its children produces a
+  figure that matches no page and no queue.
+- **A manager-only page is gated by the SERVER**, not by the role: the rail asks
+  the same RPC that guards the page. A caller who may not enter does not see the
+  door.
+- **Collapsed, the children disappear and the module's ONE icon remains.** A
+  collapsed rail is for table room, not for navigating thirteen pages by guessing
+  thirteen icons.
+- **The rail overflows, and that is the accepted cost of the whole map.** The one
+  defect that may not survive is landing on a rail whose highlighted row is off
+  screen: **the active row is brought into view on mount** — `block: "nearest"`,
+  visible rather than centred, and never re-run on navigation, which would yank the
+  rail while the operator is reading further down it.
+
+*Built: `apps/web/src/pages/portal/portal-nav.ts` (`PortalNavChild`) ·
+`PortalSidebar.tsx` · `operation/PurchasingTabs.tsx` ·
+`operation/components/ModuleHeader.tsx` (`page` prop).*
+
 # §5 · The right rail
 
 ### MISSION
