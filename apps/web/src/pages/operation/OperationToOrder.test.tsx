@@ -41,9 +41,19 @@ const OHANA = "11111111-1111-1111-1111-111111111111";
 const NF = "33333333-3333-3333-3333-333333333333";
 const KLANG = "2f181917-f4e1-42b2-9e25-d7ee6785424a";
 
-function build(key: string, model: string, codes: string, qty = 1, size: string | null = null) {
+function build(
+  key: string,
+  model: string,
+  codes: string,
+  qty = 1,
+  size: string | null = null,
+  /** The build's one spec sentence (fabric · colour · legs) — level 2 of the
+   *  hierarchy. Empty on most fixtures, which is the COLLAPSE case: one
+   *  variant and the middle band is never drawn. */
+  spec = "",
+) {
   return {
-    key, title: model, spec: "", codes, qty, size, model, ordinal: null,
+    key, title: model, spec, codes, qty, size, model, ordinal: null,
     lines: [{ lineId: `${key}-l1`, sku: codes, qty, cost: 100 }],
   };
 }
@@ -157,6 +167,19 @@ const TO_ORDER = {
           delivery: "2026-08-25",
           orderBy: "2026-08-03",
           builds: [build("m1", "Sonic", "SONIC-Q", 1, "Queen")],
+        },
+        {
+          // TWO VARIANTS of one item — the fixture's only three-level case
+          // (card §2). Same model AND size, so both land in the one `Sonic Q`
+          // group, and the fabric tells them apart on the middle band.
+          orderId: "o21", so: 1401, customer: "siti", qty: 2,
+          summary: "Sonic · 2 Mattresses", stockReady: "2026-08-20",
+          delivery: "2026-08-26",
+          orderBy: "2026-08-03",
+          builds: [
+            build("m2", "Sonic", "SONIC-Q", 1, "Queen", "Beige"),
+            build("m3", "Sonic", "SONIC-Q", 1, "Queen", "Grey"),
+          ],
         },
       ],
     },
@@ -448,22 +471,32 @@ describe("the grid — business language only", () => {
         .filter(Boolean).join(" | "),
     ]);
 
-    // `Cody K` holds TWO variants, so all three levels draw: item band →
-    // variant band → the SO lines under it.
-    const kIndex = shape.findIndex(([kit, text]) =>
-      kit === "data-group-parent" && text.startsWith("Cody K"));
-    expect(kIndex).toBeGreaterThan(-1);
-    expect(shape[kIndex + 1]![0]).toBe("data-group");
-    expect(shape[kIndex + 1]![1]).toMatch(/↳King/);
-    expect(shape[kIndex + 2]![0]).toBe("data-row");
+    // `Sonic Q` holds more than one fabric, so all three levels draw: item
+    // band → variant band → the SO lines under it.
+    const three = shape.findIndex(([kit, text]) =>
+      kit === "data-group-parent" && text.startsWith("Sonic Q"));
+    expect(three).toBeGreaterThan(-1);
+    // Everything under that band, up to wherever the next item begins.
+    const under = [];
+    for (let i = three + 1; i < shape.length; i += 1) {
+      if (shape[i]![0] === "data-group-parent") break;
+      under.push(shape[i]!);
+    }
+    // Level 2 comes first and names the fabrics; level 3 hangs under it.
+    expect(under[0]![0]).toBe("data-group");
+    expect(under[1]![0]).toBe("data-row");
+    const variants = under.filter(([kit]) => kit === "data-group").map(([, t]) => t);
+    expect(variants.length).toBeGreaterThan(1);
+    expect(variants.join(" ")).toMatch(/Beige/);
+    expect(variants.join(" ")).toMatch(/Grey/);
 
     // `Cody Q` holds ONE, so the middle level is not drawn at all — the level
     // collapses to two rather than printing a band that repeats its parent.
-    const qIndex = shape.findIndex(([kit, text]) =>
+    const two = shape.findIndex(([kit, text]) =>
       kit === "data-group-parent" && text.startsWith("Cody Q"));
-    expect(qIndex).toBeGreaterThan(-1);
-    expect(shape[qIndex + 1]![0]).toBe("data-row");
-    expect(shape[qIndex + 1]![1]).toMatch(/↳SO-1300/);
+    expect(two).toBeGreaterThan(-1);
+    expect(shape[two + 1]![0]).toBe("data-row");
+    expect(shape[two + 1]![1]).toMatch(/↳SO-1300/);
   });
 
   it("a SOFA groups by SALES ORDER; its lines drop the identity the band states", async () => {
