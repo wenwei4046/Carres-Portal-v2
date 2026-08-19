@@ -40,6 +40,19 @@ import { useOpenWorkSet, type WorkRow } from "./use-open-work";
  * a NEW document, linked from the same Sales Order.
  */
 
+/** The §4 chain facts (0363) — display words registered in COPY-STANDARD. */
+const HANDOVER_LABEL: Record<string, string> = {
+  ready_for_handover: "Ready for handover",
+  handed_over: "Handed over",
+  received_by_logistics: "Received by logistics",
+};
+
+/** The §4 duty words — one login may hold both; the event names which acted. */
+const DUTY_LABEL: Record<string, string> = {
+  warehouse: "Warehouse",
+  logistics: "Logistics",
+};
+
 /** Owner column ruling 2026-08-18: Created GREY · Out for delivery BLUE ·
  *  Delivered GREEN · Delivery exception AMBER. */
 const STATUS_TONE: Record<string, OrderActionTone> = {
@@ -86,9 +99,12 @@ export default function DeliveryOrderPage() {
               reasonKey: a.reason_key,
               recordedAt: a.recorded_at,
             })),
+            handoverEvents: (data?.handoverEvents ?? []).map((e) => ({
+              kind: e.kind,
+            })),
           })
         : null,
-    [d, data?.attempts],
+    [d, data?.attempts, data?.handoverEvents],
   );
 
   // Photos through the EXISTING signed-url door (0280) — one reader path.
@@ -403,6 +419,57 @@ export default function DeliveryOrderPage() {
             ) : null}
           </Panel>
 
+          {/* WAREHOUSE — the §4 handover facts, read-only (the acts live on
+              the Delivery page; this page writes nothing). */}
+          <Panel title="Warehouse handover">
+            {(data?.handoverEvents ?? []).length === 0 ? (
+              <Absence>
+                No handover recorded yet — the warehouse records it on the Delivery page.
+              </Absence>
+            ) : (
+              <ul className="flex flex-col gap-3" data-testid="do-handover-facts">
+                {(data?.handoverEvents ?? []).map((e) => (
+                  <li key={e.id} className="flex flex-col gap-0.5">
+                    <span className="text-body font-medium text-base-900">
+                      {HANDOVER_LABEL[e.kind] ?? e.kind}
+                      {e.kind === "handed_over" && e.counterparty
+                        ? ` — to ${e.counterparty}`
+                        : ""}
+                      {e.kind === "handed_over" && e.receiver_name
+                        ? ` · received by ${e.receiver_name}`
+                        : ""}
+                    </span>
+                    <span className="text-label text-base-600">
+                      {e.recorded_by_name || "Recorded"} ·{" "}
+                      {DUTY_LABEL[e.duty] ?? e.duty}
+                      {e.company ? ` · ${e.company}` : ""} · {fmtDate(e.recorded_at)}
+                      {e.vehicle ? ` · Vehicle: ${e.vehicle}` : ""}
+                    </span>
+                    {e.goods && e.goods.length > 0 ? (
+                      <span className="text-label text-base-600">
+                        Goods:{" "}
+                        {e.goods.map((g) => `${g.sku} × ${g.qty}`).join(" · ")}
+                      </span>
+                    ) : null}
+                    {e.note ? (
+                      <span className="text-label text-base-600">{e.note}</span>
+                    ) : null}
+                    {e.proofUrl ? (
+                      <a
+                        href={e.proofUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-label font-medium text-blue-700 underline-offset-2 hover:underline"
+                      >
+                        Open handover proof →
+                      </a>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Panel>
+
           {/* DELIVERY PHOTO */}
           <Panel title="Delivery photo">
             {photoRows.length === 0 ? (
@@ -498,6 +565,22 @@ export default function DeliveryOrderPage() {
                   {fmtDate(d.issued_at)} · issued by the system when every requirement was met
                 </span>
               </li>
+              {(data?.handoverEvents ?? []).map((e) => (
+                <li key={e.id} className="flex flex-col">
+                  <span className="text-body text-base-900">
+                    {HANDOVER_LABEL[e.kind] ?? e.kind}
+                    {e.kind === "handed_over" && e.receiver_name
+                      ? ` — received by ${e.receiver_name}`
+                      : ""}
+                  </span>
+                  <span className="text-label text-base-600">
+                    {fmtDate(e.recorded_at)}
+                    {e.recorded_by_name ? ` · ${e.recorded_by_name}` : ""} ·{" "}
+                    {DUTY_LABEL[e.duty] ?? e.duty}
+                    {e.company ? ` · ${e.company}` : ""}
+                  </span>
+                </li>
+              ))}
               {(data?.attempts ?? []).map((a, i) => (
                 <li key={i} className="flex flex-col">
                   <span className="text-body text-base-900">

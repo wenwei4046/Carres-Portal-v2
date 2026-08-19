@@ -44,6 +44,7 @@ import { locationForAddress } from "@/lib/region";
 import ListPageShell, { type ActiveChip } from "@/components/ListPageShell";
 import { SectionBand, SectionCard } from "@/components/SectionPanel";
 import BookingSpine from "./components/BookingSpine";
+import WarehouseHandoverBlock from "./components/WarehouseHandoverBlock";
 import OrderDetailDrawer from "./components/OrderDetailDrawer";
 // The ladder and its inputs are IMPORTED from the Orders list, never re-derived.
 // T11's own law is "the same computed actions the Orders list shows, so the two
@@ -1229,6 +1230,16 @@ function DeliveryDetail({
           photoUploaded={Array.isArray(photos) && photos.length > 0}
         />
       </div>
+
+      {/* §4 HANDOVER CHAIN (card 2026-08-19) — the acts live HERE, on the work
+          surface; the DO object page shows the same facts read-only. The block
+          renders only once a document exists: no DO, no handover. */}
+      {o.do_number && (
+        <WarehouseHandoverBlock
+          doNumber={o.do_number}
+          logisticsName={row.logisticsName ?? null}
+        />
+      )}
 
       {/* T8 — what this trip carries, and what is still owed. */}
       {allGroups.length > 0 && (

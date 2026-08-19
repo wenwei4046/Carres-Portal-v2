@@ -536,6 +536,15 @@ table are one-to-one, so a queue and a row can never spell one action two ways.
 | `Delay planning` | `Delay planning` | `Record the delay decision` | — (none: the row leaves by itself, and `Arrange new delivery date` says what happened) | `No supplier date lands after a promised date.` |
 | `Arrange new delivery date` | `Call {logistics} — arrange new delivery date` | `Record new date` | `New date recorded` | `No delayed order needs a new date.` |
 | `Collect RM {amount}` | `Collect RM {amount} from {customer}` | `Record payment` | `Payment recorded` | `Nothing outstanding.` |
+| — *(no queue: the §4 chain lives on the Delivery page's detail, one next act at a time)* | — *(same)* | `Mark ready for handover` | `Ready for handover recorded` | — *(the block renders only once a DO exists — no DO, no handover, no empty queue)* |
+| — *(same)* | — *(same)* | `Record handover` | `Handed over to {logistics}` | — *(same)* |
+| — *(same)* | — *(same)* | `Confirm logistics receipt` | `Received by logistics — out for delivery` | — *(same)* |
+
+**The handover chain's FACT words** (delivery MASTER §4, slice 1 shipped 2026-08-19): on screen a
+recorded fact reads `Ready for handover` · `Handed over` · `Received by logistics`, sentence case,
+with its recorder, duty word (`Warehouse` / `Logistics`), company and date. The receipt form's
+instruction sentence is `Logistics' own count — correct any quantity that differs; both counts
+stay on record.` — a discrepancy keeps both facts and overwrites neither.
 
 **PURCHASING** (docs/purchasing/MASTER.md):
 
@@ -1738,7 +1747,7 @@ others. The status set is the document's own lifecycle — registered here and i
 |---|---|---|
 | The sidebar door / register | **Delivery Orders** | DOs · Deliveries · Dispatch |
 | A fresh document, no run yet | **Created** | New · Open · Pending |
-| Goods on the vehicle (awaiting the handover fact — registered, not yet derivable) | **Out for delivery** | In transit · Dispatched · On the way |
+| Goods received by logistics, not yet resulted (derived from the §4 chain's `Received by logistics` fact, 0363 — never from the calendar) | **Out for delivery** | In transit · Dispatched · On the way |
 | The trip completed | **Delivered** | Done · Complete · Closed |
 | The trip did not complete | **Delivery exception** + its ONE reason from the T4 Reason Library | Failed · Problem · a second word list |
 | A voided document | **Cancelled** + `Order cancelled` / `Rescheduled` | Deleted · Void · Removed |

@@ -1870,7 +1870,18 @@ export {
   type DeliveryOrderStatusKind,
   type DeliveryOrderStatusInput,
   type DeliveryOrderAttemptFact,
+  type DeliveryHandoverKind,
 } from "./delivery-order-status";
+// The §4 handover chain door inputs (0363) — one schema for Worker and web.
+export {
+  DELIVERY_HANDOVER_KINDS,
+  handoverGoodsLineSchema,
+  recordHandoverInput,
+  signHandoverProofUploadInput,
+  type HandoverGoodsLine,
+  type RecordHandoverInput,
+  type SignHandoverProofUploadInput,
+} from "./schemas/delivery-handover";
 export {
   isWorkingDay,
   addWorkingDays,

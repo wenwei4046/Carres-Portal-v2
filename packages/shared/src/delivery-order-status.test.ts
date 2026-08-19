@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   DELIVERY_ORDER_STATUS_LABEL,
   deliveryOrderStatusOf,
+  type DeliveryHandoverKind,
 } from "./delivery-order-status";
 
 const attempt = (
@@ -10,9 +11,16 @@ const attempt = (
   recordedAt: string,
 ) => ({ result, reasonKey, recordedAt });
 
+const events = (...kinds: DeliveryHandoverKind[]) => kinds.map((kind) => ({ kind }));
+
 describe("deliveryOrderStatusOf — ONE arithmetic for the document status", () => {
   it("a fresh document with no attempts is Created", () => {
-    const s = deliveryOrderStatusOf({ voidedAt: null, voidReason: null, attempts: [] });
+    const s = deliveryOrderStatusOf({
+      voidedAt: null,
+      voidReason: null,
+      attempts: [],
+      handoverEvents: [],
+    });
     expect(s.kind).toBe("created");
     expect(s.label).toBe("Created");
     expect(s.reasonLabel).toBeNull();
@@ -23,6 +31,7 @@ describe("deliveryOrderStatusOf — ONE arithmetic for the document status", () 
       voidedAt: null,
       voidReason: null,
       attempts: [attempt("delivered", null, "2026-08-18T02:00:00Z")],
+      handoverEvents: [],
     });
     expect(s.kind).toBe("delivered");
     expect(s.label).toBe("Delivered");
@@ -33,6 +42,7 @@ describe("deliveryOrderStatusOf — ONE arithmetic for the document status", () 
       voidedAt: null,
       voidReason: null,
       attempts: [attempt("failed", "customer_unreachable", "2026-08-18T02:00:00Z")],
+      handoverEvents: [],
     });
     expect(s.kind).toBe("exception");
     expect(s.label).toBe("Delivery exception");
@@ -44,6 +54,7 @@ describe("deliveryOrderStatusOf — ONE arithmetic for the document status", () 
       voidedAt: null,
       voidReason: null,
       attempts: [attempt("partial", "goods_damaged", "2026-08-18T02:00:00Z")],
+      handoverEvents: [],
     });
     expect(s.kind).toBe("exception");
     expect(s.reasonLabel).toBe("Goods damaged");
@@ -59,6 +70,7 @@ describe("deliveryOrderStatusOf — ONE arithmetic for the document status", () 
         attempt("failed", "vehicle_breakdown", "2026-08-17T02:00:00Z"),
         attempt("delivered", null, "2026-08-18T05:00:00Z"),
       ],
+      handoverEvents: [],
     });
     expect(s.kind).toBe("delivered");
   });
@@ -72,6 +84,7 @@ describe("deliveryOrderStatusOf — ONE arithmetic for the document status", () 
       voidedAt: null,
       voidReason: null,
       attempts: [attempt("failed", "delivery_failed", "2026-08-17T02:00:00Z")],
+      handoverEvents: [],
     });
     expect(failedTrip.kind).toBe("exception");
     expect(failedTrip.reasonLabel).toBe("Delivery failed");
@@ -82,6 +95,7 @@ describe("deliveryOrderStatusOf — ONE arithmetic for the document status", () 
       voidedAt: "2026-08-18T03:00:00Z",
       voidReason: "order_cancelled",
       attempts: [],
+      handoverEvents: [],
     });
     expect(cancelled.kind).toBe("cancelled");
     expect(cancelled.label).toBe("Cancelled");
@@ -91,22 +105,75 @@ describe("deliveryOrderStatusOf — ONE arithmetic for the document status", () 
       voidedAt: "2026-08-18T03:00:00Z",
       voidReason: "rescheduled",
       attempts: [attempt("failed", "customer_unreachable", "2026-08-17T02:00:00Z")],
+      handoverEvents: [],
     });
     expect(rescheduled.kind).toBe("cancelled");
     expect(rescheduled.reasonLabel).toBe("Rescheduled");
   });
 
-  it("Out for delivery is registered vocabulary but never derived — no handover fact exists to prove it", () => {
-    // The canvas's own boundary rule ("no `In transit` is invented"): the word
-    // is in the dictionary for the day the handover fact arrives; deriving it
-    // from the calendar would claim a departure nobody recorded (§2.5).
-    expect(DELIVERY_ORDER_STATUS_LABEL.out_for_delivery).toBe("Out for delivery");
-    const onTheDay = deliveryOrderStatusOf({
+  // ── the §4 chain (0363) — the card's own assertions, verbatim ─────────────
+
+  it("Ready for Handover alone does NOT derive Out for delivery", () => {
+    const s = deliveryOrderStatusOf({
       voidedAt: null,
       voidReason: null,
       attempts: [],
+      handoverEvents: events("ready_for_handover"),
     });
-    expect(onTheDay.kind).toBe("created");
+    expect(s.kind).toBe("created");
+  });
+
+  it("Handed Over alone does NOT derive Out for delivery — handover is not receipt", () => {
+    const s = deliveryOrderStatusOf({
+      voidedAt: null,
+      voidReason: null,
+      attempts: [],
+      handoverEvents: events("ready_for_handover", "handed_over"),
+    });
+    expect(s.kind).toBe("created");
+  });
+
+  it("only Received by Logistics derives Out for delivery", () => {
+    const s = deliveryOrderStatusOf({
+      voidedAt: null,
+      voidReason: null,
+      attempts: [],
+      handoverEvents: events("ready_for_handover", "handed_over", "received_by_logistics"),
+    });
+    expect(s.kind).toBe("out_for_delivery");
+    expect(s.label).toBe("Out for delivery");
+    expect(s.reasonLabel).toBeNull();
+  });
+
+  it("a recorded Delivery Result outranks the handover derivation — Delivered wins", () => {
+    const s = deliveryOrderStatusOf({
+      voidedAt: null,
+      voidReason: null,
+      attempts: [attempt("delivered", null, "2026-08-19T05:00:00Z")],
+      handoverEvents: events("ready_for_handover", "handed_over", "received_by_logistics"),
+    });
+    expect(s.kind).toBe("delivered");
+  });
+
+  it("a recorded exception outranks the handover derivation — the exception stays", () => {
+    const s = deliveryOrderStatusOf({
+      voidedAt: null,
+      voidReason: null,
+      attempts: [attempt("failed", "customer_unreachable", "2026-08-19T05:00:00Z")],
+      handoverEvents: events("ready_for_handover", "handed_over", "received_by_logistics"),
+    });
+    expect(s.kind).toBe("exception");
+    expect(s.reasonLabel).toBe("Customer unreachable");
+  });
+
+  it("a voided document is Cancelled even when its goods were received — the void stamp wins", () => {
+    const s = deliveryOrderStatusOf({
+      voidedAt: "2026-08-19T06:00:00Z",
+      voidReason: "order_cancelled",
+      attempts: [],
+      handoverEvents: events("ready_for_handover", "handed_over", "received_by_logistics"),
+    });
+    expect(s.kind).toBe("cancelled");
   });
 
   it("no internal enum reaches a screen — every kind has a dictionary label", () => {
