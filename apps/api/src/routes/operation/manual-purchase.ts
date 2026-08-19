@@ -1,8 +1,9 @@
 import { Hono, type Context } from "hono";
 import { z } from "zod";
-import { DEMAND_PURPOSE_VALUES, isOpsManager } from "@carres/shared";
+import { DEMAND_PURPOSE_VALUES, expectedArrivalOf, isOpsManager } from "@carres/shared";
 import { requireOperation } from "../../lib/auth-guards";
 import { myDuties } from "../../lib/duties";
+import { loadPurchasingSettings } from "../../lib/purchasing-settings";
 import { mapPgError } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
@@ -42,6 +43,42 @@ async function canApprove(c: Context<AppEnv>): Promise<boolean> {
   return isOpsManager(role, email, await myDuties(c));
 }
 
+/**
+ * `Arrived` IS NOT A BUTTON (the Observation Law, card §5): the system reads
+ * the linked PO's posted receipt. A demand line is `received` when the PO
+ * line it became is received in full — matched by its own `demand_id` link
+ * (0361), with a `(po_id, sku)` fallback for lines issued before the link
+ * existed.
+ */
+async function stampReceived(
+  sb: ReturnType<typeof userClient>,
+  lines: Array<Record<string, unknown>>,
+): Promise<Array<Record<string, unknown>>> {
+  const issued = lines.filter((l) => l.po_id != null);
+  if (issued.length === 0) return lines;
+  const poIds = [...new Set(issued.map((l) => l.po_id as string))];
+  const { data: poLines } = await sb
+    .from("purchase_order_lines")
+    .select("po_id, sku, qty, received_qty, demand_id")
+    .in("po_id", poIds);
+  const byDemand = new Map<string, boolean>();
+  const byPoSku = new Map<string, boolean>();
+  for (const pl of poLines ?? []) {
+    const full = Number(pl.received_qty ?? 0) >= Number(pl.qty ?? 0) && Number(pl.qty ?? 0) > 0;
+    if (pl.demand_id) byDemand.set(pl.demand_id as string, full);
+    byPoSku.set(`${pl.po_id}|${pl.sku}`, full);
+  }
+  return lines.map((l) => ({
+    ...l,
+    received:
+      l.po_id == null
+        ? false
+        : (byDemand.get(l.id as string) ??
+          byPoSku.get(`${l.po_id}|${l.sku}`) ??
+          false),
+  }));
+}
+
 manualPurchaseRouter.get("/", requireOperation, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
 
@@ -73,14 +110,14 @@ manualPurchaseRouter.get("/", requireOperation, async (c) => {
       const m = mapPgError(res.error);
       return c.json(m.body, m.status);
     }
-    lines = res.data ?? [];
+    lines = await stampReceived(sb, res.data ?? []);
   }
 
   // Names for the columns — read through the owners' tables, never stored
   // twice (Law B: a summary is read-only).
   const [dests, sups, users] = await Promise.all([
     sb.from("purchasing_destinations").select("id, name"),
-    sb.from("suppliers").select("id, name"),
+    sb.from("suppliers").select("id, name, kind"),
     sb.from("app_users").select("id, name"),
   ]);
   for (const r of [dests, sups, users]) {
@@ -135,6 +172,7 @@ manualPurchaseRouter.get("/detail/:id", requireOperation, async (c) => {
     return c.json(m.body, m.status);
   }
 
+  const stamped = await stampReceived(sb, lines ?? []);
   const approver = await canApprove(c);
   let costs: Record<string, number | null> = {};
   if (approver && (lines ?? []).length > 0) {
@@ -149,13 +187,13 @@ manualPurchaseRouter.get("/detail/:id", requireOperation, async (c) => {
 
   const [dests, sups, users] = await Promise.all([
     sb.from("purchasing_destinations").select("id, name"),
-    sb.from("suppliers").select("id, name"),
+    sb.from("suppliers").select("id, name, kind"),
     sb.from("app_users").select("id, name"),
   ]);
 
   return c.json({
     request,
-    lines: (lines ?? []).map((l) => ({
+    lines: stamped.map((l) => ({
       ...l,
       // The approver's money — absent entirely for everyone else, so the
       // same screen renders minus the money, never a permission error.
@@ -287,6 +325,212 @@ manualPurchaseRouter.post("/:id/lines", requireOperation, async (c) => {
     return c.json(m.body, m.status);
   }
   return c.json(data);
+});
+
+const issueBody = z.object({
+  requestIds: z.array(z.string().uuid()).min(1).max(20),
+  /** The consolidation OFFER's answer. Declinable by design (card §6):
+   *  `false` issues one document per request. */
+  together: z.boolean(),
+  /** supplierId → delivery partner, required only for factory-pickup
+   *  suppliers; the RPC re-validates. */
+  partners: z.record(z.string().uuid(), z.string().uuid()).nullish(),
+});
+
+/**
+ * ISSUE — approved requests become purchase orders, THE SAME DAY (card §6:
+ * no PO-day gate anywhere on this lane; consolidation windows buy nothing
+ * from a furniture factory). Everything goes through the ONE creation
+ * authority `purchasing_issue_pos_batch` (0339); 0361 taught its payload the
+ * `purpose` and the per-line `demand_id`, and the issue is recorded on the
+ * demand inside the same transaction.
+ *
+ * Grouping: a document never mixes suppliers, categories, destinations or
+ * purposes — `together` merges across REQUESTS within those walls; declined,
+ * each request keeps its own documents. The server recomputes everything
+ * from its own read; a stale tab cannot issue yesterday's quantities.
+ */
+manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+
+  let raw: unknown;
+  try {
+    raw = await c.req.json();
+  } catch {
+    return c.json({ error: "invalid_json" }, 400);
+  }
+  const parsed = issueBody.safeParse(raw);
+  if (!parsed.success) {
+    return c.json({ error: "invalid_body", code: "invalid_param" }, 400);
+  }
+  const { requestIds, together, partners } = parsed.data;
+
+  const { data: requests, error: reqErr } = await sb
+    .from("purchase_requests")
+    .select("*")
+    .in("id", requestIds);
+  if (reqErr) {
+    const m = mapPgError(reqErr);
+    return c.json(m.body, m.status);
+  }
+  if ((requests ?? []).length !== requestIds.length) {
+    return c.json({ error: "unknown_request", code: "unknown_request" }, 404);
+  }
+  for (const r of requests ?? []) {
+    const ready = r.refused_at === null && (!r.approval_required || r.approved_at !== null);
+    if (!ready) {
+      return c.json(
+        { error: "not_ready_to_order", code: "not_ready_to_order", requestId: r.id },
+        409,
+      );
+    }
+  }
+
+  const { data: allLines, error: lineErr } = await sb
+    .from("purchase_demands")
+    .select("id, request_id, sku, supplier_id, qty, approved_qty, issued_qty, cancelled_at")
+    .in("request_id", requestIds);
+  if (lineErr) {
+    const m = mapPgError(lineErr);
+    return c.json(m.body, m.status);
+  }
+
+  // What is still to buy on each line: the approver's number less what was
+  // already issued — never the original ask (card §4's arithmetic, reused).
+  const toIssue = (allLines ?? [])
+    .filter((l) => l.cancelled_at === null)
+    .map((l) => ({
+      ...l,
+      issueQty: Math.max(
+        0,
+        Number(l.approved_qty ?? l.qty) - Number(l.issued_qty ?? 0),
+      ),
+    }))
+    .filter((l) => l.issueQty > 0);
+  if (toIssue.length === 0) {
+    return c.json({ error: "nothing_to_issue", code: "nothing_to_issue" }, 409);
+  }
+
+  // The catalog facts: supplier truth, cost, category (for the ETA).
+  const skus = [...new Set(toIssue.map((l) => l.sku as string))];
+  const { data: catRows, error: catErr } = await sb
+    .from("product_skus")
+    .select("sku, supplier_id, cost, product_models!inner(category)")
+    .in("sku", skus);
+  if (catErr) {
+    const m = mapPgError(catErr);
+    return c.json(m.body, m.status);
+  }
+  const catalog = new Map(
+    (catRows ?? []).map((r) => [
+      r.sku as string,
+      {
+        supplierId: r.supplier_id as string | null,
+        cost: r.cost as number | null,
+        category: (r.product_models as unknown as { category: string }).category,
+      },
+    ]),
+  );
+
+  const { data: supRows } = await sb.from("suppliers").select("id, kind");
+  const supplierKind = new Map((supRows ?? []).map((s) => [s.id as string, s.kind as string]));
+
+  const { data: whRows, error: whErr } = await sb
+    .from("warehouses")
+    .select("id, name, kind")
+    .eq("kind", "own");
+  if (whErr) {
+    const m = mapPgError(whErr);
+    return c.json(m.body, m.status);
+  }
+  const warehouse =
+    (whRows ?? []).find((w) => /klang|klg/i.test((w.name as string) ?? "")) ??
+    (whRows ?? [])[0];
+  if (!warehouse) return c.json({ error: "no_warehouse", code: "no_warehouse" }, 500);
+
+  let settings;
+  try {
+    settings = await loadPurchasingSettings(sb);
+  } catch (e) {
+    return c.json({ error: "settings_unavailable", message: (e as Error).message }, 500);
+  }
+
+  const reqById = new Map((requests ?? []).map((r) => [r.id as string, r]));
+
+  // A document never mixes suppliers, categories, destinations or purposes.
+  // `together` widens the group across requests inside those walls.
+  const groups = new Map<string, typeof toIssue>();
+  for (const l of toIssue) {
+    const cat = catalog.get(l.sku as string);
+    if (!cat || !cat.supplierId) {
+      return c.json(
+        { error: "unresolved_supplier", code: "unresolved_supplier", sku: l.sku },
+        422,
+      );
+    }
+    if (cat.cost == null || cat.cost <= 0) {
+      // The manual lane issues at catalog cost; a SKU without one is a
+      // configuration hole the catalog must fix — surfaced by name.
+      return c.json({ error: "cost_required", code: "cost_required", sku: l.sku }, 422);
+    }
+    const req = reqById.get(l.request_id as string)!;
+    const wall = `${cat.supplierId}|${cat.category}|${req.destination_id}|${req.purpose}`;
+    const key = together ? wall : `${l.request_id}|${wall}`;
+    groups.set(key, [...(groups.get(key) ?? []), l]);
+  }
+
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const governedPos: Record<string, unknown>[] = [];
+  for (const [, lines] of groups) {
+    const first = catalog.get(lines[0].sku as string)!;
+    const req = reqById.get(lines[0].request_id as string)!;
+    const kind = supplierKind.get(first.supplierId!) ?? null;
+    const partnerId = partners?.[first.supplierId!] ?? null;
+    if (kind === "factory_pickup" && !partnerId) {
+      return c.json(
+        {
+          error: "pickup_partner_required",
+          code: "pickup_partner_required",
+          supplierId: first.supplierId,
+        },
+        422,
+      );
+    }
+    governedPos.push({
+      supplier_id: first.supplierId,
+      warehouse_id: warehouse.id as string,
+      destination_id: req.destination_id,
+      // The frozen ETA arithmetic, called not copied — no PO-day gate ever
+      // touches this lane.
+      eta_date: expectedArrivalOf(settings, {
+        supplierId: first.supplierId!,
+        category: first.category,
+        fromIso: todayIso,
+      }),
+      procurement_partner_id: kind === "factory_pickup" ? partnerId : null,
+      so_refs: null,
+      purpose: req.purpose,
+      lines: lines.map((l) => ({
+        sku: l.sku,
+        qty: l.issueQty,
+        cost: catalog.get(l.sku as string)!.cost,
+        cost_source: "catalog",
+        commercial_treatment: "normal",
+        commercial_reason: null,
+        demand_id: l.id,
+      })),
+    });
+  }
+
+  const { data: batch, error: batchErr } = await sb.rpc("purchasing_issue_pos_batch", {
+    p_pos: governedPos,
+  });
+  if (batchErr) {
+    const m = mapPgError(batchErr);
+    return c.json(m.body, m.status);
+  }
+  const poIds = ((batch as { po_ids?: unknown } | null)?.po_ids ?? []) as string[];
+  return c.json({ poIds, documents: governedPos.length });
 });
 
 manualPurchaseRouter.get("/already-have", requireOperation, async (c) => {

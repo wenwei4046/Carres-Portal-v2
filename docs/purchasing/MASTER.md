@@ -442,12 +442,17 @@ It cannot tell you about a button you have not imagined. **Read the file.**
 Review, consolidate and issue purchase orders for **demand the engine generated from
 customer orders**. Purchase Orders MANAGES the documents once they exist.
 
-> **APPROVED, NOT YET BUILT (Jess, 2026-08-07):** this tab becomes **`SO Batch Purchase`**,
-> and the hand-typed purposes (Ready Stock · Display · Office · Warranty · Spare Parts)
-> leave it for their own tab, **`Manual Purchase`** — with a FULL-PAGE create workspace,
-> never the 600px dialog. **Both lanes issue their own POs** (§1). `+ Create Purchase`
-> leaves this rail with them. Everything below describes the single `To Order` tab as it
-> stands today.
+> **THE SPLIT SHIPPED (Jess 2026-08-07, executed 2026-08-19 —
+> CARD-2026-08-18-manual-purchase):** the hand-typed purposes (Ready Stock · Display ·
+> Office · Warranty · Spare Parts) LEFT this grid for their own page, **`Manual
+> Purchase`** — a FULL-PAGE create workspace (the 600px dialog is retired), a request
+> register (`REQ-` series), a manager approval (0359/0360), and its own same-day Issue
+> through the ONE authority (0361 taught `purchasing_issue_pos_batch` the `purpose` and
+> the per-line `demand_id`). **Both lanes issue their own POs and a PO says which lane
+> bore it.** `+ Create Purchase` left this rail with them; this grid now answers ONE
+> question — what have customers ordered that we still have to buy. The rename to
+> **`SO Batch Purchase`** rides the rail (shipped with the sidebar card); this page's
+> own grid rebuild is `CARD-2026-08-18-so-batch-purchase.md`.
 
 > ### ⭐ THE GRID BECOMES A HIERARCHY, AND SOFA GROUPS DIFFERENTLY (Jess, 2026-08-18)
 > **APPROVED, NOT YET BUILT.** Today's grid is FLAT — one row per SO line. Four customers
@@ -508,7 +513,15 @@ customer orders**. Purchase Orders MANAGES the documents once they exist.
 > **The buyer picks WHAT to buy; the system decides how it splits.**
 
 > ### ⭐ MANUAL PURCHASE — THE REQUEST, THE APPROVAL, THE ORDER (Jess, 2026-08-18)
-> **APPROVED, NOT YET BUILT.** 2990s has nothing to copy here: its manual entrance is a BLANK
+> **SHIPPED 2026-08-19 (CARD-2026-08-18-manual-purchase, three slices — PRs #848/#849 +
+> the issue slice; migrations 0359/0360/0361).** Built exactly as ruled below, with the
+> execution facts recorded in the card: the request header (`purchase_requests`, REQ-
+> series, `why` door-enforced), the per-purpose approval switches
+> (`purchasing_purpose_approval`, default ON, no amounts), one decide door
+> (`purchasing_decide_request` — the Settings manager gate; refusal's reason required in
+> SQL; cuts per line), approver-only money, and same-day Issue through the one authority
+> with the consolidation OFFER declinable on the same screen. `Arrived` derives from the
+> linked PO's posted receipt — no button anywhere. 2990s had nothing to copy here: its manual entrance is a BLANK
 > New PO (`PurchaseOrderNew.tsx`), which this module already rejects — a PO with no demand
 > behind it has no reason on the record. The pattern is the Purchase Requisition every mature
 > ERP carries (SAP `ME57` / `ME59N`, Dynamics' purchase requisitions, Oracle's AutoCreate).

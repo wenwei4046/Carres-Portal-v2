@@ -447,111 +447,16 @@ async function loadToOrder(
   }
 
   /**
-   * READY STOCK — demand a human typed (Jess, 2026-08-03).
+   * TYPED DEMAND LEFT THIS GRID (CARD-2026-08-18-manual-purchase §1,
+   * executed with the issue slice so nothing was ever unissuable).
    *
-   * It joins the customer requirements as ordinary `ToOrderLine`s, which is
-   * the whole ruling: *"ONE unified demand table. Customer Orders flow in,
-   * Create Purchase flows in, ONE engine eats it, no second pipeline ever."*
-   * So the order-by date, the supplier×category grouping and Issue all work on
-   * it without knowing it came from a person rather than a customer.
-   *
-   * Its `orderId` is `demand:<uuid>` so it groups alone on the grid — a ready
-   * stock buy has no customer to sit under — and so the issue path can map a
-   * created purchase order back to the row that asked for it.
-   *
-   * OPEN MEANS "STILL SOMETHING TO BUY", AND THAT IS THE REMAINDER — not the
-   * absence of a purchase order link (0320, Loo's 2026-08-04 ruling). A demand
-   * for 5 whose ready stock covered 2 is a demand for 3 and must still be here;
-   * reading `po_id is null` would have shown it as 5 or as nothing at all.
-   * `remaining_qty` is generated in the database, so this number and the
-   * counter behind it cannot disagree.
+   * 0319's "ONE unified demand table" ruling still holds for the STORE —
+   * both lanes keep their demand in `purchase_demands` — but the 2026-08-18
+   * ruling split the SURFACES: this grid answers ONE question, *what have
+   * customers ordered that we still have to buy*, and the Manual Purchase
+   * page answers the other. Two lanes, two Issue buttons, and a PO that can
+   * always say which lane bore it (0361's `purpose` + `demand_id`).
    */
-  {
-    const { data: demandRows, error: demandErr } = await sb
-      .from("purchase_demands")
-      .select(
-        "id, purpose, sku, supplier_id, destination_id, qty, issued_qty, remaining_qty, required_by, remark",
-      )
-      .gt("remaining_qty", 0)
-      .is("cancelled_at", null);
-    /**
-     * THIS READ MAY NEVER TAKE THE PAGE DOWN.
-     *
-     * To Order's job is turning CUSTOMER orders into purchase orders, and it
-     * did that for months before typed demand existed. If `purchase_demands` is
-     * absent — the window between deploying this code and applying 0319/0320,
-     * a rebuilt environment, a half-applied migration — the FEATURE is
-     * unavailable and the workspace is untouched. Returning an error here would
-     * 500 the whole page over an optional read, which is a far worse failure
-     * than the one it would be reporting.
-     *
-     * Fail CLOSED, not open: nothing is invented, the typed-demand list is
-     * simply empty, and the WRITE door still answers a real, named error to
-     * anyone who tries to create one — so the state is discoverable rather
-     * than silent.
-     */
-    if (demandErr) {
-      console.error("purchase_demands unavailable — typed demand omitted", demandErr.message);
-    }
-    const destName = new Map<string, string>();
-    if (!demandErr && (demandRows ?? []).length > 0) {
-      const { data: destRows } = await sb
-        .from("purchasing_destinations")
-        .select("id, name");
-      for (const d of destRows ?? []) destName.set(d.id as string, (d.name as string) ?? "");
-    }
-    for (const d of (demandErr ? [] : (demandRows ?? [])) as Record<string, unknown>[]) {
-      const c = cat.get(d.sku as string);
-      const category = c?.category;
-      const supplierId = (d.supplier_id as string | null) ?? c?.supplierId ?? null;
-      // A demand whose SKU left the catalog, or whose pair has no production
-      // time, is held out exactly as a customer line would be — never planned
-      // on a guessed number.
-      if (!category || !isToOrderCategory(category) || !supplierId) continue;
-      const leadDays = productionWorkingDaysFor(
-        settings,
-        supplierId,
-        category as ProductCategory,
-      );
-      if (leadDays == null) {
-        const k = `${supplierId}::${category}`;
-        if (!seenMissing.has(k)) {
-          seenMissing.add(k);
-          missingProductionDays.push({ supplierId, category });
-        }
-        continue;
-      }
-      const id = d.id as string;
-      demand.push({
-        lineId: `demand:${id}`,
-        orderId: `demand:${id}`,
-        sku: d.sku as string,
-        category: category as ProductCategory,
-        supplierId,
-        // What is LEFT to buy, never what was originally asked for. The row is
-        // only in this list because that number is above zero.
-        qty: Number(d.remaining_qty ?? 0),
-        deadline: (d.required_by as string | null) ?? null,
-        leadDays,
-        offDays: workWeekOffDaysFor(settings, supplierId),
-        placedAt: todayIso(),
-        committed: true,
-        so: null,
-        customerName: null,
-        modelName: c?.modelName ?? null,
-        variant: c?.variant ?? null,
-        variantKind: c?.variantKind ?? null,
-        buildKey: null,
-        fabricName: null,
-        legHeight: null,
-        itemHeight: null,
-        cost: c?.cost ?? null,
-        readyStock: true,
-        destinationName: destName.get(d.destination_id as string) ?? null,
-      });
-      issuedByLine.set(`demand:${id}`, Number(d.issued_qty ?? 0));
-    }
-  }
 
   // Supply: what open POs already cover. A line already on a PO has left this
   // workspace, so it must never appear as something still to buy.

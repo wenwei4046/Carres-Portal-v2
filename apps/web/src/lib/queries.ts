@@ -4164,13 +4164,16 @@ export interface PurchaseRequestLineRow {
   po_id: string | null;
   cancelled_at: string | null;
   cancel_reason: string | null;
+  /** Derived by the server from the linked PO's posted receipt (the
+   *  Observation Law) — never a button anywhere. */
+  received?: boolean;
 }
 
 export interface ManualPurchaseRegisterPayload {
   requests: PurchaseRequestRow[];
   lines: PurchaseRequestLineRow[];
   destinations: Array<{ id: string; name: string }>;
-  suppliers: Array<{ id: string; name: string }>;
+  suppliers: Array<{ id: string; name: string; kind?: string | null }>;
   users: Array<{ id: string; name: string | null }>;
   /** The Settings manager gate — decides what RENDERS (money, Approve). */
   canApprove: boolean;
@@ -4182,7 +4185,7 @@ export interface ManualPurchaseDetailPayload {
    *  for both roles, minus the money, never a permission error. */
   lines: Array<PurchaseRequestLineRow & { unit_cost?: number | null }>;
   destinations: Array<{ id: string; name: string }>;
-  suppliers: Array<{ id: string; name: string }>;
+  suppliers: Array<{ id: string; name: string; kind?: string | null }>;
   users: Array<{ id: string; name: string | null }>;
   canApprove: boolean;
 }
@@ -4196,6 +4199,23 @@ export function useManualPurchaseDetail(id: string | null) {
       ),
     enabled: !!id,
     staleTime: 15_000,
+  });
+}
+
+export function useIssuePurchaseRequests() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: {
+      requestIds: string[];
+      together: boolean;
+      partners?: Record<string, string> | null;
+    }) =>
+      apiFetch<{ poIds: string[]; documents: number }>(
+        "/api/operation/purchasing/requests/issue",
+        { method: "POST", body: JSON.stringify(input) },
+      ),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ["operation", "purchasing", "requests"] }),
   });
 }
 
