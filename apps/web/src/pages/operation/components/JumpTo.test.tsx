@@ -131,10 +131,13 @@ describe("the empty query", () => {
 });
 
 describe("what typing searches", () => {
-  it("matches a governed destination NAME", () => {
+  it("matches governed destination NAMES — the pages, never an unbuilt door", () => {
+    // The Purchasing parent row died with the 2026-08-19 heading correction;
+    // the PAGES are the destinations now. `Purchase Returns` is `Coming soon`
+    // and a door the rail refuses to open may not be offered here.
     expect(
       matchDestinations(permittedDestinations("operation"), "purch").map((d) => d.label),
-    ).toEqual(["Purchasing"]);
+    ).toEqual(["Purchase Orders", "SO Batch Purchase", "Manual Purchase"]);
   });
 
   it("a document result prints its number, its type and the identifying party", async () => {

@@ -13,17 +13,18 @@ import {
 import {
   visibleGroups,
   visibleItems,
-  visibleChildren,
   navItemHref,
   areaDefaultHref,
   type PortalArea,
-  type PortalNavChild,
   type PortalNavGroup,
   type PortalNavItem,
 } from "./portal-nav";
 
 const COLLAPSE_KEY = "ops-sidebar-collapsed";
-const SECTION_ORDER = ["Workspace", "Sales", "Supply Chain", "Finance", "Customer Care", "Master Data", "Admin"];
+/** A module is a HEADING, never a parent row (Jess, 2026-08-19 — the SALES
+ *  template). Purchasing · Delivery · Stock replaced the umbrella word
+ *  `Supply Chain`, in the rail order the queue index draws. */
+const SECTION_ORDER = ["Workspace", "Sales", "Purchasing", "Delivery", "Stock", "Finance", "Customer Care", "Master Data", "Admin"];
 
 function orderedItems(group: PortalNavGroup, role: Parameters<typeof visibleItems>[1]) {
   return [...visibleItems(group, role)].sort(
@@ -207,111 +208,6 @@ export default function PortalSidebar() {
     return current === item.key;
   }
 
-  /**
-   * Is this CHILD PAGE the one on screen?
-   *
-   * Same two shapes the items use: a `path` page matches by pathname prefix, a
-   * tab page matches the `?tab=` value — and never while a path page of the
-   * same module is showing, or `Receiving` would light up next to
-   * `Purchase Orders`.
-   */
-  function isChildActive(
-    group: PortalNavGroup,
-    child: PortalNavChild,
-  ): boolean {
-    if (child.soon) return false; // it is not a page yet; it cannot be the page
-    if (child.path) return location.pathname.startsWith(child.path);
-    if (onPathSection(group)) return false;
-    return (searchTab ?? group.defaultTab) === (child.tab ?? child.key);
-  }
-
-  /**
-   * One page row under its module.
-   *
-   * A `soon` child is deliberately NOT A LINK. `docs/03-page-patterns.md:149`
-   * bans a control that opens nothing; there is no arrow here to be dead,
-   * because the row is a `<span>` with no href, out of the tab order and
-   * `aria-disabled`. `:219` of the same document requires a deliberately
-   * disabled control to say WHY on screen, and `Coming soon` on the row is
-   * that sentence (`docs/COPY-STANDARD.md` — the ONE word for a planned door,
-   * never `TBD`, never `Not available`, never a grey word with nothing beside
-   * it).
-   *
-   * It carries no count either, not even zero: a number would claim work
-   * exists on a page that does not.
-   *
-   * The 43px indent aligns a page word under its module word — 14px padding +
-   * an 18px icon + the 11px gap the parent row already uses.
-   */
-  function renderChild(
-    group: PortalNavGroup,
-    parent: PortalNavItem,
-    child: PortalNavChild,
-  ) {
-    const rule = child.dividerAbove ? (
-      <div key={`${child.key}-rule`} className="mx-3.5 my-1 border-t border-base-100" />
-    ) : null;
-
-    const row = "relative w-full text-left pl-[43px] pr-3.5 py-[7px] rounded text-meta flex items-center gap-2";
-
-    if (child.soon) {
-      // `Coming soon` sits on its OWN line, under the name. Measured on the
-      // production stylesheet (2026-08-19, 1440×900 and 1920): beside the 71px
-      // tag a name gets 71px of the row's 150px and every one of the seven
-      // unbuilt names needs 78–128px — all truncate, and the three Consignment
-      // entries truncate to the same string. The map exists so staff learn the
-      // NAMES; the name owns the line, the reason sits under it at the same
-      // indent, and every word is still on the row (`03-page-patterns.md:219`).
-      return (
-        <div key={child.key}>
-          {rule}
-          <span
-            data-testid={`nav-child-${child.key}`}
-            data-soon="1"
-            aria-disabled="true"
-            tabIndex={-1}
-            className="relative w-full text-left pl-[43px] pr-3.5 py-[7px] rounded text-meta flex flex-col items-start text-base-400 font-medium cursor-default select-none"
-          >
-            <span className="w-full truncate">{child.label}</span>
-            <span className="text-label text-base-400">Coming soon</span>
-          </span>
-        </div>
-      );
-    }
-
-    const active = isChildActive(group, child);
-    return (
-      <div key={child.key}>
-        {rule}
-        <Link
-          to={navItemHref(group, child)}
-          onClick={() => fireMarkSeen(child.badge)}
-          data-testid={`nav-child-${child.key}`}
-          ref={active ? (activeRowRef as Ref<HTMLAnchorElement>) : undefined}
-          className={
-            active
-              ? `${row} bg-kit-blue-3 text-base-900 font-semibold`
-              : `${row} text-base-600 font-medium hover:bg-hovertint`
-          }
-        >
-          {active && (
-            <span
-              className="absolute left-0 top-[6px] bottom-[6px] bg-kit-blue-9 rounded-r-sm"
-              style={{ width: 3 }}
-            />
-          )}
-          <span className="flex-1 truncate">{child.label}</span>
-          {child.badge && (
-            <NavBadge
-              count={badgeCount[child.badge] ?? 0}
-              label={`${parent.label} ${child.label}`}
-            />
-          )}
-        </Link>
-      </div>
-    );
-  }
-
   const roleLabel = role ? role.charAt(0).toUpperCase() + role.slice(1) : "";
   const homeHref = groups[0] ? areaDefaultHref(groups[0]) : "/";
   const activeGroup = groups.find((g) => g.area === activeArea) ?? groups[0];
@@ -364,7 +260,11 @@ export default function PortalSidebar() {
         {collapsed
           ? // Icon rail — the active area's items only (collapse = more room,
             // not area-switching; expand to jump areas).
-            (activeGroup ? orderedItems(activeGroup, role) : []).map((item) => {
+            (activeGroup ? orderedItems(activeGroup, role) : [])
+              // A collapsed rail is for table room: an unbuilt page is not a
+              // control and gets no icon; the server-gated door stays gated.
+              .filter((it) => !it.soon && (!it.managerOnly || canEditPurchasingSettings))
+              .map((item) => {
               const active = isItemActive(activeGroup, item);
               const dot =
                 (item.badge && (badgeCount[item.badge] ?? 0) > 0) ||
@@ -423,7 +323,14 @@ export default function PortalSidebar() {
 
                   {open && (
                     <div className="flex flex-col gap-0.5">
-                      {orderedItems(group, role).map((item, index, items) => {
+                      {orderedItems(group, role)
+                        .filter(
+                          // The Settings door is gated by the SERVER, not the
+                          // role — the rail asks the same RPC that guards the
+                          // seven engine numbers (sidebar card, unchanged).
+                          (it) => !it.managerOnly || canEditPurchasingSettings,
+                        )
+                        .map((item, index, items) => {
                         const active = isItemActive(group, item);
                         const baseCls =
                           "relative w-full text-left px-3.5 py-[9px] rounded text-body flex items-center gap-[11px]";
@@ -431,10 +338,40 @@ export default function PortalSidebar() {
                           ? `${baseCls} bg-kit-blue-3 text-base-900 font-semibold`
                           : `${baseCls} text-base-600 font-medium hover:bg-hovertint`;
                         const startsSection = item.section && item.section !== items[index - 1]?.section;
-                        const children =
-                          item.children && group.area === activeArea && active
-                            ? visibleChildren(item, { canEditPurchasingSettings })
-                            : [];
+                        const rule = item.dividerAbove ? (
+                          <div className="mx-3.5 my-1 border-t border-base-100" />
+                        ) : null;
+                        if (item.soon) {
+                          /* A `soon` page is NOT A CONTROL (sidebar card §2,
+                           * held unchanged by the 2026-08-19 corrections): a
+                           * span with no href, out of the tab order,
+                           * `aria-disabled`, the name owning line 1 and
+                           * `Coming soon` on line 2 (measured 2026-08-19 —
+                           * beside the tag every unbuilt name truncated). */
+                          return (
+                            <Fragment key={item.key}>
+                              {startsSection && (
+                                <div className="px-3.5 pb-1 pt-3 text-label font-semibold uppercase tracking-[0.14em] text-base-500">
+                                  {item.section}
+                                </div>
+                              )}
+                              {rule}
+                              <span
+                                data-testid={`nav-child-${item.key}`}
+                                data-soon="1"
+                                aria-disabled="true"
+                                tabIndex={-1}
+                                className="relative w-full text-left px-3.5 py-[7px] rounded text-meta flex flex-col items-start text-base-400 font-medium cursor-default select-none"
+                              >
+                                <span className="flex w-full items-center gap-[11px]">
+                                  <item.icon size={18} strokeWidth={2} className="shrink-0 text-base-300" />
+                                  <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                                </span>
+                                <span className="pl-[29px] text-label text-base-400">Coming soon</span>
+                              </span>
+                            </Fragment>
+                          );
+                        }
                         return (
                           <Fragment key={item.key}>
                           {startsSection && (
@@ -442,16 +379,14 @@ export default function PortalSidebar() {
                               {item.section}
                             </div>
                           )}
+                          {rule}
                           <div>
                             <Link
                               to={navItemHref(group, item)}
                               onClick={() => fireMarkSeen(item.badge)}
+                              data-testid={`nav-child-${item.key}`}
                               className={cls}
-                              ref={
-                                active && children.length === 0
-                                  ? (activeRowRef as Ref<HTMLAnchorElement>)
-                                  : undefined
-                              }
+                              ref={active ? (activeRowRef as Ref<HTMLAnchorElement>) : undefined}
                             >
                               {active && (
                                 <span
@@ -482,17 +417,6 @@ export default function PortalSidebar() {
                                 </span>
                               )}
                             </Link>
-
-                            {children.length > 0 && (
-                              <div
-                                data-testid={`nav-children-${item.key}`}
-                                className="flex flex-col gap-0.5 mt-0.5 mb-1"
-                              >
-                                {children.map((child) =>
-                                  renderChild(group, item, child),
-                                )}
-                              </div>
-                            )}
                           </div>
                           </Fragment>
                         );

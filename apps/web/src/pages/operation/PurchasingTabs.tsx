@@ -15,7 +15,7 @@ import ModuleHeader from "./components/ModuleHeader";
  * for three siblings and a bad home for eleven: it scrolls sideways, it cannot
  * show a count without shouting, and it cannot group. **The module's pages
  * moved to the SIDEBAR**, where the existing `Purchasing` rail item now expands
- * in place (`portal/portal-nav.ts` → `PortalNavChild`).
+ * in place, and since 2026-08-19 as a PURCHASING heading (`portal-nav.ts`).
  *
  * A second left column INSIDE the module was refused: the portal rail is
  * already 232px and a purchasing page already carries a 200px right rail, so a

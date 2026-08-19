@@ -57,6 +57,9 @@ vi.mock("./OperationPurchaseOrders", () => ({
 vi.mock("./OperationToOrder", () => ({
   default: () => <div data-testid="to-order-stub">to-order</div>,
 }));
+vi.mock("./OperationManualPurchase", () => ({
+  default: () => <div data-testid="manual-purchase-stub">manual-purchase</div>,
+}));
 // The right rail self-fetches (tasks/notes) — stub it; this suite tests routing.
 vi.mock("./components/OperationRightRail", () => ({
   default: () => <div data-testid="right-rail-stub">rail</div>,
@@ -183,5 +186,26 @@ describe("OperationApp — the Sales Order cutover's two doors", () => {
     renderApp("/operation/orders/so/new");
     expect(screen.getByTestId("workspace-stub")).toBeInTheDocument();
     expect(screen.queryByTestId("sales-orders-work-surface")).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * ONE HEADER ON MANUAL PURCHASE (corrections card §2, Jess 2026-08-19 on a
+ * production screenshot). The shell law: the shell draws the header and a page
+ * draws no second one. `?tab=manual-purchase` was missing from the
+ * GlobalTopBar suppression list, so production showed two bells both reading
+ * 54. The suppression is the fix; the page's own PurchasingTabs row is the ONE
+ * header.
+ */
+describe("OperationApp — one header on Manual Purchase", () => {
+  it("?tab=manual-purchase suppresses the global top bar like its siblings", () => {
+    renderApp("/operation?tab=manual-purchase");
+    expect(screen.getByTestId("manual-purchase-stub")).toBeInTheDocument();
+    expect(screen.queryByTestId("global-topbar-stub")).not.toBeInTheDocument();
+  });
+
+  it("the dashboard keeps its top bar — the suppression is per purchasing page", () => {
+    renderApp("/operation?tab=dashboard");
+    expect(screen.getByTestId("global-topbar-stub")).toBeInTheDocument();
   });
 });

@@ -69,45 +69,6 @@ export type PortalArea = "operation" | "finance" | "hr" | "principal";
 /** Operation badge keys surfaced as nav counters (reuses the 0083 unread set). */
 export type PortalBadge = "orders" | "procurement" | "service-notes";
 
-/**
- * A PAGE inside a module, listed under it in the rail (Jess, 2026-08-18).
- *
- * Purchasing is the first module to hold eleven pages, and a 44px tab strip is
- * a good home for three siblings and a bad home for eleven. The module's rail
- * item EXPANDS instead — one rail, not two, because a second left column would
- * spend ~430px of a 1440px screen on navigation before the first column of
- * data (232px rail + a module rail + the pages' own 200px right rail).
- *
- * `soon` is the whole reason all thirteen may be listed before seven exist.
- * Jess overruled the empty-shell rule on 2026-08-18: that rule
- * (`docs/03-page-patterns.md:149`) governs REGIONS INSIDE a page, and the rail
- * is the module's MAP — a map showing four of eleven roads teaches three
- * operators a shape that is about to change under them seven more times. The
- * same document grants the way (`:219`): *"a control that is deliberately
- * disabled must say why, on screen."* So a `soon` entry is NOT A CONTROL —
- * it renders as a plain span with no href, out of the tab order, printing
- * `Coming soon` on the row. There is no dead arrow because there is no arrow.
- */
-export interface PortalNavChild {
-  /** the `?tab=` value this page mounts at (or a placeholder key when `soon`). */
-  key: string;
-  label: string;
-  /** a path-driven page reached by pathname, not `?tab=`. */
-  path?: string;
-  /** the `?tab=` value when it differs from `key`. */
-  tab?: string;
-  /** nav unread counter. */
-  badge?: PortalBadge;
-  /** manager-gated at RUNTIME by the purchasing settings RPC, not by role. */
-  managerOnly?: true;
-  /** a hairline above this entry — Report/Settings are PORTAL pages, not the
-   *  module's own (`docs/ERP-ARCHITECTURE.md` §2.1). They are reached here for
-   *  convenience and the rule is what stops convenience reading as ownership. */
-  dividerAbove?: true;
-  /** APPROVED, NOT BUILT. Renders as a non-control saying `Coming soon`. */
-  soon?: true;
-}
-
 export interface PortalNavItem {
   /** routing key:
    *  - operation/principal → the `?tab=` value consumed by that shell
@@ -136,12 +97,28 @@ export interface PortalNavItem {
   /** optional per-item narrowing of the group's roles — the item shows only
    *  for these roles. */
   roles?: ReadonlyArray<Role>;
-  /** ERP Shell V1 responsibility heading within a real portal area. */
-  section?: "Workspace" | "Sales" | "Supply Chain" | "Finance" | "Customer Care" | "Master Data" | "Admin";
-  /** the module's PAGES, listed under it while this module is the active one.
-   *  Expanded rail only — a collapsed rail is for table room, not for
-   *  navigating thirteen pages by guessing thirteen icons. */
-  children?: ReadonlyArray<PortalNavChild>;
+  /** ERP Shell V1 responsibility heading within a real portal area. A module
+   *  is a HEADING, never a parent row (Jess, 2026-08-19 — the SALES template):
+   *  `Supply Chain` died with the Purchasing parent row; Delivery and Stock
+   *  each carry their own heading until they restructure. */
+  section?:
+    | "Workspace"
+    | "Sales"
+    | "Purchasing"
+    | "Delivery"
+    | "Stock"
+    | "Finance"
+    | "Customer Care"
+    | "Master Data"
+    | "Admin";
+  /** APPROVED, NOT BUILT (sidebar card §2). Renders as a NON-CONTROL saying
+   *  `Coming soon` on its own line — no href, out of the tab order. */
+  soon?: true;
+  /** a hairline above this entry — Report/Settings are PORTAL pages, not the
+   *  module's own (`docs/ERP-ARCHITECTURE.md` §2.1). */
+  dividerAbove?: true;
+  /** manager-gated at RUNTIME by the purchasing settings RPC, not by role. */
+  managerOnly?: true;
 }
 
 export interface PortalNavGroup {
@@ -219,84 +196,41 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         path: "/operation/old-orders",
         section: "Sales",
       },
-      // Purchasing (2026-07-21) — the THREE procurement rails (To Order / the
-      // Purchase Order register / Receiving) collapsed into ONE sidebar item.
-      // Its click target is the default tab, To Order (`?tab=purchase`); the
-      // shared PurchasingTabs bar at the top of each page switches between the
-      // three. `activeFor` keeps the item lit across all three routes.
-      // R2 (2026-07-27) added a FOURTH tab — Claims (what the supplier still
-      // owes us). Still no new sidebar item: the receiving & claim queue's own
-      // rule, and a claim is what a receiving produces.
+      /* PURCHASING IS A HEADING, NOT A PARENT ROW (Jess, 2026-08-19 —
+       * CARD-2026-08-19-purchasing-rail-corrections §1, ruled on a production
+       * screenshot). SALES is the template and it has TWO layers: a group
+       * heading, then the pages. The `Purchasing` parent row shipped by the
+       * sidebar card is deleted; its pages ARE the doors, at the same indent
+       * as `Sales Orders`.
+       *
+       * Everything else the sidebar card ruled HOLDS: the thirteen entries,
+       * their order and their words never reshuffle; `Coming soon` entries are
+       * non-controls; a count means work waiting and zero prints nothing;
+       * Settings is server-gated; Report/Settings sit below a hairline. An
+       * entry still goes live in ITS OWN page's PR by exactly two edits: drop
+       * `soon`, and the row becomes a link. */
+      { key: "purchase", label: "SO Batch Purchase", icon: ShoppingBag, section: "Purchasing" },
+      { key: "manual-purchase", label: "Manual Purchase", icon: ClipboardList, section: "Purchasing" },
       {
-        key: "purchasing",
-        label: "Purchasing",
-        // ShoppingBag = the MODULE's one face (sidebar + header nameplate,
-        // Loo 2026-08-02); ClipboardCheck stays the To Order TAB's icon —
-        // the two used to share one icon and read as the same thing.
-        icon: ShoppingBag,
-        tab: "purchase",
-        activeFor: [
-          "tab:purchase",
-          "tab:manual-purchase",
-          "tab:receiving",
-          "tab:claims",
-          "tab:purchasing-report",
-          "tab:purchasing-settings",
-          "path:/operation/procurement",
-        ],
-        section: "Supply Chain",
-        /* THE THIRTEEN (Jess, 2026-08-18) — the module's pages left the 44px
-         * tab strip and joined the rail. Order is the approved eleven of
-         * `docs/purchasing/MASTER.md` §1, then the two PORTAL pages below a
-         * hairline.
-         *
-         * The parent carries NO count of its own: summing its children would
-         * produce a figure that matches no page and no queue. A count means
-         * ROWS A HUMAN MUST ACT ON, never how many rows the table holds, and
-         * NavBadge already prints nothing at zero — a zero badge is a daily
-         * invitation to check a page with nothing on it.
-         *
-         * An entry goes live in ITS OWN page's PR by exactly two edits: drop
-         * `soon`, and the span becomes a link. Nothing is added later and no
-         * order is renegotiated, so the rail never reshuffles under a staff
-         * member who has learned it. */
-        children: [
-          // `To Order` renamed (Jess, 2026-08-18): it read like a status a row
-          // can be in, not a place a buyer goes. The new word says whose
-          // demand it is (a sales order's) and what the page does with it.
-          { key: "purchase", label: "SO Batch Purchase" },
-          // Went live with its page's own PR (CARD-2026-08-18-manual-purchase):
-          // the flag dropped, the span became a link — the two ruled edits.
-          { key: "manual-purchase", label: "Manual Purchase" },
-          // `operation:procurement` counts POs in the Pickup-action bucket —
-          // this is the page that bucket belongs to.
-          {
-            key: "purchase-orders",
-            label: "Purchase Orders",
-            path: "/operation/procurement",
-            badge: "procurement",
-          },
-          // KEEPS ITS WORD. The approved page list wrote `Goods Receipts`, but
-          // `ERP-ARCHITECTURE.md:123` names pages after the JOB the staff
-          // member does and blesses `Receiving` by name, and
-          // `purchasing/MASTER.md:768` bans the letters `GRN` from a tab
-          // forever. `Goods Receipts` is a document name; `Receiving` is the
-          // work, and the work wins.
-          { key: "receiving", label: "Receiving" },
-          // `Claims` renamed: Carres has claims in two directions — a customer
-          // claiming from us, and us claiming from a supplier. The bare word is
-          // the one that gets opened by mistake.
-          { key: "claims", label: "Supplier Claims" },
-          { key: "purchase-returns", label: "Purchase Returns", soon: true },
-          { key: "repair-orders", label: "Repair Orders", soon: true },
-          { key: "display-requests", label: "Display Requests", soon: true },
-          { key: "consignment-orders", label: "Consignment Orders", soon: true },
-          { key: "consignment-receipts", label: "Consignment Receipts", soon: true },
-          { key: "consignment-returns", label: "Consignment Returns", soon: true },
-          { key: "purchasing-report", label: "Report", dividerAbove: true },
-          { key: "purchasing-settings", label: "Settings", managerOnly: true },
-        ],
+        // `operation:procurement` counts POs in the Pickup-action bucket —
+        // this is the page that bucket belongs to.
+        key: "purchase-orders",
+        label: "Purchase Orders",
+        icon: FileText,
+        path: "/operation/procurement",
+        badge: "procurement",
+        section: "Purchasing",
       },
+      { key: "receiving", label: "Receiving", icon: PackageCheck, section: "Purchasing" },
+      { key: "claims", label: "Supplier Claims", icon: Scale, section: "Purchasing" },
+      { key: "purchase-returns", label: "Purchase Returns", icon: Undo2, soon: true, section: "Purchasing" },
+      { key: "repair-orders", label: "Repair Orders", icon: ArrowUpRight, soon: true, section: "Purchasing" },
+      { key: "display-requests", label: "Display Requests", icon: Store, soon: true, section: "Purchasing" },
+      { key: "consignment-orders", label: "Consignment Orders", icon: ArrowDownLeft, soon: true, section: "Purchasing" },
+      { key: "consignment-receipts", label: "Consignment Receipts", icon: BadgeCheck, soon: true, section: "Purchasing" },
+      { key: "consignment-returns", label: "Consignment Returns", icon: Undo2, soon: true, section: "Purchasing" },
+      { key: "purchasing-report", label: "Report", icon: BarChart3, dividerAbove: true, section: "Purchasing" },
+      { key: "purchasing-settings", label: "Settings", icon: Settings, managerOnly: true, section: "Purchasing" },
       // Delivery (T11, Jess 2026-07-27) — **the ONE new menu item in the whole
       // build plan**; every other line upgrades an existing door, and its place
       // in the rail is the one the queue index draws (Orders · Purchasing ·
@@ -304,7 +238,7 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       // reasons and photos stay behind the order drawer's server-side gates, so
       // this door shows the delivery work and hands over to the same drawer the
       // Orders list opens.
-      { key: "delivery", label: "Delivery", icon: Route, section: "Supply Chain" },
+      { key: "delivery", label: "Delivery", icon: Route, section: "Delivery" },
       // Stock (K0, Jess 2026-07-27) — the two stock doors merged into ONE
       // entry, same shape as the Purchasing merge above: one warehouse, three
       // questions (On hand · Ready stock [joins at K2] · In & out). Click
@@ -318,7 +252,7 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         icon: Boxes,
         tab: "stock-onhand",
         activeFor: ["tab:stock-onhand", "tab:stock-plan", "tab:movements"],
-        section: "Supply Chain",
+        section: "Stock",
       },
       { key: "payments", label: "Payments", icon: Wallet, section: "Finance" },
       // Rental base (0247-0249, Loo 2026-07-25) — rent-to-own agreements +
@@ -501,10 +435,10 @@ export function visibleItems(
   return group.items.filter((it) => !it.roles || (role != null && it.roles.includes(role)));
 }
 
-/** The href a nav item — or one of its child PAGES — points at. */
+/** The href a nav item points at. */
 export function navItemHref(
   group: PortalNavGroup,
-  item: PortalNavItem | PortalNavChild,
+  item: PortalNavItem,
 ): string {
   if (group.area === "finance") {
     return (item as PortalNavItem).financePath ?? group.base;
@@ -517,21 +451,4 @@ export function navItemHref(
 export function areaDefaultHref(group: PortalNavGroup): string {
   if (group.area === "finance") return "/finance/dashboard";
   return `${group.base}?tab=${group.defaultTab}`;
-}
-
-/**
- * The child pages of a module a given caller may see.
- *
- * `managerOnly` is a RUNTIME gate, not a role one: the purchasing Settings page
- * is server-gated by the same RPC that guards the seven engine numbers, so the
- * rail asks that RPC rather than guessing from the role. A caller the server
- * says may not edit does not see the door at all.
- */
-export function visibleChildren(
-  item: PortalNavItem,
-  opts: { canEditPurchasingSettings: boolean },
-): ReadonlyArray<PortalNavChild> {
-  return (item.children ?? []).filter(
-    (c) => !c.managerOnly || opts.canEditPurchasingSettings,
-  );
 }

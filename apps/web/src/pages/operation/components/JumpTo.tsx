@@ -85,6 +85,10 @@ export function permittedDestinations(
   const out: JumpDestination[] = [];
   for (const group of visibleGroups(role)) {
     for (const item of visibleItems(group, role)) {
+      // A `Coming soon` page is NOT A CONTROL anywhere — the rail renders it
+      // as a span with no href, and Jump to may not offer a door the rail
+      // itself refuses to open (corrections card, 2026-08-19).
+      if (item.soon) continue;
       out.push({
         id: `${group.area}:${item.key}`,
         label: item.label,

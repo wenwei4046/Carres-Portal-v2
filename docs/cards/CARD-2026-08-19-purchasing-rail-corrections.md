@@ -1,6 +1,6 @@
-STATUS: QUEUED
+STATUS: EXECUTED — shipped and deployed 2026-08-19; owner walk owed
 DATE: 2026-08-19
-PR: pending
+PR: the corrections PR carrying this flip
 IMPLEMENTATION: APPROVED — Jess ruled all seven corrections with the architect 2026-08-19, on production screenshots
 
 # PURCHASING RAIL + MANUAL PURCHASE CORRECTIONS — seven defects, one card
@@ -128,6 +128,32 @@ Claims pages · the Settings gate · the collapse behaviour and its storage key.
 - At 1280, 1440 and ~1920 no column header is clipped — measured in a real
   browser, numbers written down.
 - The empty-state sentence matches `COPY-STANDARD.md` byte for byte.
+
+## BUILD RECORD — EXECUTED 2026-08-19
+
+All seven, one PR. §1: the `Purchasing` parent row and its `children` machinery
+are deleted from `portal-nav.ts`/`PortalSidebar.tsx`; the thirteen pages are
+ITEMS under a `PURCHASING` section heading, exactly the SALES structure —
+`Supply Chain` is gone, and Delivery and Stock each carry their own heading
+(the precedent was already in the rail: `Finance` heads the single `Payments`
+row). Soon rows keep every non-control property at item level; the collapsed
+rail shows LIVE pages as icons like the SALES pages and no icon for a
+non-control. §2: `manual-purchase` joins the GlobalTopBar suppression list —
+that missing entry was the whole double header. §3: the rail is LEFT at 200px
+(`RailAside`, same tiles, counts and testids). §4: `+ New request` rides the
+DataGrid's `toolbarStart` slot; the empty band is deleted. §5 measured in real
+Chromium (the register's own `.scroll` box owns `overflow-x`): 1280 → box
+816px / table 1081px, scrolls whole inside its own box, `Status` header 190px
+and its pill intact at scroll end; 1440 → 976/1081, same; 1920 → 1456/1456, no
+scroll, `Status` stretches to 256px. The old defect — the column cut
+UNREACHABLE under the right rail — is structurally impossible with the rail on
+the left. §6: the empty state registered in `COPY-STANDARD.md`. §7: `ui/MASTER`
+§4.2 overwritten (heading, not parent row; accordion and one-module-icon
+wording corrected), `purchasing/MASTER` §1 notes the left rail.
+
+**Owner walk owed** (authenticated, 1440 + ~1920): PURCHASING heading with the
+pages directly under it exactly like SALES · one header on Manual Purchase ·
+rail left · button in the control band · no clipped column · screenshots.
 
 ## Acceptance boundary
 
