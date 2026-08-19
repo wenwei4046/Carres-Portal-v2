@@ -3254,6 +3254,14 @@ export interface operationPoListRow {
    *  OPTIONAL — an older Worker omits it, and pre-0361 POs are NULL (never
    *  backfilled); both degrade to printing nothing. */
   purpose?: string | null;
+  /** 0364 — which version of the document the factory holds; 1 at issue, a
+   *  revise mints the next. The panel prints `PO-2041 · Version 2` from > 1.
+   *  OPTIONAL — an older Worker omits it and the PO reads as Version 1. */
+  version?: number;
+  /** 0364 — when the CURRENT version was minted; NULL = never revised. The
+   *  governed sentence `{po} Version {n} has not reached {supplier}` is
+   *  DERIVED from this against the latest send — never stored. */
+  revised_at?: string | null;
   placed_at: string;
   purchase_order_lines: {
     // 0076 (Loo 2026-05-10): line UUID — primary key after migration. Used
@@ -4441,6 +4449,29 @@ export function useRecordSend(poId: string | null) {
     mutationFn: (input: { channel: "whatsapp" | "email" | "print"; note?: string }) =>
       apiFetch<{ ok: true; result: { revision: number } }>(
         `/api/operation/pos/${encodeURIComponent(poId ?? "")}/sends`,
+        { method: "POST", body: JSON.stringify(input) },
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["operation", "pos"] });
+    },
+  });
+}
+
+/**
+ * PO Revisions (0364, Jess 2026-08-18) — a sent PO keeps its number and mints
+ * a version. Only the CHANGED lines ride the wire; the server snapshots the
+ * prior document, floors every qty at received_qty (409 `received_floor`) and
+ * refuses without a reason.
+ */
+export function useRevisePo(poId: string | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: {
+      reason: string;
+      lines: { lineId: string; qty: number; destinationId: string | null }[];
+    }) =>
+      apiFetch<{ ok: true; result: { version: number } }>(
+        `/api/operation/pos/${encodeURIComponent(poId ?? "")}/revise`,
         { method: "POST", body: JSON.stringify(input) },
       ),
     onSuccess: () => {
