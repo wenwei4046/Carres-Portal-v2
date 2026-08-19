@@ -208,16 +208,31 @@ Sections     the content
 History      Today · Yesterday · Earlier
 ```
 
-### TABS APPEAR ONLY WHERE PARALLEL TRACKS EXIST
-A Sales Order carries EIGHT (`items · delivery · balance · storage · loan · documents · cases ·
-activity`) and earns every one: those things run at the same time and none waits for another. **A
-purchase return has one track — get the goods back.** Eight tabs on it would be one tab and seven
-empty rooms. **One track is one scroll. Several genuinely parallel tracks are tabs.**
+### A TAB EARNS ITS PLACE TWO WAYS, AND ONLY TWO
+*(Corrected the day it was written: the first draft gave one reason, then a Supplier Claim failed
+the test while plainly needing tabs. The rule was incomplete, not the claim.)*
+
+**REASON ONE — genuinely parallel tracks.** A Sales Order carries EIGHT (`items · delivery ·
+balance · storage · loan · documents · cases · activity`) and earns every one: goods, delivery and
+money all move at the same time and none waits for another.
+
+**REASON TWO — reference a human opens rarely but must be able to find.** Versions, History, the
+route map. Not work; evidence. Burying them in the scroll makes the daily page longer for
+something read once a month, and hiding them altogether means somebody re-derives it from
+WhatsApp.
+
+**Everything else is ONE SCROLL.** A purchase return has a single track — get the goods back —
+and eight tabs on it is one tab and seven empty rooms.
 ```
-TABS      Purchase Order · Supplier Claim
-NO TABS   Goods Receipt · Purchase Return · Repair Order · Display Request ·
-          Manual Purchase · the three Consignment documents
+PARALLEL TRACKS      Sales Order (8)
+REFERENCE ONLY       Purchase Order · Supplier Claim
+                       work is the first tab; the rest are Versions / History / Order Route
+ONE SCROLL           Goods Receipt · Purchase Return · Repair Order · Display Request ·
+                       Manual Purchase · the three Consignment documents
 ```
+**The test, and it is mechanical: would a staff member open this tab on an ordinary Tuesday?**
+Yes and it runs beside the others → reason one. No, but they would hunt for it when something
+went wrong → reason two. Neither → it is a section in the scroll, not a tab.
 
 ### THE SPLIT IS AN EDIT MODE, AND ONLY WHERE AN OUTSIDER READS THE RESULT
 **Viewing never splits the screen** (Jess, 2026-08-18). Pressing edit does, and the right half is
