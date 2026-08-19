@@ -1,6 +1,7 @@
-STATUS: QUEUED
+STATUS: EXECUTED — built, tested, 0362 probed on production in a rolled-back
+        transaction (7 probes, all negative controls fired); owner walk owed
 DATE: 2026-08-19
-PR: pending
+PR: #855
 IMPLEMENTATION: APPROVED — Jess ruled the complete package with the planner
 2026-08-19, triggered by a real incident the same day (goods delivered with
 money uncollected and no approval).
