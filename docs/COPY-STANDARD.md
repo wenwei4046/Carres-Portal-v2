@@ -975,7 +975,7 @@ from the day the rail changes, and seven of them do not exist yet.
 
 | Situation | The words |
 |---|---|
-| A rail entry for a page that is approved but not built | **`Coming soon`**, right-aligned on the row |
+| A rail entry for a page that is approved but not built | **`Coming soon`**, on its own line under the name (measured 2026-08-19: beside the tag every unbuilt name truncates) |
 
 **Banned for the same fact:** `TBD` · `Not available` · `Not yet` · `In progress` ·
 `Soon` on its own · a greyed word with nothing beside it. Those are six sentences

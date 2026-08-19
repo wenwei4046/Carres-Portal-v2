@@ -425,6 +425,14 @@ describe("PortalSidebar — the Purchasing pages are in the rail", () => {
       expect(row.getAttribute("tabindex")).toBe("-1");
       expect(row.getAttribute("aria-disabled")).toBe("true");
       expect(row.textContent).toContain("Coming soon");
+      // Measured 2026-08-19 on the production stylesheet: beside the 71px tag
+      // a name gets 71px of the row's 150px and every unbuilt name needs
+      // 78-128px — the three Consignment entries truncated to one identical
+      // string. The name owns its line; the reason stacks under it.
+      expect(row.className).toContain("flex-col");
+      expect(row.querySelector(".w-full.truncate")?.textContent).not.toContain(
+        "Coming soon",
+      );
     }
   });
 
