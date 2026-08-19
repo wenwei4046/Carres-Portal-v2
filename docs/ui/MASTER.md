@@ -465,10 +465,16 @@ shipped code, and stated the opposite.)*
 shipped and was overruled on sight.** SALES is the template and it has TWO
 layers: a group HEADING, then the pages. A module is a heading — `PURCHASING`
 replaced the umbrella word `SUPPLY CHAIN`, the `Purchasing` parent row is
-deleted, and the pages sit at the same indent as `Sales Orders`. Delivery and
-Stock each carry their own heading until they restructure. A module still does
-not open a second left column, and it does not keep a tab strip once it has more
-than a handful of pages.
+deleted, and the pages sit at the same indent as `Sales Orders`. Delivery
+carries its own heading until it restructures. **Stock restructured 2026-08-19
+(CARD-2026-08-19-warehouse-rail): the merged `Stock` row became the `WAREHOUSE`
+heading** with its pages as rows — `On hand` · `Ready stock` · `In & out` live,
+`Transfers` · `Counts` printing `Coming soon` (Warehouse Blueprint item 13).
+The blueprint keeps Reports and Settings central, so WAREHOUSE lists **no
+Report row and no Settings row**. Its strip died the same way Purchasing's did:
+`StockTabs` keeps drawing the ONE header row in the destination format. A
+module still does not open a second left column, and it does not keep a tab
+strip once it has more than a handful of pages.
 
 ```
 ▾ Purchasing
@@ -528,7 +534,8 @@ says where you are once the strip is gone.
   rail while the operator is reading further down it.
 
 *Built: `apps/web/src/pages/portal/portal-nav.ts` (`PortalNavChild`) ·
-`PortalSidebar.tsx` · `operation/PurchasingTabs.tsx` ·
+`PortalSidebar.tsx` · `operation/PurchasingTabs.tsx` · `operation/StockTabs.tsx`
+(destination header since CARD-2026-08-19-warehouse-rail) ·
 `operation/components/ModuleHeader.tsx` (`page` prop).*
 
 # §5 · The right rail

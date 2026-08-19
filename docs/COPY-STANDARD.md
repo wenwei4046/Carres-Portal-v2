@@ -1176,8 +1176,11 @@ Information Architecture and live in [`ERP-ARCHITECTURE.md`](ERP-ARCHITECTURE.md
 | Telling logistics to re-arrange a delayed delivery | **`Call {logistics} — arrange new delivery date`** | Call customer (stock delay) · Inform customer · Reschedule |
 | Call to fix delivery date + slot | **Call {customer} — book delivery date** | Schedule delivery · Chase · Call customer (book delivery) [old T2 spelling] |
 | The company responsible for customer contact/transport in Delivery | **Logistics Partner** · a named one reads `NETS Logistics` | Logistic · Carrier · Delivery partner |
-| The goods pool (any page/tab/label) | **Stock** | Inventory · Warehouse (as a menu word) |
-| Stock in/out history (tab/label) | **In & out** | Movements · Movement log (menu) · Ledger |
+| The goods pool (any page/tab/label) | **Stock** | Inventory · Warehouse (as the goods-pool word — `WAREHOUSE` is the module's rail HEADING since 2026-08-19, never the pool's name) |
+| The module's rail heading (CARD-2026-08-19-warehouse-rail) | **Warehouse** | Stock (as a heading) · Supply Chain |
+| Stock in/out history (page/label) | **In & out** | Movements · Movement log (menu) · Ledger |
+| The cross-site custody journey page (Warehouse Blueprint item 13, `Coming soon`) | **Transfers** | Movements · Relocations |
+| The formal unit-verification page (Warehouse Blueprint item 13, `Coming soon`) | **Counts** | Stocktake · Audit |
 | A logistics company's own working rules | **delivery rules** | Partner profile · SLA · Carrier config |
 | Notice logistics need before a delivery day | **working days notice** | Lead time · Cut-off · Booking window |
 | A date logistics are closed | **not running on** | Blackout · Unavailable · Out of service |
@@ -1857,7 +1860,9 @@ the ruling's phrase stays in the documents and the screen keeps the word it has.
 `On hand` (what's here now) · `Ready stock` (how much to keep — a PLAN about
 the same goods, never a second pool) · `In & out` (when things moved).
 "Inventory" and "Movements" are banned UI words (POD treatment); internal
-keys/routes keep their names.
+keys/routes keep their names. **Since CARD-2026-08-19-warehouse-rail the three
+questions are sidebar rows under the `WAREHOUSE` heading** (Warehouse Blueprint
+item 13) — the words are unchanged; only the door moved.
 
 **Aligning Purchase and Orders panels:** the Orders panel uses **Placed**
 for the pre-Proceed state (customer ordered, ETA not confirmed). The

@@ -132,13 +132,61 @@ describe("PURCHASING is a heading, not a parent row (Jess, 2026-08-19)", () => {
     expect(batch.parentElement?.parentElement).toBe(sales.parentElement?.parentElement);
   });
 
-  it("Delivery and Stock each carry their own heading — no umbrella survives", () => {
+  it("Delivery and Warehouse each carry their own heading — no umbrella survives", () => {
     renderAt("/operation?tab=purchase");
-    for (const word of ["Delivery", "Stock"]) {
+    for (const word of ["Delivery", "Warehouse"]) {
       const els = screen.getAllByText(word);
       // One of them is the heading (a non-link div with the heading classes).
       expect(els.some((el) => el.closest("a") === null && el.className.includes("uppercase"))).toBe(true);
     }
+  });
+});
+
+describe("WAREHOUSE is a heading with its pages as rows (Warehouse Blueprint item 13, CARD-2026-08-19-warehouse-rail)", () => {
+  beforeEach(() => {
+    mockRole = "operation";
+  });
+
+  it("renders the WAREHOUSE heading and no bare `Stock` row", () => {
+    renderAt("/operation?tab=stock-onhand");
+    const heading = screen.getByText("Warehouse");
+    // A heading is a <div>, never a link — the pages are the doors.
+    expect(heading.closest("a")).toBeNull();
+    expect(heading.className).toContain("uppercase");
+    expect(screen.queryByText("Stock")).not.toBeInTheDocument();
+  });
+
+  it("the three built pages are doors keeping their `?tab=` addresses", () => {
+    renderAt("/operation?tab=stock-onhand");
+    const onHand = screen.getByText("On hand").closest("a") as HTMLAnchorElement;
+    const ready = screen.getByText("Ready stock").closest("a") as HTMLAnchorElement;
+    const inOut = screen.getByText("In & out").closest("a") as HTMLAnchorElement;
+    expect(onHand).toHaveAttribute("href", "/operation?tab=stock-onhand");
+    expect(ready).toHaveAttribute("href", "/operation?tab=stock-plan");
+    expect(inOut).toHaveAttribute("href", "/operation?tab=movements");
+  });
+
+  it("Transfers and Counts print `Coming soon` and are NOT controls", () => {
+    renderAt("/operation?tab=stock-onhand");
+    for (const word of ["Transfers", "Counts"]) {
+      const el = screen.getByText(word);
+      expect(el.closest("a")).toBeNull();
+      const row = el.closest("[data-soon='1']") as HTMLElement;
+      expect(row).not.toBeNull();
+    }
+  });
+
+  it("the blueprint keeps Reports and Settings central — no Report or Settings row under WAREHOUSE", () => {
+    renderAt("/operation?tab=stock-onhand");
+    const nav = screen.getAllByTestId(/^nav-child-/).filter((el) =>
+      ["stock", "stock-plan", "movements", "transfers", "counts"].includes(
+        el.getAttribute("data-testid")!.replace("nav-child-", ""),
+      ),
+    );
+    // Exactly the five blueprint rows — nothing else joined the group.
+    expect(nav.length).toBeGreaterThanOrEqual(3);
+    expect(screen.queryByTestId("nav-child-warehouse-report")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("nav-child-warehouse-settings")).not.toBeInTheDocument();
   });
 });
 
@@ -179,8 +227,8 @@ describe("PortalSidebar — ERP Shell V1 responsibility groups", () => {
   it("groups real operation destinations without removing temporary Old Orders access", () => {
     mockRole = "operation";
     renderAt("/operation/orders");
-    for (const heading of ["Workspace", "Sales", "Purchasing", "Delivery", "Stock", "Finance", "Customer Care", "Master Data"]) {
-      // Delivery/Stock appear twice (heading + their own row) — assert the
+    for (const heading of ["Workspace", "Sales", "Purchasing", "Delivery", "Warehouse", "Finance", "Customer Care", "Master Data"]) {
+      // Delivery appears twice (heading + its own row) — assert the
       // HEADING form exists: a non-link div in the heading rank.
       const els = screen.getAllByText(heading);
       expect(

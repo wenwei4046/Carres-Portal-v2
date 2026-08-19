@@ -112,10 +112,12 @@ describe("the empty query", () => {
       .map((el) => el.textContent);
     /* Six were stored; the MASTER caps the recent block at five, and the sixth
      * still appears once — below, as an ordinary destination. */
+    /* `operation:stock` is the On hand page since the WAREHOUSE heading
+     * (CARD-2026-08-19-warehouse-rail) — same key, the sidebar's own word. */
     expect(labels.slice(0, 5)).toEqual([
       "WorkOperations",
       "Sales OrdersOperations",
-      "StockOperations",
+      "On handOperations",
       "PaymentsOperations",
       "DeliveryOperations",
     ]);

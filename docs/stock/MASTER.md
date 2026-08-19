@@ -3,8 +3,16 @@
 > **The only Stock document.** Overwritten when re-ruled; never versioned.
 > **You read `CLAUDE.md` and this file.**
 >
-> **Inventory and Ready Stock are ONE module, and that is measured, not chosen:** the portal has
-> a single `Stock` door with three tabs. Two masters would be two names for one screen.
+> **Inventory and Ready Stock are ONE module, and that is measured, not chosen.** Since
+> 2026-08-19 the module's pages live in the sidebar under the **`WAREHOUSE` heading**
+> (CARD-2026-08-19-warehouse-rail); the old single `Stock` door with three tabs is gone.
+> Two masters would still be two names for one module.
+>
+> **The owner-approved Warehouse Blueprint (22 items, reviewed item by item 2026-08-14)**
+> is the module's approved operating-model target — Unit as truth, NETS-executed physical
+> operation, Sites/custody, counts, transfers, consignment, permissions. Its full
+> persistence into this MASTER is pending the owner's blanket approval; **item 13
+> (navigation) is applied** by the rail card below.
 
 | I am working on | Read |
 |---|---|
@@ -24,14 +32,31 @@ Answer three questions and no more: **what is physically here · what moved · w
 for the shelf.**
 
 ### WHAT IS ON SCREEN TODAY
-ONE sidebar item, three tabs (`OperationStock.tsx`, 156 lines — the tab shell).
-*Measured 2026-08-05 from file sizes, routes and the shipped card records; **pages not read line
-by line.***
+**The `WAREHOUSE` sidebar heading with the module's pages as rows**
+(CARD-2026-08-19-warehouse-rail — Warehouse Blueprint item 13, under the Jess
+2026-08-19 SALES-template heading law):
 
 ```
-OperationStockOnHand.tsx    547   On hand    — the per-unit register, chip-filtered
-OperationMovements.tsx      885   In & out   — every movement
-OperationStockPlan.tsx      746   Ready stock — the plan, reorder points, K5's digest
+WAREHOUSE
+  On hand        ?tab=stock-onhand   — the per-unit register, chip-filtered
+  Ready stock    ?tab=stock-plan     — the plan, reorder points, K5's digest
+  In & out       ?tab=movements      — every movement
+  Transfers      Coming soon         — blueprint item 13.3, its own card
+  Counts         Coming soon         — blueprint item 13.4, its own card
+```
+
+- The three live rows keep K0's learned order; the rail never reshuffles. When
+  Ready stock folds into On hand Views (blueprint item 13.7) its row dies in
+  that card's own PR.
+- **No Report row, no Settings row** — the blueprint keeps both central.
+- The tab strip died with the rail move; `StockTabs.tsx` keeps drawing the ONE
+  destination-format header (壳画头), page words = the sidebar's own words.
+- Every `?tab=` address is unchanged — the door moved, not the address.
+
+```
+OperationStockOnHand.tsx    On hand    — the per-unit register, chip-filtered
+OperationMovements.tsx      In & out   — every movement
+OperationStockPlan.tsx      Ready stock — the plan, reorder points, K5's digest
 ```
 
 **`Inventory` and `Movements` are BANNED UI words.** The goods pool is **`Stock`** on any page,
