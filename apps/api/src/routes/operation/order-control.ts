@@ -808,6 +808,53 @@ orderControlRouter.post("/:id/delivery-order", async (c) => {
   }
 });
 
+/**
+ * POST /:id/delivery-order/request — the `Request Delivery Order` door
+ * (owner ruling 2026-08-19, card §5). Outstation trips need the document
+ * BEFORE a customer-confirmed booking exists, because the partner schedules
+ * the customer. The door walks the SAME single issuing path with the SAME
+ * gates — goods Ready/Reserved, the money gate (0362) and no OPEN Finance
+ * exception — merely without waiting for the booking-confirm trigger. It is
+ * never a free-form create: no editable customer, goods, price or number, and
+ * a refusal names the failing gate.
+ */
+orderControlRouter.post("/:id/delivery-order/request", async (c) => {
+  const auth = c.var.auth;
+  requireOperationOrPrincipal(auth.role);
+
+  const idCheck = ORDER_ID.safeParse(c.req.param("id"));
+  if (!idCheck.success) throw new HTTPException(404, { message: "Order not found" });
+
+  const sb = userClient(c.env, auth.jwt);
+  const attempt = await attemptDeliveryOrderIssue(sb, idCheck.data, {
+    waitBookingConfirm: false,
+  });
+  switch (attempt.outcome) {
+    case "issued":
+      return c.json({
+        order: { id: idCheck.data, do_number: attempt.doNumber },
+        issued: true,
+      });
+    case "already":
+      return c.json({
+        order: { id: idCheck.data, do_number: attempt.doNumber },
+        issued: false,
+      });
+    case "blocked":
+      return c.json(
+        {
+          error: "delivery_order_gate",
+          code: "delivery_order_gate",
+          message: `Cannot issue the delivery order: ${attempt.reasons.join(" ")}`,
+          reasons: attempt.reasons,
+        },
+        422,
+      );
+    case "error":
+      return c.json(attempt.body, attempt.status);
+  }
+});
+
 // ── T9 · logistic partner rules (migration 0283) ────────────────────────────
 // Four facts a carrier states about itself — working days, blackout dates,
 // daily capacity, notice period — turned into a warning BEFORE a date is

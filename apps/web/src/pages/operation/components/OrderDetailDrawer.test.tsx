@@ -145,32 +145,34 @@ describe("OrderDetailDrawer — no Purchase Order creation door", () => {
  * exists at all, and the drawer is 7,000 lines of branches.
  */
 describe("OrderDetailDrawer — C7 → Slice 2, the delivery order", () => {
-  it("⭐ renders a delivery-order row with NO issue control in any state (Slice 2)", () => {
-    // `docs/orders/MASTER.md` §8: the SYSTEM issues the DO when every
-    // requirement is met — no Release button, no Approve button, no manual
-    // bypass. The row is a fact in both states, so the PRESS is gone. The one
-    // click the row keeps is a READ door: the number navigates to the DO
-    // object page (§0.1: a document number opens its authoritative object) —
-    // navigation is not an act, and there is nothing to press before the
-    // number exists.
+  it("⭐ renders a delivery-order row whose ONLY control is the governed request door (2026-08-19)", () => {
+    // `docs/orders/MASTER.md` §8: the SYSTEM issues the DO — no Issue,
+    // Release or Approve button in any state. The one control the owner ruled
+    // (card §5, 2026-08-19) is `Request Delivery Order`: the manual door for
+    // the outstation trip, walking the SAME path with the SAME gates. The
+    // issued state keeps its one READ door: the number navigates to the DO
+    // object page (§0.1).
     expect(SRC).toContain("<DeliveryOrderRow");
     expect(SRC).not.toMatch(/orderActionButton\("issue_delivery_order"\)/);
     expect(SRC).not.toMatch(/useIssueDeliveryOrder/);
     const i = SRC.indexOf("function DeliveryOrderRow(");
     expect(i, "DeliveryOrderRow is missing").toBeGreaterThan(-1);
-    const body = SRC.slice(i, SRC.indexOf("\n}", i));
-    expect(body).not.toContain("<Btn");
-    // (the governed absence sentence SAYS "the system issues it", so the scan
-    // bans control surface, not the word)
-    expect(body).not.toMatch(/useIssueDeliveryOrder|mutate|useMutation/);
-    // the only onClick is the navigation door to the document's page
+    // (slice to the next top-level function — the multi-line props block
+    // means "\n}" lands inside the signature)
+    const body = SRC.slice(i, SRC.indexOf("\nfunction ", i + 1));
+    // The one governed control, spelt the dictionary's way — and it walks the
+    // request endpoint, never a free-form create.
+    expect(body).toContain("Request Delivery Order");
+    expect(body).toContain("/delivery-order/request");
+    expect(body).not.toMatch(/Issue delivery order|Release|Approve/);
+    // the issued branch's only onClick is the navigation door to the page
     expect(body).toContain("/operation/delivery-orders/");
   });
 
   it("the row shows the number as a FACT once it exists — no second press", () => {
     const i = SRC.indexOf("function DeliveryOrderRow(");
     expect(i, "DeliveryOrderRow is missing").toBeGreaterThan(-1);
-    const body = SRC.slice(i, i + 1600);
+    const body = SRC.slice(i, SRC.indexOf("\nfunction ", i + 1));
     // The issued branch prints the number as the door to its page; the
     // unissued branch reads the governed absence SENTENCE (COPY-STANDARD:
     // an absent value reads as words, never a dash).

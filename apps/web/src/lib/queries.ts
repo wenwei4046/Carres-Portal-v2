@@ -4627,11 +4627,26 @@ export interface SalesOrderRouteClaim {
 }
 
 /** `order_finance_exceptions` (0355) as `/api/finance/exceptions/:orderId`
- *  serves it — the ONE money blocker on the DO (decision A, 2026-08-16). */
+ *  serves it — an OPEN one blocks the DO regardless of payment. */
 export interface SalesOrderRouteFinanceException {
   id: string;
   status: "open" | "cleared";
   reason: string;
+}
+
+/** `order_delivery_payment_approvals` (0362, owner ruling 2026-08-19) as
+ *  `/api/operation/payment-approvals/:orderId` serves it — only an APPROVED
+ *  row opens the money gate; it means COD before unloading. */
+export interface DeliveryPaymentApprovalRow {
+  id: string;
+  order_id: string;
+  status: "pending" | "approved" | "refused";
+  request_reason: string;
+  requested_by: string | null;
+  requested_at: string | null;
+  decided_by: string | null;
+  decided_at: string | null;
+  decision_reason: string | null;
 }
 
 export interface SalesOrderRouteFactsResponse {
@@ -4644,6 +4659,7 @@ export interface SalesOrderRouteFactsResponse {
   receiving: SalesOrderRouteReceivingSession[];
   claims: SalesOrderRouteClaim[];
   financeExceptions: SalesOrderRouteFinanceException[];
+  paymentApprovals: DeliveryPaymentApprovalRow[];
 }
 
 /**
@@ -4667,7 +4683,7 @@ export function useSalesOrderRouteFacts(
           `/api/operation/pos/${encodeURIComponent(poId)}/receiving`,
         ),
       ));
-      const [allocation, booking, attempts, loans, refunds, cases, claims, financeExceptions] =
+      const [allocation, booking, attempts, loans, refunds, cases, claims, financeExceptions, paymentApprovals] =
         await Promise.all([
           apiFetch<{ allocation: SalesOrderAllocation }>(`/api/operation/orders/${id}/allocation`),
           apiFetch<{ brief: BookingBrief }>(`/api/operation/orders/${id}/booking-brief`),
@@ -4676,10 +4692,11 @@ export function useSalesOrderRouteFacts(
           apiFetch<{ refunds: SalesOrderRouteRefund[] }>(`/api/operation/orders/${id}/refunds`),
           apiFetch<{ items: SalesOrderRouteCase[] }>(`/api/ops/service-cases?orderId=${id}`),
           apiFetch<{ claims: SalesOrderRouteClaim[] }>("/api/operation/supplier-claims?status=all"),
-          // Decision A (2026-08-16) — the gate's one money question. The route
-          // reads the same table the server-side gate reads, so the canvas and
-          // the refusal can never disagree (Law D).
+          // The gate's two money records (0355 + 0362, owner ruling
+          // 2026-08-19). The route reads the same tables the server-side gate
+          // reads, so the canvas and the refusal can never disagree (Law D).
           apiFetch<SalesOrderRouteFinanceException[]>(`/api/finance/exceptions/${id}`),
+          apiFetch<DeliveryPaymentApprovalRow[]>(`/api/operation/payment-approvals/${id}`),
         ]);
       const receiving = await receivingPromise;
       return {
@@ -4692,11 +4709,77 @@ export function useSalesOrderRouteFacts(
         receiving: receiving.flatMap((result) => result.sessions),
         claims: claims.claims.filter((claim) => poIds.includes(claim.po_id)),
         financeExceptions,
+        paymentApprovals,
       };
     },
     enabled: !!orderId && open,
     staleTime: 10_000,
     ...opts,
+  });
+}
+
+/* ─── THE DELIVERY PAYMENT APPROVAL (0362, owner ruling 2026-08-19) ──────────
+ *
+ * Money in full before delivery is the only default; the one exception is a
+ * recorded APPROVED approval — COD on the owner's terms. Two doors, two
+ * hooks: Operation / the salesperson RAISES with a reason; the configured
+ * approver (today: Jess) DECIDES with a reason. The database refuses anyone
+ * else — these hooks only carry the ask.
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+/** The order's approval rows — for surfaces outside the route fan-in. */
+export function useDeliveryPaymentApprovals(orderId: string | null) {
+  return useQuery({
+    queryKey: ["operation", "orders", orderId ?? "null", "payment-approvals"] as const,
+    queryFn: () =>
+      apiFetch<DeliveryPaymentApprovalRow[]>(
+        `/api/operation/payment-approvals/${encodeURIComponent(orderId ?? "")}`,
+      ),
+    enabled: !!orderId,
+    staleTime: 10_000,
+  });
+}
+
+/** Raise the request. Raising changes nothing else — no gate opens. */
+export function useRequestPaymentApproval(orderId: string) {
+  const qc = useQueryClient();
+  return useMutation<DeliveryPaymentApprovalRow, Error, { reason: string }>({
+    mutationFn: (body) =>
+      apiFetch<DeliveryPaymentApprovalRow>(
+        `/api/operation/payment-approvals/${encodeURIComponent(orderId)}`,
+        { method: "POST", body: JSON.stringify(body) },
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({
+        queryKey: ["operation", "orders", orderId, "payment-approvals"],
+      });
+      // The route canvas reads the same record through its own fan-in.
+      void qc.invalidateQueries({ queryKey: qk.operation.orderRoute(orderId) });
+    },
+  });
+}
+
+/** The approver's word — approved authorises COD; refused keeps the gate shut. */
+export function useDecidePaymentApproval(orderId: string) {
+  const qc = useQueryClient();
+  return useMutation<
+    DeliveryPaymentApprovalRow,
+    Error,
+    { id: string; decision: "approved" | "refused"; reason: string }
+  >({
+    mutationFn: ({ id, ...body }) =>
+      apiFetch<DeliveryPaymentApprovalRow>(
+        `/api/operation/payment-approvals/${encodeURIComponent(id)}/decide`,
+        { method: "POST", body: JSON.stringify(body) },
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({
+        queryKey: ["operation", "orders", orderId, "payment-approvals"],
+      });
+      void qc.invalidateQueries({ queryKey: qk.operation.orderRoute(orderId) });
+      // An approval may complete the gate — the SYSTEM may have issued the DO.
+      void qc.invalidateQueries({ queryKey: qk.operation.order(orderId) });
+    },
   });
 }
 

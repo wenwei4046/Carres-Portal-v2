@@ -26,8 +26,9 @@ beforeEach(() => {
     if (url.endsWith("/loans")) return Promise.resolve({ loans: [] });
     if (url.endsWith("/refunds")) return Promise.resolve({ refunds: [] });
     if (url.startsWith("/api/ops/service-cases")) return Promise.resolve({ items: [] });
-    // Decision A (0355) — the gate's one money question rides the same fan-in.
+    // The gate's two money records (0355 + 0362) ride the same fan-in.
     if (url.startsWith("/api/finance/exceptions/")) return Promise.resolve([]);
+    if (url.startsWith("/api/operation/payment-approvals/")) return Promise.resolve([]);
     if (url.startsWith("/api/operation/supplier-claims")) return Promise.resolve({
       claims: [
         { id: "c1", claim_no: "CL-1", po_id: "PO-1", status: "open", reported_at: "2026-08-12" },
@@ -62,6 +63,7 @@ describe("useSalesOrderRouteFacts", () => {
       "/api/ops/service-cases?orderId=order-1",
       "/api/operation/supplier-claims?status=all",
       "/api/finance/exceptions/order-1",
+      "/api/operation/payment-approvals/order-1",
       "/api/operation/pos/PO-1/receiving",
       "/api/operation/pos/PO-2/receiving",
     ]));

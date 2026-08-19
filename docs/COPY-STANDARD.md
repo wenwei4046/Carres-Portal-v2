@@ -1221,6 +1221,29 @@ its name: renaming a label is a copy decision, renaming an identifier is a break
 |---|---|---|
 | What the customer still owes HQ, anywhere on screen | **`Outstanding`** | Balance · Balance owing · Amount due · Owing |
 
+### The delivery money gate, payment approval and COD words (owner ruling 2026-08-19)
+
+Money in full before delivery is the only default; the one exception is a recorded APPROVED
+Delivery Payment Approval, which means COD on the owner's exact terms. These are the governed
+spellings — the gate, the canvas, the object page, the drawer and the DO document all read them
+from the shared modules (`delivery-payment-approval.ts` · `delivery-order.ts`), never a local
+rewording.
+
+| Meaning | Use exactly | Do NOT use |
+|---|---|---|
+| The manual DO door (outstation — partner schedules the customer) | **`Request Delivery Order`** | Issue DO · Create DO · Generate DO · Release |
+| The approval object / the Money-block label | **`Delivery payment approval`** | Payment exception · Money release · COD request |
+| The raise door on the order | **`Request payment approval`**, reason field **`Reason`**, submit **`Send request`** | Ask Jess · Escalate · Apply for release |
+| The approver's two verbs | **`Approve`** · **`Refuse`**, reason field **`Decision reason`** | Reject · Deny · OK |
+| The approved state, everywhere it renders | **`COD approved — collect before unloading`** | Released · Money waived · Approved to deliver |
+| A raised, undecided request | **`Waiting for decision`** (gate line: `… approval waiting for decision`) | Pending approval · In review |
+| ⭐ The DO document's instruction, printed when issued under an approval and still owing | **`COLLECT RM {amount} BY ONLINE TRANSFER BEFORE UNLOADING — NO CASH.`** | any softer or reworded version — these are the owner's words |
+| The gate refusal, nothing raised | **`RM {amount} is still outstanding — collect it in full, or request a payment approval.`** | Money not collected · Balance due |
+| The gate refusal, request pending | **`RM {amount} is still outstanding — a payment approval is waiting for the approver's decision.`** | — |
+| Route gate, money met | **`Money in full`** · under approval **`COD approved — collect before unloading`** | Paid · Settled |
+| Route gate, unpriced order | **`No price yet — unknown never holds`** | Money does not hold this delivery |
+| The drawer's absence sentence | **`No delivery order yet — the system issues it when the goods, money and date are ready`** | the 2026-08-16 version without `money` |
+
 ### The Sales Order register and object words (owner ruling 2026-08-15)
 
 | Meaning | Use exactly | Do NOT use |

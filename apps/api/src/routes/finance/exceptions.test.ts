@@ -309,7 +309,8 @@ describe("Slice 2 — a clear that completes the gate issues the delivery order"
     return {
       orders: issueOrdersMock(
         {
-          data: { id: ORDER_ID, so: 1234, paid: 0, do_number: over?.doNumber ?? null },
+          // Paid in full: the 2026-08-19 money gate holds the mint otherwise.
+          data: { id: ORDER_ID, so: 1234, paid: 2500, do_number: over?.doNumber ?? null },
           error: null,
         },
         { data: { id: ORDER_ID, do_number: "DO-170826-1234" }, error: null },
@@ -332,6 +333,8 @@ describe("Slice 2 — a clear that completes the gate issues the delivery order"
       }),
       ops_stock_items: issueTableMock({ data: [], error: null }),
       order_finance_exceptions: issueTableMock({ data: [CLEARED_ROW], error: null }),
+      // 0362 — the approval record. Empty: nothing asked.
+      order_delivery_payment_approvals: issueTableMock({ data: [], error: null }),
       ops_delivery_orders: issueTableMock({ data: [], error: null }),
     };
   }

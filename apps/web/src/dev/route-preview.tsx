@@ -126,6 +126,7 @@ const input: SalesOrderRouteInput = {
   delivery: { logistics: null, booking: null, attempts: [] },
   money: { known: true, outstanding: 1500 },
   financeExceptions: [],
+  paymentApprovals: [],
   loans: [{ id: "L1", label: "sofa", qty: 1, returned: false }],
   cases: [],
   claims: [],
