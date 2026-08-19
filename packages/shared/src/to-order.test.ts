@@ -1211,24 +1211,27 @@ describe("P13 · the take path speaks the drawer's word", () => {
  * word the server refuses BY NAME.
  */
 describe("P15 · the Source a typed demand may carry", () => {
-  it("holds exactly the four the database can store", () => {
+  it("holds exactly the five the database can store", () => {
+    // `spare_parts` joined the CHECK in 0359 (the Manual Purchase ruling,
+    // Jess 2026-08-18); the list moved in all three places together.
     expect(DEMAND_PURPOSES.map((p) => p.value)).toEqual([
       "ready_stock",
       "display",
       "warranty",
       "office",
+      "spare_parts",
     ]);
   });
 
   it("offers no word the store has no value for", () => {
-    // `Spare Parts` and `Other…` are RULED WORDS and they are deliberately not
-    // offerable — neither has ever had a CHECK value, and inventing one would
-    // be a screen ruling on a business question nobody has asked.
+    // `Other…` is a RULED WORD and deliberately not offerable — it has never
+    // had a CHECK value, and inventing one would be a screen ruling on a
+    // business question nobody has asked ("other" than what, recorded where?).
+    // `Spare Parts` stopped being on this list the day 0359 gave it a value.
     const labels = DEMAND_PURPOSES.map((p) => p.label);
-    expect(labels).not.toContain(TO_ORDER_WORDS.reasonSpareParts);
     expect(labels).not.toContain(TO_ORDER_WORDS.reasonOther);
-    // ...and the words themselves survive, because a later card may need them.
-    expect(TO_ORDER_WORDS.reasonSpareParts).toBe("Spare Parts");
+    expect(labels).toContain(TO_ORDER_WORDS.reasonSpareParts);
+    // ...and the unoffered word survives, because a later card may need it.
     expect(TO_ORDER_WORDS.reasonOther).toBe("Other…");
   });
 
@@ -1244,9 +1247,9 @@ describe("P15 · the Source a typed demand may carry", () => {
     expect(isDemandPurpose(DEMAND_PURPOSE_DEFAULT)).toBe(true);
   });
 
-  it("the guard admits the four and refuses everything else", () => {
+  it("the guard admits the five and refuses everything else", () => {
     for (const v of DEMAND_PURPOSE_VALUES) expect(isDemandPurpose(v)).toBe(true);
-    for (const v of ["spare_parts", "other", "", "READY_STOCK", null, 7, undefined]) {
+    for (const v of ["other", "", "READY_STOCK", null, 7, undefined]) {
       expect(isDemandPurpose(v)).toBe(false);
     }
   });
