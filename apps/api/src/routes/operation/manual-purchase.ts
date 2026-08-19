@@ -1,7 +1,8 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { z } from "zod";
-import { DEMAND_PURPOSE_VALUES } from "@carres/shared";
+import { DEMAND_PURPOSE_VALUES, isOpsManager } from "@carres/shared";
 import { requireOperation } from "../../lib/auth-guards";
+import { myDuties } from "../../lib/duties";
 import { mapPgError } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
@@ -31,6 +32,15 @@ import type { AppEnv } from "../../types";
  * `/api/operation/purchase/to-order/demand/pick-items`.
  */
 const manualPurchaseRouter = new Hono<AppEnv>();
+
+/** The approver is the Settings manager — the card names them one and the
+ *  same gate (`ops_manager` duty or principal). `canApprove` decides what
+ *  RENDERS (the money, the Approve row); `purchasing_decide_request`
+ *  re-gates in SQL, which is the actual protection. */
+async function canApprove(c: Context<AppEnv>): Promise<boolean> {
+  const { role, email } = c.var.auth;
+  return isOpsManager(role, email, await myDuties(c));
+}
 
 manualPurchaseRouter.get("/", requireOperation, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
@@ -86,7 +96,116 @@ manualPurchaseRouter.get("/", requireOperation, async (c) => {
     destinations: dests.data ?? [],
     suppliers: sups.data ?? [],
     users: users.data ?? [],
+    canApprove: await canApprove(c),
   });
+});
+
+/**
+ * One request, for the object detail (ui/MASTER §4.1 — ONE SCROLL, no tabs).
+ * Money rides ONLY for the approver: the same request renders for both roles,
+ * minus the money — never a permission error (card §4).
+ */
+manualPurchaseRouter.get("/detail/:id", requireOperation, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const id = c.req.param("id");
+  if (!z.string().uuid().safeParse(id).success) {
+    return c.json({ error: "invalid_request_id", code: "invalid_param" }, 400);
+  }
+
+  const { data: request, error } = await sb
+    .from("purchase_requests")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  if (!request) return c.json({ error: "not_found" }, 404);
+
+  const { data: lines, error: lineErr } = await sb
+    .from("purchase_demands")
+    .select(
+      `id, sku, supplier_id, qty, approved_qty, issued_qty, remaining_qty,
+       required_by, remark, po_id, cancelled_at, cancel_reason`,
+    )
+    .eq("request_id", id);
+  if (lineErr) {
+    const m = mapPgError(lineErr);
+    return c.json(m.body, m.status);
+  }
+
+  const approver = await canApprove(c);
+  let costs: Record<string, number | null> = {};
+  if (approver && (lines ?? []).length > 0) {
+    const { data: skuRows } = await sb
+      .from("product_skus")
+      .select("sku, cost")
+      .in("sku", (lines ?? []).map((l) => l.sku as string));
+    costs = Object.fromEntries(
+      (skuRows ?? []).map((s) => [s.sku as string, (s.cost as number | null) ?? null]),
+    );
+  }
+
+  const [dests, sups, users] = await Promise.all([
+    sb.from("purchasing_destinations").select("id, name"),
+    sb.from("suppliers").select("id, name"),
+    sb.from("app_users").select("id, name"),
+  ]);
+
+  return c.json({
+    request,
+    lines: (lines ?? []).map((l) => ({
+      ...l,
+      // The approver's money — absent entirely for everyone else, so the
+      // same screen renders minus the money, never a permission error.
+      ...(approver ? { unit_cost: costs[l.sku as string] ?? null } : {}),
+    })),
+    destinations: dests.data ?? [],
+    suppliers: sups.data ?? [],
+    users: users.data ?? [],
+    canApprove: approver,
+  });
+});
+
+const decideBody = z.object({
+  decision: z.enum(["approve", "refuse"]),
+  reason: z.string().max(1000).nullish(),
+  cuts: z
+    .array(z.object({ id: z.string().uuid(), qty: z.number().int().min(0) }))
+    .nullish(),
+});
+
+manualPurchaseRouter.post("/:id/decide", requireOperation, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const id = c.req.param("id");
+  if (!z.string().uuid().safeParse(id).success) {
+    return c.json({ error: "invalid_request_id", code: "invalid_param" }, 400);
+  }
+
+  let raw: unknown;
+  try {
+    raw = await c.req.json();
+  } catch {
+    return c.json({ error: "invalid_json" }, 400);
+  }
+  const parsed = decideBody.safeParse(raw);
+  if (!parsed.success) {
+    return c.json({ error: "invalid_body", code: "invalid_param" }, 400);
+  }
+  const { decision, reason, cuts } = parsed.data;
+
+  const { data, error } = await sb.rpc("purchasing_decide_request", {
+    p_id: id,
+    p_decision: decision,
+    p_reason: reason ?? null,
+    p_cuts: cuts && cuts.length > 0 ? cuts : null,
+  });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json(data);
 });
 
 const headerBody = z.object({

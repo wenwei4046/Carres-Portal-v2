@@ -4172,6 +4172,56 @@ export interface ManualPurchaseRegisterPayload {
   destinations: Array<{ id: string; name: string }>;
   suppliers: Array<{ id: string; name: string }>;
   users: Array<{ id: string; name: string | null }>;
+  /** The Settings manager gate — decides what RENDERS (money, Approve). */
+  canApprove: boolean;
+}
+
+export interface ManualPurchaseDetailPayload {
+  request: PurchaseRequestRow;
+  /** `unit_cost` is present ONLY for the approver — the same screen renders
+   *  for both roles, minus the money, never a permission error. */
+  lines: Array<PurchaseRequestLineRow & { unit_cost?: number | null }>;
+  destinations: Array<{ id: string; name: string }>;
+  suppliers: Array<{ id: string; name: string }>;
+  users: Array<{ id: string; name: string | null }>;
+  canApprove: boolean;
+}
+
+export function useManualPurchaseDetail(id: string | null) {
+  return useQuery<ManualPurchaseDetailPayload, ApiError>({
+    queryKey: ["operation", "purchasing", "requests", "detail", id ?? ""],
+    queryFn: () =>
+      apiFetch<ManualPurchaseDetailPayload>(
+        `/api/operation/purchasing/requests/detail/${id}`,
+      ),
+    enabled: !!id,
+    staleTime: 15_000,
+  });
+}
+
+export function useDecidePurchaseRequest() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: {
+      id: string;
+      decision: "approve" | "refuse";
+      reason?: string | null;
+      cuts?: Array<{ id: string; qty: number }> | null;
+    }) =>
+      apiFetch<{ id: string; req_no: string; decision: string }>(
+        `/api/operation/purchasing/requests/${input.id}/decide`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            decision: input.decision,
+            reason: input.reason ?? null,
+            cuts: input.cuts ?? null,
+          }),
+        },
+      ),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ["operation", "purchasing", "requests"] }),
+  });
 }
 
 export function useManualPurchaseRegister() {
