@@ -538,3 +538,92 @@ describe("comparePoRisk — the register's default order", () => {
     ]);
   });
 });
+
+/* ── PO REVISIONS (0364, Jess 2026-08-18) — the version words + derivations ── */
+import {
+  poReviseSaveGapOf,
+  poUnsharedVersionNoticeOf,
+  poVersionLabelOf,
+} from "./po-workspace";
+
+describe("the version label — Version 1 is just the PO", () => {
+  it("says nothing for an unrevised PO", () => {
+    expect(poVersionLabelOf(1)).toBeNull();
+    expect(poVersionLabelOf(null)).toBeNull();
+    expect(poVersionLabelOf(undefined)).toBeNull();
+  });
+  it("names the version from the first revise on", () => {
+    expect(poVersionLabelOf(2)).toBe("Version 2");
+    expect(poVersionLabelOf(5)).toBe("Version 5");
+  });
+});
+
+describe("the disabled Save NAMES its gap, first gap wins", () => {
+  it("the floor outranks everything — it is the ruling's red line", () => {
+    expect(
+      poReviseSaveGapOf({
+        belowFloorSku: "SKU-CODY-Q",
+        nothingChanged: true,
+        reasonEmpty: true,
+      }),
+    ).toBe("Save — below received");
+  });
+  it("an unchanged document cannot mint a version", () => {
+    expect(
+      poReviseSaveGapOf({
+        belowFloorSku: null,
+        nothingChanged: true,
+        reasonEmpty: true,
+      }),
+    ).toBe("Save — nothing changed");
+  });
+  it("a change without a why is refused by name", () => {
+    expect(
+      poReviseSaveGapOf({
+        belowFloorSku: null,
+        nothingChanged: false,
+        reasonEmpty: true,
+      }),
+    ).toBe("Save — say why");
+  });
+  it("nothing missing → Save runs", () => {
+    expect(
+      poReviseSaveGapOf({
+        belowFloorSku: null,
+        nothingChanged: false,
+        reasonEmpty: false,
+      }),
+    ).toBeNull();
+  });
+});
+
+describe("the unshared-version sentence — derived, never stored", () => {
+  const base = { id: "PO-2041", version: 2, revised_at: "2026-08-19T03:00:00Z" };
+  it("a revised PO with no later hand-over raises the governed sentence", () => {
+    expect(poUnsharedVersionNoticeOf({ ...base, sends: [] }, "Ohana")).toBe(
+      "PO-2041 Version 2 has not reached Ohana",
+    );
+    expect(
+      poUnsharedVersionNoticeOf(
+        { ...base, sends: [{ sent_at: "2026-08-18T09:00:00Z" }] },
+        "Ohana",
+      ),
+    ).toBe("PO-2041 Version 2 has not reached Ohana");
+  });
+  it("a hand-over AFTER the revise silences it — that send carried the new version", () => {
+    expect(
+      poUnsharedVersionNoticeOf(
+        { ...base, sends: [{ sent_at: "2026-08-19T05:00:00Z" }] },
+        "Ohana",
+      ),
+    ).toBeNull();
+  });
+  it("Version 1 never raises it — the Issue ladder owns the first share story", () => {
+    expect(
+      poUnsharedVersionNoticeOf(
+        { id: "PO-2041", version: 1, revised_at: null, sends: [] },
+        "Ohana",
+      ),
+    ).toBeNull();
+  });
+});

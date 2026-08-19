@@ -589,6 +589,26 @@ screen respells it):
 | The consolidation OFFER | `Issue as one PO?` — with `Issue as one PO` · `Issue separately` both live on the same screen; an offer that cannot be declined is a gate wearing an offer's clothes |
 | The register's empty state | `No requests yet — press + New request to raise the first one.` (registered 2026-08-19 — the sentence shipped approved; its absence from this table was the defect) |
 
+**PO REVISIONS — the sent document's version** (CARD-2026-08-19-po-revisions, executing
+purchasing/MASTER.md §4's revision rule, Jess 2026-08-18 — *a sent PO is not overwritten, it is
+REVISED*; registered on execution so no screen respells them):
+
+| Where | The word |
+|---|---|
+| The panel title | `PO-2041 · Version 2` — **Version 1 prints nothing**: an unrevised PO is just the PO |
+| The door | `Revise` — beside `Print PDF`, an act on the document; only an open PO offers it |
+| The form's fields | `Qty` · `Destination` · `Why` |
+| The floor, stated inline where it binds | `{n} received` — grey while honoured, red when the draft breaks it |
+| Save | `Save Version {n}` — the button names the act's product |
+| The disabled Save NAMES its gap (the Receiving button law; first gap wins, the floor first) | `Save — below received` · `Save — nothing changed` · `Save — say why` |
+| The unshared version (DERIVED, work to do, never a stage) | `{po} Version {n} has not reached {supplier}` |
+| A silent qty / Deliver To edit on a shared PO, refused (the SQL door's own sentence, printed inline) | `A shared PO changes through Revise.` |
+| The history row | `Revised to Version {n} — {old → new changes} — {why}` |
+
+`Revision` stays off every screen for the SNAPSHOT store (0317's ruling holds — `Snapshot N` is
+the hand-over word); `Version` is the DOCUMENT changing, which is exactly what that ruling
+reserved the word for.
+
 **SIXTY-FIVE ACTIONS BECAME TWENTY, AND THAT WAS THE POINT** (Jess, 2026-08-18). *(Thirteen was
 this section's first count, taken before all eleven pages had been designed; seven more surfaced
 and the number is corrected here rather than defended.)* A blueprint

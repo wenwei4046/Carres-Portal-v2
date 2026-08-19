@@ -14,6 +14,9 @@ import {
   poCurrentActionOf,
   poOverdueDays,
   poReceivingProgress,
+  poReviseSaveGapOf,
+  poUnsharedVersionNoticeOf,
+  poVersionLabelOf,
   poWorkStateOf,
   productionWorkingDaysFor,
   purchasingActionButton,
@@ -65,6 +68,7 @@ import {
   useRecordReadyDate,
   useRecordSend,
   useRecordSupplierDate,
+  useRevisePo,
   useSetMessageTemplate,
   useOperationWarehouse,
   usePurchasingSettings,
@@ -1681,6 +1685,7 @@ export default function OperationPurchaseOrders() {
                 warehouse={warehouseById.get(selected.warehouse_id)}
                 messageTemplate={messageTemplate}
                 labelOf={lineLabel}
+                destinations={destinations}
                 onClose={() => dispatch({ type: "close" })}
               />
             ) : (
@@ -2329,6 +2334,7 @@ function WorkspaceBody({
   warehouse,
   messageTemplate,
   labelOf,
+  destinations,
   onClose,
 }: {
   po: operationPoListRow;
@@ -2336,11 +2342,26 @@ function WorkspaceBody({
   warehouse: { name: string; address: string | null } | undefined;
   messageTemplate: string | null;
   labelOf: (l: operationPoListRow["purchase_order_lines"][number]) => string;
+  destinations: { id: string; name: string; is_default: boolean }[];
   onClose: () => void;
 }) {
   const supplierName = supplier?.name ?? po.supplier_id;
   const items = useMemo(() => docRowsOf(po, labelOf), [po, labelOf]);
   const progress = poReceivingProgress(po.purchase_order_lines);
+  /** REVISE takes the stage (0364, Jess 2026-08-18): while it is open the
+   *  read-only Items block and the Communication desk step aside, the same way
+   *  Receiving Mode takes the Receiving pane — five editable lines plus a
+   *  reason do not fit beside them in 368px. Closed on every PO change. */
+  const [revising, setRevising] = useState(false);
+  useEffect(() => setRevising(false), [po.id]);
+  /** `PO-2041 · Version 2` — nothing for Version 1 (shared rule). */
+  const versionLabel = poVersionLabelOf(po.version);
+  /** The governed sentence, DERIVED: the current version was minted after the
+   *  last observed hand-over. */
+  const unshared = poUnsharedVersionNoticeOf(
+    { id: po.id, version: po.version, revised_at: po.revised_at, sends: po.sends },
+    supplierName,
+  );
   return (
     <div className="px-4 py-4" data-testid="po-document">
       {/* ── ① IDENTITY + ITS ACTIONS, on one row (Q10 Ⓐ + Ⓔ).
@@ -2354,7 +2375,29 @@ function WorkspaceBody({
       <div className="flex items-start gap-2" data-testid="po-panel-title">
         <span className="min-w-0 flex-1 text-page font-semibold font-mono text-kit-slate-12">
           {po.id}
+          {/* The version fact lives on the PANEL TITLE, never on a register
+              column (Jess, 2026-08-18): `PO-2041 · Version 2`. Version 1
+              prints nothing — an unrevised PO is just the PO. */}
+          {versionLabel ? (
+            <span className="text-kit-slate-9 font-sans" data-testid="po-version">
+              {" "}· {versionLabel}
+            </span>
+          ) : null}
         </span>
+        {/* The Revise door (0364) — an act on the DOCUMENT, so it sits with
+            the object's own actions beside Print PDF (Q10's rule). Only an
+            open PO can be revised: received and cancelled are finished
+            stories. */}
+        {po.status === "open" && !revising ? (
+          <button
+            type="button"
+            onClick={() => setRevising(true)}
+            data-testid="po-revise-open"
+            className={DOC_BTN}
+          >
+            Revise
+          </button>
+        ) : null}
         <PrintPdfButton poId={po.id} />
         <button
           type="button"
@@ -2367,6 +2410,15 @@ function WorkspaceBody({
           <Icon name="close" size={14} />
         </button>
       </div>
+
+      {/* The unshared version is WORK TO DO, never a stage (frozen rule:
+          communication is not a STATUS). Amber — it is our own gap, not a
+          factory's broken promise. */}
+      {unshared ? (
+        <div className="mt-1 text-label text-kit-amber-11" data-testid="po-unshared">
+          {unshared}
+        </div>
+      ) : null}
 
       {/* ── ② FIXED HEADER — the facts this activity is ABOUT. ────────── */}
       <div className="mt-2 flex items-start gap-2" data-testid="po-working-header">
@@ -2414,7 +2466,20 @@ function WorkspaceBody({
            and WRITTEN in only one.** So there is no dropdown, no date field,
            no `Save` and no `⋮` here — the destination, the two dates and the
            note stay in the expand, and rule 3 (ONE editing surface) is
-           untouched. A test asserts this block holds no control at all. */}
+           untouched. A test asserts this block holds no control at all.
+
+           REVISE (0364) does not weaken that: while its form is open the
+           read-only block is OFF the stage entirely, so one PO never shows an
+           editable and a read-only copy of the same line at once. */}
+      {revising ? (
+        <ReviseForm
+          po={po}
+          labelOf={labelOf}
+          destinations={destinations}
+          onClose={() => setRevising(false)}
+        />
+      ) : (
+        <>
       <div className="mt-4">
         <DeskBand>Items</DeskBand>
       </div>
@@ -2475,6 +2540,223 @@ function WorkspaceBody({
 
       {/* ── ④ ACTIVITY — tools + the business timeline. ───────────────── */}
       <ActivityDesk po={po} supplier={supplier} template={messageTemplate} />
+        </>
+      )}
+    </div>
+  );
+}
+
+/**
+ * REVISE — a sent PO keeps its number and mints a version (Jess, 2026-08-18;
+ * 0364). EXISTING lines only: qty (floored at what has already been received)
+ * and where each line goes, from the governed destination registry. ONE
+ * required reason. Save mints `Version {n}`: the server snapshots the prior
+ * document with the reason and the author, and the panel title picks up the
+ * new version from the refetch. Adding items is still a NEW PO; stopping is
+ * still the whole PO (Cancel).
+ *
+ * Zero popups, zero toasts (this page's law): the floor is stated INLINE on
+ * the line that has one, the disabled Save NAMES its gap (the Receiving button
+ * law — first gap wins), and a server refusal prints inline under the form.
+ */
+const REVISE_GRID = "grid grid-cols-[16px_minmax(0,1fr)_56px_120px] gap-2";
+
+function ReviseForm({
+  po,
+  labelOf,
+  destinations,
+  onClose,
+}: {
+  po: operationPoListRow;
+  labelOf: (l: operationPoListRow["purchase_order_lines"][number]) => string;
+  destinations: { id: string; name: string; is_default: boolean }[];
+  onClose: () => void;
+}) {
+  const save = useRevisePo(po.id);
+  const [reason, setReason] = useState("");
+  const [err, setErr] = useState<string | null>(null);
+  /** Draft per LINE (the ruling's floor is per line, so the form speaks
+   *  lines — not the Excel SO × SKU rows the read-only block prints). The
+   *  destination draft holds the RESOLVED value; only a real change rides
+   *  the wire, so a line that merely FOLLOWS the PO's destination is never
+   *  rewritten into an explicit one as a side effect. */
+  const [draft, setDraft] = useState<
+    Record<string, { qty: string; destinationId: string }>
+  >(() =>
+    Object.fromEntries(
+      po.purchase_order_lines.map((l) => [
+        l.id,
+        {
+          qty: String(l.qty),
+          destinationId: l.destination_id ?? po.destination_id ?? "",
+        },
+      ]),
+    ),
+  );
+
+  const lines = po.purchase_order_lines;
+  const resolvedOf = (l: (typeof lines)[number]) =>
+    l.destination_id ?? po.destination_id ?? "";
+
+  /** The changed lines, exactly as the wire wants them. */
+  const changes = lines.flatMap((l) => {
+    const d = draft[l.id];
+    if (!d) return [];
+    const qty = Number(d.qty);
+    const qtyChanged = Number.isInteger(qty) && qty !== l.qty;
+    const destChanged = d.destinationId !== "" && d.destinationId !== resolvedOf(l);
+    if (!qtyChanged && !destChanged) return [];
+    return [
+      {
+        lineId: l.id,
+        qty: Number.isInteger(qty) && qty >= 1 ? qty : l.qty,
+        destinationId: destChanged ? d.destinationId : (l.destination_id ?? null),
+      },
+    ];
+  });
+
+  const belowFloorSku =
+    lines.find((l) => {
+      const d = draft[l.id];
+      if (!d) return false;
+      const qty = Number(d.qty);
+      return !Number.isInteger(qty) || qty < 1 || qty < l.received_qty;
+    })?.sku ?? null;
+
+  const gap = poReviseSaveGapOf({
+    belowFloorSku,
+    nothingChanged: changes.length === 0,
+    reasonEmpty: reason.trim() === "",
+  });
+  const nextVersion = (po.version ?? 1) + 1;
+
+  const submit = () => {
+    if (gap != null || save.isPending) return;
+    setErr(null);
+    save.mutate(
+      { reason: reason.trim(), lines: changes },
+      {
+        onSuccess: onClose,
+        onError: (e) => setErr(e instanceof Error ? e.message : String(e)),
+      },
+    );
+  };
+
+  return (
+    <div data-testid="po-revise-form">
+      <div className="mt-4">
+        <DeskBand>Revise</DeskBand>
+      </div>
+      <div
+        className={`${REVISE_GRID} mt-1 text-label uppercase tracking-wide text-kit-slate-9 border-b border-kit-slate-5 py-1`}
+      >
+        <span className="font-medium">#</span>
+        <span className="min-w-0 font-medium">Description</span>
+        <span className="text-right font-medium">Qty</span>
+        <span className="font-medium">Destination</span>
+      </div>
+      {lines.map((l, i) => {
+        const d = draft[l.id] ?? { qty: String(l.qty), destinationId: resolvedOf(l) };
+        const qty = Number(d.qty);
+        const belowFloor = !Number.isInteger(qty) || qty < 1 || qty < l.received_qty;
+        return (
+          <div key={l.id} className="border-b border-kit-slate-4">
+            <div
+              className={`${REVISE_GRID} py-1.5 text-body`}
+              data-testid={`po-revise-line-${i + 1}`}
+            >
+              <span className="text-kit-slate-9 tabular-nums">{i + 1}</span>
+              <span
+                title={l.sku}
+                className="min-w-0 truncate font-semibold text-kit-slate-12"
+              >
+                {labelOf(l)}
+              </span>
+              <input
+                type="number"
+                min={Math.max(1, l.received_qty)}
+                value={d.qty}
+                onChange={(e) =>
+                  setDraft((cur) => ({
+                    ...cur,
+                    [l.id]: { ...d, qty: e.target.value },
+                  }))
+                }
+                aria-label={`Qty for ${l.sku}`}
+                data-testid={`po-revise-qty-${i + 1}`}
+                className="h-8 w-full rounded-control border border-kit-slate-5 bg-white px-2 text-right text-body text-kit-slate-12 tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9"
+              />
+              <select
+                value={d.destinationId}
+                onChange={(e) =>
+                  setDraft((cur) => ({
+                    ...cur,
+                    [l.id]: { ...d, destinationId: e.target.value },
+                  }))
+                }
+                aria-label={`Destination for ${l.sku}`}
+                data-testid={`po-revise-destination-${i + 1}`}
+                className="h-8 w-full min-w-0 rounded-control border border-kit-slate-5 bg-white px-1 text-body text-kit-slate-12"
+              >
+                {d.destinationId === "" && <option value="">—</option>}
+                {destinations.map((dst) => (
+                  <option key={dst.id} value={dst.id}>
+                    {dst.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {/* THE FLOOR, stated where it binds — only when it binds: goods a
+                warehouse already holds cannot be un-ordered by editing a
+                document. Red only when the draft breaks it. */}
+            {l.received_qty > 0 ? (
+              <div
+                className={`pb-1.5 pl-6 text-label ${belowFloor ? "text-kit-red-11" : "text-kit-slate-9"}`}
+                data-testid={`po-revise-floor-${i + 1}`}
+              >
+                {l.received_qty} received
+              </div>
+            ) : null}
+          </div>
+        );
+      })}
+
+      <div className="mt-2">
+        <input
+          type="text"
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          placeholder="Why"
+          aria-label="Why"
+          data-testid="po-revise-reason"
+          className="h-8 w-full rounded-control border border-kit-slate-5 bg-white px-2 text-body text-kit-slate-12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9"
+        />
+      </div>
+
+      <div className="mt-2 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={submit}
+          disabled={gap != null || save.isPending}
+          data-testid="po-revise-save"
+          className={`${DOC_BTN} font-medium disabled:opacity-40`}
+        >
+          {save.isPending ? "Saving…" : (gap ?? `Save Version ${nextVersion}`)}
+        </button>
+        <button
+          type="button"
+          onClick={onClose}
+          data-testid="po-revise-cancel"
+          className="text-label text-kit-slate-9 hover:text-kit-slate-12"
+        >
+          Cancel
+        </button>
+      </div>
+      {err ? (
+        <div className="mt-1 text-label text-kit-red-11" data-testid="po-revise-error">
+          {err}
+        </div>
+      ) : null}
     </div>
   );
 }

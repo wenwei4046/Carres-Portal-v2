@@ -451,6 +451,8 @@ export {
   // Q5 (0318) — the supplier's promised READY date, the third answer body.
   recordReadyDateInput,
   recordSendInput,
+  // PO Revisions (0364) — a sent PO keeps its number and mints a version.
+  revisePoInput,
   setMessageTemplateInput,
   setLineDestinationInput,
   setLineOpsRemarkInput,
@@ -941,7 +943,10 @@ export {
   poCurrentActionOf,
   poDateHistoryOf,
   poOverdueDays,
+  poReviseSaveGapOf,
   poRiskRungOf,
+  poUnsharedVersionNoticeOf,
+  poVersionLabelOf,
   poWorkStateOf,
   type PoArrivalGap,
   type PoCurrentAction,
