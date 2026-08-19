@@ -1,4 +1,4 @@
-STATUS: QUEUED
+STATUS: IN PROGRESS — 3 of 6 finish items done; BLOCKED on three owner rulings (see BUILD RECORD)
 DATE: 2026-08-18
 PR: pending
 IMPLEMENTATION: APPROVED — owner ruled every section with the architect 2026-08-18, build straight to production
@@ -187,20 +187,103 @@ and the `Queues` rail filtering the grid. Overwrite `docs/purchasing/MASTER.md`
   Needed · Stock · On PO · To Buy · Coverage · Supplier · PO No.); selection =
   shortage-only, sofa set spreads via `toggleLeaf`. **`tsc` CLEAN.**
 
-**NOT DONE — the build chat finishes:**
-1. `OperationToOrder.test.tsx` — the suite asserts the OLD flat grid; rewrite to
-   the card's mandatory list (three levels; collapse; sofa set; To Buy printed +
-   locked; To Buy 0 unselectable; coverage tags; floats).
-2. The `Queues` rail block (§6): `Issue PO` (count = shortage orders) and `Check
-   the supplier` (count = the wire's `unresolved` — measured: that array IS
-   supplier-missing demand, to-order.ts:378). `Check the SKU` has NO wire fact on
-   this page and its queue already lives on Manual Purchase's rail — do not build
-   a second door (Law C); record the deviation in this card when you close it.
-3. §4/§5 — verify Issue asks nothing the SO already says (destination/date derive
-   server-side; header rolls up); remove any remaining ask; consequence line on an
-   inline destination change.
-4. Sort switch keys for the new columns (`need`/`stock`/`onpo`/`tobuy` cases).
-5. Widths re-measured in a REAL browser (no guessed number outlives the build);
-   COPY-STANDARD gains the new column words + coverage tags in the same PR.
-6. MASTER §3 WHAT IS ON SCREEN TODAY overwrite · release · SHA proof · flip this
-   card EXECUTED.
+## BUILD RECORD — slice 2 landed (2026-08-19, build chat) · `3dae5b6b`
+
+**DONE, gates stated:**
+4. **Sort keys.** `need` · `stock` · `onpo` · `tobuy` were declared `sortable`
+   and fell through to `return 0` — four dead headers. Each now compares through
+   the SAME helper its cell prints (`leafNeed` / `leafToBuy`, plus the new
+   `stockShown` / `onPoShown` for the two the projection does not own). `leafOf`
+   moved above the sort so both sides share one arithmetic (Law D).
+2. **The `Queues` rail** — heading + `Issue PO`, counted under the portal's facet
+   law so the row's number IS what its click leaves on screen. It appends BELOW
+   the calendar and the categories: Jess pointed at that rail on 2026-08-19 and
+   ruled it stays exactly as it is, so nothing she approved moves down the page.
+5. **P16 widths, re-measured in Chrome** at the app's own tokens (cell `400 13px
+   Inter`, band `600 13px`, header `500 11px`), method unchanged. **The method was
+   proved before the numbers were trusted: re-measuring `Supplier`, whose content
+   this card does not touch, reproduced its shipped `111px` exactly.**
+   `so 175→151 · need 111→99 · stock 71→66 · onpo 71→70 · tobuy 75→73 ·
+   coverage 140→74 · po 175→121`. `customer` (181) and `delivery` (163) KEEP their
+   shipped numbers — this card changes neither column's content, and today's rows
+   are TEST data (`CLAUDE.md` §6), so they are no evidence for narrowing a column
+   measured on live data.
+   COPY-STANDARD gained the grid's whole vocabulary in the same commit.
+1. **Tests, PARTLY.** The card's own mandatory cases are written and GREEN: three
+   levels render · a single-variant item collapses to two · the sofa band is the
+   SALES ORDER and its lines drop the identity it states · `To Buy` printed and
+   with no input on the cell · a `To Buy = 0` line offers no checkbox · the
+   coverage tags · one sofa tick takes the whole same-SO set while a bedframe tick
+   does not. **66 pass · 42 still assert the flat grid** — and most of those 42 are
+   blocked by the three rulings below, not by test mechanics.
+
+---
+
+## 🔴 BLOCKED — three owner decisions this card cannot make for her
+
+### B1 · §4's destination derivation contradicts a LOCKED ruling, and has no source
+
+§4: *"Each PO line's destination and delivery date derive from the source SO line."*
+
+**MEASURED, 2026-08-19, production:**
+- There is **no destination column on `orders` or `order_items`** — the only ones in
+  the schema belong to Purchasing (`purchase_orders` · `purchase_order_lines` ·
+  `purchase_demands` · `purchasing_supplier_settings`).
+- `orders.warehouse_id`, the nearest thing, is **NULL on 93 of 93 orders**.
+- `ToOrderLine.destinationName` is **read** (`to-order.ts:573`) and **never written**
+  anywhere in the API — it is always `undefined`.
+- Issue posts `destinationId: defaultDest.id` — the registry default — for every PO
+  (`OperationToOrder.tsx:1233`).
+
+**And `purchasing/MASTER.md` §"Deliver To — owner-locked operating rule (2026-08-14)"
+rules the opposite of §4:** *"`Deliver To` is Purchasing's authoritative instruction, at
+PO level with a PO-line override… **must not be copied onto Sales Orders**"*, default
+`Carres Klang`, with Operations free to change it in Batch Purchase before Issue.
+
+So the half of §4 that says the issue form must ASK nothing is **satisfied and verified**
+— there is no destination or date question anywhere in it, and the dates already derive
+through the locked engine. The half that says destination derives from the SO **cannot be
+built**: the fact does not exist, and the standing ruling forbids creating it.
+
+**RECOMMENDATION:** keep the 2026-08-14 Deliver To rule as written and strike §4's
+derivation sentence. What §4 was really reaching for is already licensed by that rule —
+an inline `Deliver To` cell on this grid, editable before Issue, with the split staying on
+one supplier PO. That is a buildable card; it needs a `Deliver To` column, which the card's
+own §2 column list does not include. **The stock-transfer consequence line (§4's last
+bullet) waits on the same decision.**
+
+### B2 · `Check the supplier` cannot be a row on this rail
+
+**MEASURED:** the wire's `unresolved` demand never becomes a grid row. The engine drops it
+at `to-order.ts:384` (`continue`) because a SKU with no supplier has no production days and
+so no raise-by date. A queue row filtering THIS grid by it would always show an empty sheet.
+Its action (`Save the supplier`) has no door anywhere in the portal — it is catalog work,
+and this card may not touch those files.
+
+The count is not lost: it stays on the amber band, which already names the affected items.
+
+**RECOMMENDATION:** card it against the catalog, where the supplier is actually mapped.
+`Check the SKU` is a separate matter and correctly absent — its queue already lives on
+Manual Purchase's rail, and a second door for one act is what Law C forbids.
+
+### B3 · The card's column list silently drops `Proceed date` (P18)
+
+The ten columns in §2 have no `Proceed date`, and the foundations commit removed it. **P18
+is an approved, shipped, tested feature** — it exists precisely because that fact was
+*"homeless"*, and eight tests assert it. The card never says to remove it.
+
+It also does not survive the hierarchy unchanged: it is an ORDER fact, and an ITEM band
+spans many orders, so its old home (the order line) is gone. On a sofa band it still fits;
+on a leaf it fits.
+
+**RECOMMENDATION:** put `Proceed date` back, on the LEAF, where one row is one SO line —
+the fact keeps a home and the eight tests keep their meaning. **Do not delete an approved
+feature on the strength of a column sketch that also omits `PO No.` and kept it.** Jess's
+word decides; until it comes, the tests stay red rather than being deleted, because deleting
+them is the silent overturn Law 4 exists to stop.
+
+---
+
+**STILL OPEN after the three above are ruled:** finish the remaining flat-grid tests ·
+overwrite `purchasing/MASTER.md` §3 WHAT IS ON SCREEN TODAY · release · SHA proof · flip
+this card EXECUTED. **It is NOT executed and must not be recorded as such.**
