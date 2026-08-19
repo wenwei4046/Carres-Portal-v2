@@ -16,11 +16,16 @@ vi.mock("@/lib/auth", () => ({
     selector({ role: mockRole, session: { user: { email: "x@carres.com" } } }),
 }));
 
-// The rail self-fetches badges / pending count; stub the queries so no network.
+// The rail self-fetches badges / pending count / the purchasing settings gate;
+// stub the queries so no network.
+let mockCanEditPurchasingSettings = false;
 vi.mock("@/lib/queries", () => ({
   useOperationBadges: () => ({ data: undefined }),
   useMarkOperationBadgeSeen: () => ({ mutate: vi.fn() }),
   usePrincipalDashboard: () => ({ data: undefined }),
+  usePurchasingSettings: () => ({
+    data: { canEdit: mockCanEditPurchasingSettings },
+  }),
 }));
 
 import PortalSidebar from "./PortalSidebar";
@@ -319,5 +324,166 @@ describe("PortalSidebar — the Sales Order cutover's two doors", () => {
     renderAt("/operation/old-orders/in_production");
     expect(oldLink().className).toContain("font-semibold");
     expect(salesLink().className).not.toContain("font-semibold");
+  });
+});
+
+/**
+ * THE PURCHASING PAGES LEFT THE HEADER AND JOINED THE RAIL (Jess, 2026-08-18).
+ *
+ * The module's `Purchasing` item expands in place — one rail, not two. All
+ * THIRTEEN entries are listed from day one (the eleven approved pages, then
+ * Report and Settings below a hairline), because the rail is the module's MAP
+ * and a map showing four of eleven roads teaches three operators a shape that
+ * is about to change under them seven more times.
+ *
+ * The seven unbuilt entries are NOT CONTROLS: no href, out of the tab order,
+ * `aria-disabled`, printing `Coming soon` on the row. That is what keeps them
+ * inside `03-page-patterns.md:149` (no dead controls) while satisfying `:219`
+ * (a deliberately disabled control must say why, on screen).
+ */
+describe("PortalSidebar — the Purchasing pages are in the rail", () => {
+  beforeEach(() => {
+    mockRole = "operation";
+    mockCanEditPurchasingSettings = false;
+  });
+
+  const LIVE = [
+    "SO Batch Purchase",
+    "Purchase Orders",
+    "Receiving",
+    "Supplier Claims",
+    "Report",
+  ];
+  const SOON = [
+    "Manual Purchase",
+    "Purchase Returns",
+    "Repair Orders",
+    "Display Requests",
+    "Consignment Orders",
+    "Consignment Receipts",
+    "Consignment Returns",
+  ];
+
+  it("lists every page while standing in Purchasing", () => {
+    renderAt("/operation?tab=purchase");
+    for (const word of [...LIVE, ...SOON]) {
+      expect(screen.getByText(word)).toBeInTheDocument();
+    }
+  });
+
+  it("lists them in the approved order of purchasing/MASTER.md §1", () => {
+    renderAt("/operation?tab=purchase");
+    const rows = Array.from(
+      screen.getByTestId("nav-children-purchasing").querySelectorAll("[data-testid^='nav-child-']"),
+    ).map((el) => el.textContent?.replace("Coming soon", "").trim());
+    expect(rows).toEqual([
+      "SO Batch Purchase",
+      "Manual Purchase",
+      "Purchase Orders",
+      "Receiving",
+      "Supplier Claims",
+      "Purchase Returns",
+      "Repair Orders",
+      "Display Requests",
+      "Consignment Orders",
+      "Consignment Receipts",
+      "Consignment Returns",
+      "Report",
+    ]);
+  });
+
+  it("the two renames are live and the old words appear nowhere", () => {
+    renderAt("/operation?tab=purchase");
+    expect(screen.getByText("SO Batch Purchase")).toBeInTheDocument();
+    expect(screen.getByText("Supplier Claims")).toBeInTheDocument();
+    expect(screen.queryByText("To Order")).not.toBeInTheDocument();
+    expect(screen.queryByText("Claims")).not.toBeInTheDocument();
+  });
+
+  it("`Receiving` keeps its word — no `Goods Receipts`, no `GRN`", () => {
+    renderAt("/operation?tab=purchase");
+    expect(screen.getByText("Receiving")).toBeInTheDocument();
+    expect(screen.queryByText("Goods Receipts")).not.toBeInTheDocument();
+    expect(screen.queryByText(/GRN/)).not.toBeInTheDocument();
+  });
+
+  it("an unbuilt entry is NOT a control — no href, not focusable, says why", () => {
+    renderAt("/operation?tab=purchase");
+    for (const key of [
+      "manual-purchase",
+      "purchase-returns",
+      "repair-orders",
+      "display-requests",
+      "consignment-orders",
+      "consignment-receipts",
+      "consignment-returns",
+    ]) {
+      const row = screen.getByTestId(`nav-child-${key}`);
+      expect(row.tagName).toBe("SPAN");
+      expect(row.getAttribute("href")).toBeNull();
+      expect(row.getAttribute("role")).not.toBe("link");
+      expect(row.getAttribute("tabindex")).toBe("-1");
+      expect(row.getAttribute("aria-disabled")).toBe("true");
+      expect(row.textContent).toContain("Coming soon");
+    }
+  });
+
+  it("a live entry IS a link and does not say `Coming soon`", () => {
+    renderAt("/operation?tab=purchase");
+    const row = screen.getByTestId("nav-child-receiving");
+    expect(row.tagName).toBe("A");
+    expect(row.getAttribute("href")).toBe("/operation?tab=receiving");
+    expect(row.textContent).not.toContain("Coming soon");
+  });
+
+  it("`Purchase Orders` links to its nested path, not to a ?tab=", () => {
+    renderAt("/operation?tab=purchase");
+    expect(screen.getByTestId("nav-child-purchase-orders").getAttribute("href")).toBe(
+      "/operation/procurement",
+    );
+  });
+
+  it("no unbuilt entry renders a count, and none renders a `0`", () => {
+    renderAt("/operation?tab=purchase");
+    for (const key of SOON) {
+      const row = screen.getByText(key).closest("[data-testid^='nav-child-']");
+      expect(row?.querySelector("[data-testid^='nav-badge-']")).toBeNull();
+      expect(row?.textContent).not.toMatch(/\b0\b/);
+    }
+  });
+
+  it("Settings renders only for a caller the server says may edit", () => {
+    mockCanEditPurchasingSettings = false;
+    const { unmount } = renderAt("/operation?tab=purchase");
+    expect(screen.queryByTestId("nav-child-purchasing-settings")).not.toBeInTheDocument();
+    unmount();
+
+    mockCanEditPurchasingSettings = true;
+    renderAt("/operation?tab=purchase");
+    expect(screen.getByTestId("nav-child-purchasing-settings")).toBeInTheDocument();
+  });
+
+  it("the page you are standing on is the highlighted one", () => {
+    renderAt("/operation?tab=receiving");
+    expect(screen.getByTestId("nav-child-receiving").className).toContain("font-semibold");
+    expect(screen.getByTestId("nav-child-claims").className).not.toContain("font-semibold");
+  });
+
+  it("a nested path page wins — Receiving does not light up next to Purchase Orders", () => {
+    renderAt("/operation/procurement");
+    expect(screen.getByTestId("nav-child-purchase-orders").className).toContain(
+      "font-semibold",
+    );
+    expect(screen.getByTestId("nav-child-receiving").className).not.toContain(
+      "font-semibold",
+    );
+  });
+
+  it("standing in another module closes the list", () => {
+    renderAt("/operation?tab=stock-onhand");
+    expect(screen.queryByTestId("nav-children-purchasing")).not.toBeInTheDocument();
+    expect(screen.queryByText("Supplier Claims")).not.toBeInTheDocument();
+    // …but the module door itself is still there.
+    expect(screen.getByText("Purchasing")).toBeInTheDocument();
   });
 });

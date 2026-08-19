@@ -967,6 +967,29 @@ lag, not the other way round.
 **Every module fails the same way:** one `Exception` plus a `Reason`, never a family of
 different failure words.
 
+### A door that is planned but not open says `Coming soon` (Jess, 2026-08-18)
+
+**`Coming soon` is the ONE way the portal marks a page that is approved but not
+built.** It is the sidebar's own case: Purchasing lists all thirteen of its pages
+from the day the rail changes, and seven of them do not exist yet.
+
+| Situation | The words |
+|---|---|
+| A rail entry for a page that is approved but not built | **`Coming soon`**, right-aligned on the row |
+
+**Banned for the same fact:** `TBD` · `Not available` · `Not yet` · `In progress` ·
+`Soon` on its own · a greyed word with nothing beside it. Those are six sentences
+for one fact and a new hire has to learn all six.
+
+**The words are only half of it — the row may not be a control.** A `Coming soon`
+row is a `<span>` with no href, out of the tab order and `aria-disabled`. That is
+what keeps it inside `03-page-patterns.md:149` (*a control that opens nothing is a
+dead control*) while satisfying `:219` (*a control that is deliberately disabled
+must say why, on screen*). **There is no dead arrow because there is no arrow.**
+
+**It never carries a count**, not even zero — a number would claim work exists on
+a page that does not.
+
 ### A number is not a status until someone sets a target (locked 2026-07-27)
 
 A percentage, a count or a rate is a FACT. It gets a colour only when a human has set the
