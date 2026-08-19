@@ -34,6 +34,44 @@
 set search_path = public, pg_temp;
 
 -- ---------------------------------------------------------------------
+-- 0. The Checkpoint-A prototype steps aside (drift found 2026-08-19)
+-- ---------------------------------------------------------------------
+-- Production already carried a `purchase_requests` TABLE this repository
+-- never heard of: a line-level, display-only requisition prototype whose own
+-- comment says "WORKING NAME — prototype store … (Checkpoint A)". It arrived
+-- as applied migrations `0308_manual_purchase_states_its_reason` and
+-- `0309_purchase_requests_proof`, whose FILES are missing from the repo (the
+-- P0 of red line #7 — their PR, #522, was closed unmerged; recovered
+-- snapshots now live beside this file). It brought two doors
+-- (`purchase_request_create` / `purchase_request_cancel`) and
+-- `purchase_order_lines.purchase_request_id`. ZERO application code
+-- references any of it, and it holds one test row.
+--
+-- NOTHING IS DROPPED. The table is RENAMED aside with its row and its
+-- incoming FK intact; the two doors are revoked so a stale client cannot
+-- reach them (they would now fail loudly anyway — they name the old table).
+-- `purchase_order_lines.purchase_request_id` is left exactly where it is;
+-- the issue slice records the demand link's fate.
+
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'purchase_requests'
+      and column_name = 'product_sku_id'
+  ) then
+    alter table public.purchase_requests rename to purchase_requests_checkpoint_a;
+    comment on table public.purchase_requests_checkpoint_a is
+      'RETIRED Checkpoint-A prototype (0308/0309, files recovered 2026-08-19). Renamed aside by 0359, which builds the approved request header. Read-only evidence; nothing writes here.';
+  end if;
+end $$;
+
+revoke execute on function public.purchase_request_create(uuid, int, jsonb, date, text)
+  from public, anon, authenticated;
+revoke execute on function public.purchase_request_cancel(uuid, text)
+  from public, anon, authenticated;
+
+-- ---------------------------------------------------------------------
 -- 1. The header
 -- ---------------------------------------------------------------------
 

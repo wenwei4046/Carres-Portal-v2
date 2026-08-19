@@ -241,6 +241,16 @@ Any string this build finds it needs and cannot find in the table is added to
 
 ## BUILD RECORD
 
+**P0 FOUND AND CURED ON THE WAY (2026-08-19).** Production carried a
+`purchase_requests` PROTOTYPE this repository never heard of — applied
+migrations `0308`/`0309` whose files died with closed PR #522 (the exact P0 of
+red line #7). It was a line-level, display-only "Checkpoint A" store with two
+doors and `purchase_order_lines.purchase_request_id`; zero application code
+references it and it held one test row. 0359 renames it aside
+(`purchase_requests_checkpoint_a`, nothing dropped), revokes its doors, and
+the two lost files are RECOVERED into the repo from production's own schema,
+marked as reconstructions.
+
 **Slice 1 — IMPLEMENTED 2026-08-19** (migration `0359`): `purchase_requests`
 header (REQ- series, five purposes with `spare_parts`, door-enforced `why`,
 approval fields stamped from the new per-purpose switches in
