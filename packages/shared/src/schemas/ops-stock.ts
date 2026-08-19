@@ -195,6 +195,16 @@ export const opsStockItemSchema = z.object({
   // fixtures/constructors don't break.
   soldAt: z.string().nullable().optional(),
   soldOrderId: z.string().nullable().optional(),
+  // D9 (ERP-ARCHITECTURE §3.1) — what kind of product this is, and it is the
+  // CATALOG's answer: ops_stock_items.sku → product_skus → product_models.
+  // NOTHING may re-derive it from the SKU text.
+  //
+  // `null` and ABSENT are different facts and both are real here:
+  //   null      — we asked the catalog and it holds no row for this SKU
+  //   undefined — this endpoint did not ask
+  // Only /inventory asks today (the On hand rail is its only reader), so the
+  // field is optional as well as nullable.
+  category: z.string().nullable().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });

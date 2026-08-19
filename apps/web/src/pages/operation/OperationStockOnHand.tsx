@@ -59,6 +59,44 @@ const CONDITION_LABEL: Record<string, string> = {
 };
 const CONDITION_ORDER = ["new", "exhibition", "old", "refurbished", "damaged"];
 
+/**
+ * CATEGORY — D9 (ERP-ARCHITECTURE §3.1). The values arrive already answered by
+ * the CATALOG on `/inventory`; this file only labels and orders them. It must
+ * never look at a SKU string to work one out — that is the defect D9 names.
+ *
+ * The order is the catalog enum's own (`productCategorySchema`), so a category
+ * that starts appearing on the shelf lands in its ruled place instead of
+ * wherever the data happened to sort.
+ */
+const CATEGORY_LABEL: Record<string, string> = {
+  mattress: "Mattress",
+  bedframe: "Bedframe",
+  sofa: "Sofa",
+  accessory: "Accessory",
+  service: "Service",
+  guarantee: "Guarantee",
+};
+const CATEGORY_ORDER = [
+  "mattress",
+  "bedframe",
+  "sofa",
+  "accessory",
+  "service",
+  "guarantee",
+];
+
+/**
+ * The honest bucket for a unit whose SKU the catalog does not hold — 87 of 136
+ * live records (975 units), almost all free-text import SKUs.
+ *
+ * It is NOT a category and never folds into Accessory: *we do not know what
+ * this is* is a different fact from *this is an accessory*, and merging them
+ * would put 975 units under a word nobody chose. Every live row is TEST data
+ * (Constitution §6), so this is display, never a cleanup worklist.
+ */
+const NO_CATALOG = "__none__";
+const NO_CATALOG_LABEL = "Not in catalog";
+
 function isReady(r: OpsStockItem): boolean {
   return (
     isSellableStockStatus(r.status) &&
@@ -98,6 +136,16 @@ function matchesStatus(r: OpsStockItem, s: Status): boolean {
   }
 }
 
+/**
+ * The rail key for a unit's category — the CATALOG's answer, or the honest
+ * no-match bucket. `null` (the catalog holds no row) and `undefined` (an
+ * endpoint that did not ask) both land in the same bucket, because from the
+ * rail's side they are the same fact: nothing to show.
+ */
+function categoryKey(r: OpsStockItem): string {
+  return r.category ?? NO_CATALOG;
+}
+
 function matchesQuery(r: OpsStockItem, q: string): boolean {
   const hay = [r.sku, r.unitCode, r.reservedRef, r.poNo, r.sourceRef, r.supplier]
     .filter(Boolean)
@@ -121,6 +169,8 @@ const ALL_ACTIONS = [
 
 export default function OperationStockOnHand() {
   const [status, setStatus] = useState<Status>("all");
+  // "" = every category. Otherwise a catalog value, or NO_CATALOG.
+  const [category, setCategory] = useState<string>("");
   const [condition, setCondition] = useState<string>("");
   const [supplier, setSupplier] = useState<string>("");
   // "Needs attention" quick-views (each an additive AND filter).
@@ -149,6 +199,7 @@ export default function OperationStockOnHand() {
       noPo = 0;
     const byCondition = new Map<string, number>();
     const bySupplier = new Map<string, number>();
+    const byCategory = new Map<string, number>();
     for (const r of items) {
       if (isReady(r)) ready += 1;
       if (isReserved(r)) reserved += 1;
@@ -159,6 +210,8 @@ export default function OperationStockOnHand() {
       byCondition.set(r.condition, (byCondition.get(r.condition) ?? 0) + 1);
       if (r.supplier)
         bySupplier.set(r.supplier, (bySupplier.get(r.supplier) ?? 0) + 1);
+      const cat = categoryKey(r);
+      byCategory.set(cat, (byCategory.get(cat) ?? 0) + 1);
     }
     return {
       all: items.length,
@@ -170,6 +223,7 @@ export default function OperationStockOnHand() {
       noPo,
       byCondition,
       bySupplier,
+      byCategory,
     };
   }, [items]);
 
@@ -178,23 +232,42 @@ export default function OperationStockOnHand() {
     [counts.bySupplier],
   );
 
+  /**
+   * The category pills to draw: the catalog's own order first, then anything
+   * present that this file has no ruled place for.
+   *
+   * The tail is not defensive padding. If the catalog gains a seventh category,
+   * those units would otherwise be counted in the register and have no pill —
+   * present in `All`, reachable by no filter, and nothing on screen would say
+   * so. A category we cannot order is still a category we must show.
+   */
+  const categoryKeys = useMemo(() => {
+    const present = [...counts.byCategory.keys()].filter((k) => k !== NO_CATALOG);
+    return [
+      ...CATEGORY_ORDER.filter((c) => present.includes(c)),
+      ...present.filter((c) => !CATEGORY_ORDER.includes(c)).sort(),
+    ];
+  }, [counts.byCategory]);
+
   const qLower = q.trim().toLowerCase();
   const filtered = useMemo(
     () =>
       items.filter(
         (r) =>
           matchesStatus(r, status) &&
+          (category === "" || categoryKey(r) === category) &&
           (condition === "" || r.condition === condition) &&
           (supplier === "" || r.supplier === supplier) &&
           (!onlyRepair || r.needsRepair) &&
           (!onlyNoPo || !r.poNo) &&
           (qLower === "" || matchesQuery(r, qLower)),
       ),
-    [items, status, condition, supplier, onlyRepair, onlyNoPo, qLower],
+    [items, status, category, condition, supplier, onlyRepair, onlyNoPo, qLower],
   );
 
   const anyFilter =
     status !== "all" ||
+    category !== "" ||
     condition !== "" ||
     supplier !== "" ||
     onlyRepair ||
@@ -202,6 +275,7 @@ export default function OperationStockOnHand() {
     qLower !== "";
   function clearAll() {
     setStatus("all");
+    setCategory("");
     setCondition("");
     setSupplier("");
     setOnlyRepair(false);
@@ -322,6 +396,46 @@ export default function OperationStockOnHand() {
                   />
                 </div>
               </div>
+            ) : null}
+
+            {/* Category — D9: the CATALOG answered this on the way in, and the
+                no-match bucket is shown as itself rather than folded into a
+                category nobody chose. Renders only when there is a unit to
+                count, so an empty register shows no empty group. */}
+            {counts.byCategory.size > 0 ? (
+              <FilterGroup label="Category">
+                {/* `Any`, not `All`. The card proposed `All`, but this rail
+                    already spends `All` on the STATUS bucket list, where it is
+                    one of the buckets. Every FACET group's no-filter pill is
+                    `Any` (Condition, Supplier), and a second `All` sitting one
+                    group above the first asks the operator "all of what?".
+                    Status/Condition/Supplier are locked, so Category is the
+                    word that moves. */}
+                <FilterPill
+                  label="Any"
+                  active={category === ""}
+                  onClick={() => setCategory("")}
+                />
+                {categoryKeys.map((c) => (
+                  <FilterPill
+                    key={c}
+                    label={CATEGORY_LABEL[c] ?? c}
+                    n={counts.byCategory.get(c) ?? 0}
+                    active={category === c}
+                    onClick={() => setCategory((cur) => (cur === c ? "" : c))}
+                  />
+                ))}
+                {counts.byCategory.get(NO_CATALOG) ? (
+                  <FilterPill
+                    label={NO_CATALOG_LABEL}
+                    n={counts.byCategory.get(NO_CATALOG) ?? 0}
+                    active={category === NO_CATALOG}
+                    onClick={() =>
+                      setCategory((cur) => (cur === NO_CATALOG ? "" : NO_CATALOG))
+                    }
+                  />
+                ) : null}
+              </FilterGroup>
             ) : null}
 
             {/* Status */}

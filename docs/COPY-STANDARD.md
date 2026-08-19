@@ -933,6 +933,34 @@ transition (0098) — a day too late to give logistics the paper they ask for th
 before. Card C7 moves the stamp to customer confirmation. Nobody ever authors a delivery
 order by hand.
 
+### The On hand Category filter words (card 2026-08-19)
+
+The `Category` heading itself is already governed above (*facts about the record*). These are
+the pill words underneath it on On hand's left rail. **The category is the CATALOG's answer**
+(ERP-ARCHITECTURE §3.1 · D9) — no screen derives one from a SKU string, so every word here is
+either a catalog value or the honest admission that there is none.
+
+| Meaning | Use exactly | Do NOT use |
+|---|---|---|
+| No category filter applied | **`Any`** | `All` — this rail already spends `All` on the Status bucket list, where it names a bucket. Two `All` pills stacked in one rail ask *"all of what?"* |
+| The catalog's own six values | **`Mattress` · `Bedframe` · `Sofa` · `Accessory` · `Service` · `Guarantee`**, in that order | count order · alphabetical order · any raw SKU word |
+| The SKU has no catalog row | **`Not in catalog`** | `No catalog match` · `Unknown` · `Uncategorised` · `Other` · `Other goods` — and above all never folded into `Accessory` |
+
+**Why `Not in catalog` and not `No catalog match`.** *Match* names the lookup the system just
+performed; this rail states a fact about the GOODS. It is the same shape as the two facts this
+dictionary already rules — **`Supplier not assigned`** and **`Address not given yet`** — and the
+same reason `Invalid SKU` and `Supplier error` are banned there: a screen reports what is true of
+the record, never what the query did.
+
+**It is display, never a worklist.** 87 of 136 live records (975 units) sit in this bucket, and
+they are free-text import SKUs. Every live row today is TEST data (Constitution §6), so the
+number is honest reporting — it raises no alert, and it is never a cleanup or backfill queue.
+
+**`Other goods` is NOT the fallback here.** That word is ruled for the Sales Order footer's
+category tally, where a line is known goods that simply has no tally word of its own. *We do not
+know what this is* is a different fact, and borrowing the word would hide 975 unknown units
+under a confident one.
+
 ### The Receiving Workspace's own words (locked 2026-08-03, Slice B)
 
 `Check in` above is the ACT and stays the queue word. These are the words the

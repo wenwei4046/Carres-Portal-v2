@@ -39,6 +39,7 @@ import {
 import { requireOperationOrPrincipal } from "../../lib/auth-guards";
 import { attemptDeliveryOrderIssue } from "../../lib/delivery-order-issue";
 import { myDuties } from "../../lib/duties";
+import { skuCategories } from "../../lib/sku-categories";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -49,7 +50,10 @@ import type { AppEnv } from "../../types";
  *   /ready      — status='free' AND condition∈('new','exhibition') AND !needs_repair
  *   /reserved   — status='reserved'
  *   /repair     — needs_repair=true OR condition∈('old','damaged')
- *   /inventory  — everything (master grid)
+ *   /inventory  — everything (master grid), each row carrying its CATALOG
+ *                 category (D9). The other three do not ask, so their rows
+ *                 carry no `category` key at all rather than a null that would
+ *                 read as "the catalog has no row for this".
  *
  * POST endpoints (5 actions, each calls a SECURITY DEFINER RPC):
  *   /reserve, /release, /reassign, /takeout, /flag-repair
@@ -119,6 +123,19 @@ opsStockRouter.get("/repair", requireOperationOrPrincipal, async (c) => {
   return c.json({ items: shape(data ?? []), total: (data ?? []).length });
 });
 
+/**
+ * /inventory — the master grid, and the only list view that carries a CATEGORY.
+ *
+ * D9 (ERP-ARCHITECTURE §3.1): *"what kind of product is this?"* is the
+ * CATALOG's answer and nobody else's. The category is resolved through
+ * `sku → product_skus → product_models.category` by the ONE shared reader every
+ * other gate already asks (`skuCategories`), so this screen can never disagree
+ * with the earliest-sell floor or the goods gate about what a sofa is.
+ *
+ * **Nothing here reads the SKU TEXT.** The prefix/regex guessers that D9 was
+ * raised against are wrong for every live SKU; a unit the catalog does not hold
+ * comes back `category: null` and says so on screen.
+ */
 opsStockRouter.get("/inventory", requireOperationOrPrincipal, async (c) => {
   const auth = c.var.auth;
   const sb = userClient(c.env, auth.jwt);
@@ -128,7 +145,13 @@ opsStockRouter.get("/inventory", requireOperationOrPrincipal, async (c) => {
     .order("sku", { ascending: true })
     .order("status", { ascending: true });
   if (error) throw new HTTPException(500, { message: error.message });
-  return c.json({ items: shape(data ?? []), total: (data ?? []).length });
+  const rows = (data ?? []) as RawRow[];
+  const categories = await skuCategories(sb, rows.map((r) => r.sku));
+  const items = shape(rows).map((item) => ({
+    ...item,
+    category: categories.get(item.sku) ?? null,
+  }));
+  return c.json({ items, total: rows.length });
 });
 
 // =====================================================================
