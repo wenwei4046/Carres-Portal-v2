@@ -65,6 +65,21 @@ export const TO_ORDER_WORDS = {
   colQty: "Qty",
   colPoNo: "PO No.",
 
+  // ── The hierarchy grid's own columns (CARD-2026-08-18-so-batch-purchase §2;
+  //    registered in COPY-STANDARD in the same PR — no screen respells them).
+  //    `To Buy` is PRINTED, never left as `11 − 3 − 2`, and the buyer may not
+  //    edit it. `Coverage` per SO line says what stands behind the promise. ──
+  colNeed: "Qty Needed",
+  colStock: "Stock",
+  colToBuy: "To Buy",
+  colCoverage: "Coverage",
+  /** The Coverage tag for a line with nothing behind it — danger, so it is
+   *  the one SHOUTED word on the row. */
+  covShort: "SHORT",
+  /** The Coverage tag for a line free stock can cover today (SUGGESTED,
+   *  never consumed — the locked ruling stands; the tag is advisory). */
+  covStock: "stock",
+
   noDeliveryDate: "No delivery date",
 
   destination: "Destination",
@@ -2124,4 +2139,233 @@ export function planFromDocuments(
         lines: [...bySku.values()],
       };
     });
+}
+
+// ═══ THE HIERARCHY PROJECTION — the grid becomes three levels ══════════════
+//
+// CARD-2026-08-18-so-batch-purchase §2/§3. Today one row per SO line, flat:
+// four customers wanting the same beige three-seater are four rows and the
+// buyer adds them up in their head. Carres buys from a FACTORY, not from a
+// sales order — MOQ, pack and lorry-fill are all per item — so the grid
+// groups by ITEM, then variant, then the SO lines underneath (SAP MD04 is
+// per material, Odoo replenishment per product, Dynamics' requisition
+// worksheet per item; 2990s runs this shape in production, Mrp.tsx).
+//
+// SOFA IS THE EXCEPTION AND GROUPS BY SALES ORDER: a sofa is a colour-matched
+// SET, two customers' sofas may not merge onto one PO line, and selecting any
+// piece selects the whole same-SO set (Mrp.tsx:15-17 states the same law).
+//
+// Everything here is a PROJECTION over numbers the engine already computed —
+// Law D, one arithmetic: `toBuy` is the engine's own net quantity, never a
+// second subtraction performed here.
+
+/** One demand/receipt leaf, exactly the facts the page's grid row carries. */
+export interface HierarchyLeaf {
+  /** The page's selection key — the projection never invents its own. */
+  key: string;
+  category: string;
+  /** The item word — `railItemLabel(model, size)`. Level 1 groups on it. */
+  model: string;
+  /** The build's one spec sentence (fabric · colour · legs). Level 2. */
+  spec: string;
+  so: number | null;
+  orderId: string;
+  customer: string | null;
+  delivery: IsoDate | null;
+  readyStock: boolean;
+  destination: string | null;
+  supplier: string | null;
+  /** STILL TO BUY — the engine's net (already net of PO cover and of stock
+   *  actually TAKEN; suggested stock is never netted — locked ruling). */
+  qty: number;
+  takenFromStock: number;
+  /** SUGGESTED free stock (advisory, never consumed). */
+  freeStock: number;
+  coveredByOpenPo: number;
+  coveredByOpenPoPos: readonly string[];
+  /** A receipt (already a PO this session or fully covered) — never selectable. */
+  orderedPo: string | null;
+}
+
+/** What stands behind one SO line's promise — the `Coverage` tag. */
+export type LeafCoverage =
+  | { kind: "ordered"; po: string }
+  | { kind: "po"; po: string }
+  | { kind: "stock" }
+  | { kind: "short" };
+
+export function leafCoverage(l: HierarchyLeaf): LeafCoverage {
+  if (l.orderedPo != null) return { kind: "ordered", po: l.orderedPo };
+  if (l.qty <= 0 && l.coveredByOpenPoPos.length > 0)
+    return { kind: "po", po: l.coveredByOpenPoPos[0] };
+  if (l.takenFromStock > 0 && l.qty <= 0) return { kind: "stock" };
+  // Suggested stock that could cover the whole ask reads `stock` — advisory:
+  // the promise has something behind it TODAY, though nothing is consumed.
+  if (l.qty > 0 && l.freeStock >= l.qty) return { kind: "stock" };
+  return l.qty > 0 ? { kind: "short" } : { kind: "stock" };
+}
+
+/** `To Buy`, PRINTED — the engine's net, zero on a receipt. */
+export function leafToBuy(l: HierarchyLeaf): number {
+  return l.orderedPo != null ? 0 : Math.max(0, l.qty);
+}
+
+/** `Qty Needed` — what was ASKED, reassembled from the engine's own parts. */
+export function leafNeed(l: HierarchyLeaf): number {
+  if (l.orderedPo != null && l.coveredByOpenPo === 0) return l.qty;
+  return l.qty + l.takenFromStock + l.coveredByOpenPo;
+}
+
+export interface HierarchyTotals {
+  need: number;
+  stock: number;
+  onPo: number;
+  toBuy: number;
+}
+
+export interface HierarchyVariant extends HierarchyTotals {
+  key: string;
+  /** NULL when the item has ONE variant — the level collapses to two. */
+  label: string | null;
+  leaves: HierarchyLeaf[];
+}
+
+export interface HierarchyGroup extends HierarchyTotals {
+  key: string;
+  /** `item` groups by model; `so` is the sofa exception. */
+  kind: "item" | "so";
+  /** The item word, or `SO-1310` / the customer word on the sofa group. */
+  title: string;
+  customer: string | null;
+  /** Earliest customer delivery under the group — the urgency fact. */
+  delivery: IsoDate | null;
+  variants: HierarchyVariant[];
+}
+
+function totalsOf(leaves: readonly HierarchyLeaf[]): HierarchyTotals {
+  let need = 0;
+  let stock = 0;
+  let onPo = 0;
+  let toBuy = 0;
+  for (const l of leaves) {
+    need += leafNeed(l);
+    stock += l.takenFromStock + Math.max(0, l.freeStock);
+    onPo += l.coveredByOpenPo;
+    toBuy += leafToBuy(l);
+  }
+  return { need, stock, onPo, toBuy };
+}
+
+const earliestOf = (leaves: readonly HierarchyLeaf[]): IsoDate | null =>
+  leaves.reduce<IsoDate | null>(
+    (a, l) => (l.delivery == null ? a : a == null || l.delivery < a ? l.delivery : a),
+    null,
+  );
+
+/** SHORT floats to the top; inside a bucket the earliest promise first. */
+function leafOrder(a: HierarchyLeaf, b: HierarchyLeaf): number {
+  const sa = leafToBuy(a) > 0 ? 0 : 1;
+  const sb = leafToBuy(b) > 0 ? 0 : 1;
+  if (sa !== sb) return sa - sb;
+  const da = a.delivery ?? "9999-12-31";
+  const db = b.delivery ?? "9999-12-31";
+  return da < db ? -1 : da > db ? 1 : a.key.localeCompare(b.key);
+}
+
+function groupOrder(a: HierarchyGroup, b: HierarchyGroup): number {
+  const sa = a.toBuy > 0 ? 0 : 1;
+  const sb = b.toBuy > 0 ? 0 : 1;
+  if (sa !== sb) return sa - sb;
+  const da = a.delivery ?? "9999-12-31";
+  const db = b.delivery ?? "9999-12-31";
+  if (da !== db) return da < db ? -1 : 1;
+  return a.title.localeCompare(b.title);
+}
+
+/**
+ * The three levels. Mattress · Bedframe · Pillow · Protector group by ITEM;
+ * Sofa groups by SALES ORDER (`isOnePoPerOrder`). One page, two groupings,
+ * chosen by category — the complexity is in the business, and refusing it
+ * moves it into a buyer's head every morning.
+ */
+export function buildHierarchy(leaves: readonly HierarchyLeaf[]): HierarchyGroup[] {
+  const items = new Map<string, HierarchyLeaf[]>();
+  const sofas = new Map<string, HierarchyLeaf[]>();
+  for (const l of leaves) {
+    const bySo = isOnePoPerOrder(l.category);
+    const m = bySo ? sofas : items;
+    const k = bySo ? l.orderId : l.model;
+    const arr = m.get(k);
+    if (arr) arr.push(l);
+    else m.set(k, [l]);
+  }
+
+  const groups: HierarchyGroup[] = [];
+
+  for (const [model, ls] of items) {
+    const byVariant = new Map<string, HierarchyLeaf[]>();
+    for (const l of ls) {
+      const arr = byVariant.get(l.spec);
+      if (arr) arr.push(l);
+      else byVariant.set(l.spec, [l]);
+    }
+    // ONE variant (or none) → the level collapses to two (card's own test).
+    const collapse = byVariant.size <= 1;
+    const variants: HierarchyVariant[] = [...byVariant.entries()]
+      .map(([spec, vls]) => ({
+        key: `${model}::${spec}`,
+        label: collapse ? null : spec || "—",
+        leaves: [...vls].sort(leafOrder),
+        ...totalsOf(vls),
+      }))
+      .sort((a, b) =>
+        a.toBuy > 0 === b.toBuy > 0
+          ? (a.label ?? "").localeCompare(b.label ?? "")
+          : a.toBuy > 0
+            ? -1
+            : 1,
+      );
+    groups.push({
+      key: `item:${model}`,
+      kind: "item",
+      title: model,
+      customer: null,
+      delivery: earliestOf(ls),
+      variants,
+      ...totalsOf(ls),
+    });
+  }
+
+  for (const [orderId, ls] of sofas) {
+    const first = ls[0];
+    const sorted = [...ls].sort(leafOrder);
+    groups.push({
+      key: `so:${orderId}`,
+      kind: "so",
+      title: first.so != null ? `SO-${first.so}` : (first.customer ?? first.model),
+      customer: first.customer,
+      delivery: earliestOf(ls),
+      // A sofa group's second level is the SET itself — one variant band, the
+      // sets underneath. `label: null` keeps it two levels on screen.
+      variants: [
+        { key: `so:${orderId}:sets`, label: null, leaves: sorted, ...totalsOf(ls) },
+      ],
+      ...totalsOf(ls),
+    });
+  }
+
+  return groups.sort(groupOrder);
+}
+
+/**
+ * WHAT A TICK MAY TOUCH. Only a shortage line is selectable; a receipt never
+ * is. On a sofa group the answer is the whole same-SO set: selecting any
+ * piece returns every still-to-buy piece of that order, so the fabric batch
+ * can never split across purchase orders.
+ */
+export function selectableKeysOf(g: HierarchyGroup, leaf?: HierarchyLeaf): string[] {
+  const pool = g.variants.flatMap((v) => v.leaves).filter((l) => leafToBuy(l) > 0);
+  if (g.kind === "so") return pool.map((l) => l.key);
+  if (leaf == null) return pool.map((l) => l.key);
+  return leafToBuy(leaf) > 0 ? [leaf.key] : [];
 }

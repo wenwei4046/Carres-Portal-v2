@@ -388,6 +388,23 @@ export interface DataTableProps<Row> {
       /** The box's accessible name — the caller's words. */
       label: (row: Row) => string;
     };
+    /**
+     * A SECOND, OUTER band above the group line — the hierarchy grid's
+     * item/set level (CARD-2026-08-18-so-batch-purchase: Item → variant →
+     * SO lines). Emitted whenever ITS key changes, before the inner band.
+     * Same aligned-cells shape; `cells` returning `null` skips the band —
+     * that is how a single-variant item collapses to two levels (the inner
+     * band answers `null` and only the outer one draws).
+     */
+    parent?: {
+      keyOf: (row: Row) => string;
+      cells: (row: Row) => GroupRowCell[] | null;
+      selection?: {
+        state: (row: Row) => boolean | "indeterminate" | null;
+        onToggle: (row: Row) => void;
+        label: (row: Row) => string;
+      };
+    };
   } & (
     /**
      * **A GROUP LINE IS A HEADER OR IT IS CELLS — never both, never neither.**
@@ -414,8 +431,12 @@ export interface DataTableProps<Row> {
          *
          * The alternative to `header`, never a companion to it: a page that
          * passes `header` alone renders byte-identical markup to what it did.
+         *
+         * Returning `null` SKIPS the band for that group — the hierarchy
+         * grid's collapse: a single-variant item draws only its outer parent
+         * band and the level disappears instead of repeating the same words.
          */
-        cells: (row: Row) => readonly GroupRowCell[];
+        cells: (row: Row) => readonly GroupRowCell[] | null;
         header?: never;
       }
   );
@@ -1042,10 +1063,68 @@ export default function DataTable<Row>({
               const opensGroup =
                 group != null &&
                 (rowIndex === 0 || group.keyOf(row) !== group.keyOf(rows[rowIndex - 1]!));
+              /* The OUTER band (hierarchy level 1) — emitted on ITS key
+               * change, before the inner band. A parent key change implies
+               * nothing about the inner key, so both are tested on their own. */
+              const opensParent =
+                group?.parent != null &&
+                (rowIndex === 0 ||
+                  group.parent.keyOf(row) !== group.parent.keyOf(rows[rowIndex - 1]!));
+              const parentCells = opensParent ? group!.parent!.cells(row) : null;
+              const innerCells =
+                opensGroup && group?.cells ? group.cells(row) : null;
               return (
                 <Fragment key={`grp-${id}`}>
+                {opensParent && group?.parent && parentCells ? (
+                  <tr data-kit="data-group-parent" className={groupRowClass}>
+                    {expansion && <td className={`px-2 h-9 align-middle ${groupCellWash}`} />}
+                    {selection && (
+                      <td
+                        className={`px-2 h-9 align-middle ${groupCellWash}`}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {(() => {
+                          const s = group.parent!.selection?.state(row);
+                          return group.parent!.selection && s != null ? (
+                            <Checkbox
+                              id={`kit-table-parent-${group.parent!.keyOf(row)}`}
+                              ariaLabel={group.parent!.selection.label(row)}
+                              checked={s}
+                              onCheckedChange={() => group.parent!.selection!.onToggle(row)}
+                            />
+                          ) : null;
+                        })()}
+                      </td>
+                    )}
+                    {(() => {
+                      let at = 0;
+                      return parentCells.map((c, i) => {
+                        const start = at;
+                        const span = c.span ?? 1;
+                        at += span;
+                        return (
+                          <td
+                            key={i}
+                            colSpan={span}
+                            className={`px-2 h-9 align-middle ${groupCellWash} ${
+                              fills || at < ordered.length ? COLUMN_RULE : ""
+                            } ${start === 0 && hasGutter ? GUTTER_RULE : ""} ${
+                              c.align === "right" ? "text-right" : ""
+                            }`}
+                          >
+                            {c.content}
+                          </td>
+                        );
+                      });
+                    })()}
+                    {fills && (
+                      <td aria-hidden="true" data-kit="table-filler" className="h-9 bg-kit-slate-3" />
+                    )}
+                  </tr>
+                ) : null}
                 {opensGroup && group ? (
                   group.cells ? (
+                    innerCells == null ? null : (
                     /* T1 — the ALIGNED group line (Loo, 2026-08-06). The order's
                      * facts sit in the table's own columns, so the header words
                      * name them and the eye reads DOWN a column instead of
@@ -1075,7 +1154,7 @@ export default function DataTable<Row>({
                       )}
                       {(() => {
                         let at = 0;
-                        return group.cells(row).map((c, i) => {
+                        return innerCells.map((c, i) => {
                           const start = at;
                           const span = c.span ?? 1;
                           at += span;
@@ -1098,6 +1177,7 @@ export default function DataTable<Row>({
                         <td aria-hidden="true" data-kit="table-filler" className="h-9 bg-kit-slate-3" />
                       )}
                     </tr>
+                    )
                   ) : (
                   /* P17 — THE BAND IS NOT SLICED, and that is the card's own
                    * diagnosis followed rather than reversed: it floated
