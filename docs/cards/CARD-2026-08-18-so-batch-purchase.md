@@ -166,3 +166,41 @@ hierarchy, the sofa exception, `To Buy` printed and locked, `Coverage` on every 
 line, shortages at the top, no destination question at issue, one PO per supplier,
 and the `Queues` rail filtering the grid. Overwrite `docs/purchasing/MASTER.md`
 §3's WHAT IS ON SCREEN TODAY in the same PR under the MASTER OVERWRITE LAW.
+
+## BUILD RECORD — foundations landed on `claude/so-batch-hierarchy` (2026-08-19, planner chat)
+
+**DONE on this branch, gates state:**
+- `packages/shared/src/to-order.ts` — the whole hierarchy projection: `buildHierarchy`
+  (item groups; sofa by SO via `isOnePoPerOrder`), `leafCoverage` (`ordered · po ·
+  stock · short`), `leafToBuy` (PRINTED, engine's own net — Law D), `leafNeed`,
+  `selectableKeysOf` (sofa whole-set), the new words (`Qty Needed · Stock · To Buy ·
+  Coverage · SHORT · stock`). **17 unit tests, shared suite 2448 GREEN.** Exported
+  from `index.ts`.
+- `apps/web/src/components/kit/DataTable.tsx` — ADDITIVE `group.parent` outer band
+  (aligned cells + optional selection) and `group.cells` may return `null` to skip
+  the inner band (the single-variant collapse). No live page changes behaviour
+  unless it passes `parent`.
+- `apps/web/src/pages/operation/OperationToOrder.tsx` — the page surgery: GridRow
+  carries `spec`; `effViewSet` opens where the work is (Overdue first — Jess's
+  2026-08-19 defect); hierarchy flatten + band builders (`parentCells` /
+  `variantCells`); new column set (tree · Customer · Customer Delivery · Qty
+  Needed · Stock · On PO · To Buy · Coverage · Supplier · PO No.); selection =
+  shortage-only, sofa set spreads via `toggleLeaf`. **`tsc` CLEAN.**
+
+**NOT DONE — the build chat finishes:**
+1. `OperationToOrder.test.tsx` — the suite asserts the OLD flat grid; rewrite to
+   the card's mandatory list (three levels; collapse; sofa set; To Buy printed +
+   locked; To Buy 0 unselectable; coverage tags; floats).
+2. The `Queues` rail block (§6): `Issue PO` (count = shortage orders) and `Check
+   the supplier` (count = the wire's `unresolved` — measured: that array IS
+   supplier-missing demand, to-order.ts:378). `Check the SKU` has NO wire fact on
+   this page and its queue already lives on Manual Purchase's rail — do not build
+   a second door (Law C); record the deviation in this card when you close it.
+3. §4/§5 — verify Issue asks nothing the SO already says (destination/date derive
+   server-side; header rolls up); remove any remaining ask; consequence line on an
+   inline destination change.
+4. Sort switch keys for the new columns (`need`/`stock`/`onpo`/`tobuy` cases).
+5. Widths re-measured in a REAL browser (no guessed number outlives the build);
+   COPY-STANDARD gains the new column words + coverage tags in the same PR.
+6. MASTER §3 WHAT IS ON SCREEN TODAY overwrite · release · SHA proof · flip this
+   card EXECUTED.

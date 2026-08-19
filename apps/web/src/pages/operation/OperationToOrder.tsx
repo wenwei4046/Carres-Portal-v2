@@ -72,10 +72,17 @@ import {
   unresolvedHeadline,
   freeStockLine,
   onPoLine,
-  proceedWaitedDays,
   reserveFromStockLabel,
   reservedFromStockLabel,
   stockExpandLabel,
+  // The hierarchy projection (CARD-2026-08-18-so-batch-purchase §2/§3).
+  buildHierarchy,
+  leafCoverage,
+  leafToBuy,
+  leafNeed,
+  selectableKeysOf,
+  type HierarchyGroup,
+  type HierarchyLeaf,
   type ToOrderOrderedRow,
   type ToOrderProposal,
 } from "@carres/shared";
@@ -208,6 +215,9 @@ interface GridRow {
    */
   proceedDate: string | null;
   model: string;
+  /** The build's one spec sentence (fabric · colour · legs) — the hierarchy's
+   *  variant level groups on it. `""` on a receipt read back off a PO. */
+  spec: string;
   qty: number;
   /**
    * The calendar row this demand belongs to: `overdue` · a PO day's ISO
@@ -386,7 +396,10 @@ export default function OperationToOrder() {
       { replace: true },
     );
   const toggleView = (v: string) => {
-    const n = new Set(viewSet);
+    // Toggles run against the EFFECTIVE set (the open-where-the-work-is
+    // default included), so the first click on a lit default turns it off.
+    // Legal forward reference: this body only runs on click, after render.
+    const n = new Set(effViewSet);
     if (n.has(v)) n.delete(v);
     else n.add(v);
     setParam("view", [...n].join(","));
@@ -499,6 +512,7 @@ export default function OperationToOrder() {
             late: today != null && r.delivery != null && r.delivery < today,
             proceedDate: r.proceedDate ?? null,
             model: railItemLabel(b.model, b.size ?? null),
+            spec: b.spec,
             qty: b.qty,
             bucket,
             /**
@@ -570,6 +584,7 @@ export default function OperationToOrder() {
         late: today != null && o.delivery != null && o.delivery < today,
         proceedDate: o.proceedDate ?? null,
         model: o.model,
+        spec: "",
         qty: o.qty,
         // Ordered TODAY sits on the current run's row (今天下了哪些);
         // older receipts belong to Purchase Orders, not this calendar.
@@ -607,13 +622,27 @@ export default function OperationToOrder() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allRows, rowPo]);
 
+  /**
+   * ⭐ THE PAGE OPENS WHERE THE WORK IS (Jess, 2026-08-19, on the live page:
+   * it opened on today's EMPTY run while `Overdue 18` waited one click above,
+   * and a new hire read "No purchase orders to issue" as "no work today").
+   * With no explicit rail choice, the default view is Overdue whenever
+   * Overdue holds work; today's run only when it does not. An explicit
+   * `?view=` — including an explicit clear — is never overridden.
+   */
+  const effViewSet = useMemo<ReadonlySet<string>>(() => {
+    if (rawView != null || scopeSo != null) return viewSet;
+    if ((timeCounts.get("overdue")?.size ?? 0) > 0) return new Set(["overdue"]);
+    return viewSet;
+  }, [rawView, scopeSo, viewSet, timeCounts]);
+
   // ── The Excel pipeline: view → category → search → column filters → sort ──
 
   const inView = useMemo(
     () =>
       allRows.filter(
         (r) =>
-          (viewSet.size === 0 || viewSet.has(r.bucket)) &&
+          (effViewSet.size === 0 || effViewSet.has(r.bucket)) &&
           (catSet.size === 0 || catSet.has(r.category)) &&
           (search.trim() === "" ||
             (r.so != null && `so-${r.so}`.includes(search.trim().toLowerCase())) ||
@@ -622,7 +651,7 @@ export default function OperationToOrder() {
             (poOf(r) ?? "").toLowerCase().includes(search.trim().toLowerCase())),
       ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [allRows, viewSet, catSet, search, rowPo],
+    [allRows, effViewSet, catSet, search, rowPo],
   );
 
   /** Does a row pass ONE column's filter? Sentinels are facts, not values. */
@@ -702,7 +731,7 @@ export default function OperationToOrder() {
     for (const r of allRows) {
       if (poOf(r) || r.blocker != null) continue;
       // Everything `inView` applies except the category picks — see above.
-      if (viewSet.size > 0 && !viewSet.has(r.bucket)) continue;
+      if (effViewSet.size > 0 && !effViewSet.has(r.bucket)) continue;
       const q = search.trim().toLowerCase();
       if (
         q !== "" &&
@@ -720,7 +749,7 @@ export default function OperationToOrder() {
     }
     return { byCategory, all };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allRows, viewSet, search, colFilters, rowPo]);
+  }, [allRows, effViewSet, search, colFilters, rowPo]);
 
   const visibleRows = useMemo(() => {
     const rows = filteredExcept(null);
@@ -835,6 +864,94 @@ export default function OperationToOrder() {
   }, [allRows, userOff, userOn, rowPo]);
 
   const rowByKey = useMemo(() => new Map(allRows.map((r) => [r.key, r])), [allRows]);
+
+  // ── THE HIERARCHY (card §2/§3): Item → variant → SO lines; sofa by SO ────
+
+  /** GridRow → the projection's leaf. Same key, engine numbers untouched —
+   *  the projection is a VIEW over `buildToOrder`'s own arithmetic (Law D). */
+  const leafOf = (r: GridRow): HierarchyLeaf => ({
+    key: r.key,
+    category: r.category,
+    model: r.model,
+    spec: r.spec,
+    so: r.so,
+    orderId: r.orderId ?? r.key,
+    customer: r.customer,
+    delivery: r.delivery,
+    readyStock: r.readyStock,
+    destination: r.destination,
+    supplier: r.supplier,
+    qty: r.qty,
+    takenFromStock: r.takenFromStock,
+    freeStock: r.freeStock,
+    coveredByOpenPo: r.coveredByOpenPo,
+    coveredByOpenPoPos: r.coveredByOpenPoPos,
+    orderedPo: poOf(r) ?? null,
+  });
+
+  const hierarchy = useMemo(() => {
+    const groups = buildHierarchy(visibleRows.map(leafOf));
+    if (sort != null) {
+      /* A header sort re-orders GROUPS by their best row — the re-cluster law
+       * (Loo, 2026-08-07) one level up: an item's lines never scatter, and the
+       * sort still means what the header says. Stable sort keeps the ruled
+       * float order inside a tie. */
+      const at = new Map<string, number>();
+      visibleRows.forEach((r, i) => at.set(r.key, i));
+      const best = (g: HierarchyGroup) =>
+        Math.min(
+          ...g.variants.flatMap((v) => v.leaves.map((l) => at.get(l.key) ?? Infinity)),
+        );
+      groups.sort((a, b) => best(a) - best(b));
+    }
+    return groups;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visibleRows, sort, rowPo]);
+
+  /** The DataTable's flat row order + the band lookups, one pass. */
+  const flat = useMemo(() => {
+    const rows: GridRow[] = [];
+    const variantKeyByRow = new Map<string, string>();
+    const variantLabelByRow = new Map<string, string | null>();
+    const groupByRow = new Map<string, HierarchyGroup>();
+    const facts = new Map<
+      string,
+      { need: number; toBuy: number; coverage: ReturnType<typeof leafCoverage> }
+    >();
+    for (const g of hierarchy) {
+      for (const v of g.variants) {
+        for (const l of v.leaves) {
+          const gr = rowByKey.get(l.key);
+          if (!gr) continue;
+          rows.push(gr);
+          variantKeyByRow.set(l.key, v.key);
+          variantLabelByRow.set(l.key, v.label);
+          groupByRow.set(l.key, g);
+          facts.set(l.key, {
+            need: leafNeed(l),
+            toBuy: leafToBuy(l),
+            coverage: leafCoverage(l),
+          });
+        }
+      }
+    }
+    return { rows, variantKeyByRow, variantLabelByRow, groupByRow, facts };
+  }, [hierarchy, rowByKey]);
+
+  /** Only a shortage line is selectable (card §2) — and on a SOFA group the
+   *  unit of selection is the whole same-SO set: the fabric batch may never
+   *  split across purchase orders (card §3; Mrp.tsx:15-17). */
+  const toggleLeaf = (r: GridRow) => {
+    if (poOf(r) || r.blocker != null || r.qty <= 0) return;
+    const g = flat.groupByRow.get(r.key);
+    const keys =
+      g != null && g.kind === "so" ? selectableKeysOf(g) : [r.key];
+    const target = !isSelected(r);
+    for (const k of keys) {
+      const x = rowByKey.get(k);
+      if (x && !poOf(x) && x.blocker == null && isSelected(x) !== target) toggleRow(x);
+    }
+  };
 
   /** Header select-all — over the rows the operator can SEE, Excel's rule. */
   const toggleAllVisible = () => {
@@ -1222,12 +1339,6 @@ export default function OperationToOrder() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inView, colFilters]);
 
-  const modelOptions = useMemo(() => {
-    const base = filteredExcept("model");
-    const models = [...new Set(base.map((r) => r.model))].sort();
-    return models.map((m) => ({ value: m, label: m }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inView, colFilters]);
 
   const poOptions = useMemo(() => {
     const base = filteredExcept("po");
@@ -1287,63 +1398,6 @@ export default function OperationToOrder() {
     return opts;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inView, colFilters]);
-  /**
-   * ── The GROUP: one line per customer order ────────────────────────────────
-   *
-   * AutoCount's shape (Loo, 2026-08-03, from its `SO Batch Posting` screen —
-   * its own version of this page). Its row IS the customer order and the items
-   * open underneath, so the customer's name, the order number and the date are
-   * stated ONCE. Ours was one row per item, so a customer buying three pieces
-   * printed their name three times.
-   *
-   * Two facts move onto the header because they belong to the ORDER and could
-   * never honestly sit on a row: whether the order is PARTLY ordered, and the
-   * purchase-order numbers it has already produced — one customer order can
-   * carry several, because SO-1286 goes to two factories and that is two
-   * documents.
-   *
-   * Computed from ALL rows, never from the visible ones: an order is partly
-   * ordered whether or not the ordered half happens to pass today's filter,
-   * and a status that changed when you filtered would be a status nobody could
-   * trust.
-   */
-  const groupFacts = useMemo(() => {
-    const m = new Map<
-      string,
-      {
-        so: number | null;
-        customer: string | null;
-        delivery: string | null;
-        late: boolean;
-        total: number;
-        ordered: number;
-        pos: string[];
-      }
-    >();
-    for (const r of allRows) {
-      const k = r.orderId ?? r.key;
-      const g =
-        m.get(k) ??
-        {
-          so: r.so,
-          customer: r.customer,
-          delivery: r.delivery,
-          late: r.late,
-          total: 0,
-          ordered: 0,
-          pos: [] as string[],
-        };
-      g.total += 1;
-      const po = poOf(r);
-      if (po) {
-        g.ordered += 1;
-        if (!g.pos.includes(po)) g.pos.push(po);
-      }
-      m.set(k, g);
-    }
-    return m;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allRows, rowPo]);
 
 
   /**
@@ -1352,32 +1406,28 @@ export default function OperationToOrder() {
    * hidden by a filter neither counts nor issues, so the box neither reads
    * nor writes rows the sheet is not showing.
    */
-  const visibleByGroup = useMemo(() => {
-    const m = new Map<string, GridRow[]>();
-    for (const r of visibleRows) {
-      const k = r.orderId ?? r.key;
-      const arr = m.get(k);
-      if (arr) arr.push(r);
-      else m.set(k, [r]);
-    }
-    return m;
-  }, [visibleRows]);
-
   /**
-   * The order line's ☑ — a CONVENIENCE toggle over its builds, nothing more.
-   * Selection stays BUILD-level (Loo's frozen meaning: membership of THIS
-   * purchase order); this box is all / some (the indeterminate dash) / none
-   * over those very builds, and a group with nothing selectable (a receipt)
-   * gets no box at all.
+   * The GROUP band's ☑ — a CONVENIENCE toggle over the group's SELECTABLE
+   * leaves (shortage only). Selection stays BUILD-level (Loo's frozen
+   * meaning: membership of THIS purchase order); this box is all / some (the
+   * indeterminate dash) / none over those very leaves, and a group with
+   * nothing selectable (fully covered, receipts) gets no box at all.
    */
+  const groupRowsOf = (r: GridRow): GridRow[] => {
+    const g = flat.groupByRow.get(r.key);
+    if (!g) return [];
+    return selectableKeysOf(g)
+      .map((k) => rowByKey.get(k))
+      .filter((x): x is GridRow => x != null && !poOf(x) && x.blocker == null);
+  };
   const groupSelState = (r: GridRow): boolean | "indeterminate" | null => {
-    const rows = (visibleByGroup.get(r.orderId ?? r.key) ?? []).filter((x) => !poOf(x));
+    const rows = groupRowsOf(r);
     if (rows.length === 0) return null;
     const n = rows.filter(isSelected).length;
     return n === 0 ? false : n === rows.length ? true : "indeterminate";
   };
   const groupSelToggle = (r: GridRow) => {
-    const rows = (visibleByGroup.get(r.orderId ?? r.key) ?? []).filter((x) => !poOf(x));
+    const rows = groupRowsOf(r);
     if (rows.length === 0) return;
     const all = rows.every(isSelected);
     for (const x of rows) {
@@ -1388,95 +1438,50 @@ export default function OperationToOrder() {
   };
 
   /**
-   * ── Grid columns — T1, the AutoCount-aligned grid (Loo, 2026-08-06) ──────
+   * ── Grid columns — the HIERARCHY grid (CARD-2026-08-18-so-batch-purchase,
+   * Jess 2026-08-18; supersedes T1's flat AutoCount-aligned mock) ──────────
    *
-   * ORDER (Loo's approved mock, + T1.1's two and T3's one):
-   *   ☑ · SO No. · Customer · Customer Delivery · Proceed date · Supplier ·
-   *   Qty · Model · Ready Stock · On PO · PO No.
+   * Item → variant → SO lines. The bands are the kit's group machinery
+   * (`group.parent` + `group`); the LEAF columns are the card's own list —
+   * SO No · Customer · Customer Delivery · Qty Needed · Stock · On PO ·
+   * To Buy · Coverage · Supplier · PO No. The first column is the TREE: the
+   * item word on the band, `↳ SO-…` on a line (2990s Mrp's shape — a literal
+   * glyph, never padding, so it survives a resize and copies into Excel).
    *
-   * The last three are the buyer's own question in order — *is it in the
-   * warehouse · is it already bought · did I buy it today* — and they sit
-   * beside each other for that reason (2990s' MRP row: `Stock · PO
-   * Outstanding · Shortage`).
+   * `To Buy` is PRINTED, never `11 − 3 − 2`, and the buyer may not edit it —
+   * wanting extra for the shelf is a Manual Purchase behind approval
+   * (card §2). Only a shortage line is selectable.
    *
-   * The free-text group sentence is retired: Loo ruled it hard to read.
-   * EVERY fact gets a column, and the ORDER's facts (SO · customer · date)
-   * print on their own ALIGNED row — the group line — under the headers that
-   * name them, exactly AutoCount's `SO Batch Posting` shape. The three
-   * identity columns are BLANK on an item row: the fact is stated once, on
-   * the order line above, and a blank cell under a named header still reads
-   * as "see the line above", which a sentence never did.
-   *
-   * P16'S WIDTH LAW IS UNCHANGED: every width is the CONTENT's, measured in
-   * a real browser (13px Inter cells, 11px/500 headers, `px-2` = 16) against
-   * the worst string the column can hold, `ceil(measured) + 4` (the sub-pixel
-   * guard `PO No.` paid for once), and a sorted+filtered header is a floor of
-   * word + 2 + 14 (arrow) + 2 + 24 (▼) + 16 (padding).
-   *
-   *   col                worst content (measured 2026-08-06)   → width
-   *   SO No.             the ORDER LINE's `Ready Stock` 79 + 16     99
-   *   Customer           `Myhouse Management Plt` 160.5 + 16*     181
-   *   Customer Delivery  `Required By 30 Aug 26` 142.9 + 16**     163
-   *   Proceed date       `22 Jul 26 (15 days)` 123 + 16           143
-   *   Supplier           `Carres Internal`  90.8 + 16             111
-   *   Qty                header floor 50.8                         55
-   *   Model              `Mattress Protector SS` 134.3 + 16       155
-   *   Ready Stock        header floor `Ready Stock` 62.4 + 32       99
-   *   On PO              header floor `On PO` 34.7 + 32 (T3)       71
-   *   PO No.             `Partly ordered` + gap + `PO-2053` 155   175
-   *                                                             ── 1252
-   *   * the longest customer name in production today (22 chars, found with
-   *     SQL over `orders.customer_name`, display-cased). A name is the one
-   *     string with no upper bound, so a longer future name truncates with
-   *     a title tooltip rather than growing the column without limit.
-   *   ** the Ready Stock group's `Required By {date}` line — WIDER than both
-   *     the header's own floor (97.6 + 58 = 155.6) and the customer's
-   *     `Wed, 30 Aug 26` (100 + 16); the widest thing the column holds is
-   *     what sizes it.
-   *
-   * THE GRID SCROLLS SIDEWAYS below its own width instead of truncating —
-   * Loo's own T1 ruling, Purchase Orders' existing behaviour (its nine columns
-   * min at 1208). 1252 + the ☑ 42 + the ⊞ 32 = 1326, so on a 1280 laptop with
-   * the 200px rail the grid scrolls, and that is the ruled behaviour rather
-   * than a regression: **deleting a business column to avoid a scrollbar is
-   * forbidden.** T3 measured the alternative — shrinking `Customer` or
-   * `Model` — and refused it: both already sit at their own worst string, so
-   * the saving would come straight out of a truncated customer name.
-   *
-   * `sizing="content"` still hands the slack to the kit's filler: no column
-   * absorbs it, and trailing whitespace keeps saying *these facts, no more*.
+   * P16's width law: the numbers below are provisional and are re-measured
+   * in a real browser before the card flips EXECUTED — no guessed number
+   * outlives the build record.
    */
   const columns: readonly Column<GridRow>[] = [
     {
-      /**
-       * SO No. — BLANK on an item row; the order line prints it (T1). The
-       * column exists so the fact has a header, a sort and its ▼ back.
-       */
+      /** The TREE column: item word on the band; `↳ SO-…` / `↳ Ready Stock`
+       *  on a line; on a sofa line the MODEL, because the band is the SO. */
       key: "so",
-      label: W.colSoNo,
-      // T1.1 re-measured it: the widest string this column holds is not `SO No.`
-      // and not `SO-1286` — it is the ORDER LINE's own `Ready Stock` (79), which
-      // ellipsised by two pixels at T1's 95. + 16 padding + the 4px guard.
-      width: "99px",
+      label: W.itemLabel,
+      width: "175px",
       sortable: true,
       filter: filterFor("so", soOptions, { searchable: true }),
-      /**
-       * ⭐ AN ITEM ROW IS NEVER BLANK FROM THE LEFT EDGE (Loo, 2026-08-07).
-       *
-       * The identity columns are blank on an item row on purpose — the fact is
-       * stated once, on the order line. That was fine while the goods sat right
-       * beside them; with nine columns the grid is 1,255px, so on a narrower
-       * window the ONLY columns an operator can see are the four that are
-       * deliberately empty, and a screen of already-bought orders reads as a
-       * page of blank blocks. His screenshot is exactly that.
-       *
-       * The marker is 2990s' own answer (`Mrp.module.css:348-353`): a literal
-       * `↳` in a cell, never a `padding-left` indent, because it survives a
-       * column resize and it copies into Excel as a character rather than as
-       * vanished whitespace. One glyph, the quietest ink in the palette, and
-       * the parent/child shape is legible with no colour and no extra width.
-       */
-      cell: () => <span className="text-kit-slate-9">↳</span>,
+      cell: (r) => {
+        const sofa = flat.groupByRow.get(r.key)?.kind === "so";
+        return (
+          <span className="flex items-baseline gap-1.5 min-w-0">
+            <span className="text-kit-slate-9">↳</span>
+            {sofa ? (
+              <span className="truncate" title={r.model}>
+                {r.model}
+              </span>
+            ) : (
+              <span className="tabular-nums text-kit-slate-12">
+                {r.readyStock ? W.readyStockGroup : r.so != null ? `SO-${r.so}` : "—"}
+              </span>
+            )}
+          </span>
+        );
+      },
     },
     {
       key: "customer",
@@ -1484,133 +1489,63 @@ export default function OperationToOrder() {
       width: "181px",
       sortable: true,
       filter: filterFor("customer", customerOptions, { searchable: true }),
-      cell: () => null,
+      cell: (r) => {
+        // A sofa line's identity is its SET band — stated once, above.
+        if (flat.groupByRow.get(r.key)?.kind === "so") return null;
+        if (r.readyStock)
+          return r.destination ? (
+            <span className="block truncate" title={r.destination}>
+              {r.destination}
+            </span>
+          ) : null;
+        return r.customer ? (
+          <span className="block truncate" title={displayCustomerName(r.customer)}>
+            {displayCustomerName(r.customer)}
+          </span>
+        ) : null;
+      },
     },
     {
-      /**
-       * The CUSTOMER's date — §12.2's own word for it. The Excel date ▼
-       * (presets · months · Custom Date Range…) plus `Overdue` rides it.
-       */
       key: "delivery",
       label: W.colPreferred,
       width: "163px",
       sortable: true,
       filter: filterFor("delivery", deliveryOptions, { range: true }),
-      cell: () => null,
+      cell: (r) => {
+        if (flat.groupByRow.get(r.key)?.kind === "so") return null;
+        // G8 — a Ready Stock line prints `Required By {date}` (the create
+        // dialog's own word) and NOTHING when none was asked for: an empty
+        // date on typed demand means *buy it on the next run*.
+        if (r.readyStock)
+          return r.delivery ? (
+            <span className="tabular-nums">{`${W.requiredBy} ${fmtDateShort(r.delivery)}`}</span>
+          ) : null;
+        return (
+          <span
+            className={
+              r.late ? "text-kit-red-11 font-medium tabular-nums" : "tabular-nums"
+            }
+          >
+            {r.delivery ? fmtDate(r.delivery) : W.noDeliveryDate}
+          </span>
+        );
+      },
     },
     {
-      /**
-       * T1.1 (Loo, 2026-08-06) — SALES' PLANNED PRODUCTION START, IN ITS OWN
-       * COLUMN.
-       *
-       * T1 printed it in the order line's middle SPAN, under the headers
-       * `Supplier · Qty · Model`, and Loo caught exactly that: *"proceed date
-       * out at first column"* + *"now we got header title or not?"*. A fact
-       * sitting under a header that names something else is the defect this
-       * whole grid was rebuilt to end, and the span made the page one
-       * unheaded region again.
-       *
-       * BLANK on an item row, like the three identity columns: it is an ORDER
-       * fact and every item under one order carries the same value (Loo,
-       * 2026-08-04). It carries NO in-cell label any more — the header is the
-       * label now, so the cell prints the date alone.
-       *
-       * No sort and no ▼: the column is blank on every row the table sorts,
-       * so both controls would act on values the operator cannot see.
-       */
-      key: "proceed",
-      label: W.proceedDate,
-      // MEASURED in a real browser on live data: `22 Jul 26 (15 days)` is 123
-      // (the header's own floor is 86), + 16 of padding + P16's 4px sub-pixel
-      // guard. A first pass at 138 was ONE pixel short of the content and the
-      // browser would have ellipsised it — the same rounding the `PO No.`
-      // column paid for in P16.
-      width: "143px",
-      cell: () => null,
-    },
-    {
-      /**
-       * Supplier — the column that answers "why 3 POs?" on the ROW. It is not
-       * the same fact as the rail's category, and it stops being derivable
-       * from it the day a second mattress supplier exists (September).
-       */
-      key: "supplier",
-      label: W.supplierLabel,
-      // `Carres Internal` — 90.8px, the longest of the ten supplier names.
+      key: "need",
+      label: W.colNeed,
       width: "111px",
-      sortable: true,
-      filter: filterFor("supplier", supplierOptions, { searchable: true }),
-      cell: (r) => r.supplier ?? "—",
-    },
-    {
-      key: "qty",
-      label: W.colQty,
-      // The HEADER's floor, not the digits': `Qty` + its sort arrow + padding
-      // is 50.8, where three digits need 40.2.
-      width: "55px",
       align: "right",
       numeric: true,
       sortable: true,
-      // NO filter caret (Jess, 2026-08-01): a distinct-value list of 1·2·3
-      // filters nothing worth the button, and on a narrow numeric column the
-      // caret is what pushed the word off the numbers' edge.
-      cell: (r) => r.qty,
+      cell: (r) => flat.facts.get(r.key)?.need ?? r.qty,
     },
     {
-      // Still the widest column, because model names are the longest text on
-      // the page — but 151px, which is what the longest of them MEASURES
-      // (`Mattress Protector SS`, 134.3), not whatever the table had left
-      // over. The stock note below rides this cell and does NOT buy width:
-      // it is `shrink-0` beside a `truncate`d name, it shows on a row that
-      // reserved stock (0 of 6 today), and paying 135px of permanent width
-      // for it is the permanently-empty column Loo rejected.
-      key: "model",
-      label: W.colModel,
-      width: "155px",
-      sortable: true,
-      filter: filterFor("model", modelOptions, { searchable: true }),
-      cell: (r) =>
-        r.takenFromStock > 0 ? (
-          <span className="flex items-baseline gap-2 min-w-0">
-            <span className="truncate">{r.model}</span>
-            {/* P10 — why this row's quantity is smaller than what was asked
-                for. A number that simply falls is the silent failure this
-                module keeps paying for. It rides the Model column because
-                that is where the page's spare width is. */}
-            <span className="shrink-0 text-label text-kit-green-11">
-              {reservedFromStockLabel(r.takenFromStock)}
-            </span>
-          </span>
-        ) : (
-          r.model
-        ),
-    },
-    {
-      /**
-       * ⭐ T1.1 · READY STOCK — the buyer's first question, answered without a
-       * click (Loo, 2026-08-06: *"i need to add to show ready stock like
-       * autocount"*).
-       *
-       * WHAT WAS WRONG, MEASURED: the free-stock number existed on every row
-       * since P10 and could only be reached by noticing a ⊞ that renders ONLY
-       * where stock exists — so the fact that answers *must I buy this at all*
-       * was visible exactly where it was already too late to be a surprise.
-       * Production the day this shipped: **91 free units across 50 SKUs**, and
-       * ONE row on the page said so.
-       *
-       * THE COLUMN IS THE FACT; THE EXPAND IS THE ACT. `Reserve` stays behind
-       * the ⊞ — it writes the stock register and it may not sit one stray
-       * click from a scanning finger — but the NUMBER is now scanned like any
-       * other, sorted like any other, and a row with nothing available prints
-       * nothing at all rather than a `0` that reads as an answer.
-       *
-       * An ordered row prints nothing either: a receipt has no decision left.
-       */
-      key: "readystock",
-      label: W.colReadyStock,
-      // Header floor: `Ready Stock` 62.4 + 2 + the sort arrow 14 + 16 of
-      // padding = 94.4. The content is one or two digits.
-      width: "99px",
+      /** SUGGESTED free stock — advisory, never consumed (locked ruling).
+       *  Green because it is something a human can take TODAY (P10). */
+      key: "stock",
+      label: W.colStock,
+      width: "71px",
       align: "right",
       numeric: true,
       sortable: true,
@@ -1623,61 +1558,19 @@ export default function OperationToOrder() {
           >
             {r.freeStock}
           </span>
+        ) : r.takenFromStock > 0 ? (
+          <span className="text-kit-green-11" title={reservedFromStockLabel(r.takenFromStock)}>
+            {r.takenFromStock}
+          </span>
         ) : null,
     },
     {
-      /**
-       * ⭐ T3 · ON PO — what is already bought and on its way (Loo, 2026-08-06).
-       *
-       * WHAT WAS WRONG, MEASURED: `net-requirements.ts` has netted open
-       * purchase orders out of demand since it was written, and the number
-       * left the engine nowhere — `coveredByOpenPo` had ZERO readers in the
-       * whole repository. A partly covered line therefore printed its REDUCED
-       * quantity with nothing beside it: the grid says `Qty 1` where the
-       * customer ordered 3, and the two units on `PO-2051` are stated on no
-       * screen. The buyer cannot answer *why 1?* and so cannot check the plan
-       * before signing it.
-       *
-       * THE THIRD OF FOUR NUMBERS. 2990s' MRP screen puts them side by side —
-       * `Qty Needed · Stock · PO Outstanding · Shortage`. This page already
-       * had two of them (`Ready Stock` = in the warehouse, `Qty` = still to
-       * buy); this is the third, and it is the one that explains the fourth.
-       *
-       * NEUTRAL INK, NOT GREEN, and the difference is the operator's: `Ready
-       * Stock` is green because it is something you can TAKE today (`Reserve`
-       * is one click away, behind the ⊞). This is informational — the goods
-       * are bought, nothing here can be done about them — so it reads like
-       * `Qty`, the other number on this grid that is simply true.
-       *
-       * BLANK AT ZERO. A `0` reads as an answer somebody worked out; a blank
-       * reads as *nothing to say*, which is what it means. Same rule
-       * `Ready Stock` ships on.
-       *
-       * A FACT, SO A COLUMN, AND IT TAKES NO ACTION (MASTER §3's own rule).
-       * The ⊞ still holds the two acts and only them.
-       *
-       * ⚠️ A FULLY COVERED LINE IS NOT ON THIS GRID AT ALL and this column
-       * cannot say so — the line is dropped upstream in `buildToOrder` because
-       * nothing is left to buy. **Measured on production 2026-08-06: 41 of 78
-       * eligible demand lines are covered by an open purchase order and ALL 41
-       * are covered in full, so this column is blank on every live row today.**
-       * That is the column working as ruled, not a defect; the number appears
-       * the first time a line is PARTLY covered (3 ordered, 2 on a PO). The
-       * demand returns by itself if the purchase order is cancelled — the
-       * engine reads `status = 'open'` and nothing else.
-       */
       key: "onpo",
       label: W.colOnPo,
-      // Header floor, MEASURED in a real browser (see the P16 block above):
-      // `On PO` 11px/500 = 34.7 + 2 + the sort arrow 14 + 16 of padding = 66.7,
-      // + P16's 4px sub-pixel guard. The content is one or two digits (43
-      // units sit on open POs across the whole live database).
       width: "71px",
       align: "right",
       numeric: true,
       sortable: true,
-      // No ▼: the values are 1 · 2, exactly the list Jess ruled not worth a
-      // button on `Qty`.
       cell: (r) =>
         r.coveredByOpenPo > 0 && !poOf(r) ? (
           <span
@@ -1689,34 +1582,88 @@ export default function OperationToOrder() {
         ) : null,
     },
     {
+      /** PRINTED, never `11 − 3 − 2` — and never editable (card §2). */
+      key: "tobuy",
+      label: W.colToBuy,
+      width: "75px",
+      align: "right",
+      numeric: true,
+      sortable: true,
+      cell: (r) => {
+        const n = flat.facts.get(r.key)?.toBuy ?? 0;
+        return n > 0 ? (
+          <span
+            className="font-semibold text-kit-slate-12"
+            data-testid={`to-order-tobuy-${r.key}`}
+          >
+            {n}
+          </span>
+        ) : (
+          <span className="text-kit-slate-9">0</span>
+        );
+      },
+    },
+    {
+      /** What stands behind THIS promise — `stock` · `PO-2041` · `SHORT`
+       *  (card §2: the buyer sees at a glance which promises have nothing
+       *  behind them). A receipt's answer is its own PO cell. */
+      key: "coverage",
+      label: W.colCoverage,
+      width: "140px",
+      cell: (r) => {
+        const c = flat.facts.get(r.key)?.coverage;
+        if (!c || c.kind === "ordered") return null;
+        if (c.kind === "short")
+          return (
+            <span
+              className="text-kit-red-11 font-semibold"
+              data-testid={`to-order-cov-${r.key}`}
+            >
+              {W.covShort}
+            </span>
+          );
+        if (c.kind === "stock")
+          return (
+            <span className="text-kit-green-11" data-testid={`to-order-cov-${r.key}`}>
+              {W.covStock}
+            </span>
+          );
+        return (
+          <button
+            type="button"
+            className="text-kit-blue-11 tabular-nums hover:underline"
+            title={onPoLine(r.coveredByOpenPo, r.coveredByOpenPoPos) ?? undefined}
+            onClick={() => {
+              const slug = PO_TAB_SLUG[r.category];
+              navigate(
+                slug
+                  ? `/operation/procurement/${slug}?po=${encodeURIComponent(c.po)}`
+                  : "/operation/procurement",
+              );
+            }}
+            data-testid={`to-order-cov-${r.key}`}
+          >
+            {c.po}
+          </button>
+        );
+      },
+    },
+    {
+      key: "supplier",
+      label: W.supplierLabel,
+      width: "111px",
+      sortable: true,
+      filter: filterFor("supplier", supplierOptions, { searchable: true }),
+      cell: (r) => r.supplier ?? "—",
+    },
+    {
       key: "po",
       label: W.colPoNo,
-      // ⭐ T1.1 — the width is now set by the ORDER LINE, not by the item row:
-      // `Partly ordered` (86.6) + the gap (8) + `PO-2053` (60.4) = 155, + 16
-      // of padding. An item row holds `Yet to Order` (73.9) or one number and
-      // no longer holds a button at all (see the cell).
       width: "175px",
       sortable: true,
       filter: filterFor("po", poOptions),
       cell: (r) => {
         const po = poOf(r);
-        // Not "no data" — WORK. Muted, unclickable, filterable by name.
-        //
-        // ── T1.1 · G10 IS CLOSED — `Cancel` HAS LEFT THIS CELL.
-        //
-        // P12 put the button here in 2026-08-04 on a real argument (`PO No.`
-        // asks *did this become a purchase order?* and `Cancel` answers *it
-        // never will*), and MASTER §3 has carried it as gap **G10** ever since
-        // for the equally real reason that §9's own rule forbids one column
-        // holding a status word AND an action.
-        //
-        // What settles it is not the argument but the SCAN: this column is the
-        // one an operator reads down to answer *what is left to buy today*, and
-        // a destructive button repeated down it is noise on every row it does
-        // not apply to. **A fact is scanned; an act is chosen.** So the act
-        // moved to the row's own ⊞ beside `Reserve` — the two things you can
-        // DO to a row now live in one place — and this cell went back to
-        // answering one question.
         if (!po) {
           return (
             <span className="text-kit-slate-11 truncate">
@@ -1724,8 +1671,6 @@ export default function OperationToOrder() {
             </span>
           );
         }
-        // The number is the receipt AND the door to the next step: it lands
-        // on Purchase Orders with THIS document opened.
         const slug = PO_TAB_SLUG[r.category];
         return (
           <button
@@ -1757,112 +1702,123 @@ export default function OperationToOrder() {
   ];
 
   /**
-   * ── T1 · the ORDER LINE, as aligned cells (Loo's approved mock) ──────────
+   * ── The two BANDS of the hierarchy (card §2) — aligned cells ─────────────
    *
-   * One line per customer order, its facts in the table's OWN columns: SO,
-   * customer and date under the headers that name them, the middle span
-   * (Supplier‥Model — blank on an order line by construction) carrying the
-   * two order-level extras P18 and 2026-08-03 ruled visible — the proceed
-   * date with its waited count, and the `Partly ordered` pill — and the PO
-   * cell carrying the numbers the order has already produced. Nothing ruled
-   * visible moved off screen; everything moved INTO a column.
-   *
-   * A Ready Stock group prints `Required By {date}` in the Delivery column
-   * (the create dialog's own word — MASTER §3 G8's bare-date defect, fixed),
-   * and prints NOTHING when none was asked for: an empty date on typed
-   * demand means *buy it on the next run*, never *unconfirmed*.
+   * Level 1 is the ITEM (or, for sofa, the SALES ORDER — the colour-matched
+   * set), its totals under the number headers that name them. Level 2 is the
+   * variant; a single-variant item answers `null` and the level collapses to
+   * two — the kit skips the band. Level 3 is the leaf rows below.
    */
-  const groupCells = (r: GridRow): GroupRowCell[] => {
-    const gk = r.orderId ?? r.key;
-    const g = groupFacts.get(gk);
-    const partly = g != null && g.ordered > 0 && g.ordered < g.total;
-    const waited = proceedWaitedDays(r.proceedDate, today);
+  const bandNum = (n: number, strong = false): GroupRowCell => ({
+    align: "right",
+    content:
+      n > 0 ? (
+        <span
+          className={
+            strong
+              ? "font-semibold text-kit-slate-12 tabular-nums"
+              : "text-kit-slate-11 tabular-nums"
+          }
+        >
+          {n}
+        </span>
+      ) : (
+        <span className="text-kit-slate-9 tabular-nums">0</span>
+      ),
+  });
+
+  const parentCells = (r: GridRow): GroupRowCell[] => {
+    const g = flat.groupByRow.get(r.key);
+    if (!g) return [{ content: null, span: 10 }];
+    const suppliers = new Set(
+      g.variants.flatMap((v) => v.leaves.map((l) => l.supplier)).filter(Boolean),
+    );
     return [
       {
         content: (
           <span
-            className="font-semibold text-kit-slate-12 tabular-nums"
-            data-testid={`to-order-group-${gk}`}
+            className="block truncate font-semibold text-kit-slate-12"
+            title={g.title}
+            data-testid={`to-order-item-${g.key}`}
           >
-            {r.readyStock ? W.readyStockGroup : r.so != null ? `SO-${r.so}` : "—"}
+            {g.title}
           </span>
         ),
       },
       {
-        content: r.readyStock ? (
-          r.destination ? (
-            <span className="block truncate text-kit-slate-12" title={r.destination}>
-              {r.destination}
+        content:
+          g.kind === "so" && g.customer ? (
+            <span
+              className="block truncate text-kit-slate-12"
+              title={displayCustomerName(g.customer)}
+            >
+              {displayCustomerName(g.customer)}
             </span>
-          ) : null
-        ) : r.customer ? (
-          <span className="block truncate text-kit-slate-12" title={displayCustomerName(r.customer)}>
-            {displayCustomerName(r.customer)}
-          </span>
-        ) : null,
+          ) : null,
       },
       {
-        content: r.readyStock ? (
-          r.delivery ? (
-            // G8's fix: the typed-demand date carries ITS name. Labelled, so
-            // the short spelling — P18's own pairing rule for a labelled date.
-            <span className="text-kit-slate-12 tabular-nums">
-              {`${W.requiredBy} ${fmtDateShort(r.delivery)}`}
-            </span>
-          ) : null
-        ) : (
+        content: g.delivery ? (
           <span
             className={
-              r.late
+              today != null && g.delivery < today
                 ? "text-kit-red-11 font-medium tabular-nums"
                 : "text-kit-slate-11 tabular-nums"
             }
           >
-            {r.delivery ? fmtDate(r.delivery) : W.noDeliveryDate}
-          </span>
-        ),
-      },
-      {
-        /* T1.1 — the proceed date in the column that NAMES it. The label is
-           gone from the cell: repeating the header inside every cell is what
-           a header exists to stop. */
-        content: r.proceedDate ? (
-          <span className="text-kit-slate-11 tabular-nums">
-            {fmtDateShort(r.proceedDate)}
-            {waited == null ? "" : ` (${waited} ${waited === 1 ? "day" : "days"})`}
+            {fmtDate(g.delivery)}
           </span>
         ) : null,
       },
-      /* Supplier · Qty · Model · Ready Stock · On PO — an order line has none
-         of the five by construction, and T1.1 leaves the span EMPTY rather
-         than parking an order fact under an item header (the defect Loo
-         caught). T3 widened the span by one when `On PO` joined: the cover is
-         a fact about an ITEM, and summing five items' cover onto the order
-         line would put an item number under an order's own row. */
-      { span: 5, content: null },
+      bandNum(g.need),
       {
-        /* T1.1 — `Partly ordered` joins the numbers it is derived from. Both
-           answer this column's own question (*did this become a purchase
-           order?*): the pill says SOME of it did, the numbers say which. */
+        align: "right",
         content:
-          partly || (g && g.pos.length > 0) ? (
-            <span className="flex items-center gap-2 min-w-0">
-              {partly ? (
-                <span className="shrink-0 rounded-full bg-kit-amber-3 px-2 py-0.5 text-label text-kit-amber-11">
-                  {W.partlyOrdered}
-                </span>
-              ) : null}
-              {g && g.pos.length > 0 ? (
-                <span
-                  className="truncate text-kit-blue-11 tabular-nums"
-                  title={g.pos.join(" · ")}
-                >
-                  {g.pos.join(" · ")}
-                </span>
-              ) : null}
-            </span>
+          g.stock > 0 ? (
+            <span className="text-kit-green-11 tabular-nums">{g.stock}</span>
           ) : null,
       },
+      bandNum(g.onPo),
+      bandNum(g.toBuy, true),
+      { content: null },
+      {
+        content:
+          suppliers.size === 1 ? (
+            <span className="block truncate">{[...suppliers][0] as string}</span>
+          ) : null,
+      },
+      { content: null },
+    ];
+  };
+
+  const variantCells = (r: GridRow): GroupRowCell[] | null => {
+    const label = flat.variantLabelByRow.get(r.key);
+    if (label == null) return null;
+    const g = flat.groupByRow.get(r.key);
+    const v = g?.variants.find((x) => x.key === flat.variantKeyByRow.get(r.key));
+    if (!v) return null;
+    return [
+      {
+        span: 3,
+        content: (
+          <span className="flex items-baseline gap-1.5 min-w-0 pl-3">
+            <span className="text-kit-slate-9">↳</span>
+            <span className="truncate text-kit-slate-11" title={label}>
+              {label}
+            </span>
+          </span>
+        ),
+      },
+      bandNum(v.need),
+      {
+        align: "right",
+        content:
+          v.stock > 0 ? (
+            <span className="text-kit-green-11 tabular-nums">{v.stock}</span>
+          ) : null,
+      },
+      bandNum(v.onPo),
+      bandNum(v.toBuy, true),
+      { content: null, span: 3 },
     ];
   };
 
@@ -1920,7 +1876,7 @@ export default function OperationToOrder() {
               it has something to say. */}
           {(timeCounts.get("overdue")?.size ?? 0) > 0 ? (
             <NavRow
-              active={viewSet.has("overdue")}
+              active={effViewSet.has("overdue")}
               onClick={() => toggleView("overdue")}
               testId="to-order-overdue"
               name={W.filterOverdue}
@@ -1932,7 +1888,7 @@ export default function OperationToOrder() {
           {scheduleDays.map((day) => (
             <NavRow
               key={day}
-              active={viewSet.has(day)}
+              active={effViewSet.has(day)}
               onClick={() => toggleView(day)}
               testId={`to-order-day-${day}`}
               name={fmtDate(day)}
@@ -2182,7 +2138,7 @@ export default function OperationToOrder() {
                  goes with the radius — it existed to clip the corners. */
               <div className="flex-1 min-h-0 flex flex-col">
                 <DataTable
-                  rows={visibleRows}
+                  rows={flat.rows}
                   columns={columns}
                   /* Loo's rule ①, as a mechanism: the columns take exactly
                      what their content measured and the leftover goes to a
@@ -2333,8 +2289,24 @@ export default function OperationToOrder() {
                    * toggle over the builds it heads. The free-text sentence
                    * this replaces was ruled hard to read. */
                   group={{
-                    keyOf: (r) => r.orderId ?? r.key,
-                    cells: groupCells,
+                    /* The hierarchy's two bands (card §2): the INNER band is
+                     * the VARIANT (fabric / colour), skipped when the item has
+                     * one; the OUTER `parent` band is the ITEM — or, for sofa,
+                     * the SALES ORDER, because a sofa is a colour-matched SET
+                     * (card §3). The selection box rides the parent band and
+                     * covers the group's selectable (shortage) leaves only. */
+                    keyOf: (r) => flat.variantKeyByRow.get(r.key) ?? r.key,
+                    cells: variantCells,
+                    parent: {
+                      keyOf: (r) => flat.groupByRow.get(r.key)?.key ?? r.key,
+                      cells: parentCells,
+                      selection: {
+                        state: groupSelState,
+                        onToggle: groupSelToggle,
+                        label: (r) =>
+                          `${W.select} ${flat.groupByRow.get(r.key)?.title ?? ""}`.trim(),
+                      },
+                    },
                     /* ⭐ WHITE, RULED — NOT A GREY BAND (Loo, on the live page,
                      * 2026-08-06: *"every customer is grey too — i confused"*).
                      *
@@ -2353,18 +2325,6 @@ export default function OperationToOrder() {
                      * background, the header strip, the table head); a
                      * customer's order is DATA, and data is white. */
                     tone: "plain",
-                    selection: {
-                      state: groupSelState,
-                      onToggle: groupSelToggle,
-                      label: (r) =>
-                        `${W.select} ${
-                          r.readyStock
-                            ? W.readyStockGroup
-                            : r.so != null
-                              ? `SO-${r.so}`
-                              : ""
-                        }`.trim(),
-                    },
                   }}
                   /* T1 — the ALWAYS-ON total: AutoCount's own footer habit,
                    * on the kit's D0.5d totals strip. One sentence, the whole
@@ -2404,11 +2364,16 @@ export default function OperationToOrder() {
                     selected: selectedKeys,
                     onToggleRow: (id) => {
                       const r = rowByKey.get(id);
-                      if (r) toggleRow(r);
+                      // The sofa set travels together (card §3) — the leaf
+                      // toggle spreads to the whole same-SO set.
+                      if (r) toggleLeaf(r);
                     },
                     onToggleAll: toggleAllVisible,
                     label: W.select,
-                    selectable: (r) => !poOf(r) && r.blocker == null,
+                    // Only a SHORTAGE line is selectable (card §2): a receipt
+                    // never, a fully covered line never, To Buy = 0 never.
+                    selectable: (r) =>
+                      !poOf(r) && r.blocker == null && r.qty > 0,
                   }}
                 />
                 {/* q1 (Loo, 2026-08-03). The footer counted customer ORDERS

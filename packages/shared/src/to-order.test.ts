@@ -1384,3 +1384,131 @@ describe("P18 · the label", () => {
     expect(TO_ORDER_WORDS.proceedDate).not.toBe(TO_ORDER_WORDS.colPreferred);
   });
 });
+
+// ═══ The hierarchy projection (CARD-2026-08-18-so-batch-purchase) ══════════
+
+import {
+  buildHierarchy,
+  leafCoverage,
+  leafToBuy,
+  selectableKeysOf,
+  type HierarchyLeaf,
+} from "./to-order";
+
+function leaf(over: Partial<HierarchyLeaf>): HierarchyLeaf {
+  return {
+    key: over.key ?? "k1",
+    category: "mattress",
+    model: "Cody Queen",
+    spec: "",
+    so: 1300,
+    orderId: "o1",
+    customer: "Ah Hock",
+    delivery: "2026-08-22",
+    readyStock: false,
+    destination: null,
+    supplier: "Nice Future",
+    qty: 1,
+    takenFromStock: 0,
+    freeStock: 0,
+    coveredByOpenPo: 0,
+    coveredByOpenPoPos: [],
+    orderedPo: null,
+    ...over,
+  };
+}
+
+describe("buildHierarchy — the grid becomes three levels", () => {
+  it("groups four customers wanting one item into ONE group with summed totals", () => {
+    const g = buildHierarchy([
+      leaf({ key: "a", so: 1, orderId: "o1", qty: 2 }),
+      leaf({ key: "b", so: 2, orderId: "o2", qty: 3 }),
+      leaf({ key: "c", so: 3, orderId: "o3", qty: 1, coveredByOpenPo: 2, coveredByOpenPoPos: ["PO-2041"] }),
+      leaf({ key: "d", so: 4, orderId: "o4", qty: 0, coveredByOpenPo: 1, coveredByOpenPoPos: ["PO-2041"], orderedPo: "PO-2041" }),
+    ]);
+    expect(g).toHaveLength(1);
+    expect(g[0].kind).toBe("item");
+    expect(g[0].title).toBe("Cody Queen");
+    // To Buy is PRINTED and is the engine's own net — 2+3+1, the receipt 0.
+    expect(g[0].toBuy).toBe(6);
+    expect(g[0].onPo).toBe(3);
+    expect(g[0].need).toBe(2 + 3 + 3 + 1);
+  });
+
+  it("a single-variant item collapses to two levels (label null)", () => {
+    const g = buildHierarchy([leaf({ key: "a" }), leaf({ key: "b", so: 2, orderId: "o2" })]);
+    expect(g[0].variants).toHaveLength(1);
+    expect(g[0].variants[0].label).toBeNull();
+  });
+
+  it("two specs make two variant bands, shortage band first", () => {
+    const g = buildHierarchy([
+      leaf({ key: "a", spec: "Beige", qty: 0, coveredByOpenPo: 1, coveredByOpenPoPos: ["PO-1"], orderedPo: "PO-1" }),
+      leaf({ key: "b", spec: "Grey", qty: 2, so: 2, orderId: "o2" }),
+    ]);
+    expect(g[0].variants.map((v) => v.label)).toEqual(["Grey", "Beige"]);
+  });
+
+  it("sofa groups by SALES ORDER, never by item", () => {
+    const g = buildHierarchy([
+      leaf({ key: "a", category: "sofa", model: "Booqit 3 Seater", so: 10, orderId: "oA" }),
+      leaf({ key: "b", category: "sofa", model: "Booqit 3 Seater", so: 11, orderId: "oB" }),
+    ]);
+    expect(g).toHaveLength(2);
+    expect(g.map((x) => x.kind)).toEqual(["so", "so"]);
+    expect(g.map((x) => x.title).sort()).toEqual(["SO-10", "SO-11"]);
+  });
+
+  it("shortage groups float; fully covered sink", () => {
+    const g = buildHierarchy([
+      leaf({ key: "a", model: "Covered", qty: 0, coveredByOpenPo: 2, coveredByOpenPoPos: ["PO-9"], orderedPo: "PO-9", delivery: "2026-08-20" }),
+      leaf({ key: "b", model: "Short", qty: 1, delivery: "2026-08-25", so: 2, orderId: "o2" }),
+    ]);
+    expect(g.map((x) => x.title)).toEqual(["Short", "Covered"]);
+  });
+});
+
+describe("leafCoverage — what stands behind the promise", () => {
+  it("fully on an open PO names the document", () => {
+    expect(
+      leafCoverage(leaf({ qty: 0, coveredByOpenPo: 2, coveredByOpenPoPos: ["PO-2041"] })),
+    ).toEqual({ kind: "po", po: "PO-2041" });
+  });
+  it("suggested stock covering the whole ask reads stock — advisory, never consumed", () => {
+    expect(leafCoverage(leaf({ qty: 2, freeStock: 3 }))).toEqual({ kind: "stock" });
+  });
+  it("nothing behind it reads SHORT", () => {
+    expect(leafCoverage(leaf({ qty: 2 }))).toEqual({ kind: "short" });
+  });
+  it("a receipt reads ordered with its own PO", () => {
+    expect(leafCoverage(leaf({ orderedPo: "PO-1" }))).toEqual({ kind: "ordered", po: "PO-1" });
+  });
+});
+
+describe("selectableKeysOf — only a shortage line is selectable", () => {
+  it("a non-sofa leaf selects only itself, and a covered leaf selects nothing", () => {
+    const g = buildHierarchy([
+      leaf({ key: "a", qty: 2 }),
+      leaf({ key: "b", so: 2, orderId: "o2", qty: 0, coveredByOpenPo: 1, coveredByOpenPoPos: ["PO-1"], orderedPo: "PO-1" }),
+    ])[0];
+    const short = g.variants[0].leaves.find((l) => l.key === "a")!;
+    const covered = g.variants[0].leaves.find((l) => l.key === "b")!;
+    expect(selectableKeysOf(g, short)).toEqual(["a"]);
+    expect(selectableKeysOf(g, covered)).toEqual([]);
+  });
+
+  it("selecting any sofa piece takes the whole same-SO set", () => {
+    const g = buildHierarchy([
+      leaf({ key: "s1", category: "sofa", model: "Sofa 1", orderId: "oA", so: 10, qty: 1 }),
+      leaf({ key: "s2", category: "sofa", model: "Sofa 2", orderId: "oA", so: 10, qty: 1 }),
+      leaf({ key: "s3", category: "sofa", model: "Sofa 3", orderId: "oA", so: 10, qty: 0, coveredByOpenPo: 1, coveredByOpenPoPos: ["PO-7"], orderedPo: "PO-7" }),
+    ])[0];
+    const one = g.variants[0].leaves.find((l) => l.key === "s1")!;
+    // The receipt stays out; the still-to-buy pieces travel together.
+    expect(selectableKeysOf(g, one).sort()).toEqual(["s1", "s2"]);
+  });
+
+  it("`To Buy` is zero on a receipt whatever its qty says", () => {
+    expect(leafToBuy(leaf({ qty: 3, orderedPo: "PO-1" }))).toBe(0);
+  });
+});
