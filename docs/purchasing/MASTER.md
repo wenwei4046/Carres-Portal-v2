@@ -599,7 +599,63 @@ customer orders**. Purchase Orders MANAGES the documents once they exist.
 > Consignment Order so the floor position is never briefly empty or briefly double-booked.
 > **Over-delivery reuses this same collection mechanism** rather than growing a fourth path.
 
-> **A NEW SHOWROOM IS A SETTINGS ROW, MANAGER-GATED — never a field Sales can type into.** The
+> ### ⭐ THE TEN OBJECT DETAILS — what is on each one (Jess, 2026-08-18)
+**APPROVED, NOT YET BUILT.** Shape comes from `../ui/MASTER.md` §4.1 and is not re-argued here;
+this records only what each object PUTS in it. All ten are ONE SCROLL except Supplier Claim, which
+adds History and Order Route as reference tabs.
+
+**GOODS RECEIPT** — from / landed at / **Supplier DO No.** (theirs, no default) / **Goods received
+at** (when the goods physically arrived, never when they were keyed) / counted by. Then per line:
+ordered · received · `Receive now` · damaged · wrong · Unit IDs ticked as they are scanned ·
+photos. **The Save button names the gap** (`Save — add a DO number`) and
+`Remaining after save: {n} (stays on this PO)` prints beside it. **The scanned/not-scanned ticks
+are the point** — a counter sees how many units are still missing without counting them again.
+**No split, ever:** receiving RECORDS a count, it composes nothing anyone outside will read.
+
+**PURCHASE RETURN** — source claim, GRN and PO / collect from / pickup date / **version and whether
+it was shared**. Units going back with their reason and photo. Then `HANDOVER`: proof, handed to,
+signed by — **and stock does not move until those three are filled.** A shared return that changed
+its collection point or its units mints a version and is shared again, exactly like a PO.
+
+**REPAIR ORDER** — unit / sent from / what is wrong + photo / **chargeable or under warranty** /
+expected back. `HANDOVER OUT` with its proof. Then `BACK`, and it prints **`Unit ID must be
+CU-000184`** — a scan of anything else stops the receipt. Ownership never moves; this is not a
+Purchase Return.
+
+**DISPLAY REQUEST** — raised by / what kind / the unit standing there now, with **`on display {n}
+days` and `no enquiry in {n} days`** / what they want (a description and a photo are enough) / why
+/ wanted by. **`WILL BECOME` names the document this turns into** — read from the supplier's
+ownership setting, so nobody has to remember which supplier is consignment.
+
+**MANUAL PURCHASE** — raised by / what / how many / deliver to / needed by / **why, never blank**.
+Then `WHAT WE ALREADY HAVE`: free stock · already on PO · **still needed** — and **`still needed`
+is the number the approver acts on**, not the number that was asked for. Money appears on this
+surface for the approver only.
+
+**CONSIGNMENT ORDER** — deliver to / source request / **ownership fixed to the supplier and not
+editable** / consignment cost (approver only). `COMING IN` and `GOING BACK` on ONE document, the
+old unit carrying its days on display. **Splits when edited** — the supplier receives it.
+
+**CONSIGNMENT RECEIPT** — identical to a Goods Receipt, same engine, same number series; only the
+source reads `CO-` instead of `PO-`. **The person counting at a showroom does not need to know
+whether the sofa is bought or consigned** — the fact rides the unit, and posting stamps
+`Supplier Consignment` on it.
+
+**CONSIGNMENT RETURN** — collect from / pickup date / **`Paired with {CO}`** when it is a swap /
+the unit and its days on display / handover proof. **No credit note is chased and none is owed** —
+the goods were never Carres'.
+
+**SUPPLIER CLAIM** — `THE ITEM` is permanent and never collapses (`PO · GRN · Supplier · DO` +
+Unit). Then what went wrong with its photos, **and who is waiting** — the customer, their order and
+their promised date, because a claim with a customer behind it cannot be argued about for three
+weeks. What we asked (frozen once answered) · what the supplier answered · **what the customer
+gets** · **what happens to the item**. The second decision does not open until the first is made:
+what happens to a broken sofa depends on what the customer is getting instead.
+**The screen states the money line itself** — `{supplier} refused — this is Carres paying now` —
+and the owner chip flips to the approver, because that is the ruled boundary and an operator should
+not have to remember it at 5pm.
+
+**A NEW SHOWROOM IS A SETTINGS ROW, MANAGER-GATED — never a field Sales can type into.** The
 > name reaches a supplier's PO and a driver follows the address; it also needs a receiving
 > contact and a ruling on whether goods may land there at all, and Sales owns none of those.
 > Sales picks from the list; the list is maintained where the seven engine numbers are.
