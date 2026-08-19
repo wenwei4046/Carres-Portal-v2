@@ -40,11 +40,11 @@ file (`PortalSidebar.tsx:255-283`).
   ▫ Sales Orders      (3)
   ▾ Purchasing
       SO Batch Purchase  4
+      Manual Purchase         Coming soon
       Purchase Orders    2
       Receiving          1
       Supplier Claims
-      Report
-      Settings
+      … (the full thirteen are in §2)
   ▫ Delivery
   ▫ Stock
   ▫ Payments
@@ -55,38 +55,91 @@ first page and opens the list; clicking `Stock` closes Purchasing and opens Stoc
 That is the rule the area groups already follow — *"the active area stays open"*
 (`PortalSidebar.tsx:107`) — applied one level down, so nothing new is invented.
 
-## 2 · The list, and the two renames
+## 2 · THIRTEEN entries — the whole map, and the unbuilt ones say so
 
-Six entries, and **only pages that actually exist today**:
+**Jess overruled the empty-shell rule on 2026-08-18, and she was right.** The
+original draft of this card listed only the four pages that exist and quoted
+`03-page-patterns.md:149` (*"an unbuilt region is not rendered as an empty
+placeholder"*) to justify it. But that line governs REGIONS INSIDE a page. The
+rail is the module's MAP, and a map that shows four of eleven roads teaches three
+operators a shape that is about to change under them seven more times.
+
+Her own law already grants the way to do it — `03-page-patterns.md:219`:
+**"a control that is deliberately disabled must say why, on screen."**
 
 ```
-SO Batch Purchase   ← `To Order` renamed
-Purchase Orders
-Receiving
-Supplier Claims     ← `Claims` renamed
-Report
-Settings            ← manager only, server-gated (unchanged)
+▾ Purchasing
+    SO Batch Purchase      4
+    Manual Purchase             Coming soon
+    Purchase Orders        3
+    Receiving              1
+    Supplier Claims
+    Purchase Returns            Coming soon
+    Repair Orders               Coming soon
+    Display Requests            Coming soon
+    Consignment Orders          Coming soon
+    Consignment Receipts        Coming soon
+    Consignment Returns         Coming soon
+    ─────────────────────
+    Report
+    Settings
 ```
+
+Order is the approved eleven of `purchasing/MASTER.md` §1, unchanged. `Report` and
+`Settings` sit below a hairline because they are PORTAL pages, not Purchasing
+pages (`ERP-ARCHITECTURE.md` §2.1) — they are reached here today and the divider
+is what stops that convenience reading as ownership.
+
+### A `Coming soon` entry IS NOT A CONTROL
+
+This is the whole of why it is allowed to be there:
+
+- **It is a `<span>`, never a `<Link>`.** There is no href, so there is no dead
+  arrow to click. `03-page-patterns.md:149` bans a chevron that opens nothing;
+  this opens nothing because it is not an opener.
+- **It is out of the tab order** (`tabIndex={-1}` / not focusable) and carries
+  `aria-disabled`. A keyboard user who tabs into a dead stop has found the same
+  dead control by another door.
+- **`Coming soon` prints on the row**, right-aligned and quiet. That is §219's
+  requirement satisfied literally: the row says why it does nothing.
+- **It never carries a count**, not even zero. A number on it would claim work
+  exists on a page that does not.
+- Grey text, no hover tint, no active bar, `cursor-default`.
+
+### THE RAIL NOW SCROLLS, AND THAT IS THE ONE COST
+
+Thirteen children plus the module rows is roughly 860px of rail on a screen whose
+viewport is about 800px. **The rail already scrolls** (`PortalSidebar.tsx:219`,
+`overflow-auto`) so nothing breaks — but `Delivery` and `Stock` can now sit below
+the fold while Purchasing is open, and an operator who works Purchasing → Stock all
+day would scroll for it every time.
+
+**Stated as a trade-off, not hidden:** the whole map costs the bottom of the rail.
+Jess chose the map. The one defect that must not survive is landing on a rail whose
+highlighted row is off screen, so:
+
+- **On load, the active entry is scrolled into view.** Not centred, not animated —
+  just visible.
+- No max-height, no inner scrollbox, no "show more" link. One scroll region, the
+  one that is already there.
+
+### The two renames
 
 `To Order` → **`SO Batch Purchase`**. `To Order` reads like a status a row can be
 in, not a place a buyer goes. The renamed word says whose demand it is (a sales
-order's) and what the page does with it (batches it). The rename is already the
-first section of `CARD-2026-08-18-so-batch-purchase.md`; whichever card ships
-first performs it and the other inherits it.
+order's) and what the page does with it (batches it). The rename is also the first
+section of `CARD-2026-08-18-so-batch-purchase.md`; whichever card ships first
+performs it and the other inherits it.
 
 `Claims` → **`Supplier Claims`**. Carres has claims in two directions — a customer
 claiming from us, and us claiming from a supplier. The bare word is the one that
 gets opened by mistake.
 
 `Receiving` KEEPS ITS WORD. The eleven-page list approved on 2026-08-18 wrote
-`Goods Receipts`, but `ERP-ARCHITECTURE.md:123` names pages after the job the
-staff member does and blesses `Receiving` by name, and `purchasing/MASTER.md:768`
-bans the letters `GRN` from a tab forever. `Goods Receipts` is a document name;
+`Goods Receipts`, but `ERP-ARCHITECTURE.md:123` names pages after the job the staff
+member does and blesses `Receiving` by name, and `purchasing/MASTER.md:768` bans
+the letters `GRN` from a tab forever. `Goods Receipts` is a document name;
 `Receiving` is the work. **The work wins.**
-
-**NOT ADDED YET: the other seven pages.** `docs/ui-reference/03-page-patterns.md:149`
-(Loo 2026-07-31): *"没建的区不可以放一个空壳。一个点了没反应的箭头是死控制。"* Seven
-dead entries would teach the staff that this rail lies.
 
 ## 3 · What is left of the header row
 
@@ -112,7 +165,7 @@ both. Do not write a new width and do not write a new storage key.**
 
 Collapsed, the children disappear and the module's ONE icon remains, exactly as
 the collapsed rail behaves today (`:221-250`). A collapsed rail is for table room,
-not for navigating six pages by guessing icons.
+not for navigating thirteen pages by guessing thirteen icons.
 
 ## 5 · Counts are work waiting, never totals
 
@@ -131,13 +184,15 @@ Counts come from the existing `procurement` badge feed
 splits them. **Any child whose count is not already fed shows no number** rather
 than a guessed one.
 
-## 6 · How the list grows
+## 6 · How an entry goes live
 
-An entry joins the rail **on the day its page ships**, in the same PR that ships
-it — never in advance, never in a batch at the end. The order stays the order of
-the approved eleven-page list in `purchasing/MASTER.md` §1, so a page slots into
-its final position the day it appears and the rail never reshuffles under a
-staff member who has learned it.
+Every entry is already on the rail from day one, so the list NEVER reshuffles under
+a staff member who has learned it. **Shipping a page does exactly two things, in
+that page's own PR: the `<span>` becomes a `<Link>`, and `Coming soon` disappears.**
+
+That is the whole growth mechanism. No entry is added later, no order is
+renegotiated, and the day a page lands nobody has to be told where it went — they
+have been looking at its name for weeks.
 
 ## 7 · Copy
 
@@ -146,6 +201,11 @@ code.** The two renames above are added to the module-word list in the same PR.
 Rail entries are nouns — a door is named for the place, not the verb; verbs are
 the ACTION layer and may never share a name with a field or a door
 (`purchasing/MASTER.md:211-216`).
+
+**`Coming soon` is Jess's own word (2026-08-18) and is added to `COPY-STANDARD.md`
+as the ONE way the portal marks a door that is planned but not open.** Never
+`TBD`, never `Not available`, never a greyed word with nothing beside it — those
+are three different sentences for one fact, and a new hire has to learn all three.
 
 ## STILL LOCKED — do not touch
 
@@ -157,14 +217,21 @@ not the address) · the Settings server gate · the contents of all six pages ·
 
 ## TESTS AND DEPLOY — MANDATORY, EVERY SLICE
 
-- Standing on any purchasing page, the rail shows the six children and the module
-  is open; standing on Stock, Purchasing is closed.
-- The six labels are exactly the six words in §2; `To Order` and `Claims` appear
-  nowhere in the rendered rail.
+- Standing on any purchasing page, the rail shows all thirteen entries and the
+  module is open; standing on Stock, Purchasing is closed.
+- The thirteen labels are exactly the thirteen words in §2, in that order;
+  `To Order` and `Claims` appear nowhere in the rendered rail.
+- Each of the seven unbuilt entries renders as a NON-link: assert no `href`, no
+  `role="link"`, `tabIndex` is -1, `aria-disabled` is set, and `Coming soon` is
+  present on the row.
+- Clicking an unbuilt entry changes neither the URL nor the active highlight.
+- Tabbing through the rail visits only the six live entries.
+- On load the active entry is within the rail's visible area without user scroll.
+- No unbuilt entry renders a count, and none renders a `0`.
 - Settings does not render for a caller the server says may not edit.
 - Collapsing hides the children, shows one icon, and survives a reload.
-- A child with zero work prints no badge — assert the absence of the element, not
-  a `0` string.
+- A live child with zero work prints no badge — assert the absence of the element,
+  not a `0` string.
 - The parent entry prints no count.
 - The purchasing header renders the nameplate and page word and NO tab strip;
   every one of the eight importing pages still renders exactly one header.
@@ -174,9 +241,11 @@ not the address) · the Settings server gate · the contents of all six pages ·
 
 ## Acceptance boundary
 
-Authenticated production verification at 1440×900 and ~1920: the six entries under
-an open `Purchasing`, both renames live, no tab strip on any purchasing page, the
-collapse remembered across a reload, counts that mean work waiting and vanish at
-zero, and every old purchasing link still landing on its page. Overwrite
+Authenticated production verification at 1440×900 and ~1920: all thirteen entries
+under an open `Purchasing` in the approved order, the seven unbuilt ones grey,
+unclickable, unfocusable and reading `Coming soon`, both renames live, no tab strip
+on any purchasing page, the collapse remembered across a reload, counts that mean
+work waiting and vanish at zero, and every old purchasing link still landing on its
+page. Overwrite
 `docs/ERP-ARCHITECTURE.md` §2.1 and `docs/ui/MASTER.md` §4 in the same PR under
 the MASTER OVERWRITE LAW.
