@@ -235,7 +235,9 @@ Any string this build finds it needs and cannot find in the table is added to
 - **`purchase_orders` (0001:322) has NO reason column; `purchase_order_lines`
   has NO demand link** — confirmed against the migrations, not only the MASTER's
   2026-08-06 note. §6's owed migration is real.
-- Migration numbering: next free is **0337**.
+- Migration numbering: next free is **0359**. *(This line first said 0337,
+  measured on the parked omnibus branch; by execution day main and the applied
+  production tracker both ended at 0358 — red line #7, MAX of every tail.)*
 
 ## STILL LOCKED — do not touch
 
