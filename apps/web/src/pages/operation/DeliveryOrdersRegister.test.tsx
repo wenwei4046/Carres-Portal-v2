@@ -14,6 +14,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import DeliveryOrdersRegister from "./DeliveryOrdersRegister";
 import { fmtDate } from "@/lib/fmt-date";
 import type {
+  DeliveryHandoverKindRow,
   DeliveryOrderAttemptRow,
   DeliveryOrderRow,
   DeliveryOrdersRegisterPayload,
@@ -63,9 +64,10 @@ const doRow = (over: Partial<DeliveryOrderRow> = {}): DeliveryOrderRow => ({
 function mount(
   rows: DeliveryOrderRow[],
   attempts: DeliveryOrderAttemptRow[] = [],
+  handoverEvents: DeliveryHandoverKindRow[] = [],
 ) {
   hookState = {
-    data: { deliveryOrders: rows, attempts },
+    data: { deliveryOrders: rows, attempts, handoverEvents },
     isLoading: false,
     isError: false,
     error: null,
@@ -156,6 +158,50 @@ describe("DeliveryOrdersRegister", () => {
     expect(screen.getAllByText("Created").length).toBeGreaterThan(0);
     expect(screen.getByText("Delivery exception")).toBeTruthy();
     expect(screen.getByText("Customer unreachable")).toBeTruthy();
+  });
+
+  it("a received-not-yet-resulted document reads Out for delivery — earlier chain facts alone do not", () => {
+    // §4 slice 1 (0363): ready + handed on one document derive NOTHING new;
+    // logistics receipt on the other lights the blue pill.
+    mount(
+      [
+        doRow(),
+        doRow({
+          id: "00000000-0000-0000-0000-0000000d0002",
+          do_number: "DO-190826-7070",
+        }),
+      ],
+      [],
+      [
+        { delivery_order_id: "00000000-0000-0000-0000-0000000d0001", kind: "ready_for_handover" },
+        { delivery_order_id: "00000000-0000-0000-0000-0000000d0001", kind: "handed_over" },
+        { delivery_order_id: "00000000-0000-0000-0000-0000000d0002", kind: "ready_for_handover" },
+        { delivery_order_id: "00000000-0000-0000-0000-0000000d0002", kind: "handed_over" },
+        { delivery_order_id: "00000000-0000-0000-0000-0000000d0002", kind: "received_by_logistics" },
+      ],
+    );
+    expect(screen.getByText("Out for delivery")).toBeTruthy();
+    // The ready+handed document still reads Created.
+    expect(screen.getAllByText("Created").length).toBeGreaterThan(0);
+  });
+
+  it("a recorded Delivery Result outranks the handover derivation", () => {
+    mount(
+      [doRow()],
+      [
+        {
+          do_number: "DO-180826-3035",
+          result: "delivered",
+          reason_key: null,
+          recorded_at: "2026-08-20T09:00:00Z",
+        },
+      ],
+      [
+        { delivery_order_id: "00000000-0000-0000-0000-0000000d0001", kind: "received_by_logistics" },
+      ],
+    );
+    expect(screen.getByText("Delivered")).toBeTruthy();
+    expect(screen.queryByText("Out for delivery")).toBeNull();
   });
 
   it("a voided document reads Cancelled and never Delivered", () => {

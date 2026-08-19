@@ -7,7 +7,7 @@ vi.mock("../../lib/supabase", () => ({
   userClient: vi.fn(),
   adminClient: vi.fn(),
 }));
-import { userClient } from "../../lib/supabase";
+import { adminClient, userClient } from "../../lib/supabase";
 
 const env = {
   SUPABASE_URL: "https://t.x",
@@ -77,7 +77,10 @@ const ATTEMPT_ROW = {
  * (select→order→limit / select→eq→maybeSingle / select→in) all work without
  * this mock knowing their exact shapes.
  */
-function mockSb(results: Array<{ data?: unknown; error?: unknown }>) {
+function mockSb(
+  results: Array<{ data?: unknown; error?: unknown }>,
+  rpcResults: Array<{ data?: unknown; error?: unknown }> = [],
+) {
   const queue = [...results];
   const from = vi.fn().mockImplementation(() => {
     const res = queue.shift() ?? { data: null, error: null };
@@ -96,15 +99,24 @@ function mockSb(results: Array<{ data?: unknown; error?: unknown }>) {
       );
     return chain;
   });
-  vi.mocked(userClient).mockReturnValue({ from } as never);
-  return { from };
+  const rpcQueue = [...rpcResults];
+  const rpc = vi.fn().mockImplementation(() => {
+    const res = rpcQueue.shift() ?? { data: null, error: null };
+    return Promise.resolve({ data: res.data ?? null, error: res.error ?? null });
+  });
+  vi.mocked(userClient).mockReturnValue({ from, rpc } as never);
+  return { from, rpc };
 }
 
-async function call(path: string, role: string) {
+async function call(path: string, role: string, init?: RequestInit) {
   const jwt = await makeJwt(role);
   return app.fetch(
     new Request(`http://t/api/operation/delivery-orders${path}`, {
-      headers: { Authorization: `Bearer ${jwt}` },
+      ...init,
+      headers: {
+        Authorization: `Bearer ${jwt}`,
+        ...(init?.body ? { "Content-Type": "application/json" } : {}),
+      },
     }),
     env,
   );
@@ -162,6 +174,7 @@ describe("GET /api/operation/delivery-orders/:id — the document", () => {
       { data: detailRow },
       { data: [ATTEMPT_ROW] }, // attempts
       { data: [] }, // loans
+      { data: [] }, // handover events (0363)
       { data: [{ sku: "JAGER-SS", variant: "Jager Super Single" }] },
     ]);
     const res = await call("/DO-180826-3035", "operation");
@@ -170,9 +183,11 @@ describe("GET /api/operation/delivery-orders/:id — the document", () => {
       deliveryOrder: { do_number: string };
       lineDescriptions: Record<string, string>;
       loans: unknown[];
+      handoverEvents: unknown[];
     };
     expect(body.deliveryOrder.do_number).toBe("DO-180826-3035");
     expect(body.lineDescriptions["JAGER-SS"]).toBe("Jager Super Single");
+    expect(body.handoverEvents).toEqual([]);
   });
 
   it("answers 404 with words when the document does not exist", async () => {
@@ -181,5 +196,136 @@ describe("GET /api/operation/delivery-orders/:id — the document", () => {
     expect(res.status).toBe(404);
     const body = (await res.json()) as { message: string };
     expect(body.message).toContain("not found");
+  });
+});
+
+describe("POST /:id/handover — the §4 chain door (0363)", () => {
+  const DO_ID = "00000000-0000-0000-0000-0000000d0001";
+
+  it("refuses a role outside operation/principal", async () => {
+    mockSb([]);
+    const res = await call(`/${DO_ID}/handover`, "supplier", {
+      method: "POST",
+      body: JSON.stringify({ kind: "ready_for_handover" }),
+    });
+    expect([401, 403]).toContain(res.status);
+  });
+
+  it("records Ready for handover through the governed RPC — nothing is written directly", async () => {
+    const { from, rpc } = mockSb([], [{ data: { id: "ev1", kind: "ready_for_handover" } }]);
+    const res = await call(`/${DO_ID}/handover`, "operation", {
+      method: "POST",
+      body: JSON.stringify({ kind: "ready_for_handover" }),
+    });
+    expect(res.status).toBe(201);
+    expect(rpc).toHaveBeenCalledWith(
+      "delivery_handover_record",
+      expect.objectContaining({ p_do_id: DO_ID, p_kind: "ready_for_handover" }),
+    );
+    // Ready needs no goods derivation — no table read happens at all.
+    expect(from).not.toHaveBeenCalled();
+  });
+
+  it("derives the DEFAULT goods count from the document's own trip lines when the recorder omits it", async () => {
+    const { rpc } = mockSb(
+      [
+        {
+          data: {
+            id: DO_ID,
+            trip_groups: null,
+            orders: { order_lines: [{ sku: "JAGER-SS", qty: 2 }] },
+          },
+        },
+      ],
+      [{ data: { id: "ev2", kind: "received_by_logistics" } }],
+    );
+    const res = await call(`/${DO_ID}/handover`, "operation", {
+      method: "POST",
+      body: JSON.stringify({ kind: "received_by_logistics" }),
+    });
+    expect(res.status).toBe(201);
+    expect(rpc).toHaveBeenCalledWith(
+      "delivery_handover_record",
+      expect.objectContaining({
+        p_kind: "received_by_logistics",
+        p_goods: [{ sku: "JAGER-SS", qty: 2 }],
+      }),
+    );
+  });
+
+  it("a proof path outside this document's own prefix is refused — proof binds to the exact event", async () => {
+    mockSb([]);
+    const res = await call(`/${DO_ID}/handover`, "operation", {
+      method: "POST",
+      body: JSON.stringify({
+        kind: "handed_over",
+        receiverName: "Ahmad",
+        goods: [{ sku: "JAGER-SS", qty: 1 }],
+        proofPath: "handover/other-document/x.jpg",
+      }),
+    });
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { message: string };
+    expect(body.message).toContain("does not belong to this delivery order");
+  });
+
+  it("the door's own refusals reach the operator in words (out-of-order chain)", async () => {
+    const { rpc } = mockSb(
+      [],
+      [
+        {
+          error: {
+            code: "P0001",
+            message: "goods are handed over only after Ready for handover is recorded",
+            details: "handover_out_of_order",
+          },
+        },
+      ],
+    );
+    const res = await call(`/${DO_ID}/handover`, "operation", {
+      method: "POST",
+      body: JSON.stringify({
+        kind: "handed_over",
+        receiverName: "Ahmad",
+        goods: [{ sku: "JAGER-SS", qty: 1 }],
+        proofPath: `handover/${DO_ID}/proof.jpg`,
+      }),
+    });
+    expect(rpc).toHaveBeenCalled();
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code: string };
+    expect(body.code).toBe("handover_out_of_order");
+  });
+});
+
+describe("POST /:id/handover-proof/sign-upload", () => {
+  const DO_ID = "00000000-0000-0000-0000-0000000d0001";
+
+  it("refuses a cancelled document — a cancelled document has no handover", async () => {
+    mockSb([{ data: { id: DO_ID, voided_at: "2026-08-19T02:00:00Z" } }]);
+    const res = await call(`/${DO_ID}/handover-proof/sign-upload`, "operation", {
+      method: "POST",
+      body: JSON.stringify({ mimeType: "image/jpeg", sizeBytes: 1024 }),
+    });
+    expect(res.status).toBe(409);
+  });
+
+  it("signs a server-generated key under this document's own handover/ prefix", async () => {
+    mockSb([{ data: { id: DO_ID, voided_at: null } }]);
+    const createSignedUploadUrl = vi
+      .fn()
+      .mockResolvedValue({ data: { token: "t", path: `handover/${DO_ID}/k.jpg` }, error: null });
+    vi.mocked(adminClient).mockReturnValue({
+      storage: { from: vi.fn().mockReturnValue({ createSignedUploadUrl }) },
+    } as never);
+    const res = await call(`/${DO_ID}/handover-proof/sign-upload`, "operation", {
+      method: "POST",
+      body: JSON.stringify({ mimeType: "image/jpeg", sizeBytes: 1024 }),
+    });
+    expect(res.status).toBe(200);
+    const arg = createSignedUploadUrl.mock.calls[0]?.[0] as string;
+    expect(arg.startsWith(`handover/${DO_ID}/`)).toBe(true);
+    const body = (await res.json()) as { token: string; path: string };
+    expect(body.token).toBe("t");
   });
 });

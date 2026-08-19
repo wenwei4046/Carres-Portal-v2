@@ -13,6 +13,9 @@ import {
   type AssignPickupPartnerInput,
   type AttachDoInput,
   type AwaitingStockShortageResponse,
+  type DeliveryHandoverKind,
+  type HandoverGoodsLine,
+  type RecordHandoverInput,
   type CancelOrderInput,
   type CatalogResponse,
   type JumpSearchResponse,
@@ -5740,9 +5743,16 @@ export interface DeliveryOrderAttemptRow {
   recorded_at: string;
   recorded_by?: string | null;
 }
+/** One §4 handover fact (0363) as the register needs it — the kind alone. */
+export interface DeliveryHandoverKindRow {
+  delivery_order_id: string;
+  kind: DeliveryHandoverKind;
+}
+
 export interface DeliveryOrdersRegisterPayload {
   deliveryOrders: DeliveryOrderRow[];
   attempts: DeliveryOrderAttemptRow[];
+  handoverEvents: DeliveryHandoverKindRow[];
 }
 export function useDeliveryOrdersRegister(opts?: { orderId?: string }) {
   const scope = opts?.orderId ?? "all";
@@ -5788,7 +5798,29 @@ export interface DeliveryOrderDetailPayload {
     returned_at: string | null;
     loan_note_no: string | null;
   }>;
+  handoverEvents: DeliveryHandoverEventRow[];
 }
+
+/** One §4 handover fact as recorded (0363) — person, company, active duty,
+ *  time, proof; the receipt may carry its OWN goods count (a discrepancy
+ *  keeps both facts visible). */
+export interface DeliveryHandoverEventRow {
+  id: string;
+  kind: DeliveryHandoverKind;
+  duty: "warehouse" | "logistics";
+  company: string | null;
+  counterparty: string | null;
+  receiver_name: string | null;
+  vehicle: string | null;
+  goods: HandoverGoodsLine[] | null;
+  note: string | null;
+  proof_path: string | null;
+  recorded_by: string;
+  recorded_by_name: string | null;
+  recorded_at: string;
+  proofUrl: string | null;
+}
+
 export function useDeliveryOrder(idOrNumber: string | null) {
   return useQuery<DeliveryOrderDetailPayload, ApiError>({
     queryKey: ["operation", "delivery-orders", "detail", idOrNumber],
@@ -5797,6 +5829,31 @@ export function useDeliveryOrder(idOrNumber: string | null) {
         `/api/operation/delivery-orders/${encodeURIComponent(idOrNumber ?? "")}`,
       ),
     enabled: Boolean(idOrNumber),
+  });
+}
+
+/** The §4 chain door (0363): record ONE ordered fact on a live document.
+ *  Invalidates every delivery-order read AND the delivery/orders lists — the
+ *  register pill may turn `Out for delivery` on this write. */
+export function useRecordHandoverEvent(
+  doId: string,
+  opts?: Partial<
+    UseMutationOptions<{ event: unknown }, ApiError, RecordHandoverInput>
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation<{ event: unknown }, ApiError, RecordHandoverInput>({
+    mutationFn: (input) =>
+      apiFetch<{ event: unknown }>(
+        `/api/operation/delivery-orders/${encodeURIComponent(doId)}/handover`,
+        { method: "POST", body: JSON.stringify(input) },
+      ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: ["operation", "delivery-orders"] });
+      await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
   });
 }
 

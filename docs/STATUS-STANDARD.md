@@ -77,7 +77,7 @@ never hand-keyed:
 | Status | Tone | Derived from |
 |---|---|---|
 | Created | neutral (grey) — owner column ruling 2026-08-18 | document exists, no delivery run recorded |
-| Out for delivery | info (blue) | REGISTERED, NOT YET DERIVABLE — awaits the warehouse→logistics handover fact (`delivery/MASTER.md` §4); never derived from the calendar |
+| Out for delivery | info (blue) | the §4 chain's `Received by Logistics` fact (0363) with no result recorded yet — never derived from the calendar, and any recorded result outranks it |
 | Delivered | success (green) | latest `delivery_attempts` result for this number = delivered |
 | Delivery exception | warning (amber) | latest result = partial/failed · carries its ONE T4 reason on the quieter second line |
 | Cancelled | neutral (grey) | `voided_at` stamp (`order_cancelled` / `rescheduled`) |

@@ -74,7 +74,30 @@ const payload = (
   attempts: [],
   lineDescriptions: { "mattress:JAGER-SS": "Jager Super Single" },
   loans: [],
+  handoverEvents: [],
   ...extra,
+});
+
+/** One §4 handover fact for the fixtures (0363). */
+const handoverEvent = (
+  kind: "ready_for_handover" | "handed_over" | "received_by_logistics",
+  over: Partial<DeliveryOrderDetailPayload["handoverEvents"][number]> = {},
+): DeliveryOrderDetailPayload["handoverEvents"][number] => ({
+  id: `ev-${kind}`,
+  kind,
+  duty: kind === "received_by_logistics" ? "logistics" : "warehouse",
+  company: kind === "received_by_logistics" ? "NETS" : "Carres Klang",
+  counterparty: kind === "handed_over" ? "NETS" : null,
+  receiver_name: kind === "handed_over" ? "Ahmad" : null,
+  vehicle: null,
+  goods: null,
+  note: null,
+  proof_path: kind === "handed_over" ? "handover/x/proof.jpg" : null,
+  recorded_by: "00000000-0000-0000-0000-0000000e0001",
+  recorded_by_name: "Shasha",
+  recorded_at: "2026-08-19T03:00:00Z",
+  proofUrl: null,
+  ...over,
 });
 
 function mount(data: DeliveryOrderDetailPayload) {
@@ -184,6 +207,102 @@ describe("DeliveryOrderPage", () => {
     expect(screen.getByText("Jager Super Single")).toBeTruthy();
     expect(screen.queryByText("sofa:HK55-3S")).toBeNull();
     expect(screen.getByText(/follows on a second trip/)).toBeTruthy();
+  });
+
+  it("the Warehouse handover block renders the §4 facts read-only, with recorder, duty and company", () => {
+    mount(
+      payload(
+        {},
+        {
+          handoverEvents: [
+            handoverEvent("ready_for_handover"),
+            handoverEvent("handed_over", {
+              vehicle: "WXY 1234",
+              goods: [{ sku: "mattress:JAGER-SS", qty: 1 }],
+            }),
+          ],
+        },
+      ),
+    );
+    expect(screen.getByText("Warehouse handover")).toBeTruthy();
+    // Each fact renders in the Warehouse block AND in History (append-only).
+    expect(screen.getAllByText(/Ready for handover/).length).toBeGreaterThan(0);
+    expect(screen.getByText(/Handed over — to NETS · received by Ahmad/)).toBeTruthy();
+    expect(screen.getAllByText(/Shasha/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Warehouse · Carres Klang/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Vehicle: WXY 1234/).length).toBeGreaterThan(0);
+    // Still read-only: the facts add no input and no button.
+    expect(document.querySelectorAll("input, textarea, select").length).toBe(0);
+  });
+
+  it("a received-not-yet-resulted document reads Out for delivery; handed over alone does not", () => {
+    mount(
+      payload(
+        {},
+        {
+          handoverEvents: [
+            handoverEvent("ready_for_handover"),
+            handoverEvent("handed_over"),
+          ],
+        },
+      ),
+    );
+    expect(screen.queryByText("Out for delivery")).toBeNull();
+
+    mount(
+      payload(
+        {},
+        {
+          handoverEvents: [
+            handoverEvent("ready_for_handover"),
+            handoverEvent("handed_over"),
+            handoverEvent("received_by_logistics"),
+          ],
+        },
+      ),
+    );
+    expect(screen.getByText("Out for delivery")).toBeTruthy();
+  });
+
+  it("a receipt with a different quantity keeps BOTH counts visible — neither fact is overwritten", () => {
+    mount(
+      payload(
+        {},
+        {
+          handoverEvents: [
+            handoverEvent("ready_for_handover"),
+            handoverEvent("handed_over", {
+              goods: [{ sku: "mattress:JAGER-SS", qty: 2 }],
+            }),
+            handoverEvent("received_by_logistics", {
+              goods: [{ sku: "mattress:JAGER-SS", qty: 1 }],
+              note: "One unit left behind — no space on the truck",
+            }),
+          ],
+        },
+      ),
+    );
+    expect(screen.getByText(/mattress:JAGER-SS × 2/)).toBeTruthy();
+    expect(screen.getByText(/mattress:JAGER-SS × 1/)).toBeTruthy();
+    expect(screen.getByText(/One unit left behind/)).toBeTruthy();
+  });
+
+  it("History lists each handover event append-only with its recorder", () => {
+    mount(
+      payload(
+        {},
+        {
+          handoverEvents: [
+            handoverEvent("ready_for_handover"),
+            handoverEvent("handed_over"),
+            handoverEvent("received_by_logistics"),
+          ],
+        },
+      ),
+    );
+    // The facts appear twice — the Warehouse block and History — so at least 2.
+    expect(screen.getAllByText(/Ready for handover/).length).toBeGreaterThan(1);
+    expect(screen.getAllByText(/Received by logistics/).length).toBeGreaterThan(1);
   });
 
   it("the loan block renders only when a loan exists", () => {
