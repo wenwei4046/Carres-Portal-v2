@@ -470,6 +470,11 @@ carries its own heading until it restructures. **Stock restructured 2026-08-19
 (CARD-2026-08-19-warehouse-rail): the merged `Stock` row became the `WAREHOUSE`
 heading** with its pages as rows — `On hand` · `Ready stock` · `In & out` live,
 `Transfers` · `Counts` printing `Coming soon` (Warehouse Blueprint item 13).
+**`Transfers` went live 2026-08-19** (CARD-2026-08-19-warehouse-transfers, 0365)
+by exactly the two edits this section rules: the `soon` flag dropped and the
+span became a `Link` to its own unchanged `?tab=transfers` address, in that
+page's own PR. **Its place in the rail did not move** — the row a staff member
+had already learned is the row that lit up. `Counts` still prints `Coming soon`.
 The blueprint keeps Reports and Settings central, so WAREHOUSE lists **no
 Report row and no Settings row**. Its strip died the same way Purchasing's did:
 `StockTabs` keeps drawing the ONE header row in the destination format. A

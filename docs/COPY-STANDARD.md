@@ -1179,7 +1179,16 @@ Information Architecture and live in [`ERP-ARCHITECTURE.md`](ERP-ARCHITECTURE.md
 | The goods pool (any page/tab/label) | **Stock** | Inventory · Warehouse (as the goods-pool word — `WAREHOUSE` is the module's rail HEADING since 2026-08-19, never the pool's name) |
 | The module's rail heading (CARD-2026-08-19-warehouse-rail) | **Warehouse** | Stock (as a heading) · Supply Chain |
 | Stock in/out history (page/label) | **In & out** | Movements · Movement log (menu) · Ledger |
-| The cross-site custody journey page (Warehouse Blueprint item 13, `Coming soon`) | **Transfers** | Movements · Relocations |
+| The cross-site custody journey page (Warehouse Blueprint item 13 — LIVE since 0365) | **Transfers** | Movements · Relocations |
+| A unit that has left one site and not yet been received at the other — **OUR goods between OUR sites** | **In transit** | Transferred (that reads as ARRIVED — the operator goes looking for it at the destination, where it is not) · On the way (that is `incoming`, a different fact) · Moving. **Boundary, and it is not a contradiction:** the delivery row far below bans `In transit` for a DO on its way to a CUSTOMER, where the ruled word is `Out for delivery`. Two different journeys, two different owners, two different words — a unit moving between Klang and a showroom is never *out for delivery*, and a customer's goods on a truck are never a *stock transfer* |
+| A transfer nobody has collected yet | **Requested** | New · Draft · Pending · Open |
+| A transfer whose goods the destination has taken in | **Received** | Completed · Closed · Delivered (that is a CUSTOMER word) · Arrived |
+| The register column of when the goods actually LEFT | **Collection** | Collected date · Pickup · Dispatch |
+| The register column of when the goods are due to land | **Expected arrival** | ETA (banned — Business Date Dictionary) · Due date · Arrival date |
+| A transfer's date cells before the fact has happened | **`Not collected yet`** · **`Not received yet`** | — · blank · N/A · Pending |
+| Why goods are being moved (the four ruled purposes) | **`For a sales order`** · **`For display`** · **`Move stock between sites`** · **`Back to the warehouse`** | Reason codes · Transfer type · Rebalance (as a visible word) |
+| The three governed transfer doors | **`Request transfer`** · **`Confirm collection`** · **`Confirm arrival`** | Create transfer · Dispatch · Ship · Post · Complete · Receive (bare) |
+| Stopping a transfer that has not left | **`Cancel transfer`** | Delete · Void · Reverse — and it is REFUSED after collection: the way back is a new return transfer |
 | The formal unit-verification page (Warehouse Blueprint item 13, `Coming soon`) | **Counts** | Stocktake · Audit |
 | A logistics company's own working rules | **delivery rules** | Partner profile · SLA · Carrier config |
 | Notice logistics need before a delivery day | **working days notice** | Lead time · Cut-off · Booking window |

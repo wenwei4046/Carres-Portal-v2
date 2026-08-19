@@ -259,7 +259,7 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       { key: "stock", label: "On hand", icon: Boxes, tab: "stock-onhand", section: "Warehouse" },
       { key: "stock-plan", label: "Ready stock", icon: ClipboardList, section: "Warehouse" },
       { key: "movements", label: "In & out", icon: ArrowLeftRight, section: "Warehouse" },
-      { key: "transfers", label: "Transfers", icon: Truck, soon: true, section: "Warehouse" },
+      { key: "transfers", label: "Transfers", icon: Truck, section: "Warehouse" },
       { key: "counts", label: "Counts", icon: ScrollText, soon: true, section: "Warehouse" },
       { key: "payments", label: "Payments", icon: Wallet, section: "Finance" },
       // Rental base (0247-0249, Loo 2026-07-25) — rent-to-own agreements +

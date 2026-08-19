@@ -166,14 +166,20 @@ describe("WAREHOUSE is a heading with its pages as rows (Warehouse Blueprint ite
     expect(inOut).toHaveAttribute("href", "/operation?tab=movements");
   });
 
-  it("Transfers and Counts print `Coming soon` and are NOT controls", () => {
+  it("Transfers went live and is a real link — the flag dropped, the span became a Link", () => {
+    // CARD-2026-08-19-warehouse-transfers (0365): going live is two edits in
+    // the page's own PR, and the row keeps its learned place in the rail.
     renderAt("/operation?tab=stock-onhand");
-    for (const word of ["Transfers", "Counts"]) {
-      const el = screen.getByText(word);
-      expect(el.closest("a")).toBeNull();
-      const row = el.closest("[data-soon='1']") as HTMLElement;
-      expect(row).not.toBeNull();
-    }
+    const transfers = screen.getByText("Transfers").closest("a") as HTMLAnchorElement;
+    expect(transfers).toHaveAttribute("href", "/operation?tab=transfers");
+    expect(screen.getByText("Transfers").closest("[data-soon='1']")).toBeNull();
+  });
+
+  it("Counts still prints `Coming soon` and is NOT a control", () => {
+    renderAt("/operation?tab=stock-onhand");
+    const el = screen.getByText("Counts");
+    expect(el.closest("a")).toBeNull();
+    expect(el.closest("[data-soon='1']")).not.toBeNull();
   });
 
   it("the blueprint keeps Reports and Settings central — no Report or Settings row under WAREHOUSE", () => {

@@ -39,6 +39,7 @@ import dispatchCustomerLegRouter from "./routes/operation/dispatch-customer-leg"
 import deliveryChainRouter from "./routes/operation/delivery-chain";
 import orderControlRouter from "./routes/operation/order-control";
 import deliveryOrdersRouter from "./routes/operation/delivery-orders";
+import stockTransfersRouter from "./routes/operation/stock-transfers";
 import paymentApprovalsRouter from "./routes/operation/payment-approvals";
 import purchaseRouter from "./routes/operation/purchase";
 import toOrderRouter from "./routes/operation/to-order";
@@ -194,6 +195,7 @@ api.route("/operation/orders", deliveryChainRouter);
 // 0159 P2 control overlay — GET + PUT /:id/control
 api.route("/operation/orders", orderControlRouter);
 api.route("/operation/delivery-orders", deliveryOrdersRouter);
+api.route("/operation/stock-transfers", stockTransfersRouter);
 // 0362 — the Delivery Payment Approval: raise · decide · read (owner ruling 2026-08-19)
 api.route("/operation/payment-approvals", paymentApprovalsRouter);
 // 0184 balance job — payment ledger + storage collect / waiver / delivery gate

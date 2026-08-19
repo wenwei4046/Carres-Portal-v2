@@ -21,6 +21,7 @@
 | what moved | **§4 In & out** |
 | the shelf plan and reorder points | **§5 Ready stock** |
 | quarantined goods | **§6 Held stock** |
+| goods moving between two sites | **§9 Transfers** |
 | the review numbers | **§7** |
 
 ---
@@ -41,11 +42,11 @@ WAREHOUSE
   On hand        ?tab=stock-onhand   — the per-unit register, chip-filtered
   Ready stock    ?tab=stock-plan     — the plan, reorder points, K5's digest
   In & out       ?tab=movements      — every movement
-  Transfers      Coming soon         — blueprint item 13.3, its own card
+  Transfers      ?tab=transfers      — the cross-site custody journey (§9, 0365)
   Counts         Coming soon         — blueprint item 13.4, its own card
 ```
 
-- The three live rows keep K0's learned order; the rail never reshuffles. When
+- The four live rows keep K0's learned order; the rail never reshuffles. When
   Ready stock folds into On hand Views (blueprint item 13.7) its row dies in
   that card's own PR.
 - **No Report row, no Settings row** — the blueprint keeps both central.
@@ -57,6 +58,7 @@ WAREHOUSE
 OperationStockOnHand.tsx    On hand    — the per-unit register, chip-filtered
 OperationMovements.tsx      In & out   — every movement
 OperationStockPlan.tsx      Ready stock — the plan, reorder points, K5's digest
+StockTransfersRegister.tsx  Transfers  — the cross-site custody register
 ```
 
 **`Inventory` and `Movements` are BANNED UI words.** The goods pool is **`Stock`** on any page,
@@ -206,6 +208,84 @@ A damaged or wrong unit stops counting as future supply, under the claim that is
   oldest row silently becomes *"when our records start"*.
 
 ---
+
+# §9 · Transfers — the cross-site custody journey
+
+### MISSION
+Move an exact unit from one site to another so that three facts survive the journey:
+**who handed it over · who held it in between · whether the destination really received the
+same unit.**
+
+### WHAT IS ON SCREEN TODAY
+`StockTransfersRegister.tsx` at `?tab=transfers` — the Transfers register on the Register
+Template, with the owner's own default columns:
+
+```
+Transfer No. | From | To | Units | Purpose | State | Collection | Expected arrival | Received
+```
+
+**BUILT for slice 1** (CARD-2026-08-19-warehouse-transfers, migration `0365`): the Transfer
+object, its exact-unit lines, the append-only custody events, four governed doors and the
+register. **The rail row went live in the same PR** — the flag dropped and the span became a
+link, per ui MASTER §4.2's two-edit rule.
+
+### FROZEN RULES — owner-approved Warehouse Blueprint item 8, reviewed 2026-08-14
+
+- **SAME SITE = Move; DIFFERENT SITE = Transfer.** A cross-site relocation may NEVER be a
+  direct edit of `ops_stock_items.warehouse_id`. The owner's reason, in her own words: a direct
+  edit hides who handed the goods over, who held them in transit, and whether the destination
+  received the same unit. The `from ≠ to` rule is a CHECK constraint, not advice.
+- **COLLECTION AND ARRIVAL ARE TWO EVENTS, NEVER ONE.** The blueprint explicitly rejects
+  2990's "one action writes OUT and IN", which pretends the journey between them does not
+  exist. The OUT movement lands at collection and the IN movement lands at arrival — and
+  **collection alone never derives `Received`**, which is asserted in both the database probes
+  and the shared unit tests.
+- **THE STATE IS DERIVED, NEVER STORED.** `Requested → In transit → Received`, plus
+  `Cancelled` before collection. `stockTransferStateOf` (packages/shared) is the ONE
+  arithmetic (Architecture Law D); no table has a transfer-status column and no dropdown
+  edits one.
+- **A COLLECTED TRANSFER CANNOT BE CANCELLED.** The way back is a NEW return transfer, never
+  an undo of a journey that physically happened. The database refuses it.
+- **IN TRANSIT IS `transferred`, AND 0365 IS ITS FIRST WRITER.** The status sat in the
+  vocabulary since 0137 with no writer and zero rows (measured 2026-08-19). It now means
+  exactly one thing: custody has left the origin, the destination has not yet received. A unit
+  holding it is **absent from every availability figure** — `SELLABLE_STOCK_STATUSES` is
+  `['free']`, every pick filters `free`, and `ops_rollup_stock_balances` counts only
+  free + reserved. **Its word is `In transit`, not "Transferred"**, because an operator
+  reading "Transferred" goes looking for the unit at the destination, where it is not.
+- **A RESERVATION SURVIVES THE JOURNEY.** `reserved_ref` is never cleared by a transfer, and
+  arrival restores the status RECORDED at request time (`status_before`), so a reserved unit
+  lands reserved. The status is recorded rather than re-derived at arrival: deriving it from
+  `reserved_ref` would silently free the unit if the ref had moved in between.
+- **A reserved unit travels only for its OWN fulfilment** — purpose `sales_order` whose ref
+  matches the unit's. Ordinary display or site rebalancing may never take reserved goods.
+  **A held (`on_hold`) unit may not join a slice-1 transfer at all**; the blueprint's
+  controlled exceptions (inspection · repair · supplier return · quarantine relocation) need
+  destinations this slice does not have.
+- **A unit may be on only one open transfer at a time**, checked under a row lock so two
+  requests cannot claim the same goods.
+- **EVENTS ARE APPEND-ONLY AND DELETION IS REFUSED AT THE DATABASE**, not inside one RPC
+  (0299's lesson). Each records the person, the time and the unit set. A transfer document is
+  cancelled, never deleted.
+
+### 🔴 THE ONE THING THAT BLOCKS USE — a business fact only the owner can give
+
+**Measured on production 2026-08-19: the `warehouses` register holds exactly ONE row,
+`Carres Klang`.** The engine is built and proven, but a cross-site transfer has nowhere to go
+until Carres' real sites exist as rows — the showrooms and outlets the blueprint names
+(`PJ Showroom`, outlets, and the partner locations `AL` / `HOUZS`, which exist today only as
+`delivery_partners`). **This is configuration, not code**: `warehouses` already carries
+`kind` (`own` | `logistics_partner`) and `owning_partner_id` from 0027, so each site is one
+row and no schema changes. **Ask Jess for her site list; do not invent one** — which
+showrooms and outlets Carres has is a business fact, and the card's own acceptance walk (one
+real transfer between two sites) cannot run until it is answered. A Settings surface for
+sites is explicitly a later slice.
+
+### NOT IN THIS SLICE — and not faked
+Positions / Operational Areas · partial receipt and its exception Work · `Receive With Issue` ·
+`Reject` and its next-custody rule · supplier and repair-partner destinations · the
+`Exceptions` register column (it joins when it can be true) · batch/dye-lot matching ·
+Counts · any Settings surface.
 
 # §8 · Approved Evolution
 
