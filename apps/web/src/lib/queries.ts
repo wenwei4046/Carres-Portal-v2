@@ -3246,6 +3246,11 @@ export interface operationPoListRow {
    *  degrades to "no ready date yet", which is also the state that raises
    *  `Confirm ready date`. */
   expected_ready_date?: string | null;
+  /** 0361 — the reason this PO was born: `customer_sales` (the customer lane's
+   *  auto-stamp) or a typed demand purpose. The panel prints it as `Need for`.
+   *  OPTIONAL — an older Worker omits it, and pre-0361 POs are NULL (never
+   *  backfilled); both degrade to printing nothing. */
+  purpose?: string | null;
   placed_at: string;
   purchase_order_lines: {
     // 0076 (Loo 2026-05-10): line UUID — primary key after migration. Used

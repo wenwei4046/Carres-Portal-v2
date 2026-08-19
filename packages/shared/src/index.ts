@@ -1907,6 +1907,7 @@ export {
   DEMAND_PURPOSE_DEFAULT,
   DEMAND_PURPOSE_VALUES,
   isDemandPurpose,
+  poPurposeLabelOf,
   type DemandPurpose,
   type DemandPickItem,
   buildToOrder,

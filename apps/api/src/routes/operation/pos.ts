@@ -90,7 +90,10 @@ operationPosRouter.get("/", requireOperation, async (c) => {
       // It is a different fact from `eta_date` (OUR prediction) and the two are
       // never merged: R5 grades a supplier on this column, so it holds only
       // what a human recorded after the supplier answered.
-      "id, supplier_id, warehouse_id, destination_id, status, sup_status, so, so_refs, eta_date, expected_ready_date, placed_at, purchase_order_lines(id, sku, qty, received_qty, damaged_qty, wrong_item_qty, short_since, attrs, destination_id, ops_remark)",
+      // 0361: `purpose` — the reason the PO was born (customer_sales auto-stamp
+      // or a typed demand purpose). The panel prints it as `Need for`; NULL for
+      // every PO issued before 0361, deliberately not backfilled.
+      "id, supplier_id, warehouse_id, destination_id, status, sup_status, so, so_refs, eta_date, expected_ready_date, placed_at, purpose, purchase_order_lines(id, sku, qty, received_qty, damaged_qty, wrong_item_qty, short_since, attrs, destination_id, ops_remark)",
     );
 
   if (status !== "all") q = q.eq("status", status);
