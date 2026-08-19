@@ -314,6 +314,7 @@ export default function OperationApp() {
           !isProcurementUrl &&
           !isToOrderUrl &&
           tab !== "purchase" &&
+          tab !== "manual-purchase" &&
           tab !== "receiving" &&
           tab !== "claims" &&
           tab !== "purchasing-report" &&

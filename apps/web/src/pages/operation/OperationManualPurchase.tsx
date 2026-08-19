@@ -343,18 +343,33 @@ export default function OperationManualPurchase() {
     <div className="flex h-full min-h-0 flex-col">
       <PurchasingTabs />
       <div className="flex min-h-0 flex-1 gap-2 p-2">
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2" data-testid="register-column">
-          <div className="flex items-center justify-end">
-            <Button
-              variant="primary"
-              onClick={() => setMode("create")}
-              data-testid="manual-purchase-new-request"
-            >
-              {MW.newRequest}
-            </Button>
-          </div>
+        {/* The 200px rail sits on the LEFT, like every other purchasing page
+            (corrections card §3 — SO Batch, Receiving and Claims all measure
+            a left 200px rail; the RIGHT side is §5's supervision widgets').
+            Same tiles, same counts, same behaviour — only the side changed. */}
+        <RailAside
+          queueRows={queueRows}
+          statusFilter={statusFilter}
+          setStatusFilter={setStatusFilter}
+          purposeFilter={purposeFilter}
+          setPurposeFilter={setPurposeFilter}
+          rows={rows}
+        />
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col" data-testid="register-column">
           <DataGrid<RequestRegisterRow>
             appearance="reference"
+            /* `+ New request` is the register's PRIMARY action and lives in the
+               control band (corrections §4) — a whole empty row above the grid
+               was a band spent on one control. */
+            toolbarStart={
+              <Button
+                variant="primary"
+                onClick={() => setMode("create")}
+                data-testid="manual-purchase-new-request"
+              >
+                {MW.newRequest}
+              </Button>
+            }
             rows={filtered}
             columns={columns}
             storageKey="carres.manualPurchase.register.v1"
@@ -385,72 +400,91 @@ export default function OperationManualPurchase() {
           />
         </div>
 
-        {/* The 200px rail — queues above, the Need for facet below. A count is
-            work waiting; at zero NOTHING is printed. */}
-        <aside
-          className="flex w-[200px] shrink-0 flex-col gap-4 overflow-auto"
-          data-testid="manual-purchase-rail"
-        >
-          <section>
-            <h3 className="px-2 pb-1 text-label font-semibold uppercase tracking-[0.14em] text-base-500">
-              Queues
-            </h3>
-            <div className="flex flex-col gap-0.5">
-              {queueRows.map((row) => {
-                const on = statusFilter === row.kind;
-                return (
-                  <button
-                    key={row.kind}
-                    type="button"
-                    data-testid={`mp-queue-${row.kind}`}
-                    onClick={() => setStatusFilter(on ? null : row.kind)}
-                    className={`flex w-full items-center gap-2 rounded px-2 py-[7px] text-left text-meta ${
-                      on
-                        ? "bg-kit-blue-3 font-semibold text-base-900"
-                        : "font-medium text-base-700 hover:bg-hovertint"
-                    }`}
-                  >
-                    <span className="min-w-0 flex-1 truncate">{row.label}</span>
-                    {row.count > 0 ? (
-                      <span className="shrink-0 tabular-nums text-base-600">{row.count}</span>
-                    ) : null}
-                  </button>
-                );
-              })}
-            </div>
-          </section>
-          <section>
-            <h3 className="px-2 pb-1 text-label font-semibold uppercase tracking-[0.14em] text-base-500">
-              {MW.needFor}
-            </h3>
-            <div className="flex flex-col gap-0.5">
-              {DEMAND_PURPOSES.map((p) => {
-                const on = purposeFilter === p.value;
-                const count = rows.filter((r) => r.purpose === p.value).length;
-                return (
-                  <button
-                    key={p.value}
-                    type="button"
-                    data-testid={`mp-facet-${p.value}`}
-                    onClick={() => setPurposeFilter(on ? null : p.value)}
-                    className={`flex w-full items-center gap-2 rounded px-2 py-[7px] text-left text-meta ${
-                      on
-                        ? "bg-kit-blue-3 font-semibold text-base-900"
-                        : "font-medium text-base-700 hover:bg-hovertint"
-                    }`}
-                  >
-                    <span className="min-w-0 flex-1 truncate">{p.label}</span>
-                    {count > 0 ? (
-                      <span className="shrink-0 tabular-nums text-base-600">{count}</span>
-                    ) : null}
-                  </button>
-                );
-              })}
-            </div>
-          </section>
-        </aside>
       </div>
     </div>
+  );
+}
+
+/* ── The left rail — queues above, the Need for facet below ──────────────── */
+
+function RailAside({
+  queueRows,
+  statusFilter,
+  setStatusFilter,
+  purposeFilter,
+  setPurposeFilter,
+  rows,
+}: {
+  queueRows: Array<{ label: string; kind: ManualPurchaseStatusKind; count: number }>;
+  statusFilter: ManualPurchaseStatusKind | null;
+  setStatusFilter: (v: ManualPurchaseStatusKind | null) => void;
+  purposeFilter: string | null;
+  setPurposeFilter: (v: string | null) => void;
+  rows: RequestRegisterRow[];
+}) {
+  return (
+    <aside
+      className="flex w-[200px] shrink-0 flex-col gap-4 overflow-auto"
+      data-testid="manual-purchase-rail"
+    >
+      <section>
+        <h3 className="px-2 pb-1 text-label font-semibold uppercase tracking-[0.14em] text-base-500">
+          Queues
+        </h3>
+        <div className="flex flex-col gap-0.5">
+          {queueRows.map((row) => {
+            const on = statusFilter === row.kind;
+            return (
+              <button
+                key={row.kind}
+                type="button"
+                data-testid={`mp-queue-${row.kind}`}
+                onClick={() => setStatusFilter(on ? null : row.kind)}
+                className={`flex w-full items-center gap-2 rounded px-2 py-[7px] text-left text-meta ${
+                  on
+                    ? "bg-kit-blue-3 font-semibold text-base-900"
+                    : "font-medium text-base-700 hover:bg-hovertint"
+                }`}
+              >
+                <span className="min-w-0 flex-1 truncate">{row.label}</span>
+                {row.count > 0 ? (
+                  <span className="shrink-0 tabular-nums text-base-600">{row.count}</span>
+                ) : null}
+              </button>
+            );
+          })}
+        </div>
+      </section>
+      <section>
+        <h3 className="px-2 pb-1 text-label font-semibold uppercase tracking-[0.14em] text-base-500">
+          {MW.needFor}
+        </h3>
+        <div className="flex flex-col gap-0.5">
+          {DEMAND_PURPOSES.map((p) => {
+            const on = purposeFilter === p.value;
+            const count = rows.filter((r) => r.purpose === p.value).length;
+            return (
+              <button
+                key={p.value}
+                type="button"
+                data-testid={`mp-facet-${p.value}`}
+                onClick={() => setPurposeFilter(on ? null : p.value)}
+                className={`flex w-full items-center gap-2 rounded px-2 py-[7px] text-left text-meta ${
+                  on
+                    ? "bg-kit-blue-3 font-semibold text-base-900"
+                    : "font-medium text-base-700 hover:bg-hovertint"
+                }`}
+              >
+                <span className="min-w-0 flex-1 truncate">{p.label}</span>
+                {count > 0 ? (
+                  <span className="shrink-0 tabular-nums text-base-600">{count}</span>
+                ) : null}
+              </button>
+            );
+          })}
+        </div>
+      </section>
+    </aside>
   );
 }
 

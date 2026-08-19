@@ -613,3 +613,37 @@ describe("issue and the observed arrival (slice 3)", () => {
     ).toBe("Arrived");
   });
 });
+
+/**
+ * THE RAIL CORRECTIONS (CARD-2026-08-19-purchasing-rail-corrections §3 · §4,
+ * Jess on production screenshots): the QUEUES + NEED FOR rail sits on the
+ * LEFT at 200px like every measured purchasing sibling, and `+ New request`
+ * lives in the register's control band — no empty band above the grid.
+ */
+describe("the rail corrections (2026-08-19)", () => {
+  it("the rail renders LEFT of the register at 200px", async () => {
+    await loaded();
+    const rail = screen.getByTestId("manual-purchase-rail");
+    const grid = screen.getByTestId("register-column");
+    expect(rail.className).toContain("w-[200px]");
+    // Document order: the rail comes BEFORE the register column.
+    expect(
+      rail.compareDocumentPosition(grid) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    // Same tiles, same counts — behaviour unchanged.
+    expect(screen.getByTestId("mp-queue-waiting_approval")).toBeInTheDocument();
+    expect(screen.getByTestId("mp-facet-office")).toBeInTheDocument();
+  });
+
+  it("`+ New request` sits inside the register column's control band — no empty band", async () => {
+    await loaded();
+    const btn = screen.getByTestId("manual-purchase-new-request");
+    const grid = screen.getByTestId("register-column");
+    // The button lives INSIDE the register column (the DataGrid toolbar), not
+    // in a standalone row above it.
+    expect(grid.contains(btn)).toBe(true);
+    // The register column's first child is the grid surface itself — no
+    // dedicated button row precedes it.
+    expect(grid.firstElementChild?.contains(btn)).toBe(true);
+  });
+});

@@ -78,6 +78,14 @@ views of one record or one work surface, so they must not be placed in a shared 
 Purchasing navigation exposes each destination individually through the governed portal
 navigation. A page may not recreate the old `PurchasingTabs` strip as a second navigation.
 
+**THE RAIL IS A HEADING AND THE MANUAL PURCHASE RAIL IS LEFT (Jess, 2026-08-19
+— corrections card, ruled on production screenshots).** The sidebar lists this
+module's pages under a `PURCHASING` heading exactly like SALES — no parent row,
+no `SUPPLY CHAIN` umbrella (`ui/MASTER.md` §4.2 carries the law). And Manual
+Purchase's QUEUES + NEED FOR rail sits on the LEFT at 200px like its measured
+siblings (SO Batch §3, Receiving, Claims); the RIGHT side belongs to the
+supervision widgets.
+
 **PURCHASING SETTINGS ENTRY.** The old Purchasing `Settings` tab/word is retired with the tab
 strip (Loo, 2026-08-11 — APPROVED / LOCKED), and the Page Header's global Settings gear remains
 the governed entry into the one full-page Settings Workspace. The SHIPPED rail

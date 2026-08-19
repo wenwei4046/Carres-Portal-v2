@@ -577,6 +577,7 @@ screen respells it):
 | The states | `Waiting for approval` · `Waiting for the SKU` · `Ready to order` · `Ordered` · `Arrived` · `Not going ahead` — `Waiting` always names what it waits ON; `Arrived` is a FACT the system observes, never a button |
 | The number series | `REQ-` (never `PR-` — 2990s prints PR for a purchase return) |
 | The consolidation OFFER | `Issue as one PO?` — with `Issue as one PO` · `Issue separately` both live on the same screen; an offer that cannot be declined is a gate wearing an offer's clothes |
+| The register's empty state | `No requests yet — press + New request to raise the first one.` (registered 2026-08-19 — the sentence shipped approved; its absence from this table was the defect) |
 
 **SIXTY-FIVE ACTIONS BECAME TWENTY, AND THAT WAS THE POINT** (Jess, 2026-08-18). *(Thirteen was
 this section's first count, taken before all eleven pages had been designed; seven more surfaced

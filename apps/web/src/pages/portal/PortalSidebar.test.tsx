@@ -91,38 +91,54 @@ describe("PortalSidebar — role visibility", () => {
   });
 });
 
-describe("PortalSidebar — merged Purchasing item active across its 3 routes", () => {
+describe("PURCHASING is a heading, not a parent row (Jess, 2026-08-19)", () => {
   beforeEach(() => {
     mockRole = "operation";
   });
 
-  function purchasingLink() {
-    return screen.getByText("Purchasing").closest("a") as HTMLAnchorElement;
-  }
-
-  it("links to the To Order tab (?tab=purchase), not ?tab=purchasing", () => {
+  it("renders the PURCHASING heading and no bare `Purchasing` row", () => {
     renderAt("/operation?tab=purchase");
-    expect(purchasingLink()).toHaveAttribute("href", "/operation?tab=purchase");
+    const heading = screen.getByText("Purchasing");
+    // A heading is a <div>, never a link — the pages are the doors.
+    expect(heading.closest("a")).toBeNull();
+    expect(heading.className).toContain("uppercase");
+    // The umbrella word is gone for good.
+    expect(screen.queryByText("Supply Chain")).toBeNull();
   });
 
-  it("is active on the To Order tab (?tab=purchase)", () => {
+  it("each page lights ITSELF — SO Batch Purchase on its tab, Receiving on its own", () => {
     renderAt("/operation?tab=purchase");
-    expect(purchasingLink().className).toContain("font-semibold");
+    expect(
+      (screen.getByTestId("nav-child-purchase").closest("a") ?? screen.getByTestId("nav-child-purchase")).className,
+    ).toContain("font-semibold");
+    expect(screen.getByTestId("nav-child-receiving").className).not.toContain("font-semibold");
   });
 
-  it("is active on the Receiving tab (?tab=receiving)", () => {
-    renderAt("/operation?tab=receiving");
-    expect(purchasingLink().className).toContain("font-semibold");
-  });
-
-  it("is active on the Purchase Orders path (/operation/procurement)", () => {
+  it("Purchase Orders lights on its path, alone", () => {
     renderAt("/operation/procurement/nice-future");
-    expect(purchasingLink().className).toContain("font-semibold");
+    expect(screen.getByTestId("nav-child-purchase-orders").className).toContain("font-semibold");
+    expect(screen.getByTestId("nav-child-purchase").className).not.toContain("font-semibold");
   });
 
-  it("is NOT active on a non-purchasing tab (e.g. ?tab=payments)", () => {
-    renderAt("/operation?tab=payments");
-    expect(purchasingLink().className).not.toContain("font-semibold");
+  it("the purchasing pages sit at the same structure as Sales Orders — items, not children", () => {
+    renderAt("/operation?tab=purchase");
+    const sales = screen.getByText("Sales Orders").closest("a")!;
+    const batch = screen.getByTestId("nav-child-purchase");
+    // Equal structure: both are direct rows in the same items column, with the
+    // same base classes (assert structure, not pixel numbers).
+    expect(batch.tagName).toBe("A");
+    expect(batch.className).toContain("px-3.5");
+    expect(sales.className).toContain("px-3.5");
+    expect(batch.parentElement?.parentElement).toBe(sales.parentElement?.parentElement);
+  });
+
+  it("Delivery and Stock each carry their own heading — no umbrella survives", () => {
+    renderAt("/operation?tab=purchase");
+    for (const word of ["Delivery", "Stock"]) {
+      const els = screen.getAllByText(word);
+      // One of them is the heading (a non-link div with the heading classes).
+      expect(els.some((el) => el.closest("a") === null && el.className.includes("uppercase"))).toBe(true);
+    }
   });
 });
 
@@ -163,8 +179,13 @@ describe("PortalSidebar — ERP Shell V1 responsibility groups", () => {
   it("groups real operation destinations without removing temporary Old Orders access", () => {
     mockRole = "operation";
     renderAt("/operation/orders");
-    for (const heading of ["Workspace", "Sales", "Supply Chain", "Finance", "Customer Care", "Master Data"]) {
-      expect(screen.getByText(heading)).toBeInTheDocument();
+    for (const heading of ["Workspace", "Sales", "Purchasing", "Delivery", "Stock", "Finance", "Customer Care", "Master Data"]) {
+      // Delivery/Stock appear twice (heading + their own row) — assert the
+      // HEADING form exists: a non-link div in the heading rank.
+      const els = screen.getAllByText(heading);
+      expect(
+        els.some((el) => el.closest("a") === null && el.className.includes("uppercase")),
+      ).toBe(true);
     }
     expect(screen.getByText("Catalog")).toBeInTheDocument();
     expect(screen.queryByText("Operation Catalog")).not.toBeInTheDocument();
@@ -375,9 +396,19 @@ describe("PortalSidebar — the Purchasing pages are in the rail", () => {
 
   it("lists them in the approved order of purchasing/MASTER.md §1", () => {
     renderAt("/operation?tab=purchase");
+    const PURCHASING_KEYS = [
+      "purchase", "manual-purchase", "purchase-orders", "receiving", "claims",
+      "purchase-returns", "repair-orders", "display-requests",
+      "consignment-orders", "consignment-receipts", "consignment-returns",
+      "purchasing-report", "purchasing-settings",
+    ];
     const rows = Array.from(
-      screen.getByTestId("nav-children-purchasing").querySelectorAll("[data-testid^='nav-child-']"),
-    ).map((el) => el.textContent?.replace("Coming soon", "").trim());
+      document.querySelectorAll("[data-testid^='nav-child-']"),
+    )
+      .filter((el) =>
+        PURCHASING_KEYS.includes(el.getAttribute("data-testid")!.replace("nav-child-", "")),
+      )
+      .map((el) => el.textContent?.replace("Coming soon", "").trim());
     expect(rows).toEqual([
       "SO Batch Purchase",
       "Manual Purchase",
@@ -431,7 +462,7 @@ describe("PortalSidebar — the Purchasing pages are in the rail", () => {
       // 78-128px — the three Consignment entries truncated to one identical
       // string. The name owns its line; the reason stacks under it.
       expect(row.className).toContain("flex-col");
-      expect(row.querySelector(".w-full.truncate")?.textContent).not.toContain(
+      expect(row.querySelector(".truncate")?.textContent ?? "").not.toContain(
         "Coming soon",
       );
     }
@@ -488,11 +519,12 @@ describe("PortalSidebar — the Purchasing pages are in the rail", () => {
     );
   });
 
-  it("standing in another module closes the list", () => {
+  it("the pages never hide — SALES' template, no accordion (2026-08-19)", () => {
     renderAt("/operation?tab=stock-onhand");
-    expect(screen.queryByTestId("nav-children-purchasing")).not.toBeInTheDocument();
-    expect(screen.queryByText("Supplier Claims")).not.toBeInTheDocument();
-    // …but the module door itself is still there.
-    expect(screen.getByText("Purchasing")).toBeInTheDocument();
-  });
-});
+    // Standing in Stock, the purchasing pages are still on screen — the
+    // accordion died with the parent row.
+    expect(screen.getByTestId("nav-child-purchase")).toBeInTheDocument();
+    expect(screen.getByText("Supplier Claims")).toBeInTheDocument();
+    // ...and the heading is still there.
+    expect(screen.getByText("Purchasing").closest("a")).toBeNull();
+  });});
