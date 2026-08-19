@@ -242,6 +242,22 @@ async function loaded() {
   await screen.findByTestId("to-order-day-2026-07-31");
 }
 
+/**
+ * ⭐ THE PAGE OPENS WHERE THE WORK IS (Jess, 2026-08-19) — and this helper is
+ * what that ruling costs the suite.
+ *
+ * With no explicit `?view=`, the default view is now **Overdue** whenever
+ * Overdue holds work. So a test that wants the WHOLE sheet can no longer get
+ * there by clicking `Overdue` — that click lands on the lit default and turns
+ * the time block OFF, which is a different state that happens to look similar
+ * on this fixture. An explicit empty `view=` says the thing the test means:
+ * no time narrowing at all, every bucket on screen.
+ */
+async function loadedAll() {
+  render(wrap("/operation/to-order?view="));
+  await screen.findByTestId("to-order-day-2026-07-31");
+}
+
 describe("the PO Schedule — a purchase calendar, not a menu", () => {
   it("keeps an SO deep-link in the one toolbar and clearing it restores normal Batch Purchase", async () => {
     apiFetch.mockImplementation((path: string) => {
@@ -396,28 +412,26 @@ describe("the PO Schedule — a purchase calendar, not a menu", () => {
 });
 
 describe("the grid — business language only", () => {
-  it("T1 — every fact has a column; the order's facts print ONCE, aligned", async () => {
+  it("every fact has a column — the hierarchy's TEN, in the card's order", async () => {
     await loaded();
-    // The TEN, in Loo's approved order (T1 2026-08-06, extended by T1.1 the
-    // same day and by T3): the identity columns render their facts on the
-    // aligned ORDER line; the two T1.1 additions are the two facts that were
-    // homeless — `Proceed date`, which T1 parked under `Supplier` in an
-    // unheaded span, and `Ready Stock`, which had no home on screen at all —
-    // and T3's `On PO` is the third, computed by the engine since the day it
-    // was written and read by nobody.
+    // CARD-2026-08-18-so-batch-purchase §2. The flat AutoCount-aligned set
+    // (`Proceed date` · `Qty` · `Model` · `Ready Stock`) is GONE: the tree
+    // column carries identity, and the four numbers the buyer actually buys
+    // from — `Qty Needed` · `Stock` · `On PO` · `To Buy` — replace the single
+    // `Qty` that made him do the subtraction in his head.
     const heads = [...document.querySelectorAll("thead th")]
       .map((t) => (t.textContent ?? "").trim())
       .filter((t) => t.length > 0);
     expect(heads).toEqual([
-      W.colSoNo,
+      W.itemLabel,
       W.colCustomer,
       W.colPreferred,
-      W.proceedDate,
-      W.supplierLabel,
-      W.colQty,
-      W.colModel,
-      W.colReadyStock,
+      W.colNeed,
+      W.colStock,
       W.colOnPo,
+      W.colToBuy,
+      W.colCoverage,
+      W.supplierLabel,
       W.colPoNo,
     ]);
     expect(screen.queryByText("Category")).toBeNull();
@@ -425,29 +439,56 @@ describe("the grid — business language only", () => {
     expect(screen.queryByText("Stock ready")).toBeNull();
   });
 
-  it("T1 — an ITEM row leaves the identity cells blank; the order line fills them", async () => {
-    await loaded();
-    fireEvent.click(screen.getByTestId("to-order-overdue"));
-    // PETER's order: the group line says SO-1207 · PETER · the date; his two
-    // item rows say none of it — the fact is stated once, in its column.
-    const rows = [...document.querySelectorAll('[data-kit="data-row"]')];
-    expect(rows.length).toBeGreaterThan(0);
-    for (const r of rows) {
-      const tds = [...r.querySelectorAll("td")];
-      // [0]=⊞ gutter, [1]=☑, [2]=SO No., [3]=Customer, [4]=Delivery.
-      //
-      // The SO cell carries 2990s' continuation marker and nothing else
-      // (`Mrp.module.css:348`): with nine columns the grid is 1,255px, so on a
-      // narrower window the only columns an operator can see are the four that
-      // are deliberately blank, and a screen of already-bought orders read as
-      // blank blocks. One glyph, no width, no colour — and never the ORDER's
-      // own number, which is stated once above.
-      expect(tds[2]?.textContent ?? "").toBe("↳");
-      expect(tds[2]?.textContent ?? "").not.toMatch(/SO-/);
-      expect(tds[3]?.textContent ?? "").toBe("");
-      expect(tds[4]?.textContent ?? "").toBe("");
-    }
+  it("THREE LEVELS render, and a single-variant item collapses to two", async () => {
+    await loadedAll();
     const sheet = screen.getByTestId("to-order-sheet");
+    const shape = [...sheet.querySelectorAll("tr")].map((tr) => [
+      tr.getAttribute("data-kit"),
+      [...tr.querySelectorAll("td")].map((td) => (td.textContent ?? "").trim())
+        .filter(Boolean).join(" | "),
+    ]);
+
+    // `Cody K` holds TWO variants, so all three levels draw: item band →
+    // variant band → the SO lines under it.
+    const kIndex = shape.findIndex(([kit, text]) =>
+      kit === "data-group-parent" && text.startsWith("Cody K"));
+    expect(kIndex).toBeGreaterThan(-1);
+    expect(shape[kIndex + 1]![0]).toBe("data-group");
+    expect(shape[kIndex + 1]![1]).toMatch(/↳King/);
+    expect(shape[kIndex + 2]![0]).toBe("data-row");
+
+    // `Cody Q` holds ONE, so the middle level is not drawn at all — the level
+    // collapses to two rather than printing a band that repeats its parent.
+    const qIndex = shape.findIndex(([kit, text]) =>
+      kit === "data-group-parent" && text.startsWith("Cody Q"));
+    expect(qIndex).toBeGreaterThan(-1);
+    expect(shape[qIndex + 1]![0]).toBe("data-row");
+    expect(shape[qIndex + 1]![1]).toMatch(/↳SO-1300/);
+  });
+
+  it("a SOFA groups by SALES ORDER; its lines drop the identity the band states", async () => {
+    await loadedAll();
+    const sheet = screen.getByTestId("to-order-sheet");
+    const rows = [...sheet.querySelectorAll("tr")];
+
+    // Card §3 — the sofa band IS the sales order (colour-matched set), so it
+    // names SO and customer where an item band names the model.
+    const band = rows.find(
+      (tr) =>
+        tr.getAttribute("data-kit") === "data-group-parent" &&
+        (tr.textContent ?? "").includes("SO-1207"),
+    )!;
+    expect(band).toBeTruthy();
+    expect(band.textContent).toContain("PETER");
+
+    // Its two lines carry the MODEL and leave Customer / Delivery blank: the
+    // fact is stated once, on the band above them.
+    const line = rows[rows.indexOf(band) + 1]!;
+    expect(line.getAttribute("data-kit")).toBe("data-row");
+    const tds = [...line.querySelectorAll("td")];
+    expect(tds[2]?.textContent ?? "").toBe("↳Booqit");
+    expect(tds[3]?.textContent ?? "").toBe("");
+    expect(tds[4]?.textContent ?? "").toBe("");
     expect((sheet.textContent ?? "").match(/PETER/g)?.length).toBe(1);
   });
 
@@ -467,10 +508,9 @@ describe("the grid — business language only", () => {
 
   it("rows arrive PRE-SELECTED and the toolbar pill answers for the visible sheet", async () => {
     await loaded();
-    // Friday (default) holds only the receipt — nothing selectable, so the
-    // toolbar stays QUIET (view-scoped batch, Excel's iron law).
-    expect(screen.queryByTestId("to-order-issue-pill")).toBeNull();
-    fireEvent.click(screen.getByTestId("to-order-overdue"));
+    // The page OPENS on Overdue now (Jess, 2026-08-19), so the work — and the
+    // pill that answers for it — are on screen without a click. Friday, which
+    // holds only a receipt, is one click away and still stays quiet.
     const pill = screen.getByTestId("to-order-issue-pill");
     // 5 BUILDS (PETER's order is two sofas = two rows; kee tong's TBD
     // order is not listed).
@@ -479,11 +519,17 @@ describe("the grid — business language only", () => {
     // STATE (the caption); the button is the ACTION alone.
     expect(screen.getByTestId("to-order-issue")).toHaveTextContent(/^Issue 3 POs$/);
     expect(pill.textContent).not.toContain("→");
+
+    // Friday alone: a receipt, nothing selectable, no pill — the view-scoped
+    // batch law, unchanged by the new opening.
+    fireEvent.click(screen.getByTestId("to-order-overdue")); // off
+    fireEvent.click(screen.getByTestId("to-order-day-2026-07-31")); // on
+    expect(screen.queryByTestId("to-order-issue-pill")).toBeNull();
   });
 
   it("the engine pre-ticks ONLY its own plan — a future row waits for a human", async () => {
-    await loaded();
-    fireEvent.click(screen.getByTestId("to-order-day-2026-08-03")); // Monday joins Friday
+    render(wrap("/operation/to-order?view=2026-08-03")); // Monday ALONE
+    await screen.findByTestId("to-order-day-2026-08-03");
     const box = rowBox(`${NF}::mattress`, "o20", "m1");
     expect(box).not.toBeNull();
     expect(box.getAttribute("data-state")).not.toBe("checked");
@@ -497,13 +543,13 @@ describe("the grid — business language only", () => {
 
   it("an untick drops the pill's promise; unticking everything removes the pill", async () => {
     await loaded();
-    fireEvent.click(screen.getByTestId("to-order-overdue"));
     fireEvent.click(rowBox(`${OHANA}::sofa`, "o2", "bk-e"));
     expect(screen.getByTestId("to-order-issue-pill")).toHaveTextContent("4 selected");
     expect(screen.getByTestId("to-order-issue")).toHaveTextContent(/^Issue 2 POs$/);
+    // PETER's two sofa pieces leave together — one set, one tick (card §3) —
+    // so the two bedframes are all that is left to untick after them.
     for (const [p, o, b] of [
       [`${OHANA}::sofa`, "o1", "bk-a"],
-      [`${OHANA}::sofa`, "o1", "bk-b"],
       [`${OHANA}::bedframe`, "o9", "l1"],
       [`${OHANA}::bedframe`, "o8", "l2"],
     ] as const) {
@@ -514,7 +560,6 @@ describe("the grid — business language only", () => {
 
   it("the operator's ticks and unticks survive a view switch — deltas, not snapshots", async () => {
     await loaded();
-    fireEvent.click(screen.getByTestId("to-order-overdue"));
     fireEvent.click(rowBox(`${OHANA}::sofa`, "o2", "bk-e"));
     fireEvent.click(screen.getByTestId("to-order-cat-bedframe"));
     fireEvent.click(screen.getByTestId("to-order-cat-all"));
@@ -523,7 +568,6 @@ describe("the grid — business language only", () => {
 
   it("search narrows by SO or model", async () => {
     await loaded();
-    fireEvent.click(screen.getByTestId("to-order-overdue"));
     fireEvent.change(document.getElementById("to-order-search")!, {
       target: { value: "cody" },
     });
@@ -535,6 +579,67 @@ describe("the grid — business language only", () => {
     await loaded();
     expect(screen.getByTestId("to-order-updated")).toHaveTextContent(/^Updated/);
     expect(screen.queryByText("Refresh")).toBeNull();
+  });
+});
+
+/**
+ * CARD-2026-08-18-so-batch-purchase §2/§3 — the four rules that make the
+ * hierarchy a BUYING sheet rather than a prettier list.
+ */
+describe("To Buy, Coverage and what a tick may take", () => {
+  it("`To Buy` is PRINTED, and the buyer may not edit it", async () => {
+    await loadedAll();
+    // ella's line: 1 asked, nothing behind it → 1 to buy, stated as a number.
+    const cell = screen.getByTestId(`to-order-tobuy-${OHANA}::sofa:o2:bk-e`);
+    expect(cell).toHaveTextContent("1");
+    // Never `11 − 3 − 2`: the sheet does the subtraction, not the reader.
+    expect(cell.textContent).not.toMatch(/[−-]/);
+    // Wanting extra for the shelf is a Manual Purchase behind approval — so
+    // there is no input, no contenteditable and no spin control on this cell.
+    expect(cell.querySelector("input,textarea,[contenteditable=true]")).toBeNull();
+    expect(cell.closest("td")!.querySelector("input")).toBeNull();
+  });
+
+  it("`Coverage` names what stands behind each promise — stock · PO · SHORT", async () => {
+    await loadedAll();
+    // Nothing behind ella's sofa: the buyer sees the gap without opening it.
+    expect(screen.getByTestId(`to-order-cov-${OHANA}::sofa:o2:bk-e`)).toHaveTextContent(
+      W.covShort,
+    );
+    // A row already on a purchase order answers in its PO cell instead, so it
+    // draws no coverage tag at all — one fact, one column.
+    expect(screen.queryByTestId("to-order-cov-po:PO-9001:o30:0")).toBeNull();
+    expect(screen.getByTestId("row-po-po:PO-9001:o30:0")).toHaveTextContent("PO-9001");
+  });
+
+  it("a line with `To Buy = 0` is NOT selectable — the receipt cannot be re-bought", async () => {
+    await loadedAll();
+    // The already-ordered row prints its PO and offers no checkbox at all.
+    expect(document.getElementById("kit-table-row-po:PO-9001:o30:0")).toBeNull();
+  });
+
+  it("selecting one SOFA piece takes the whole same-SO set; a bedframe does not", async () => {
+    await loadedAll();
+    // PETER's order is two sofa pieces of ONE colour-matched set. The fabric
+    // batch may never split across purchase orders (card §3), so a single
+    // untick has to take both pieces with it.
+    const a = rowBox(`${OHANA}::sofa`, "o1", "bk-a");
+    const b = rowBox(`${OHANA}::sofa`, "o1", "bk-b");
+    expect(a.getAttribute("data-state")).toBe("checked");
+    expect(b.getAttribute("data-state")).toBe("checked");
+    fireEvent.click(a);
+    expect(a.getAttribute("data-state")).not.toBe("checked");
+    expect(b.getAttribute("data-state")).not.toBe("checked");
+
+    // A bedframe is bought per ITEM, so its neighbour is untouched — two
+    // customers' bedframes merge onto one PO line and always could.
+    const l1 = rowBox(`${OHANA}::bedframe`, "o9", "l1");
+    const l2 = rowBox(`${OHANA}::bedframe`, "o8", "l2");
+    expect(l1.getAttribute("data-state")).toBe("checked");
+    expect(l2.getAttribute("data-state")).toBe("checked");
+    fireEvent.click(l1);
+    expect(l1.getAttribute("data-state")).not.toBe("checked");
+    expect(l2.getAttribute("data-state")).toBe("checked");
   });
 });
 

@@ -1487,6 +1487,35 @@ roles run their whole lifecycle on it.
 | Demand somebody has consciously reviewed and delayed | region **`Purchasing on Hold`** · row fact **`On hold until {date}`**, carrying **Held by** · **Reason** · **Held time** · **Resume date** | Snoozed · Paused · Excluded · Hidden · Pending |
 | An item whose supplier cannot be worked out | **`Supplier not assigned`** — a FACT, under Missing Configuration. Supporting line: `Assign a supplier before this item can enter the purchasing plan.` | Orphan · Unknown supplier · Invalid SKU · Supplier error |
 
+### The SO Batch Purchase grid words (owner ruling 2026-08-18 — the hierarchy card)
+
+`To Order` is renamed **`SO Batch Purchase`** and its grid becomes Item → variant → SO line.
+The columns below are that grid's whole vocabulary. **Every one is a FACT — a name, a date or
+a number — so none may contain a to-do word.**
+
+| Concept | Canonical word | Do NOT use |
+|---|---|---|
+| The tree column — the item band's word, and the `↳` line under it | **`Item`** | Product · Description · Model |
+| What the customer asked for, before anything is taken off it | **`Qty Needed`** | Required · Demand · Qty Required |
+| Free stock that COULD cover it — suggested, never consumed | **`Stock`** | Available · Free · On hand |
+| Already covered by an open purchase order | **`On PO`** | Ordered · In transit · Covered |
+| What is left to buy, PRINTED as one number | **`To Buy`** | Shortfall · Balance · Net · Outstanding |
+| What stands behind THIS promise | **`Coverage`** | Status · Source · Fulfilment |
+| Coverage — nothing behind the promise | **`SHORT`** (red) | Missing · No stock · Unfulfilled · At risk |
+| Coverage — free stock could cover it today | **`stock`** (lower case, green) | Available · In stock |
+| Coverage — an open purchase order covers it | the **PO number** itself, as a link | Ordered · On order |
+
+**`To Buy` is never written as a sum.** `11 − 3 − 2` is arithmetic the reader should not have
+to do; the sheet prints `6`. The same law Receiving carries for `Outstanding`.
+
+**`SHORT` is upper case and `stock` is lower case, and that is deliberate.** One is the
+exception the buyer is looking for; the other is reassurance he only needs to notice. Shouting
+both would flatten the difference.
+
+**The rail's third heading is `QUEUES`** — the module's open actions, defined once in the
+facet-heading table above. `Issue PO` is its row here, and its five strings are the PURCHASING
+table's, unchanged.
+
 ### The register's Current Action words (Loo, 2026-08-04 — card Q8)
 
 The Purchase Orders register has a `Current Action` column. **It holds exactly ONE state word

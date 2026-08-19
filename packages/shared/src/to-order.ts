@@ -118,6 +118,21 @@ export const TO_ORDER_WORDS = {
   poScheduleHeading: "PO Schedule",
   /** The rail's second block heading — work ORDER, not a filter bar. */
   categoryHeading: "CATEGORY",
+  /**
+   * The rail's third block — the module's OPEN ACTIONS
+   * (CARD-2026-08-18-so-batch-purchase §6; the heading is COPY-STANDARD's own
+   * ruled word, *"`Queues` holds actions, it is not one"*).
+   *
+   * It sits BELOW the other two on purpose. Jess pointed at this rail in
+   * production on 2026-08-19 and ruled it stays EXACTLY as it is — so the
+   * calendar and the categories keep their pixel positions and the new block
+   * appends, rather than pushing what she approved down the page.
+   *
+   * NO `Status` heading joins it, and that is the same ruling: status is the
+   * pill on the row, and a facet filtering by it would compete with these
+   * rows for the same job.
+   */
+  queuesHeading: "QUEUES",
   categoryAll: "All",
   /** Accessory KINDS get their own rail rows (Jess, 2026-08-01) — planned
    *  ahead of the inventory-demand pipeline that will fill them. */

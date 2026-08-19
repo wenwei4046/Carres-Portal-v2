@@ -386,7 +386,18 @@ export default function OperationToOrder() {
       ) as ReadonlySet<string>,
     [rawCat],
   );
-  const setParam = (key: "view" | "cat", value: string) =>
+  /**
+   * The rail's QUEUES block (card §6) — the module's open actions.
+   *
+   * ONE legal value today, and that is a build record rather than a stub:
+   * `Check the supplier` and `Check the SKU` are named in the card but
+   * neither can be a row on THIS rail (see `needsIssue` below and the card's
+   * own BUILD RECORD). A queue row that filtered the grid to nothing would
+   * be worse than no row.
+   */
+  const rawQueue = searchParams.get("queue");
+  const queueOn = rawQueue === "issue-po";
+  const setParam = (key: "view" | "cat" | "queue", value: string) =>
     setSearchParams(
       (prev) => {
         const n = new URLSearchParams(prev);
@@ -411,6 +422,7 @@ export default function OperationToOrder() {
     setParam("cat", [...n].join(","));
   };
   const clearCats = () => setParam("cat", "");
+  const toggleQueue = () => setParam("queue", queueOn ? "" : "issue-po");
   const clearSoScope = () =>
     setSearchParams(
       (prev) => {
@@ -609,6 +621,61 @@ export default function OperationToOrder() {
   /** A row's PO, whichever way it got one — this session or the server. */
   const poOf = (r: GridRow) => rowPo.get(r.key) ?? r.orderedPo;
 
+  /**
+   * GridRow → the projection's leaf. Same key, engine numbers untouched —
+   * the projection is a VIEW over `buildToOrder`'s own arithmetic (Law D).
+   *
+   * It sits ABOVE the sort deliberately: a header click on `Qty Needed` or
+   * `To Buy` must compare the number the CELL prints, and the only way to
+   * guarantee that forever is for both to call `leafNeed` / `leafToBuy` on
+   * the same leaf. A second copy of the subtraction here would agree today
+   * and drift the first time either side is touched — Law D's whole point.
+   */
+  const leafOf = (r: GridRow): HierarchyLeaf => ({
+    key: r.key,
+    category: r.category,
+    model: r.model,
+    spec: r.spec,
+    so: r.so,
+    orderId: r.orderId ?? r.key,
+    customer: r.customer,
+    delivery: r.delivery,
+    readyStock: r.readyStock,
+    destination: r.destination,
+    supplier: r.supplier,
+    qty: r.qty,
+    takenFromStock: r.takenFromStock,
+    freeStock: r.freeStock,
+    coveredByOpenPo: r.coveredByOpenPo,
+    coveredByOpenPoPos: r.coveredByOpenPoPos,
+    orderedPo: poOf(r) ?? null,
+  });
+
+  /**
+   * The two number columns the projection does NOT own, stated once so the
+   * cell and its header sort read the same fact (Law D again).
+   *
+   * `Stock` prints SUGGESTED free stock while the row is still demand, and
+   * what was already reserved once it is a receipt; `On PO` empties the
+   * moment the row has a PO of its own, because the answer moved to the PO
+   * column. A sort that ignored either rule would float rows whose cells
+   * are blank.
+   */
+  const stockShown = (r: GridRow) =>
+    r.freeStock > 0 && !poOf(r) ? r.freeStock : r.takenFromStock;
+  const onPoShown = (r: GridRow) => (poOf(r) ? 0 : r.coveredByOpenPo);
+
+  /**
+   * `Issue PO`'s own demand — the ONE queue this rail can carry (card §6).
+   *
+   * It is the selection rule stated once: a row still to buy, not already on
+   * a purchase order, not refused by the engine. `leafToBuy` rather than
+   * `r.qty` because To Buy is the printed net and the queue must name the
+   * same rows the ☑ will act on.
+   */
+  const needsIssue = (r: GridRow) =>
+    !poOf(r) && r.blocker == null && leafToBuy(leafOf(r)) > 0;
+
   /** The rail's counts — unissued work per calendar row, falling as POs land. */
   const timeCounts = useMemo(() => {
     const m = new Map<string, Set<string>>();
@@ -644,6 +711,7 @@ export default function OperationToOrder() {
         (r) =>
           (effViewSet.size === 0 || effViewSet.has(r.bucket)) &&
           (catSet.size === 0 || catSet.has(r.category)) &&
+          (!queueOn || needsIssue(r)) &&
           (search.trim() === "" ||
             (r.so != null && `so-${r.so}`.includes(search.trim().toLowerCase())) ||
             r.model.toLowerCase().includes(search.trim().toLowerCase()) ||
@@ -651,7 +719,7 @@ export default function OperationToOrder() {
             (poOf(r) ?? "").toLowerCase().includes(search.trim().toLowerCase())),
       ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [allRows, effViewSet, catSet, search, rowPo],
+    [allRows, effViewSet, catSet, queueOn, search, rowPo],
   );
 
   /** Does a row pass ONE column's filter? Sentinels are facts, not values. */
@@ -725,6 +793,39 @@ export default function OperationToOrder() {
    * category gives back — the two rows stay arithmetically consistent with
    * each other whichever one is lit.
    */
+  /**
+   * `Issue PO`'s count — ORDERS, the unit the calendar block above already
+   * counts, so two stacked rails never mean two different things by a bare
+   * number.
+   *
+   * Counted with every narrowing on the page EXCEPT the queue pick itself —
+   * the portal's facet law (§8.2), and the same guarantee the categories
+   * buy: the number the row shows IS the number its click leaves on screen.
+   */
+  const issueQueueOrders = useMemo(() => {
+    const orders = new Set<string>();
+    for (const r of allRows) {
+      if (!needsIssue(r)) continue;
+      if (effViewSet.size > 0 && !effViewSet.has(r.bucket)) continue;
+      if (catSet.size > 0 && !catSet.has(r.category)) continue;
+      const q = search.trim().toLowerCase();
+      if (
+        q !== "" &&
+        !(
+          (r.so != null && `so-${r.so}`.includes(q)) ||
+          r.model.toLowerCase().includes(q) ||
+          (r.customer ?? "").toLowerCase().includes(q) ||
+          (poOf(r) ?? "").toLowerCase().includes(q)
+        )
+      )
+        continue;
+      if (![...colFilters.entries()].every(([k, sel]) => passes(r, k, sel))) continue;
+      orders.add(r.orderId ?? r.key);
+    }
+    return orders.size;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allRows, effViewSet, catSet, search, colFilters, rowPo]);
+
   const categoryUnits = useMemo(() => {
     const byCategory = new Map<string, number>();
     let all = 0;
@@ -784,6 +885,20 @@ export default function OperationToOrder() {
             return cmpNull(a.customer, b.customer, (x, y) => x.localeCompare(y));
           case "qty":
             return (a.qty - b.qty) * dir;
+          /**
+           * The hierarchy's four number columns (card §2). Each one compares
+           * through the SAME helper its cell prints — `leafNeed` · `leafToBuy`
+           * — so a header click can never order the sheet by one arithmetic
+           * while the eye reads another (Law D).
+           */
+          case "need":
+            return (leafNeed(leafOf(a)) - leafNeed(leafOf(b))) * dir;
+          case "stock":
+            return (stockShown(a) - stockShown(b)) * dir;
+          case "onpo":
+            return (onPoShown(a) - onPoShown(b)) * dir;
+          case "tobuy":
+            return (leafToBuy(leafOf(a)) - leafToBuy(leafOf(b))) * dir;
           case "po":
             return cmpNull(poOf(a), poOf(b), (x, y) => x.localeCompare(y));
           default:
@@ -866,28 +981,6 @@ export default function OperationToOrder() {
   const rowByKey = useMemo(() => new Map(allRows.map((r) => [r.key, r])), [allRows]);
 
   // ── THE HIERARCHY (card §2/§3): Item → variant → SO lines; sofa by SO ────
-
-  /** GridRow → the projection's leaf. Same key, engine numbers untouched —
-   *  the projection is a VIEW over `buildToOrder`'s own arithmetic (Law D). */
-  const leafOf = (r: GridRow): HierarchyLeaf => ({
-    key: r.key,
-    category: r.category,
-    model: r.model,
-    spec: r.spec,
-    so: r.so,
-    orderId: r.orderId ?? r.key,
-    customer: r.customer,
-    delivery: r.delivery,
-    readyStock: r.readyStock,
-    destination: r.destination,
-    supplier: r.supplier,
-    qty: r.qty,
-    takenFromStock: r.takenFromStock,
-    freeStock: r.freeStock,
-    coveredByOpenPo: r.coveredByOpenPo,
-    coveredByOpenPoPos: r.coveredByOpenPoPos,
-    orderedPo: poOf(r) ?? null,
-  });
 
   const hierarchy = useMemo(() => {
     const groups = buildHierarchy(visibleRows.map(leafOf));
@@ -1452,9 +1545,36 @@ export default function OperationToOrder() {
    * wanting extra for the shelf is a Manual Purchase behind approval
    * (card §2). Only a shortage line is selectable.
    *
-   * P16's width law: the numbers below are provisional and are re-measured
-   * in a real browser before the card flips EXECUTED — no guessed number
-   * outlives the build record.
+   * ── P16 widths, RE-MEASURED in a real browser (2026-08-19) ──────────────
+   *
+   * Method unchanged, and it is the shipped one: `ceil(worst string + 16px of
+   * `px-2`) + 4px sub-pixel guard`, or the header's own floor (word + 2px gap
+   * + 14px sort arrow + the same padding and guard) where that is wider. Taken
+   * in Chrome at the app's own type tokens — cell `400 13px Inter`, band title
+   * `600 13px`, header `500 11px` (`tailwind.config.ts:151-153`).
+   *
+   * The METHOD was proved before the new numbers were trusted: re-measuring
+   * `Supplier`, whose content this card does not touch, reproduced its shipped
+   * `111px` exactly.
+   *
+   *   so        175 → 151  the band's model word (`Memory Foam Pillow`, 130.5)
+   *                        drives it; the `↳` leaves are far narrower
+   *   need      111 →  99  the HEADER drives it — `Qty Needed` + its arrow
+   *   stock      71 →  66  header-driven, `Stock` being the shortest word
+   *   onpo       71 →  70  header-driven (the 1px is this Inter build, not a
+   *                        method change — the shipped record measured 34.1
+   *                        for the word and this one 33.5)
+   *   tobuy      75 →  73  header-driven
+   *   coverage  140 →  74  `PO-2041` (53.4) is the widest thing it ever holds;
+   *                        140 was a guess made before the tags were written
+   *   po        175 → 121  it no longer carries the old order line's pill —
+   *                        `No delivery date` (100.7) is now its worst case
+   *
+   * `customer` (181) and `delivery` (163) keep their shipped numbers: this
+   * card does not change what either column holds, and today's rows are TEST
+   * data (`CLAUDE.md` §6), so they are no evidence for NARROWING a column that
+   * was measured on live data. `delivery`'s worst string under the year rule
+   * (`Required By 12 Aug 27`) re-measures at 159 — inside the 163 already set.
    */
   const columns: readonly Column<GridRow>[] = [
     {
@@ -1462,7 +1582,7 @@ export default function OperationToOrder() {
        *  on a line; on a sofa line the MODEL, because the band is the SO. */
       key: "so",
       label: W.itemLabel,
-      width: "175px",
+      width: "151px",
       sortable: true,
       filter: filterFor("so", soOptions, { searchable: true }),
       cell: (r) => {
@@ -1534,7 +1654,7 @@ export default function OperationToOrder() {
     {
       key: "need",
       label: W.colNeed,
-      width: "111px",
+      width: "99px",
       align: "right",
       numeric: true,
       sortable: true,
@@ -1545,7 +1665,7 @@ export default function OperationToOrder() {
        *  Green because it is something a human can take TODAY (P10). */
       key: "stock",
       label: W.colStock,
-      width: "71px",
+      width: "66px",
       align: "right",
       numeric: true,
       sortable: true,
@@ -1553,31 +1673,31 @@ export default function OperationToOrder() {
         r.freeStock > 0 && !poOf(r) ? (
           <span
             className="text-kit-green-11"
-            title={freeStockLine(stockWarehouse ?? "", r.freeStock)}
+            title={freeStockLine(stockWarehouse ?? "", stockShown(r))}
             data-testid={`to-order-free-${r.key}`}
           >
-            {r.freeStock}
+            {stockShown(r)}
           </span>
-        ) : r.takenFromStock > 0 ? (
-          <span className="text-kit-green-11" title={reservedFromStockLabel(r.takenFromStock)}>
-            {r.takenFromStock}
+        ) : stockShown(r) > 0 ? (
+          <span className="text-kit-green-11" title={reservedFromStockLabel(stockShown(r))}>
+            {stockShown(r)}
           </span>
         ) : null,
     },
     {
       key: "onpo",
       label: W.colOnPo,
-      width: "71px",
+      width: "70px",
       align: "right",
       numeric: true,
       sortable: true,
       cell: (r) =>
-        r.coveredByOpenPo > 0 && !poOf(r) ? (
+        onPoShown(r) > 0 ? (
           <span
-            title={onPoLine(r.coveredByOpenPo, r.coveredByOpenPoPos) ?? undefined}
+            title={onPoLine(onPoShown(r), r.coveredByOpenPoPos) ?? undefined}
             data-testid={`to-order-onpo-${r.key}`}
           >
-            {r.coveredByOpenPo}
+            {onPoShown(r)}
           </span>
         ) : null,
     },
@@ -1585,7 +1705,7 @@ export default function OperationToOrder() {
       /** PRINTED, never `11 − 3 − 2` — and never editable (card §2). */
       key: "tobuy",
       label: W.colToBuy,
-      width: "75px",
+      width: "73px",
       align: "right",
       numeric: true,
       sortable: true,
@@ -1609,7 +1729,7 @@ export default function OperationToOrder() {
        *  behind them). A receipt's answer is its own PO cell. */
       key: "coverage",
       label: W.colCoverage,
-      width: "140px",
+      width: "74px",
       cell: (r) => {
         const c = flat.facts.get(r.key)?.coverage;
         if (!c || c.kind === "ordered") return null;
@@ -1659,7 +1779,7 @@ export default function OperationToOrder() {
     {
       key: "po",
       label: W.colPoNo,
-      width: "175px",
+      width: "121px",
       sortable: true,
       filter: filterFor("po", poOptions),
       cell: (r) => {
@@ -1927,6 +2047,42 @@ export default function OperationToOrder() {
               countWord={unitsHeadline(categoryUnits.byCategory.get(c.key) ?? 0)}
             />
           ))}
+
+          <div className="my-2 border-t border-kit-slate-6" />
+
+          {/* ── QUEUES (card §6) — the module's OPEN ACTIONS, each row's name
+               IS its action. It appends BELOW the two blocks Jess pointed at
+               in production on 2026-08-19 ("it stays EXACTLY as it is"), so
+               the calendar and the categories keep their pixel positions.
+
+               ONE row ships, and the two the card also names are a reported
+               deviation rather than an omission:
+
+               · `Check the SKU` — its queue already lives on Manual
+                 Purchase's rail, and a second door for one act is the thing
+                 Law C forbids.
+               · `Check the supplier` — MEASURED, not assumed: the wire's
+                 `unresolved` demand never becomes a grid row at all. The
+                 engine drops it at `to-order.ts:384` (`continue`) because a
+                 SKU with no supplier has no production days and so no
+                 raise-by date. A rail row filtering this grid by it would
+                 always show an empty sheet, and the act it names
+                 (`Save the supplier`) has no door anywhere in the portal —
+                 it belongs to the catalog, whose files this card may not
+                 touch. The count stays on the amber band below, where it
+                 already names the affected items.
+               ─────────────────────────────────────────────────────────── */}
+          <span className="px-2 pb-1 text-label font-medium uppercase text-kit-slate-11">
+            {W.queuesHeading}
+          </span>
+          <NavRow
+            active={queueOn}
+            onClick={toggleQueue}
+            testId="to-order-queue-issue-po"
+            name={W.issuePos}
+            count={String(issueQueueOrders)}
+            countWord={ordersHeadline(issueQueueOrders)}
+          />
 
           {/* The manual entrance LEFT this page for `Manual Purchase`
               (CARD-2026-08-18-manual-purchase §1): this grid now answers ONE
