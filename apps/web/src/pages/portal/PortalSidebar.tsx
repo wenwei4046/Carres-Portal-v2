@@ -21,9 +21,11 @@ import {
 
 const COLLAPSE_KEY = "ops-sidebar-collapsed";
 /** A module is a HEADING, never a parent row (Jess, 2026-08-19 — the SALES
- *  template). Purchasing · Delivery · Stock replaced the umbrella word
- *  `Supply Chain`, in the rail order the queue index draws. */
-const SECTION_ORDER = ["Workspace", "Sales", "Purchasing", "Delivery", "Stock", "Finance", "Customer Care", "Master Data", "Admin"];
+ *  template). Purchasing · Delivery · Warehouse replaced the umbrella word
+ *  `Supply Chain`, in the rail order the queue index draws. `Stock` became
+ *  the WAREHOUSE heading with its pages as rows (Warehouse Blueprint item 13,
+ *  CARD-2026-08-19-warehouse-rail). */
+const SECTION_ORDER = ["Workspace", "Sales", "Purchasing", "Delivery", "Warehouse", "Finance", "Customer Care", "Master Data", "Admin"];
 
 function orderedItems(group: PortalNavGroup, role: Parameters<typeof visibleItems>[1]) {
   return [...visibleItems(group, role)].sort(

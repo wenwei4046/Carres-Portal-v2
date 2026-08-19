@@ -211,17 +211,10 @@ export default function OperationStockOnHand() {
 
   return (
     <>
-    <StockTabs />
-    <div className="px-9 py-8 pb-14" data-testid="operation-stock-onhand">
-      {/* Top bar — title + search (Orders-style) */}
-      <div className="mb-5 flex items-start justify-between gap-4">
-        <div>
-          <div className="kicker">HQ · Operations · Carres Klang</div>
-          <h1 className="text-page font-display mt-1.5">On Hand</h1>
-          <div className="text-body text-base-600 mt-1.5">
-            Every physical unit at Carres Klang, tracked by Unit ID.
-          </div>
-        </div>
+    {/* The destination header draws the page word (壳画头); the search and
+        import controls live in its right slot like Receiving's do. */}
+    <StockTabs
+      right={
         <div className="flex items-center gap-2 shrink-0">
           <div className="relative">
             <input
@@ -251,8 +244,9 @@ export default function OperationStockOnHand() {
             Import sheet
           </button>
         </div>
-      </div>
-
+      }
+    />
+    <div className="px-9 py-8 pb-14" data-testid="operation-stock-onhand">
       {showImport ? (
         <ImportStockDialog
           existing={items}

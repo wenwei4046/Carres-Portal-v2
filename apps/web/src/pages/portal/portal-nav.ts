@@ -1,5 +1,6 @@
 import {
   LayoutDashboard,
+  ArrowLeftRight,
   ClipboardList,
   ShoppingBag,
   Boxes,
@@ -106,7 +107,7 @@ export interface PortalNavItem {
     | "Sales"
     | "Purchasing"
     | "Delivery"
-    | "Stock"
+    | "Warehouse"
     | "Finance"
     | "Customer Care"
     | "Master Data"
@@ -242,21 +243,24 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       // this door shows the delivery work and hands over to the same drawer the
       // Orders list opens.
       { key: "delivery", label: "Delivery", icon: Route, section: "Delivery" },
-      // Stock (K0, Jess 2026-07-27) — the two stock doors merged into ONE
-      // entry, same shape as the Purchasing merge above: one warehouse, three
-      // questions (On hand · Ready stock [joins at K2] · In & out). Click
-      // target = On hand; the shared StockTabs bar at the top of each page
-      // switches between them. Word law (COPY-STANDARD): the user-facing word
-      // is "Stock" — "Inventory"/"Movements" are banned UI words; the old tab
-      // keys stay live so existing links keep working.
-      {
-        key: "stock",
-        label: "Stock",
-        icon: Boxes,
-        tab: "stock-onhand",
-        activeFor: ["tab:stock-onhand", "tab:stock-plan", "tab:movements"],
-        section: "Stock",
-      },
+      /* WAREHOUSE IS A HEADING, NOT A PARENT ROW (Warehouse Blueprint item 13,
+       * owner-approved; applied 2026-08-19 under the Jess 2026-08-19 SALES
+       * template — CARD-2026-08-19-warehouse-rail). K0's single merged `Stock`
+       * row becomes the module's pages in the rail. The three built pages keep
+       * their `?tab=` addresses; `Transfers` and `Counts` are blueprint pages
+       * printing `Coming soon` until their own PRs. The blueprint keeps
+       * Reports and Settings central: NO Report row, NO Settings row here.
+       * The three live rows keep K0's learned order (On hand · Ready stock ·
+       * In & out) — the rail never reshuffles under an operator; when Ready
+       * stock folds into On hand Views (blueprint item 13.7) its row dies in
+       * that card's own PR. Word law (COPY-STANDARD): "Inventory" and
+       * "Movements" stay banned UI words; the goods pool is still `Stock` on
+       * any page — `Warehouse` is the MODULE heading, not the pool word. */
+      { key: "stock", label: "On hand", icon: Boxes, tab: "stock-onhand", section: "Warehouse" },
+      { key: "stock-plan", label: "Ready stock", icon: ClipboardList, section: "Warehouse" },
+      { key: "movements", label: "In & out", icon: ArrowLeftRight, section: "Warehouse" },
+      { key: "transfers", label: "Transfers", icon: Truck, soon: true, section: "Warehouse" },
+      { key: "counts", label: "Counts", icon: ScrollText, soon: true, section: "Warehouse" },
       { key: "payments", label: "Payments", icon: Wallet, section: "Finance" },
       // Rental base (0247-0249, Loo 2026-07-25) — rent-to-own agreements +
       // the deployed-unit asset registry. Dormant until the POS rental lane.
