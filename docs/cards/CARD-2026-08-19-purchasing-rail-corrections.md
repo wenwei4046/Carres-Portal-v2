@@ -58,6 +58,20 @@ PURCHASING
   entries are non-controls, order never reshuffles, counts are work waiting,
   zero prints nothing, Settings server-gated, Report/Settings below the hairline.
 
+**AMENDED same day (owner ruling 2026-08-19, afternoon): the `Settings` row is
+DELETED from the rail.** *"Settings should be at the header settings, not
+every panel got one setting."* Purchasing Settings is reached through the
+header gear → central Settings; the page itself and its server gate are
+unchanged — only the rail door dies. This overrides the earlier
+"Settings below the hairline" wording in this card wherever it appears.
+
+> **AMENDMENT EXECUTED 2026-08-19 (the walk-fixes PR, after #851):** the
+> `purchasing-settings` nav item, the `managerOnly` machinery and the rail's
+> manager-gate RPC read are deleted; the sketch above keeps `Settings` only as
+> the record of what §1 first ruled. The same PR carries the walk's other three
+> corrections — `SKU · Model` on a picked line, the `Needed by` gate with the
+> gap-naming Send, and the PO panel's `Need for` row (0361's purpose printed).
+
 ## 2 · Manual Purchase draws ONE header
 
 Production shows two header rows on `?tab=manual-purchase` — two bells, both

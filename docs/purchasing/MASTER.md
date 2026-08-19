@@ -86,14 +86,16 @@ Purchase's QUEUES + NEED FOR rail sits on the LEFT at 200px like its measured
 siblings (SO Batch §3, Receiving, Claims); the RIGHT side belongs to the
 supervision widgets.
 
-**PURCHASING SETTINGS ENTRY.** The old Purchasing `Settings` tab/word is retired with the tab
-strip (Loo, 2026-08-11 — APPROVED / LOCKED), and the Page Header's global Settings gear remains
-the governed entry into the one full-page Settings Workspace. The SHIPPED rail
-(CARD-2026-08-18-purchasing-sidebar, Jess 2026-08-18) additionally lists `Report` and `Settings`
-below a hairline at the bottom of the module's children — they are PORTAL pages reached from
-here, the hairline is what stops that convenience reading as ownership, and the Settings row
-renders only for a caller the SERVER says may edit. Page Toolbars and `…` still do not repeat
-the door; the manager gate and audit requirements remain authoritative.
+**PURCHASING SETTINGS ENTRY — THE HEADER GEAR IS THE ONE DOOR (Jess, 2026-08-19, amending the
+corrections card in place).** *"Settings should be at the header settings, not every panel got
+one setting."* The rail's `Settings` row is DELETED (shipped 2026-08-19 with the walk-fixes
+PR); the Page Header's global Settings gear is the governed entry into the one full-page
+Settings Workspace (`/operation/settings/purchasing`), and no rail carries a Settings door.
+The page itself, its route and its server gate are unchanged — only the rail door died, and
+with it the rail's manager-gate RPC read. `Report` keeps its hairline row: it is a PORTAL page
+reached from here, and the hairline is what stops that convenience reading as ownership. Page
+Toolbars and `…` still do not repeat the door; the manager gate and audit requirements remain
+authoritative.
 
 **ELEVEN PAGES, AND WHY IT IS NOT FIVE** (Jess, 2026-08-18). The five-page tree was argued
 from information architecture: expose modules, then reveal documents inside them. Jess
@@ -529,7 +531,12 @@ customer orders**. Purchase Orders MANAGES the documents once they exist.
 > (`purchasing_decide_request` — the Settings manager gate; refusal's reason required in
 > SQL; cuts per line), approver-only money, and same-day Issue through the one authority
 > with the consolidation OFFER declinable on the same screen. `Arrived` derives from the
-> linked PO's posted receipt — no button anywhere. 2990s had nothing to copy here: its manual entrance is a BLANK
+> linked PO's posted receipt — no button anywhere. **The same-day owner walk (2026-08-19)
+> corrected three built facts in its own PR:** a picked line prints `SKU · Model`, never the
+> model word alone (P15's own defect, returned); `Needed by` is enforced before Send — a
+> request with no date leaves the approver and issuer nothing to plan against; and the
+> disabled Send NAMES its gap (`Send — pick a date` · `Send — say why`, the Receiving button
+> law, first missing header fact wins). 2990s had nothing to copy here: its manual entrance is a BLANK
 > New PO (`PurchaseOrderNew.tsx`), which this module already rejects — a PO with no demand
 > behind it has no reason on the record. The pattern is the Purchase Requisition every mature
 > ERP carries (SAP `ME57` / `ME59N`, Dynamics' purchase requisitions, Oracle's AutoCreate).
@@ -1108,6 +1115,11 @@ CENTRE       TEN frozen columns, ONE fixed set (Jess, 2026-08-18 — `Receiving`
 
 RIGHT 400px  WORKING HEADER → REFERENCE LAYER → SUPPLIER FOLLOW-UP →
              RECEIVING SUMMARY → ACTIVITY
+             The working header prints `Need for` — WHY the PO was born
+             (0361's `purpose`: `Customer Sales` auto-stamp or the typed
+             demand purpose; shipped 2026-08-19 with the walk-fixes PR).
+             A pre-0361 PO has NULL, never backfilled — the row hides
+             rather than printing a dash the operator must interpret.
 ```
 
 **Controls** `po-date-open`/`-form`/`-input`/`-save`/`-reason`/`-remarks`/`-extend` ·

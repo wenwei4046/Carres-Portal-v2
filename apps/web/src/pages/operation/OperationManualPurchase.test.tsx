@@ -196,6 +196,18 @@ async function openWorkspace() {
 const pickRow = (sku: string) =>
   screen.getByText(sku, { selector: ".font-mono" }).closest("tr")!;
 
+/** The DatePicker opens on the current month — pick a day there (the
+ *  SalesOrderAmendDeliveryDate.test.tsx pattern). */
+function pickNeededBy(dayOfMonth = 15) {
+  fireEvent.click(document.getElementById("mp-needed")!);
+  const cell = screen
+    .getAllByRole("gridcell")
+    .find((c) => c.textContent?.trim() === String(dayOfMonth));
+  if (!cell) throw new Error(`no day cell for ${dayOfMonth}`);
+  /* react-day-picker puts the clickable button INSIDE the gridcell. */
+  fireEvent.click(cell.querySelector("button") ?? cell);
+}
+
 describe("the register — one request per row (card §7)", () => {
   it("lists requests with the REQ- series and the ruled columns", async () => {
     await loaded();
@@ -252,12 +264,19 @@ describe("the create workspace — full page, never a dialog (card §3)", () => 
     ]);
   });
 
-  it("Send stays off until Why is filled — whitespace does not pass", async () => {
+  it("Send NAMES its gap — the date first, then Why, then it is live (2026-08-19 walk)", async () => {
     await openWorkspace();
     fireEvent.focus(document.getElementById("mp-item-0")!);
     fireEvent.click(pickRow("5539-2NA"));
+    // No date yet — the disabled button says which fact is missing.
     expect(screen.getByTestId("mp-send")).toBeDisabled();
+    expect(screen.getByTestId("mp-send")).toHaveTextContent(MW.sendNeedsDate);
 
+    pickNeededBy();
+    expect(screen.getByTestId("mp-send")).toBeDisabled();
+    expect(screen.getByTestId("mp-send")).toHaveTextContent(MW.sendNeedsWhy);
+
+    // Whitespace does not pass for Why.
     fireEvent.change(screen.getByTestId("mp-why"), { target: { value: "   " } });
     expect(screen.getByTestId("mp-send")).toBeDisabled();
 
@@ -265,6 +284,16 @@ describe("the create workspace — full page, never a dialog (card §3)", () => 
       target: { value: "Balakong floor sofa is worn." },
     });
     expect(screen.getByTestId("mp-send")).toBeEnabled();
+    expect(screen.getByTestId("mp-send")).toHaveTextContent(MW.send);
+  });
+
+  it("a picked line shows SKU + Model, never the model word alone (P15's defect, returned)", async () => {
+    await openWorkspace();
+    fireEvent.focus(document.getElementById("mp-item-0")!);
+    fireEvent.click(pickRow("5539-2NA"));
+    expect((document.getElementById("mp-item-0") as HTMLInputElement).value).toContain(
+      "5539-2NA",
+    );
   });
 
   it("Send stays off until an item is picked, even with a Why", async () => {
@@ -298,6 +327,7 @@ describe("the create workspace — full page, never a dialog (card §3)", () => 
   it("ONE act, per-row result — a failed line keeps its row, retry reuses the header", async () => {
     await openWorkspace();
     fireEvent.change(screen.getByTestId("mp-why"), { target: { value: "two items" } });
+    pickNeededBy();
     fireEvent.focus(document.getElementById("mp-item-0")!);
     fireEvent.click(pickRow("5539-2NA"));
     fireEvent.click(screen.getByTestId("mp-line-add"));
@@ -341,6 +371,7 @@ describe("the create workspace — full page, never a dialog (card §3)", () => 
   it("no supplier key rides the wire — the server derives it", async () => {
     await openWorkspace();
     fireEvent.change(screen.getByTestId("mp-why"), { target: { value: "one item" } });
+    pickNeededBy();
     fireEvent.focus(document.getElementById("mp-item-0")!);
     fireEvent.click(pickRow("5539-2NA"));
 

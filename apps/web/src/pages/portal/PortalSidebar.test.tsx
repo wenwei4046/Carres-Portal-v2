@@ -400,7 +400,7 @@ describe("PortalSidebar — the Purchasing pages are in the rail", () => {
       "purchase", "manual-purchase", "purchase-orders", "receiving", "claims",
       "purchase-returns", "repair-orders", "display-requests",
       "consignment-orders", "consignment-receipts", "consignment-returns",
-      "purchasing-report", "purchasing-settings",
+      "purchasing-report",
     ];
     const rows = Array.from(
       document.querySelectorAll("[data-testid^='nav-child-']"),
@@ -492,15 +492,10 @@ describe("PortalSidebar — the Purchasing pages are in the rail", () => {
     }
   });
 
-  it("Settings renders only for a caller the server says may edit", () => {
-    mockCanEditPurchasingSettings = false;
-    const { unmount } = renderAt("/operation?tab=purchase");
-    expect(screen.queryByTestId("nav-child-purchasing-settings")).not.toBeInTheDocument();
-    unmount();
-
-    mockCanEditPurchasingSettings = true;
+  it("no rail carries a Settings row — the header gear is the one entry (Jess, 2026-08-19)", () => {
     renderAt("/operation?tab=purchase");
-    expect(screen.getByTestId("nav-child-purchasing-settings")).toBeInTheDocument();
+    expect(screen.queryByTestId("nav-child-purchasing-settings")).not.toBeInTheDocument();
+    expect(screen.queryByText("Settings")).not.toBeInTheDocument();
   });
 
   it("the page you are standing on is the highlighted one", () => {

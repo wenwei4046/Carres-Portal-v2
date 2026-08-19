@@ -17,6 +17,7 @@ import {
   poWorkStateOf,
   productionWorkingDaysFor,
   purchasingActionButton,
+  poPurposeLabelOf,
   purchasingActionQueue,
   purchasingCallCalendarDays,
   purchasingCallCalendarOf,
@@ -2377,6 +2378,14 @@ function WorkspaceBody({
           </Prop>
           <Prop label="Delivery To">{warehouse?.name ?? "—"}</Prop>
           <Prop label="Supplier">{supplierName}</Prop>
+          {/* Why this PO was born (0361; MASTER §1: a PO carries the reason it
+              was born for). Absent on pre-0361 POs — the row hides rather than
+              printing a dash the operator must interpret. */}
+          {poPurposeLabelOf(po.purpose) ? (
+            <Prop label="Need for">
+              <span data-testid="po-need-for">{poPurposeLabelOf(po.purpose)}</span>
+            </Prop>
+          ) : null}
           {/* The date we promised the CUSTOMER — the one number the supplier
               date has to be judged against, and it was not on this panel at
               all (Jess, 2026-08-03). Read-only here: purchasing cannot move

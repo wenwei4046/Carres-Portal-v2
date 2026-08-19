@@ -81,6 +81,8 @@ const POS = [
     so_refs: null,
     eta_date: TODAY,
     placed_at: "2026-03-01T08:00:00Z",
+    // 0361 — the customer lane's auto-stamp; the panel prints `Need for`.
+    purpose: "customer_sales",
     customer_delivery: "2099-08-20",
     eta_revised: false,
     orders: [{ so: 1300, customer_name: "Ah Hock", delivery_date: "2099-08-20" }],
@@ -1603,6 +1605,22 @@ describe("the Supplier Workspace (Jess's v7 freeze, 2026-08-02)", () => {
     expect(header.queryByText("PO-9003")).toBeNull();
     // Progress belongs to the rail — the header never repeats it.
     expect(screen.queryByTestId("po-work-state")).not.toBeInTheDocument();
+  });
+
+  it("the header prints WHY the PO was born — and hides the row when 0361 never stamped it", async () => {
+    await mountLoaded();
+    // PO-9003 (auto-selected) carries the customer lane's auto-stamp.
+    const header = within(screen.getByTestId("po-working-header"));
+    expect(header.getByText("Need for")).toBeInTheDocument();
+    expect(header.getByTestId("po-need-for")).toHaveTextContent("Customer Sales");
+
+    // PO-9001 pre-dates 0361 (purpose NULL, never backfilled) — the row hides
+    // rather than printing a dash the operator must interpret.
+    fireEvent.click(listing().getByText("PO-9001"));
+    await waitFor(() =>
+      expect(within(screen.getByTestId("po-panel-title")).getByText("PO-9001")).toBeInTheDocument(),
+    );
+    expect(screen.queryByTestId("po-need-for")).not.toBeInTheDocument();
   });
 
   it("the supplier-date row opens IN PLACE and carries the field's own history", async () => {

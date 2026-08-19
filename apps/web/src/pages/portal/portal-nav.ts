@@ -114,11 +114,9 @@ export interface PortalNavItem {
   /** APPROVED, NOT BUILT (sidebar card §2). Renders as a NON-CONTROL saying
    *  `Coming soon` on its own line — no href, out of the tab order. */
   soon?: true;
-  /** a hairline above this entry — Report/Settings are PORTAL pages, not the
+  /** a hairline above this entry — Report is a PORTAL page, not the
    *  module's own (`docs/ERP-ARCHITECTURE.md` §2.1). */
   dividerAbove?: true;
-  /** manager-gated at RUNTIME by the purchasing settings RPC, not by role. */
-  managerOnly?: true;
 }
 
 export interface PortalNavGroup {
@@ -203,12 +201,18 @@ export const PORTAL_NAV: PortalNavGroup[] = [
        * sidebar card is deleted; its pages ARE the doors, at the same indent
        * as `Sales Orders`.
        *
-       * Everything else the sidebar card ruled HOLDS: the thirteen entries,
-       * their order and their words never reshuffle; `Coming soon` entries are
+       * Everything else the sidebar card ruled HOLDS: the entries, their order
+       * and their words never reshuffle; `Coming soon` entries are
        * non-controls; a count means work waiting and zero prints nothing;
-       * Settings is server-gated; Report/Settings sit below a hairline. An
-       * entry still goes live in ITS OWN page's PR by exactly two edits: drop
-       * `soon`, and the row becomes a link. */
+       * Report sits below a hairline. An entry still goes live in ITS OWN
+       * page's PR by exactly two edits: drop `soon`, and the row becomes a
+       * link.
+       *
+       * NO SETTINGS ROW (Jess, 2026-08-19 afternoon, amending the same card):
+       * "Settings should be at the header settings, not every panel got one
+       * setting." The rail door is DELETED; the header gear is the ONE entry
+       * (GlobalTopBar → /operation/settings/purchasing). The page and its
+       * server gate are unchanged — only this door died. */
       { key: "purchase", label: "SO Batch Purchase", icon: ShoppingBag, section: "Purchasing" },
       { key: "manual-purchase", label: "Manual Purchase", icon: ClipboardList, section: "Purchasing" },
       {
@@ -230,7 +234,6 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       { key: "consignment-receipts", label: "Consignment Receipts", icon: BadgeCheck, soon: true, section: "Purchasing" },
       { key: "consignment-returns", label: "Consignment Returns", icon: Undo2, soon: true, section: "Purchasing" },
       { key: "purchasing-report", label: "Report", icon: BarChart3, dividerAbove: true, section: "Purchasing" },
-      { key: "purchasing-settings", label: "Settings", icon: Settings, managerOnly: true, section: "Purchasing" },
       // Delivery (T11, Jess 2026-07-27) — **the ONE new menu item in the whole
       // build plan**; every other line upgrades an existing door, and its place
       // in the rail is the one the queue index draws (Orders · Purchasing ·

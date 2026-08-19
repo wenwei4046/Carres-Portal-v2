@@ -15,6 +15,11 @@ export const MANUAL_PURCHASE_WORDS = {
   newRequest: "+ New request",
   createTitle: "NEW REQUEST",
   send: "Send for approval",
+  /** The disabled Send NAMES its gap (the Receiving law: a grey button that
+   *  will not say why is banned). The FIRST missing header fact wins, in the
+   *  form's own top-to-bottom order. */
+  sendNeedsDate: "Send — pick a date",
+  sendNeedsWhy: "Send — say why",
   cancel: "Cancel",
   needFor: "Need for",
   neededBy: "Needed by",

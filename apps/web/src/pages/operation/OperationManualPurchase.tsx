@@ -599,14 +599,23 @@ function CreateRequestWorkspace({
   /** `Why` may not be blank and the Send button stays off until it is filled
    *  (card §3) — whitespace does not pass. The DOOR enforces it again. */
   const whyOk = why.trim().length > 0;
+  /** `Needed by` is one of the request's six facts (MASTER §3) — a request
+   *  with no date leaves the approver and the issuer with nothing to plan
+   *  against. Found empty-but-sendable on the 2026-08-19 owner walk. */
+  const dateOk = neededBy !== "";
 
   const canSend =
     !saving &&
     whyOk &&
+    dateOk &&
     chosenDest != null &&
     submittable.length > 0 &&
     submittable.every(qtyOk) &&
     everyStartedLineNamesAnItem;
+
+  /** The disabled button NAMES its gap (the Receiving law) — the first
+   *  missing header fact wins, in the form's own top-to-bottom order. */
+  const sendLabel = !dateOk ? MW.sendNeedsDate : !whyOk ? MW.sendNeedsWhy : MW.send;
 
   function addLine() {
     const l = blankLine();
@@ -705,7 +714,7 @@ function CreateRequestWorkspace({
             onClick={() => void send()}
             data-testid="mp-send"
           >
-            {MW.send}
+            {sendLabel}
           </Button>
         </span>
       </div>
@@ -802,10 +811,13 @@ function CreateRequestWorkspace({
                 style={{ gridTemplateColumns: LINE_GRID }}
                 data-testid={`mp-line-${i}`}
               >
+                {/* SKU + Model, never the model word alone — four Booqit
+                    variants rendered as the single word `Booqit` is P15's
+                    own defect returned (2026-08-19 owner walk). */}
                 <SearchInput
                   id={`mp-item-${i}`}
                   aria-label={W.itemLabel}
-                  value={picked ? picked.label : line.needle}
+                  value={picked ? `${picked.sku} · ${picked.label}` : line.needle}
                   disabled={done}
                   onFocus={() => setActiveId(line.id)}
                   onChange={(e) => {

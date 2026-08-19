@@ -8,7 +8,6 @@ import {
   useOperationBadges,
   useMarkOperationBadgeSeen,
   usePrincipalDashboard,
-  usePurchasingSettings,
 } from "@/lib/queries";
 import {
   visibleGroups,
@@ -119,13 +118,8 @@ export default function PortalSidebar() {
   const principalDashQ = usePrincipalDashboard({ enabled: principalVisible });
   const pendingCount = principalDashQ.data?.kpis?.pending_approvals ?? 0;
 
-  // Purchasing Settings is a manager door and the SERVER decides who is one —
-  // the rail asks the same RPC that guards the seven engine numbers rather
-  // than guessing from the role. `enabled` keeps a finance-only user from
-  // calling an operation endpoint (it would 403), the same shape the badge
-  // feed above already uses.
-  const purchasingSettingsQ = usePurchasingSettings({ enabled: opVisible });
-  const canEditPurchasingSettings = purchasingSettingsQ.data?.canEdit ?? false;
+  // NO SETTINGS ROW ON ANY RAIL (Jess, 2026-08-19): the header gear is the one
+  // Settings entry, so the rail no longer asks the manager-gate RPC at all.
 
   // THE RAIL NOW SCROLLS, AND THAT IS THE COST OF THE WHOLE MAP (Jess,
   // 2026-08-18). Thirteen purchasing pages plus the module rows is ~860px on a
@@ -263,7 +257,7 @@ export default function PortalSidebar() {
             (activeGroup ? orderedItems(activeGroup, role) : [])
               // A collapsed rail is for table room: an unbuilt page is not a
               // control and gets no icon; the server-gated door stays gated.
-              .filter((it) => !it.soon && (!it.managerOnly || canEditPurchasingSettings))
+              .filter((it) => !it.soon)
               .map((item) => {
               const active = isItemActive(activeGroup, item);
               const dot =
@@ -323,14 +317,7 @@ export default function PortalSidebar() {
 
                   {open && (
                     <div className="flex flex-col gap-0.5">
-                      {orderedItems(group, role)
-                        .filter(
-                          // The Settings door is gated by the SERVER, not the
-                          // role — the rail asks the same RPC that guards the
-                          // seven engine numbers (sidebar card, unchanged).
-                          (it) => !it.managerOnly || canEditPurchasingSettings,
-                        )
-                        .map((item, index, items) => {
+                      {orderedItems(group, role).map((item, index, items) => {
                         const active = isItemActive(group, item);
                         const baseCls =
                           "relative w-full text-left px-3.5 py-[9px] rounded text-body flex items-center gap-[11px]";

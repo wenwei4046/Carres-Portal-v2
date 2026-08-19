@@ -250,6 +250,9 @@ export const TO_ORDER_WORDS = {
   reasonSpareParts: "Spare Parts",
   reasonOffice: "Office",
   reasonOther: "Other…",
+  /** The customer lane's auto-stamp (0361) — never offered in a picker; a PO
+   *  born from sales orders says so itself. */
+  reasonCustomerSales: "Customer Sales",
   // ── P15 (Loo, 2026-08-04) — the item picker stops being one word per row ──
   /**
    * The picker's SKU column. **This is the card's first and worst defect**:
@@ -494,6 +497,19 @@ export const DEMAND_PURPOSE_VALUES = DEMAND_PURPOSES.map((p) => p.value) as read
 
 export function isDemandPurpose(v: unknown): v is DemandPurpose {
   return typeof v === "string" && DEMAND_PURPOSE_VALUES.includes(v);
+}
+
+/**
+ * What a PO's `purpose` (0361) prints as — the `Need for` fact on the PO
+ * surfaces. `customer_sales` is the customer lane's auto-stamp; the five typed
+ * purposes reuse the demand labels above (one dictionary, Law D). NULL — every
+ * PO issued before 0361, deliberately not backfilled — prints nothing, and the
+ * caller decides what nothing looks like.
+ */
+export function poPurposeLabelOf(v: string | null | undefined): string | null {
+  if (!v) return null;
+  if (v === "customer_sales") return TO_ORDER_WORDS.reasonCustomerSales;
+  return DEMAND_PURPOSES.find((p) => p.value === v)?.label ?? null;
 }
 
 /**
