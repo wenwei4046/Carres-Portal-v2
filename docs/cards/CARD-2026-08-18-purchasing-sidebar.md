@@ -1,6 +1,6 @@
-STATUS: IMPLEMENTED — RELEASE OWED
+STATUS: EXECUTED — shipped and deployed 2026-08-19; owner walk owed
 DATE: 2026-08-18
-PR: committed on safety/e404cf43-omnibus — ffbd7368
+PR: #846 (feature, main `3af57bba`) + the measurement-correction PR that carries this flip
 IMPLEMENTATION: APPROVED — owner ruled the shape with the architect 2026-08-18, build straight to production
 
 # PURCHASING SIDEBAR — the module's pages leave the header and join the rail (one card)
@@ -100,8 +100,14 @@ This is the whole of why it is allowed to be there:
 - **It is out of the tab order** (`tabIndex={-1}` / not focusable) and carries
   `aria-disabled`. A keyboard user who tabs into a dead stop has found the same
   dead control by another door.
-- **`Coming soon` prints on the row**, right-aligned and quiet. That is §219's
-  requirement satisfied literally: the row says why it does nothing.
+- **`Coming soon` prints on the row**, quiet, on its own second line under the
+  name at the same indent. That is §219's requirement satisfied literally: the
+  row says why it does nothing. *(Corrected by the owed production measurement,
+  2026-08-19: the card first wrote "right-aligned" beside the name — but beside
+  the 71px tag a name gets 71px of the row's 150px, every one of the seven
+  unbuilt names needs 78–128px, all truncate, and the three Consignment entries
+  truncate to one identical string. The map exists so staff learn the NAMES,
+  so the name owns the line and the reason sits under it.)*
 - **It never carries a count**, not even zero. A number on it would claim work
   exists on a page that does not.
 - Grey text, no hover tint, no active bar, `cursor-default`.
@@ -276,3 +282,42 @@ Engineer-Owned Delivery (`CLAUDE.md`): delivery is owned to PRODUCTION. In order
    change the code and this card in the same PR.
 5. Acceptance boundary above, verified authenticated on production.
 6. Flip this card to EXECUTED with the production SHA.
+
+---
+
+**EXECUTED 2026-08-19.**
+
+- **The omnibus branch could not ship** — 331 commits behind `main`, conflicting
+  in files this card may not touch. The five card commits were cherry-picked onto
+  the latest `origin/main` and merged as **PR #846 → `main` `3af57bba`**. Merge
+  resolutions kept main's ERP Shell V1 section headings and the LOCKED
+  governed-blue active colour (the card's pre-blue `bg-primary` child treatment
+  was adapted to `kit-blue-3` / `kit-blue-9`), plus this card's children
+  rendering, server-gated Settings and scroll-into-view.
+- **Gate:** `tsc --noEmit` clean · lint 0 · 3,024 tests / 262 files green (CI
+  `verify` pass, 8m11s).
+- **Deploy is wrangler, not Vercel** (step 3 above was wrong; `ENGINEERING.md`
+  §6 rules): built from the `main` tip and deployed to BOTH Pages projects.
+  Bundle `index-DS88Bmj7.js` proven on all four canonicals
+  (erp/pos.carresofficial.com + both `.pages.dev`), **live md5 == local build**,
+  both directions grepped against the predecessor from its own deployment URL
+  (`SO Batch Purchase` 0→2 · `Supplier Claims` 0→2 · control `Sales Orders`
+  11→11). No Worker deploy owed — live Worker already at the merge base and no
+  `apps/api` file changed.
+- **The owed measurement ran on the production stylesheet** in real Chromium at
+  1440×900 and 1920 (the rail is login-gated; the probe rendered the exact rail
+  DOM against the downloaded live CSS): child rows 30px (`text-meta` 12/16px +
+  7px/7px), indent 43px, and the child label x-position exactly equals the
+  parent label x at both widths. **One defect found and fixed in the same PR as
+  this flip:** beside the 71px `Coming soon` tag a name got 71px of the row's
+  150px while the seven unbuilt names need 78–128px — all truncated, the three
+  Consignment entries to one identical string. The tag moved to its own second
+  line under the name (§2 corrected above); soon rows are now two-line, measured
+  44px against the same stylesheet at both widths, live rows unchanged at 30px,
+  every label still on the shared 55px x-line.
+- **Owner walk still owed:** authenticated acceptance at 1440×900/~1920 is
+  OWNER-only (this chat has no production login). Checklist: thirteen entries
+  under an open Purchasing in the approved order · seven grey two-line
+  `Coming soon` non-controls · both renames live · no tab strip on any
+  purchasing page · collapse remembered across reload · counts vanish at zero ·
+  every old purchasing URL still lands.

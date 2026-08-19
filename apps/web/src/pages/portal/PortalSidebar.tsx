@@ -255,6 +255,13 @@ export default function PortalSidebar() {
     const row = "relative w-full text-left pl-[43px] pr-3.5 py-[7px] rounded text-meta flex items-center gap-2";
 
     if (child.soon) {
+      // `Coming soon` sits on its OWN line, under the name. Measured on the
+      // production stylesheet (2026-08-19, 1440×900 and 1920): beside the 71px
+      // tag a name gets 71px of the row's 150px and every one of the seven
+      // unbuilt names needs 78–128px — all truncate, and the three Consignment
+      // entries truncate to the same string. The map exists so staff learn the
+      // NAMES; the name owns the line, the reason sits under it at the same
+      // indent, and every word is still on the row (`03-page-patterns.md:219`).
       return (
         <div key={child.key}>
           {rule}
@@ -263,10 +270,10 @@ export default function PortalSidebar() {
             data-soon="1"
             aria-disabled="true"
             tabIndex={-1}
-            className={`${row} text-base-400 font-medium cursor-default select-none`}
+            className="relative w-full text-left pl-[43px] pr-3.5 py-[7px] rounded text-meta flex flex-col items-start text-base-400 font-medium cursor-default select-none"
           >
-            <span className="flex-1 truncate">{child.label}</span>
-            <span className="shrink-0 text-label text-base-400">Coming soon</span>
+            <span className="w-full truncate">{child.label}</span>
+            <span className="text-label text-base-400">Coming soon</span>
           </span>
         </div>
       );
