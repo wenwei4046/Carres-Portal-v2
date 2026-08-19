@@ -166,3 +166,39 @@ hierarchy, the sofa exception, `To Buy` printed and locked, `Coverage` on every 
 line, shortages at the top, no destination question at issue, one PO per supplier,
 and the `Queues` rail filtering the grid. Overwrite `docs/purchasing/MASTER.md`
 §3's WHAT IS ON SCREEN TODAY in the same PR under the MASTER OVERWRITE LAW.
+
+---
+
+## PLANNER RULINGS — 2026-08-19, the three blockers resolved WITHOUT the owner
+
+The build chat raised three items as owner decisions. Measured against
+authority, **none of them is one** (CLAUDE.md: *"Can this be answered by
+reading the code, the docs, the database, or by measuring? YES → IT IS
+YOURS."*). All three are ruled here so the build continues.
+
+**1 · §4's "destination derives from the source SO line" is STRUCK from this
+card.** The build chat measured it correctly: no destination column exists on
+`orders` or `order_items`, `orders.warehouse_id` is null on 93 of 93 rows,
+and `purchasing/MASTER.md:1152` carries the **owner-locked** *Deliver To*
+rule (2026-08-14) — `Deliver To` is **Purchasing's own instruction at PO
+level with a PO-line override**, explicitly not copied from Sales Orders. A
+card may not overturn a locked owner ruling by implication. The half of §4
+already satisfied (the issue form asks nothing) STANDS. Nothing further is
+built for §4.
+
+**2 · `Check the supplier` is STRUCK from the QUEUES rail.** Its demand never
+becomes a grid row (`to-order.ts:384` drops supplier-less SKUs before demand
+exists), so the queue would always filter to an empty sheet, and no
+`Save the supplier` door exists anywhere. It is catalog work, whose files
+this card forbids. `Issue PO` remains the rail's queue, as built.
+
+**3 · `Proceed date` STAYS on the leaf row.** The card's ten-column list
+omitted it; an omission is not a deletion. It is an approved, shipped feature
+with eight tests, and the same sketch also omitted `PO No.`, which was kept —
+so the list is demonstrably not exhaustive. Deleting an approved feature on a
+silent reading is precisely what Law 4 exists to stop. One leaf row is one SO
+line, which is exactly the grain the fact needs. Repair the eight tests
+against the leaf row; do not delete them.
+
+**Consequence:** the 43 red tests lose their blocker. Finish the suite, run
+the release gate, PR, and merge. Do not return these three to the owner.
