@@ -1971,6 +1971,15 @@ export {
   type ToOrderSupplier,
 } from "./to-order";
 export {
+  MANUAL_PURCHASE_WORDS,
+  MANUAL_PURCHASE_STATUS_WORDS,
+  manualPurchaseStatusOf,
+  stillNeededOf,
+  type ManualPurchaseStatus,
+  type ManualPurchaseStatusInput,
+  type ManualPurchaseStatusKind,
+} from "./manual-purchase";
+export {
   IMPORT_ACCESSORY_KINDS,
   IMPORT_LEAD_DAYS_DEFAULT,
   importAccessoryKind,

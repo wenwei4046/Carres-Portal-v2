@@ -45,6 +45,7 @@ import ModuleHeader from "./components/ModuleHeader";
 
 type PurchasingPage =
   | "to-order"
+  | "manual-purchase"
   | "purchase-orders"
   | "receiving"
   | "claims"
@@ -55,6 +56,7 @@ type PurchasingPage =
  *  words (`portal-nav.ts`) — a page word is never invented here. */
 const PAGE_WORD: Record<PurchasingPage, string> = {
   "to-order": "SO Batch Purchase",
+  "manual-purchase": "Manual Purchase",
   "purchase-orders": "Purchase Orders",
   receiving: "Receiving",
   claims: "Supplier Claims",
@@ -68,7 +70,9 @@ export default function PurchasingTabs({ right }: { right?: ReactNode } = {}) {
   const tabParam = new URLSearchParams(location.search).get("tab");
   const active: PurchasingPage = onProcurement
     ? "purchase-orders"
-    : tabParam === "receiving"
+    : tabParam === "manual-purchase"
+      ? "manual-purchase"
+      : tabParam === "receiving"
       ? "receiving"
       : tabParam === "claims"
         ? "claims"

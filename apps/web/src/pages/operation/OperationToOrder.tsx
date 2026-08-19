@@ -110,7 +110,13 @@ import {
 import { fmtDate, fmtDateShort } from "@/lib/fmt-date";
 import { displayCustomerName } from "@/lib/customer-name";
 import { qk } from "@/lib/queries";
-import CreatePurchaseDialog, { type Destination } from "./CreatePurchaseDialog";
+/** A deliver-to option the payload carries. Lived in the retired
+ *  CreatePurchaseDialog; the grid's own destination cell still needs it. */
+interface Destination {
+  id: string;
+  name: string;
+  isDefault: boolean;
+}
 import PurchasingTabs from "./PurchasingTabs";
 
 // ── Wire types ──────────────────────────────────────────────────────────────
@@ -419,7 +425,6 @@ export default function OperationToOrder() {
   const [rowPo, setRowPo] = useState<ReadonlyMap<string, string>>(new Map());
   const [results, setResults] = useState<ReadonlyMap<string, GroupResult>>(new Map());
   const [creating, setCreating] = useState(false);
-  const [dialogOpen, setDialogOpen] = useState(false);
   const [issueReviewOpen, setIssueReviewOpen] = useState(false);
   const [commercialDecisions, setCommercialDecisions] = useState<
     ReadonlyMap<string, CommercialDecision>
@@ -1967,19 +1972,11 @@ export default function OperationToOrder() {
             />
           ))}
 
-          <div className="my-2 border-t border-kit-slate-6" />
-
-          {/* The manual entrance — always present (Loo: the door may never
-              be missing). The dialog is real; its SAVE arrives with the
-              unified purchase_demands card. */}
-          <button
-            type="button"
-            onClick={() => setDialogOpen(true)}
-            data-testid="to-order-create-purchase"
-            className="flex w-full items-center gap-1 px-2 py-1.5 rounded-control text-body text-kit-slate-11 hover:bg-kit-slate-3 text-left"
-          >
-            + {W.createPurchase}
-          </button>
+          {/* The manual entrance LEFT this page for `Manual Purchase`
+              (CARD-2026-08-18-manual-purchase §1): this grid now answers ONE
+              question — what have customers ordered that we still have to
+              buy. Loo's "the door may never be missing" holds at the module
+              level: the door is the rail's own Manual Purchase entry. */}
         </aside>
 
         {/* ── The Excel Workspace: one toolbar, one grid. ─────────────────
@@ -2629,13 +2626,6 @@ export default function OperationToOrder() {
           })}
         </div>
       </Modal>
-
-      <CreatePurchaseDialog
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        destinations={destinations}
-        onCreated={() => void q.refetch()}
-      />
 
       {/* P12 — the confirm step for `Cancel`. The page REFETCHES rather than
           hiding the row itself: a cancel takes the whole remainder, so the row

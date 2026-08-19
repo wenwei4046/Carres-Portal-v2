@@ -4131,6 +4131,124 @@ export function usePurchasePushLines() {
  * banner and urgent bypass, the delivery queue deadlines, the right-rail
  * team card). A number with one home is the whole point of P1.
  */
+/** ── Manual Purchase — the typed request lane (0359) ─────────────────────── */
+
+export interface PurchaseRequestRow {
+  id: string;
+  req_no: string;
+  purpose: string;
+  destination_id: string;
+  required_by: string | null;
+  why: string;
+  approval_required: boolean;
+  approved_at: string | null;
+  approved_by: string | null;
+  refused_at: string | null;
+  refused_by: string | null;
+  refuse_reason: string | null;
+  created_by: string | null;
+  created_at: string;
+}
+
+export interface PurchaseRequestLineRow {
+  id: string;
+  request_id: string;
+  sku: string;
+  supplier_id: string | null;
+  qty: number;
+  approved_qty: number | null;
+  issued_qty: number;
+  remaining_qty: number;
+  required_by: string | null;
+  remark: string | null;
+  po_id: string | null;
+  cancelled_at: string | null;
+  cancel_reason: string | null;
+}
+
+export interface ManualPurchaseRegisterPayload {
+  requests: PurchaseRequestRow[];
+  lines: PurchaseRequestLineRow[];
+  destinations: Array<{ id: string; name: string }>;
+  suppliers: Array<{ id: string; name: string }>;
+  users: Array<{ id: string; name: string | null }>;
+}
+
+export function useManualPurchaseRegister() {
+  return useQuery<ManualPurchaseRegisterPayload, ApiError>({
+    queryKey: ["operation", "purchasing", "requests"],
+    queryFn: () =>
+      apiFetch<ManualPurchaseRegisterPayload>("/api/operation/purchasing/requests"),
+    staleTime: 30_000,
+  });
+}
+
+export function useCreatePurchaseRequest() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: {
+      purpose: string;
+      destinationId: string;
+      requiredBy?: string | null;
+      why: string;
+    }) =>
+      apiFetch<{ id: string; req_no: string; approval_required: boolean }>(
+        "/api/operation/purchasing/requests",
+        { method: "POST", body: JSON.stringify(body) },
+      ),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ["operation", "purchasing", "requests"] }),
+  });
+}
+
+export function useCreatePurchaseRequestLine() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: {
+      requestId: string;
+      sku: string;
+      qty: number;
+      destinationId: string;
+      requiredBy?: string | null;
+      note?: string | null;
+      purpose: string;
+    }) =>
+      apiFetch<{ id: string; supplier_id: string }>(
+        `/api/operation/purchasing/requests/${input.requestId}/lines`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            sku: input.sku,
+            qty: input.qty,
+            destinationId: input.destinationId,
+            requiredBy: input.requiredBy ?? null,
+            note: input.note ?? null,
+            purpose: input.purpose,
+          }),
+        },
+      ),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ["operation", "purchasing", "requests"] }),
+  });
+}
+
+/** What is already on an open PO for one SKU — `free` deliberately rides the
+ *  pick-items read instead (one arithmetic, Law D). */
+export function useAlreadyOnPo(sku: string | null) {
+  return useQuery<
+    { sku: string; alreadyOnPo: number; firstPo: { id: string; eta: string | null } | null },
+    ApiError
+  >({
+    queryKey: ["operation", "purchasing", "already-have", sku ?? ""],
+    queryFn: () =>
+      apiFetch(
+        `/api/operation/purchasing/requests/already-have?sku=${encodeURIComponent(sku ?? "")}`,
+      ),
+    enabled: !!sku,
+    staleTime: 30_000,
+  });
+}
+
 export function usePurchasingSettings(
   opts?: Partial<UseQueryOptions<PurchasingSettingsResponse>>,
 ) {

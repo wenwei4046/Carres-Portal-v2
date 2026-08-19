@@ -52,13 +52,12 @@ const LANE = [
   // was green. A lane list that does not grow with the lane is a lane list
   // that quietly stops being one.
   "pages/operation/OperationPurchaseOrders.tsx",
-  // Added by P14 (2026-08-04), the day `CreatePurchaseDialog` moved out of
-  // `OperationToOrder.tsx` into its own file. Its words were scanned by every
-  // rule below while it lived inside the page; leaving it off this list would
-  // have let a PURE MOVE quietly retire five of them, and every rule here is a
-  // NEGATIVE assertion — the suite would have gone on passing, more easily.
-  // That is the failure the note above records having already been paid for.
-  "pages/operation/CreatePurchaseDialog.tsx",
+  // Added by P14 (2026-08-04) as `CreatePurchaseDialog.tsx`; the dialog
+  // retired on CARD-2026-08-18-manual-purchase and its door moved to the
+  // Manual Purchase page — the scan follows the words to their new file for
+  // exactly the reason P14 added the old one: a PURE MOVE may not quietly
+  // retire a negative assertion.
+  "pages/operation/OperationManualPurchase.tsx",
 ];
 
 const read = (rel: string) => readFileSync(join(WEB_SRC, rel), "utf8");

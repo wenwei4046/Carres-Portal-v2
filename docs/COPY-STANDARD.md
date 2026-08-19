@@ -562,6 +562,21 @@ table are one-to-one, so a queue and a row can never spell one action two ways.
 | `Check the supplier` | `Check the supplier for {model}` | `Save the supplier` | `Supplier saved` | `Every model has a supplier.` |
 | `Upload handover proof` | `Upload handover proof` | `Upload handover proof` | `Handover proof saved` | `Every handover has its proof.` |
 
+**MANUAL PURCHASE — the request's own words** (CARD-2026-08-18-manual-purchase, added on
+execution 2026-08-19; every string below is the card's own ruled text, recorded here so no
+screen respells it):
+
+| Where | The word |
+|---|---|
+| The page's create button | `+ New request` |
+| The create workspace title | `New request` |
+| Submit · abandon | `Send for approval` · `Cancel` |
+| The form's fields | `Need for` · `Needed by` · `Deliver to` · `Raised by` · `Why` · `Items` · `Qty` · `Note` · `Supplier` · `+ Add line` · `Remove` |
+| The already-have block | `WHAT WE ALREADY HAVE` — `free stock` · `already on PO` · `still needed` (the arithmetic is PRINTED, never left to the reader) |
+| The register columns | `Ref` · `Need for` · `What` · `Qty` · `Deliver to` · `Needed by` · `Raised by` · `Status` |
+| The states | `Waiting for approval` · `Waiting for the SKU` · `Ready to order` · `Ordered` · `Arrived` · `Not going ahead` — `Waiting` always names what it waits ON; `Arrived` is a FACT the system observes, never a button |
+| The number series | `REQ-` (never `PR-` — 2990s prints PR for a purchase return) |
+
 **SIXTY-FIVE ACTIONS BECAME TWENTY, AND THAT WAS THE POINT** (Jess, 2026-08-18). *(Thirteen was
 this section's first count, taken before all eleven pages had been designed; seven more surfaced
 and the number is corrected here rather than defended.)* A blueprint

@@ -44,6 +44,7 @@ import OperationWork from "./OperationWork";
 import OperationRental from "./OperationRental";
 // Purchase / Procurement MRP cockpit — the "what to buy today" guided worklist.
 import OperationToOrder from "./OperationToOrder";
+import OperationManualPurchase from "./OperationManualPurchase";
 import OperationWarehouse from "./OperationWarehouse";
 import OperationMovements from "./OperationMovements";
 import TabbedProcurementShell from "./procurement/TabbedProcurementShell";
@@ -446,6 +447,9 @@ export default function OperationApp() {
             {/* Purchasing → To Order — the Planning Workspace, rebuilt from
                 the Golden Template 2026-07-31 (docs/03-page-patterns.md). */}
             {tab === "purchase" && <OperationToOrder />}
+            {/* Purchasing → Manual Purchase — the typed request lane
+                (CARD-2026-08-18-manual-purchase). */}
+            {tab === "manual-purchase" && <OperationManualPurchase />}
             {tab === "catalog" &&
               (role === "principal" ? (
                 <Navigate

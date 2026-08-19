@@ -1,6 +1,6 @@
-STATUS: QUEUED
+STATUS: IN BUILD — slice 1 (create + register + first act) shipped; approval and issue slices follow
 DATE: 2026-08-18
-PR: pending
+PR: slice 1 on claude/manual-purchase
 IMPLEMENTATION: APPROVED — owner ruled the lane with the architect 2026-08-18, build straight to production
 
 # MANUAL PURCHASE — the request, the approval, the order (one card)
@@ -238,6 +238,21 @@ Any string this build finds it needs and cannot find in the table is added to
 - Migration numbering: next free is **0359**. *(This line first said 0337,
   measured on the parked omnibus branch; by execution day main and the applied
   production tracker both ended at 0358 — red line #7, MAX of every tail.)*
+
+## BUILD RECORD
+
+**Slice 1 — IMPLEMENTED 2026-08-19** (migration `0359`): `purchase_requests`
+header (REQ- series, five purposes with `spare_parts`, door-enforced `why`,
+approval fields stamped from the new per-purpose switches in
+`purchasing_purpose_approval`) · `purchase_demands.request_id` + `approved_qty`
+· `OperationManualPurchase.tsx` (register + rail + full-page create workspace
+with per-line `WHAT WE ALREADY HAVE` and a PRINTED `still needed`) ·
+`+ Create Purchase` and the 600px dialog left SO Batch Purchase; the rail
+entry went live by the two ruled edits. **Re-sequencing, stated:** typed
+`purchase_demands` rows stay in the SO Batch Purchase grid until the ISSUE
+slice ships the manual lane's own Issue — pulling them out earlier would make
+an approved request unissuable, and an operator regression is not a slice
+boundary. §1's grid split therefore lands with §6, not before it.
 
 ## STILL LOCKED — do not touch
 
