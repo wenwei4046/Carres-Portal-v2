@@ -133,7 +133,7 @@ Purchasing
 ├── SO Batch Purchase
 ├── Manual Purchase
 ├── Purchase Orders
-├── Goods Receipts
+├── Receiving
 ├── Supplier Claims
 ├── Purchase Returns
 ├── Repair Orders
@@ -147,8 +147,36 @@ Portal
 └── Settings
 ```
 
+*`Receiving`, not `Goods Receipts` (SHIPPED 2026-08-18).* The approved page list wrote the
+document name; this section's own rule names a page after the JOB, and `Receiving` is named
+here as the accepted ERP operation. `docs/purchasing/MASTER.md:768` also bans the letters
+`GRN` from a tab forever. The document is still a Goods Receipt; the door is Receiving.
+
 **This is navigation, not workflow.** How the operator moves between these pages — which one
 feeds which — is the module MASTER's, and it changes when the business changes.
+
+**A MODULE'S PAGES LIVE IN THE RAIL, AND THE WHOLE MAP IS SHOWN FROM DAY ONE**
+(Jess, 2026-08-18 — SHIPPED). A 44px tab strip is a good home for three siblings and a bad
+home for eleven: it scrolls sideways, it cannot show a count without shouting, and it cannot
+group. The module's sidebar item EXPANDS in place instead — **one rail, not two**, because a
+second left column would spend ~430px of a 1440px screen on navigation before the first
+column of data (a 232px rail plus a page's own 200px right rail).
+
+**Every approved page is listed before it exists.** The rail is the module's MAP, and a map
+showing four of eleven roads teaches the operators a shape that is about to change under them
+seven more times. An unbuilt entry prints **`Coming soon`** and **is not a control** — a
+`<span>` with no href, out of the tab order, `aria-disabled`. `03-page-patterns.md:149` bans
+a control that opens nothing; there is no dead arrow because there is no arrow. `:219` of the
+same file requires a deliberately disabled control to say why on screen, and `Coming soon` is
+that sentence (`COPY-STANDARD.md` — the ONE word for it, never `TBD`, never `Not available`).
+
+**An entry goes live in its own page's PR by exactly two edits: drop the flag, and the span
+becomes a link.** Nothing is added later and no order is renegotiated, so the rail never
+reshuffles under a staff member who has learned it.
+
+**The cost, stated:** thirteen purchasing entries plus the module rows overflow a laptop rail,
+so it scrolls. Accepted. The one defect that may not survive is landing on a rail whose
+highlighted row is off screen, so the active row is brought into view on mount.
 
 **A DOCUMENT EARNS A DOOR WHEN A HUMAN LOOKS FOR IT BY NAME** (Jess, 2026-08-18). Purchasing's
 five pages became eleven, and the reason is measured rather than stylistic: **Carres runs three

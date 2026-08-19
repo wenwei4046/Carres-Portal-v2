@@ -264,6 +264,73 @@ shipped code, and stated the opposite.)*
 
 ---
 
+# §4.2 · MODULE NAVIGATION — APPROVED / SHIPPED, Jess 2026-08-18
+
+### THE PAGES OF A MODULE LIVE IN THE RAIL
+
+A module's sidebar item **expands in place** to list its pages. It does not open a
+second left column, and it does not keep a tab strip once it has more than a
+handful of pages.
+
+```
+▾ Purchasing
+    SO Batch Purchase      4
+    Manual Purchase             Coming soon
+    Purchase Orders        3
+    Receiving              1
+    Supplier Claims
+    …
+    ─────────────────────
+    Report
+    Settings
+```
+
+**Why not a second column.** The portal rail is 232px and a working page already
+carries a 200px right rail (§5). A module rail between them spends ~430px of a
+1440px screen on navigation before the first column of data.
+
+**Why not a tab strip.** A 44px strip is a good home for three siblings and a bad
+home for eleven: it scrolls sideways, it cannot show a count without shouting, and
+it cannot group. **The header row stays** — the shell still draws it (壳画头), and
+the nameplate gains the page word (`Purchasing · Receiving`) so the header still
+says where you are once the strip is gone.
+
+### FROZEN RULES
+
+- **Only the module you are standing in is open.** Same rule the area groups
+  already follow; applied one level down, so nothing new is invented.
+- **The whole map is listed from day one.** An approved page appears before it is
+  built. A map showing four of eleven roads teaches a shape that is about to
+  change under the operator seven more times.
+- **An unbuilt entry is NOT A CONTROL.** A `<span>` with no href, out of the tab
+  order, `aria-disabled`, printing **`Coming soon`** (`COPY-STANDARD.md`). This is
+  what keeps it inside `03-page-patterns.md:149` (*a control that opens nothing is
+  a dead control* — there is no arrow to be dead) while satisfying `:219` (*a
+  deliberately disabled control must say why, on screen*).
+- **Going live is two edits, in that page's own PR:** drop the flag, the span
+  becomes a link. **Nothing is added later and no order is renegotiated**, so the
+  rail never reshuffles under a staff member who has learned it.
+- **A count means rows a human must act on, never how many rows the table holds**,
+  and **nothing is printed at zero.** A zero badge is a daily invitation to check a
+  page with nothing on it.
+- **The parent carries no count of its own.** Summing its children produces a
+  figure that matches no page and no queue.
+- **A manager-only page is gated by the SERVER**, not by the role: the rail asks
+  the same RPC that guards the page. A caller who may not enter does not see the
+  door.
+- **Collapsed, the children disappear and the module's ONE icon remains.** A
+  collapsed rail is for table room, not for navigating thirteen pages by guessing
+  thirteen icons.
+- **The rail overflows, and that is the accepted cost of the whole map.** The one
+  defect that may not survive is landing on a rail whose highlighted row is off
+  screen: **the active row is brought into view on mount** — `block: "nearest"`,
+  visible rather than centred, and never re-run on navigation, which would yank the
+  rail while the operator is reading further down it.
+
+*Built: `apps/web/src/pages/portal/portal-nav.ts` (`PortalNavChild`) ·
+`PortalSidebar.tsx` · `operation/PurchasingTabs.tsx` ·
+`operation/components/ModuleHeader.tsx` (`page` prop).*
+
 # §5 · The right rail
 
 ### MISSION

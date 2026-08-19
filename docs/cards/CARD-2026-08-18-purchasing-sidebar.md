@@ -1,6 +1,6 @@
-STATUS: QUEUED
+STATUS: EXECUTED
 DATE: 2026-08-18
-PR: pending
+PR: committed on safety/e404cf43-omnibus — ffbd7368
 IMPLEMENTATION: APPROVED — owner ruled the shape with the architect 2026-08-18, build straight to production
 
 # PURCHASING SIDEBAR — the module's pages leave the header and join the rail (one card)
@@ -247,5 +247,19 @@ unclickable, unfocusable and reading `Coming soon`, both renames live, no tab st
 on any purchasing page, the collapse remembered across a reload, counts that mean
 work waiting and vanish at zero, and every old purchasing link still landing on its
 page. Overwrite
-`docs/ERP-ARCHITECTURE.md` §2.1 and `docs/ui/MASTER.md` §4 in the same PR under
-the MASTER OVERWRITE LAW.
+`docs/ERP-ARCHITECTURE.md` §2.1 and `docs/ui/MASTER.md` in the same PR under the
+MASTER OVERWRITE LAW.
+
+*Corrected on execution: this line first named `ui/MASTER.md` §4, which is Shells
+and grids and owns no navigation. The law landed as a new **§4.2 · MODULE
+NAVIGATION** instead. The section number is fixed here rather than defended.*
+
+---
+
+**EXECUTED 2026-08-18** — `ffbd7368`. 28 tests pass on `PortalSidebar.test.tsx`
+(16 existing + 12 new); `tsc --noEmit` clean. Law written to
+`ERP-ARCHITECTURE.md` §2.1, `ui/MASTER.md` §4.2 and `COPY-STANDARD.md`
+(`Coming soon`). **Still owed: the browser measurement.** The child row's
+`text-meta` size, its `py-[7px]` height and the 43px indent were derived from the
+parent row's existing numbers, not measured on screen — the card requires them
+re-measured in a real browser before this is called finished.
