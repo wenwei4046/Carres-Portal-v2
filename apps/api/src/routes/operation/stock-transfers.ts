@@ -102,6 +102,12 @@ stockTransfersRouter.post("/", requireOperationOrPrincipal, async (c) => {
   }
   const input = parsed.data;
 
+  // One unit named twice is one unit travelling, not two. Deduped here so the
+  // caller's slip never reaches the unit lines' unique index, where it would
+  // surface as an unreadable constraint error instead of doing the obvious
+  // thing.
+  const unitIds = [...new Set(input.unitIds)];
+
   const today = todayIsoMYT();
   for (let attempt = 0; attempt < 4; attempt++) {
     const id = crypto.randomUUID();
@@ -112,7 +118,7 @@ stockTransfersRouter.post("/", requireOperationOrPrincipal, async (c) => {
       p_transfer_no: transferNo,
       p_from: input.fromWarehouseId,
       p_to: input.toWarehouseId,
-      p_unit_ids: input.unitIds,
+      p_unit_ids: unitIds,
       p_purpose: input.purpose,
       p_expected_date: input.expectedDate,
       p_sales_order_ref: input.salesOrderRef ?? null,
@@ -120,9 +126,13 @@ stockTransfersRouter.post("/", requireOperationOrPrincipal, async (c) => {
     });
     if (!error) return c.json({ transfer: data }, 201);
 
-    // 23505 = the number is taken. Draw a new seed and try again; every other
-    // error is the caller's or the law's and is returned as it stands.
-    if (error.code === "23505" && attempt < 3) continue;
+    // Retry ONLY when this document's number is the thing that collided — a
+    // fresh id draws a fresh tail. A bare 23505 retry would also swallow a
+    // genuine duplicate elsewhere and burn four attempts on an error that was
+    // never going to change.
+    const numberTaken =
+      error.code === "23505" && /transfer_no/i.test(`${error.message} ${error.details ?? ""}`);
+    if (numberTaken && attempt < 3) continue;
     const m = mapPgError(error);
     return c.json(m.body, m.status);
   }
