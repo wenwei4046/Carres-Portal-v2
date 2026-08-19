@@ -51,6 +51,12 @@ export type DoTemplateData = {
 
   /** Currency display code, default "MYR". */
   currency: string;
+
+  /** 0362 (owner ruling 2026-08-19) — set when the document was issued under
+   *  an APPROVED Delivery Payment Approval and money is still owed:
+   *  `COLLECT RM {amount} BY ONLINE TRANSFER BEFORE UNLOADING — NO CASH.`
+   *  The one ruled exception to "a delivery doc never talks money". */
+  cod_instruction?: string | null;
 };
 
 export type InvoiceTemplateData = {

@@ -30,10 +30,13 @@ import { loadBookingContext } from "./booking-context";
  *   · **The LOCKED number scheme** — `docNumber`, `DO-DDMMYY-NNNN`, tail
  *     seeded on the ORDER id, date = the day it is issued (Jess 2026-07-19).
  *     A reprint reads the stored number and always matches the original.
- *   · **The gate** — `deliveryOrderIssueGate`, unchanged: confirmed date +
- *     slot, no Sunday, no Malaysian public holiday, goods reserved, and no
- *     OPEN Finance exception (decision A). A blocked order issues nothing and
- *     the reasons name what is still open.
+ *   · **The gate** — `deliveryOrderIssueGate`: confirmed date + slot, no
+ *     Sunday, no Malaysian public holiday, goods reserved, MONEY IN FULL or an
+ *     APPROVED Delivery Payment Approval (owner ruling 2026-08-19, 0362), and
+ *     no OPEN Finance exception (0355 — the second blocker). A blocked order
+ *     issues nothing and the reasons name what is still open. The database
+ *     asserts the money law again on the mint itself (0362's trigger), so no
+ *     path around this module can issue an unapproved owing order's paper.
  *
  * FAIL-SOFT AT EVERY HOOK. The doors that call this after their own act
  * (confirm / clear / reserve) treat any failure here as "not issued yet" —
@@ -73,6 +76,13 @@ export async function attemptDeliveryOrderIssue(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   sb: any,
   orderId: string,
+  opts?: {
+    /** The manual `Request Delivery Order` door (card §5, 2026-08-19): the
+     *  SAME path and the SAME gates, minus only waiting for the customer's
+     *  booking confirmation — outstation trips need the paper before the
+     *  partner has scheduled the customer. Never a free-form create. */
+    waitBookingConfirm?: boolean;
+  },
 ): Promise<DeliveryOrderAttempt> {
   // The trip's scope is the one ALREADY booked (`booking_groups`), never a
   // caller's opinion: this issues the paper for the trip the customer
@@ -92,16 +102,25 @@ export async function attemptDeliveryOrderIssue(
   // second document for one trip.
   if (order.do_number) return { outcome: "already", doNumber: order.do_number };
 
-  // ⭐ Decision A (owner ruling 2026-08-16) — the ONE money question left is
-  // whether Finance opened an exception (0355). Read from the owning table,
-  // never derived from a balance; the gate words the refusal itself through
-  // the shared spelling.
-  const { data: financeExceptions, error: feError } = await sb
-    .from("order_finance_exceptions")
-    .select("id, status, reason, opened_at, cleared_at, clear_evidence")
-    .eq("order_id", orderId);
-  if (feError) {
-    return { outcome: "error", body: { message: feError.message }, status: 500 };
+  // ⭐ The two money questions (owner ruling 2026-08-19): the outstanding
+  // figure against the approval record (0362), and Finance's exception (0355)
+  // — each read from its one owning table, never derived from each other; the
+  // gate words every refusal itself through the shared spellings.
+  const [feRes, paRes] = await Promise.all([
+    sb
+      .from("order_finance_exceptions")
+      .select("id, status, reason, opened_at, cleared_at, clear_evidence")
+      .eq("order_id", orderId),
+    sb
+      .from("order_delivery_payment_approvals")
+      .select("id, status, request_reason, requested_at, decided_at, decision_reason")
+      .eq("order_id", orderId),
+  ]);
+  if (feRes.error) {
+    return { outcome: "error", body: { message: feRes.error.message }, status: 500 };
+  }
+  if (paRes.error) {
+    return { outcome: "error", body: { message: paRes.error.message }, status: 500 };
   }
 
   const issue = deliveryOrderIssueGate({
@@ -109,7 +128,7 @@ export async function attemptDeliveryOrderIssue(
     confirmedDateIso: (control?.confirmed_date as string | null) ?? null,
     confirmedTimeSlot: (control?.confirmed_time_slot as string | null) ?? null,
     gate,
-    financeExceptions: (financeExceptions ?? []).map(
+    financeExceptions: (feRes.data ?? []).map(
       (row: Record<string, unknown>) => ({
         id: row.id as string,
         status: row.status as "open" | "cleared",
@@ -119,7 +138,18 @@ export async function attemptDeliveryOrderIssue(
         clearEvidence: (row.clear_evidence as string | null) ?? null,
       }),
     ),
+    paymentApprovals: (paRes.data ?? []).map(
+      (row: Record<string, unknown>) => ({
+        id: row.id as string,
+        status: row.status as "pending" | "approved" | "refused",
+        requestReason: row.request_reason as string,
+        requestedAt: (row.requested_at as string | null) ?? null,
+        decidedAt: (row.decided_at as string | null) ?? null,
+        decisionReason: (row.decision_reason as string | null) ?? null,
+      }),
+    ),
     holidays: myHolidaySet(),
+    waitBookingConfirm: opts?.waitBookingConfirm ?? true,
   });
   if (!issue.ok) return { outcome: "blocked", reasons: issue.reasons };
 
@@ -180,7 +210,10 @@ export async function attemptDeliveryOrderIssue(
   try {
     await sb.rpc("operation_add_annotation", {
       p_order_id: orderId,
-      p_content: `${orderActionDone("issue_delivery_order")} — ${doNumber}`,
+      p_content:
+        opts?.waitBookingConfirm === false
+          ? `${orderActionDone("issue_delivery_order")} — ${doNumber} — on Request Delivery Order`
+          : `${orderActionDone("issue_delivery_order")} — ${doNumber}`,
       p_tag: null,
     });
   } catch {

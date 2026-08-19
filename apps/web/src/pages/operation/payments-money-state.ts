@@ -44,7 +44,8 @@ export function moneyStateOf(input: {
   owing: number;
   /** What has actually come in (goods paid + live storage collections). */
   paid: number;
-  /** `collectionClock(...).attention` — `late` = past the T−1 deadline. */
+  /** `collectionClock(...).attention` — `late` = past the T−2 deadline
+   *  (owner ruling 2026-08-19). */
   attention: CollectionAttention;
 }): MoneyState {
   // An unpriced order names no figure, so it can be neither paid nor owing —

@@ -75,6 +75,7 @@ function input(over: Partial<SalesOrderRouteInput> = {}): SalesOrderRouteInput {
     delivery: { logistics: null, booking: null, attempts: [] },
     money: { known: true, outstanding: 1249 },
     financeExceptions: [],
+    paymentApprovals: [],
     loans: [],
     cases: [],
     claims: [],
@@ -291,35 +292,47 @@ describe("LOAN", () => {
 });
 
 /* ─────────────────────────────────────────────────────────────────────────────
- * THE GATE. Read-only, system-issued, and the one money requirement is the
- * Finance exception — owner ruling 2026-08-16, decision A.
+ * THE GATE. Read-only, system-issued. Two money requirements since the owner
+ * ruling of 2026-08-19: money in full (or an APPROVED payment approval), and
+ * no OPEN Finance exception.
  * ──────────────────────────────────────────────────────────────────────────── */
 
 describe("the DELIVERY ORDER gate", () => {
   it("lists every missing requirement in plain sentences with the met count", () => {
     const map = resolveSalesOrderRoute(input());
     const gate = node(map, "delivery-order");
-    /* The order owes RM 1,249 and the gate does not care: 3 open requirements
-       are goods, logistics and the appointment — never the balance. */
-    expect(gate.lines).toEqual(["NOT READY FOR DELIVERY", "1 of 4 requirements met"]);
+    /* The order owes RM 1,249 with no approval: the balance is a gate
+       requirement again (owner ruling 2026-08-19). */
+    expect(gate.lines).toEqual(["NOT READY FOR DELIVERY", "1 of 5 requirements met"]);
     expect(gate.requirements.map((r) => r.text)).toEqual([
       "Goods not ready (1 of 3)",
       "No logistics chosen",
       "Date + slot not confirmed",
+      "RM 1,249.00 still outstanding — collect, or request a payment approval",
       "No Finance hold",
     ]);
   });
 
-  it("never grows a Release or Approve control in any state", () => {
+  it("never grows a Release or Approve CONTROL in any state", () => {
+    /* The law guards CONTROLS — an action or a door — not the gate's status
+       sentences, which since 2026-08-19 legitimately name the payment
+       approval. The system issues; nobody presses. */
     for (const map of [
       resolveSalesOrderRoute(input()),
       resolveSalesOrderRoute(input({ money: { known: true, outstanding: 0 } })),
+      resolveSalesOrderRoute(
+        input({ paymentApprovals: [{ id: "pa-1", status: "approved" }] }),
+      ),
     ]) {
       const gate = node(map, "delivery-order");
       expect(gate.door).toBeNull();
-      const words = JSON.stringify(map).toLowerCase();
-      expect(words).not.toContain("release button");
-      expect(words).not.toContain("approve");
+      const controls = map.nodes
+        .flatMap((n) => [n.action?.label ?? "", n.door?.label ?? ""])
+        .join(" ")
+        .toLowerCase();
+      expect(controls).not.toContain("release");
+      expect(controls).not.toContain("approve");
+      expect(controls).not.toContain("issue");
     }
   });
 
@@ -348,15 +361,54 @@ describe("the DELIVERY ORDER gate", () => {
     });
   });
 
-  it("⭐ an outstanding balance is NOT a gate requirement — and it is not erased either", () => {
-    /* RM 1,249 owed, no exception: the gate requirement is met, and the MONEY
-       branch still prints the amount with its open collect. Money left the
-       GATE, never the screen. */
+  it("⭐ an outstanding balance IS a gate requirement again — owner ruling 2026-08-19", () => {
+    /* RM 1,249 owed, nothing raised: the money requirement refuses and names
+       both closers; the MONEY branch still prints the amount with its open
+       collect — the gate and the screen agree. */
     const map = resolveSalesOrderRoute(input());
-    expect(requirement(map, "finance-exception")!.met).toBe(true);
+    expect(requirement(map, "money")).toEqual({
+      id: "money",
+      met: false,
+      text: "RM 1,249.00 still outstanding — collect, or request a payment approval",
+    });
     const money = node(map, "money");
     expect(money.mark).not.toBe("complete");
     expect(money.lines).toContain("RM 1,249.00 still to collect");
+  });
+
+  it("an APPROVED payment approval meets the money requirement — and the collect stays open", () => {
+    const map = resolveSalesOrderRoute(
+      input({ paymentApprovals: [{ id: "pa-1", status: "approved" }] }),
+    );
+    expect(requirement(map, "money")).toEqual({
+      id: "money",
+      met: true,
+      text: "COD approved — collect before unloading",
+    });
+    /* COD does not forgive the money: the branch still owes and still acts. */
+    const money = node(map, "money");
+    expect(money.mark).not.toBe("complete");
+    expect(money.lines).toContain("COD approved — collect before unloading");
+  });
+
+  it("a PENDING request keeps the money requirement unmet and says the decision is awaited", () => {
+    const map = resolveSalesOrderRoute(
+      input({ paymentApprovals: [{ id: "pa-1", status: "pending" }] }),
+    );
+    const req = requirement(map, "money")!;
+    expect(req.met).toBe(false);
+    expect(req.text).toContain("approval waiting for decision");
+  });
+
+  it("paid in full meets the money requirement with no approval", () => {
+    const map = resolveSalesOrderRoute(
+      input({ money: { known: true, outstanding: 0 } }),
+    );
+    expect(requirement(map, "money")).toEqual({
+      id: "money",
+      met: true,
+      text: "Money in full",
+    });
   });
 
   it("a CLEARED exception removes the block", () => {
@@ -387,6 +439,11 @@ describe("the DELIVERY ORDER gate", () => {
       input({ money: { known: false, outstanding: 0 } }),
     );
     expect(requirement(map, "finance-exception")!.met).toBe(true);
+    expect(requirement(map, "money")).toEqual({
+      id: "money",
+      met: true,
+      text: "No price yet — unknown never holds",
+    });
   });
 
   it("names a refused delivery day instead of failing silently", () => {

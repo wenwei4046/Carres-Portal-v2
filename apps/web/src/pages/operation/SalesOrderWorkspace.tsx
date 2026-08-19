@@ -69,6 +69,7 @@ import {
   type SalesOrderRouteMap as SalesOrderRouteModel,
 } from "@carres/shared";
 import Button from "@/components/kit/Button";
+import Textarea from "@/components/kit/Textarea";
 import Checkbox from "@/components/kit/Checkbox";
 import DatePicker from "@/components/kit/DatePicker";
 import EmptyState from "@/components/kit/EmptyState";
@@ -83,9 +84,13 @@ import { fmtDate } from "@/lib/fmt-date";
 import { displayCustomerName } from "@/lib/customer-name";
 import { renderSalesOrderPdf } from "@/lib/pdf/render";
 import type { SalesOrderTemplateData } from "@/lib/pdf/types";
+import { useAuth } from "@/lib/auth";
 import {
   useCreateSalesOrder,
   useCustomerTypeProbe,
+  useDecidePaymentApproval,
+  useDeliveryPaymentApprovals,
+  useRequestPaymentApproval,
   useOperationDealersRef,
   useOperationOrder,
   useOperationPoDuty,
@@ -565,6 +570,170 @@ function Block({
       </div>
       <div className="mt-3">{children}</div>
     </section>
+  );
+}
+
+/**
+ * THE DELIVERY PAYMENT APPROVAL (0362, owner ruling 2026-08-19). Sales Order
+ * OWNS this record, so its doors live here — this is not the Money summary
+ * gaining a form (Law B): nothing here writes a payment or a price. Operation
+ * or the salesperson RAISES the ask with a reason; the configured approver —
+ * today Jess only — APPROVES or REFUSES with a reason. An APPROVED record
+ * opens the DO money gate as COD: full balance by online transfer BEFORE
+ * unloading, no cash. The server refuses every other role; the role check
+ * here only hides doors a user cannot walk through.
+ */
+function PaymentApprovalBlock({
+  orderId,
+  outstanding,
+}: {
+  orderId: string;
+  outstanding: number;
+}) {
+  const role = useAuth((s) => s.role);
+  const approvalsQuery = useDeliveryPaymentApprovals(orderId);
+  const request = useRequestPaymentApproval(orderId);
+  const decide = useDecidePaymentApproval(orderId);
+  const [asking, setAsking] = useState(false);
+  const [reason, setReason] = useState("");
+  const [decisionReason, setDecisionReason] = useState("");
+
+  const rows = approvalsQuery.data ?? [];
+  const approved = rows.find((r) => r.status === "approved") ?? null;
+  const pending = rows.find((r) => r.status === "pending") ?? null;
+
+  // Nothing owed and nothing ever asked → the block does not exist.
+  if (rows.length === 0 && outstanding <= 0) return null;
+
+  const canRaise =
+    role === "operation" || role === "salesperson" || role === "principal";
+  /* The approver list is DATA (principal today; the delivery_payment_approver
+     duty later). The server is the boundary — showing the buttons to
+     principal only keeps the screen honest for everyone else today. */
+  const canDecide = role === "principal";
+
+  return (
+    <div
+      className="mt-3 border-t border-kit-slate-5 pt-3"
+      data-testid="payment-approval-block"
+    >
+      <div className="text-label text-base-500">Delivery payment approval</div>
+      {approved ? (
+        <div className="mt-1 text-body text-base-900" data-testid="payment-approval-approved">
+          COD approved — collect before unloading
+          {approved.decided_at ? ` · ${fmtDate(approved.decided_at)}` : ""}
+          {approved.decision_reason ? ` · ${approved.decision_reason}` : ""}
+        </div>
+      ) : pending ? (
+        <div className="mt-1" data-testid="payment-approval-pending">
+          <div className="text-body text-base-900">
+            Waiting for decision
+            {pending.requested_at ? ` · requested ${fmtDate(pending.requested_at)}` : ""}
+            {` · ${pending.request_reason}`}
+          </div>
+          {canDecide && (
+            <div className="mt-2 flex flex-col gap-2 sm:max-w-md">
+              <Textarea
+                id="payment-approval-decision-reason"
+                label="Decision reason"
+                value={decisionReason}
+                rows={2}
+                onChange={(e) => setDecisionReason(e.target.value)}
+              />
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  data-testid="payment-approval-approve"
+                  disabled={decide.isPending || decisionReason.trim().length === 0}
+                  onClick={() =>
+                    decide.mutate(
+                      { id: pending.id, decision: "approved", reason: decisionReason.trim() },
+                      {
+                        onSuccess: () => setDecisionReason(""),
+                        onError: (e) => toast.error(e.message),
+                      },
+                    )
+                  }
+                >
+                  Approve
+                </Button>
+                <Button
+                  size="sm"
+                  variant="neutral"
+                  data-testid="payment-approval-refuse"
+                  disabled={decide.isPending || decisionReason.trim().length === 0}
+                  onClick={() =>
+                    decide.mutate(
+                      { id: pending.id, decision: "refused", reason: decisionReason.trim() },
+                      {
+                        onSuccess: () => setDecisionReason(""),
+                        onError: (e) => toast.error(e.message),
+                      },
+                    )
+                  }
+                >
+                  Refuse
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      ) : outstanding > 0 && canRaise ? (
+        asking ? (
+          <div className="mt-2 flex flex-col gap-2 sm:max-w-md">
+            <Textarea
+              id="payment-approval-reason"
+              label="Reason"
+              value={reason}
+              rows={2}
+              onChange={(e) => setReason(e.target.value)}
+            />
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                data-testid="payment-approval-request-send"
+                disabled={request.isPending || reason.trim().length === 0}
+                onClick={() =>
+                  request.mutate(
+                    { reason: reason.trim() },
+                    {
+                      onSuccess: () => {
+                        setReason("");
+                        setAsking(false);
+                      },
+                      onError: (e) => toast.error(e.message),
+                    },
+                  )
+                }
+              >
+                Send request
+              </Button>
+              <Button size="sm" variant="neutral" onClick={() => setAsking(false)}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="mt-1">
+            <Button
+              size="sm"
+              variant="neutral"
+              data-testid="payment-approval-request"
+              onClick={() => setAsking(true)}
+            >
+              Request payment approval
+            </Button>
+          </div>
+        )
+      ) : (
+        /* Refused history, nothing pending: state the last word. */
+        <div className="mt-1 text-body text-base-700">
+          {rows[0]?.status === "refused"
+            ? `Refused${rows[0].decided_at ? ` · ${fmtDate(rows[0].decided_at)}` : ""}${rows[0].decision_reason ? ` · ${rows[0].decision_reason}` : ""}`
+            : null}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -1250,19 +1419,23 @@ export default function SalesOrderWorkspace() {
           recordedAt: attempt.recorded_at,
         })),
       },
-      /* Straight from the ONE arithmetic (§8). Decision A retired `holds` —
-         money cannot hold a delivery, so the route reads only what is known
-         and what is owed. */
+      /* Straight from the ONE arithmetic (§8): what is known and what is owed.
+         Under the 2026-08-19 ruling the outstanding figure is a GATE input
+         again — money in full before delivery, or an approved COD. */
       money: {
         known: money.known,
         outstanding: money.outstanding,
       },
-      /* The ONE money blocker (decision A, 0355) — the same table the
-         server-side gate reads, so the canvas cannot lie about the refusal. */
+      /* The two money records (0355 + 0362) — the same tables the server-side
+         gate reads, so the canvas cannot lie about the refusal. */
       financeExceptions: (facts.financeExceptions ?? []).map((row) => ({
         id: row.id,
         status: row.status,
         reason: row.reason,
+      })),
+      paymentApprovals: (facts.paymentApprovals ?? []).map((row) => ({
+        id: row.id,
+        status: row.status,
       })),
       cases: facts.cases.map((item) => ({
         id: item.id,
@@ -1702,6 +1875,15 @@ export default function SalesOrderWorkspace() {
               Open this order in Payments
             </button>
           </div>
+        )}
+        {/* 0362 (owner ruling 2026-08-19) — the black-and-white door that lets
+            an owing order deliver COD. Sales Order OWNS this record; raising
+            and deciding are ITS doors, not a money form (Law B untouched). */}
+        {!isNew && order && (
+          <PaymentApprovalBlock
+            orderId={order.id}
+            outstanding={money.known ? money.outstanding : 0}
+          />
         )}
       </Block>
 

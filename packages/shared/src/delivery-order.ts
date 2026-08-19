@@ -1,37 +1,40 @@
 /**
- * C7 · The delivery order — the HARD gate (Jess 2026-07-27), corrected by the
- * owner ruling of 2026-08-16 ("decision A", `docs/orders/MASTER.md` §8):
+ * C7 · The delivery order — the HARD gate (Jess 2026-07-27), re-ruled by the
+ * owner 2026-08-19 (`docs/orders/MASTER.md` §8, SUPERSEDING 2026-08-16):
  *
- *   outstanding money does not block the DO
- *   an OPEN Finance exception is the ONLY money blocker
- *   CLEARED removes the block
+ *   Money in full BEFORE delivery. That is the only default.
+ *   outstanding = 0, OR an APPROVED Delivery Payment Approval covers the order
+ *   AND no OPEN Finance exception — the exception record (0355) is NOT
+ *   retired; it is the second blocker, not the only one.
+ *
+ * The 2026-08-16 "outstanding never blocks the DO" law is REVERSED on the
+ * owner's own evidence: on 2026-08-19 an order was delivered with money
+ * uncollected and no approval — exactly the exposure the old rule permitted.
+ * Operation cannot proceed on its own word; the only exception is a recorded
+ * approval, black and white in the system (`delivery-payment-approval.ts`,
+ * 0362), which authorises COD on the owner's exact terms.
  *
  * WHAT THIS GATE STILL REFUSES — unchanged: a booking the customer has not
  * confirmed (date AND slot), a Sunday, a Malaysian public holiday, and goods
- * not reserved to this order. WHAT IT NO LONGER REFUSES: a balance. A customer
- * may owe any amount, of any age, and the paper still issues — collection runs
- * independently of the delivery, and the collect action survives it.
+ * not reserved to this order. Paid alone never issues a DO — the date and
+ * goods gates still hold (owner re-confirmed 2026-08-19: "已付清也要有 ETA
+ * 才发 DO").
  *
- * THE ONE MONEY QUESTION LEFT is `financeExceptionHolds` — the same predicate
- * the action engine and the route canvas ask (`finance-exception.ts`, 0355).
- * One predicate, three readers, so the map, the worklist and this refusal can
- *  never disagree about an order (Architecture Law D). That discipline is why
- * decision B refused to ship the earlier split: a gate that counts requirements
- * the server does not is the screen telling a lie, in either direction.
+ * THE MANUAL DOOR (`Request Delivery Order`, card §5): outstation trips need
+ * the document BEFORE a customer-confirmed booking exists, because the partner
+ * schedules the customer. `waitBookingConfirm: false` walks the SAME gate
+ * minus only the booking-confirm requirement — goods, money and the Finance
+ * exception still refuse, and a confirmed date landing on a Sunday or public
+ * holiday still refuses. It is never a free-form create.
  *
- * WHY A DATE CHECK LIVES HERE TOO. §5 names Sunday and Malaysian public
- * holidays as the two hard calendar blocks. The confirm route already refuses a
- * Sunday, so nothing REGRESSES by keeping that there — but a booking made
- * before the holiday calendar knew about a date, or confirmed through an older
- * build, must not be able to put a truck on a day nobody runs. The document is
- * the last thing produced before the trip, so it is the right place to ask
- * again.
+ * AN UNKNOWN VALUE NEVER BLOCKS (§8's own law): `orderMoney` reads an unpriced
+ * order's goods owing as 0, so `outstanding` here is only ever a figure
+ * somebody actually knows.
  *
- * PURE — no clock, no I/O, no calendar of its own: the holiday set is INJECTED,
- * exactly as `working-days.ts` takes it, and the Finance exceptions are handed
- * in as rows the caller read from the one owning table. Nothing here computes
- * an exception from a balance — that would rebuild the retired gate under a
- * new name.
+ * PURE — no clock, no I/O, no calendar of its own: the holiday set is
+ * INJECTED, and the Finance exceptions and payment approvals are handed in as
+ * rows the caller read from the one owning table each. Nothing here computes
+ * an exception or an approval from a balance.
  */
 
 import { isSundayIso, type BookingGateResult } from "./booking-gate";
@@ -39,6 +42,10 @@ import {
   financeExceptionReason,
   type FinanceException,
 } from "./finance-exception";
+import {
+  paymentApprovalReason,
+  type DeliveryPaymentApproval,
+} from "./delivery-payment-approval";
 
 export interface DeliveryOrderIssueInput {
   /** D1/0277 — the CUSTOMER confirmed (not the logistics company's word). */
@@ -48,16 +55,24 @@ export interface DeliveryOrderIssueInput {
   /** The customer-confirmed time slot. 0277's CHECK makes it ride the date, so
    *  a confirmed booking missing one is a row from before that migration. */
   confirmedTimeSlot: string | null;
-  /** The goods answer, from the ONE shared reading of this order. The money
-   *  fields that used to ride beside it are gone from this gate on purpose —
-   *  decision A retired them, and accepting-but-ignoring them would let a
-   *  caller believe money still counts. */
-  gate: Pick<BookingGateResult, "goodsReady" | "notReadySkus">;
+  /** The goods answer AND the money figure, from the ONE shared reading of
+   *  this order (`bookingConfirmGate` → `orderMoney`). `outstanding` is goods
+   *  + add-ons + chargeable storage − paid: the §8 arithmetic, never a second
+   *  one computed here. */
+  gate: Pick<BookingGateResult, "goodsReady" | "notReadySkus" | "outstanding">;
   /** `order_finance_exceptions` (0355) — the rows for THIS order, read from
-   *  the one owning table. Only an OPEN one refuses. */
+   *  the one owning table. An OPEN one refuses regardless of payment. */
   financeExceptions: ReadonlyArray<FinanceException>;
+  /** `order_delivery_payment_approvals` (0362) — the rows for THIS order.
+   *  Only an APPROVED one opens the money gate; pending and refused keep it
+   *  shut. */
+  paymentApprovals: ReadonlyArray<DeliveryPaymentApproval>;
   /** Malaysian public holidays, injected as ISO dates (`myHolidaySet()`). */
   holidays?: ReadonlySet<string> | readonly string[];
+  /** The manual `Request Delivery Order` door (card §5) passes `false`: the
+   *  booking-confirm requirement is the ONLY one it does not wait for.
+   *  Default `true` — the automatic path requires the confirmed booking. */
+  waitBookingConfirm?: boolean;
 }
 
 export interface DeliveryOrderIssueResult {
@@ -83,7 +98,7 @@ function has(
  * Every refusal names the thing that is missing AND what closes it, because a
  * gate that only states a fact leaves a new hire holding a phone and no idea
  * who to ring (COPY-STANDARD's error pattern). The Finance refusal names
- * Finance, because Finance is the only party that can clear it.
+ * Finance; the money refusal names the collection and the approval door.
  */
 export function deliveryOrderIssueGate({
   bookingConfirmed,
@@ -91,20 +106,29 @@ export function deliveryOrderIssueGate({
   confirmedTimeSlot,
   gate,
   financeExceptions,
+  paymentApprovals,
   holidays,
+  waitBookingConfirm = true,
 }: DeliveryOrderIssueInput): DeliveryOrderIssueResult {
   const reasons: string[] = [];
 
   if (!bookingConfirmed || !confirmedDateIso || !confirmedTimeSlot) {
-    reasons.push(
-      "The customer has not confirmed a delivery date and time slot yet — record the confirmation first.",
-    );
-  } else if (isSundayIso(confirmedDateIso)) {
-    reasons.push("Sunday is not a delivery working day — pick another date");
-  } else if (has(holidays, confirmedDateIso)) {
-    reasons.push(
-      "The confirmed date is a public holiday — pick another date with the customer.",
-    );
+    if (waitBookingConfirm) {
+      reasons.push(
+        "The customer has not confirmed a delivery date and time slot yet — record the confirmation first.",
+      );
+    }
+    // The manual door does not wait for the confirmation — but a date that
+    // EXISTS is still checked below, so a Sunday cannot slip through it.
+  }
+  if (confirmedDateIso) {
+    if (isSundayIso(confirmedDateIso)) {
+      reasons.push("Sunday is not a delivery working day — pick another date");
+    } else if (has(holidays, confirmedDateIso)) {
+      reasons.push(
+        "The confirmed date is a public holiday — pick another date with the customer.",
+      );
+    }
   }
 
   if (!gate.goodsReady) {
@@ -115,10 +139,17 @@ export function deliveryOrderIssueGate({
     );
   }
 
-  // ⭐ THE ONE MONEY BLOCKER (decision A). An outstanding balance never lands
-  // here; only an explicit OPEN Finance exception does, and the sentence names
-  // who clears it. `financeExceptionReason` is the shared spelling — this gate
-  // never words the refusal for itself.
+  // ⭐ THE MONEY GATE (owner ruling 2026-08-19). Money in full before delivery
+  // is the only default; the one exception is a recorded APPROVED payment
+  // approval. `paymentApprovalReason` is the shared spelling — this gate never
+  // words the refusal for itself.
+  const moneyReason = paymentApprovalReason(gate.outstanding, paymentApprovals);
+  if (moneyReason) {
+    reasons.push(moneyReason);
+  }
+
+  // The SECOND money blocker: an OPEN Finance exception refuses regardless of
+  // payment — an approval does not clear a Finance judgement (0355 unchanged).
   const financeReason = financeExceptionReason(financeExceptions);
   if (financeReason) {
     reasons.push(financeReason);

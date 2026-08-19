@@ -2597,6 +2597,11 @@ export * from "./collection-clock";
  * delivery order is never briefly ungated.
  */
 export * from "./finance-exception";
+/* THE DELIVERY PAYMENT APPROVAL (owner ruling 2026-08-19, 0362) — the
+ * black-and-white door that opens the money gate: money in full before
+ * delivery is the only default; the exception is a recorded APPROVED
+ * approval, which authorises COD on the owner's exact terms. */
+export * from "./delivery-payment-approval";
 // CARD 5 — delivery attempts: every vehicle run leaves a record; a failure is
 // ONE exception (Reason Library + where the goods are), units move with reality.
 export * from "./schemas/delivery-attempt";

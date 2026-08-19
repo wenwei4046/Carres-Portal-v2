@@ -91,19 +91,18 @@ problems and history.
   that **the system issues the DO when its requirements are met**; it is no longer an employee act.
   The rest of that sentence stands and is reinforced: **never use Release or free-form Create DO**,
   and there is **no Release button and no Approve button** on this path (§15's dictionary entry
-  `Release → Issue Delivery Order` is unchanged and still binding). The money half of the
-  requirements also changed: **outstanding money no longer blocks the DO, and an OPEN Finance
-  exception is the only money blocker.** A Finance exception is an explicit Finance-created record
-  linked to the SO, with creator, reason, status, timestamps and clear evidence; **only Finance
-  creates or clears it**, `OPEN` blocks this gate and `CLEARED` removes the block. The full ruling
-  lives once in [`../orders/MASTER.md`](../orders/MASTER.md) §8, which owns the gate — Delivery
-  READS it and may never write it. Delivery remains the writer of the document and the owner of the
-  carrier, the trip derivation and the proof.
-  ✅ **BUILT AND PRODUCTION-VERIFIED.** The Finance exception record (migration `0355`, PR #829),
-  the decision-A gate re-key (PR #830) and automatic issuance on the booking-confirm and
-  finance-clear doors (PR #835) are live; the authenticated walks are recorded in
-  [`../orders/MASTER.md`](../orders/MASTER.md) §8 (SO-1321 · `DO-170826-5050` issued over an owing
-  balance; SO-1322 · `DO-180826-3035` issued by the system with no press).
+  `Release → Issue Delivery Order` is unchanged and still binding). The one governed manual door is
+  **`Request Delivery Order`** (owner ruling 2026-08-19) — the outstation trip's door, same single
+  issuing path and same gates, merely not waiting for the booking-confirm trigger.
+- ⭐ **THE MONEY HALF IS RE-RULED 2026-08-19 (SUPERSEDING 2026-08-16):** **money in full before
+  delivery is the only default** — a DO issues only when **outstanding = 0, or an APPROVED
+  Delivery Payment Approval covers the order (COD: full balance by online transfer before
+  unloading, no cash), and no OPEN Finance exception holds it.** The 0362 approval record, the
+  0355 Finance exception and the COD terms are defined once in
+  [`../orders/MASTER.md`](../orders/MASTER.md) §8, which owns the gate — Delivery READS it and may
+  never write it. A DO issued under an approval **prints the COD instruction** on the document.
+  Delivery remains the writer of the document and the owner of the carrier, the trip derivation
+  and the proof.
 - Issue rechecks permitted goods, split, Warehouse, address and applicable hold rules atomically,
   snapshots the scope and assigns the next owner. It does not create an actual delivery event.
   **These rechecks survive system issuance unchanged** — what changed is who triggers the act, not

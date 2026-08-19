@@ -162,7 +162,8 @@ function tables(over?: {
         data: {
           id: ORDER_ID,
           so: 1234,
-          paid: 0,
+          // Paid in full: the 2026-08-19 money gate holds the mint otherwise.
+          paid: 2500,
           do_number: over?.orderDoNumber ?? null,
           ops_assigned_logistic: PARTNER_ID,
         },
@@ -196,6 +197,8 @@ function tables(over?: {
       data: over?.financeExceptions ?? [],
       error: null,
     });
+    // 0362 — the approval record rides the same read pair. Empty: nothing asked.
+    t.order_delivery_payment_approvals = tableMock({ data: [], error: null });
   }
   // The document rows (0356): the supersede path reads the active document by
   // number (maybeSingle) and the repeat-letter lookup reads the order's
@@ -209,7 +212,7 @@ function tables(over?: {
 }
 
 describe("booking confirm — the door that completes the gate issues the document", () => {
-  it("⭐ a qualifying confirmation issues the DO with no further press — over an outstanding balance", async () => {
+  it("⭐ a qualifying confirmation issues the DO with no further press — money in full", async () => {
     const t = tables();
     const sb = makeSb(t);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
