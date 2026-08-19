@@ -1,4 +1,4 @@
-STATUS: EXECUTED
+STATUS: IMPLEMENTED — RELEASE OWED
 DATE: 2026-08-18
 PR: committed on safety/e404cf43-omnibus — ffbd7368
 IMPLEMENTATION: APPROVED — owner ruled the shape with the architect 2026-08-18, build straight to production
@@ -256,10 +256,23 @@ NAVIGATION** instead. The section number is fixed here rather than defended.*
 
 ---
 
-**EXECUTED 2026-08-18** — `ffbd7368`. 28 tests pass on `PortalSidebar.test.tsx`
-(16 existing + 12 new); `tsc --noEmit` clean. Law written to
-`ERP-ARCHITECTURE.md` §2.1, `ui/MASTER.md` §4.2 and `COPY-STANDARD.md`
-(`Coming soon`). **Still owed: the browser measurement.** The child row's
-`text-meta` size, its `py-[7px]` height and the 43px indent were derived from the
-parent row's existing numbers, not measured on screen — the card requires them
-re-measured in a real browser before this is called finished.
+**IMPLEMENTED 2026-08-18** — `ffbd7368` + `a80992d6` on
+`safety/e404cf43-omnibus`. 28 tests pass on `PortalSidebar.test.tsx` (16 existing
++ 12 new); `tsc --noEmit` clean. Law written to `ERP-ARCHITECTURE.md` §2.1,
+`ui/MASTER.md` §4.2 and `COPY-STANDARD.md` (`Coming soon`).
+
+## RELEASE — what the build chat executes now
+
+Engineer-Owned Delivery (`CLAUDE.md`): delivery is owned to PRODUCTION. In order:
+
+1. Full gate on the branch: `pnpm --filter @carres/web typecheck` ·
+   `pnpm --filter @carres/web lint` · `pnpm --filter @carres/web test`. A red
+   anywhere stops the release; fix forward on the same branch.
+2. `git push origin safety/e404cf43-omnibus` → PR to `main` → CI green → merge.
+3. Vercel deploys `main`; prove the SHA on production.
+4. **The owed browser measurement, on production:** the child row's `text-meta`
+   size, `py-[7px]` height and 43px indent were DERIVED from the parent row's
+   numbers, never measured. Measure at 1440×900 and ~1920; if a number changes,
+   change the code and this card in the same PR.
+5. Acceptance boundary above, verified authenticated on production.
+6. Flip this card to EXECUTED with the production SHA.
