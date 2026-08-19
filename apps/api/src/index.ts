@@ -41,6 +41,7 @@ import orderControlRouter from "./routes/operation/order-control";
 import deliveryOrdersRouter from "./routes/operation/delivery-orders";
 import purchaseRouter from "./routes/operation/purchase";
 import toOrderRouter from "./routes/operation/to-order";
+import manualPurchaseRouter from "./routes/operation/manual-purchase";
 import purchasingSettingsRouter from "./routes/operation/purchasing-settings";
 import opsStaffRouter from "./routes/operation/staff";
 import poDutyRouter from "./routes/operation/po-duty";
@@ -202,6 +203,8 @@ api.route("/operation/orders", bulkCompleteRouter);
 api.route("/operation/payments", operationPaymentsRouter);
 api.route("/operation/purchase", purchaseRouter);
 api.route("/operation/purchase/to-order", toOrderRouter);
+// Manual Purchase requests (0359) — the typed lane's header + lines + register.
+api.route("/operation/purchasing/requests", manualPurchaseRouter);
 // P1 (0303) — Purchasing → Settings: the numbers the ordering engine reads.
 api.route("/operation/purchasing/settings", purchasingSettingsRouter);
 // 0232 staff assignment pool — GET / + PUT /:userId

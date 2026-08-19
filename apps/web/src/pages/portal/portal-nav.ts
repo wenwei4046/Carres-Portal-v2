@@ -237,6 +237,7 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         tab: "purchase",
         activeFor: [
           "tab:purchase",
+          "tab:manual-purchase",
           "tab:receiving",
           "tab:claims",
           "tab:purchasing-report",
@@ -264,7 +265,9 @@ export const PORTAL_NAV: PortalNavGroup[] = [
           // can be in, not a place a buyer goes. The new word says whose
           // demand it is (a sales order's) and what the page does with it.
           { key: "purchase", label: "SO Batch Purchase" },
-          { key: "manual-purchase", label: "Manual Purchase", soon: true },
+          // Went live with its page's own PR (CARD-2026-08-18-manual-purchase):
+          // the flag dropped, the span became a link — the two ruled edits.
+          { key: "manual-purchase", label: "Manual Purchase" },
           // `operation:procurement` counts POs in the Pickup-action bucket —
           // this is the page that bucket belongs to.
           {

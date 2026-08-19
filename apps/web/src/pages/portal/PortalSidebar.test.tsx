@@ -349,13 +349,15 @@ describe("PortalSidebar — the Purchasing pages are in the rail", () => {
 
   const LIVE = [
     "SO Batch Purchase",
+    // Went live 2026-08-19 (CARD-2026-08-18-manual-purchase): the two ruled
+    // edits — the flag dropped, the span became a link.
+    "Manual Purchase",
     "Purchase Orders",
     "Receiving",
     "Supplier Claims",
     "Report",
   ];
   const SOON = [
-    "Manual Purchase",
     "Purchase Returns",
     "Repair Orders",
     "Display Requests",
@@ -410,7 +412,6 @@ describe("PortalSidebar — the Purchasing pages are in the rail", () => {
   it("an unbuilt entry is NOT a control — no href, not focusable, says why", () => {
     renderAt("/operation?tab=purchase");
     for (const key of [
-      "manual-purchase",
       "purchase-returns",
       "repair-orders",
       "display-requests",

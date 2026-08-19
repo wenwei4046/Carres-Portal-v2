@@ -2226,11 +2226,12 @@ describe("POST …/to-order/demand — the Source rides the wire (P15)", () => {
   });
 
   it("refuses a purpose the database has no value for, before it reaches the RPC", async () => {
-    // `Spare Parts` and `Other…` are ruled WORDS with no CHECK value. The
-    // dialog does not offer them; this proves the wire does not either, so the
-    // three lists (CHECK · function gate · shared constant) cannot drift into
-    // a fourth that only the api believes.
-    for (const p of ["spare_parts", "other", "", "READY_STOCK"]) {
+    // `Other…` is a ruled WORD with no CHECK value (`spare_parts` joined the
+    // CHECK in 0359, on the Manual Purchase ruling). This proves the wire
+    // refuses what the store cannot hold, so the three lists (CHECK · function
+    // gate · shared constant) cannot drift into a fourth that only the api
+    // believes.
+    for (const p of ["other", "", "READY_STOCK"]) {
       const { res, calls } = await create({ ...base, purpose: p });
       expect(res.status).toBe(400);
       expect(calls).toHaveLength(0);
