@@ -209,13 +209,27 @@ and the `Queues` rail filtering the grid. Overwrite `docs/purchasing/MASTER.md`
    are TEST data (`CLAUDE.md` §6), so they are no evidence for narrowing a column
    measured on live data.
    COPY-STANDARD gained the grid's whole vocabulary in the same commit.
-1. **Tests, PARTLY.** The card's own mandatory cases are written and GREEN: three
-   levels render · a single-variant item collapses to two · the sofa band is the
-   SALES ORDER and its lines drop the identity it states · `To Buy` printed and
-   with no input on the cell · a `To Buy = 0` line offers no checkbox · the
-   coverage tags · one sofa tick takes the whole same-SO set while a bedframe tick
-   does not. **66 pass · 42 still assert the flat grid** — and most of those 42 are
-   blocked by the three rulings below, not by test mechanics.
+1. **Tests, PARTLY — but every case this card makes MANDATORY is written and GREEN:**
+   three levels render · a single-variant item collapses to two · the sofa band is
+   the SALES ORDER and its lines drop the identity it states · `To Buy` printed with
+   no input on the cell · a `To Buy = 0` line offers no checkbox · the coverage tags
+   · one sofa tick takes the whole same-SO set while a bedframe tick does not · Issue
+   emits one PO per supplier and a failed group fails ALONE and stays retryable.
+
+   The fixture had NO three-level case to test against — every `build()` carried
+   `spec: ""`, so every item collapsed. It now takes a spec, and SO-1401 orders two
+   fabrics of one `Sonic Q`.
+
+   **65 pass · 43 still assert the flat grid**, and those are blocked by ruling B3
+   below rather than by test mechanics — the `P18 · proceed date` and
+   `T1 · the aligned order line` describes test a column and a row shape this card
+   removed.
+
+   ⚠️ **Four of the 43 are TIMEOUTS, not failures.** `posts one ARRANGEMENT per
+   group` · `a failed group fails ALONE` · `a session-issued PO's number` · `a
+   refused take states the server's own reason` exceed the 20s default on a loaded
+   machine; run in isolation they take ~11s each and all four PASS. Do not "fix"
+   them.
 
 ---
 
