@@ -209,6 +209,34 @@ this page uses — `Approve the purchase`, `Issue PO`, `Check the SKU` — all e
 Any string this build finds it needs and cannot find in the table is added to
 `COPY-STANDARD.md` in the same PR, never invented inline.
 
+## 10 · WHAT EXISTS TODAY — measured 2026-08-19, so the build starts from facts
+
+- **`purchase_demands` exists** (migration 0319) with `purpose` CHECK
+  `ready_stock · display · office · warranty` — **no `spare_parts`**, this card
+  adds it to the CHECK and the door.
+- **There is NO `why` column.** `remark` exists per row; `why` is new, header
+  level, door-enforced non-blank.
+- **There is NO approval layer, BY DESIGN, and 0323's own comment says so:**
+  *"No proposal and no approval layer, because today one person decides and
+  Operation executes."* This card is the ruling that changes that sentence —
+  approval fields (approved/refused, by whom, at what qty, refuse reason) are
+  NEW, and 0323's table comment is overwritten in the same migration.
+- **There is NO `status` column and none may be added for `Ordered`/`Arrived`:**
+  0323 rules `open/ordered/done derive from po_id` — the Observation Law was
+  already in the schema. `Arrived` derives from the linked PO's posted receipt.
+  Only the states a human DECIDES (approval, refusal, `Not going ahead`) get
+  columns; the rest stay derived.
+- **Partial issue + cancel already work** (0320 `issued_qty`/`remaining_qty`,
+  0321 `purchasing_cancel_demand` with its required reason) — reuse, do not
+  duplicate. `Not going ahead` maps onto 0321's cancel with reason.
+- **The write door is `purchasing_create_demand`** (0323): supplier DERIVED from
+  the SKU, never chosen. Keep both properties; add `p_why`, admit `spare_parts`,
+  and read the approval switch per purpose from Settings.
+- **`purchase_orders` (0001:322) has NO reason column; `purchase_order_lines`
+  has NO demand link** — confirmed against the migrations, not only the MASTER's
+  2026-08-06 note. §6's owed migration is real.
+- Migration numbering: next free is **0337**.
+
 ## STILL LOCKED — do not touch
 
 The SO Batch Purchase grid, its hierarchy and its sofa-by-SO rule · the engine
