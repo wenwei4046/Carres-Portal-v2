@@ -320,6 +320,14 @@ Each Purchasing destination uses the governed Register destination header. **The
 shared Purchasing tab header.** Page identity is drawn once; a page may not add a duplicate
 breadcrumb, title, icon row or module-tab strip.
 
+> **SHIPPED 2026-08-19** (Jess, on a production screenshot: *"why you don't follow sales
+> order header?"*). `PurchasingTabs` had kept drawing the 13px `Purchasing · {page}`
+> module-word pair after the strip died — the code lagging this section, not a second law.
+> It now renders `ModuleHeader destinationHeader` with the page's own word (`SO Batch
+> Purchase` · `Manual Purchase` · …), the SAME component and geometry Sales Orders and
+> Delivery Orders draw (50px, 24px word, no icon, no `Purchasing ·` prefix — the sidebar's
+> PURCHASING heading already answers which module you are in).
+
 **One Workspace template**: 200px navigation rail → kit `DataTable` listing (for FINDING —
 sort, filter, search) → 400px workspace pane (where the WORK happens). Receiving, Purchase
 Orders and Report all run it. To Order runs the same shell with a launcher rail.

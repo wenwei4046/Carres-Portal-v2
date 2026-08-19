@@ -105,6 +105,11 @@ takes the others with it.
 `PO SCHEDULE` (rolling calendar, `Overdue` above the days, every row
 `Fri 7 Aug`, zero-count days still render) and `CATEGORY` are unchanged.
 
+> **Jess, 2026-08-19, pointing at this rail in production: it stays EXACTLY
+> as it is** — weekday-first day rows (`Wed, 19 Aug`), `Overdue` red on top,
+> the 200px left column. *"Stop creating new"*: the rebuild reuses this rail,
+> it does not redraw it.
+
 **`Queues` joins them**, and it is the ruled heading (`COPY-STANDARD.md`) — the
 module's open actions, each row's name IS its action:
 
