@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type Ref } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ChevronDown, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { useAuth } from "@/lib/auth";
@@ -8,13 +8,16 @@ import {
   useOperationBadges,
   useMarkOperationBadgeSeen,
   usePrincipalDashboard,
+  usePurchasingSettings,
 } from "@/lib/queries";
 import {
   visibleGroups,
   visibleItems,
+  visibleChildren,
   navItemHref,
   areaDefaultHref,
   type PortalArea,
+  type PortalNavChild,
   type PortalNavGroup,
   type PortalNavItem,
 } from "./portal-nav";
@@ -103,6 +106,29 @@ export default function PortalSidebar() {
   const principalDashQ = usePrincipalDashboard({ enabled: principalVisible });
   const pendingCount = principalDashQ.data?.kpis?.pending_approvals ?? 0;
 
+  // Purchasing Settings is a manager door and the SERVER decides who is one —
+  // the rail asks the same RPC that guards the seven engine numbers rather
+  // than guessing from the role. `enabled` keeps a finance-only user from
+  // calling an operation endpoint (it would 403), the same shape the badge
+  // feed above already uses.
+  const purchasingSettingsQ = usePurchasingSettings({ enabled: opVisible });
+  const canEditPurchasingSettings = purchasingSettingsQ.data?.canEdit ?? false;
+
+  // THE RAIL NOW SCROLLS, AND THAT IS THE COST OF THE WHOLE MAP (Jess,
+  // 2026-08-18). Thirteen purchasing pages plus the module rows is ~860px on a
+  // ~800px viewport, so `Delivery` and `Stock` can sit below the fold while
+  // Purchasing is open. The rail already scrolls (`overflow-auto` below) so
+  // nothing breaks — but landing on a rail whose highlighted row is OFF SCREEN
+  // is a real defect, so the active row is brought into view once on mount.
+  // `block: "nearest"` on purpose: visible, not centred, not animated.
+  const activeRowRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    activeRowRef.current?.scrollIntoView({ block: "nearest" });
+    // Mount only: re-running on every navigation would yank the rail while the
+    // operator is reading further down it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Manually-opened groups (in addition to the always-open active area).
   const [opened, setOpened] = useState<Set<PortalArea>>(new Set());
   const isOpen = (area: PortalArea) => area === activeArea || opened.has(area);
@@ -167,6 +193,104 @@ export default function PortalSidebar() {
     if (onPathSection(group)) return false;
     const current = searchTab ?? group.defaultTab;
     return current === item.key;
+  }
+
+  /**
+   * Is this CHILD PAGE the one on screen?
+   *
+   * Same two shapes the items use: a `path` page matches by pathname prefix, a
+   * tab page matches the `?tab=` value — and never while a path page of the
+   * same module is showing, or `Receiving` would light up next to
+   * `Purchase Orders`.
+   */
+  function isChildActive(
+    group: PortalNavGroup,
+    child: PortalNavChild,
+  ): boolean {
+    if (child.soon) return false; // it is not a page yet; it cannot be the page
+    if (child.path) return location.pathname.startsWith(child.path);
+    if (onPathSection(group)) return false;
+    return (searchTab ?? group.defaultTab) === (child.tab ?? child.key);
+  }
+
+  /**
+   * One page row under its module.
+   *
+   * A `soon` child is deliberately NOT A LINK. `docs/03-page-patterns.md:149`
+   * bans a control that opens nothing; there is no arrow here to be dead,
+   * because the row is a `<span>` with no href, out of the tab order and
+   * `aria-disabled`. `:219` of the same document requires a deliberately
+   * disabled control to say WHY on screen, and `Coming soon` on the row is
+   * that sentence (`docs/COPY-STANDARD.md` — the ONE word for a planned door,
+   * never `TBD`, never `Not available`, never a grey word with nothing beside
+   * it).
+   *
+   * It carries no count either, not even zero: a number would claim work
+   * exists on a page that does not.
+   *
+   * The 43px indent aligns a page word under its module word — 14px padding +
+   * an 18px icon + the 11px gap the parent row already uses.
+   */
+  function renderChild(
+    group: PortalNavGroup,
+    parent: PortalNavItem,
+    child: PortalNavChild,
+  ) {
+    const rule = child.dividerAbove ? (
+      <div key={`${child.key}-rule`} className="mx-3.5 my-1 border-t border-base-100" />
+    ) : null;
+
+    const row = "relative w-full text-left pl-[43px] pr-3.5 py-[7px] rounded text-meta flex items-center gap-2";
+
+    if (child.soon) {
+      return (
+        <div key={child.key}>
+          {rule}
+          <span
+            data-testid={`nav-child-${child.key}`}
+            data-soon="1"
+            aria-disabled="true"
+            tabIndex={-1}
+            className={`${row} text-base-400 font-medium cursor-default select-none`}
+          >
+            <span className="flex-1 truncate">{child.label}</span>
+            <span className="shrink-0 text-label text-base-400">Coming soon</span>
+          </span>
+        </div>
+      );
+    }
+
+    const active = isChildActive(group, child);
+    return (
+      <div key={child.key}>
+        {rule}
+        <Link
+          to={navItemHref(group, child)}
+          onClick={() => fireMarkSeen(child.badge)}
+          data-testid={`nav-child-${child.key}`}
+          ref={active ? (activeRowRef as Ref<HTMLAnchorElement>) : undefined}
+          className={
+            active
+              ? `${row} bg-base-100 text-base-900 font-semibold`
+              : `${row} text-base-600 font-medium hover:bg-hovertint`
+          }
+        >
+          {active && (
+            <span
+              className="absolute left-0 top-[6px] bottom-[6px] bg-primary rounded-r-sm"
+              style={{ width: 3 }}
+            />
+          )}
+          <span className="flex-1 truncate">{child.label}</span>
+          {child.badge && (
+            <NavBadge
+              count={badgeCount[child.badge] ?? 0}
+              label={`${parent.label} ${child.label}`}
+            />
+          )}
+        </Link>
+      </div>
+    );
   }
 
   const roleLabel = role ? role.charAt(0).toUpperCase() + role.slice(1) : "";
@@ -287,42 +411,63 @@ export default function PortalSidebar() {
                         const cls = active
                           ? `${baseCls} bg-base-100 text-base-900 font-semibold`
                           : `${baseCls} text-base-600 font-medium hover:bg-hovertint`;
+                        const children =
+                          item.children && group.area === activeArea && active
+                            ? visibleChildren(item, { canEditPurchasingSettings })
+                            : [];
                         return (
-                          <Link
-                            key={item.key}
-                            to={navItemHref(group, item)}
-                            onClick={() => fireMarkSeen(item.badge)}
-                            className={cls}
-                          >
-                            {active && (
-                              <span
-                                className="absolute left-0 top-[7px] bottom-[7px] bg-primary rounded-r-sm"
-                                style={{ width: 3 }}
+                          <div key={item.key}>
+                            <Link
+                              to={navItemHref(group, item)}
+                              onClick={() => fireMarkSeen(item.badge)}
+                              className={cls}
+                              ref={
+                                active && children.length === 0
+                                  ? (activeRowRef as Ref<HTMLAnchorElement>)
+                                  : undefined
+                              }
+                            >
+                              {active && (
+                                <span
+                                  className="absolute left-0 top-[7px] bottom-[7px] bg-primary rounded-r-sm"
+                                  style={{ width: 3 }}
+                                />
+                              )}
+                              <item.icon
+                                size={18}
+                                strokeWidth={2}
+                                className={`shrink-0 ${
+                                  active ? "text-primary" : "text-base-400"
+                                }`}
                               />
-                            )}
-                            <item.icon
-                              size={18}
-                              strokeWidth={2}
-                              className={`shrink-0 ${
-                                active ? "text-primary" : "text-base-400"
-                              }`}
-                            />
-                            <span className="flex-1">{item.label}</span>
-                            {item.badge && (
-                              <NavBadge
-                                count={badgeCount[item.badge] ?? 0}
-                                label={item.label}
-                              />
-                            )}
-                            {item.pendingPill && pendingCount > 0 && (
-                              <span
-                                className="font-mono bg-primary text-primary-foreground rounded-full px-[7px] py-px text-label font-semibold text-center"
-                                style={{ minWidth: 16 }}
+                              <span className="flex-1">{item.label}</span>
+                              {item.badge && (
+                                <NavBadge
+                                  count={badgeCount[item.badge] ?? 0}
+                                  label={item.label}
+                                />
+                              )}
+                              {item.pendingPill && pendingCount > 0 && (
+                                <span
+                                  className="font-mono bg-primary text-primary-foreground rounded-full px-[7px] py-px text-label font-semibold text-center"
+                                  style={{ minWidth: 16 }}
+                                >
+                                  {pendingCount}
+                                </span>
+                              )}
+                            </Link>
+
+                            {children.length > 0 && (
+                              <div
+                                data-testid={`nav-children-${item.key}`}
+                                className="flex flex-col gap-0.5 mt-0.5 mb-1"
                               >
-                                {pendingCount}
-                              </span>
+                                {children.map((child) =>
+                                  renderChild(group, item, child),
+                                )}
+                              </div>
                             )}
-                          </Link>
+                          </div>
                         );
                       })}
                     </div>
