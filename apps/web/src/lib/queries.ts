@@ -14,6 +14,7 @@ import {
   type AttachDoInput,
   type AwaitingStockShortageResponse,
   type DeliveryHandoverKind,
+  type StockTransferEventKind,
   type HandoverGoodsLine,
   type RecordHandoverInput,
   type CancelOrderInput,
@@ -5878,6 +5879,53 @@ export function useDeliveryOrdersRegister(opts?: { orderId?: string }) {
           ? `/api/operation/delivery-orders?order=${opts.orderId}`
           : "/api/operation/delivery-orders",
       ),
+    staleTime: 30_000,
+  });
+}
+
+/* ── WAREHOUSE TRANSFERS (0365) ──────────────────────────────────────────────
+ *  The cross-site custody journey. The register reads the transfers AND the
+ *  events its state is derived from — `stockTransferStateOf` is the ONE
+ *  arithmetic and it runs on the client over these facts, exactly as the
+ *  Delivery Orders register runs `deliveryOrderStatusOf`. */
+export interface StockTransferRow {
+  id: string;
+  transfer_no: string;
+  from_warehouse_id: string;
+  to_warehouse_id: string;
+  purpose: string;
+  sales_order_ref: string | null;
+  expected_date: string;
+  note: string | null;
+  requested_at: string;
+}
+export interface StockTransferEventRow {
+  transfer_id: string;
+  kind: StockTransferEventKind;
+  carrier: string | null;
+  handover_to: string | null;
+  received_by_name: string | null;
+  reason: string | null;
+  recorded_at: string;
+}
+export interface StockTransferUnitRow {
+  transfer_id: string;
+  stock_item_id: string;
+}
+export interface StockTransferWarehouseRow {
+  id: string;
+  name: string;
+}
+export interface StockTransfersRegisterPayload {
+  transfers: StockTransferRow[];
+  events: StockTransferEventRow[];
+  units: StockTransferUnitRow[];
+  warehouses: StockTransferWarehouseRow[];
+}
+export function useStockTransfersRegister() {
+  return useQuery<StockTransfersRegisterPayload, ApiError>({
+    queryKey: ["operation", "stock-transfers"],
+    queryFn: () => apiFetch<StockTransfersRegisterPayload>("/api/operation/stock-transfers"),
     staleTime: 30_000,
   });
 }

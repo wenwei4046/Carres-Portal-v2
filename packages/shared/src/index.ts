@@ -1131,6 +1131,34 @@ export {
   type StockHoldResolveProblem,
 } from "./stock-hold";
 
+// Warehouse Transfers (0365) — the cross-site custody journey. The STATE is
+// derived from events here and nowhere else (Architecture Law D).
+export {
+  STOCK_TRANSFER_EVENT_KINDS,
+  STOCK_TRANSFER_STATE_LABEL,
+  STOCK_TRANSFER_PURPOSES,
+  STOCK_TRANSFER_PURPOSE_KEYS,
+  IN_TRANSIT_STOCK_STATUS,
+  stockTransferStateOf,
+  stockTransferStateLabel,
+  stockTransferPurposeLabel,
+  isInTransitStockStatus,
+  type StockTransferEventKind,
+  type StockTransferEventFact,
+  type StockTransferState,
+  type StockTransferPurpose,
+} from "./stock-transfer";
+export {
+  requestStockTransferInput,
+  collectStockTransferInput,
+  arriveStockTransferInput,
+  cancelStockTransferInput,
+  type RequestStockTransferInput,
+  type CollectStockTransferInput,
+  type ArriveStockTransferInput,
+  type CancelStockTransferInput,
+} from "./schemas/stock-transfer";
+
 // T8 · Delivery groups — bed set never splits; the sofa may take a second trip
 export {
   DELIVERY_GROUPS,

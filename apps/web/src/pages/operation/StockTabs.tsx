@@ -29,7 +29,7 @@ import ModuleHeader from "./components/ModuleHeader";
  * "Movements" remain banned UI words; the goods pool is still `Stock`.
  */
 
-type StockPage = "on-hand" | "ready" | "in-out";
+type StockPage = "on-hand" | "ready" | "in-out" | "transfers";
 
 /** The page word printed as the destination header. These are the SIDEBAR's
  *  own words (`portal-nav.ts`) — a page word is never invented here. */
@@ -37,13 +37,20 @@ const PAGE_WORD: Record<StockPage, string> = {
   "on-hand": "On hand",
   ready: "Ready stock",
   "in-out": "In & out",
+  transfers: "Transfers",
 };
 
 export default function StockTabs({ right }: { right?: ReactNode } = {}) {
   const location = useLocation();
   const tabParam = new URLSearchParams(location.search).get("tab");
   const active: StockPage =
-    tabParam === "movements" ? "in-out" : tabParam === "stock-plan" ? "ready" : "on-hand";
+    tabParam === "movements"
+      ? "in-out"
+      : tabParam === "stock-plan"
+        ? "ready"
+        : tabParam === "transfers"
+          ? "transfers"
+          : "on-hand";
   const activeLabel = PAGE_WORD[active];
 
   return (

@@ -1,6 +1,15 @@
-STATUS: QUEUED
+STATUS: BUILT — MIGRATION NOT YET APPLIED (owner action required)
 DATE: 2026-08-19
 PR: pending
+MIGRATION: 0365 — written, and PROVEN in a rolled-back transaction against live
+(all nine probes passed, nothing written). **It has NOT been applied**: applying
+schema to the shared production database was refused by this session's
+permission gate, so the apply is the owner's to authorise. Everything else in
+this card is built, tested and ready.
+BLOCKED ON A BUSINESS FACT: production's `warehouses` register holds exactly ONE
+row (`Carres Klang`), so a cross-site transfer has nowhere to go and the
+acceptance walk below cannot run. Carres' real site list is a business fact —
+see `docs/stock/MASTER.md` §9's 🔴 note. Do not invent sites.
 IMPLEMENTATION: APPROVED — Warehouse Blueprint item 8 (Transfers) and item 13
 (navigation), owner-reviewed 2026-08-14; the owner directed 2026-08-19 to
 continue the blueprint. This card builds the FIRST slice and turns the rail's

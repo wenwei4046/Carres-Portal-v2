@@ -57,7 +57,13 @@ export const OPS_STOCK_STATUS_LABEL: Record<string, string> = {
   free: "Free",
   reserved: "Reserved",
   sold: "Sold",
-  transferred: "Transferred",
+  // 0365 gave `transferred` its first writer and its meaning: the goods have
+  // left one site and the destination has not yet received them. The word says
+  // what is TRUE NOW ("In transit"), not what will be true when the journey
+  // ends — an operator reading "Transferred" would look for the unit at the
+  // destination, where it is not. Safe to fix rather than change: the status
+  // had no writer and zero rows before 0365, so no screen ever printed it.
+  transferred: "In transit",
   voided: "Cancelled",
   // R4
   on_hold: "On hold",
