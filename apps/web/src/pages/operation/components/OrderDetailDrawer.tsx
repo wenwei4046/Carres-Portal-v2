@@ -131,6 +131,7 @@ import {
 } from "@/lib/wa-templates";
 import {
   lineCategory,
+  resolvedCategory,
   lineSize,
   lineKind,
   lineSortRank,
@@ -1481,8 +1482,14 @@ function DrawerBody({
   // Combine duplicate-SKU lines into ONE row (Jess: don't repeat the same item),
   // then list mattress → bedframe → sofa → pillow → M.P → service.
   const orderedLines = Object.values(
-    lines.reduce<Record<string, { sku: string; qty: number }>>((acc, l) => {
-      const e = acc[l.sku] ?? { sku: l.sku, qty: 0 };
+    lines.reduce<Record<string, { sku: string; qty: number; category?: string | null }>>((acc, l) => {
+      // D9 (2026-08-20) — the CATALOG's category rides through the merge. It is
+      // a property of the SKU, so every duplicate row carries the same value:
+      // seed it once and never overwrite. `e.category ?? l.category` would be
+      // wrong — it turns a legitimate `null` (asked, catalog silent) into a
+      // later row's `undefined` (nobody asked), and those two mean different
+      // things downstream.
+      const e = acc[l.sku] ?? { sku: l.sku, qty: 0, category: l.category };
       e.qty += Number(l.qty || 0);
       acc[l.sku] = e;
       return acc;
@@ -3618,9 +3625,16 @@ function DrawerBody({
               orderCategories={[
                 // CORE categories only — a loaner substitutes a mattress /
                 // bedframe / sofa; "acc" would let keyword-missed units leak in.
+                //
+                // D9, 2026-08-20: `resolvedCategory` asks the CATALOG first and
+                // only parses the SKU text where the catalog is silent. The
+                // "keyword-missed" the comment above worries about is exactly
+                // what that fixes — and it had a second, unstated cost: a line
+                // the keyword list missed contributed NOTHING to this set, so
+                // its own category could not be matched by any free unit.
                 ...new Set(
                   goodsLines
-                    .map((l) => lineCategory(l.sku))
+                    .map((l) => resolvedCategory(l.sku, l.category))
                     .filter((c) => c !== "acc"),
                 ),
               ]}

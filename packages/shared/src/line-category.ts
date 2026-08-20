@@ -134,6 +134,55 @@ export function lineClass(sku: string): LineClass {
  * give `unknown` its own header and DELETE this function. It exists to keep one
  * lie in one place with its address written on it, not to be lived with.
  */
+/**
+ * ⭐ THE CATALOG'S ANSWER FIRST — the parser only where the catalog is silent.
+ *
+ * D9 (`ERP-ARCHITECTURE.md:28`): *"what kind of product is this?"* had three
+ * answers and no owner, and the one that is right — the CATALOG — was never
+ * asked. `56239a3c` (PR #859) closed Stock's half by making `/inventory` read
+ * `sku -> product_skus -> product_models.category` through the one shared
+ * reader. This is the Sales Order half: the drawer's loan flow was still
+ * deducing the category from the SKU TEXT in the browser, and it was not doing
+ * it cosmetically — it was FILTERING WAREHOUSE STOCK with the result.
+ *
+ * Two arguments, and the second one is deliberately three-valued:
+ *
+ *   category === undefined   ABSENT. Nobody asked. The payload came from an
+ *                            endpoint that does not carry the field, or from a
+ *                            Worker built before it did. Parse, exactly as
+ *                            before — this is the version-skew branch and the
+ *                            only one that is purely defensive.
+ *   category === null        ASKED, and the catalog holds no row for this SKU.
+ *   category === "sofa"      ASKED and ANSWERED. The catalog wins outright; no
+ *                            keyword list is consulted, ever.
+ *
+ * **Why `null` still falls through to the parser, which looks like the defect
+ * this function exists to remove.** It is a measured decision, not an
+ * oversight. On 2026-08-19 the catalog held a row for 49 of 74 distinct live
+ * SKUs; the other 87 records — 975 units — do not join
+ * (`CARD-2026-08-19-onhand-category-filter`). Treating `null` as "not this
+ * category" would drop nearly the whole warehouse out of the loan picker in one
+ * commit, which is a far larger regression than the guess it removes. So the
+ * parser keeps that bucket, and the bucket shrinks every time someone keys a
+ * product into the catalog. **The day it is empty, this branch and
+ * `lineCategory` die together** — that is the exit condition, and it is the
+ * reason the two cases are written apart even though they return the same thing
+ * today.
+ *
+ * A catalog value this codebase has no core word for (a future `accessory`,
+ * `service`, anything Settings adds) reads as `acc`, never as a core good:
+ * an unknown word must not be able to substitute for a sofa.
+ */
+export function resolvedCategory(sku: string, category?: string | null): CoreCat | "acc" {
+  // ABSENT — version skew. Nobody asked; the parser is all there is.
+  if (category === undefined) return lineCategory(sku);
+  // ASKED, catalog silent. See the measured reason above; this is the branch
+  // that deletes itself once the catalog is populated.
+  if (category === null) return lineCategory(sku);
+  const c = category.trim().toLowerCase();
+  return c === "sofa" || c === "bedframe" || c === "mattress" ? (c as CoreCat) : "acc";
+}
+
 export function lineCategory(sku: string): CoreCat | "acc" {
   const c = lineClass(sku);
   return c === "unknown" ? "acc" : c;

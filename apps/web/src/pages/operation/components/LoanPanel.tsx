@@ -22,7 +22,7 @@ import {
   useReturnLoanSupplier,
   type SupplierRow,
 } from "@/lib/queries";
-import { lineCategory } from "@/lib/line-category";
+import { lineCategory, resolvedCategory } from "@/lib/line-category";
 import { fmtDateShort } from "@/lib/fmt-date";
 import type { ReserveFreeUnit } from "./ReserveStockDialog";
 
@@ -549,7 +549,7 @@ function WarehousePick({
           key,
           sku: u.sku,
           condition: u.condition,
-          cat: lineCategory(u.sku),
+          cat: resolvedCategory(u.sku, u.category),
           count: 0,
           firstId: u.id,
           poNo: u.poNo,
@@ -712,7 +712,13 @@ export default function LoanPanel({
   const visible = [...active, ...owed.filter((l) => l.status === "returned")];
 
   const catSet = new Set(orderCategories);
-  const lendable = freeUnits.filter((u) => catSet.has(lineCategory(u.sku)));
+  // D9, 2026-08-20 — the CATALOG decides what this unit is, not a keyword list
+  // compiled into `packages/shared`. This line FILTERS warehouse stock: before
+  // the change, a real sofa whose model name was absent from `lineClass`'s
+  // regex resolved to "acc", which the drawer deliberately excludes from
+  // `orderCategories`, and the unit simply was not offered. Every product keyed
+  // into the catalog from 2026-08-19 onward is in that missing set.
+  const lendable = freeUnits.filter((u) => catSet.has(resolvedCategory(u.sku, u.category)));
 
   // §7.9 lend flow — closed by default; "+ Lend" opens the two-source choice.
   const [lending, setLending] = useState(false);

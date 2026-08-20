@@ -378,6 +378,11 @@ describe("GET /api/operation/orders/:id", () => {
     poLines?: any[];
     warehouse?: any;
     stockBalances?: any[];
+    /** Rows `product_skus` answers with. ONE fixture serves BOTH readers the
+     *  route makes of that table — `resolveSkuLabels` (name) and
+     *  `skuCategories` (category) — which is the point: they read one join. */
+    productSkus?: any[];
+    freeUnits?: any[];
   }) {
     const fromImpl = vi.fn((table: string) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -416,6 +421,17 @@ describe("GET /api/operation/orders/:id", () => {
           break;
         case 'stock_balances':
           chain.in = vi.fn(() => promise(opts.stockBalances ?? []));
+          break;
+        // These two are awaited at the END of a chain whose length varies
+        // (`ops_stock_items` appends `.eq(warehouse)` only when the order has
+        // one), so the chain itself is the thenable rather than any one method.
+        case 'product_skus':
+          chain.then = (res: (v: unknown) => unknown) =>
+            res({ data: opts.productSkus ?? [], error: null });
+          break;
+        case 'ops_stock_items':
+          chain.then = (res: (v: unknown) => unknown) =>
+            res({ data: opts.freeUnits ?? [], error: null });
           break;
       }
       return chain;
@@ -497,6 +513,78 @@ describe("GET /api/operation/orders/:id", () => {
     );
     expect(res.status).toBe(403);
     expect(from).not.toHaveBeenCalled();
+  });
+
+  /**
+   * D9's SALES ORDER HALF — the drawer's loan flow stops guessing.
+   *
+   * `56239a3c` made /inventory read the CATALOG. This endpoint feeds the OTHER
+   * screen that answers "what kind of product is this?", and it was not
+   * answering cosmetically: `LoanPanel` FILTERS the free-unit list with the
+   * result, so a real sofa whose model name was missing from a hardcoded
+   * keyword list was never offered as a loaner.
+   *
+   * `5539-1A(LHF)` is not invented. It is one of thirteen production SKUs read
+   * off live orders on 2026-08-08 — a sofa module `lineClass` returns
+   * `unknown` for. It is the whole reason this test exists.
+   */
+  it("carries the CATALOG's category on BOTH the lines and the free units", async () => {
+    mockDetailQueries({
+      order: {
+        id: ORDER_ID, so: 4002, status: "proceed_order", operation_stage: "in_production",
+        warehouse_id: "00000000-0000-0000-0000-000000000w01",
+        customer_name: "Tan Ah Kow", customer_phone: "+60123456789", customer_address: "...",
+        delivery_date: null, placed_at: "2026-08-20T10:00:00Z",
+        do_number: null, do_note: null, dispatched_at: null, delivered_at: null,
+        delivery_partner_id: null, dealer_id: "00000000-0000-0000-0000-000000000d01",
+        dealers: { name: "BedHouse KL" }, outlet_id: null, outlets: null,
+      },
+      lines: [
+        // The keyword list reads this as `unknown` → `acc`. The catalog knows.
+        { sku: "5539-1A(LHF)", qty: 1, unit_price: 1200 },
+        // Held by no catalog row — an AutoCount free-text import.
+        { sku: "LEGACY-FREE-TEXT-9", qty: 1, unit_price: 300 },
+      ],
+      productSkus: [
+        { sku: "5539-1A(LHF)", variant: "Charcoal", product_models: { name: "Hookka", category: "sofa" } },
+        { sku: "SOFA-UNIT-77", variant: null, product_models: { name: "Hookka", category: "sofa" } },
+      ],
+      freeUnits: [
+        // A free unit whose SKU no keyword list matches either.
+        { id: "u1", unit_code: "U-0001", sku: "SOFA-UNIT-77", warehouse_id: "00000000-0000-0000-0000-000000000w01", condition: "new", po_no: null, source_ref: null, date_in: "2026-08-01", qty: 1 },
+      ],
+      warehouse: { id: "00000000-0000-0000-0000-000000000w01", name: "KL HQ", address: "..." },
+    });
+
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/${ORDER_ID}`, {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await res.json()) as any;
+
+    // The line the parser gets wrong, answered by the catalog.
+    expect(body.lines[0].sku).toBe("5539-1A(LHF)");
+    expect(body.lines[0].category).toBe("sofa");
+
+    // The free unit the loan filter compares against it — same answer, same
+    // reader. Before this, one side guessed and the unit vanished.
+    expect(body.freeUnits[0].sku).toBe("SOFA-UNIT-77");
+    expect(body.freeUnits[0].category).toBe("sofa");
+
+    // ⭐ null is NOT absent, and the difference is load-bearing. This endpoint
+    // ASKED, so a SKU the catalog does not hold comes back with the key present
+    // and null. An ABSENT key means a Worker that never asked, and the browser
+    // reads those two differently (`resolvedCategory`).
+    expect("category" in body.lines[1]).toBe(true);
+    expect(body.lines[1].category).toBeNull();
+
+    // The label reader still works off the same rows — one join, two consumers.
+    expect(body.lines[0].label).toBe("Hookka · Charcoal");
   });
 });
 
