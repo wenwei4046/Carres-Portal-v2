@@ -65,6 +65,7 @@ function mount(
   rows: DeliveryOrderRow[],
   attempts: DeliveryOrderAttemptRow[] = [],
   handoverEvents: DeliveryHandoverKindRow[] = [],
+  initialEntry = "/operation/delivery-orders",
 ) {
   hookState = {
     data: { deliveryOrders: rows, attempts, handoverEvents },
@@ -82,7 +83,7 @@ function mount(
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={qc}>
-      <MemoryRouter initialEntries={["/operation/delivery-orders"]}>
+      <MemoryRouter initialEntries={[initialEntry]}>
         <LocationTap />
         <Routes>
           <Route path="/operation/delivery-orders" element={<DeliveryOrdersRegister />} />
@@ -100,6 +101,11 @@ beforeEach(() => {
 });
 
 describe("DeliveryOrdersRegister", () => {
+  it("asks Delivery for only the source Sales Order named by the URL", () => {
+    mount([], [], [], "/operation/delivery-orders?order=order-1");
+    expect(useDeliveryOrdersRegisterSpy).toHaveBeenCalledWith({ orderId: "order-1" });
+  });
+
   it("renders the owner's ruled eight columns in order, Created off by default, and NO owner/avatar/action column", () => {
     mount([doRow()]);
     for (const label of [

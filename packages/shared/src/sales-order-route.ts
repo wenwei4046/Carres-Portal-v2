@@ -118,6 +118,13 @@ export interface NodeAction {
   ownerKey: StationOwnerKey;
   /** The act, in the governed voice: `Confirm the ready date`. */
   label: string;
+  /** The third row on a current node: its owning document and an actual due
+   *  date. Null is spoken plainly as `No due date yet`; the route never
+   *  invents a clock. */
+  context: {
+    subject: string;
+    dueOn: string | null;
+  };
 }
 
 /** One plain sentence on the gate, GitHub-checks style. */
@@ -416,6 +423,7 @@ const TITLE_H = 20;
 const LINE_H = 18;
 const REQ_H = 16;
 const ACTION_H = 22;
+const CONTEXT_H = 18;
 const DOOR_H = 18;
 const BOX_PAD = 22;
 
@@ -430,8 +438,8 @@ function nodeHeight(node: {
     TITLE_H +
     node.lines.length * LINE_H +
     node.requirements.length * REQ_H +
-    (node.action ? ACTION_H : 0) +
-    (node.door ? DOOR_H : 0)
+    (node.action ? ACTION_H + CONTEXT_H : 0) +
+    (!node.action && node.door ? DOOR_H : 0)
   );
 }
 
@@ -608,7 +616,11 @@ function purchaseChain(
       title: "SUPPLIER",
       complete: Boolean(po.expectedReadyDate),
       lines: [po.expectedReadyDate ? dated("Estimated ready", po.expectedReadyDate) : "Ready date not confirmed"],
-      action: { ownerKey: "purchasing", label: "Confirm ready date" },
+      action: {
+        ownerKey: "purchasing",
+        label: "Confirm ready date",
+        context: { subject: po.id, dueOn: null },
+      },
       door: open(po.id, poHref(po.id)),
     },
     {
@@ -623,14 +635,18 @@ function purchaseChain(
               ? `${receivedQty} of ${orderedQty} received`
               : "Not received yet",
           ],
-      action: { ownerKey: "receiving", label: "Check in" },
+      action: {
+        ownerKey: "receiving",
+        label: "Check in",
+        context: { subject: po.id, dueOn: po.expectedReadyDate },
+      },
       door: record ? open(record.recordNo, receivingHref(record.id)) : null,
     },
   ];
 }
 
 /** The quantity no Purchase Order covers — the whole chain is still ahead. */
-function unassignedChain(line: LineFacts): NodeDraft[] {
+function unassignedChain(line: LineFacts, soNumber: string): NodeDraft[] {
   return [
     {
       id: `${line.sku}:unassigned:purchasing`,
@@ -639,7 +655,11 @@ function unassignedChain(line: LineFacts): NodeDraft[] {
       complete: false,
       blocked: true,
       lines: ["No Purchase Order yet"],
-      action: { ownerKey: "purchasing", label: "Issue PO" },
+      action: {
+        ownerKey: "purchasing",
+        label: "Issue PO",
+        context: { subject: soNumber, dueOn: null },
+      },
       door: open("Purchasing", purchasingHref),
     },
     {
@@ -660,7 +680,7 @@ function unassignedChain(line: LineFacts): NodeDraft[] {
 }
 
 /** The STOCK truth of one goods line — its own fork off the Sales Order. */
-function stockDraft(line: LineFacts, destination: string | null): NodeDraft {
+function stockDraft(line: LineFacts, destination: string | null, soNumber: string): NodeDraft {
   const readyQty = line.reservedQty + line.soldQty;
   const allReady = readyQty >= line.committedQty && line.committedQty > 0;
   const codes = unitNames([...line.reservedUnits, ...line.soldUnits]);
@@ -672,7 +692,11 @@ function stockDraft(line: LineFacts, destination: string | null): NodeDraft {
     lines: allReady
       ? [`${units(line.committedQty)} ready`, codes || null, destination]
       : [`${readyQty} of ${line.committedQty} Units ready`, "Waiting for purchase"],
-    action: { ownerKey: "stock", label: "Create the Units" },
+    action: {
+      ownerKey: "stock",
+      label: "Create the Units",
+      context: { subject: soNumber, dueOn: null },
+    },
     door: open("Stock", stockHref),
   };
 }
@@ -683,15 +707,22 @@ function stockDraft(line: LineFacts, destination: string | null): NodeDraft {
 
 function logisticsDraft(input: SalesOrderRouteInput): NodeDraft {
   const name = input.delivery.logistics?.partnerName?.trim() || null;
+  const issuedDates = input.purchaseOrders
+    .map((po) => po.issuedAt)
+    .filter((date): date is string => Boolean(date))
+    .sort();
+  const dueOn = issuedDates[0] ?? input.order.placedAt;
   return {
     id: "logistics",
     kind: "logistics",
     title: "LOGISTICS",
     complete: Boolean(name),
-    lines: name
-      ? [name]
-      : ["No logistics chosen yet", dated("Due", input.order.deliveryDate)],
-    action: { ownerKey: "delivery", label: "Assign logistics" },
+    lines: name ? [name] : ["No logistics chosen yet"],
+    action: {
+      ownerKey: "delivery",
+      label: "Assign logistics",
+      context: { subject: `SO-${input.order.so}`, dueOn },
+    },
     door: open("Delivery", deliveryHref(input.order.id)),
   };
 }
@@ -707,7 +738,11 @@ function deliveryDateDraft(input: SalesOrderRouteInput): NodeDraft {
     lines: confirmed
       ? [dated("Delivery appointment", confirmed), booking?.slot ?? "Slot not confirmed"]
       : ["Date + slot not confirmed", dated("Customer requested", input.order.deliveryDate)],
-    action: { ownerKey: "sales", label: "Confirm delivery date" },
+    action: {
+      ownerKey: "sales",
+      label: "Confirm delivery date",
+      context: { subject: `SO-${input.order.so}`, dueOn: null },
+    },
     door: open("Delivery", deliveryHref(input.order.id)),
   };
 }
@@ -722,7 +757,11 @@ function deliveryDateDraft(input: SalesOrderRouteInput): NodeDraft {
  */
 function moneyDraft(input: SalesOrderRouteInput): NodeDraft {
   const payments = open("Payments", paymentsHref(input.order.so));
-  const action: NodeAction = { ownerKey: "payment", label: "Collect" };
+  const action: NodeAction = {
+    ownerKey: "payment",
+    label: "Collect",
+    context: { subject: `SO-${input.order.so}`, dueOn: null },
+  };
   if (!input.money.known) {
     return {
       id: "money",
@@ -778,7 +817,14 @@ function loanDrafts(input: SalesOrderRouteInput): NodeDraft[] {
       `${loan.qty} ${loan.label} on loan to customer`,
       input.order.deliveredAt ? "Loan not collected back" : "Collect back on delivery day",
     ],
-    action: { ownerKey: "delivery" as const, label: "Collect the loan item" },
+    action: {
+      ownerKey: "delivery" as const,
+      label: "Collect the loan item",
+      context: {
+        subject: `SO-${input.order.so}`,
+        dueOn: input.delivery.booking?.confirmedDate ?? input.order.deliveredAt,
+      },
+    },
     door: open("Delivery", deliveryHref(input.order.id)),
   }));
 }
@@ -1003,7 +1049,14 @@ function deliverDraft(input: SalesOrderRouteInput): NodeDraft {
         `Delivery ${lastFailed.attemptNo} not completed`,
         lastFailed.reason ?? "No reason recorded",
       ],
-      action: { ownerKey: "delivery", label: "Arrange new delivery date" },
+      action: {
+        ownerKey: "delivery",
+        label: "Arrange new delivery date",
+        context: {
+          subject: lastFailed.doNumber ?? `SO-${input.order.so}`,
+          dueOn: null,
+        },
+      },
       door: open("Delivery", deliveryHref(input.order.id)),
     };
   }
@@ -1027,7 +1080,14 @@ function photoDraft(input: SalesOrderRouteInput): NodeDraft {
     lines: photo
       ? [photo.by ? `Uploaded by ${photo.by}` : "Uploaded", dated("Uploaded", photo.at)]
       : ["No delivery photo yet"],
-    action: { ownerKey: "delivery", label: "Upload delivery photo" },
+    action: {
+      ownerKey: "delivery",
+      label: "Upload delivery photo",
+      context: {
+        subject: input.delivery.doNumber ?? `SO-${input.order.so}`,
+        dueOn: null,
+      },
+    },
     door: open("Delivery", deliveryHref(input.order.id)),
   };
 }
@@ -1074,8 +1134,8 @@ export function resolveSalesOrderRoute(input: SalesOrderRouteInput): SalesOrderR
     for (const slice of slices) {
       chains.push(seal(purchaseChain(slice, input.receivingRecords), "goods"));
     }
-    if (unassignedQty > 0) chains.push(seal(unassignedChain(line), "goods"));
-    const stock = seal([stockDraft(line, destination)], "goods")[0]!;
+    if (unassignedQty > 0) chains.push(seal(unassignedChain(line, soNumber), "goods"));
+    const stock = seal([stockDraft(line, destination, soNumber)], "goods")[0]!;
 
     const buyQty = slices.reduce((sum, slice) => sum + slice.qty, 0) + unassignedQty;
     const { nodes: plateNodes } = sealChain(

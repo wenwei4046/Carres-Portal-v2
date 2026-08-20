@@ -63,6 +63,7 @@ const TITLE_H = 20;
 const LINE_H = 18;
 const REQ_H = 16;
 const ACTION_H = 22;
+const CONTEXT_H = 18;
 const DOOR_H = 18;
 
 const MIN_SCALE = 0.4;
@@ -197,6 +198,11 @@ function Node({
     );
   }
   const person = node.action ? ownerOf(owners, node.action.ownerKey) : null;
+  const actionContext = node.action
+    ? `${node.action.context.subject} · ${
+        node.action.context.dueOn ? `Due: ${node.action.context.dueOn}` : "No due date yet"
+      }`
+    : null;
 
   const spoken = [
     node.title,
@@ -205,6 +211,7 @@ function Node({
     node.action
       ? `${person ? personLabel(person.name, person.email) : "Unassigned"}: ${node.action.label}`
       : null,
+    actionContext ? spellDates(actionContext) : null,
   ]
     .filter(Boolean)
     .join(" — ");
@@ -263,7 +270,8 @@ function Node({
       {node.lines.map((line, i) => (
         <div
           key={`${node.id}-line-${i}`}
-          className={`truncate text-body ${
+          data-testid={`route-fact-${node.id}-${i}`}
+          className={`truncate text-body ${node.action ? "font-semibold" : ""} ${
             node.mark === "future" ? "text-kit-slate-9" : "text-base-900"
           }`}
           style={{ height: LINE_H, lineHeight: `${LINE_H}px` }}
@@ -296,7 +304,7 @@ function Node({
         /* The 13 / 11 two-line grammar: the FACT above, the INSTRUCTION here,
            with the owner as a chip rather than a name inside the sentence. */
         <div
-          className="flex items-center gap-1.5"
+          className="flex items-center gap-1.5 text-label"
           style={{ height: ACTION_H }}
           data-testid={`route-action-${node.id}`}
         >
@@ -305,7 +313,17 @@ function Node({
         </div>
       )}
 
-      {node.door && (
+      {node.action && actionContext && (
+        <div
+          data-testid={`route-context-${node.id}`}
+          className="truncate text-label text-base-600"
+          style={{ height: CONTEXT_H, lineHeight: `${CONTEXT_H}px` }}
+        >
+          {spellDates(actionContext)}
+        </div>
+      )}
+
+      {!node.action && node.door && (
         <div style={{ height: DOOR_H, lineHeight: `${DOOR_H}px` }}>
           <Link
             to={node.door.href}

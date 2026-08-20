@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import {
   resolveSalesOrderRoute,
@@ -181,6 +181,26 @@ describe("Order Route — the nodes", () => {
     expect(supplier).not.toHaveTextContent("Yu Jun: Confirm");
   });
 
+  it("keeps fact, owner action and document due context on three separate rows", () => {
+    draw();
+    const supplier = nodeEl("PO-2048:supplier");
+    const fact = screen.getByTestId("route-fact-PO-2048:supplier-0");
+    const action = screen.getByTestId("route-action-PO-2048:supplier");
+    const context = screen.getByTestId("route-context-PO-2048:supplier");
+
+    expect(fact).toHaveTextContent("Ready date not confirmed");
+    expect(fact).toHaveClass("text-body", "font-semibold");
+    expect(action).toHaveTextContent("YJ");
+    expect(action).toHaveTextContent("Confirm ready date");
+    expect(action).toHaveClass("text-label");
+    expect(context).toHaveTextContent("PO-2048 · No due date yet");
+    expect(context).toHaveClass("text-label", "text-base-600");
+    expect(fact.parentElement).toBe(supplier);
+    expect(action.parentElement).toBe(supplier);
+    expect(context.parentElement).toBe(supplier);
+    expect(within(supplier).queryByText("Open PO-2048 →")).not.toBeInTheDocument();
+  });
+
   it("shows at most three CURRENT nodes, one per route", () => {
     const { container } = draw();
     expect(container.querySelectorAll('[data-current="true"]')).toHaveLength(3);
@@ -279,7 +299,7 @@ describe("Order Route — accessibility", () => {
     const supplier = nodeEl("PO-2048:supplier");
     expect(supplier).toHaveAttribute("tabindex", "0");
     expect(supplier.getAttribute("aria-label")).toBe(
-      "SUPPLIER — Ready date not confirmed — Yu Jun: Confirm ready date",
+      "SUPPLIER — Ready date not confirmed — Yu Jun: Confirm ready date — PO-2048 · No due date yet",
     );
     expect(supplier).toHaveAttribute("aria-current", "step");
   });

@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   deliveryOrderStatusOf,
   type DeliveryHandoverKind,
@@ -107,7 +107,11 @@ const NO_DATE = "No delivery date yet";
 
 export default function DeliveryOrdersRegister() {
   const navigate = useNavigate();
-  const { data, isLoading, isError, error, refetch } = useDeliveryOrdersRegister();
+  const [searchParams] = useSearchParams();
+  const sourceOrderId = searchParams.get("order")?.trim() || undefined;
+  const { data, isLoading, isError, error, refetch } = useDeliveryOrdersRegister(
+    sourceOrderId ? { orderId: sourceOrderId } : undefined,
+  );
 
   const rows = useMemo<DoRegisterRow[]>(() => {
     const attemptsByDo = new Map<string, DeliveryOrderAttemptRow[]>();

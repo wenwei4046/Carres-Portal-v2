@@ -56,7 +56,11 @@ import { apiFetch, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { renderCombinedSalesOrderPdf, renderSalesOrderPdf } from "@/lib/pdf/render";
 import type { SalesOrderTemplateData } from "@/lib/pdf/types";
-import { useOperationOrders, useSalesOrderExpansion } from "@/lib/queries";
+import {
+  useDeliveryOrdersRegister,
+  useOperationOrders,
+  useSalesOrderExpansion,
+} from "@/lib/queries";
 import CancelSalesOrderDialog from "./CancelSalesOrderDialog";
 import DestinationHeader from "./DestinationHeader";
 import GoodsMiniTable, { categoryWord, type GoodsMiniLine } from "./components/GoodsMiniTable";
@@ -202,26 +206,43 @@ function toGridColumn(
   if (f.key === "do_number") {
     return {
       ...base,
-      /* §0.1 — a document number navigates to its AUTHORITATIVE OBJECT:
-         DO → DO. The number used to open the PDF directly; the DO object page
-         (blueprint card 2026-08-16) is the document's home and carries Print. */
-      accessor: (r) =>
-        r.o.do_number ? (
+      /* The SO-to-DO relationship comes from the Delivery document ledger,
+         never the one-number mirror on `orders`. One document opens its
+         object; many open Delivery's register filtered to this SO. */
+      accessor: (r) => {
+        if (r.deliveryOrders.length === 0) {
+          return <span className="text-kit-slate-9">No delivery order yet</span>;
+        }
+        if (r.deliveryOrders.length === 1) {
+          const deliveryOrder = r.deliveryOrders[0]!;
+          return (
+            <button
+              type="button"
+              className="font-medium text-blue-700 underline-offset-2 hover:underline"
+              onClick={(event) => {
+                event.stopPropagation();
+                navigate(
+                  `/operation/delivery-orders/${encodeURIComponent(deliveryOrder.do_number)}`,
+                );
+              }}
+            >
+              {deliveryOrder.do_number}
+            </button>
+          );
+        }
+        return (
           <button
             type="button"
             className="font-medium text-blue-700 underline-offset-2 hover:underline"
             onClick={(event) => {
               event.stopPropagation();
-              navigate(
-                `/operation/delivery-orders/${encodeURIComponent(r.o.do_number!)}`,
-              );
+              navigate(`/operation/delivery-orders?order=${encodeURIComponent(r.id)}`);
             }}
           >
-            {r.o.do_number}
+            {r.deliveryOrders.length} Delivery Orders
           </button>
-        ) : (
-          absenceAware(f.text(r))
-        ),
+        );
+      },
     };
   }
   if (f.key === "customer") {
@@ -474,10 +495,25 @@ export default function SalesOrdersRegister() {
   const { data, isLoading, isError, error, refetch } = useOperationOrders(
     serverSearch ? { search: serverSearch } : {},
   );
+  const deliveryOrdersQuery = useDeliveryOrdersRegister();
+
+  const deliveryOrdersBySalesOrder = useMemo(() => {
+    const grouped = new Map<string, NonNullable<typeof deliveryOrdersQuery.data>["deliveryOrders"]>();
+    for (const deliveryOrder of deliveryOrdersQuery.data?.deliveryOrders ?? []) {
+      if (!deliveryOrder.order_id) continue;
+      const current = grouped.get(deliveryOrder.order_id) ?? [];
+      current.push(deliveryOrder);
+      grouped.set(deliveryOrder.order_id, current);
+    }
+    return grouped;
+  }, [deliveryOrdersQuery.data]);
 
   const all = useMemo<RegisterRow[]>(
-    () => (data?.orders ?? []).filter((o) => !isRental(o)).map(buildRegisterRow),
-    [data],
+    () =>
+      (data?.orders ?? [])
+        .filter((o) => !isRental(o))
+        .map((o) => buildRegisterRow(o, deliveryOrdersBySalesOrder.get(o.id) ?? [])),
+    [data, deliveryOrdersBySalesOrder],
   );
 
   /* The scope is the register's population; the engine's search and ▽s narrow
@@ -579,16 +615,21 @@ export default function SalesOrdersRegister() {
 
       {/* 8px outer frame gap — REGISTER STATUS FOOTER law, docs/ui/MASTER.md. */}
       <div className="flex min-h-0 flex-1 flex-col p-2" data-testid="register-column">
-        {isError ? (
+        {isError || deliveryOrdersQuery.isError ? (
           <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 bg-white">
             <p className="text-body text-base-700">The register could not be loaded</p>
-            {(error as Error | undefined)?.message ? (
-              <p className="text-meta text-base-500">{(error as Error).message}</p>
+            {((error ?? deliveryOrdersQuery.error) as Error | undefined)?.message ? (
+              <p className="text-meta text-base-500">
+                {((error ?? deliveryOrdersQuery.error) as Error).message}
+              </p>
             ) : null}
             <button
               type="button"
               className="rounded-md border border-base-200 bg-white px-3 py-1.5 text-meta font-medium text-base-700 hover:bg-base-50"
-              onClick={() => void refetch()}
+              onClick={() => {
+                void refetch();
+                void deliveryOrdersQuery.refetch();
+              }}
             >
               Try again
             </button>
@@ -608,7 +649,7 @@ export default function SalesOrdersRegister() {
                the search itself still matches SO number, customer, phone and
                item, and the ▽ per-column filters say so column by column. */
             searchPlaceholder="Search sales orders…"
-            isLoading={isLoading}
+            isLoading={isLoading || deliveryOrdersQuery.isLoading}
             emptyMessage={rows.length === 0 ? "No orders yet" : "No matching sales orders."}
             groupBanner={false}
             /* Optional columns may widen the sheet (MASTER §0.1), so the row's
