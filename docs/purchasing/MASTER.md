@@ -326,34 +326,35 @@ policies on the two tables: **NONE**. SELECT/UPDATE policies preserved: **7**.
 **VERDICT — PASS.** `purchasing_issue_pos_batch(jsonb)` is the sole reachable Purchase
 Order creation authority.
 
-## 2.0.1 · 🔴 GAP — Emergency has no governed continuation. NOT SOLVED HERE.
+## 2.0.1 · Emergency order — RESOLVED FROM AUTHORITY / NOT YET WIRED
 
-**Recorded under Card 4B §7, deliberately unsolved: it needs a business decision.**
-
-Urgent restock (card K3, migration 0290, `UrgentRestockPanel` under the monthly
-Stock plan) runs:
+Urgent restock is **not a third way to create a PO**. The authority chain already
+settles the operating model:
 
 ```
-somebody raises an ask  →  the COO approves it  →  … →  someone ticks "I ordered it"
+Urgent need → Manual Purchase Request (`Need for = Ready Stock`)
+            → governed approval
+            → same-day Manual Purchase Issue
+            → purchasing_issue_pos_batch(jsonb)
+            → linked PO is the completion fact
 ```
 
-**The "…" was `+ New PO`.** The approved ask created no `purchase_demands` row and
-never reached Batch Purchase; a human read the list and raised the PO on the legacy
-modal. That modal is deleted and those authorities are revoked, so **an approved
-emergency now has no governed way to become a Purchase Order.** `I ordered it` is
-still a self-declared tick and will now be ticked against work done elsewhere, or
-not at all.
+`Urgent` changes `Needed by` and therefore the dated Work Engine action; it never
+changes who may approve, who owns supplier/SKU/destination truth, or which authority
+may mint the PO. The requester states the need and why. Manual Purchase resolves the
+SKU, quantity, supplier, destination and governed cost through its existing request,
+approval and Issue contract. The old `I ordered it` self-declared tick is rejected:
+the action closes only when a linked PO exists.
 
-**What must NOT be done about it** (each was considered and each is forbidden by
-the card that found the gap): keep a legacy authority alive for Emergency · bypass
-the governed boundary · auto-convert approved emergency asks into `purchase_demands`
-· mint a new emergency exception.
+**Why this is resolved without an Owner Decision.** §1 permits exactly two PO birth
+lanes, Manual Purchase already admits `Ready Stock`, §2.0 permits one creation
+authority, and the Manual Purchase approval law already owns internal buying. A
+special Emergency writer would contradict all four facts. The remaining gap is only
+implementation: `UrgentRestockPanel` does not yet open/prefill the governed Manual
+Purchase Request and still exposes the obsolete completion tick.
 
-**What the decision actually is, for whoever cards it:** does an approved emergency
-ask become a `purchase_demand` — and if so, who owns the supplier, quantity, cost and
-destination that Batch Purchase will demand of it, given K3's own ruling that an
-emergency deliberately carries NO suggested quantity? That is a business question,
-not an engineering one.
+**Still forbidden:** a legacy `+ New PO` · a direct Emergency PO writer · automatic
+PO creation on approval · a third Emergency demand/approval model.
 
 ## 2.1 · The shell
 
@@ -495,11 +496,44 @@ It cannot tell you about a button you have not imagined. **Read the file.**
 
 ---
 
-# §3 · SO Batch Purchase *(on screen today as `To Order`)*
+# §3 · Purchase Demands + SO Batch Purchase
 
 ### MISSION
-Review, consolidate and issue purchase orders for **demand the engine generated from
-customer orders**. Purchase Orders MANAGES the documents once they exist.
+Show every governed customer-order buying demand, make its blocker or coverage
+understandable, then consolidate and issue the demands that are ready. Purchase Orders
+MANAGES the documents once they exist.
+
+### THE TWO-PAGE SEAM — APPROVED / LOCKED, 2026-08-20
+
+These are two destinations because they answer two different operator questions. They
+reuse one server recomputation and never store two demand remainders:
+
+```
+Purchase Demands                          SO Batch Purchase
+What needs buying, and why?               What will we order now?
+All demand + coverage + blockers          Ready customer demand for the chosen PO run
+Inspect · filter · open owner             Select · arrange · set Deliver To · Issue PO
+NO Issue PO                               the customer-demand lane's ONLY Issue PO
+```
+
+`Purchase Demands` is the authoritative Register of the computed customer-order demand.
+It includes demand that is fully covered, partly covered, blocked by a missing customer
+date, blocked because the sold SKU is absent from Catalog, blocked by a missing supplier,
+or blocked by missing production days.
+It never hides a valid procurable order line merely because it cannot be issued. Its row
+opens the owning Sales Order or the owning master-data/Settings surface; it does not copy
+those writers. It has no PO draft, no separate status store and no Issue control.
+
+`SO Batch Purchase` is the work surface. It reads the same recomputation, defaults to the
+governed PO schedule, admits only shortage quantities that pass the Issue gates, and is the
+only customer-demand surface that calls `POST /api/operation/purchase/to-order/issue`.
+Selection and arrangement are visit-local until Issue; refresh returns the current server
+plan. A formal PO is the first stored document.
+
+Both pages use the approved Purchasing Destination Header and keep the existing 200px
+page-owned rail. The Register follows the Sales Orders Register Template. The Batch page
+keeps its current PO Schedule/Category working rail and uses the hierarchy below; neither
+page creates a module tab strip or a second sidebar.
 
 > **THE SPLIT SHIPPED (Jess 2026-08-07, executed 2026-08-19 —
 > CARD-2026-08-18-manual-purchase):** the hand-typed purposes (Ready Stock · Display ·
@@ -545,26 +579,23 @@ customer orders**. Purchase Orders MANAGES the documents once they exist.
 > complexity is already in the business — refusing it does not remove it, it moves it into a
 > buyer's head every morning.
 
-> ### ⭐ DERIVE THE DESTINATION AND THE DATE — NEVER ASK THE BUYER (Jess, 2026-08-18)
-> **APPROVED, NOT YET BUILT.** 2990s shipped a "PO Defaults" card asking Expected Delivery and
-> Purchase Location on the batch screen, then DELETED it —
-> `apps/backend/src/pages/PurchaseOrderFromSo.tsx:6-9`: *"REMOVED the 'PO Defaults' card …
-> Those are NOT asked anymore — the server derives each PO line's warehouse from the source
-> SO's Sales Location, and each line's delivery date from the SO line's own delivery date …
-> header expected_at / purchase location are rolled up from the lines server-side."*
+> ### ⭐ DELIVER TO IS DECIDED BEFORE ISSUE — PURCHASING OWNS IT (Jess, 2026-08-14 / 2026-08-20)
+> **APPROVED, NOT YET BUILT ON SO BATCH PURCHASE.** `Deliver To` is not the Sales Order's
+> showroom/location and is not derived from Sales. It is Purchasing's instruction telling the
+> supplier where these goods must arrive. Every selected quantity defaults to the governed
+> `Carres Klang` destination, so the normal purchase needs no extra decision.
 >
-> **The customer's order already says where the goods go and when they are wanted.** Asking a
-> buyer to retype it invites a mismatch between the SO and the PO that nobody can reconcile,
-> and it is work for an answer the system already holds. **The line derives; the header rolls
-> UP from the lines.** A buyer may still change a line, and the change is an exception with a
-> reason — never the default keystroke. **It is an INLINE CELL, never a queue action:** every
-> line always carries a destination, so an action would fire on every PO and be ignored on all
-> but one, and a prompt everybody dismisses daily is a prompt nobody reads on the day it
-> matters. **A change has a consequence the screen must state** — goods landing at `AL` for an
-> order shipping from `Carres` need a stock transfer before the delivery date, and the system
-> says so at the moment of the change rather than letting the warehouse find out on the morning
-> of the run. *(This retires the proposed action `Assign where the goods go` entirely: on the
-> customer lane it is derived, and on Manual Purchase the requester picks it in the form.)*
+> Before `Issue PO`, Operations may change `Deliver To` directly in Batch Purchase. One SKU
+> quantity may split across destinations — for example `B1201S-K ×10 → Carres Klang` and
+> `B1201S-K ×1 → AL Sungai Buloh` — and the quantities must add back to the governed `To Buy`
+> amount. Different destinations remain separate lines on the **same supplier PO**; they never
+> manufacture two POs for one supplier. The server revalidates every active destination and the
+> complete quantity allocation immediately before Issue.
+>
+> The customer delivery date remains Sales' promise and feeds the ordering arithmetic; the buyer
+> does not retype it. After Issue, destination changes leave Batch Purchase and follow §4's PO
+> governance: direct edit plus History before the PO is sent, then a revision/change record and
+> required supplier update after it was sent. Sales Order only reads the final PO/line result.
 >
 > **Grouping is the SERVER's, not the buyer's** — `PurchaseOrderFromSo.tsx:17`: *"Server groups
 > by main supplier and emits one PO per supplier."* Same rule Dynamics states for requisition
@@ -863,16 +894,18 @@ here. Card 2 governs the Issue boundary itself:
 - A Customer Order without a confirmed delivery date remains visible but is blocked.
 - The SKU supplier master is authoritative. Missing or mismatched supplier truth blocks only
   the affected demand and any document containing it. There is no emergency override yet.
-- `NULL` cost is unknown and blocks the affected document. A positive Catalog reference cost
-  may seed the PO transaction cost; a hand-entered positive transaction cost belongs only to
-  that PO and is audited. `0` is accepted only as explicit `free_of_charge`, with a mandatory
-  reason and audit. Neither path silently updates Catalog.
+- **Price never stops Operations from ordering** (Jess, 2026-08-20). SO Batch Purchase does
+  not show price, ask Operations to choose a cost, or block `Issue PO` because Catalog cost is
+  missing or changed. The server snapshots the latest known Catalog cost when one exists; an
+  unknown cost stays explicitly unknown for the authorised approver/Finance follow-up. A later
+  price correction is audited on the PO and never silently rewrites Catalog. `Free of Charge`
+  is also a commercial decision for an authorised approver, not an Operations Issue question.
 - Every `factory_pickup` Issue document requires one existing procurement partner. This is a
   document fact, not a demand blocker or line fact. The current partner table has no lifecycle
   state, so Card 2 validates existence only and invents no active/inactive law.
 - Validation is server-side inside one transaction. The RPC serializes PO-number allocation,
-  rejects stale Catalog-seeded cost with `40001`, retains the existing demand-thread conflict
-  claim, and rolls the whole batch back when any document fails.
+  reads the current Catalog cost without making the operator compare it, retains the existing
+  demand-thread conflict claim, and rolls the whole batch back when any document fails.
 
 Migration `0337_governed_batch_purchase_issue` adds nullable legacy-compatible
 `purchase_order_lines.commercial_treatment` and `commercial_reason` plus the governed
@@ -997,10 +1030,12 @@ historical `operation_issue_pos_for_order(uuid)` function without deleting legac
   Master-Sheet IMPORT artifacts — test data only. Go-live starts clean with no such import, so
   **no feature may depend on `source_ref` existing** and the ruling is recorded here so the
   column never comes back.
-- **An order with no delivery date does not reach operation** (Loo, 2026-08-06). The SALES
-  portal enforces the date at entry; To Order's guard (a dateless customer order is not listed)
-  is a backstop, not the enforcement. **The enforcement build belongs to the Orders module,
-  not Purchasing.** A Ready Stock demand is exempt: its empty date means *buy on the next run*.
+- **A customer order with no delivery date remains visible in Purchase Demands but cannot enter
+  Issue** (current Blueprint, 2026-08-20). The row states that the customer promise is missing
+  and the shared Work Engine routes `Ask customer for a delivery date` to the responsible
+  Salesperson. SO Batch Purchase may show the blocked row when reached through an SO scope, but
+  never selects it. Sales owns the date writer; Purchasing neither hides the demand nor invents a
+  date. Manual Ready Stock uses its own required `Needed by` rule.
 
 ### APPROVED EVOLUTION
 - **The Planning Workspace** — the frozen information architecture made true on this tab.
@@ -1017,53 +1052,22 @@ historical `operation_issue_pos_for_order(uuid)` function without deleting legac
 - **The September switch** — Nice Future stops supplying; a new mattress supplier takes over on
   the subscription model. Sofa and bedframe unchanged.
 
-### ⛔ THE CHILD MINI-TABLE ON THIS TAB — NOT ADOPTED, AND THE OWNER MUST RULE
+### THE SALES ORDER CHILD MINI-TABLE IS REJECTED HERE — RESOLVED FROM AUTHORITY
 
-**Status: OPEN OWNER DECISION, 2026-08-15. Nothing below is law.** The Expand Mini-Table card
-ruled the shared child mini-table (`docs/orders/MASTER.md` §0.1 — THE CHILD MINI-TABLE) onto BOTH
-the Sales Orders Register and this tab, with the ☑ capability switched on here. **The Register half
-is built and shipped. This half is not**, and the reason is measured, not preferred.
+Purchase Demands and SO Batch Purchase keep their specialised buyer hierarchy. They do not copy
+the Sales Orders child mini-table merely because both surfaces show goods.
 
-**WHAT THE CARD ASSUMES.** That this tab is a grid of customer ORDERS, each with a `▸` that opens
-its goods. **It is not.** This tab is a flat grid of BUILDS — one row per piece of goods to buy —
-clustered under a white order line, and its `▸` opens the row's two ACTS (`Reserve` ·
-`Cancel Purchase`), not a table. Adopting the card literally means rebuilding the grid into
-order-rows plus expansions.
+- Sales Orders answers *what the customer ordered* and reads Unit ID/Deliver To after other
+  modules own them.
+- Purchase Demands answers *what still needs buying and what covers it*; `Ready Stock`, `On PO`,
+  `To Buy`, supplier and customer date must remain in the scan path.
+- SO Batch Purchase answers *what will be issued now*; selection is at the governed build/shortage
+  grain, with sofa kept together by SO.
 
-**THREE OF THE CARD'S FOUR SELECTION RULES ALREADY HOLD HERE, AND THE FOURTH CANNOT OCCUR.**
-
-| Card §4 rule | This tab today |
-|---|---|
-| every purchasable line has its own checkbox | ✅ selection is BUILD-level and frozen that way |
-| the parent switch cycles `☐ none · ▣ partial · ☑ all` | ✅ `groupSelState` / `groupSelToggle` |
-| the action bar counts selected LINES, never orders | ✅ the toolbar's selection state |
-| a Service line shows `—` and select-all skips it | **cannot occur** — a service never becomes purchase demand, so this tab has no service rows |
-
-**WHAT ADOPTING IT WOULD COST, MEASURED.** The ruled child columns are
-`Category | Unit ID | Deliver To | SKU | Qty | Item`. On this tab:
-
-- **TWO OF THE SIX WOULD BE PERMANENTLY EMPTY.** `Unit ID` reads Stock's allocation and
-  `Deliver To` reads the PO/PO-line result (`GET /api/operation/orders/:id/expansion`). A row a
-  buyer can still ACT on is by definition a row with no purchase order and no allocated unit — a
-  row that has both is a RECEIPT and cannot be ticked. So every actionable line would print
-  `Not allocated` and a constant default destination. **`CLAUDE.md` §10: empty fields do not reach
-  the screen.**
-- **FOUR DECISION COLUMNS WOULD LEAVE THE SCAN PATH.** `Supplier · Ready Stock · On PO · PO No.`
-  are not among the ruled six. `Ready Stock` and `On PO` exist precisely because *a fact is
-  scanned, an act is chosen* (T1.1 · T3 above) — burying them inside a disclosure re-creates the
-  defect those two cards were written to close.
-- **THE SCAN ITSELF WOULD BECOME A CLICK.** The buyer's morning is *tick everything due today*.
-  Order-rows plus expansions turns one pass down a sheet into one expand per order.
-
-**RECOMMENDATION (Carres, evidence-based): KEEP this tab's grid; the ruling stands unchanged on the
-Sales Orders Register.** The shared component carries the ☑ capability and is tested, so the day a
-page genuinely needs a goods child table with line selection — `Manual Purchase`'s create
-workspace is the likely one — it switches on rather than being rebuilt.
-
-**WHAT WOULD OVERTURN IT (the falsifier):** either (a) the owner's intent is the grid restructure
-itself, in which case the four buyer columns need a ruled home before any code moves, or (b)
-`Unit ID` and `Deliver To` gain a pre-purchase meaning on this tab — a planned destination on the
-demand row rather than a PO result — which is a Purchasing business change, not a presentation one.
+`Deliver To` now has a valid pre-Issue meaning on Batch Purchase, but that does not make Unit ID
+or the Sales Orders six-column disclosure appropriate here. It is one inline arrangement fact on
+the buying workspace. `Unit ID` remains absent until Stock creates/allocates the units. The shared
+Register/DataTable powers are reused; the Sales business columns and layout are not.
 
 ---
 

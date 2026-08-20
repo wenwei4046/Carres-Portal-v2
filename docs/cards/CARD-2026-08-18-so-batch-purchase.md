@@ -1,204 +1,337 @@
 STATUS: QUEUED
-DATE: 2026-08-18
+DATE: 2026-08-18 · rewritten to final authority 2026-08-20
 PR: pending
-IMPLEMENTATION: APPROVED — owner ruled every section with the architect 2026-08-18, build straight to production
+IMPLEMENTATION: APPROVED TARGET — build after Purchase Demands; no Owner Decision remains
 
-# SO BATCH PURCHASE — the buying grid becomes a hierarchy (one card)
+# SO BATCH PURCHASE — arrange ready customer demand and issue the correct POs
 
-**TAB — `To Order` → renamed `SO Batch Purchase`.** This card owns that ONE tab.
-It may not touch Receiving, Claims, Report or Settings files (the §5 boundary
-dispute of 2026-08-06 is still open and this card does not resolve it).
+【TAB】 — CARD-2026-08-18-so-batch-purchase · Select shortage, set or split Deliver To, then issue the governed supplier POs
 
-Read `CLAUDE.md`, `docs/purchasing/MASTER.md` (§1 · §2 · §3 · §4's arrival law),
-`docs/ERP-ARCHITECTURE.md`, `docs/ui/MASTER.md` (§4 · §4.1 · §6.4),
-`docs/COPY-STANDARD.md` (the PURCHASING five-string table, the nine verbs) on the
-LATEST `origin/main`. Execute as CONTINUOUS BUILD: implement in your own slice
-order → tests → release gate → PR → CI → merge → deploy → prove SHA → overwrite
-the owning MASTERs in the same PRs. **If code structure conflicts with this card,
-STOP and report — do not choose.**
+**Depends on:** `CARD-2026-08-20-purchase-demands.md` shared demand read and live Register.
 
-## 1 · The rename, and what does NOT move yet
+**Owns:** the `SO Batch Purchase` work surface, its visit-local Issue arrangement, and the one
+customer-demand call into `purchasing_issue_pos_batch(jsonb)`.
 
-`To Order` becomes **`SO Batch Purchase`**. The tab word, the route and the page
-title move together.
+**May touch:** the shared to-order plan/types, To Order API/UI/tests, the sole issue RPC through a
+new migration, the PO-line destination split invariant, governed copy, and Purchasing MASTER
+closure evidence.
 
-**`+ Create Purchase` STAYS ON THIS RAIL until the Manual Purchase card ships.**
-The approved end state moves it (`purchasing/MASTER.md` §1/§3), but a manual
-entrance that exists nowhere is worse than one in the wrong place — the law says
-it *"may never be missing"*. Removing it is the Manual Purchase card's first act,
-not this card's.
+**Must not touch:** Purchase Demands' no-Issue boundary, Manual Purchase, PO follow-up/revision
+screens, Sales Order writers, Receiving, Claims, supplier acknowledgement, automatic WhatsApp/
+email, or external cutover.
 
-## 2 · The grid becomes three levels
+Read on latest `origin/main`: `CLAUDE.md` → `docs/ERP-ARCHITECTURE.md` →
+`docs/purchasing/MASTER.md` §1/§2/§3/§4 → `docs/orders/MASTER.md` Purchasing read boundary →
+`docs/stock/MASTER.md` coverage/Unit boundary → `docs/delivery/MASTER.md` dated-arrival seam →
+`docs/ui/MASTER.md` Shell/Register/Object rules → `docs/COPY-STANDARD.md` and
+`docs/ACTION-FLOW-STANDARD.md`. Execute as BUILD/DELIVERY through production verification. Do not
+ask the Owner to choose files, state shape, test order, migration number, branch, PR or deploy
+mechanics.
 
-Today one row per SO line, flat. Four customers wanting the same beige
-three-seater are four rows and the buyer adds them up in their head. **Carres buys
-from a factory, not from a sales order**, and MOQ, pack and lorry-fill are all per
-item.
+## 1 · Final authority — old Card statements are dead
 
+This rewrite removes the old competing statements. The build must obey only this target:
+
+1. `Purchase Demands` inspects/prepares; **SO Batch Purchase is the customer-demand lane's only
+   `Issue PO` workspace**.
+2. `Deliver To` is Purchasing-owned. It defaults to `Carres Klang`, is directly editable before
+   Issue and may split one SKU quantity across destinations.
+3. `Deliver To` is not derived from Sales Order/showroom/warehouse location. Sales reads the final
+   PO/line result only.
+4. Customer delivery remains Sales' date and drives the engine; Operations does not retype it.
+5. **Price does not stop Operations from ordering.** No price/FOC question appears here and a
+   missing/changed Catalog cost may not disable Issue.
+6. Sofa remains together by Sales Order; other goods group by item.
+7. The server decides document grouping. There is no Combined/Per-SO choice.
+8. `purchasing_issue_pos_batch(jsonb)` remains the one PO creation authority.
+
+Emergency/urgent Ready Stock is Manual Purchase and is outside this Card.
+
+## 2 · Operator journey
+
+The page must allow a new staff member to complete the job without remembering a procedure:
+
+```text
+1  Open SO Batch Purchase.
+2  The PO Schedule opens the governed run; each row prints weekday + date.
+3  Read Qty Needed · Ready Stock · On PO · To Buy.
+4  Select only the shortage to order now.
+5  Check Deliver To. Leave Carres Klang, or change/split only the exception.
+6  Press Issue {n} PO(s).
+7  The system creates the PO number(s) and shows each supplier; every PO number opens Purchase Orders.
+8  Purchase Orders tells staff to share the correct PO PDF and later what supplier fact to chase.
 ```
-Item · Description        Qty Needed · Stock · On PO · To Buy
-  └─ variant (fabric / colour)
+
+No `Today`, `Tomorrow`, `Needs attention`, generic `Follow up`, `Priority`, `Prepare PO`, `Send PO`
+or `Acknowledged` stage may be added. Issuing creates the formal PO; sharing the PDF and every later
+supplier update remain Purchase Orders work.
+
+## 3 · Page composition
+
+Keep the approved Sales Orders-sized Destination Header and the existing 200px left working rail:
+
+```text
+SO Batch Purchase                           Jump to…  Alerts  Help  Settings
+────────────────────────────────────────────────────────────────────────────
+PO SCHEDULE     │ [Search…]                         Updated 10:32 AM
+Overdue         │
+Wed, 19 Aug     │ Item · Description     Qty Needed  Ready Stock  On PO  To Buy
+Fri, 21 Aug     │   └─ variant
+Mon, 24 Aug     │       └─ SO No · Customer · Customer Delivery · Qty ·
+                │           Coverage · Supplier
+CATEGORY        │
+All             │
+Mattress        │
+Bedframe        │
+Sofa            │
+────────────────────────────────────────────────────────────────────────────
+                │ N units selected                         Issue N PO(s)
+```
+
+The rail remains exactly the current PO Schedule + Category concept: rolling actual dates,
+`Overdue` above the days, zero-count configured days still visible, multi-select filters, URL state,
+no new Queue/Status/Settings block.
+
+The grid becomes the approved hierarchy:
+
+```text
+Item · Description              Qty Needed · Ready Stock · On PO · To Buy
+  └─ variant (size / fabric / colour)
        └─ SO No · Customer · Customer Delivery · Qty · Coverage · Supplier
 ```
 
-- **`To Buy` is PRINTED**, never left as `11 − 3 − 2`. Same law Receiving carries
-  for `Outstanding`.
-- **The buyer may not edit `To Buy`.** Wanting extra for the shelf is a Manual
-  Purchase and goes through approval; typing it onto a customer's line hides a
-  spend behind a customer's authority.
-- **Shortage floats to the top. Only a shortage line is selectable.**
-- **`Coverage` per SO line** — `stock` · `PO-2041 · 22 Aug` · `SHORT`. The buyer
-  sees at a glance which promises have nothing behind them.
+- `To Buy` is printed, server-derived and never editable.
+- shortage floats; `To Buy = 0`, fully-on-PO and blocked demand are visible as receipts/explanation
+  when reached from a scoped SO but are never selectable;
+- selection is at build/shortage grain; parent selection cycles none/partial/all;
+- mattress, bedframe, pillow and protector group by item;
+- sofa groups by Sales Order; selecting one module selects the complete same-SO matched set;
+- a single-variant item may render two levels rather than an empty middle level;
+- customer date missing, supplier missing and production days missing name the fact and cannot be
+  selected; the fixing writer remains its owning module;
+- Ready Stock is only an offer. The existing `Reserve` act remains human and server-recomputed;
+- current search, column filters, sorting, footer, horizontal grid overflow and PO links survive;
+- no Sales Orders child mini-table and no Unit ID column.
 
-Reference: 2990s runs this shape in production —
-`apps/backend/src/pages/Mrp.tsx` (Item Code → variant → SO lines; only SHORTAGE
-lines orderable, `:184`; shortage models float, `:212`).
+Refactor the 2,800-line `OperationToOrder.tsx` into page-level components only where it reduces
+duplicate state. The page remains one work surface; do not turn each hierarchy level into a card.
 
-## 3 · Sofa groups by SALES ORDER, everything else by item
+## 4 · Deliver To — default, change and split before Issue
 
-A sofa is sold as a colour-matched SET and two customers' sofas may not merge onto
-one PO line — the fabric batch must match inside the set. **Selecting any piece
-selects the whole same-SO set.**
+The selection state exposes one compact arrangement table before the Issue action:
 
-```
-Mattress · Bedframe · Pillow · Protector    group by ITEM
-Sofa                                        group by SALES ORDER
-```
-
-2990s states the reason in its own header — `Mrp.tsx:15-17`: *"A sofa is one PO
-per SO, so selecting any sofa variant selects the whole same-SO set together."*
-
-**One page, two groupings, chosen by category.** The complexity is in the
-business; refusing it moves it into a buyer's head every morning.
-
-## 4 · Destination and date are DERIVED — never asked
-
-The customer's order already says where the goods go and when they are wanted.
-
-- **Each PO line's destination and delivery date derive from the source SO line.**
-- **The header rolls UP from the lines.** It is not asked.
-- A buyer may still change a line. That is an **inline cell**, never a queue
-  action, and it carries a reason.
-- **A changed destination raises its consequence at the moment of the change** —
-  goods landing at `AL` for an order shipping from `Carres` need a stock transfer
-  before the delivery date, and the screen says so rather than letting the
-  warehouse find out on the morning of the run.
-
-2990s shipped a "PO Defaults" card asking these two and DELETED it —
-`PurchaseOrderFromSo.tsx:6-9`.
-
-## 5 · Grouping at Issue belongs to the SERVER
-
-`PurchaseOrderFromSo.tsx:17` — *"Server groups by main supplier and emits one PO
-per supplier."* Dynamics 365 states the same floor for requisition consolidation:
-differ on legal entity, vendor or currency and a separate order is created.
-
-**The buyer picks WHAT to buy; the system decides how it splits.** No Combined /
-Per-SO choice is offered.
-
-`Issue` keeps its current behaviour: **zero popups, zero toasts**; rows update in
-place; a partial failure stays with `Retry` until it succeeds and never silently
-takes the others with it.
-
-## 6 · The rail
-
-`PO SCHEDULE` (rolling calendar, `Overdue` above the days, every row
-`Fri 7 Aug`, zero-count days still render) and `CATEGORY` are unchanged.
-
-> **Jess, 2026-08-19, pointing at this rail in production: it stays EXACTLY
-> as it is** — weekday-first day rows (`Wed, 19 Aug`), `Overdue` red on top,
-> the 200px left column. *"Stop creating new"*: the rebuild reuses this rail,
-> it does not redraw it.
-
-**`Queues` joins them**, and it is the ruled heading (`COPY-STANDARD.md`) — the
-module's open actions, each row's name IS its action:
-
-```
-Queues
-  Issue PO
-  Check the supplier
-  Check the SKU
+```text
+ITEM / SKU          QTY      DELIVER TO
+B1201S-K             10      Carres Klang ▾
+CODY-Q                 1      AL Sungai Buloh ▾
+SOFA-01                1      HOUZS ▾
 ```
 
-No `STATUS` heading is added: status is the pill on the row, and a facet
-filtering by it competes with the queue rows for the same job.
+Every selected unit defaults from `purchasing_default_destination()` and must resolve to the active
+governed destination named `Carres Klang`. Normal buying requires no extra click.
 
-## 7 · Copy
+`Split` appears only when quantity is greater than one:
 
-Every string comes from the PURCHASING five-string table in
-`docs/COPY-STANDARD.md`. **No new word is invented in code.** The two that this
-page raises:
+```text
+B1201S-K · Qty 11
 
+Carres Klang       10
+AL Sungai Buloh     1
+                   ──
+                   11 ✓
 ```
-Check the supplier   →  Check the supplier for {model}   →  Save the supplier
-Check the SKU        →  Check the SKU with {supplier}    →  Publish the SKU
+
+Rules:
+
+- integer quantity at least 1; allocation total must equal the server's current `To Buy` qty;
+- the same destination entered twice merges into one allocation row;
+- removing a split returns its quantity to the original/default row;
+- changing a sofa build applies to every module in that matched build;
+- destination changes are visit-local until Issue; refresh restores the fresh server plan and
+  default rather than pretending a draft PO exists;
+- different destinations create separate lines inside the same supplier PO, never separate POs;
+- the PO header keeps `Carres Klang` as default; only exception lines store an override;
+- no Warehouse transfer is inferred from a supplier delivery instruction;
+- after Issue, every destination change uses §4 Purchase Order edit/revision law and cannot be
+  performed here.
+
+Use governed `Select`, `Input`, `Button`, inline validation and row/disclosure components. Do not
+open a second sidebar, nested window or permanent third header band. This pre-Issue arrangement is
+not a formal PO object and therefore does not use the 50%/50% Object Detail PDF layout.
+
+## 5 · Shared plan contract
+
+Extend `packages/shared/src/to-order.ts` and `packages/shared/src/to-order.test.ts` with one explicit
+allocation model; do not create a second arithmetic file:
+
+```ts
+interface DestinationAllocation {
+  sourceLineId: string;
+  qty: number;
+  destinationId: string;
+}
+
+interface IssueDocument {
+  key: string;
+  include: boolean;
+  buildKeys: string[];
+  destinationAllocations: DestinationAllocation[];
+}
 ```
 
-Two-line rows are `[fact] / [owner chip] [action]`; the owner is a chip, never
-sentence text; dates print through `fmtDate()`.
+The pure validation/plan functions must:
 
-## STILL LOCKED — do not touch
+1. prove each allocation line belongs to an included build in that document;
+2. prove exact integer totals per current source line;
+3. reject unknown/duplicate source lines, unknown builds, duplicate builds, empty documents,
+   merged sofa SOs and batches over the existing maximum;
+4. default every selected source line to the governed default destination;
+5. group output PO lines by SKU + configuration + effective destination, not SKU alone;
+6. preserve source SO references and sofa one-PO-per-SO construction;
+7. remain deterministic regardless of selection order.
 
-The engine numbers and `expectedArrivalOf` · the arrival-provenance colour law
-(red only for a date the factory GAVE) · `Ready stock is SUGGESTED, never
-consumed` · the PO-day plan pre-selection and human ticks as DELTAS · the single
-`purchasing_issue_pos_batch` authority · Receiving, Claims, Report and Settings
-files · the nine measured column widths of the Purchase Orders register.
+Write failing unit tests for default, whole-line change, 10/1 split, duplicate-destination merge,
+under/over allocation, stale qty, sofa modules and mixed suppliers before changing the planner.
 
-## TESTS AND DEPLOY — MANDATORY, EVERY SLICE
+## 6 · API and one creation authority
 
-- Three levels render; a single-variant item collapses to two.
-- Sofa selection takes the whole same-SO set; a non-sofa item does not.
-- `To Buy` is printed and is not editable.
-- A line with `To Buy = 0` is not selectable.
-- Destination and delivery date are absent from the issue form and present on the
-  issued PO lines, derived from the source SO line.
-- Changing a line's destination raises the stock-transfer consequence.
-- Issue emits one PO per supplier; a partial failure leaves the others issued and
-  the failed group retryable.
-- No string on the page is absent from `COPY-STANDARD.md`.
-- Widths re-measured in a real browser; no guessed number is written down.
+Update `apps/api/src/routes/operation/to-order.ts` and its tests:
 
-## Acceptance boundary
+- the Issue body carries destination allocations per document, not one client-trusted header
+  destination;
+- reload the current demand plan and active destination registry before validating;
+- compute the default destination on the server; never trust a client label/default;
+- validate every allocation against current source-line quantity;
+- continue grouping by governed supplier/category/SO rules;
+- call only `purchasing_issue_pos_batch(jsonb)`; no compatibility endpoint or direct insert;
+- return created PO ids with supplier/destination summary so the UI can show the exact documents;
+- keep current per-supplier progress/retry behaviour: a completed supplier group is never issued
+  twice, and a failed group remains named and retryable.
 
-Authenticated production verification at 1440×900 and ~1920 on real demand: the
-hierarchy, the sofa exception, `To Buy` printed and locked, `Coverage` on every SO
-line, shortages at the top, no destination question at issue, one PO per supplier,
-and the `Queues` rail filtering the grid. Overwrite `docs/purchasing/MASTER.md`
-§3's WHAT IS ON SCREEN TODAY in the same PR under the MASTER OVERWRITE LAW.
+### Price boundary
 
----
+Delete the Operations commercial-decision review from `OperationToOrder.tsx` and the Issue body.
+The Issue route reads the latest Catalog cost immediately before creation:
 
-## PLANNER RULINGS — 2026-08-19, the three blockers resolved WITHOUT the owner
+- known positive cost → snapshot it on the PO line;
+- missing/changed cost → Issue continues with cost explicitly unknown; only an authorised
+  Purchase Order/Finance surface may later resolve it, and this Card creates no Operations action
+  or new AP model;
+- Operations never sees price, types price, chooses FOC or receives `stale_catalog_cost`;
+- no write silently updates Catalog.
 
-The build chat raised three items as owner decisions. Measured against
-authority, **none of them is one** (CLAUDE.md: *"Can this be answered by
-reading the code, the docs, the database, or by measuring? YES → IT IS
-YOURS."*). All three are ruled here so the build continues.
+Add negative tests proving a missing cost and a cost changed after page load both still issue, while
+supplier mismatch, invalid destination, stale demand, invalid quantity and missing pickup partner
+still refuse by name.
 
-**1 · §4's "destination derives from the source SO line" is STRUCK from this
-card.** The build chat measured it correctly: no destination column exists on
-`orders` or `order_items`, `orders.warehouse_id` is null on 93 of 93 rows,
-and `purchasing/MASTER.md:1152` carries the **owner-locked** *Deliver To*
-rule (2026-08-14) — `Deliver To` is **Purchasing's own instruction at PO
-level with a PO-line override**, explicitly not copied from Sales Orders. A
-card may not overturn a locked owner ruling by implication. The half of §4
-already satisfied (the issue form asks nothing) STANDS. Nothing further is
-built for §4.
+## 7 · Migration and database invariants
 
-**2 · `Check the supplier` is STRUCK from the QUEUES rail.** Its demand never
-becomes a grid row (`to-order.ts:384` drops supplier-less SKUs before demand
-exists), so the queue would always filter to an empty sheet, and no
-`Save the supplier` door exists anywhere. It is catalog work, whose files
-this card forbids. `Issue PO` remains the rail's queue, as built.
+Create a new migration numbered from the maximum of production tracker, repository and every branch
+at execution time. Never edit 0311/0337/0361.
 
-**3 · `Proceed date` STAYS on the leaf row.** The card's ten-column list
-omitted it; an omission is not a deletion. It is an approved, shipped feature
-with eight tests, and the same sketch also omitted `PO No.`, which was kept —
-so the list is demonstrably not exhaustive. Deleting an approved feature on a
-silent reading is precisely what Law 4 exists to stop. One leaf row is one SO
-line, which is exactly the grain the fact needs. Repair the eight tests
-against the leaf row; do not delete them.
+Extend the existing authority in place so each line payload may carry `destination_id` and the
+constructor writes the line override atomically with PO creation. Preserve:
 
-**Consequence:** the 43 red tests lose their blocker. Finish the suite, run
-the release gate, PR, and merge. Do not return these three to the owner.
+- operation/principal gate and `SECURITY DEFINER` search path;
+- one advisory lock and one transaction;
+- supplier/SKU/destination validation;
+- PO number allocator;
+- Unit minting and demand-thread conflict protection;
+- PO purpose, SO references, partner, ETA, History and audit;
+- revocation of every legacy/direct PO creation authority.
+
+The current `po_lines_sku_attrs_uniq` index ignores destination while
+`purchasing_split_line_destination` creates a second same-SKU/config line. Measure the deployed
+schema with a rolled-back split negative control. The migration must make duplicate protection
+destination-aware so exactly one SKU/config/effective-destination line is allowed while two real
+destinations are allowed. Because replacing an existing index is governed destructive DDL, obtain
+the repository-required explicit migration approval immediately before applying it; this is a
+deployment gate, not an Owner operating-model decision.
+
+Also update the creation RPC's cost validation so unknown cost is allowed and recorded honestly.
+Do not invent a fake zero. Preserve explicit FOC/history on existing POs, but remove it from the
+Operations Issue decision.
+
+Migration verification must run inside a rollback and prove:
+
+1. default-only issue writes header Carres Klang and null line overrides;
+2. 10 Klang + 1 AL creates one PO with two lines and effective destinations 10/1;
+3. invalid/inactive destination and allocation mismatch roll back the whole PO;
+4. two operators cannot double-issue the same demand;
+5. direct authenticated calls to legacy functions/table INSERT still fail;
+6. missing cost creates the PO with unknown cost, never zero;
+7. existing PO destination set/split/revision functions continue to work.
+
+## 8 · UI state, feedback and next document
+
+Modify `apps/web/src/pages/operation/OperationToOrder.tsx` and
+`apps/web/src/pages/operation/OperationToOrder.test.tsx`; extract focused components/tests if the
+page would otherwise grow further.
+
+The selected Toolbar replaces the normal Toolbar in the same height. Opening the arrangement keeps
+the grid position. Issue is disabled only for a named demand/destination/partner/quantity blocker,
+never for price.
+
+During Issue, disable repeat submission. On success, rows update in place and show formal results:
+
+```text
+PO-2041 is ready
+Open PO-2041 and share its PDF with Nice Future.
+```
+
+The PO number is the door to Purchase Orders with that document open. Do not add a second PDF,
+email or WhatsApp sender here. Purchase Orders owns `shared_at`, the document snapshot, later
+supplier-date calls and revision rules. Do not label the PO `Acknowledged`; sharing the issued PDF
+means it was ordered unless the supplier later reports a model/fabric/date exception.
+
+Ordinary success uses the governed toast tray without moving the grid. Business blockers remain
+inline beside the affected document/line. A partial supplier-group failure names the supplier and
+keeps `Retry`; it never returns already-created groups to the selection.
+
+## 9 · Tests and regression boundary
+
+Required targeted suites:
+
+```bash
+pnpm --filter @carres/shared test -- to-order
+pnpm --filter @carres/api test -- to-order purchase-demands
+pnpm --filter @carres/web test -- OperationToOrder OperationPurchaseDemands OperationPurchaseOrders OperationApp PurchasingTabs PortalSidebar
+```
+
+Then run the exact release gate from `docs/ENGINEERING.md`, `git diff --check`, migration guards,
+and `check:v4`.
+
+Keep tests for every current capability this rewrite can accidentally erase:
+
+- actual-date PO Schedule, Overdue and category multi-filter;
+- search, per-column filters, sorting, totals, narrow-width horizontal scroll;
+- server preselection plus human deltas after refetch;
+- reserve-ready-stock offer and server recomputation;
+- recent issued PO rows and PO deep links;
+- missing customer date/supplier/production days blockers;
+- factory-pickup procurement partner;
+- no Manual Purchase typed demand in this grid;
+- one Issue authority and no old Orders/Delivery/PO-register Issue door.
+
+## 10 · Production acceptance
+
+Authenticated owner walk at 1440×900 and 1130×820 on real representative demand:
+
+1. Header matches Sales Orders; sidebar BUY and exactly one active state are correct.
+2. PO Schedule prints weekday + date, never Today/Tomorrow.
+3. Hierarchy groups an ordinary repeated SKU by item and a sofa by Sales Order.
+4. Qty Needed, Ready Stock, On PO, To Buy and every SO/customer leaf reconcile.
+5. Only shortage is selectable; sofa set selection is atomic.
+6. Default Issue needs no Deliver To click and produces Carres Klang.
+7. Whole-line change and 10/1 split show correct totals and create one supplier PO with correct
+   effective line destinations.
+8. Missing/changed price does not appear and does not stop Issue.
+9. Repeated click cannot double issue; stale quantity/destination refuses with the fix.
+10. Success names the created PO and opens Purchase Orders; there is no duplicate PDF/send flow.
+11. Existing Purchase Demands Register remains no-Issue.
+12. No console error, no clipped business value and no new UI component outside the kit.
+
+**Done means merged, deployed and production verified.** Record exact SHA, Worker/pages convergence,
+screenshots and measured current behaviour in `docs/purchasing/MASTER.md`; mark this Card
+`EXECUTED`. Do not declare Purchasing complete merely because these two pages shipped: the MASTER's
+other approved but unbuilt Purchasing objects remain separate scopes.
