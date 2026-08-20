@@ -89,6 +89,7 @@ import {
   useCreateSalesOrder,
   useCustomerTypeProbe,
   useDecidePaymentApproval,
+  useDeliveryOrdersRegister,
   useDeliveryPaymentApprovals,
   useRequestPaymentApproval,
   useOperationDealersRef,
@@ -114,6 +115,7 @@ import CorrectionWorkList from "./CorrectionWorkList";
 import SalesOrderAmendDeliveryDate from "./SalesOrderAmendDeliveryDate";
 import SalesOrderAmendment from "./SalesOrderAmendment";
 import SalesOrderAttribution from "./SalesOrderAttribution";
+import SalesOrderDeliveryOrdersBlock from "./SalesOrderDeliveryOrdersBlock";
 import SalesOrderLedger from "./SalesOrderLedger";
 import SalesOrderRoute from "./SalesOrderRoute";
 import SalesOrderTabs from "./SalesOrderTabs";
@@ -841,6 +843,10 @@ export default function SalesOrderWorkspace() {
   const revisionsQ = useSalesOrderRevisions(isNew ? null : (orderId ?? null));
   const goodsTruthQ = useSalesOrderExpansion(isNew ? "" : (orderId ?? ""));
   const amendmentQ = useSalesOrderAmendment(isNew ? null : (orderId ?? null));
+  const deliveryOrdersQ = useDeliveryOrdersRegister({
+    orderId: isNew ? undefined : orderId,
+    enabled: !isNew && Boolean(orderId),
+  });
   /* 3.4 · what this sales order's changes have raised for other modules. The
    * workspace SHOWS it and cannot close it — the module that raised the work
    * does not tick it off. */
@@ -2025,6 +2031,32 @@ export default function SalesOrderWorkspace() {
           </div>
         )}
       </Block>
+
+      {/* Delivery owns these documents and every write on them. Sales shows
+          the complete relationship so a failed, voided or rebooked DO never
+          disappears behind the current one-number mirror on `orders`. */}
+      {!isNew && mode !== "oldrev" && (
+        <Block title="Delivery Orders">
+          {deliveryOrdersQ.isLoading ? (
+            <p className="text-label text-base-600">Checking delivery orders…</p>
+          ) : deliveryOrdersQ.isError ? (
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-label text-base-700">Delivery orders could not be loaded.</p>
+              <Button size="sm" variant="neutral" onClick={() => void deliveryOrdersQ.refetch()}>
+                Try again
+              </Button>
+            </div>
+          ) : (
+            <SalesOrderDeliveryOrdersBlock
+              payload={deliveryOrdersQ.data ?? {
+                deliveryOrders: [],
+                attempts: [],
+                handoverEvents: [],
+              }}
+            />
+          )}
+        </Block>
+      )}
 
       {/* ⑨ WHAT THIS CHANGE STARTED ELSEWHERE — 3.4. Shown only when there IS
           work: a section that says "nothing" on every order is a section the

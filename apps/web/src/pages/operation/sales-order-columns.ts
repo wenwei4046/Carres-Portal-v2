@@ -31,7 +31,7 @@
  */
 import { fmtDate } from "@/lib/fmt-date";
 import { displayCustomerName } from "@/lib/customer-name";
-import type { operationOrderListRow } from "@/lib/queries";
+import type { DeliveryOrderRow, operationOrderListRow } from "@/lib/queries";
 import {
   digits,
   itemsSummary,
@@ -103,6 +103,9 @@ export interface RegisterRow {
   customerDelivery: string | null;
   deliveryLocation: string;
   poNumbers: string[];
+  /** Every Delivery document produced by this SO. `orders.do_number` is only
+   *  the current mirror and may never hide failed, voided or rebooked DOs. */
+  deliveryOrders: DeliveryOrderRow[];
   total: MoneyState;
   paid: MoneyState;
   balance: MoneyState;
@@ -110,7 +113,10 @@ export interface RegisterRow {
   phoneDigits: string;
 }
 
-export function buildRegisterRow(o: operationOrderListRow): RegisterRow {
+export function buildRegisterRow(
+  o: operationOrderListRow,
+  deliveryOrders: DeliveryOrderRow[] = [],
+): RegisterRow {
   const money = moneyOfOrder(o);
   const phone = o.customer_phone ?? "";
   return {
@@ -128,6 +134,7 @@ export function buildRegisterRow(o: operationOrderListRow): RegisterRow {
     customerDelivery: o.delivery_date_tbd ? null : (o.delivery_date ?? null),
     deliveryLocation: conciseLocality(o.customer_address_city, o.customer_address_state),
     poNumbers: o.po_numbers ?? [],
+    deliveryOrders,
     total: valueState(money),
     /* `paid` is never "unpriced" and never "settled": a payment either
      * happened or it did not, and the truthful cell for "it did not" is
@@ -214,7 +221,12 @@ export const REGISTER_FIELDS: readonly RegisterField[] = [
   { key: "po_number", label: "PO No", width: "170px", group: "Document", on: true,
     text: (r) => r.poNumbers.join(" · ") || NOT_RECORDED },
   { key: "do_number", label: "DO No", width: "150px", group: "Document", on: true,
-    text: (r) => r.o.do_number || NOT_RECORDED },
+    text: (r) =>
+      r.deliveryOrders.length === 0
+        ? "No delivery order yet"
+        : r.deliveryOrders.length === 1
+          ? r.deliveryOrders[0]!.do_number
+          : `${r.deliveryOrders.length} Delivery Orders` },
   { key: "items", label: "Items", width: "300px", group: "Items",
     text: (r) => r.items },
   { key: "total", label: "Total", width: "109px", align: "right", numeric: true,
