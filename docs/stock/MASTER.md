@@ -350,8 +350,9 @@ answer beside the availability word — `delivered` · `cancelled_before_receipt
 `returned_to_supplier` · `active` — so Delivered / history can tell them apart without a second
 query or a second arithmetic. Physical disposal is not a fifth word until that fact is recorded.
 
-**Four migrations, because self-review and review each found a real hole before merge. Every one of
-them was found by looking again, not by a failing test — which is the point of Law 4.**
+**Five migrations, because self-review and review kept finding real holes. Every one was found by
+looking again, not by a failing test — which is the point of Law 4. Two of the five (0369, 0370)
+exist because a guard I had described as protecting the numbers could not fire at all.**
 
 | | What it does | Why it exists |
 |---|---|---|
@@ -361,7 +362,9 @@ them was found by looking again, not by a failing test — which is the point of
 
 | **0369** | every bucket in `stock_sku_availability` is `coalesce(..., 0)`; `anon` loses its SELECT on all seven objects; the sanity block is rewritten NULL-safe and carries its own negative control | **found by review, and the sharpest of the three.** 0366 counted rows (`count(*) filter`, which returns 0 for an empty group); 0368 had to SUM `qty` so a bulk record contributes 555 rather than 1 — and `sum(...) filter` returns **NULL** for an empty group. Measured: `reserved` NULL on 73 of 74 rows, `bulk_on_hand` on 69, `incoming` on 50. Worse, 0368's own reconciliation guard was written `where sellable <> available + bulk_on_hand`, and a NULL on either side makes that predicate NULL — neither true nor false — so it never raised. **The predicate evaluated to NULL on all 74 rows: the guard was not passing, it was not testing anything.** A test believed to hold while the thing it guards is broken. 0369's guards use `is distinct from` and one of them is a deliberate negative control that proves the reconciliation check CAN fail |
 
-**Verification evidence.** All four migrations applied to production; each sanity block passed.
+| **0370** | the rollup upserts every pair (no `> 0` predicate), then RE-READS what it wrote and raises if it disagrees with the register | **found by review, and it had already caused harm.** During the window between 0368 and 0369 the view returned NULL for empty buckets, and the rollup's two predicates both read `(sellable + reserved)`: `NULL > 0` is NULL, so the INSERT skipped the row and the follow-up `update ... set qty = 0 where not exists (... > 0)` matched it and **zeroed it**. The cache said Carres held **5** units where the register held **980** — and eighteen SECURITY DEFINER functions read that cache. Repaired by re-running the rollup (980 = 980, 0 drifted rows). But the real defect was that a function whose whole job is to keep two numbers equal could write a wrong answer and return success, so it now proves its own answer and a disagreement aborts the statement that caused it |
+
+**Verification evidence.** All five migrations applied to production; each sanity block passed.
 Eight negative controls were run against production in a rolled-back transaction after 0366 —
 duplicate id · delete · id reuse after write-off · rename · bulk reservation · hand-written total ·
 the retired adjust door · editing a unit event — and **all eight fired**; the register was unchanged
@@ -373,7 +376,10 @@ and its negative control proves it can fail, and **0 grants of any kind remain t
 seven objects. Live figures unchanged throughout: on_hand 980 · available 85 · bulk_on_hand 893 ·
 sellable 978 · reserved 2 · incoming 43. 0366 and 0367 were reconciled against their repository
 files by comment-stripped md5 (`3955ccd7f936151d144a959afef4af22` and
-`a98022030312d9071a60b3b2c55d1ada`).
+`a98022030312d9071a60b3b2c55d1ada`). After 0370 the cache equals the register exactly
+(**980 = 980**, 0 drifted rows), and healing was proven end to end in a rolled-back transaction:
+the cache was zeroed deliberately, ONE unit touched, and the statement trigger restored all 980
+units for the whole Site.
 Local release gate: shared, API and web suites green, typecheck and build clean, no server secret in
 the web bundle.
 
