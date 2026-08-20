@@ -18,9 +18,10 @@
  * PATTERNS only; every colour, size, spacing and component here is the Carres
  * UI Kit.
  */
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { AlertTriangle, Check, Circle, CircleDot, Maximize2, Minus, Plus } from "lucide-react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { AlertTriangle, Check, ChevronDown, ChevronRight, Circle, CircleDot, Maximize2, Minus, Plus } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
+import { ROUTE_NODE_W } from "@carres/shared";
 import type {
   NodeMark,
   RouteEdge,
@@ -74,6 +75,195 @@ const STEP = 0.15;
  *  centred on the Sales Order and pans; the ⛶ control still offers the true
  *  whole-map fit as an explicit act. */
 const FIT_FLOOR = 0.7;
+
+const MAP_PAD = 28;
+const MAP_COLUMN_GAP = 32;
+const MAP_GROUP_GAP = 72;
+const MAP_ROW_GAP = 30;
+const MAP_BAND_HEIGHT = 22;
+const MAP_BAND_GAP = 28;
+const MAP_BAND_DROP = 18;
+const MAP_GATE_GAP = 56;
+
+function routeElbow(from: RouteNode, to: RouteNode) {
+  const x1 = from.x + from.w / 2;
+  const y1 = from.y + from.h;
+  const x2 = to.x + to.w / 2;
+  const y2 = to.y;
+  if (x1 === x2) return [{ x: x1, y: y1 }, { x: x2, y: y2 }];
+  const midY = y1 + (y2 - y1) / 2;
+  return [
+    { x: x1, y: y1 },
+    { x: x1, y: midY },
+    { x: x2, y: midY },
+    { x: x2, y: y2 },
+  ];
+}
+
+function goodsGroups(route: RouteMap) {
+  const outgoing = new Map<string, string[]>();
+  for (const edge of route.edges) {
+    const list = outgoing.get(edge.from) ?? [];
+    list.push(edge.to);
+    outgoing.set(edge.from, list);
+  }
+  const byId = new Map(route.nodes.map((node) => [node.id, node]));
+  return route.nodes
+    .filter((node) => node.kind === "goods-line")
+    .map((plate) => {
+      const ids = new Set<string>([plate.id]);
+      const queue = [plate.id];
+      while (queue.length > 0) {
+        const from = queue.shift()!;
+        for (const id of outgoing.get(from) ?? []) {
+          const next = byId.get(id);
+          if (!next || next.branch !== "goods" || ids.has(id)) continue;
+          ids.add(id);
+          queue.push(id);
+        }
+      }
+      return { plate, ids };
+    });
+}
+
+export function defaultExpandedGoods(route: RouteMap): string | null {
+  const groups = goodsGroups(route);
+  const current = route.nodes.find((node) => node.branch === "goods" && node.current);
+  return groups.find((group) => current && group.ids.has(current.id))?.plate.id ?? groups[0]?.plate.id ?? null;
+}
+
+/**
+ * The resolver keeps the complete truth graph. This presentation fold gives a
+ * long order a readable shape: goods lines stack down the page; the line with
+ * today's work opens; the rest stay as one-line disclosure plates. Delivery
+ * and Money remain parallel, and every visible branch still converges on the
+ * one Delivery Order gate.
+ */
+export function compactOrderRoute(route: RouteMap, expandedPlateId: string | null): RouteMap {
+  const source = new Map(route.nodes.map((node) => [node.id, node]));
+  const placed = new Map<string, RouteNode>();
+  const groups = goodsGroups(route);
+  const goodsSourceIds = new Set(groups.flatMap((group) => [...group.ids]));
+  const cancelled = route.nodes.filter((node) => node.branch === "goods" && !goodsSourceIds.has(node.id));
+
+  const groupBounds = groups.map((group) => {
+    const nodes = [...group.ids].map((id) => source.get(id)!).filter(Boolean);
+    return {
+      ...group,
+      nodes,
+      minX: Math.min(...nodes.map((node) => node.x)),
+      minY: Math.min(...nodes.map((node) => node.y)),
+      width: Math.max(...nodes.map((node) => node.x + node.w)) - Math.min(...nodes.map((node) => node.x)),
+      height: Math.max(...nodes.map((node) => node.y + node.h)) - Math.min(...nodes.map((node) => node.y)),
+    };
+  });
+  const expanded = groupBounds.find((group) => group.plate.id === expandedPlateId) ?? groupBounds[0] ?? null;
+  const goodsWidth = Math.max(ROUTE_NODE_W, expanded?.width ?? ROUTE_NODE_W);
+  const deliveryWidth = ROUTE_NODE_W;
+  const moneyWidth = ROUTE_NODE_W;
+  const loanNodes = route.nodes.filter((node) => node.branch === "loan");
+  const loanWidth = loanNodes.length > 0
+    ? loanNodes.length * ROUTE_NODE_W + (loanNodes.length - 1) * MAP_COLUMN_GAP
+    : 0;
+  const totalWidth =
+    goodsWidth + MAP_GROUP_GAP + deliveryWidth + MAP_GROUP_GAP + moneyWidth +
+    (loanWidth > 0 ? MAP_GROUP_GAP + loanWidth : 0);
+  const centreX = MAP_PAD + totalWidth / 2;
+  const originSource = route.nodes.find((node) => node.kind === "sales-order")!;
+  const origin = { ...originSource, x: centreX - originSource.w / 2, y: MAP_PAD };
+  placed.set(origin.id, origin);
+  const bandY = origin.y + origin.h + MAP_BAND_GAP;
+  const rowTop = bandY + MAP_BAND_HEIGHT + MAP_BAND_DROP;
+
+  let goodsY = rowTop;
+  for (const group of groupBounds) {
+    if (group.plate.id === expanded?.plate.id) {
+      for (const node of group.nodes) {
+        placed.set(node.id, {
+          ...node,
+          x: MAP_PAD + node.x - group.minX,
+          y: goodsY + node.y - group.minY,
+        });
+      }
+      goodsY += group.height + MAP_ROW_GAP;
+    } else {
+      placed.set(group.plate.id, { ...group.plate, x: MAP_PAD, y: goodsY, w: ROUTE_NODE_W });
+      goodsY += group.plate.h + 18;
+    }
+  }
+  for (const node of cancelled) {
+    placed.set(node.id, { ...node, x: MAP_PAD, y: goodsY });
+    goodsY += node.h + 18;
+  }
+
+  const deliveryX = MAP_PAD + goodsWidth + MAP_GROUP_GAP;
+  const moneyX = deliveryX + deliveryWidth + MAP_GROUP_GAP;
+  const loanX = moneyX + moneyWidth + MAP_GROUP_GAP;
+  const placeChain = (branch: RouteNode["branch"], x: number) => {
+    const chain = route.nodes.filter((node) => node.branch === branch);
+    if (chain.length === 0) return rowTop;
+    const minY = Math.min(...chain.map((node) => node.y));
+    let bottom = rowTop;
+    chain.forEach((node, index) => {
+      const next = { ...node, x: x + index * (branch === "loan" ? ROUTE_NODE_W + MAP_COLUMN_GAP : 0), y: rowTop + node.y - minY };
+      placed.set(node.id, next);
+      bottom = Math.max(bottom, next.y + next.h);
+    });
+    return bottom;
+  };
+  const deliveryBottom = placeChain("delivery", deliveryX);
+  const moneyBottom = placeChain("money", moneyX);
+  const loanBottom = placeChain("loan", loanX);
+  const deepest = Math.max(goodsY - MAP_ROW_GAP, deliveryBottom, moneyBottom, loanBottom);
+
+  const gateSource = route.nodes.find((node) => node.kind === "delivery-order")!;
+  const gate = { ...gateSource, x: centreX - gateSource.w / 2, y: deepest + MAP_GATE_GAP };
+  placed.set(gate.id, gate);
+  let tailY = gate.y + gate.h + MAP_ROW_GAP;
+  for (const node of route.nodes.filter((item) => item.branch === "tail")) {
+    const next = { ...node, x: centreX - node.w / 2, y: tailY };
+    placed.set(node.id, next);
+    tailY += node.h + MAP_ROW_GAP;
+  }
+
+  const visible = new Set(placed.keys());
+  const edges: RouteEdge[] = route.edges
+    .filter((edge) => visible.has(edge.from) && visible.has(edge.to))
+    .map((edge) => {
+      const from = placed.get(edge.from)!;
+      const to = placed.get(edge.to)!;
+      return { ...edge, points: routeElbow(from, to), labelAt: null };
+    });
+  for (const group of groupBounds) {
+    if (group.plate.id === expanded?.plate.id) continue;
+    edges.push({
+      id: `${group.plate.id}→delivery-order:collapsed`,
+      from: group.plate.id,
+      to: gate.id,
+      style: "dashed",
+      labelLines: [],
+      points: routeElbow(placed.get(group.plate.id)!, gate),
+      labelAt: null,
+    });
+  }
+
+  const bands = [
+    { id: "goods" as const, label: "GOODS", x: MAP_PAD, y: bandY, w: goodsWidth, h: MAP_BAND_HEIGHT },
+    { id: "delivery" as const, label: "DELIVERY", x: deliveryX, y: bandY, w: ROUTE_NODE_W, h: MAP_BAND_HEIGHT },
+    { id: "money" as const, label: "MONEY", x: moneyX, y: bandY, w: ROUTE_NODE_W, h: MAP_BAND_HEIGHT },
+    ...(loanNodes.length > 0
+      ? [{ id: "loan" as const, label: "LOAN", x: loanX, y: bandY, w: loanWidth, h: MAP_BAND_HEIGHT }]
+      : []),
+  ];
+  return {
+    ...route,
+    nodes: [...placed.values()],
+    edges,
+    bands,
+    width: MAP_PAD * 2 + totalWidth,
+    height: tailY - MAP_ROW_GAP + MAP_PAD,
+  };
+}
 
 /** State is never colour-only (card §12): every mark carries a glyph too. */
 const MARK_GLYPH: Record<NodeMark, typeof Check> = {
@@ -148,12 +338,16 @@ function Node({
   node,
   owners,
   onReveal,
+  goodsExpanded,
+  onToggleGoods,
 }: {
   node: RouteNode;
   owners: RouteActionOwners;
   /** Slice 4 — the page pans the transformed surface so a focused node is
    *  visible; the browser cannot do it for a CSS-transformed canvas. */
   onReveal?: (node: RouteNode) => void;
+  goodsExpanded?: boolean;
+  onToggleGoods?: (id: string) => void;
 }) {
   const navigate = useNavigate();
   const Glyph = MARK_GLYPH[node.mark];
@@ -163,13 +357,15 @@ function Node({
      a station: no glyph, no state word, no action, no door. */
   if (node.kind === "goods-line") {
     return (
-      <div
+      <button
+        type="button"
         data-testid={`route-node-${node.id}`}
         data-kind={node.kind}
         data-mark={node.mark}
-        role="group"
         aria-label={[node.title, ...node.lines].join(" — ")}
-        className="absolute overflow-hidden rounded-card border border-kit-slate-5 bg-kit-slate-3 px-3"
+        aria-expanded={goodsExpanded}
+        onClick={() => onToggleGoods?.(node.id)}
+        className="absolute overflow-hidden rounded-card border border-kit-slate-5 bg-kit-slate-3 px-3 text-left hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9"
         style={{
           left: node.x,
           top: node.y,
@@ -180,10 +376,11 @@ function Node({
         }}
       >
         <div
-          className="truncate text-label font-semibold text-base-900"
+          className="flex items-center gap-1 truncate text-label font-semibold text-base-900"
           style={{ height: TITLE_H, lineHeight: `${TITLE_H}px` }}
         >
-          {node.title}
+          {goodsExpanded ? <ChevronDown size={12} aria-hidden="true" /> : <ChevronRight size={12} aria-hidden="true" />}
+          <span className="truncate">{node.title}</span>
         </div>
         {node.lines.map((line, i) => (
           <div
@@ -194,15 +391,11 @@ function Node({
             {spellDates(line)}
           </div>
         ))}
-      </div>
+      </button>
     );
   }
   const person = node.action ? ownerOf(owners, node.action.ownerKey) : null;
-  const actionContext = node.action
-    ? `${node.action.context.subject} · ${
-        node.action.context.dueOn ? `Due: ${node.action.context.dueOn}` : "No due date yet"
-      }`
-    : null;
+  const actionContext = node.action?.context.detail ?? null;
 
   const spoken = [
     node.title,
@@ -392,6 +585,10 @@ export default function SalesOrderRoute({
   loading?: boolean;
 }) {
   const frame = useRef<HTMLDivElement | null>(null);
+  const initialExpanded = useMemo(() => defaultExpandedGoods(route), [route]);
+  const [expandedGoods, setExpandedGoods] = useState<string | null>(initialExpanded);
+  useEffect(() => setExpandedGoods(initialExpanded), [initialExpanded]);
+  const map = useMemo(() => compactOrderRoute(route, expandedGoods), [route, expandedGoods]);
   const [view, setView] = useState({ scale: 1, tx: 0, ty: 0 });
   const drag = useRef<{ x: number; y: number; tx: number; ty: number } | null>(null);
 
@@ -402,15 +599,15 @@ export default function SalesOrderRoute({
   const fit = useCallback(
     (whole = false) => {
       const box = frame.current?.getBoundingClientRect();
-      if (!box || box.width === 0 || route.width === 0) return;
-      const wFit = box.width / route.width;
-      const raw = Math.min(1, wFit, box.height / route.height);
+      if (!box || box.width === 0 || map.width === 0) return;
+      const wFit = box.width / map.width;
+      const raw = Math.min(1, wFit, box.height / map.height);
       if (whole || raw >= FIT_FLOOR) {
         const scale = Math.max(MIN_SCALE, raw);
         setView({
           scale,
-          tx: Math.max(0, (box.width - route.width * scale) / 2),
-          ty: Math.max(0, (box.height - route.height * scale) / 2),
+          tx: Math.max(0, (box.width - map.width * scale) / 2),
+          ty: Math.max(0, (box.height - map.height * scale) / 2),
         });
         return;
       }
@@ -420,19 +617,19 @@ export default function SalesOrderRoute({
          the Sales Order, panning sideways. */
       if (wFit >= FIT_FLOOR * 0.95) {
         const scale = Math.min(1, wFit);
-        setView({ scale, tx: Math.max(0, (box.width - route.width * scale) / 2), ty: 0 });
+        setView({ scale, tx: Math.max(0, (box.width - map.width * scale) / 2), ty: 0 });
         return;
       }
       const scale = FIT_FLOOR;
-      const so = route.nodes.find((n) => n.kind === "sales-order");
-      const cx = so ? so.x + so.w / 2 : route.width / 2;
+      const so = map.nodes.find((n) => n.kind === "sales-order");
+      const cx = so ? so.x + so.w / 2 : map.width / 2;
       setView({
         scale,
-        tx: Math.min(0, Math.max(box.width - route.width * scale, box.width / 2 - cx * scale)),
+        tx: Math.min(0, Math.max(box.width - map.width * scale, box.width / 2 - cx * scale)),
         ty: 0,
       });
     },
-    [route.width, route.height, route.nodes],
+    [map],
   );
 
   useLayoutEffect(() => {
@@ -535,14 +732,14 @@ export default function SalesOrderRoute({
           data-testid="route-surface"
           className="absolute left-0 top-0 origin-top-left motion-safe:transition-transform motion-safe:duration-150"
           style={{
-            width: route.width,
-            height: route.height,
+            width: map.width,
+            height: map.height,
             transform: `translate(${view.tx}px, ${view.ty}px) scale(${view.scale})`,
           }}
         >
           {/* The route names live on these bands — GOODS · DELIVERY · MONEY —
               never on the connectors (owner ruling 2026-08-17). */}
-          {route.bands.map((band) => (
+          {map.bands.map((band) => (
             <div
               key={band.id}
               data-testid={`route-band-${band.id}`}
@@ -558,9 +755,16 @@ export default function SalesOrderRoute({
               {band.label}
             </div>
           ))}
-          <Edges map={route} />
-          {route.nodes.map((node) => (
-            <Node key={node.id} node={node} owners={owners} onReveal={revealNode} />
+          <Edges map={map} />
+          {map.nodes.map((node) => (
+            <Node
+              key={node.id}
+              node={node}
+              owners={owners}
+              onReveal={revealNode}
+              goodsExpanded={node.kind === "goods-line" ? node.id === expandedGoods : undefined}
+              onToggleGoods={(id) => setExpandedGoods((current) => current === id ? current : id)}
+            />
           ))}
         </div>
 

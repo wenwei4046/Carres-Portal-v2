@@ -144,6 +144,32 @@ describe("Sales Order object template contract", () => {
     expect(workspace).toContain("Viewing Rev {viewedRevision.revision} · read-only");
     /* No save bar can exist there — the diff is empty by construction. */
     expect(workspace).toContain('if (mode === "oldrev") return [];');
+    /* Selecting an old revision leaves the ledger and opens the SAME complete
+       document workspace. The Revisions tab remains current in the header. */
+    expect(workspace).toContain(
+      '(objectView === "Revisions" && mode !== "oldrev") || objectView === "History"',
+    );
+  });
+
+  it("shows Delivery Journey and a complete read-only Related Documents index", () => {
+    expect(workspace).toContain('<Block title="Delivery Journey">');
+    expect(workspace).toContain('<Block title="Related Documents">');
+    expect(workspace).toContain('data-testid="sales-order-related-documents"');
+    for (const word of [
+      "Purchase Orders",
+      "Receiving Sessions",
+      "Stock Units",
+      "Delivery Orders",
+      "Payments",
+      "Service Cases",
+      "Guarantees",
+    ]) {
+      expect(workspace).toContain(`label="${word}"`);
+    }
+    expect(workspace).toContain("<SalesOrderDeliveryOrdersBlock payload={deliveryOrdersQ.data} />");
+    expect(workspace).toContain("Delivery Orders could not be loaded");
+    expect(workspace).toContain("Documents could not be loaded");
+    expect(workspace).toContain("Open Order Route →");
   });
 
   it("puts no toolbar on or above the paper", () => {

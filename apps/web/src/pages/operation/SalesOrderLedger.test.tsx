@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import SalesOrderLedger from "./SalesOrderLedger";
+import SalesOrderLedger, { historyWords } from "./SalesOrderLedger";
 
 const revisions = [{
   revision: 1,
@@ -33,5 +33,14 @@ describe("Sales Order Revisions and History are different records", () => {
     render(<SalesOrderLedger revisions={rows} history={history} currentRevision={2} viewedRevision={null} onViewRevision={vi.fn()} onProposeRevision={onProposeRevision} />);
     fireEvent.click(screen.getByRole("button", { name: "Propose this version again" }));
     expect(onProposeRevision).toHaveBeenCalledWith(rows[0]);
+  });
+
+  it("translates stored field keys into the same plain words as the object page", () => {
+    expect(historyWords("Staff correction - Rev 2 - customer_name")).toBe(
+      "Staff correction · Rev 2 · Customer name",
+    );
+    expect(historyWords("Changed delivery_date and delivery_has_lift")).toBe(
+      "Changed Customer Delivery and Lift available",
+    );
   });
 });
