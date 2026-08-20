@@ -239,7 +239,7 @@ describe("the accordion", () => {
 describe("the elbow connectors", () => {
   /* DELIVERY IS THE FLAT MODULE NOW. Purchasing grew a nested level under
    * CARD-2026-08-20, so the one-level contract is proved on the module that
-   * still has one level — six pages, Report under its hairline, which is the
+   * still has one level — seven pages, Report under its hairline, which is the
    * exact shape Purchasing used to have. Purchasing's own nesting is proved in
    * its own describe below. */
   it("every child row carries its own elbow", () => {
@@ -247,7 +247,7 @@ describe("the elbow connectors", () => {
     const group = screen.getByTestId("nav-children-delivery");
     const rows = group.querySelectorAll("[data-testid^='nav-child-']");
     const elbows = group.querySelectorAll("[data-testid^='nav-elbow-']");
-    expect(rows.length).toBe(6);
+    expect(rows.length).toBe(7);
     expect(elbows.length).toBe(rows.length);
   });
 
@@ -269,7 +269,7 @@ describe("the elbow connectors", () => {
     const group = screen.getByTestId("nav-children-delivery");
     const rows = group.querySelectorAll("[data-testid^='nav-child-']");
     const trunks = group.querySelectorAll("[data-testid^='nav-trunk-']");
-    expect(rows.length).toBe(6);
+    expect(rows.length).toBe(7);
     expect(trunks.length).toBe(rows.length - 1);
     // Report is last, and nothing hangs below it.
     expect(screen.getByTestId("nav-elbow-delivery-report")).toBeInTheDocument();
