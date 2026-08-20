@@ -1,247 +1,286 @@
-# STOCK — MASTER
+# STOCK / WAREHOUSE — MASTER
 
-> **The only Stock document.** Overwritten when re-ruled; never versioned.
-> **You read `CLAUDE.md` and this file.**
->
-> **Inventory and Ready Stock are ONE module, and that is measured, not chosen.** Since
-> 2026-08-19 the module's pages live in the sidebar under the **`WAREHOUSE` heading**
-> (CARD-2026-08-19-warehouse-rail); the old single `Stock` door with three tabs is gone.
-> Two masters would still be two names for one module.
->
-> **The owner-approved Warehouse Blueprint (22 items, reviewed item by item 2026-08-14)**
-> is the module's approved operating-model target — Unit as truth, NETS-executed physical
-> operation, Sites/custody, counts, transfers, consignment, permissions. Its full
-> persistence into this MASTER is pending the owner's blanket approval; **item 13
-> (navigation) is applied** by the rail card below.
+> **APPROVED / LOCKED — owner-reviewed 2026-08-20.**
+> This is the only Warehouse operating model. It overwrites the former On hand, Ready stock
+> planning and Held stock model. Current code is evidence only, never target authority.
 
-| I am working on | Read |
+## 1 · Mission and ownership
+
+Warehouse answers: **Which exact Unit is where, who has it, what condition is it in, and can it
+be used?**
+
+Carres currently uses third-party warehouse and delivery operators. NETS performs physical work;
+Carres Portal preserves Carres-controlled inventory truth. The model must work unchanged with
+another 3PL or a future Carres-operated warehouse.
+
+| Fact | Owner |
 |---|---|
-| anything | **§1 · §2** |
-| what is physically here | **§3 On hand** |
-| what moved | **§4 In & out** |
-| the shelf plan and reorder points | **§5 Ready stock** |
-| quarantined goods | **§6 Held stock** |
-| the review numbers | **§7** |
+| PO, Consignment Order, supplier promise/claim and commercial reason | Purchasing |
+| Unit ID, Where, Who has it, condition, availability and physical history | Stock / Warehouse |
+| receiving session and receipt evidence | Receiving |
+| exact Unit promised, reservation and release decision | Sales Order |
+| journey, carrier handover and proof | Delivery |
+| customer problem after delivery | Service Case |
+| invoice, settlement, payment and valuation | Finance |
+| material adjustment, write-off and major dispute approval | Management |
 
----
+Purchasing explains why Carres obtained the Unit. Stock explains where it is now. A consequence
+never transfers write ownership.
 
-# §1 · Overview
+## 2 · Navigation and words
 
-### MISSION
-Answer three questions and no more: **what is physically here · what moved · what should we buy
-for the shelf.**
+Warehouse destinations are **Stock · Ready stock · In & out · Transfers · Counts**.
 
-### WHAT IS ON SCREEN TODAY
-**The `WAREHOUSE` sidebar heading with the module's pages as rows**
-(CARD-2026-08-19-warehouse-rail — Warehouse Blueprint item 13, under the Jess
-2026-08-19 SALES-template heading law):
+- Stock: every currently controlled Unit.
+- Ready stock: exact Units currently eligible for a new customer promise.
+- In & out: append-only physical events.
+- Transfers: Site-to-Site movement and handover.
+- Counts: dated physical counts and Unit-level differences.
 
-```
-WAREHOUSE
-  On hand        ?tab=stock-onhand   — the per-unit register, chip-filtered
-  Ready stock    ?tab=stock-plan     — the plan, reorder points, K5's digest
-  In & out       ?tab=movements      — every movement
-  Transfers      Coming soon         — blueprint item 13.3, its own card
-  Counts         Coming soon         — blueprint item 13.4, its own card
-```
+Reports, Settings, Work, Quick Rail and Calendar keep their shared Shell homes. Receiving,
+Purchasing, Delivery, Payments and Service Cases keep their own doors.
 
-- The three live rows keep K0's learned order; the rail never reshuffles. When
-  Ready stock folds into On hand Views (blueprint item 13.7) its row dies in
-  that card's own PR.
-- **No Report row, no Settings row** — the blueprint keeps both central.
-- The tab strip died with the rail move; `StockTabs.tsx` keeps drawing the ONE
-  destination-format header (壳画头), page words = the sidebar's own words.
-- Every `?tab=` address is unchanged — the door moved, not the address.
+Approved operator words include **Where · Who has it · Carres Owned · Supplier Consignment ·
+Report issue · Count again**.
 
-```
-OperationStockOnHand.tsx    On hand    — the per-unit register, chip-filtered
-OperationMovements.tsx      In & out   — every movement
-OperationStockPlan.tsx      Ready stock — the plan, reorder points, K5's digest
-```
+Rejected Warehouse UI words include On hand as the master-list name, Stock Units as the list name,
+Inventory, Movements, Custody, bare Hold, Quarantine, and generic Review, Handle, Follow up,
+Next Action, Priority, Edit, Delete, Add stock, Remove stock or Mark done. Shared copy remains
+governed by the Copy Standard.
 
-**`Inventory` and `Movements` are BANNED UI words.** The goods pool is **`Stock`** on any page,
-tab or label.
+## 3 · Unit operating model
 
-### LIVE SCALE — measured 2026-08-05
-```
-ops_stock_items 135 · units on_hold 0 · ops_stock_pool_usage 0
-49 warehouse SKUs, ZERO with a single real sale, seven days of real records
-```
+Every physical sofa Carres controls has one permanent Carres Unit ID, including Carres-owned and
+supplier-consignment display goods, sold display goods awaiting delivery, and goods awaiting repair,
+change, return or supplier collection.
 
----
+The ID is created when a PO or Consignment Order is confirmed and supplied to the supplier. The
+supplier adds CARRES UNIT ID to its own label; Carres does not routinely print supplier labels.
+A wrong or unreadable label starts a controlled issue, never a second Unit. Replacement labels keep
+the original ID and full evidence. IDs are never reused.
 
-# §2 · Shared architecture
+Every active Unit has Catalog identity, source order, ownership, **Where**, **Who has it**,
+condition, calculated availability, reservation connection, last verified date, evidence and
+append-only history.
 
-| Concern | The ONE home |
+| Where | Who has it |
 |---|---|
-| the per-unit register | `ops_stock_items` — **the register is the authority, not a rollup** |
-| whose the goods are | `ops_stock_items.ownership` — `carres` or `supplier` + which supplier |
-| the Unit ID | minted by Stock when a purchase or consignment order is CONFIRMED |
-| where it stands, since when | the site and the display-start date, both on the unit |
-| the rolled-up balance | `stock_balances` via `ops_rollup_stock_balances` |
-| quarantine outcomes + status mapping | `packages/shared/src/stock-hold.ts` |
-| pool draw reasons (K4's dated ledger) | `ops_stock_pool_usage` + `POOL_USE_REASONS` |
-| reorder points | `ops_reorder_points` |
+| Carres Klang Warehouse | NETS Warehouse |
+| On the way to PJ Showroom | NETS Delivery |
+| PJ Showroom | PJ Showroom |
+| selected JB partner warehouse | JB partner |
+| On the way to the Singapore customer | EU or SSY |
 
-> **THE TRAP THAT HAS COST REAL TIME: two base tables with NO trigger between them.**
-> `ops_stock_items` (the register) and `stock_balances` (the rollup) do not move together.
-> **Anything that decides whether stock is available must read the REGISTER** — a rollup number
-> does not fall when a draw happens, so the same units get offered again tomorrow.
+NETS is not a Site. Site, operating party and role are separate. Independently saleable or
+replaceable modules each have a Unit ID; pure shipping packages are children of their Unit.
+Missing required modules, components or packages prevents Ready stock eligibility.
 
----
+## 4 · Availability, reservation and replenishment
 
-# §3 · On hand
+The Unit register is authority. Every quantity is derived from identifiable Units; no rollup,
+page or integration maintains another available quantity.
 
-### MISSION
-What is physically in a warehouse right now, per unit.
-
-### FROZEN RULES
-- **A UNIT IS BORN WITH ITS ORDER, NOT WITH THE TRUCK** (Jess, 2026-08-18). Confirming a
-  purchase or consignment order mints one row per physical piece, `status='incoming'`, so the
-  numbers can go OUT on the order and the supplier can print them on its own label. Carres does
-  not print supplier labels. **`incoming` means ORDERED, never HELD** — this module already paid
-  for forgetting that once (§6: a broken unit sat in `incoming` and both the reorder engine and
-  the ready-stock plan read it as *coming*, inflating supply with goods that would never arrive).
-  Every arithmetic that answers *what can we sell* or *what must we still buy* treats `incoming`
-  as absent.
-- **A UNIT SAYS WHOSE IT IS** (Jess, 2026-08-18). `ownership` is `carres` or `supplier`, and on a
-  supplier row the supplier is named. Without it a consigned sofa standing in a showroom is
-  indistinguishable from one Carres paid for, and nothing can answer what is owed for what.
-  **Ownership never moves on a warehouse action** — not on a transfer, not on a count, not on a
-  status change. Only a Purchasing or Finance record moves it, and selling a `supplier` unit is
-  what tells Finance a payable now exists.
-- **DIFFERENT FABRIC IS DIFFERENT STOCK.** Three beige do not satisfy an order for grey. Whatever
-  the catalog does with variants above, the count below is kept per variant, and every pick reads
-  the count that matches what was actually ordered.
-- **A UNIT KNOWS WHERE IT STANDS AND SINCE WHEN.** The site (`Carres` · `AL` · `HOUZS`, extended in
-  Settings, never in code) and the display-start date, from which *"on display 187 days"* is
-  derived and never stored. **A slot code inside a site was refused** (Jess, 2026-08-18): with one
-  showroom the re-keying costs more than the answer, and a position nobody updates is worse than
-  no position. It becomes a real question at three or four outlets, not before.
-- **Every pick filters `status='free'`**, and the rollup counts only free + reserved.
-- **A record is drawn WHOLE.** A bulk record of N units that would over-reserve is skipped,
-  never split — so a 555-unit pillow row reserved for one pillow takes all 555 out of free
-  stock, and the ledger honestly records 555. **A pre-existing property of the per-unit engine,
-  not something a card introduced.**
-- **`Reserve`, never `Take`.** The goods do not leave; they are LOCKED until delivery, and an
-  operator who believes stock has gone will not chase it. The past tense moved with it —
-  *reserved N from stock*, never *took*.
-- **A UNIT'S CATEGORY IS THE CATALOG'S ANSWER AND NOBODY ELSE'S**
-  (CARD-2026-08-19-onhand-category-filter, closing this module's half of D9). The chain is
-  `ops_stock_items.sku → product_skus.sku → product_skus.model_id → product_models.category`,
-  read by the ONE shared reader every other gate already asks
-  (`apps/api/src/lib/sku-categories.ts`), so On hand can never disagree with the earliest-sell
-  floor or the goods gate about what a sofa is. **No screen and no shared function may
-  re-derive a category from a SKU STRING** — the prefix rule D9 was raised against was wrong
-  for every live SKU, and the free-text import SKUs are exactly the strings it mis-read
-  (`Microfiber Waterproof Mattress Protector-K` is not a mattress).
-- **A SKU THE CATALOG DOES NOT HOLD SAYS SO.** `/inventory` returns `category: null` and the
-  rail counts it under **`Not in catalog`** — never guessed, never folded into `Accessory`.
-  The other three list views do not ask and carry no `category` key at all: **absent and
-  `null` are different facts**, and a `null` there would claim the catalog was asked.
-
-### WHAT IS ON SCREEN TODAY — the left filter rail
-`Category` sits between the attention chips and `Status`, same additive-AND pill mechanics as
-the groups below it, filtered client-side off the one `/inventory` fetch. Its no-filter pill is
-**`Any`**, matching Condition and Supplier; `All` stays the Status bucket list's word.
-Words: `docs/COPY-STANDARD.md` → *The On hand Category filter words*.
-
-**Measured 2026-08-19 (production, re-measured in the build):** 136 records · 74 distinct SKUs ·
-49 records join the catalog (sofa 23 · bedframe 16 · mattress 10) · **87 do not (975 units)**.
-Every live row is TEST data (Constitution §6): the null bucket is honest display, **never a
-backfill, repair worklist or cleanup card.**
-
-> **NOT LAW — PROPOSAL, carrying its own falsifier.** The card proposed `All` for the
-> no-filter pill and `No catalog match` for the null bucket; this build shipped **`Any`** and
-> **`Not in catalog`** instead, on the rail's own existing conventions and this dictionary's
-> `Supplier not assigned` / `Address not given yet` pattern. **Falsifier: the owner's word on
-> her walk.** One sentence from Jess overturns either, and the change is a copy edit.
-
-# §4 · In & out
-
-### MISSION
-What moved, when, and why.
-
-### FROZEN RULES
-- **A movement row is a record of a decision** and is never deleted to make a number tidy.
-- **Known defect, recorded not fixed:** `ops_stock_takeout` writes `qty 1` regardless of the
-  record's real quantity, so taking out a 555-unit record logs one unit. It predates the bulk
-  column, and the movements ledger feeds a `count(*)`-based rollup — **fix both together or
-  neither**, or the two disagree differently.
-
-# §5 · Ready stock
-
-### MISSION
-Decide what to buy for the SHELF — stock nobody has ordered yet.
-
-### FROZEN RULES
-- **A reorder point is a HUMAN number.** A SKU with none reads `Set a number` and raises no
-  alert. **A quiet screen must mean *watched and fine*, never *nobody looked*.**
-- **`ops_reorder_points.reorder_point` is NOT NULL and 0 means "alert OFF"**, which is why
-  reserve levels are their OWN table — a placeholder row would silently flip `Set a number` to
-  *watched and fine*.
-- **A reserve level WARNS and never BLOCKS.** Nothing anywhere disables anything on one.
-- **Ready stock is SUGGESTED to Purchasing, never consumed.** Goods are labelled per order;
-  nothing auto-consumes them. The human presses the button.
-
-# §6 · Held stock — problem goods
-
-### MISSION
-A damaged or wrong unit stops counting as future supply, under the claim that is chasing it.
-
-### FROZEN RULES
-- **The guard asks WHERE a unit is going, never WHO is writing.** `ops_stock_items` has a
-  blanket internal write policy and three live PostgREST paths write `status`, so a rule inside
-  one RPC is a rule one call walks around.
-- **`on_hold` may reach `free`, `returned_to_supplier` or `written_off`, and can NEVER reach
-  `reserved`, `sold` or `transferred`** (0299). **A CLAIMLESS hold can never reach
-  `returned_to_supplier`** (0341) — a supplier return walks only with its claim, so the claims
-  engine keeps its single Receiving entrance.
-- **A held unit is not "on the way."** Before this, a broken unit stayed `incoming` forever and
-  both the reorder engine and the ready-stock plan read `incoming` as *coming*, inflating
-  future supply with goods that will never arrive.
-- **TWO entries, decided by the REASON** (0341, Sales Order V2 Card 2 — the owner's 2026-08-11
-  ruling that a wrong / surplus / released / customer-rejected unit *returns through inspection
-  to Available or Hold*; it overwrote the old `incoming`-only rule, and the entry rule and the
-  way out moved in the SAME change as this section always demanded):
-  - **Claim quarantine** (`damaged` · `wrong_item`) enters from `incoming` only, at Receiving,
-    with its auto-claim — 0299's law, unchanged. **A supplier claim is still only ever raised
-    at receiving.**
-  - **Inspection hold** (`customer_return` · `inspection`) enters from `free` or `reserved`
-    only, through `ops_stock_hold_unit` (claimless; a reserved unit's ref moves into
-    `ref_history`), and exits ONLY through `ops_stock_resolve_unit_hold` —
-    `back_to_stock` or `written_off` (write-off note mandatory).
-  `needs_repair` remains the flag for a pool unit awaiting refurbish, with `refurbish-complete`
-  grading it back.
-- **A committed unit is resolved, never deleted** (0341): the register's delete guard admits a
-  hard delete only for `incoming` · `free` · `voided` rows — the mis-key fix. A reserved, sold,
-  transferred, held or terminally-resolved unit structurally cannot leave the register.
-- **Every draw off the shared pool names a REASON, in the same transaction as the draw.**
-  Six reasons, and the draw and the reason cannot come apart, because a failed stamp used to
-  leave an unexplained unit.
-- **Three doors out of the pool, not two** — the reserve doors AND `Takeout` on a free row.
-
-# §7 · The review layer
-
-### FROZEN RULES
-- **It mints nothing.** It reads the reorder points (when to BUY) and the reserve levels (how
-  low it may GO) and adds no third number.
-- **Every alert withholds itself until the records can back it.** A 90-day no-sale alert waits
-  until the records SPAN 90 days; a never-sold SKU is reported quiet for exactly as long as the
-  window can see. **All four gates heal by themselves.**
-- **`unrated` is a first-class rung, not `other`.** *Nobody set a number* is a different fact
-  from *somebody chose Other*, and folding them tells a manager her staff keep choosing Other.
-- **A month still running gets no percentage.**
-- **A WINDOW is not a HISTORY.** The route says where its window ENDS, or the window's own
-  oldest row silently becomes *"when our records start"*.
-
----
-
-# §8 · Approved Evolution
-
-| What | Why it is not built |
+| Facts | Result |
 |---|---|
-| **Splitting a bulk record on partial reserve** | Approved shape: decrement `qty`, mint a reserved sibling. **Every consumer of `ops_stock_items.qty` must be re-read when it happens**, which is why it is not a small card. |
-| **A net figure for the pool-usage split** | A release does not currently negate its draw row, because the ledger answers *what did we draw on ready stock FOR* and a release does not unmake the decision. If a net figure is ever wanted: add a `released_at` stamp and give the summariser a mode — **never delete rows.** |
-| **`ops_stock_items.reserve_reason` (0213) is orphaned** | It has no writer, 0 rows and no reader; the reason lives on the dated ledger. Dropping a column is the owner's call. |
-| **A post-receipt supplier claim** | Approved as a concept. Blocked: the entry rule and the refurbish door must move together. |
+| received, inspected, complete, unreserved and uncontrolled | Available |
+| bound by Sales Order | Reserved / sold |
+| ordered but not received | Incoming |
+| between confirmed handovers | In transit |
+| issue, inspection, repair, missing component or other control | Not available |
+| customer accepted or lifecycle ended | Delivered / history |
+
+Sales Order owns choosing, binding, changing and releasing the exact promised Unit. Stock validates
+eligibility and reflects the result. Warehouse may report a problem but cannot silently release or
+substitute a reserved Unit.
+
+Ready stock contains only exact Units satisfying every eligibility rule; every total drills to IDs.
+A customer shortage separates available Units from remaining demand: Warehouse receives dated
+preparation work for available Units, Purchasing receives dated arrival work for the missing demand,
+and Sales Order displays promise risk. General replenishment is a Purchasing decision.
+
+## 5 · Physical lifecycle
+
+Confirmed PO or Consignment Order creates expected Incoming Units. Receiving owns the session.
+NETS Warehouse scans each actual ID, checks product, visible condition, required components,
+packages and label, supplies governed evidence, and records one outcome per Unit: Check in,
+check in with issue, reject, or not delivered. A bulk total cannot replace Unit results. Partial
+receipt preserves received Units and leaves the remainder Incoming. Unexpected Units are
+investigated, never added through a shortcut.
+
+Showrooms are formal Sites. Staff scan arrival and departure, report observations and perform dated
+counts. A reserved display Unit remains at its Site but leaves Ready stock. Display start and last
+condition check are visible. No governed Position or slot exists now; reconsider when three to four
+outlets or measured finding time proves Site alone inadequate.
+
+Delivery works backward from the customer date using governed calendars, cut-offs and transit.
+Warehouse consumes the calculated latest Carres Warehouse ready date and completes exact-Unit
+check, completeness, pack and handover facts; it never guesses the date.
+
+A Transfer has exact Units, From, To, collection and arrival. Collection and arrival are separate
+facts. Partial handover changes only affected Units. A Unit not confirmed at destination remains
+with its last confirmed holder. Customer Delivery remains Delivery's record; Stock reads its
+handover facts instead of creating a duplicate Transfer.
+
+A Singapore SO has two Delivery legs: Carres Klang Warehouse to the selected JB partner warehouse,
+then that warehouse to the Singapore customer through EU or SSY. Each leg has its own logistics
+partner, linked DO or trip scope, dates, handovers and proof.
+
+A returned Unit is Returned — check required, never automatically Available. Repair requires
+outbound handover, external-holder truth, return handover and inspection. Supplier collection
+requires Purchasing authority and actual handover. Write-off approval and physical disposal are
+separate facts. Ended Units leave the default view but remain searchable in Delivered / history.
+
+## 6 · Issues, Counts and correction
+
+Anyone who observes a Unit may Report issue. Reasons are observable: damaged, product different,
+Unit ID unreadable, Unit cannot be found, Unit at another Site, components missing, packaging
+problem, unsafe, supplier or destination refused, or another observed problem. The Portal explains
+the consequence, requests reason-specific evidence, protects the Unit and raises Work. Staff do not
+guess Hold or Quarantine.
+
+Inspection records an actual result and permits only governed paths: restore eligibility, dated
+repair, Purchasing decision, supplier collection, Count again, approved Site correction or proposed
+write-off. Generic Close issue is invalid.
+
+Counts are dated Site work. The first count hides the expected list. After submission, differences
+are per Unit. A repeat creates new evidence and says **Count these Units again**. Multiple
+mismatches say **Find out why {n} Units do not match the count**.
+
+Cannot find does not reduce Stock. The flow checks last handover and holder, incomplete journeys
+and an exact-Unit repeat count. Only an unexplained result becomes a proposed adjustment, and the
+proposer cannot approve a material adjustment.
+
+Correct this record preserves the original event, corrected fact, reason, evidence, actor, time and
+approval. It is not a stock adjustment. No physical event or submitted report is edited or deleted.
+
+## 7 · Pages and daily journeys
+
+All surfaces reuse the governed Shell, Register, Workspace and Object Detail grammar.
+
+Stock is the one current list. Its left rail filters the same authority by All stock, Attention,
+Availability, Site or Where, Ownership, Catalog category, and Changed today, this week or this
+month. Time choices are filters, not Work dates.
+
+Ready stock groups eligible Units by Catalog product and Site and expands to exact IDs. Sales enters
+its own Choose Unit door; Stock has no second reservation editor.
+
+In & out shows actual time, Unit, event, From, To, handled by, source and evidence. Transfers
+provides Register, Detail, mobile collection and arrival. Counts provides Register, mobile scan
+workspace and difference surface.
+
+Unit Detail is titled by Unit ID and product. It shows Where, Who has it, ownership, condition,
+availability, reservation, last verified, one current attention item, connected records, evidence,
+history and permitted actions. There is no generic Edit, status selector or Delete.
+
+- NETS Warehouse opens dated Work, scans receipt, Count and handover, and supplies evidence.
+- NETS Delivery scans collection and arrival; unresolved Units remain visibly with it.
+- Showroom scans arrivals and departures, sees and counts its Site, and reports observations.
+- Carres Warehouse / Stock maintains evidence-backed Unit truth, exceptions, returns and month-end.
+- Finance receives frozen month-end facts and never edits Units.
+- Management decides material exceptions; approval never replaces physical proof.
+
+## 8 · Work and dates
+
+Warehouse uses the one shared Work Engine. Owner and cover are structured metadata, not sentence
+text. The business object has no fake universal Owner. Labels tell a new operator the concrete act;
+completion is an authoritative fact, never Mark done.
+
+Every Work row has an actual weekday and date; appointments also have time. Today, This week,
+This month and Upcoming are view or group labels only. Without a governed real date, the action
+contract is incomplete and cannot enter Work.
+
+- current year: Tue, 18 Aug;
+- non-current year: Fri, 1 Jan 2027;
+- with time: Tue, 18 Aug · 10:42 AM;
+- standalone formal reports, audit evidence and cross-year ranges show the year.
+
+The Stock rail finds Units. Quick Rail finds actions. Calendar shows dated Count, collection,
+arrival, return, inspection, repair, supplier collection and month-end commitments.
+
+## 9 · Month-end Stock Confirmation
+
+Each month produces a formal Month-end Stock Confirmation:
+
+- Stock date: final calendar day at 11:59 PM;
+- count date: actual date, allowed within two calendar days before or after Stock date;
+- submission date: governed Warehouse date after the window.
+
+Stock operations never close. The Portal reconciles exact timestamped Unit events between count and
+Stock date; it never guesses, backdates or adjusts a total to match. The frozen report separates
+Carres Owned, Supplier Consignment, Sites, In transit, Reserved or sold, controlled Units, approved
+adjustments and unresolved differences, with drill-down to IDs.
+
+Warehouse may submit on time with disclosed unresolved differences. Finance acknowledges a specific
+version. Later correction creates a reasoned Version 2; Version 1 remains. Finance valuation reads
+ownership and source facts but does not write physical Stock.
+
+## 10 · Permissions
+
+- Sales searches and chooses through Sales Order, and reports issues; no physical edits.
+- Purchasing owns PO, Consignment, supplier, claim and Sold to Settle; no physical handover/payment.
+- NETS Warehouse owns only assigned receipt, warehouse handover, evidence and Count execution.
+- NETS Delivery owns only assigned collection, transport, arrival, return and evidence.
+- Showroom owns only its Site arrival, count and observation.
+- Warehouse / Stock owns Unit, location, condition, availability control, differences, returns and
+  month-end; no commercial terms, customer promise or payment.
+- Finance owns invoice, settlement, payment, valuation and report acknowledgement; no Unit edits.
+- Management approves material adjustment, write-off, compensation and major dispute; approval does
+  not replace evidence.
+
+No person completes demand, ordering, receipt, stock adjustment and payment end to end. Cover moves
+Work but grants no new capability.
+
+## 11 · Reports, Settings and external boundary
+
+Reports cover Stock by Site, product, ownership and availability; Showroom; stale verification;
+receipt, Transfer and Count; partner evidence; current issues; corrections and adjustments; and
+month-end versions. Reports are read-only. Export never becomes authority.
+
+Central Settings owns Sites, operators and roles, Stock calendar, month-end and Count rules, issue
+reasons, evidence rules, Unit ID rules, permissions and approval limits. Settings never edits a
+Unit, reservation, event or report.
+
+Carres Portal is the minimum control plane. NETS receives narrow mobile Work, scan, observable
+outcome and evidence surfaces, not the full ERP. Optional APIs may propose events but cannot
+overwrite Unit truth. Offline scans remain visibly Not submitted and non-authoritative until
+submission; actual and submitted times are separate.
+
+The model never hard-codes NETS. Site, operating party, role, permission, calendar and evidence
+remain separate. Current scope rejects unproven heavy-WMS bin, rack, put-away, pick-wave, forklift
+and packing-station complexity. Zone, Rack or Bin may extend the same Unit model when measured need
+justifies it.
+
+## 12 · Current implementation reality — evidence, not law
+
+The superseded implementation has one Stock entry with On hand, In & out and a reorder-planning
+page called Ready stock; ops_stock_items and stock_balances can diverge; bulk quantity rows, legacy
+on_hold, take-out and movement defects, reorder points and pool-usage rules exist.
+
+These are not approved business law. They are gaps to re-measure before any build. The old
+three-tab IA, wording, Ready stock meaning, generic Held stock or Quarantine, rollup authority,
+bulk sofa identity and claim-only issue route are superseded.
+
+## 13 · Resolved contradictions and plan state
+
+Resolved: legacy tab shell to Warehouse destinations; On hand to Stock; Ready stock planning to
+eligible Units; warehouse-only scope to all governed Sites and journeys; rollup to Unit authority;
+bulk sofa to Unit identity; Quarantine to observable issue and automatic control; Receiving-only
+supplier fault to Receiving and Service entrances; NETS-as-place to Site/operator separation;
+one movement status to collection, transit and arrival; bulk reservation to Sales Order exact-Unit
+binding; missing month-end to Stock date, window, reconciliation and version; generic task to the
+shared Action contract; and hard-coded NETS to role-based partner/future-self-operation.
+
+Intentional rejects now: duplicate Warehouse Dashboard, second exception register, manual totals,
+negative stock, generic status editing, Position or slot at current scale, heavy WMS without
+measured need, and assumed external cutover.
+
+**RESOLVED FROM AUTHORITY:** Unit authority, ownership seams, shared Work and UI grammar and
+upstream/downstream owners.
+
+**APPROVED TARGET / NOT BUILT:** this complete Warehouse operating model and UI.
+
+**BUILT / VERIFIED:** only the implementation evidence in §12, to be re-measured before build.
+
+**REAL GAP / CONTRADICTION:** none requiring an owner decision.
+
+**OWNER DECISIONS:** none unresolved.
