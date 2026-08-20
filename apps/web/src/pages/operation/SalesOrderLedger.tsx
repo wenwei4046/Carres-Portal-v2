@@ -5,6 +5,46 @@ import { describeRevisionChanges } from "./sales-order-revisions";
 
 interface HistoryEvent { text: string; occurred_at: string }
 
+/**
+ * History is an operator ledger, not a database log. Older records contain
+ * column keys because the writer stored the changed field verbatim. Translate
+ * those keys at the read boundary so the immutable event stays untouched while
+ * staff see the same words as the Sales Order page.
+ */
+const HISTORY_FIELD_WORDS: Record<string, string> = {
+  customer_name: "Customer name",
+  customer_phone: "Phone",
+  customer_email: "Email",
+  customer_address: "Delivery address",
+  customer_address_line1: "Address line 1",
+  customer_address_line2: "Address line 2",
+  customer_address_city: "City",
+  customer_address_state: "State",
+  customer_address_postcode: "Postcode",
+  customer_billing: "Billing address",
+  customer_emergency: "Emergency contact",
+  delivery_date: "Customer Delivery",
+  delivery_date_tbd: "Customer Delivery date",
+  proceed_date: "Proceed date",
+  salesperson_id: "Salesperson",
+  outlet_id: "Showroom",
+  dealer_id: "Dealer",
+  installment_months: "Instalment months",
+  delivery_floor: "Delivery floor",
+  delivery_has_lift: "Lift available",
+  delivery_stair_items: "Stair-carry items",
+  lines: "Goods",
+  addons: "Services",
+};
+
+export function historyWords(text: string): string {
+  let result = text;
+  for (const [key, word] of Object.entries(HISTORY_FIELD_WORDS)) {
+    result = result.replace(new RegExp(`\\b${key}\\b`, "g"), word);
+  }
+  return result.replace(/\s+-\s+/g, " · ");
+}
+
 export default function SalesOrderLedger({
   revisions,
   history,
@@ -95,7 +135,7 @@ export default function SalesOrderLedger({
           {history.map((event, i) => (
             <li key={i} className="flex gap-3 text-body">
               <span className="shrink-0 text-meta text-base-500 tabular-nums">{fmtDate(event.occurred_at, { time: true })}</span>
-              <span className="min-w-0 break-words">{event.text}</span>
+              <span className="min-w-0 break-words">{historyWords(event.text)}</span>
             </li>
           ))}
         </ul>

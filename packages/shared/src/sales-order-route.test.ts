@@ -184,7 +184,9 @@ describe("goods forks", () => {
     expect(purchasing.action).toEqual({
       ownerKey: "purchasing",
       label: "Issue PO",
-      context: { subject: "SO-1319", dueOn: null },
+      context: {
+        detail: "B1201S · King · 2 Units · Carres Warehouse · Customer Delivery: 2026-09-24",
+      },
     });
     /* The steps behind it are a path the work has not walked — dashed, not absent. */
     expect(node(map, "B1201S:unassigned:supplier").mark).toBe("future");
@@ -255,7 +257,9 @@ describe("CURRENT", () => {
     expect(node(map, "PO-2048:supplier").action).toEqual({
       ownerKey: "purchasing",
       label: "Confirm ready date",
-      context: { subject: "PO-2048", dueOn: null },
+      context: {
+        detail: "PO-2048 · 2 Units · Carres Warehouse · Customer Delivery: 2026-09-24",
+      },
     });
     /* A node nobody has reached carries no instruction. */
     expect(node(map, "PO-2048:receiving").action).toBeNull();

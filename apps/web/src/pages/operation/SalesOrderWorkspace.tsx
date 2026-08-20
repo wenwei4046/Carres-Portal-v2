@@ -45,7 +45,7 @@
 // tables are the order's own line block: fixed rows, no sort, no selection.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Plus, Printer, Trash2, X } from "lucide-react";
-import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import * as pdfjs from "pdfjs-dist";
 import { toast } from "sonner";
@@ -55,6 +55,7 @@ import {
   CUSTOMER_GENDER_OPTIONS,
   CUSTOMER_RACE_OPTIONS,
   deliveryReasonLabel,
+  displayGuaranteeId,
   EMERGENCY_RELATIONSHIPS,
   lineClass,
   orderMoney,
@@ -97,6 +98,8 @@ import {
   useOperationPoDuty,
   useOrderEntryConfig,
   useOrderCorrectionWork,
+  useOrderGuarantees,
+  useOrderPayments,
   useOrderServiceCases,
   useOutlets,
   useSalesOrderAmendment,
@@ -748,6 +751,69 @@ function Fact({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
+function RelatedDocumentLine({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="grid gap-1 border-t border-kit-slate-5 py-2 first:border-t-0 first:pt-0 last:pb-0 sm:grid-cols-[132px_1fr]">
+      <div className="text-label font-medium text-base-500">{label}</div>
+      <div className="min-w-0 text-body text-base-900">{children}</div>
+    </div>
+  );
+}
+
+function DocumentLinks({
+  documents,
+}: {
+  documents: ReadonlyArray<{ id: string; label: string; href: string }>;
+}) {
+  if (documents.length === 0) return <span className="text-base-500">—</span>;
+  return (
+    <span className="flex flex-wrap gap-x-3 gap-y-1">
+      {documents.map((document) => (
+        <Link
+          key={document.id}
+          to={document.href}
+          className="font-mono text-meta font-semibold text-kit-blue-11 underline-offset-2 hover:underline"
+        >
+          {document.label}
+        </Link>
+      ))}
+    </span>
+  );
+}
+
+function RelatedDocumentsValue({
+  documents,
+  loading,
+  error,
+  retry,
+}: {
+  documents: ReadonlyArray<{ id: string; label: string; href: string }>;
+  loading?: boolean;
+  error?: boolean;
+  retry?: () => unknown;
+}) {
+  if (loading) return <span className="text-base-500">Loading…</span>;
+  if (error) {
+    return (
+      <span className="inline-flex flex-wrap items-center gap-2 text-kit-red-11">
+        Documents could not be loaded
+        {retry ? (
+          <button type="button" className="font-medium underline" onClick={() => void retry()}>
+            Try again
+          </button>
+        ) : null}
+      </span>
+    );
+  }
+  return <DocumentLinks documents={documents} />;
+}
+
 /** The 0219 custom fields of one tab, rendered from the SAME contract the POS
  *  renders from. An operator who adds a field in Settings gets it on both
  *  surfaces or on neither. */
@@ -853,12 +919,16 @@ export default function SalesOrderWorkspace() {
   const correctionWorkQ = useOrderCorrectionWork(isNew ? null : (orderId ?? null));
   const routeFactsQ = useSalesOrderRouteFacts(
     isNew ? null : (orderId ?? null),
-    showRoute,
+    !isNew && Boolean(orderId),
     (detailQ.data?.pos ?? []).map((po) => po.id),
   );
   /* LINKED PROBLEMS needs the case's own translated status word, and Service
      owns that translation. The route facts carry only open/closed. */
   const serviceCasesQ = useOrderServiceCases(isNew ? "" : (orderId ?? ""), {
+    enabled: !isNew && Boolean(orderId),
+  });
+  const paymentsQ = useOrderPayments(isNew ? null : (orderId ?? null));
+  const guaranteesQ = useOrderGuarantees(isNew ? "" : (orderId ?? ""), {
     enabled: !isNew && Boolean(orderId),
   });
   const baseQ = useQuery({
@@ -1525,6 +1595,59 @@ export default function SalesOrderWorkspace() {
           ? "Existing customer"
           : "New customer";
 
+  const relatedDocuments = useMemo(() => {
+    const pos = (detailQ.data?.pos ?? []).map((po) => ({
+      id: po.id,
+      label: po.id,
+      href: `/operation/procurement?po=${encodeURIComponent(po.id)}`,
+    }));
+    const receiving = (routeFactsQ.data?.receiving ?? []).map((session) => ({
+      id: session.id,
+      label: receivingRecordNo({
+        id: session.id,
+        goods_received_at: session.goods_received_at ?? undefined,
+        submitted_at: session.submitted_at,
+      }),
+      href: `/operation?tab=receiving&receipt=${encodeURIComponent(session.id)}`,
+    }));
+    const unitIds = [...new Set((goodsTruthQ.data?.lines ?? []).flatMap((line) => line.unitIds))];
+    const stock = unitIds.map((unitId) => ({
+      id: unitId,
+      label: unitId,
+      href: `/operation?tab=stock-onhand&q=${encodeURIComponent(unitId)}`,
+    }));
+    const deliveryOrders = (deliveryOrdersQ.data?.deliveryOrders ?? []).map((deliveryOrder) => ({
+      id: deliveryOrder.id,
+      label: deliveryOrder.do_number,
+      href: `/operation/delivery-orders/${encodeURIComponent(deliveryOrder.do_number)}`,
+    }));
+    const payments = (paymentsQ.data?.payments ?? []).map((payment, index) => ({
+      id: payment.id,
+      label: payment.receipt_no ?? `Payment ${index + 1}`,
+      href: `/operation?tab=payments&so=${order?.so ?? ""}`,
+    }));
+    const cases = (serviceCasesQ.data?.items ?? []).map((serviceCase) => ({
+      id: serviceCase.id,
+      label: serviceCase.caseNo,
+      href: `/operation?tab=service-notes&case=${encodeURIComponent(serviceCase.id)}`,
+    }));
+    const guarantees = (guaranteesQ.data?.items ?? []).map((guarantee) => ({
+      id: guarantee.id,
+      label: displayGuaranteeId(guarantee) ?? guarantee.guaranteeLabel ?? guarantee.guaranteeSku,
+      href: `/operation?tab=guarantees&q=${encodeURIComponent(displayGuaranteeId(guarantee) ?? guarantee.guaranteeSku)}`,
+    }));
+    return { pos, receiving, stock, deliveryOrders, payments, cases, guarantees };
+  }, [
+    detailQ.data?.pos,
+    routeFactsQ.data?.receiving,
+    goodsTruthQ.data?.lines,
+    deliveryOrdersQ.data?.deliveryOrders,
+    paymentsQ.data?.payments,
+    serviceCasesQ.data?.items,
+    guaranteesQ.data?.items,
+    order?.so,
+  ]);
+
   const headerRight = (
     <span className="flex items-center gap-2">
       {mode === "object" && objectView === "Order" && !showRoute && order && order.status !== "cancelled" && (
@@ -2032,29 +2155,93 @@ export default function SalesOrderWorkspace() {
         )}
       </Block>
 
-      {/* Delivery owns these documents and every write on them. Sales shows
-          the complete relationship so a failed, voided or rebooked DO never
-          disappears behind the current one-number mirror on `orders`. */}
+      {/* Delivery owns the journey. Sales shows the customer promise and the
+          recorded carrying facts, then offers one door into Delivery. */}
       {!isNew && mode !== "oldrev" && (
-        <Block title="Delivery Orders">
-          {deliveryOrdersQ.isLoading ? (
-            <p className="text-label text-base-600">Checking delivery orders…</p>
-          ) : deliveryOrdersQ.isError ? (
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-label text-base-700">Delivery orders could not be loaded.</p>
-              <Button size="sm" variant="neutral" onClick={() => void deliveryOrdersQ.refetch()}>
+        <Block title="Delivery Journey">
+          {routeFactsQ.isLoading ? (
+            <Loading label="Loading the delivery journey" />
+          ) : routeFactsQ.isError ? (
+            <div className="rounded-control bg-kit-red-3 px-3 py-2 text-label text-kit-red-11">
+              Delivery facts could not be loaded
+              <button type="button" className="ml-2 font-medium underline" onClick={() => void routeFactsQ.refetch()}>
                 Try again
-              </Button>
+              </button>
             </div>
           ) : (
-            <SalesOrderDeliveryOrdersBlock
-              payload={deliveryOrdersQ.data ?? {
-                deliveryOrders: [],
-                attempts: [],
-                handoverEvents: [],
-              }}
-            />
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Fact
+                label="Customer promise"
+                value={order?.delivery_date ? fmtDate(order.delivery_date) : "Date not recorded"}
+              />
+              <Fact
+                label="Logistics partner"
+                value={routeFactsQ.data?.brief.assignedLogistics?.partnerName ?? "Not chosen yet"}
+              />
+              <Fact
+                label="Delivery appointment"
+                value={
+                  routeFactsQ.data?.brief.appointment
+                    ? `${fmtDate(routeFactsQ.data.brief.appointment.dateIso)} · ${routeFactsQ.data.brief.appointment.slot}`
+                    : "Date and slot not confirmed"
+                }
+              />
+            </div>
           )}
+          {deliveryOrdersQ.data ? (
+            <div className="mt-3 border-t border-kit-slate-5 pt-3">
+              <p className="mb-2 text-label font-semibold uppercase tracking-wide text-base-600">
+                Delivery Orders
+              </p>
+              <SalesOrderDeliveryOrdersBlock payload={deliveryOrdersQ.data} />
+            </div>
+          ) : deliveryOrdersQ.isError ? (
+            <div className="mt-3 rounded-control bg-kit-red-3 px-3 py-2 text-label text-kit-red-11">
+              Delivery Orders could not be loaded
+              <button type="button" className="ml-2 font-medium underline" onClick={() => void deliveryOrdersQ.refetch()}>
+                Try again
+              </button>
+            </div>
+          ) : (
+            <div className="mt-3"><Loading label="Loading Delivery Orders" /></div>
+          )}
+          <button
+            type="button"
+            className="mt-3 text-meta font-medium text-kit-blue-11 underline-offset-2 hover:underline"
+            onClick={() => openObjectView("Order Route")}
+          >
+            Open Order Route →
+          </button>
+        </Block>
+      )}
+
+      {/* This is the Sales Order's document index. It reads every owning
+          module and never creates, edits or closes another module's record. */}
+      {!isNew && mode !== "oldrev" && (
+        <Block title="Related Documents">
+          <div data-testid="sales-order-related-documents">
+            <RelatedDocumentLine label="Purchase Orders">
+              <DocumentLinks documents={relatedDocuments.pos} />
+            </RelatedDocumentLine>
+            <RelatedDocumentLine label="Receiving Sessions">
+              <RelatedDocumentsValue documents={relatedDocuments.receiving} loading={routeFactsQ.isLoading} error={routeFactsQ.isError} retry={routeFactsQ.refetch} />
+            </RelatedDocumentLine>
+            <RelatedDocumentLine label="Stock Units">
+              <RelatedDocumentsValue documents={relatedDocuments.stock} loading={goodsTruthQ.isLoading} error={goodsTruthQ.isError} retry={goodsTruthQ.refetch} />
+            </RelatedDocumentLine>
+            <RelatedDocumentLine label="Delivery Orders">
+              <RelatedDocumentsValue documents={relatedDocuments.deliveryOrders} loading={deliveryOrdersQ.isLoading} error={deliveryOrdersQ.isError} retry={deliveryOrdersQ.refetch} />
+            </RelatedDocumentLine>
+            <RelatedDocumentLine label="Payments">
+              <RelatedDocumentsValue documents={relatedDocuments.payments} loading={paymentsQ.isLoading} error={paymentsQ.isError} retry={paymentsQ.refetch} />
+            </RelatedDocumentLine>
+            <RelatedDocumentLine label="Service Cases">
+              <RelatedDocumentsValue documents={relatedDocuments.cases} loading={serviceCasesQ.isLoading} error={serviceCasesQ.isError} retry={serviceCasesQ.refetch} />
+            </RelatedDocumentLine>
+            <RelatedDocumentLine label="Guarantees">
+              <RelatedDocumentsValue documents={relatedDocuments.guarantees} loading={guaranteesQ.isLoading} error={guaranteesQ.isError} retry={guaranteesQ.refetch} />
+            </RelatedDocumentLine>
+          </div>
         </Block>
       )}
 
@@ -2164,7 +2351,7 @@ export default function SalesOrderWorkspace() {
             </div>
           )}
         </div>
-      ) : objectView === "Revisions" || objectView === "History" ? (
+      ) : (objectView === "Revisions" && mode !== "oldrev") || objectView === "History" ? (
         <div className="min-h-0 flex-1 overflow-auto bg-kit-slate-3 px-4 py-4">
           <div className="mx-auto max-w-5xl rounded-card border border-kit-slate-5 bg-white p-5">
             <h2 className="mb-4 text-title font-semibold text-base-900">{objectView}</h2>

@@ -102,6 +102,34 @@ describe("Order Route — one canvas", () => {
     expect(screen.queryByText("SO-1319 · Lim Kuan Yang")).not.toBeInTheDocument();
   });
 
+  it("stacks many goods as disclosure groups and opens the line holding current work", () => {
+    const resolved = map({
+      lineLabels: { B1201S: "B1201S · King", SOFA9: "SOFA9 · Three-seater" },
+      allocation: {
+        orderId: "order-1",
+        soRef: "SO-1319",
+        lines: [
+          { sku: "B1201S", committedQty: 3, reservedUnits: [], soldUnits: [], reservedQty: 0, soldQty: 0, outstandingQty: 3 },
+          { sku: "SOFA9", committedQty: 1, reservedUnits: [], soldUnits: [], reservedQty: 0, soldQty: 0, outstandingQty: 1 },
+        ],
+        unmatchedUnits: [],
+        totals: { committedQty: 4, reservedQty: 0, soldQty: 0, outstandingQty: 4 },
+      },
+      purchaseOrders: [
+        { id: "PO-2048", issuedAt: "2026-08-13", expectedReadyDate: null, lines: [{ sku: "B1201S", qty: 3, receivedQty: 0 }] },
+        { id: "PO-2050", issuedAt: "2026-08-13", expectedReadyDate: null, lines: [{ sku: "SOFA9", qty: 1, receivedQty: 0 }] },
+      ],
+    });
+    draw(resolved);
+    expect(nodeEl("B1201S:goods-line")).toHaveAttribute("aria-expanded", "true");
+    expect(nodeEl("SOFA9:goods-line")).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByTestId("route-node-PO-2050:supplier")).not.toBeInTheDocument();
+    fireEvent.click(nodeEl("SOFA9:goods-line"));
+    expect(nodeEl("SOFA9:goods-line")).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByTestId("route-node-PO-2050:supplier")).toBeInTheDocument();
+    expect(screen.queryByTestId("route-node-PO-2048:supplier")).not.toBeInTheDocument();
+  });
+
   it("draws one connector for every edge in the map", () => {
     const m = map();
     draw(m);
@@ -193,7 +221,10 @@ describe("Order Route — the nodes", () => {
     expect(action).toHaveTextContent("YJ");
     expect(action).toHaveTextContent("Confirm ready date");
     expect(action).toHaveClass("text-label");
-    expect(context).toHaveTextContent("PO-2048 · No due date yet");
+    expect(context).toHaveTextContent(
+      "PO-2048 · 3 Units · Carres Warehouse · Customer Delivery: Thu, 24 Sep",
+    );
+    expect(context).not.toHaveTextContent(/Due:|No due date|Next Action|Priority/i);
     expect(context).toHaveClass("text-label", "text-base-600");
     expect(fact.parentElement).toBe(supplier);
     expect(action.parentElement).toBe(supplier);
@@ -244,9 +275,14 @@ describe("Order Route — the gate", () => {
 
   it("renders no Release, Approve or any other control inside the map", () => {
     draw();
-    /* The ONLY buttons on the page are the three zoom controls. */
+    /* The only page controls are goods disclosure plus the three zoom controls. */
     const labels = screen.getAllByRole("button").map((b) => b.getAttribute("aria-label"));
-    expect(labels).toEqual(["Zoom out", "Zoom in", "Fit the whole route"]);
+    expect(labels).toEqual([
+      "B1201S · King — Qty 3 · 3 to buy from factory",
+      "Zoom out",
+      "Zoom in",
+      "Fit the whole route",
+    ]);
     expect(screen.queryByRole("button", { name: /release/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /approve/i })).not.toBeInTheDocument();
   });
@@ -299,7 +335,7 @@ describe("Order Route — accessibility", () => {
     const supplier = nodeEl("PO-2048:supplier");
     expect(supplier).toHaveAttribute("tabindex", "0");
     expect(supplier.getAttribute("aria-label")).toBe(
-      "SUPPLIER — Ready date not confirmed — Yu Jun: Confirm ready date — PO-2048 · No due date yet",
+      "SUPPLIER — Ready date not confirmed — Yu Jun: Confirm ready date — PO-2048 · 3 Units · Carres Warehouse · Customer Delivery: Thu, 24 Sep",
     );
     expect(supplier).toHaveAttribute("aria-current", "step");
   });
