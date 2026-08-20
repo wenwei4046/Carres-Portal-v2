@@ -696,6 +696,24 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     expect(box.className).not.toContain("border-y");
   });
 
+  it("draws a readable grid through every expanded goods column and row", () => {
+    listHookState.data = { orders: [order({ order_lines: [
+      { id: "line-1", sku: "B1201S-K", qty: 1, unit_price: 2499, label: "B1201S · King" },
+      { id: "line-2", sku: "SOFA9", qty: 1, unit_price: 3999, label: "Sofa 9" },
+    ] })] };
+    mount();
+    fireEvent.click(screen.getByRole("button", { name: "Expand row" }));
+    const goods = screen.getByRole("table", { name: "Goods on SO-1303" });
+    const [head, body] = within(goods).getAllByRole("rowgroup");
+    expect(within(head).getByRole("row").className).toContain("divide-x");
+    expect(body.className).toContain("divide-y");
+    expect(body.className).toContain("divide-base-200");
+    for (const row of within(body).getAllByRole("row")) {
+      expect(row.className).toContain("divide-x");
+      expect(row.className).toContain("divide-base-200");
+    }
+  });
+
   /**
    * ⭐ TWO TYPE LEVELS, AND A REGISTER SELECTS NOTHING (owner rulings
    * 2026-08-15). The header is the parent header's own 11px grey; every value
