@@ -41,8 +41,8 @@ buyer's module. It does not own goods movement (that is Receiving's warehouse ha
 Stock) and it does not own money (that is Finance).
 
 **TWO WAYS A PO IS BORN, ONE WAY IT LIVES** (Loo, 2026-08-06; the page list rewritten
-by Jess 2026-08-18 — **APPROVED, NOT YET BUILT**; today's screens are §3–§8's measured
-blocks):
+by Jess 2026-08-18 and **BUILT** — the rail below is the shipped navigation as of
+`c80dad43` / PR #868; the pages it opens are §3–§8's measured blocks):
 
 ```
 SALES                       PURCHASING
@@ -90,7 +90,8 @@ Purchasing navigation exposes each destination individually through the governed
 navigation. A page may not recreate the old `PurchasingTabs` strip as a second navigation.
 
 **PURCHASING IS ONE EXPANDABLE MODULE ROW WITH A TWO-LEVEL LISTING TREE (Jess,
-2026-08-20 — APPROVED / LOCKED after the 2026-08-19 production correction and PR #861).** The
+2026-08-20 — APPROVED / LOCKED, and SHIPPED `c80dad43` / PR #868, owner-walked at 1440px and
+1130px before merge).** The
 existing 232px/60px `PortalSidebar` remains the only left navigation surface. Clicking anywhere on
 the `Purchasing` row expands or hides the complete Purchasing tree; it does not create another
 sidebar, flyout, tab strip or page-owned navigation column. `Purchasing Home` and `My Purchasing

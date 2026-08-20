@@ -1,6 +1,11 @@
 【BUILD】 — CARD-2026-08-20-purchasing-sidebar-groups · Extend PR #861 with the complete Purchasing navigation tree
 
-STATUS: OWNER APPROVED — local owner-walk build only; do not merge or deploy before visual approval
+STATUS: EXECUTED — visually approved on the four owner-walk screens, merged and deployed 2026-08-20
+SHIPPED: PR #868, merge commit `c80dad43`. Production verified on all five canonical surfaces —
+`carres-portal.pages.dev`, `erp.carresofficial.com`, `pos.carresofficial.com`
+(`/__carres_deploy.json`) and the Worker on `carres-portal-v2-api.wwch.workers.dev` +
+`api.carresofficial.com` (`/health`) all report `c80dad43d46d70444b574de7b1cd4f7458c8e3b2`.
+GATES: focused 111 · web 3146 · shared 2452 · api 2288 · typecheck · lint · check:v4 · CI verify pass
 DATE: 2026-08-20
 LANE: BUILD/DELIVERY takeover commissioned by Jess after the Purchasing Blueprint sidebar ASCII was approved
 BASE: latest `origin/main`; PR #861 is existing capability and must be extended, not rebuilt
