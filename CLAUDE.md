@@ -544,7 +544,7 @@ CONFIGURATION — suppliers, SKUs, production days, rates — not transactions.
 | **Orders** | the customer's order end to end — the list, the drawer, the action engine, delay planning, the money gate | [`docs/orders/MASTER.md`](docs/orders/MASTER.md) |
 | **Purchasing** | buy what customers ordered and what the shelf needs | [`docs/purchasing/MASTER.md`](docs/purchasing/MASTER.md) |
 | **Delivery** | the delivery WORKSPACE — a view of Orders' delivery track | [`docs/delivery/MASTER.md`](docs/delivery/MASTER.md) |
-| **Stock** | on hand · in & out · ready stock · the reorder engine | [`docs/stock/MASTER.md`](docs/stock/MASTER.md) |
+| **Stock** | exact Unit · Where · Who has it · availability · physical history and month-end truth | [`docs/stock/MASTER.md`](docs/stock/MASTER.md) |
 | **Payment** | the collections desk | [`docs/payment/MASTER.md`](docs/payment/MASTER.md) |
 | **Service** | customer complaints after delivery | [`docs/service/MASTER.md`](docs/service/MASTER.md) |
 | **UI** | the design system, the kit, the portal shell and its right rail | [`docs/ui/MASTER.md`](docs/ui/MASTER.md) |

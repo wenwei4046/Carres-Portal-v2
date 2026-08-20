@@ -208,6 +208,11 @@ SUPPLY CHAIN
 │   ├── Consignment Receipts
 │   └── Consignment Returns
 ├── Warehouse
+│   ├── Stock
+│   ├── Ready stock
+│   ├── In & out
+│   ├── Transfers
+│   └── Counts
 └── Delivery
 
 FINANCE
@@ -397,20 +402,31 @@ count opened).
 ## 3.5 · STOCK
 
 **OWNS**
-- The **per-unit register** — every physical unit, its condition, its warehouse, its status.
-- Reserve · release · take out · quarantine, and the reasons for each.
-- The reorder points and reserve levels.
+- The **per-unit register** — every physical Unit, its permanent Carres Unit ID, current
+  **Where**, current **Who has it**, ownership, condition, calculated availability and
+  append-only physical history.
+- Site-to-Site transfer and physical-count records, Unit-level differences and evidence-backed
+  corrections/adjustments.
+- The Month-end Stock Confirmation: the physical cut-off, reconciliation and frozen versions.
 
-**ACTIONS** — reserve a unit to an order · release it · take it out · quarantine a problem unit
-and resolve it · set a reorder point.
+**ACTIONS** — record physical handovers through the owning Receiving/Delivery door · transfer
+Units between Sites · count and count again · inspect returned/problem Units · correct a physical
+record · propose an adjustment · submit month-end physical truth.
 
-**SUMMARISES** — the customer order a unit is reserved to · the purchase order it came from.
+**SUMMARISES** — the Sales Order reservation and customer promise · the PO/Consignment Order and
+supplier reason · Receiving session · Delivery journey · Finance valuation.
 
-**LINKS TO** — the customer order · Receiving · Supplier Claim.
+**LINKS TO** — Sales Order for choose/reserve/release · Purchasing and Supplier Claim · Receiving ·
+Delivery · Service Case · Finance.
 
 > **The register is the authority; a rollup is not.** Two base tables with no trigger between
 > them was V1's trap: a rollup does not fall when a draw happens, so the same units get offered
 > again tomorrow. **Anything deciding availability reads the REGISTER.**
+>
+> **Reservation is the Sales Order's exact-Unit promise.** Stock validates eligibility and
+> reflects the binding; it does not expose a second reservation/release editor. Problems protect
+> the Unit through observed facts and governed actions, never a generic operator-facing
+> quarantine status.
 
 ---
 
