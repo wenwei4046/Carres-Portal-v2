@@ -548,6 +548,27 @@ stay on record.` — a discrepancy keeps both facts and overwrites neither.
 
 **PURCHASING** (docs/purchasing/MASTER.md):
 
+### Purchasing navigation words — owner ruling 2026-08-20
+
+These are the exact visible words for the Purchasing sidebar tree. They name doors only; they
+do not create a second business status, work queue or source of truth.
+
+| Level | Exact visible words |
+|---|---|
+| Direct pages | `Purchasing Home` · `My Purchasing Work` |
+| Group headings | `REQUESTS` · `BUY` · `RECEIVE` · `PROBLEMS` · `CONSIGNMENT` |
+| REQUESTS pages | `New Supplier Requests` · `New SKU Requests` · `Display Requests` · `Manual Purchase Requests` |
+| BUY pages | `Purchase Demands` · `SO Batch Purchase` · `Purchase Orders` |
+| RECEIVE pages | `Goods Receipts` |
+| PROBLEMS pages | `Supplier Claims` · `Purchase Returns` · `Repair Orders` |
+| CONSIGNMENT pages | `Consignment Overview` · `Consignment Orders` · `Consignment Receipts` · `Consignment Returns` · `Consignment Sale Notices` |
+| Existing report door retained below the tree | `Report` |
+
+`My Purchasing Work` is a filtered view of the shared Work Engine. `Purchase Demands` is the
+authoritative demand register, while `SO Batch Purchase` is the only door that issues Purchase
+Orders. These distinctions belong to the Purchasing MASTER; the labels above are recorded here
+so the screen cannot respell them.
+
 | Queue tile | Row line | Button | Done message | Empty state |
 |---|---|---|---|---|
 | `Issue PO` | `Issue PO to {supplier}` | `Issue PO` | `PO issued to {supplier}` | `No purchase orders to issue.` |
@@ -609,10 +630,8 @@ REVISED*; registered on execution so no screen respells them):
 the hand-over word); `Version` is the DOCUMENT changing, which is exactly what that ruling
 reserved the word for.
 
-**SIXTY-FIVE ACTIONS BECAME TWENTY, AND THAT WAS THE POINT** (Jess, 2026-08-18). *(Thirteen was
-this section's first count, taken before all eleven pages had been designed; seven more surfaced
-and the number is corrected here rather than defended.)* A blueprint
-draft named 65 distinct pieces of work across the register rails; 49 of them opened with a verb
+**SIXTY-FIVE ACTIONS BECAME TWENTY, AND THAT WAS THE POINT** (Jess, 2026-08-18). A blueprint
+draft named 65 distinct pieces of work across the Purchasing surfaces; 49 of them opened with a verb
 this portal does not have, and most were ONE act wearing four names — `Share PO PDF` ·
 `Share Claim with Supplier` · `Share Return with Supplier` · `Share Repair Order` are one act,
 and the act is **`Issue`**, because a document that has not reached its supplier is not issued
