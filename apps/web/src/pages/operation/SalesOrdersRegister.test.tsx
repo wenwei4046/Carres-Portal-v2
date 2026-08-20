@@ -11,7 +11,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import type { operationOrderListRow } from "@/lib/queries";
+import type { DeliveryOrderRow, operationOrderListRow } from "@/lib/queries";
 import SalesOrdersRegister from "./SalesOrdersRegister";
 import { fmtDate } from "@/lib/fmt-date";
 
@@ -36,10 +36,23 @@ let expansionHookState: {
   isError: boolean;
 };
 
+let deliveryOrdersHookState: {
+  data: {
+    deliveryOrders: DeliveryOrderRow[];
+    attempts: [];
+    handoverEvents: [];
+  } | undefined;
+  isLoading: boolean;
+  isError: boolean;
+  error: unknown;
+  refetch: () => void;
+};
+
 /* A spy AROUND the hook: the component's calls — and the filters it passes —
  * are the assertion surface. */
 const useOperationOrdersSpy = vi.fn((..._args: unknown[]) => listHookState);
 const useSalesOrderExpansionSpy = vi.fn((..._args: unknown[]) => expansionHookState);
+const useDeliveryOrdersRegisterSpy = vi.fn((..._args: unknown[]) => deliveryOrdersHookState);
 
 vi.mock("@/lib/queries", async () => {
   const actual = await vi.importActual<typeof import("@/lib/queries")>("@/lib/queries");
@@ -47,6 +60,7 @@ vi.mock("@/lib/queries", async () => {
     ...actual,
     useOperationOrders: (...args: unknown[]) => useOperationOrdersSpy(...args),
     useSalesOrderExpansion: (...args: unknown[]) => useSalesOrderExpansionSpy(...args),
+    useDeliveryOrdersRegister: (...args: unknown[]) => useDeliveryOrdersRegisterSpy(...args),
   };
 });
 
@@ -104,6 +118,7 @@ function LocationProbe() {
 beforeEach(() => {
   useOperationOrdersSpy.mockClear();
   useSalesOrderExpansionSpy.mockClear();
+  useDeliveryOrdersRegisterSpy.mockClear();
   window.localStorage.clear();
   listHookState = {
     data: { orders: [order({})] },
@@ -113,7 +128,39 @@ beforeEach(() => {
     refetch: vi.fn(),
   };
   expansionHookState = { data: { lines: [] }, isLoading: false, isError: false };
+  deliveryOrdersHookState = {
+    data: { deliveryOrders: [], attempts: [], handoverEvents: [] },
+    isLoading: false,
+    isError: false,
+    error: null,
+    refetch: vi.fn(),
+  };
 });
+
+function deliveryOrder(
+  doNumber: string,
+  orderId = "00000000-0000-0000-0000-00000000cafe",
+): DeliveryOrderRow {
+  return {
+    id: `delivery-${doNumber}`,
+    order_id: orderId,
+    do_number: doNumber,
+    issued_at: "2026-08-20T02:00:00Z",
+    trip_groups: null,
+    delivery_date: "2026-08-24",
+    time_slot: "Afternoon",
+    logistics_partner: "NETS",
+    voided_at: null,
+    void_reason: null,
+    orders: {
+      id: orderId,
+      so: 1303,
+      customer_name: "Kimmy",
+      delivery_date: "2026-08-24",
+      delivery_date_tbd: false,
+    },
+  };
+}
 
 describe("FIX 1 · the register asks the SERVER", () => {
   it("mounts asking for the unfiltered population (no search key)", () => {
@@ -466,6 +513,43 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
       "DO No",
     ]);
     expect(screen.getByText("Kelana Jaya")).toBeInTheDocument();
+  });
+
+  it("says plainly when the Sales Order has produced no Delivery Order", () => {
+    listHookState.data = { orders: [order({ do_number: null })] };
+    deliveryOrdersHookState.data = { deliveryOrders: [], attempts: [], handoverEvents: [] };
+    mount();
+    expect(screen.getByText("No delivery order yet")).toBeInTheDocument();
+  });
+
+  it("opens the one authoritative Delivery Order when exactly one exists", () => {
+    deliveryOrdersHookState.data = {
+      deliveryOrders: [deliveryOrder("DO-200826-1234")],
+      attempts: [],
+      handoverEvents: [],
+    };
+    mount();
+    fireEvent.click(screen.getByRole("button", { name: "DO-200826-1234" }));
+    expect(screen.getByTestId("location")).toHaveTextContent(
+      "/operation/delivery-orders/DO-200826-1234",
+    );
+  });
+
+  it("shows every Delivery Order relationship instead of hiding all but one", () => {
+    deliveryOrdersHookState.data = {
+      deliveryOrders: [
+        deliveryOrder("DO-200826-1234"),
+        deliveryOrder("DO-210826-5678"),
+      ],
+      attempts: [],
+      handoverEvents: [],
+    };
+    mount();
+    fireEvent.click(screen.getByRole("button", { name: "2 Delivery Orders" }));
+    expect(screen.getByTestId("location")).toHaveTextContent(
+      "/operation/delivery-orders?order=00000000-0000-0000-0000-00000000cafe",
+    );
+    expect(screen.queryByText("DO-200826-1234")).not.toBeInTheDocument();
   });
 
   it("shows only the customer name in the default cell while retaining phone search context", () => {

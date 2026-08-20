@@ -5868,7 +5868,7 @@ export interface DeliveryOrdersRegisterPayload {
   attempts: DeliveryOrderAttemptRow[];
   handoverEvents: DeliveryHandoverKindRow[];
 }
-export function useDeliveryOrdersRegister(opts?: { orderId?: string }) {
+export function useDeliveryOrdersRegister(opts?: { orderId?: string; enabled?: boolean }) {
   const scope = opts?.orderId ?? "all";
   return useQuery<DeliveryOrdersRegisterPayload, ApiError>({
     queryKey: ["operation", "delivery-orders", scope],
@@ -5878,6 +5878,7 @@ export function useDeliveryOrdersRegister(opts?: { orderId?: string }) {
           ? `/api/operation/delivery-orders?order=${opts.orderId}`
           : "/api/operation/delivery-orders",
       ),
+    enabled: opts?.enabled ?? true,
     staleTime: 30_000,
   });
 }
