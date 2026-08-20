@@ -100,10 +100,30 @@ contains the current page opens automatically and may not hide that page. Open s
 per signed-in user.
 
 The tree extends PR #861's approved wire-line language: one module icon, child rows without icons,
-quiet 1px connectors/elbows and separators, no heavy boxes/cards/popovers/shadows. Only the exact
-current destination receives the governed blue wash and one straight active line; the open module
-and group headers never become second active rows. The 200px `STATUS / WORK TO DO` rail remains
-inside an individual page and never becomes portal navigation.
+quiet 1px connectors/elbows and separators, no heavy boxes/cards/popovers/shadows. The 200px
+`STATUS / WORK TO DO` rail remains inside an individual page and never becomes portal navigation.
+
+**ALWAYS EXACTLY ONE VISIBLE ACTIVE INDICATION — APPROVED / LOCKED.** Purchasing follows the
+shared module active-indication law (`../ui/MASTER.md`); grouping its Listing rows is presentation
+and does not earn it a selection rule of its own. The rail never says nothing about where the
+operator is standing, and never says it twice:
+
+```
+tree OPEN                        →  only the exact current child row is blue
+                                    (module parent and group headers stay neutral)
+tree SHUT, current page is ours  →  the Purchasing PARENT row is blue
+60px collapsed, page is ours     →  the Purchasing ICON is blue
+```
+
+An open module or group header never becomes a second active row; a shut parent standing on its
+own page is never a neutral one.
+
+**THE 60px ICON OPENS A NAMED DESTINATION — APPROVED / LOCKED.** The collapsed Purchasing icon
+links to **`SO Batch Purchase`** (`/operation?tab=purchase`), the module's existing landing
+destination. It is never derived from "the first live row": a module's landing page is a
+capability in its own right and may not move because the order of the rows around it changed. When
+`Purchasing Home` is built, that page's own approved scope may change this destination. Jump To
+ordering is untouched — it lists pages, and a landing choice is not a page.
 
 Manual Purchase's `QUEUES + NEED FOR` rail remains on the LEFT at 200px like its measured siblings
 (SO Batch §3, Receiving, Claims); the RIGHT side belongs to supervision widgets.

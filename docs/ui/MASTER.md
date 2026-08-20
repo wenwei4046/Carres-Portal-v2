@@ -503,9 +503,20 @@ the approved 50% work + 50% live-PDF surface.
 - **Existing useful destinations remain reachable.** This tree may rename/reposition a real door,
   but it may not replace a live page with an unbuilt row or delete the existing Purchasing Report
   before its separate central-report consolidation.
-- **One exact active destination.** Only the current Listing row receives `kit-blue-3` plus the
-  straight `kit-blue-9` active line. An open Purchasing/module/group header is never a second blue
-  row. Other modules keep PR #861's current behaviour until their own approved review changes it.
+- **ALWAYS EXACTLY ONE VISIBLE ACTIVE INDICATION — APPROVED / LOCKED (the shared module
+  active-indication law; Purchasing is not an exception to it).** The rail never says nothing about
+  where the operator is standing, and never says it twice. The one indication moves with what is on
+  screen:
+
+  | What is visible | What carries `kit-blue-3` + the `kit-blue-9` line |
+  |---|---|
+  | The Purchasing tree is OPEN | **only the exact current child row**; the module parent and every group header stay neutral |
+  | The Purchasing tree is SHUT while the current page belongs to Purchasing | **the Purchasing parent row** |
+  | The rail is collapsed to 60px while the current page belongs to Purchasing | **the Purchasing module icon** |
+
+  An open module parent or group header is never a second blue row; a shut parent standing on its
+  own page is never a neutral one. Grouping a module's Listing rows is presentation and does not
+  give that module its own selection rule.
 - **Wire-line, never boxes.** Reuse PR #861's measured elbow geometry and governed 1px neutral
   lines. Nested groups extend that geometry one level; no heavy outline, boxed section, card,
   popover or shadow is introduced.
@@ -515,6 +526,12 @@ the approved 50% work + 50% live-PDF surface.
   parent and group headers do not sum hidden work into a second queue number.
 - **Collapsed mode stays 60px** and shows the module's one icon; children/group headers disappear.
   Expanded/collapsed rail width keeps the existing `ops-sidebar-collapsed` law.
+- **A collapsed module icon opens a NAMED destination, never "the first live row".** A module's
+  landing page is a capability in its own right and may not be a side effect of the order its rows
+  happen to sit in. Purchasing's 60px icon links to **`SO Batch Purchase`**
+  (`/operation?tab=purchase`) until `Purchasing Home` is built, at which point that page's own
+  approved scope may change the module landing destination. Jump To ordering is unaffected — it
+  lists pages, and a landing choice is not a page.
 - **The active row is brought into view** without centring or animation. The brand/collapse area
   stays fixed at the top, the signed-in user stays fixed at the bottom, and only the middle
   destination region scrolls.

@@ -137,12 +137,17 @@ describe("the empty query", () => {
 
 describe("what typing searches", () => {
   it("matches governed destination NAMES — the pages, never an unbuilt door", () => {
-    // The Purchasing parent row died with the 2026-08-19 heading correction;
-    // the PAGES are the destinations now. `Purchase Returns` is `Coming soon`
-    // and a door the rail refuses to open may not be offered here.
+    // The PAGES are the destinations, never the module row. `Purchase Returns`
+    // is `Coming soon` and a door the rail refuses to open may not be offered
+    // here — grouping the rail (CARD-2026-08-20) changed no destination and
+    // added no door, because a drawer is presentation and Jump To lists pages.
+    //
+    // Starts-with ranks first, then contains in nav order — and in the grouped
+    // nav `Manual Purchase Requests` (REQUESTS) now precedes `SO Batch
+    // Purchase` (BUY). Same three doors, same three routes.
     expect(
       matchDestinations(permittedDestinations("operation"), "purch").map((d) => d.label),
-    ).toEqual(["Purchase Orders", "SO Batch Purchase", "Manual Purchase"]);
+    ).toEqual(["Purchase Orders", "Manual Purchase Requests", "SO Batch Purchase"]);
   });
 
   it("a document result prints its number, its type and the identifying party", async () => {

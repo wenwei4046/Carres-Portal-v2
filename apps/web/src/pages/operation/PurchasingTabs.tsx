@@ -61,12 +61,18 @@ type PurchasingPage =
   | "purchasing-settings";
 
 /** The page word printed after the nameplate. These are the SIDEBAR's own
- *  words (`portal-nav.ts`) — a page word is never invented here. */
+ *  words (`portal-nav.ts`) — a page word is never invented here.
+ *
+ *  TWO WORDS FOLLOWED THE RAIL (Jess, 2026-08-20 —
+ *  CARD-2026-08-20-purchasing-sidebar-groups): `Manual Purchase` became
+ *  `Manual Purchase Requests` and `Receiving` became `Goods Receipts`, because
+ *  the grouped rail now names the OBJECT each page holds. Only the words moved
+ *  — every key, every `?tab=` value and every route is untouched. */
 const PAGE_WORD: Record<PurchasingPage, string> = {
   "to-order": "SO Batch Purchase",
-  "manual-purchase": "Manual Purchase",
+  "manual-purchase": "Manual Purchase Requests",
   "purchase-orders": "Purchase Orders",
-  receiving: "Receiving",
+  receiving: "Goods Receipts",
   claims: "Supplier Claims",
   "purchasing-report": PO_REPORT_WORDS.tab,
   "purchasing-settings": "Settings",

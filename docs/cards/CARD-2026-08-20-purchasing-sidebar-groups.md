@@ -95,9 +95,13 @@ There is still no Settings row; the Page Header gear remains the one Settings do
 - Opening Purchasing closes another open module, preserving PR #861's one-open-module rule.
 - Entering a real Purchasing route by URL, Jump To or in-page link opens Purchasing so the active
   destination is visible. This safety rule wins over a stored closed state.
-- Closing Purchasing while standing on a Purchasing page is permitted. The hidden current page does
-  not turn the Purchasing parent blue; the exact destination remains the only selected row when the
-  tree is visible.
+- Closing Purchasing while standing on a Purchasing page is permitted, and **the Purchasing parent
+  row then carries the active indication** — the shared module active-indication law, which
+  Purchasing does not override. The rule is `ALWAYS EXACTLY ONE VISIBLE ACTIVE INDICATION`:
+  tree open → only the exact current child row is blue, parent and group neutral ·
+  tree shut on a Purchasing page → the parent row is blue ·
+  60px collapsed on a Purchasing page → the Purchasing icon is blue.
+  Never two, and never none. Purchasing is not an exception to the shipped module rule.
 - Other modules retain their current PR #861 click/navigation behaviour in this Card.
 
 ### Purchasing group rows
@@ -151,9 +155,14 @@ carres:portal-sidebar:purchasing:v1:{auth-user-id}
   individual leading icons.
 - Direct/listing words use body 13px. Group words use label 11px semibold uppercase. `Coming soon`
   remains the smaller second line from the shipped contract.
-- Only the exact current destination uses the governed `kit-blue-3` wash and `kit-blue-9` active
-  line. The open module and open group stay neutral; there is no double-active state.
-- In 60px collapsed mode, show only the Purchasing module icon; hide every direct/group/listing row.
+- The governed `kit-blue-3` wash and `kit-blue-9` active line follow the single-indication rule
+  above: the exact current destination while the tree is open, the parent row while it is shut, the
+  module icon while the rail is collapsed. There is no double-active state and no no-active state.
+- In 60px collapsed mode, show only the Purchasing module icon; hide every direct/group/listing
+  row. **That icon links to a NAMED destination — `SO Batch Purchase` (`/operation?tab=purchase`) —
+  never to "the first live row"**: `SO Batch Purchase` is the module's existing landing
+  destination, and grouping the rows may not relocate it. When `Purchasing Home` is built, its own
+  approved scope may change this. Jump To ordering is not touched.
 - Keep the active row visible with `scrollIntoView({ block: "nearest" })`; no centring or animation.
 
 ## File boundary
@@ -312,8 +321,9 @@ pnpm --filter @carres/web check:v4
 - [ ] Capture four screenshots:
   1. 1440px — Purchasing open; BUY + PROBLEMS open; SO Batch Purchase active.
   2. 1130px — Purchasing open; RECEIVE forced open; Goods Receipts active.
-  3. 1130px — portal rail collapsed to 60px; one Purchasing icon.
-  4. 1440px — Purchasing tree closed without changing the current URL.
+  3. 1130px — portal rail collapsed to 60px; one Purchasing icon, active and linked to
+     `SO Batch Purchase`.
+  4. 1440px — Purchasing tree closed, the Purchasing parent active, the URL unchanged.
 - [ ] Report the local URL, focused test totals, gate results and all four screenshots.
 - [ ] Stop for Jess's visual walk. Do not merge, deploy or start another Purchasing page.
 
@@ -326,7 +336,9 @@ The Card fails if any of these appears:
 - clicking Purchasing navigates to SO Batch Purchase;
 - opening one Purchasing group closes another;
 - an active group hides the current destination;
-- parent + group + child all look selected;
+- parent + group + child all look selected, **or nothing at all is selected while the operator is
+  standing on a Purchasing page**;
+- the collapsed Purchasing icon derives its destination from row order;
 - an individual child icon;
 - a heavy box/card/shadow around a group;
 - a dead link, fake Register or missing `Coming soon` reason for an unbuilt destination;
@@ -340,5 +352,32 @@ The Card fails if any of these appears:
 Completion is not “the tests pass.” Completion is: the existing PR #861 rail remains intact for
 every other module; Purchasing exposes the approved full map with independent group accordions;
 current real pages remain reachable; unreleased pages remain truthful non-controls; state is
-isolated per user; exact current destination is the only active row; the two current destination
-headers use the approved object words; and Jess has reviewed the four local screenshots.
+isolated per user — including a user change on a still-mounted rail; exactly one active indication
+is visible in every rail state; the collapsed icon opens its named destination; the two current
+destination headers use the approved object words; and Jess has reviewed the four local
+screenshots.
+
+## Correction record — `RESOLVED FROM AUTHORITY`
+
+**These were ordinary architecture corrections, not a new Carres operating-model decision, and
+not an owner ruling.** Each was already settled by existing authority: the shared module
+active-indication law, and the preservation of an existing Purchasing capability.
+
+`RESOLVED FROM AUTHORITY — shared module active-indication law and preservation of the existing
+Purchasing landing capability.`
+
+1. **Receiving wording.** `Goods Receipts` stands as the destination/header word. `Receiving
+   Summary` and `Start Receiving` are approved workspace/action words in `docs/COPY-STANDARD.md`
+   and are KEPT. No page body changes in this Card. `Receiving Progress` is recorded as a separate
+   pre-existing out-of-scope copy defect in `docs/carry-forwards.md`; it does not block this Card
+   and no new Card is opened for it now.
+2. **Closed/collapsed active indication** follows the shared shipped module rule. A module-scoped
+   exception around `const lit` had no authority behind it and is removed; Purchasing is governed
+   by the same rule as every other module.
+3. **Collapsed landing destination.** `SO Batch Purchase` was the Purchasing module's landing
+   destination before grouping. Grouping is presentation and may not change that capability merely
+   because row order changed, so the destination is named rather than derived from row order.
+4. **Per-user state across a user change on a still-mounted rail.** Proving the existing per-user
+   requirement exposed a real dependency gap: the route-forces-open rule was keyed only on the
+   active route, so loading the incoming user's empty state left them on a rail hiding their own
+   current page. Fixed.
