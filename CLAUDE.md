@@ -438,10 +438,10 @@ found*. **The failure has a name: dressing an engineering decision as a business
 *"Option A or B?"* about a file, a freeze, a scope or a merge is *"please do my job"*, and it is
 worse than silence because it looks like diligence.
 
-**A card is handed over TAB FIRST** — `【TAB】 — 【id】 · 【one line】`, and the paste block says
-which tab it owns and which it may not touch. The queue letters are the build line, not the
-screen, and they do not match: `R9` · `R11` · `R12` are all **Claims** and touch no Receiving
-file, while Receiving is the closed page.
+**A card is handed over MODULE FIRST** — `【MODULE】 — CARD 【sequence】 · 【clear capability name】`.
+The card file repeats the module and sequence in its metadata and H1; a date or opaque ID never
+replaces the human build order. The paste block says which module/surface it owns and which it may
+not touch. Queue letters remain technical build lines, not screen or module names.
 
 **Engineer-Owned Delivery.** After approval, engineering owns delivery until production is
 verified: implementation · testing · self-review · fixing what it finds · merge · deploy ·
