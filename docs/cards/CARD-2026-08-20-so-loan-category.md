@@ -1,6 +1,9 @@
 STATUS: EXECUTED
 DATE: 2026-08-20
-PR: (filled in from the real PR, never guessed — #866 was already Chai's)
+PR: #867 — https://github.com/wenwei4046/Carres-Portal-v2/pull/867
+(Written as #866 first and corrected: #866 was already taken by another lane
+before this branch pushed. A PR number is READ after creation, never guessed —
+the same discipline red line 7 applies to migration numbers.)
 IMPLEMENTATION: ENGINEERING-OWNED — no new owner ruling. `ERP-ARCHITECTURE.md`
 §3.1 · D9 already rules that the CATALOG owns *"what kind of product is this?"*;
 `56239a3c` (PR #859) shipped the reader and closed Stock's half. This card is
