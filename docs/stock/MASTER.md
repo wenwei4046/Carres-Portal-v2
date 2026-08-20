@@ -126,6 +126,36 @@ What is physically in a warehouse right now, per unit.
 - **`Reserve`, never `Take`.** The goods do not leave; they are LOCKED until delivery, and an
   operator who believes stock has gone will not chase it. The past tense moved with it —
   *reserved N from stock*, never *took*.
+- **A UNIT'S CATEGORY IS THE CATALOG'S ANSWER AND NOBODY ELSE'S**
+  (CARD-2026-08-19-onhand-category-filter, closing this module's half of D9). The chain is
+  `ops_stock_items.sku → product_skus.sku → product_skus.model_id → product_models.category`,
+  read by the ONE shared reader every other gate already asks
+  (`apps/api/src/lib/sku-categories.ts`), so On hand can never disagree with the earliest-sell
+  floor or the goods gate about what a sofa is. **No screen and no shared function may
+  re-derive a category from a SKU STRING** — the prefix rule D9 was raised against was wrong
+  for every live SKU, and the free-text import SKUs are exactly the strings it mis-read
+  (`Microfiber Waterproof Mattress Protector-K` is not a mattress).
+- **A SKU THE CATALOG DOES NOT HOLD SAYS SO.** `/inventory` returns `category: null` and the
+  rail counts it under **`Not in catalog`** — never guessed, never folded into `Accessory`.
+  The other three list views do not ask and carry no `category` key at all: **absent and
+  `null` are different facts**, and a `null` there would claim the catalog was asked.
+
+### WHAT IS ON SCREEN TODAY — the left filter rail
+`Category` sits between the attention chips and `Status`, same additive-AND pill mechanics as
+the groups below it, filtered client-side off the one `/inventory` fetch. Its no-filter pill is
+**`Any`**, matching Condition and Supplier; `All` stays the Status bucket list's word.
+Words: `docs/COPY-STANDARD.md` → *The On hand Category filter words*.
+
+**Measured 2026-08-19 (production, re-measured in the build):** 136 records · 74 distinct SKUs ·
+49 records join the catalog (sofa 23 · bedframe 16 · mattress 10) · **87 do not (975 units)**.
+Every live row is TEST data (Constitution §6): the null bucket is honest display, **never a
+backfill, repair worklist or cleanup card.**
+
+> **NOT LAW — PROPOSAL, carrying its own falsifier.** The card proposed `All` for the
+> no-filter pill and `No catalog match` for the null bucket; this build shipped **`Any`** and
+> **`Not in catalog`** instead, on the rail's own existing conventions and this dictionary's
+> `Supplier not assigned` / `Address not given yet` pattern. **Falsifier: the owner's word on
+> her walk.** One sentence from Jess overturns either, and the change is a copy edit.
 
 # §4 · In & out
 

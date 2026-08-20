@@ -1,6 +1,6 @@
-STATUS: QUEUED
+STATUS: EXECUTED
 DATE: 2026-08-19
-PR: pending
+PR: #859 — https://github.com/wenwei4046/Carres-Portal-v2/pull/859
 IMPLEMENTATION: APPROVED — the owner asked for a category filter on On hand
 2026-08-19 ("it should show category too"); the planner scoped it under the
 ERP architecture's ONE-category law. Build straight to production.
@@ -75,3 +75,29 @@ per-unit table and its actions · the reorder card · the WAREHOUSE rail.
 
 Screenshots at 1440 attached to the PR; `docs/stock/MASTER.md` §3 records the
 filter and the ONE-category source in the same PR. Owner walk owed.
+
+---
+
+## EXECUTED 2026-08-19 — PR #859
+
+Shipped as scoped. Baseline re-measured on production and confirmed exactly:
+136 records · 74 distinct SKUs · 49 join (sofa 23 · bedframe 16 · mattress 10) ·
+87 do not (975 units).
+
+**Two words differ from this card's recommendations** — both copy, both one line
+to reverse, both registered in `COPY-STANDARD.md` and recorded in
+`docs/stock/MASTER.md` §3 as **NOT LAW — PROPOSAL** with the falsifier named
+(Jess's word on her walk):
+
+- the no-filter pill is **`Any`**, not `All` — this rail already spends `All` on
+  the Status BUCKET list, and every FACET group's no-filter pill is `Any`;
+- the null bucket is **`Not in catalog`**, not `No catalog match` — *match* names
+  the lookup, and this dictionary states facts about the record
+  (`Supplier not assigned`, `Address not given yet`).
+
+**One fix beyond scope, deliberately:** `skuCategories()` now chunks its `in`
+list at 100. On hand is the first caller to pass every distinct SKU in the
+register; past the URL limit the read is rejected and the reader's failure mode
+was a silent empty map — every unit uncatalogued, nothing looking broken.
+
+**Owner walk still owed** — the production screenshot at 1440 is login-gated.
