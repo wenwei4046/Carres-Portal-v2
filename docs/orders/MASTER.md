@@ -108,11 +108,337 @@ Nothing survives merely because it is already there.**
 
 ---
 
-# §0.1 · SALES ORDER UI / OBJECT CLOSEOUT — OWNER RULING 2026-08-13
+# §0.1 · CURRENT SALES ORDER BLUEPRINT — OWNER RULING 2026-08-20
 
-This section is the approved target and overwrites any older UI wording that conflicts with it.
-The measured implementation record below remains evidence of what is built, not permission to
-keep a superseded target.
+This is the current owner-approved Sales Order operating model and UI authority. It overwrites
+older Sales Order placement, route-copy and action-presentation wording wherever they conflict.
+The implementation record that follows is evidence, not a competing target.
+
+## One purpose and one navigation home
+
+Sales Orders is the truth/register home of the customer order. It lets an authorised employee find
+the transaction, read the customer promise and follow every related fact and document. It is not a
+second Purchasing, Warehouse, Delivery, Payment or Work screen.
+
+The Sales module contains exactly:
+
+```
+SALES
+├─ Sales Orders
+└─ Old Orders (temporary)
+```
+
+Delivery Orders belongs under Delivery. Purchase Orders, Receiving Sessions, Stock Units and
+Payments stay under their own modules. The Sales Order links to them; it never copies their
+editors into Sales.
+
+## The four views of one Sales Order
+
+```
+SO-1319 · LIM KUAN YANG
+
+Order | Revisions | History | Order Route
+```
+
+- **Order** is the current customer-order truth and its read-only cross-module summaries.
+- **Revisions** contains complete approved commercial versions. A pending/rejected proposal is not
+  a Revision.
+- **History** is the append-only event ledger. It never substitutes for a historical document.
+- **Order Route** is one read-only connected map of authoritative facts, risks, documents and open
+  actions. It gains no cross-module writer.
+
+The identity/header persists across all four views. There is no invented overall status and no
+second View/Edit page state.
+
+## Sales Orders Register — find truth, never assign work
+
+The approved default columns remain:
+
+```
+SO No | Ordered | Customer Delivery | Customer | Delivery Location | Showroom | PO No | DO No
+```
+
+Search, filters, sorting, Columns and Export remain. Selection scopes output only. The Register
+contains no owner, avatar, next-action sentence, Priority or workflow button. A document number is
+a door to its owner: SO → SO, PO → PO, DO → DO.
+
+### The two-line cell law
+
+A second line is allowed only when it makes the first fact understandable. It uses the governed
+smaller secondary type and never repeats the customer, SO number, owner or action sentence.
+
+```
+Thu, 24 Sep
+Plan is on time
+
+No delivery date
+The customer promise is missing
+
+Thu, 24 Sep
+At risk · goods may arrive Fri, 25 Sep
+
+2 Delivery Orders
+KL → JB · JB → Singapore
+```
+
+The secondary line is a fact or risk, not an instruction. `Ask customer`, `Issue PO`, `Collect`,
+owner initials and deadlines live in Work and the action node on Order Route.
+
+The goods expander remains one read-only child table:
+
+```
+Category | Unit ID | Deliver To | SKU | Qty | Item
+```
+
+It reads Unit ID from Stock and Deliver To from Purchasing. It never infers or writes either fact.
+
+## Order view — one page, foreign facts read-only
+
+The Order view keeps the governed object header and one-page document composition. Its business
+sections are:
+
+```
+CUSTOMER PROMISE
+Customer · phone · address · Customer Delivery · Delivery Location
+
+SALES OWNERSHIP
+Dealer · Showroom · Salesperson
+
+DATES / ACCESS
+Ordered · Proceed date · floor · lift and governed access facts
+
+GOODS
+Item · SKU · quantity · commercial value
+
+DELIVERY JOURNEY
+Read-only Delivery calculation, legs, dates, current holder and risk · Open Order Route →
+
+MONEY
+Total · paid · outstanding · Open Payments →
+
+RELATED DOCUMENTS
+Every linked PO, Receiving Session, Unit, DO, Payment and applicable Case/Guarantee
+```
+
+Sales may directly correct only its governed safe/customer facts. A commercial commitment change
+uses the amendment path. Purchasing, Warehouse, Delivery and Finance facts have links, never forms.
+
+### Related Documents is complete, not a one-number mirror
+
+The object lists zero, one or many documents from each owner. It must not show only the latest or
+first Delivery Order when more exist.
+
+```
+Purchase Orders       PO-2048
+Receiving Sessions    —
+Stock Units           UNT-8821
+Delivery Orders       DO-KLJB-001 · DO-JBSG-001
+Payments              1 receipt
+Service Cases         —
+```
+
+For many documents the summary says, for example, `2 Delivery Orders →`; the door opens the
+authoritative Delivery Orders Register filtered to this SO. Every related document also remains
+independently findable in its owning Register. Optional Route branches such as Loan or Service are
+absent when no such obligation exists; the Related Documents summary may use the governed `—`.
+
+## Order Route — one connected drawing
+
+The map has one Sales Order root and three concurrent primary routes. Loan and Service are
+conditional linked obligations, never permanent empty lanes and never fake overall status.
+
+```
+                         SALES ORDER
+                              |
+             +----------------+----------------+
+             |                |                |
+           GOODS           DELIVERY          MONEY
+             |                |                |
+    available / missing    Journey facts    collection facts
+             |                |                |
+             +------ governed Delivery gates -+
+                              |
+                        Delivery Order(s)
+                              |
+                    Deliver → Delivery Proof
+```
+
+It remains one pannable/zoomable canvas, never separate route cards. It must not make the map
+unreadable merely to fit every node at once. Normal load keeps the governed readability floor and
+centres the current work; explicit Fit shows the whole map. A medium desktop keeps the same map,
+with pan/zoom and collapsed item groups rather than a stacked alternate truth.
+
+### Many goods use groups, not one endless horizontal row
+
+```
+GOODS · 7 Units
+
+▼ B1201S · King · Qty 3
+  ├─ 1 Unit available
+  │  Warehouse checks and packs it
+  └─ 2 Units missing
+     Purchasing buys 2 Units
+
+▶ Essential Memory Pillow · Qty 4
+  4 Units need buying
+```
+
+The item carrying current work opens by default; other groups may stay collapsed. Quantity/source
+forks remain connected to their parent item and rejoin only where the business facts rejoin.
+
+### Route node reading grammar
+
+A current human-action node uses three visually separate rows:
+
+```
+No Purchase Order yet
+[YJ] Raise the Purchase Order
+Have 2 × B1201S at Carres Klang Warehouse by Wed, 20 Aug
+```
+
+1. Fact/problem in primary-school English.
+2. Structured avatar/initials chip plus the short registered action.
+3. Object, quantity, place and actual weekday + calendar date.
+
+Never combine fact + person + action + date on one line. Never repeat the customer name when the
+open object already identifies the customer. A completed/read-only node may omit the action row.
+A system action says `System` and has no fake avatar.
+
+Visible employee copy does not use generic `Due`, `Next Action`, `Priority`, `Follow up`, `ASAP`,
+`Today`, `Tomorrow` or `T−2`. The sentence states the real work and date:
+
+```
+Have the goods ready by Wed, 20 Aug
+Ask Nice Future for an earlier delivery date by Tue, 18 Aug
+```
+
+The engine may retain a structured due field internally; the screen expresses its meaning.
+
+## Singapore Sales Order — two linked Delivery legs
+
+A Singapore delivery address creates one Delivery Journey projection as soon as the SO arrives.
+It does not wait for a Ready Stock route or a placed PO before planning begins.
+
+```
+CUSTOMER PROMISE (Sales Orders)
+          |
+          +--> GOODS COVERAGE
+          |      available exact Units → dated Warehouse work
+          |      missing/too-late qty   → dated Purchasing work
+          |
+          +--> DELIVERY JOURNEY (Delivery)
+                 Leg 1  Carres Klang Warehouse → selected JB partner warehouse
+                 Leg 2  JB partner warehouse → Singapore customer (EU or SSY)
+```
+
+Delivery owns the one backward calculation:
+
+```
+customer delivery date
+→ latest stock arrival at the selected JB partner warehouse
+→ KL pickup date
+→ latest Carres Warehouse ready date
+```
+
+Sales Orders reads that calculation and displays promise risk; it never recalculates it. Stock
+owns available/reserved/incoming Unit truth. Available exact Units create Warehouse work to check,
+pack and hand over by the calculated date. Missing or too-late quantity creates Purchasing work
+naming the exact goods and required arrival date at Carres Klang Warehouse. Partial availability
+creates both actions for their own quantities.
+
+Each leg has its own Logistics Partner, linked DO scope, dates, handover, **Who has it** fact and
+proof. Leg 1 completion means accepted at the named JB warehouse; it never means the Singapore
+customer received the goods. Both leg DOs appear in Related Documents and in the relevant Route
+nodes. Delivery remains the writer; Sales provides doors only.
+
+Delivery owns confirmed operational arrangement facts. Sales Orders keeps the promised Customer
+Delivery date. If the customer request changes the commercial promise, it uses the governed Sales
+Order correction/amendment path; Delivery never silently rewrites it.
+
+## Action Owner Engine — an action has an owner; the SO does not have one worker
+
+`SO PIC`, `Action Owner` and `Fault Owner` are separate structured facts.
+
+```
+missing customer promise                 → responsible salesperson
+available goods to check/pack/handover   → governed Warehouse duty
+missing goods / issue PO                 → current PO Duty
+supplier date too late                   → current PO Duty contacts supplier
+Delivery Journey / partner arrangement   → governed Delivery ownership
+customer date/time confirmation          → assigned Partner or governed proxy owner
+collect customer money                   → Payment ownership rule
+create Delivery Order                    → System
+```
+
+The Work Engine resolves the person from the owner rule, roster and cover. No manager assigns every
+SO to one person, and the Register never repeats those avatars. My Work filters the shared action
+set to the current person; Team Work groups the same actions by resolved owner.
+
+A late action is not automatically a staff fault. A fault record exists only after evidence names
+the failed fact, affected object, original date, actual event, responsible owner and corrective
+action. The UI states the late fact and remedy; it does not display three people as guilty because
+three independent actions are open.
+
+## Delivery Order — the system creates the document
+
+Sales Orders has no `New DO`, `Create DO`, `Issue`, `Release` or `Approve` control. Before a leg is
+ready, its Route gate states the outstanding governed requirements in plain English. When the
+Delivery-owned gate becomes true, the system creates the leg's Delivery Order idempotently.
+
+```
+✓ DELIVERY ORDER
+DO-200826-1234
+Created by System
+Open Delivery Order →
+```
+
+The authoritative Delivery Orders Register and DO object live under Delivery. The SO Register,
+Related Documents and Order Route only link to the documents. For Singapore, each linked leg keeps
+its own DO/document scope; split or rebooked documents remain separate history rather than
+overwriting one number.
+
+## Completion, empty, loading and error truth
+
+There is no fake overall status. Each route states its own truth:
+
+```
+Goods       Complete / Open / At risk
+Delivery    Complete / Open / At risk
+Money       Complete / Open
+Service     shown only when a Case exists
+Loan        shown only when a Loan exists
+```
+
+`Delivery complete` and `Money still open` may both be true. Do not compress them into `Order
+pending`. `No Action Required` is valid only when every governed obligation is closed; delivered or
+cancelled alone does not prove that.
+
+Empty states teach what creates the fact without inventing a work door:
+
+```
+No Purchase Orders yet
+Purchasing creates one when goods still need buying.
+
+No Delivery Orders yet
+The system creates each Delivery Order when that leg is ready.
+```
+
+A failed cross-module read is an error, never an empty truth: `Delivery facts could not be loaded
+· Try again`. Loading uses the governed skeleton. Slow or missing data never becomes `No delivery`
+or `No Finance hold`. Long text truncates only where the governed Register permits it; the full
+fact remains available through the owning object/accessible name.
+
+Keyboard and screen-reader order follows the visual route order. Every document door names its
+document, every owner chip exposes the person's full name, state is never colour-only, and pan/zoom
+controls remain keyboard-operable.
+
+---
+
+# §0.2 · BUILT IMPLEMENTATION RECORD BEFORE THE 2026-08-20 FINAL BLUEPRINT
+
+This section preserves measured build and production evidence. It is not a second UI authority.
+Where its older target wording conflicts with §0.1, §0.1 is the current truth and this section is
+read only as implementation history.
 
 ## Register
 
@@ -191,11 +517,11 @@ that it stopped being a stack and became **one connected map**.
 ```
 SO
 ├── Goods            forks per goods line and per source quantity
-├── Delivery         LOGISTICS → DELIVERY DATE
-├── Money            MONEY
+├── Delivery         Journey / LOGISTICS → DELIVERY DATE
+├── Money            collection remains its own route
 └── Loan             rendered ONLY when a loan is out
 
-Goods + Logistics + Delivery Date + Money → DELIVERY ORDER (gate) → DELIVER → DELIVERY PHOTO
+Governed leg facts + any formal Finance hold → DELIVERY ORDER (system) → DELIVER → DELIVERY PHOTO
 ```
 
 `packages/shared/src/sales-order-route.ts` resolves the map — nodes, edges AND their geometry —
@@ -1290,11 +1616,12 @@ MEMBERSHIP        the Delivery board reads the DELIVERY TRACK of the same
                   · Queue-less rows still build and still carry the ORDER's
                     headline, so a held order reads `Collect RM … 🔒` here
                     exactly as it does on the Orders list.
-                  · The assign step still waits on the ruling's OWN trigger —
-                    *"Ready Stock route known OR Purchase Order placed"*. An
-                    open `Issue PO` is neither, so goods nobody has bought stay
-                    off the board. Rule 1 forbids waiting for goods to be READY,
-                    not for them to be BOUGHT.
+                  · For an ordinary domestic order, the measured implementation
+                    still begins assignment when *"Ready Stock route known OR
+                    Purchase Order placed"*. **That trigger does not govern a
+                    Singapore Journey.** A Singapore address creates its Journey
+                    Plan as soon as the SO arrives; Delivery works backwards and
+                    creates the dated owner work before a PO or DO exists (§0.1).
 
 THE BRIEF         `resolveBookingBrief` (packages/shared/src/booking-brief.ts ·
                   GET /api/operation/orders/:id/booking-brief) — the ONE
@@ -2051,8 +2378,11 @@ disappear with the old SO. The original SO continues to owe the correct commitme
 ## Card 3 · Early Logistics Assignment + Customer Booking — approved and built
 
 ```
-PO placed → assign logistics immediately → watch Stock ETA → contact customer early
-→ Stock ETA + logistics capacity + customer preference → confirmed appointment
+Domestic order: fulfilment route known → assign logistics early → watch Stock ETA
+→ contact customer early → confirmed operational arrangement
+
+Singapore order: SO arrives → create the two-leg Journey Plan immediately
+→ work backwards to actual Warehouse/Purchasing/Delivery dates → confirm both legs
 ```
 
 Do not wait for stock to be ready before assigning logistics. Keep three independent facts:
@@ -4141,9 +4471,10 @@ decision-A programme is **closed**.
 
 The DO stopped being a bare column: `ops_delivery_orders` (0356) holds one row per trip's
 document, materialised by ONE trigger on `orders.do_number` so every mint path produces the row.
-The **Delivery Orders Register lives under SALES** beside this register, its rows open the **DO
-object page**, and document numbers are doors both ways — the SO register's `DO No` cell and the
-Order Route's issued gate node open the DO object; the DO page's `Open SO-{n} →` returns.
+The **Delivery Orders Register lives under Delivery**. Sales contains only `Sales Orders` and
+`Old Orders (temporary)`. Document numbers remain doors both ways — the SO register's `DO No`
+cell, Related Documents and the Order Route's issued gate node open the DO object; the DO page's
+`Open SO-{n} →` returns. An old bookmark resolves to the same document with Delivery highlighted.
 **docs/delivery/MASTER.md owns the document model** (status arithmetic, void law, failure-keeps-
 its-exception); this MASTER keeps only the gate. Two Law-D repairs rode the slice: the canvas
 gate now prints the number from `orders.do_number` (it used to read attempts alone, so a
