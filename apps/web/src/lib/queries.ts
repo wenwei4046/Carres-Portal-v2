@@ -13,6 +13,9 @@ import {
   type AssignPickupPartnerInput,
   type AttachDoInput,
   type AwaitingStockShortageResponse,
+  type DeliveryHandoverKind,
+  type HandoverGoodsLine,
+  type RecordHandoverInput,
   type CancelOrderInput,
   type CatalogResponse,
   type JumpSearchResponse,
@@ -3246,6 +3249,19 @@ export interface operationPoListRow {
    *  degrades to "no ready date yet", which is also the state that raises
    *  `Confirm ready date`. */
   expected_ready_date?: string | null;
+  /** 0361 — the reason this PO was born: `customer_sales` (the customer lane's
+   *  auto-stamp) or a typed demand purpose. The panel prints it as `Need for`.
+   *  OPTIONAL — an older Worker omits it, and pre-0361 POs are NULL (never
+   *  backfilled); both degrade to printing nothing. */
+  purpose?: string | null;
+  /** 0364 — which version of the document the factory holds; 1 at issue, a
+   *  revise mints the next. The panel prints `PO-2041 · Version 2` from > 1.
+   *  OPTIONAL — an older Worker omits it and the PO reads as Version 1. */
+  version?: number;
+  /** 0364 — when the CURRENT version was minted; NULL = never revised. The
+   *  governed sentence `{po} Version {n} has not reached {supplier}` is
+   *  DERIVED from this against the latest send — never stored. */
+  revised_at?: string | null;
   placed_at: string;
   purchase_order_lines: {
     // 0076 (Loo 2026-05-10): line UUID — primary key after migration. Used
@@ -4131,6 +4147,194 @@ export function usePurchasePushLines() {
  * banner and urgent bypass, the delivery queue deadlines, the right-rail
  * team card). A number with one home is the whole point of P1.
  */
+/** ── Manual Purchase — the typed request lane (0359) ─────────────────────── */
+
+export interface PurchaseRequestRow {
+  id: string;
+  req_no: string;
+  purpose: string;
+  destination_id: string;
+  required_by: string | null;
+  why: string;
+  approval_required: boolean;
+  approved_at: string | null;
+  approved_by: string | null;
+  refused_at: string | null;
+  refused_by: string | null;
+  refuse_reason: string | null;
+  created_by: string | null;
+  created_at: string;
+}
+
+export interface PurchaseRequestLineRow {
+  id: string;
+  request_id: string;
+  sku: string;
+  supplier_id: string | null;
+  qty: number;
+  approved_qty: number | null;
+  issued_qty: number;
+  remaining_qty: number;
+  required_by: string | null;
+  remark: string | null;
+  po_id: string | null;
+  cancelled_at: string | null;
+  cancel_reason: string | null;
+  /** Derived by the server from the linked PO's posted receipt (the
+   *  Observation Law) — never a button anywhere. */
+  received?: boolean;
+}
+
+export interface ManualPurchaseRegisterPayload {
+  requests: PurchaseRequestRow[];
+  lines: PurchaseRequestLineRow[];
+  destinations: Array<{ id: string; name: string }>;
+  suppliers: Array<{ id: string; name: string; kind?: string | null }>;
+  users: Array<{ id: string; name: string | null }>;
+  /** The Settings manager gate — decides what RENDERS (money, Approve). */
+  canApprove: boolean;
+}
+
+export interface ManualPurchaseDetailPayload {
+  request: PurchaseRequestRow;
+  /** `unit_cost` is present ONLY for the approver — the same screen renders
+   *  for both roles, minus the money, never a permission error. */
+  lines: Array<PurchaseRequestLineRow & { unit_cost?: number | null }>;
+  destinations: Array<{ id: string; name: string }>;
+  suppliers: Array<{ id: string; name: string; kind?: string | null }>;
+  users: Array<{ id: string; name: string | null }>;
+  canApprove: boolean;
+}
+
+export function useManualPurchaseDetail(id: string | null) {
+  return useQuery<ManualPurchaseDetailPayload, ApiError>({
+    queryKey: ["operation", "purchasing", "requests", "detail", id ?? ""],
+    queryFn: () =>
+      apiFetch<ManualPurchaseDetailPayload>(
+        `/api/operation/purchasing/requests/detail/${id}`,
+      ),
+    enabled: !!id,
+    staleTime: 15_000,
+  });
+}
+
+export function useIssuePurchaseRequests() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: {
+      requestIds: string[];
+      together: boolean;
+      partners?: Record<string, string> | null;
+    }) =>
+      apiFetch<{ poIds: string[]; documents: number }>(
+        "/api/operation/purchasing/requests/issue",
+        { method: "POST", body: JSON.stringify(input) },
+      ),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ["operation", "purchasing", "requests"] }),
+  });
+}
+
+export function useDecidePurchaseRequest() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: {
+      id: string;
+      decision: "approve" | "refuse";
+      reason?: string | null;
+      cuts?: Array<{ id: string; qty: number }> | null;
+    }) =>
+      apiFetch<{ id: string; req_no: string; decision: string }>(
+        `/api/operation/purchasing/requests/${input.id}/decide`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            decision: input.decision,
+            reason: input.reason ?? null,
+            cuts: input.cuts ?? null,
+          }),
+        },
+      ),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ["operation", "purchasing", "requests"] }),
+  });
+}
+
+export function useManualPurchaseRegister() {
+  return useQuery<ManualPurchaseRegisterPayload, ApiError>({
+    queryKey: ["operation", "purchasing", "requests"],
+    queryFn: () =>
+      apiFetch<ManualPurchaseRegisterPayload>("/api/operation/purchasing/requests"),
+    staleTime: 30_000,
+  });
+}
+
+export function useCreatePurchaseRequest() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: {
+      purpose: string;
+      destinationId: string;
+      requiredBy?: string | null;
+      why: string;
+    }) =>
+      apiFetch<{ id: string; req_no: string; approval_required: boolean }>(
+        "/api/operation/purchasing/requests",
+        { method: "POST", body: JSON.stringify(body) },
+      ),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ["operation", "purchasing", "requests"] }),
+  });
+}
+
+export function useCreatePurchaseRequestLine() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: {
+      requestId: string;
+      sku: string;
+      qty: number;
+      destinationId: string;
+      requiredBy?: string | null;
+      note?: string | null;
+      purpose: string;
+    }) =>
+      apiFetch<{ id: string; supplier_id: string }>(
+        `/api/operation/purchasing/requests/${input.requestId}/lines`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            sku: input.sku,
+            qty: input.qty,
+            destinationId: input.destinationId,
+            requiredBy: input.requiredBy ?? null,
+            note: input.note ?? null,
+            purpose: input.purpose,
+          }),
+        },
+      ),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ["operation", "purchasing", "requests"] }),
+  });
+}
+
+/** What is already on an open PO for one SKU — `free` deliberately rides the
+ *  pick-items read instead (one arithmetic, Law D). */
+export function useAlreadyOnPo(sku: string | null) {
+  return useQuery<
+    { sku: string; alreadyOnPo: number; firstPo: { id: string; eta: string | null } | null },
+    ApiError
+  >({
+    queryKey: ["operation", "purchasing", "already-have", sku ?? ""],
+    queryFn: () =>
+      apiFetch(
+        `/api/operation/purchasing/requests/already-have?sku=${encodeURIComponent(sku ?? "")}`,
+      ),
+    enabled: !!sku,
+    staleTime: 30_000,
+  });
+}
+
 export function usePurchasingSettings(
   opts?: Partial<UseQueryOptions<PurchasingSettingsResponse>>,
 ) {
@@ -4245,6 +4449,29 @@ export function useRecordSend(poId: string | null) {
     mutationFn: (input: { channel: "whatsapp" | "email" | "print"; note?: string }) =>
       apiFetch<{ ok: true; result: { revision: number } }>(
         `/api/operation/pos/${encodeURIComponent(poId ?? "")}/sends`,
+        { method: "POST", body: JSON.stringify(input) },
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["operation", "pos"] });
+    },
+  });
+}
+
+/**
+ * PO Revisions (0364, Jess 2026-08-18) — a sent PO keeps its number and mints
+ * a version. Only the CHANGED lines ride the wire; the server snapshots the
+ * prior document, floors every qty at received_qty (409 `received_floor`) and
+ * refuses without a reason.
+ */
+export function useRevisePo(poId: string | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: {
+      reason: string;
+      lines: { lineId: string; qty: number; destinationId: string | null }[];
+    }) =>
+      apiFetch<{ ok: true; result: { version: number } }>(
+        `/api/operation/pos/${encodeURIComponent(poId ?? "")}/revise`,
         { method: "POST", body: JSON.stringify(input) },
       ),
     onSuccess: () => {
@@ -4431,11 +4658,26 @@ export interface SalesOrderRouteClaim {
 }
 
 /** `order_finance_exceptions` (0355) as `/api/finance/exceptions/:orderId`
- *  serves it — the ONE money blocker on the DO (decision A, 2026-08-16). */
+ *  serves it — an OPEN one blocks the DO regardless of payment. */
 export interface SalesOrderRouteFinanceException {
   id: string;
   status: "open" | "cleared";
   reason: string;
+}
+
+/** `order_delivery_payment_approvals` (0362, owner ruling 2026-08-19) as
+ *  `/api/operation/payment-approvals/:orderId` serves it — only an APPROVED
+ *  row opens the money gate; it means COD before unloading. */
+export interface DeliveryPaymentApprovalRow {
+  id: string;
+  order_id: string;
+  status: "pending" | "approved" | "refused";
+  request_reason: string;
+  requested_by: string | null;
+  requested_at: string | null;
+  decided_by: string | null;
+  decided_at: string | null;
+  decision_reason: string | null;
 }
 
 export interface SalesOrderRouteFactsResponse {
@@ -4448,6 +4690,7 @@ export interface SalesOrderRouteFactsResponse {
   receiving: SalesOrderRouteReceivingSession[];
   claims: SalesOrderRouteClaim[];
   financeExceptions: SalesOrderRouteFinanceException[];
+  paymentApprovals: DeliveryPaymentApprovalRow[];
 }
 
 /**
@@ -4471,7 +4714,7 @@ export function useSalesOrderRouteFacts(
           `/api/operation/pos/${encodeURIComponent(poId)}/receiving`,
         ),
       ));
-      const [allocation, booking, attempts, loans, refunds, cases, claims, financeExceptions] =
+      const [allocation, booking, attempts, loans, refunds, cases, claims, financeExceptions, paymentApprovals] =
         await Promise.all([
           apiFetch<{ allocation: SalesOrderAllocation }>(`/api/operation/orders/${id}/allocation`),
           apiFetch<{ brief: BookingBrief }>(`/api/operation/orders/${id}/booking-brief`),
@@ -4480,10 +4723,11 @@ export function useSalesOrderRouteFacts(
           apiFetch<{ refunds: SalesOrderRouteRefund[] }>(`/api/operation/orders/${id}/refunds`),
           apiFetch<{ items: SalesOrderRouteCase[] }>(`/api/ops/service-cases?orderId=${id}`),
           apiFetch<{ claims: SalesOrderRouteClaim[] }>("/api/operation/supplier-claims?status=all"),
-          // Decision A (2026-08-16) — the gate's one money question. The route
-          // reads the same table the server-side gate reads, so the canvas and
-          // the refusal can never disagree (Law D).
+          // The gate's two money records (0355 + 0362, owner ruling
+          // 2026-08-19). The route reads the same tables the server-side gate
+          // reads, so the canvas and the refusal can never disagree (Law D).
           apiFetch<SalesOrderRouteFinanceException[]>(`/api/finance/exceptions/${id}`),
+          apiFetch<DeliveryPaymentApprovalRow[]>(`/api/operation/payment-approvals/${id}`),
         ]);
       const receiving = await receivingPromise;
       return {
@@ -4496,11 +4740,77 @@ export function useSalesOrderRouteFacts(
         receiving: receiving.flatMap((result) => result.sessions),
         claims: claims.claims.filter((claim) => poIds.includes(claim.po_id)),
         financeExceptions,
+        paymentApprovals,
       };
     },
     enabled: !!orderId && open,
     staleTime: 10_000,
     ...opts,
+  });
+}
+
+/* ─── THE DELIVERY PAYMENT APPROVAL (0362, owner ruling 2026-08-19) ──────────
+ *
+ * Money in full before delivery is the only default; the one exception is a
+ * recorded APPROVED approval — COD on the owner's terms. Two doors, two
+ * hooks: Operation / the salesperson RAISES with a reason; the configured
+ * approver (today: Jess) DECIDES with a reason. The database refuses anyone
+ * else — these hooks only carry the ask.
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+/** The order's approval rows — for surfaces outside the route fan-in. */
+export function useDeliveryPaymentApprovals(orderId: string | null) {
+  return useQuery({
+    queryKey: ["operation", "orders", orderId ?? "null", "payment-approvals"] as const,
+    queryFn: () =>
+      apiFetch<DeliveryPaymentApprovalRow[]>(
+        `/api/operation/payment-approvals/${encodeURIComponent(orderId ?? "")}`,
+      ),
+    enabled: !!orderId,
+    staleTime: 10_000,
+  });
+}
+
+/** Raise the request. Raising changes nothing else — no gate opens. */
+export function useRequestPaymentApproval(orderId: string) {
+  const qc = useQueryClient();
+  return useMutation<DeliveryPaymentApprovalRow, Error, { reason: string }>({
+    mutationFn: (body) =>
+      apiFetch<DeliveryPaymentApprovalRow>(
+        `/api/operation/payment-approvals/${encodeURIComponent(orderId)}`,
+        { method: "POST", body: JSON.stringify(body) },
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({
+        queryKey: ["operation", "orders", orderId, "payment-approvals"],
+      });
+      // The route canvas reads the same record through its own fan-in.
+      void qc.invalidateQueries({ queryKey: qk.operation.orderRoute(orderId) });
+    },
+  });
+}
+
+/** The approver's word — approved authorises COD; refused keeps the gate shut. */
+export function useDecidePaymentApproval(orderId: string) {
+  const qc = useQueryClient();
+  return useMutation<
+    DeliveryPaymentApprovalRow,
+    Error,
+    { id: string; decision: "approved" | "refused"; reason: string }
+  >({
+    mutationFn: ({ id, ...body }) =>
+      apiFetch<DeliveryPaymentApprovalRow>(
+        `/api/operation/payment-approvals/${encodeURIComponent(id)}/decide`,
+        { method: "POST", body: JSON.stringify(body) },
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({
+        queryKey: ["operation", "orders", orderId, "payment-approvals"],
+      });
+      void qc.invalidateQueries({ queryKey: qk.operation.orderRoute(orderId) });
+      // An approval may complete the gate — the SYSTEM may have issued the DO.
+      void qc.invalidateQueries({ queryKey: qk.operation.order(orderId) });
+    },
   });
 }
 
@@ -5547,9 +5857,16 @@ export interface DeliveryOrderAttemptRow {
   recorded_at: string;
   recorded_by?: string | null;
 }
+/** One §4 handover fact (0363) as the register needs it — the kind alone. */
+export interface DeliveryHandoverKindRow {
+  delivery_order_id: string;
+  kind: DeliveryHandoverKind;
+}
+
 export interface DeliveryOrdersRegisterPayload {
   deliveryOrders: DeliveryOrderRow[];
   attempts: DeliveryOrderAttemptRow[];
+  handoverEvents: DeliveryHandoverKindRow[];
 }
 export function useDeliveryOrdersRegister(opts?: { orderId?: string }) {
   const scope = opts?.orderId ?? "all";
@@ -5595,7 +5912,29 @@ export interface DeliveryOrderDetailPayload {
     returned_at: string | null;
     loan_note_no: string | null;
   }>;
+  handoverEvents: DeliveryHandoverEventRow[];
 }
+
+/** One §4 handover fact as recorded (0363) — person, company, active duty,
+ *  time, proof; the receipt may carry its OWN goods count (a discrepancy
+ *  keeps both facts visible). */
+export interface DeliveryHandoverEventRow {
+  id: string;
+  kind: DeliveryHandoverKind;
+  duty: "warehouse" | "logistics";
+  company: string | null;
+  counterparty: string | null;
+  receiver_name: string | null;
+  vehicle: string | null;
+  goods: HandoverGoodsLine[] | null;
+  note: string | null;
+  proof_path: string | null;
+  recorded_by: string;
+  recorded_by_name: string | null;
+  recorded_at: string;
+  proofUrl: string | null;
+}
+
 export function useDeliveryOrder(idOrNumber: string | null) {
   return useQuery<DeliveryOrderDetailPayload, ApiError>({
     queryKey: ["operation", "delivery-orders", "detail", idOrNumber],
@@ -5604,6 +5943,31 @@ export function useDeliveryOrder(idOrNumber: string | null) {
         `/api/operation/delivery-orders/${encodeURIComponent(idOrNumber ?? "")}`,
       ),
     enabled: Boolean(idOrNumber),
+  });
+}
+
+/** The §4 chain door (0363): record ONE ordered fact on a live document.
+ *  Invalidates every delivery-order read AND the delivery/orders lists — the
+ *  register pill may turn `Out for delivery` on this write. */
+export function useRecordHandoverEvent(
+  doId: string,
+  opts?: Partial<
+    UseMutationOptions<{ event: unknown }, ApiError, RecordHandoverInput>
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation<{ event: unknown }, ApiError, RecordHandoverInput>({
+    mutationFn: (input) =>
+      apiFetch<{ event: unknown }>(
+        `/api/operation/delivery-orders/${encodeURIComponent(doId)}/handover`,
+        { method: "POST", body: JSON.stringify(input) },
+      ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: ["operation", "delivery-orders"] });
+      await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
   });
 }
 

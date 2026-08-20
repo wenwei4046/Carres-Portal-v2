@@ -81,6 +81,8 @@ const POS = [
     so_refs: null,
     eta_date: TODAY,
     placed_at: "2026-03-01T08:00:00Z",
+    // 0361 — the customer lane's auto-stamp; the panel prints `Need for`.
+    purpose: "customer_sales",
     customer_delivery: "2099-08-20",
     eta_revised: false,
     orders: [{ so: 1300, customer_name: "Ah Hock", delivery_date: "2099-08-20" }],
@@ -1605,6 +1607,22 @@ describe("the Supplier Workspace (Jess's v7 freeze, 2026-08-02)", () => {
     expect(screen.queryByTestId("po-work-state")).not.toBeInTheDocument();
   });
 
+  it("the header prints WHY the PO was born — and hides the row when 0361 never stamped it", async () => {
+    await mountLoaded();
+    // PO-9003 (auto-selected) carries the customer lane's auto-stamp.
+    const header = within(screen.getByTestId("po-working-header"));
+    expect(header.getByText("Need for")).toBeInTheDocument();
+    expect(header.getByTestId("po-need-for")).toHaveTextContent("Customer Sales");
+
+    // PO-9001 pre-dates 0361 (purpose NULL, never backfilled) — the row hides
+    // rather than printing a dash the operator must interpret.
+    fireEvent.click(listing().getByText("PO-9001"));
+    await waitFor(() =>
+      expect(within(screen.getByTestId("po-panel-title")).getByText("PO-9001")).toBeInTheDocument(),
+    );
+    expect(screen.queryByTestId("po-need-for")).not.toBeInTheDocument();
+  });
+
   it("the supplier-date row opens IN PLACE and carries the field's own history", async () => {
     await mountLoaded();
     const work = await expandPo("PO-9001");
@@ -2625,5 +2643,188 @@ describe("the CALLS calendar rail (T2)", () => {
     // order-by buffer in the settings mock) — a call with no due plans no
     // day and never reaches `Later` (P1/T7).
     expect(screen.queryByTestId("po-rail-call-later")).toBeNull();
+  });
+});
+
+/* ── PO REVISIONS (0364, Jess 2026-08-18) — a sent PO keeps its number ────── */
+describe("a sent PO is not overwritten — it is REVISED", () => {
+  /** PO-9003 with a first revision minted: Version 2, one unit of Cody Q
+   *  already received (the floor's fixture), and one hand-over that happened
+   *  BEFORE the revise — so Version 2 has not reached Ohana yet. */
+  const revisedPos = () =>
+    POS.map((p) =>
+      p.id === "PO-9003"
+        ? {
+            ...p,
+            version: 2,
+            revised_at: "2026-08-19T03:00:00Z",
+            sends: [
+              {
+                channel: "whatsapp",
+                note: null,
+                sent_at: "2026-08-18T09:00:00Z",
+                po_revisions: { rev_no: 1 },
+              },
+            ],
+            purchase_order_lines: (
+              p.purchase_order_lines as { id: string; received_qty: number }[]
+            ).map((l) => (l.id === "a1" ? { ...l, received_qty: 1 } : l)),
+          }
+        : p,
+    );
+
+  it("the panel title mints `· Version 2` — and Version 1 prints nothing", async () => {
+    mockApi(revisedPos());
+    await mountLoaded();
+    await openPo("PO-9003");
+    expect(screen.getByTestId("po-version").textContent).toContain("Version 2");
+    // Version 1 is just the PO — the word would otherwise mean nothing.
+    await openPo("PO-9001");
+    expect(screen.queryByTestId("po-version")).toBeNull();
+  });
+
+  it("a version minted after the last hand-over raises the governed sentence", async () => {
+    mockApi(revisedPos());
+    await mountLoaded();
+    await openPo("PO-9003");
+    expect(screen.getByTestId("po-unshared").textContent).toBe(
+      "PO-9003 Version 2 has not reached Ohana",
+    );
+  });
+
+  it("a hand-over AFTER the revise silences it — that send carried Version 2", async () => {
+    mockApi(
+      revisedPos().map((p) =>
+        p.id === "PO-9003"
+          ? {
+              ...p,
+              sends: [
+                {
+                  channel: "whatsapp",
+                  note: null,
+                  sent_at: "2026-08-19T05:00:00Z",
+                  po_revisions: { rev_no: 2 },
+                },
+              ],
+            }
+          : p,
+      ),
+    );
+    await mountLoaded();
+    await openPo("PO-9003");
+    expect(screen.queryByTestId("po-unshared")).toBeNull();
+  });
+
+  it("Revise takes the stage: the read-only items block steps aside, and Cancel brings it back", async () => {
+    mockApi(revisedPos());
+    await mountLoaded();
+    await openPo("PO-9003");
+    fireEvent.click(screen.getByTestId("po-revise-open"));
+    expect(screen.getByTestId("po-revise-form")).toBeInTheDocument();
+    // One PO never shows an editable and a read-only copy of one line at once
+    // (§12.7.5 rule 3, kept).
+    expect(screen.queryByTestId("po-panel-items")).toBeNull();
+    fireEvent.click(screen.getByTestId("po-revise-cancel"));
+    expect(screen.queryByTestId("po-revise-form")).toBeNull();
+    expect(screen.getByTestId("po-panel-items")).toBeInTheDocument();
+  });
+
+  it("the disabled Save NAMES its gap, first gap wins — and the floor is stated inline", async () => {
+    mockApi(revisedPos());
+    await mountLoaded();
+    await openPo("PO-9003");
+    fireEvent.click(screen.getByTestId("po-revise-open"));
+
+    // Untouched form: nothing changed yet.
+    expect(screen.getByTestId("po-revise-save")).toBeDisabled();
+    expect(screen.getByTestId("po-revise-save").textContent).toBe(
+      "Save — nothing changed",
+    );
+
+    // The floor is printed where it binds — quiet while the draft honours it.
+    expect(screen.getByTestId("po-revise-floor-1").textContent).toBe("1 received");
+
+    // A change without a why is refused by name.
+    fireEvent.change(screen.getByTestId("po-revise-qty-1"), {
+      target: { value: "3" },
+    });
+    expect(screen.getByTestId("po-revise-save").textContent).toBe("Save — say why");
+
+    // Below the floor outranks everything — goods already on a Carres floor
+    // cannot be un-ordered by editing a document.
+    fireEvent.change(screen.getByTestId("po-revise-qty-1"), {
+      target: { value: "0" },
+    });
+    expect(screen.getByTestId("po-revise-save").textContent).toBe(
+      "Save — below received",
+    );
+  });
+
+  it("Save mints the version — only the CHANGED line rides the wire", async () => {
+    mockApi(revisedPos());
+    await mountLoaded();
+    await openPo("PO-9003");
+    fireEvent.click(screen.getByTestId("po-revise-open"));
+
+    fireEvent.change(screen.getByTestId("po-revise-qty-1"), {
+      target: { value: "3" },
+    });
+    fireEvent.change(screen.getByTestId("po-revise-reason"), {
+      target: { value: "Factory shorted us" },
+    });
+    const save = screen.getByTestId("po-revise-save");
+    expect(save).toBeEnabled();
+    // The button names the version it mints — the act's own product.
+    expect(save.textContent).toBe("Save Version 3");
+    fireEvent.click(save);
+
+    await waitFor(() => {
+      const call = apiFetch.mock.calls.find(
+        (c) => c[0] === "/api/operation/pos/PO-9003/revise",
+      );
+      expect(call).toBeTruthy();
+      const body = JSON.parse((call![1] as { body: string }).body);
+      expect(body.reason).toBe("Factory shorted us");
+      expect(body.lines).toEqual([
+        { lineId: "a1", qty: 3, destinationId: null },
+      ]);
+    });
+  });
+
+  it("a destination change routes through the same mint — never a silent overwrite", async () => {
+    mockApi(revisedPos());
+    await mountLoaded();
+    await openPo("PO-9003");
+    fireEvent.click(screen.getByTestId("po-revise-open"));
+
+    fireEvent.change(screen.getByTestId("po-revise-destination-2"), {
+      target: { value: AL },
+    });
+    fireEvent.change(screen.getByTestId("po-revise-reason"), {
+      target: { value: "Ship straight to AL" },
+    });
+    fireEvent.click(screen.getByTestId("po-revise-save"));
+
+    await waitFor(() => {
+      const call = apiFetch.mock.calls.find(
+        (c) => c[0] === "/api/operation/pos/PO-9003/revise",
+      );
+      expect(call).toBeTruthy();
+      const body = JSON.parse((call![1] as { body: string }).body);
+      expect(body.lines).toEqual([
+        { lineId: "a2", qty: 1, destinationId: AL },
+      ]);
+    });
+  });
+
+  it("a received or cancelled PO offers no Revise door — finished stories", async () => {
+    mockApi(
+      revisedPos().map((p) =>
+        p.id === "PO-9003" ? { ...p, status: "received" } : p,
+      ),
+    );
+    await mountLoaded();
+    await openPo("PO-9003");
+    expect(screen.queryByTestId("po-revise-open")).toBeNull();
   });
 });

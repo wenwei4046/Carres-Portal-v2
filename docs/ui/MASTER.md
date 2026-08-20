@@ -458,11 +458,23 @@ shipped code, and stated the opposite.)*
 
 # §4.2 · MODULE NAVIGATION — APPROVED / SHIPPED, Jess 2026-08-18
 
-### THE PAGES OF A MODULE LIVE IN THE RAIL
+### THE PAGES OF A MODULE LIVE IN THE RAIL — UNDER A HEADING, NEVER A PARENT ROW
 
-A module's sidebar item **expands in place** to list its pages. It does not open a
-second left column, and it does not keep a tab strip once it has more than a
-handful of pages.
+**Corrected by Jess on a production screenshot, 2026-08-19
+(CARD-2026-08-19-purchasing-rail-corrections): the "expands in place" parent row
+shipped and was overruled on sight.** SALES is the template and it has TWO
+layers: a group HEADING, then the pages. A module is a heading — `PURCHASING`
+replaced the umbrella word `SUPPLY CHAIN`, the `Purchasing` parent row is
+deleted, and the pages sit at the same indent as `Sales Orders`. Delivery
+carries its own heading until it restructures. **Stock restructured 2026-08-19
+(CARD-2026-08-19-warehouse-rail): the merged `Stock` row became the `WAREHOUSE`
+heading** with its pages as rows — `On hand` · `Ready stock` · `In & out` live,
+`Transfers` · `Counts` printing `Coming soon` (Warehouse Blueprint item 13).
+The blueprint keeps Reports and Settings central, so WAREHOUSE lists **no
+Report row and no Settings row**. Its strip died the same way Purchasing's did:
+`StockTabs` keeps drawing the ONE header row in the destination format. A
+module still does not open a second left column, and it does not keep a tab
+strip once it has more than a handful of pages.
 
 ```
 ▾ Purchasing
@@ -489,8 +501,9 @@ says where you are once the strip is gone.
 
 ### FROZEN RULES
 
-- **Only the module you are standing in is open.** Same rule the area groups
-  already follow; applied one level down, so nothing new is invented.
+- **Every module's pages are always on screen** (2026-08-19, with the heading
+  correction — the accordion died with the parent row; SALES' pages never hid
+  and Purchasing's do not either).
 - **The whole map is listed from day one.** An approved page appears before it is
   built. A map showing four of eleven roads teaches a shape that is about to
   change under the operator seven more times.
@@ -510,9 +523,10 @@ says where you are once the strip is gone.
 - **A manager-only page is gated by the SERVER**, not by the role: the rail asks
   the same RPC that guards the page. A caller who may not enter does not see the
   door.
-- **Collapsed, the children disappear and the module's ONE icon remains.** A
-  collapsed rail is for table room, not for navigating thirteen pages by guessing
-  thirteen icons.
+- **Collapsed, the LIVE pages show as icons — exactly like the SALES pages —
+  and an unbuilt page shows nothing** (2026-08-19: with no parent row there is
+  no single module icon; a `Coming soon` entry is not a control and gets no
+  icon-only ghost).
 - **The rail overflows, and that is the accepted cost of the whole map.** The one
   defect that may not survive is landing on a rail whose highlighted row is off
   screen: **the active row is brought into view on mount** — `block: "nearest"`,
@@ -520,7 +534,8 @@ says where you are once the strip is gone.
   rail while the operator is reading further down it.
 
 *Built: `apps/web/src/pages/portal/portal-nav.ts` (`PortalNavChild`) ·
-`PortalSidebar.tsx` · `operation/PurchasingTabs.tsx` ·
+`PortalSidebar.tsx` · `operation/PurchasingTabs.tsx` · `operation/StockTabs.tsx`
+(destination header since CARD-2026-08-19-warehouse-rail) ·
 `operation/components/ModuleHeader.tsx` (`page` prop).*
 
 # §5 · The right rail

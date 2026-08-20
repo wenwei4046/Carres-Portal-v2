@@ -103,8 +103,8 @@ forms and writers retire through a governed migration. Nothing here authorises d
 
 1. Sales Orders creates or revises the commercial obligation.
 2. Payment derives outstanding from the current obligation and canonical prior postings.
-3. When delivery becomes credible, the shared collection clock raises T−3/T−2 attention and the
-   T−1 final deadline.
+3. When delivery becomes credible, the shared collection clock raises T−3 attention and the
+   T−2 final deadline (owner ruling 2026-08-19 — logistics takes the DO at T−1).
 4. Payment shows stock/delivery summaries so the operator knows whether calling is useful.
 5. The operator records the actual amount, paid date, method, reference/evidence and allocation.
 6. The server atomically creates payment, allocations, receipt identity and activity.
@@ -139,11 +139,14 @@ the Work Engine resolves the person and roster/buddy cover. Payment never invent
 Sales Order owner and never writes the resolved staff name into the action sentence. Register,
 My Work and Team Work use the same action facts at different display densities.
 
-The one collection clock is `delivery − 1 working day`, Mon–Sat plus Malaysian public holidays,
-anchored on customer-confirmed date, else promised date; no anchor means no clock.
+The one collection clock is `delivery − 2 working days` (owner ruling 2026-08-19 — the T−1
+deadline was one day too late), Mon–Sat plus Malaysian public holidays, anchored on
+customer-confirmed date, else promised date; no anchor means no clock.
 
-- T−3/T−2 = attention.
-- T−1 = deadline because logistics commonly requests the DO the evening before.
+- T−3 = attention — chase begins.
+- T−2 = DEADLINE — money in full, or the payment-approval request is already raised.
+- T−1 = logistics takes the DO; the trip is scheduled. Still owing here is already `late`
+  (`t1` is retired from the attention type).
 - A promise-to-pay is the customer's word; the collection deadline is Carres' business rule.
   They remain two facts. A promise changes presentation, never erases overdue work.
 - `Collect RM {amount} from {customer}` triggers when known outstanding > 0 and completes only at
@@ -171,40 +174,31 @@ Work definitions:
 
 The delivery money gate belongs to Sales Orders, not Payment.
 
-- ⛔ **SUPERSEDED 2026-08-16 — *"issuing the DO is the hard gate"*.** The owner ruled that
-  **outstanding money does not block the DO** and that **a Finance exception is the only money
-  blocker**. Agreeing a date may still warn about money.
-- ⛔ **SUPERSEDED 2026-08-16 — *"A manager may release delivery while money remains owed."*** With no
-  money gate there is nothing to release, and the owner ruled **no Release button and no Approve
-  button**. **The companion rule survives in full and is the half that matters: RELEASE NEVER
-  FORGIVES MONEY.** Goods moving has never meant money forgiven — and it means it even less now that
-  goods move by default. Collection work stays open on a delivered order that still owes, and the
-  **waiver is untouched**: writing off a receivable remains a money decision, manager-gated, owned
-  here, with amount, reason, actor and time. A waiver is not a release and never was.
+- ⭐ **MONEY IN FULL BEFORE DELIVERY — owner ruling 2026-08-19, REVERSING 2026-08-16.** After a
+  same-day incident (goods delivered, money uncollected, no approval) the owner reversed
+  *"outstanding money does not block the DO"*: **a Delivery Order issues only when outstanding
+  = 0, or a recorded APPROVED Delivery Payment Approval covers the order — and no OPEN Finance
+  exception holds it.** An approval authorises COD on the owner's exact terms: the customer may
+  see the goods on the truck, pays the full balance by online transfer BEFORE unloading, no
+  cash; unpaid, the goods return. The governing ruling, the approval record (0362) and the COD
+  terms live once in [`../orders/MASTER.md`](../orders/MASTER.md) §8, which owns the gate; this
+  MASTER does not restate it.
+- **RELEASE NEVER FORGIVES MONEY — survives every version of the gate.** A COD-approved order
+  still OWES: collection work stays open (and survives delivery), and the **waiver is
+  untouched**: writing off a receivable remains a money decision, manager-gated, owned here,
+  with amount, reason, actor and time. A waiver is not a release and never was. There is still
+  **no Release button and no Approve button on the DO path** — the approval is a recorded
+  decision on the order, not a button on the document.
 - **Payment's own ownership is unchanged by all of this.** Payment supplies the ONE outstanding
   answer and owns the one arithmetic; Sales Orders owns the delivery gate and decides what blocks
-  goods. That boundary did not move — what moved is Sales Orders' answer.
-- **`Finance exception` — defined by the owner 2026-08-16, and Finance owns it.** An explicit
-  Finance-created record linked to the Sales Order, carrying **creator · reason · status ·
-  timestamps · clear evidence**. **Only Finance may create it and only Finance may clear it.**
-  `OPEN` blocks the DO gate; `CLEARED` removes the block. It is the ONE money blocker — an
-  outstanding balance of any size or age does not block, and neither does an uncollected storage
-  fee. **It is a decision, never a derived state:** it may not be computed from a balance, or the
-  gate this ruling removed grows back under another word. The governing ruling lives once in
-  [`../orders/MASTER.md`](../orders/MASTER.md) §8, which owns the gate; this MASTER does not
-  restate it.
-- ✅ **BUILT AND PRODUCTION-VERIFIED 2026-08-17.** Migration `0355` created the record with its
-  Finance-only DEFINER doors, RLS and no-delete trigger (PR #829); Slice 3 (PR #830) re-keyed
-  `deliveryOrderIssueGate`, the action engine, the canvas and the API onto it; the authenticated
-  walk (including the `42501` permission probes as the real users) is recorded in
-  [`../orders/MASTER.md`](../orders/MASTER.md) §8, which owns the gate.
-- **THE T−1 COLLECTION CLOCK IS KEPT — owner ruling 2026-08-16.** The shared clock
-  (T−3/T−2 attention, T−1 deadline, delivery week + Malaysian public holidays) survives unchanged.
-  What retires is only its old justification — that the DO door refused while money held. **A
-  balance has a due date because it is owed, not because it holds goods.** Collection work runs
-  **independently of the delivery**: money is no longer a DO requirement unless an OPEN Finance
-  exception exists, and collection still survives delivery on an order that has been delivered and
-  still owes.
+  goods. That boundary did not move — what moved (back) is Sales Orders' answer.
+- **`Finance exception` (0355) — Finance owns it, and it is the SECOND blocker.** An explicit
+  Finance-created record; only Finance creates or clears it, clearing costs evidence. `OPEN`
+  blocks the DO gate **regardless of payment, and a payment approval does not clear it**;
+  `CLEARED` removes the block. It is a decision, never a derived state.
+- **THE COLLECTION CLOCK'S DEADLINE IS T−2 — owner ruling 2026-08-19** (§5 above): logistics
+  takes the DO at T−1 and the DO door refuses while money holds, so the money must be settled
+  before that day. Same calendar, same anchor, one arithmetic, both consumers follow.
 - Operations sees the resulting Work change; no duplicate alert/status is created.
 
 Storage is split by record:
@@ -431,7 +425,7 @@ Payment does not report P&L, COGS, supplier AP or top-SKU profitability.
 ### Built / verified in repository
 
 - operational collections desk with queue/facets and stock-aware context;
-- shared `orderMoney`, exact formatter and T−3/T−2/T−1 clock;
+- shared `orderMoney`, exact formatter and the T−3-attention / T−2-deadline clock (2026-08-19);
 - `payment_record`/`payment_void`, direct-ledger write closure and receipt uniqueness;
 - canonical `_customer_payment_post` transaction used by operational/manual Payment, Sales/POS
   top-up, Finance AR receipt and customer Stripe checkout, with source idempotency, one allocation,

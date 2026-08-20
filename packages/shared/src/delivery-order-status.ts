@@ -13,16 +13,17 @@
  * stored status a second writer could contradict is the retired
  * `payment_status` defect — see docs/orders/MASTER.md §8.
  *
- * KNOWN BOUNDARY, reported not hidden (the canvas's own "no `In transit` is
- * invented" rule): `Out for delivery` is registered vocabulary, but no fact
- * records the warehouse→logistics handover today (docs/delivery/MASTER.md §4's
- * chain is approved target, not built). Until that fact exists this arithmetic
- * never returns it — a status derived from "the date is today" would claim a
- * departure nobody recorded (§2.5: no step nobody records).
+ * `Out for delivery` (slice 1 of the §4 chain, 0363): a DO whose goods are
+ * **Received by Logistics** and not yet resulted derives it. Ready for
+ * Handover alone does NOT; Handed Over alone does NOT — Logistics receipt is
+ * the fact that puts the goods on the road (§4: receipt is not delivery).
+ * It is still never derived from the calendar — a departure nobody recorded
+ * is not a fact (§2.5: no step nobody records).
  *
  * A FAILED TRIP KEEPS ITS EXCEPTION FOREVER (owner ruling 2026-08-16): the
  * latest attempt against THIS number governs; a rebooked trip is a NEW
- * document, so nothing here ever rewrites an exception into Delivered.
+ * document, so nothing here ever rewrites an exception into Delivered — and
+ * any recorded RESULT outranks the handover derivation.
  */
 
 import { deliveryReasonByKey } from "./delivery-reasons";
@@ -54,6 +55,12 @@ export interface DeliveryOrderAttemptFact {
   recordedAt: string;
 }
 
+/** The §4 chain facts (0363) — kinds only; the arithmetic needs nothing more. */
+export type DeliveryHandoverKind =
+  | "ready_for_handover"
+  | "handed_over"
+  | "received_by_logistics";
+
 export interface DeliveryOrderStatusInput {
   /** `ops_delivery_orders.voided_at` (0356). */
   voidedAt: string | null;
@@ -61,6 +68,8 @@ export interface DeliveryOrderStatusInput {
   voidReason: "order_cancelled" | "rescheduled" | null;
   /** The attempts recorded against THIS document's number (0344). */
   attempts: ReadonlyArray<DeliveryOrderAttemptFact>;
+  /** The handover facts recorded on THIS document (0363). */
+  handoverEvents: ReadonlyArray<{ kind: DeliveryHandoverKind }>;
 }
 
 export interface DeliveryOrderStatus {
@@ -92,6 +101,19 @@ export function deliveryOrderStatusOf(
   )[input.attempts.length - 1];
 
   if (!latest) {
+    // §4 slice 1 (0363): only LOGISTICS RECEIPT puts the goods on the road.
+    // Ready for Handover / Handed Over alone derive nothing new — and a
+    // recorded result (the branches below) always outranks this derivation.
+    const received = input.handoverEvents.some(
+      (e) => e.kind === "received_by_logistics",
+    );
+    if (received) {
+      return {
+        kind: "out_for_delivery",
+        label: DELIVERY_ORDER_STATUS_LABEL.out_for_delivery,
+        reasonLabel: null,
+      };
+    }
     return { kind: "created", label: DELIVERY_ORDER_STATUS_LABEL.created, reasonLabel: null };
   }
 

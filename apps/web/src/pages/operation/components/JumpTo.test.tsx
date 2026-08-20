@@ -112,12 +112,17 @@ describe("the empty query", () => {
       .map((el) => el.textContent);
     /* Six were stored; the MASTER caps the recent block at five, and the sixth
      * still appears once — below, as an ordinary destination. */
+    /* `operation:stock` is the On hand page since the WAREHOUSE heading
+     * (CARD-2026-08-19-warehouse-rail) — same key, the sidebar's own word. */
     expect(labels.slice(0, 5)).toEqual([
       "WorkOperations",
       "Sales OrdersOperations",
-      "StockOperations",
+      "On handOperations",
       "PaymentsOperations",
-      "DeliveryOperations",
+      // `Delivery Work` since the Delivery module's pages joined the rail
+      // (CARD-2026-08-19-sidebar-expandable-modules) — same key, same route,
+      // the governed name.
+      "Delivery WorkOperations",
     ]);
     expect(labels.filter((l) => l === "SuppliersOperations")).toHaveLength(1);
     expect(screen.getByText("Recent")).toBeInTheDocument();
@@ -131,10 +136,13 @@ describe("the empty query", () => {
 });
 
 describe("what typing searches", () => {
-  it("matches a governed destination NAME", () => {
+  it("matches governed destination NAMES — the pages, never an unbuilt door", () => {
+    // The Purchasing parent row died with the 2026-08-19 heading correction;
+    // the PAGES are the destinations now. `Purchase Returns` is `Coming soon`
+    // and a door the rail refuses to open may not be offered here.
     expect(
       matchDestinations(permittedDestinations("operation"), "purch").map((d) => d.label),
-    ).toEqual(["Purchasing"]);
+    ).toEqual(["Purchase Orders", "SO Batch Purchase", "Manual Purchase"]);
   });
 
   it("a document result prints its number, its type and the identifying party", async () => {

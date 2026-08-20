@@ -165,7 +165,7 @@ describe("workItemsForOrder — WHO + ACTION + actual working day", () => {
     expect(assign.workingDaysLate).toBe(2); // Tue 18, Wed 19
   });
 
-  it("collect keeps the ONE T−1 arithmetic — and the delivery order is nobody's work (Slice 2)", () => {
+  it("collect keeps the ONE T−2 arithmetic (deadline re-ruled 2026-08-19) — and the delivery order is nobody's work (Slice 2)", () => {
     const s: OrderActionSignals = {
       ...baseSignals,
       hasLogistics: true,
@@ -182,7 +182,9 @@ describe("workItemsForOrder — WHO + ACTION + actual working day", () => {
       HOLS,
     );
     const collect = items.find((i) => i.ruleKey === "collect")!;
-    expect(collect.dueIso).toBe("2026-08-19");
+    /* Thu 2026-08-20 delivery → deadline Tue 08-18 (T−2): logistics takes the
+       DO on Wed (T−1), so the money must land before that day. */
+    expect(collect.dueIso).toBe("2026-08-18");
     /* Decision A (2026-08-16): a plain balance no longer locks the collect.
        Slice 2 then removed the press itself: the SYSTEM issues the document
        when every requirement holds, so `issue_delivery_order` may never

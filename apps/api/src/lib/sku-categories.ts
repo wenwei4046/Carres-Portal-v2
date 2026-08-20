@@ -17,24 +17,43 @@ export async function skuCategories(
   skus: readonly string[],
 ): Promise<Map<string, string>> {
   const out = new Map<string, string>();
-  if (skus.length === 0) return out;
-  const { data, error } = await sb
-    .from("product_skus")
-    .select("sku, product_models(category)")
-    .in("sku", [...new Set(skus)]);
-  if (error) return out;
-  for (const row of (data ?? []) as Array<{
-    sku: string;
-    product_models: { category: string } | { category: string }[] | null;
-  }>) {
-    const pm = row.product_models;
-    if (!pm) continue;
-    // PostgREST 1:1 embed returns an object; some clients return an array of 1.
-    const category = Array.isArray(pm) ? pm[0]?.category : pm.category;
-    if (category) out.set(row.sku, category);
+  const unique = [...new Set(skus)];
+  if (unique.length === 0) return out;
+
+  // The `in` list travels in the URL, and a free-text warehouse SKU runs to 58
+  // characters on live prod. The order path asks about a handful of cart lines;
+  // On hand asks about every distinct SKU in the register (74 today, growing
+  // with the 1000-unit scale target), which is how one request grows past the
+  // URL limit. A rejected request returns NO rows, and this reader's failure
+  // mode is a silent empty map — every unit would render as uncatalogued and
+  // nothing would look broken. Chunking is what keeps that from ever being the
+  // answer.
+  for (let i = 0; i < unique.length; i += SKU_QUERY_CHUNK) {
+    const { data, error } = await sb
+      .from("product_skus")
+      .select("sku, product_models(category)")
+      .in("sku", unique.slice(i, i + SKU_QUERY_CHUNK));
+    // Fail OPEN and fail WHOLE. A partial map is worse than none: the goods
+    // gate below reads "unresolved" as goods, so half an answer could refuse a
+    // real order. One bad chunk therefore discards the lot, which is exactly
+    // what this function did before it chunked.
+    if (error) return new Map();
+    for (const row of (data ?? []) as Array<{
+      sku: string;
+      product_models: { category: string } | { category: string }[] | null;
+    }>) {
+      const pm = row.product_models;
+      if (!pm) continue;
+      // PostgREST 1:1 embed returns an object; some clients return an array of 1.
+      const category = Array.isArray(pm) ? pm[0]?.category : pm.category;
+      if (category) out.set(row.sku, category);
+    }
   }
   return out;
 }
+
+/** SKUs per catalog read — 100 × 58 chars stays far inside any URL limit. */
+const SKU_QUERY_CHUNK = 100;
 
 export interface GoodsViolation {
   code: "goods_required";

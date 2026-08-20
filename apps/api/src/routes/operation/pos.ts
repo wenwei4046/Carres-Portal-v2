@@ -12,6 +12,7 @@ import {
   recordReadyDateInput,
   recordTomorrowDeliveryInput,
   recordSendInput,
+  revisePoInput,
   setMessageTemplateInput,
   setLineDestinationInput,
   setLineOpsRemarkInput,
@@ -90,7 +91,14 @@ operationPosRouter.get("/", requireOperation, async (c) => {
       // It is a different fact from `eta_date` (OUR prediction) and the two are
       // never merged: R5 grades a supplier on this column, so it holds only
       // what a human recorded after the supplier answered.
-      "id, supplier_id, warehouse_id, destination_id, status, sup_status, so, so_refs, eta_date, expected_ready_date, placed_at, purchase_order_lines(id, sku, qty, received_qty, damaged_qty, wrong_item_qty, short_since, attrs, destination_id, ops_remark)",
+      // 0361: `purpose` — the reason the PO was born (customer_sales auto-stamp
+      // or a typed demand purpose). The panel prints it as `Need for`; NULL for
+      // every PO issued before 0361, deliberately not backfilled.
+      // 0364: `version` + `revised_at` — which version of the document the
+      // factory holds, and when the current one was minted. The panel prints
+      // `PO-2041 · Version 2` and derives "Version N has not reached the
+      // supplier" from `revised_at` against the latest send; nothing stores it.
+      "id, supplier_id, warehouse_id, destination_id, status, sup_status, so, so_refs, eta_date, expected_ready_date, placed_at, purpose, version, revised_at, purchase_order_lines(id, sku, qty, received_qty, damaged_qty, wrong_item_qty, short_since, attrs, destination_id, ops_remark)",
     );
 
   if (status !== "all") q = q.eq("status", status);
@@ -1442,6 +1450,11 @@ const SUPPLIER_CALL_422: Record<string, string> = {
   po_not_open: "po_not_open",
   no_expected_arrival: "no_expected_arrival",
   line_not_part_received: "line_not_part_received",
+  // PO Revisions (0364): the SQL door's own refusals. The messages are the
+  // governed sentences — the client prints them verbatim, inline.
+  reason_required: "reason_required",
+  nothing_changed: "nothing_changed",
+  sent_po_needs_revision: "sent_po_needs_revision",
 };
 
 function mapSupplierCallError(
@@ -1449,6 +1462,19 @@ function mapSupplierCallError(
   error: { code?: string; message?: string; details?: string },
 ) {
   const detail = (error.details ?? "").trim();
+  // THE FLOOR (0364, 2990s' shape): revising a line below its received_qty is
+  // a CONFLICT with goods already on a Carres floor, not a bad request — the
+  // fix is a Purchase Return, not a retype. 409, like 2990s' approve-po.
+  if (detail === "received_floor") {
+    return c.json(
+      {
+        error: "received_floor",
+        code: "received_floor",
+        message: error.message ?? "received_floor",
+      },
+      409,
+    );
+  }
   const named = SUPPLIER_CALL_422[detail];
   if (named) {
     return c.json({ error: named, code: named, message: error.message ?? named }, 422);
@@ -1571,6 +1597,32 @@ operationPosRouter.post("/:id/sends", requireOperation, async (c) => {
     p_po_id: c.req.param("id"),
     p_channel: parsed.data.channel,
     p_note: parsed.data.note ?? null,
+  });
+  if (error) return mapSupplierCallError(c, error);
+  return c.json({ ok: true, result: data });
+});
+
+// ----- POST /:id/revise -----
+// A sent PO is not overwritten — it is REVISED (Jess, 2026-08-18; 0364). The
+// number is KEPT and a version is minted: the RPC snapshots the PRIOR document
+// into po_revisions with the reason and the author, floors every qty at its
+// received_qty (409 `received_floor` — the fix is a Purchase Return, never a
+// retype), applies the line edits, bumps `version`, stamps `revised_at` and
+// appends po_history. EXISTING lines only: adding items is a NEW PO, stopping
+// is the whole PO (Cancel). The reason is required IN SQL — the zod mirror
+// here only fails faster.
+operationPosRouter.post("/:id/revise", requireOperation, async (c) => {
+  const parsed = await parseJsonBody(c, revisePoInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("purchasing_revise_po", {
+    p_po_id: c.req.param("id"),
+    p_reason: parsed.data.reason,
+    p_lines: parsed.data.lines.map((l) => ({
+      line_id: l.lineId,
+      qty: l.qty,
+      destination_id: l.destinationId,
+    })),
   });
   if (error) return mapSupplierCallError(c, error);
   return c.json({ ok: true, result: data });

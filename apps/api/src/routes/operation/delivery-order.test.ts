@@ -133,6 +133,7 @@ function tables(over?: {
   paid?: number;
   lineReceived?: Record<string, number> | null;
   financeExceptions?: Array<Record<string, unknown>>;
+  paymentApprovals?: Array<Record<string, unknown>>;
 }) {
   const control = {
     line_received: over?.lineReceived === undefined ? { [MATTRESS]: 1 } : over.lineReceived,
@@ -174,6 +175,11 @@ function tables(over?: {
     ops_delivery_orders: tableMock({ data: [], error: null }),
     order_finance_exceptions: tableMock({
       data: over?.financeExceptions ?? [],
+      error: null,
+    }),
+    // 0362 — the approval record beside it. Empty by default: nothing asked.
+    order_delivery_payment_approvals: tableMock({
+      data: over?.paymentApprovals ?? [],
       error: null,
     }),
   };
@@ -272,11 +278,34 @@ describe("POST /api/operation/orders/:id/delivery-order", () => {
     expect(((await res.json()) as { message: string }).message).toContain(MATTRESS);
   });
 
-  it("⭐ issues over an outstanding balance — decision A, money no longer refuses", async () => {
-    /* The exact fixture the retired money test refused on: paid 1000 of 2500.
-     * Under the owner ruling of 2026-08-16 the paper issues anyway, and the
-     * collection stays open on the money track. */
+  it("⭐ 422 on an outstanding balance with no approval — the 2026-08-19 money gate", async () => {
+    /* Paid 1000 of 2500. Under the 2026-08-16 ruling this issued; the owner
+     * REVERSED it on 2026-08-19 after a same-day incident: money in full
+     * before delivery, or a recorded approval. */
     const t = tables({ paid: 1000 });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(makeSb(t) as any);
+    const res = await post(await makeJwt("operation"));
+    expect(res.status).toBe(422);
+    expect(((await res.json()) as { message: string }).message).toContain(
+      "still outstanding",
+    );
+  });
+
+  it("⭐ an APPROVED Delivery Payment Approval opens the gate over the balance — COD", async () => {
+    const t = tables({
+      paid: 1000,
+      paymentApprovals: [
+        {
+          id: "pa-1",
+          status: "approved",
+          request_reason: "Outstation — partner schedules the customer",
+          requested_at: "2026-08-19T02:00:00Z",
+          decided_at: "2026-08-19T03:00:00Z",
+          decision_reason: "COD by online transfer before unloading",
+        },
+      ],
+    });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue(makeSb(t) as any);
     const res = await post(await makeJwt("operation"));
@@ -284,7 +313,7 @@ describe("POST /api/operation/orders/:id/delivery-order", () => {
     expect(((await res.json()) as { issued: boolean }).issued).toBe(true);
   });
 
-  it("⭐ 422 on an OPEN Finance exception — the ONE money blocker (decision A)", async () => {
+  it("⭐ 422 on an OPEN Finance exception — the second blocker, even fully paid (0355 unchanged)", async () => {
     const t = tables({
       paid: 2500, // fully paid, and Finance still says stop — the two are independent
       financeExceptions: [

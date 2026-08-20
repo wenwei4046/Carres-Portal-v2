@@ -451,6 +451,8 @@ export {
   // Q5 (0318) — the supplier's promised READY date, the third answer body.
   recordReadyDateInput,
   recordSendInput,
+  // PO Revisions (0364) — a sent PO keeps its number and mints a version.
+  revisePoInput,
   setMessageTemplateInput,
   setLineDestinationInput,
   setLineOpsRemarkInput,
@@ -941,7 +943,10 @@ export {
   poCurrentActionOf,
   poDateHistoryOf,
   poOverdueDays,
+  poReviseSaveGapOf,
   poRiskRungOf,
+  poUnsharedVersionNoticeOf,
+  poVersionLabelOf,
   poWorkStateOf,
   type PoArrivalGap,
   type PoCurrentAction,
@@ -1870,7 +1875,18 @@ export {
   type DeliveryOrderStatusKind,
   type DeliveryOrderStatusInput,
   type DeliveryOrderAttemptFact,
+  type DeliveryHandoverKind,
 } from "./delivery-order-status";
+// The §4 handover chain door inputs (0363) — one schema for Worker and web.
+export {
+  DELIVERY_HANDOVER_KINDS,
+  handoverGoodsLineSchema,
+  recordHandoverInput,
+  signHandoverProofUploadInput,
+  type HandoverGoodsLine,
+  type RecordHandoverInput,
+  type SignHandoverProofUploadInput,
+} from "./schemas/delivery-handover";
 export {
   isWorkingDay,
   addWorkingDays,
@@ -1907,6 +1923,7 @@ export {
   DEMAND_PURPOSE_DEFAULT,
   DEMAND_PURPOSE_VALUES,
   isDemandPurpose,
+  poPurposeLabelOf,
   type DemandPurpose,
   type DemandPickItem,
   buildToOrder,
@@ -1970,6 +1987,15 @@ export {
   type ToOrderSortKey,
   type ToOrderSupplier,
 } from "./to-order";
+export {
+  MANUAL_PURCHASE_WORDS,
+  MANUAL_PURCHASE_STATUS_WORDS,
+  manualPurchaseStatusOf,
+  stillNeededOf,
+  type ManualPurchaseStatus,
+  type ManualPurchaseStatusInput,
+  type ManualPurchaseStatusKind,
+} from "./manual-purchase";
 export {
   IMPORT_ACCESSORY_KINDS,
   IMPORT_LEAD_DAYS_DEFAULT,
@@ -2588,6 +2614,11 @@ export * from "./collection-clock";
  * delivery order is never briefly ungated.
  */
 export * from "./finance-exception";
+/* THE DELIVERY PAYMENT APPROVAL (owner ruling 2026-08-19, 0362) — the
+ * black-and-white door that opens the money gate: money in full before
+ * delivery is the only default; the exception is a recorded APPROVED
+ * approval, which authorises COD on the owner's exact terms. */
+export * from "./delivery-payment-approval";
 // CARD 5 — delivery attempts: every vehicle run leaves a record; a failure is
 // ONE exception (Reason Library + where the goods are), units move with reality.
 export * from "./schemas/delivery-attempt";

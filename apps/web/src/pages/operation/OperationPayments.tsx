@@ -358,7 +358,7 @@ interface Row {
   /** CARD 4 — the collection clock: the final deadline (1 working day before
    *  the delivery) and where today stands against it. */
   collectDueIso: string | null;
-  collectAttention: "none" | "t3" | "t2" | "t1" | "late";
+  collectAttention: "none" | "t3" | "t2" | "late";
   lastChasedAt: string | null;
 }
 
@@ -1010,17 +1010,17 @@ function PaymentRow({
                       {r.overdue ? "overdue" : "promised"} {fmtDate(r.dueDate)}
                     </span>
                   )}
-                  {/* CARD 4 — the balance deadline: 1 working day before the
-                      delivery, because logistics ask for the DO the evening
-                      before and the DO door refuses while money holds. */}
+                  {/* The balance deadline (owner ruling 2026-08-19): 2 working
+                      days before the delivery — logistics takes the DO at T−1,
+                      so the money must already be settled before that day. */}
                   {r.collectDueIso && (
                     <span
                       className={
                         r.collectAttention === "late"
                           ? "text-danger font-semibold"
-                          : r.collectAttention === "t1"
+                          : r.collectAttention === "t2"
                             ? "text-danger"
-                            : r.collectAttention === "t2" || r.collectAttention === "t3"
+                            : r.collectAttention === "t3"
                               ? "text-warning"
                               : "text-base-500"
                       }

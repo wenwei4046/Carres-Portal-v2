@@ -59,6 +59,11 @@ export type DoTemplateData = {
   /** Proof-of-delivery already captured digitally (orders.pod_*): the
    *  customer box prints the signature image when present. */
   pod?: { signature_url?: string | null; signed_at?: string | null };
+  /** 0362 (owner ruling 2026-08-19) — printed when the document was issued
+   *  under an APPROVED Delivery Payment Approval and money is still owed:
+   *  `COLLECT RM {amount} BY ONLINE TRANSFER BEFORE UNLOADING — NO CASH.`
+   *  The ONE ruled exception to "a delivery doc never talks money". */
+  cod_instruction?: string | null;
 };
 
 export type ReceiptTemplateData = {

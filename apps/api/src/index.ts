@@ -39,8 +39,10 @@ import dispatchCustomerLegRouter from "./routes/operation/dispatch-customer-leg"
 import deliveryChainRouter from "./routes/operation/delivery-chain";
 import orderControlRouter from "./routes/operation/order-control";
 import deliveryOrdersRouter from "./routes/operation/delivery-orders";
+import paymentApprovalsRouter from "./routes/operation/payment-approvals";
 import purchaseRouter from "./routes/operation/purchase";
 import toOrderRouter from "./routes/operation/to-order";
+import manualPurchaseRouter from "./routes/operation/manual-purchase";
 import purchasingSettingsRouter from "./routes/operation/purchasing-settings";
 import opsStaffRouter from "./routes/operation/staff";
 import poDutyRouter from "./routes/operation/po-duty";
@@ -192,6 +194,8 @@ api.route("/operation/orders", deliveryChainRouter);
 // 0159 P2 control overlay — GET + PUT /:id/control
 api.route("/operation/orders", orderControlRouter);
 api.route("/operation/delivery-orders", deliveryOrdersRouter);
+// 0362 — the Delivery Payment Approval: raise · decide · read (owner ruling 2026-08-19)
+api.route("/operation/payment-approvals", paymentApprovalsRouter);
 // 0184 balance job — payment ledger + storage collect / waiver / delivery gate
 api.route("/operation/orders", orderPaymentsRouter);
 // 0223 Stripe online collection — POST/GET /orders/:id/stripe/checkout[/:sid]
@@ -202,6 +206,8 @@ api.route("/operation/orders", bulkCompleteRouter);
 api.route("/operation/payments", operationPaymentsRouter);
 api.route("/operation/purchase", purchaseRouter);
 api.route("/operation/purchase/to-order", toOrderRouter);
+// Manual Purchase requests (0359) — the typed lane's header + lines + register.
+api.route("/operation/purchasing/requests", manualPurchaseRouter);
 // P1 (0303) — Purchasing → Settings: the numbers the ordering engine reads.
 api.route("/operation/purchasing/settings", purchasingSettingsRouter);
 // 0232 staff assignment pool — GET / + PUT /:userId

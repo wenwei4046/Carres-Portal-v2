@@ -94,12 +94,13 @@ const ITEM_ID = "00000000-0000-0000-0000-000000000501";
 const MATTRESS = "mattress:FirmCare-K";
 
 /** A fully qualifying order — the unit this draw reserves is the last goods
- *  requirement, so the reserved read already answers with it. */
+ *  requirement, so the reserved read already answers with it. Paid in full:
+ *  the 2026-08-19 money gate refuses an owing order with no approval. */
 function tables() {
   return {
     orders: ordersMock(
       {
-        data: { id: ORDER_ID, so: 1234, paid: 0, do_number: null },
+        data: { id: ORDER_ID, so: 1234, paid: 2500, do_number: null },
         error: null,
       },
       { data: { id: ORDER_ID, do_number: "DO-170826-2222" }, error: null },
@@ -127,6 +128,7 @@ function tables() {
       error: null,
     }),
     order_finance_exceptions: tableMock({ data: [], error: null }),
+    order_delivery_payment_approvals: tableMock({ data: [], error: null }),
     ops_delivery_orders: tableMock({ data: [], error: null }),
   };
 }

@@ -132,6 +132,7 @@ export type GateRequirementId =
   | "goods"
   | "logistics"
   | "appointment"
+  | "money"
   | "finance-exception"
   | "refused-day";
 
@@ -327,12 +328,20 @@ export interface SalesOrderRouteInput {
     outstanding: number;
   };
   /** `order_finance_exceptions` (0355) — this order's rows, read from the one
-   *  owning table. Only an OPEN one blocks the gate (decision A). REQUIRED so
-   *  a caller cannot forget the fetch and render a gate that lies. */
+   *  owning table. An OPEN one blocks the gate regardless of payment. REQUIRED
+   *  so a caller cannot forget the fetch and render a gate that lies. */
   financeExceptions: ReadonlyArray<{
     id: string;
     status: "open" | "cleared";
     reason: string;
+  }>;
+  /** `order_delivery_payment_approvals` (0362, owner ruling 2026-08-19) — this
+   *  order's rows. Money in full before delivery is the only default; an
+   *  APPROVED row is the one exception (COD on the owner's terms). REQUIRED
+   *  for the same reason the exceptions are. */
+  paymentApprovals: ReadonlyArray<{
+    id: string;
+    status: "pending" | "approved" | "refused";
   }>;
   loans?: ReadonlyArray<RouteLoan>;
   cases: ReadonlyArray<RouteLinkedCase>;
@@ -704,12 +713,12 @@ function deliveryDateDraft(input: SalesOrderRouteInput): NodeDraft {
 }
 
 /**
- * The MONEY branch under decision A: a collection fact, never a gate. It keeps
- * printing what the customer owes and keeps the collect action — money left
- * the GATE, not the screen. The "Manager release recorded" state is retired
- * with the release lever itself: with no money gate there is nothing to
- * release, so an order that owes simply reads `still to collect` until it
- * does not.
+ * The MONEY branch under the 2026-08-19 ruling: a collection fact AND the gate
+ * input — money in full before delivery is the only default, and the one
+ * exception is a recorded APPROVED Delivery Payment Approval (COD on the
+ * owner's terms). The branch prints what the customer owes, keeps the collect
+ * action, and names the approval when one stands: an approved COD order still
+ * OWES — the driver collects before unloading.
  */
 function moneyDraft(input: SalesOrderRouteInput): NodeDraft {
   const payments = open("Payments", paymentsHref(input.order.so));
@@ -720,7 +729,7 @@ function moneyDraft(input: SalesOrderRouteInput): NodeDraft {
       kind: "money",
       title: "MONEY",
       complete: false,
-      lines: ["No price yet", "Money does not hold this delivery"],
+      lines: ["No price yet", "An unknown value never holds a delivery"],
       door: payments,
     };
   }
@@ -734,12 +743,21 @@ function moneyDraft(input: SalesOrderRouteInput): NodeDraft {
       door: payments,
     };
   }
+  const approved = input.paymentApprovals.some((a) => a.status === "approved");
+  const pending = input.paymentApprovals.some((a) => a.status === "pending");
   return {
     id: "money",
     kind: "money",
     title: "MONEY",
     complete: false,
-    lines: [`${ringgit(input.money.outstanding)} still to collect`],
+    lines: [
+      `${ringgit(input.money.outstanding)} still to collect`,
+      ...(approved
+        ? ["COD approved — collect before unloading"]
+        : pending
+          ? ["Payment approval waiting for decision"]
+          : []),
+    ],
     action,
     door: payments,
   };
@@ -864,6 +882,41 @@ function financeExceptionRequirement(input: SalesOrderRouteInput): GateRequireme
   };
 }
 
+/**
+ * ⭐ THE MONEY REQUIREMENT — owner ruling 2026-08-19, superseding decision A.
+ * The same question `deliveryOrderIssueGate` and the 0362 database door ask:
+ * outstanding = 0, or a recorded APPROVED Delivery Payment Approval. The
+ * canvas asks the same predicate so the map, the worklist and the server can
+ * never disagree (Law D). An UNKNOWN value never blocks — `orderMoney` reads
+ * an unpriced order's goods owing as 0, so the figure here is always known.
+ */
+function moneyRequirement(input: SalesOrderRouteInput): GateRequirement {
+  if (!input.money.known && input.money.outstanding <= 0) {
+    // §8: an unknown value never holds — a number nobody knows may not stand
+    // between a customer and their goods. The MONEY branch already warns.
+    return { id: "money", met: true, text: "No price yet — unknown never holds" };
+  }
+  if (input.money.outstanding <= 0) {
+    return { id: "money", met: true, text: "Money in full" };
+  }
+  const approved = input.paymentApprovals.some((a) => a.status === "approved");
+  if (approved) {
+    return {
+      id: "money",
+      met: true,
+      text: "COD approved — collect before unloading",
+    };
+  }
+  const pending = input.paymentApprovals.some((a) => a.status === "pending");
+  return {
+    id: "money",
+    met: false,
+    text: pending
+      ? `${ringgit(input.money.outstanding)} still outstanding — approval waiting for decision`
+      : `${ringgit(input.money.outstanding)} still outstanding — collect, or request a payment approval`,
+  };
+}
+
 function gateRequirements(
   lines: LineFacts[],
   totals: GoodsTotals,
@@ -884,6 +937,7 @@ function gateRequirements(
       met: Boolean(confirmed && booking?.slot),
       text: confirmed && booking?.slot ? "Date + slot confirmed" : "Date + slot not confirmed",
     },
+    moneyRequirement(input),
     financeExceptionRequirement(input),
   ];
   const refused = refusedDayLine(confirmed, input.publicHolidays ?? []);

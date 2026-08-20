@@ -450,8 +450,16 @@ Fixed phrasings — reuse these, do not invent variants:
 - What is still owed: row `Second trip` → `Sofa still to deliver` +
   `Book second trip`, or `stock not in yet` when it cannot be booked.
 
-**Never** write "partial delivery", "split shipment", "back-order" or
-"consignment" on screen — say what goes and what follows, in furniture words.
+**Never** write "partial delivery", "split shipment" or "back-order" on screen — say what goes
+and what follows, in furniture words.
+
+**`consignment` IS UNBANNED ON THE PURCHASING AXIS, AND STILL BANNED HERE** (Jess, 2026-08-18).
+The ban was written to stop a DELIVERY being described as split; that meaning stays banned, and
+so does the word anywhere near a trip. But Carres genuinely holds supplier-owned furniture, the
+supplier calls it consignment, the agreement says consignment, and inventing a Carres-only word
+would leave staff translating in both directions. **`Consignment Order` · `Consignment Receipt`
+· `Consignment Return`** are the ruled document names. On a UNIT the fact is spelt
+**`Supplier Consignment`**, against **`Carres Owned`**. The word never describes a delivery.
 
 ## The dictionary — every visible word, audited (Jess 2026-07-27)
 
@@ -528,6 +536,15 @@ table are one-to-one, so a queue and a row can never spell one action two ways.
 | `Delay planning` | `Delay planning` | `Record the delay decision` | — (none: the row leaves by itself, and `Arrange new delivery date` says what happened) | `No supplier date lands after a promised date.` |
 | `Arrange new delivery date` | `Call {logistics} — arrange new delivery date` | `Record new date` | `New date recorded` | `No delayed order needs a new date.` |
 | `Collect RM {amount}` | `Collect RM {amount} from {customer}` | `Record payment` | `Payment recorded` | `Nothing outstanding.` |
+| — *(no queue: the §4 chain lives on the Delivery page's detail, one next act at a time)* | — *(same)* | `Mark ready for handover` | `Ready for handover recorded` | — *(the block renders only once a DO exists — no DO, no handover, no empty queue)* |
+| — *(same)* | — *(same)* | `Record handover` | `Handed over to {logistics}` | — *(same)* |
+| — *(same)* | — *(same)* | `Confirm logistics receipt` | `Received by logistics — out for delivery` | — *(same)* |
+
+**The handover chain's FACT words** (delivery MASTER §4, slice 1 shipped 2026-08-19): on screen a
+recorded fact reads `Ready for handover` · `Handed over` · `Received by logistics`, sentence case,
+with its recorder, duty word (`Warehouse` / `Logistics`), company and date. The receipt form's
+instruction sentence is `Logistics' own count — correct any quantity that differs; both counts
+stay on record.` — a discrepancy keeps both facts and overwrites neither.
 
 **PURCHASING** (docs/purchasing/MASTER.md):
 
@@ -539,6 +556,83 @@ table are one-to-one, so a queue and a row can never spell one action two ways.
 | `Check in` | `Check in from {supplier}` | `Check in` | `Checked in {n} of {m}` | `No goods arriving today. {supplier}'s next delivery is {date}.` |
 | `Confirm balance delivery date` | `Call {supplier} — confirm balance delivery date` | `Record balance date` | `Balance date recorded` | `Nothing short today.` |
 | `Confirm what happens next` | `Call {supplier} — confirm what happens next` | `Record what happens next` | `Supplier answer recorded` | `No claim is waiting for a supplier answer.` |
+| `Issue consignment order` | `Issue consignment order to {supplier}` | `Issue consignment order` | `Consignment order issued to {supplier}` | `No showroom is waiting for stock.` |
+| `Issue purchase return` | `Issue purchase return to {supplier}` | `Issue purchase return` | `Purchase return issued to {supplier}` | `Nothing is going back.` |
+| `Issue repair order` | `Issue repair order to {supplier}` | `Issue repair order` | `Repair order issued to {supplier}` | `Nothing is out for repair.` |
+| `Confirm collection date` | `Call {supplier} — confirm collection date` | `Record collection date` | `Collection date recorded` | `Nobody is waiting to be collected.` |
+| `Upload delivery note` | `Upload delivery note` | `Upload delivery note` | `Delivery note saved` | `Every receipt has its note.` |
+| `Check quantity difference` | `Check quantity difference` | `Record the correct count` | `Count recorded` | `Every count matches.` |
+| `Close claim` | `Close claim` | `Close claim` | `Claim closed` | `No claim is finished and waiting.` |
+| `Approve the purchase` | `Approve {n} {model} for {purpose}` | `Approve` · `Refuse` | `Approved — {n} {model}` | `Nothing waiting for you.` |
+| `Decide what the customer gets` | `Decide what {customer} gets` | `Save what we are doing` | `Recorded` | `No claim is waiting for a decision.` |
+| `Decide what happens to the item` | `Decide what happens to {unit}` | `Save what happened` | `Recorded` | `No item is waiting.` |
+| `Call about a late order` | `Call {salesperson} — {customer}'s goods will be late` | `Record what the customer decided` | `Customer decision recorded` | `No order is late.` |
+| `Check the SKU` | `Check the SKU with {supplier}` | `Publish the SKU` | `SKU published` | `Every request has its product.` |
+| `Check the supplier` | `Check the supplier for {model}` | `Save the supplier` | `Supplier saved` | `Every model has a supplier.` |
+| `Upload handover proof` | `Upload handover proof` | `Upload handover proof` | `Handover proof saved` | `Every handover has its proof.` |
+
+**MANUAL PURCHASE — the request's own words** (CARD-2026-08-18-manual-purchase, added on
+execution 2026-08-19; every string below is the card's own ruled text, recorded here so no
+screen respells it):
+
+| Where | The word |
+|---|---|
+| The page's create button | `+ New request` |
+| The create workspace title | `New request` |
+| Submit · abandon | `Send for approval` · `Cancel` |
+| The disabled Send NAMES its gap (the Receiving button law; first missing header fact wins, top-to-bottom) | `Send — pick a date` · `Send — say why` |
+| The form's fields | `Need for` · `Needed by` · `Deliver to` · `Raised by` · `Why` · `Items` · `Qty` · `Note` · `Supplier` · `+ Add line` · `Remove` |
+| The already-have block | `WHAT WE ALREADY HAVE` — `free stock` · `already on PO` · `still needed` (the arithmetic is PRINTED, never left to the reader) |
+| The register columns | `Ref` · `Need for` · `What` · `Qty` · `Deliver to` · `Needed by` · `Raised by` · `Status` |
+| The states | `Waiting for approval` · `Waiting for the SKU` · `Ready to order` · `Ordered` · `Arrived` · `Not going ahead` — `Waiting` always names what it waits ON; `Arrived` is a FACT the system observes, never a button |
+| The number series | `REQ-` (never `PR-` — 2990s prints PR for a purchase return) |
+| The consolidation OFFER | `Issue as one PO?` — with `Issue as one PO` · `Issue separately` both live on the same screen; an offer that cannot be declined is a gate wearing an offer's clothes |
+| The register's empty state | `No requests yet — press + New request to raise the first one.` (registered 2026-08-19 — the sentence shipped approved; its absence from this table was the defect) |
+
+**PO REVISIONS — the sent document's version** (CARD-2026-08-19-po-revisions, executing
+purchasing/MASTER.md §4's revision rule, Jess 2026-08-18 — *a sent PO is not overwritten, it is
+REVISED*; registered on execution so no screen respells them):
+
+| Where | The word |
+|---|---|
+| The panel title | `PO-2041 · Version 2` — **Version 1 prints nothing**: an unrevised PO is just the PO |
+| The door | `Revise` — beside `Print PDF`, an act on the document; only an open PO offers it |
+| The form's fields | `Qty` · `Destination` · `Why` |
+| The floor, stated inline where it binds | `{n} received` — grey while honoured, red when the draft breaks it |
+| Save | `Save Version {n}` — the button names the act's product |
+| The disabled Save NAMES its gap (the Receiving button law; first gap wins, the floor first) | `Save — below received` · `Save — nothing changed` · `Save — say why` |
+| The unshared version (DERIVED, work to do, never a stage) | `{po} Version {n} has not reached {supplier}` |
+| A silent qty / Deliver To edit on a shared PO, refused (the SQL door's own sentence, printed inline) | `A shared PO changes through Revise.` |
+| The history row | `Revised to Version {n} — {old → new changes} — {why}` |
+
+`Revision` stays off every screen for the SNAPSHOT store (0317's ruling holds — `Snapshot N` is
+the hand-over word); `Version` is the DOCUMENT changing, which is exactly what that ruling
+reserved the word for.
+
+**SIXTY-FIVE ACTIONS BECAME TWENTY, AND THAT WAS THE POINT** (Jess, 2026-08-18). *(Thirteen was
+this section's first count, taken before all eleven pages had been designed; seven more surfaced
+and the number is corrected here rather than defended.)* A blueprint
+draft named 65 distinct pieces of work across the register rails; 49 of them opened with a verb
+this portal does not have, and most were ONE act wearing four names — `Share PO PDF` ·
+`Share Claim with Supplier` · `Share Return with Supplier` · `Share Repair Order` are one act,
+and the act is **`Issue`**, because a document that has not reached its supplier is not issued
+yet. The merge is the reason the seven verbs are worth defending: **the count fell by 80% and
+nothing was lost.**
+
+**A SHARE IS NOT ITS OWN ACTION — `Issue` ALREADY CARRIES IT** (Jess, 2026-08-18). The row line
+has always read `Issue PO to {supplier}`: getting the document to the factory was never a second
+act, and a document the factory has not seen is not issued. **`Issue` stays open until an operator
+confirms which version went to whom on which channel**, and the button inside the form changes to
+`Record what you sent` — a form button, which needs no verb from the table. The same holds for a
+consignment order, a purchase return and a repair order. *(A separate `Check what was sent` was
+drafted and dropped: `Send` is banned, and stretching `Check` over it would have taught staff that
+`Check` means two different jobs.)*
+
+**`Return` HAS NO PURCHASING ENTRY, AND ITS ABSENCE IS RULED** (Jess, 2026-08-18). Bouncing an
+incomplete request back to whoever raised it was proposed and refused: a salesperson lives on
+the showroom floor, not in a queue, and work handed to them stops moving. **Operations calls
+them, gets the answer on the phone, and records it.** The general form — *the portal never waits
+on somebody who does not work in it* — binds every module.
 
 **SO-scoped Batch Purchase entrance** (2026-08-10):
 
@@ -684,7 +778,7 @@ against.
 
 ### The verb dictionary — portal-wide (locked 2026-07-27)
 
-**SEVEN verbs, seven meanings. Every module uses these; no module invents an eighth.**
+**NINE verbs, nine meanings. Every module uses these; no module invents a tenth.**
 
 *(It was five until 2026-07-28. `Return` was added by Loo's ruling because R6 needed a word
 for "this record goes back to whoever produced it" and reached for `Send back`. **`Prepare`
@@ -692,7 +786,13 @@ was added 2026-07-29 and RETIRED 2026-07-30** with the Purchasing clean restart:
 purchase order is one act again, so the verb has no object left. **`Check` was added by Loo
 on 2026-08-05** — see the row below and the note under the table. **The bar for an eighth is
 the bar `Return` cleared: no existing verb fits, and the alternative is a module inventing
-its own.**)*
+its own.** **`Approve` and `Decide` were added by Jess on 2026-08-18 against that same bar,
+and the reasoning is recorded because it is the test the next one must pass.** Approving a
+purchase is not `Check` — nothing is missing that could be found out; somebody must PERMIT it.
+Choosing what a customer gets is not `Assign` either: **`Assign logistics` reads clearly
+because a party is being attached to a record, and staff already read the word that way — a
+decision between four outcomes attached to nobody is a different act, and one word carrying
+both is how a screen stops being readable.**)*
 
 **They govern WORKLIST ACTIONS, not form buttons.** A button inside a form that stores what
 you just typed is `Save`, and one that abandons it is `Cancel` — those are not actions, they
@@ -772,6 +872,8 @@ resolved at render time from what is on file — never a third blended word cove
 | **Close** | a case or claim is finished and its record is sealed | the record can no longer change |
 | **Return** | a record goes BACK to the party that produced it, for them to act on | the record is with them **and its state says so on their screen** |
 | **Check** | a fact the business needs is MISSING, and somebody must establish it — by any means | the fact is **recorded in the system**. Finding out and not writing it down completes nothing |
+| **Approve** | a person with the authority permits **a purchase nobody's customer ordered** | the answer is recorded, yes or no — and a `Refuse` carries a reason that goes back to whoever asked. **The label always names WHAT is approved; a bare `Approve` is not a label** |
+| **Decide** | Carres CHOOSES between several outcomes that all exist — nothing is being found out, and nobody outside is being asked | the choice is recorded |
 
 ### `Check` vs `Call`, and `Check` vs `Check in` (Loo, 2026-08-05)
 
@@ -850,6 +952,34 @@ to hand to logistics. Today `orders.do_number` is stamped by a DB trigger on the
 transition (0098) — a day too late to give logistics the paper they ask for the evening
 before. Card C7 moves the stamp to customer confirmation. Nobody ever authors a delivery
 order by hand.
+
+### The On hand Category filter words (card 2026-08-19)
+
+The `Category` heading itself is already governed above (*facts about the record*). These are
+the pill words underneath it on On hand's left rail. **The category is the CATALOG's answer**
+(ERP-ARCHITECTURE §3.1 · D9) — no screen derives one from a SKU string, so every word here is
+either a catalog value or the honest admission that there is none.
+
+| Meaning | Use exactly | Do NOT use |
+|---|---|---|
+| No category filter applied | **`Any`** | `All` — this rail already spends `All` on the Status bucket list, where it names a bucket. Two `All` pills stacked in one rail ask *"all of what?"* |
+| The catalog's own six values | **`Mattress` · `Bedframe` · `Sofa` · `Accessory` · `Service` · `Guarantee`**, in that order | count order · alphabetical order · any raw SKU word |
+| The SKU has no catalog row | **`Not in catalog`** | `No catalog match` · `Unknown` · `Uncategorised` · `Other` · `Other goods` — and above all never folded into `Accessory` |
+
+**Why `Not in catalog` and not `No catalog match`.** *Match* names the lookup the system just
+performed; this rail states a fact about the GOODS. It is the same shape as the two facts this
+dictionary already rules — **`Supplier not assigned`** and **`Address not given yet`** — and the
+same reason `Invalid SKU` and `Supplier error` are banned there: a screen reports what is true of
+the record, never what the query did.
+
+**It is display, never a worklist.** 87 of 136 live records (975 units) sit in this bucket, and
+they are free-text import SKUs. Every live row today is TEST data (Constitution §6), so the
+number is honest reporting — it raises no alert, and it is never a cleanup or backfill queue.
+
+**`Other goods` is NOT the fallback here.** That word is ruled for the Sales Order footer's
+category tally, where a line is known goods that simply has no tally word of its own. *We do not
+know what this is* is a different fact, and borrowing the word would hide 975 unknown units
+under a confident one.
 
 ### The Receiving Workspace's own words (locked 2026-08-03, Slice B)
 
@@ -975,7 +1105,7 @@ from the day the rail changes, and seven of them do not exist yet.
 
 | Situation | The words |
 |---|---|
-| A rail entry for a page that is approved but not built | **`Coming soon`**, right-aligned on the row |
+| A rail entry for a page that is approved but not built | **`Coming soon`**, on its own line under the name (measured 2026-08-19: beside the tag every unbuilt name truncates) |
 
 **Banned for the same fact:** `TBD` · `Not available` · `Not yet` · `In progress` ·
 `Soon` on its own · a greyed word with nothing beside it. Those are six sentences
@@ -1094,8 +1224,11 @@ Information Architecture and live in [`ERP-ARCHITECTURE.md`](ERP-ARCHITECTURE.md
 | Telling logistics to re-arrange a delayed delivery | **`Call {logistics} — arrange new delivery date`** | Call customer (stock delay) · Inform customer · Reschedule |
 | Call to fix delivery date + slot | **Call {customer} — book delivery date** | Schedule delivery · Chase · Call customer (book delivery) [old T2 spelling] |
 | The company responsible for customer contact/transport in Delivery | **Logistics Partner** · a named one reads `NETS Logistics` | Logistic · Carrier · Delivery partner |
-| The goods pool (any page/tab/label) | **Stock** | Inventory · Warehouse (as a menu word) |
-| Stock in/out history (tab/label) | **In & out** | Movements · Movement log (menu) · Ledger |
+| The goods pool (any page/tab/label) | **Stock** | Inventory · Warehouse (as the goods-pool word — `WAREHOUSE` is the module's rail HEADING since 2026-08-19, never the pool's name) |
+| The module's rail heading (CARD-2026-08-19-warehouse-rail) | **Warehouse** | Stock (as a heading) · Supply Chain |
+| Stock in/out history (page/label) | **In & out** | Movements · Movement log (menu) · Ledger |
+| The cross-site custody journey page (Warehouse Blueprint item 13, `Coming soon`) | **Transfers** | Movements · Relocations |
+| The formal unit-verification page (Warehouse Blueprint item 13, `Coming soon`) | **Counts** | Stocktake · Audit |
 | A logistics company's own working rules | **delivery rules** | Partner profile · SLA · Carrier config |
 | Notice logistics need before a delivery day | **working days notice** | Lead time · Cut-off · Booking window |
 | A date logistics are closed | **not running on** | Blackout · Unavailable · Out of service |
@@ -1138,6 +1271,29 @@ its name: renaming a label is a copy decision, renaming an identifier is a break
 | Concept | Canonical word | Do NOT use |
 |---|---|---|
 | What the customer still owes HQ, anywhere on screen | **`Outstanding`** | Balance · Balance owing · Amount due · Owing |
+
+### The delivery money gate, payment approval and COD words (owner ruling 2026-08-19)
+
+Money in full before delivery is the only default; the one exception is a recorded APPROVED
+Delivery Payment Approval, which means COD on the owner's exact terms. These are the governed
+spellings — the gate, the canvas, the object page, the drawer and the DO document all read them
+from the shared modules (`delivery-payment-approval.ts` · `delivery-order.ts`), never a local
+rewording.
+
+| Meaning | Use exactly | Do NOT use |
+|---|---|---|
+| The manual DO door (outstation — partner schedules the customer) | **`Request Delivery Order`** | Issue DO · Create DO · Generate DO · Release |
+| The approval object / the Money-block label | **`Delivery payment approval`** | Payment exception · Money release · COD request |
+| The raise door on the order | **`Request payment approval`**, reason field **`Reason`**, submit **`Send request`** | Ask Jess · Escalate · Apply for release |
+| The approver's two verbs | **`Approve`** · **`Refuse`**, reason field **`Decision reason`** | Reject · Deny · OK |
+| The approved state, everywhere it renders | **`COD approved — collect before unloading`** | Released · Money waived · Approved to deliver |
+| A raised, undecided request | **`Waiting for decision`** (gate line: `… approval waiting for decision`) | Pending approval · In review |
+| ⭐ The DO document's instruction, printed when issued under an approval and still owing | **`COLLECT RM {amount} BY ONLINE TRANSFER BEFORE UNLOADING — NO CASH.`** | any softer or reworded version — these are the owner's words |
+| The gate refusal, nothing raised | **`RM {amount} is still outstanding — collect it in full, or request a payment approval.`** | Money not collected · Balance due |
+| The gate refusal, request pending | **`RM {amount} is still outstanding — a payment approval is waiting for the approver's decision.`** | — |
+| Route gate, money met | **`Money in full`** · under approval **`COD approved — collect before unloading`** | Paid · Settled |
+| Route gate, unpriced order | **`No price yet — unknown never holds`** | Money does not hold this delivery |
+| The drawer's absence sentence | **`No delivery order yet — the system issues it when the goods, money and date are ready`** | the 2026-08-16 version without `money` |
 
 ### The Sales Order register and object words (owner ruling 2026-08-15)
 
@@ -1666,7 +1822,7 @@ others. The status set is the document's own lifecycle — registered here and i
 |---|---|---|
 | The sidebar door / register | **Delivery Orders** | DOs · Deliveries · Dispatch |
 | A fresh document, no run yet | **Created** | New · Open · Pending |
-| Goods on the vehicle (awaiting the handover fact — registered, not yet derivable) | **Out for delivery** | In transit · Dispatched · On the way |
+| Goods received by logistics, not yet resulted (derived from the §4 chain's `Received by logistics` fact, 0363 — never from the calendar) | **Out for delivery** | In transit · Dispatched · On the way |
 | The trip completed | **Delivered** | Done · Complete · Closed |
 | The trip did not complete | **Delivery exception** + its ONE reason from the T4 Reason Library | Failed · Problem · a second word list |
 | A voided document | **Cancelled** + `Order cancelled` / `Rescheduled` | Deleted · Void · Removed |
@@ -1752,7 +1908,9 @@ the ruling's phrase stays in the documents and the screen keeps the word it has.
 `On hand` (what's here now) · `Ready stock` (how much to keep — a PLAN about
 the same goods, never a second pool) · `In & out` (when things moved).
 "Inventory" and "Movements" are banned UI words (POD treatment); internal
-keys/routes keep their names.
+keys/routes keep their names. **Since CARD-2026-08-19-warehouse-rail the three
+questions are sidebar rows under the `WAREHOUSE` heading** (Warehouse Blueprint
+item 13) — the words are unchanged; only the door moved.
 
 **Aligning Purchase and Orders panels:** the Orders panel uses **Placed**
 for the pre-Proceed state (customer ordered, ETA not confirmed). The

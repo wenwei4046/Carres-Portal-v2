@@ -155,7 +155,7 @@ export const ORDER_WORK_RULES: readonly WorkRule[] = [
     owner: "the order's PIC",
     action: orderActionQueue("collect"),
     dueRule:
-      "T−1 working day before the delivery (confirmed, else promised) — the Card 4 collection clock; T−3/T−2 attention",
+      "T−2 working days before the delivery (confirmed, else promised) — the collection clock, deadline re-ruled 2026-08-19 (logistics takes the DO at T−1); T−3 attention",
     completionFact: "outstanding = RM 0 through the one money arithmetic (orderMoney over orders.paid)",
   },
   // ── The blueprint card's two NEW acts (owner-approved 2026-08-16, §7) ──

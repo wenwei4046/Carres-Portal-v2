@@ -232,17 +232,17 @@ export const TO_ORDER_WORDS = {
    */
   reason: "Reason",
   /**
-   * The six. **FOUR of them can be recorded and two cannot**, and the split is
+   * The six. **FIVE of them can be recorded and one cannot**, and the split is
    * the database's, not this file's: `purchase_demands.purpose` has a CHECK
-   * holding exactly `ready_stock` · `display` · `office` · `warranty`, and
-   * 0323 opened the write door to those four and no more.
+   * holding exactly `ready_stock` · `display` · `office` · `warranty` ·
+   * `spare_parts` — 0323 opened four, and 0359 admitted `spare_parts` on the
+   * Manual Purchase ruling (Jess, 2026-08-18).
    *
-   * `reasonSpareParts` and `reasonOther` therefore have NO value to be stored
-   * as and are NOT offered by the dialog — see `DEMAND_PURPOSES`, which is the
-   * list a control may render. They stay here because they are ruled words a
-   * later card may need; a word with no home in the store is a word the server
-   * refuses by name, which is exactly the failure 0322 paid for on the pool's
-   * reasons.
+   * `reasonOther` still has NO value to be stored as and is NOT offered — see
+   * `DEMAND_PURPOSES`, which is the list a control may render. It stays here
+   * because it is a ruled word a later card may need; a word with no home in
+   * the store is a word the server refuses by name, which is exactly the
+   * failure 0322 paid for on the pool's reasons.
    */
   reasonReadyStock: "Ready Stock",
   reasonDisplay: "Display",
@@ -250,6 +250,9 @@ export const TO_ORDER_WORDS = {
   reasonSpareParts: "Spare Parts",
   reasonOffice: "Office",
   reasonOther: "Other…",
+  /** The customer lane's auto-stamp (0361) — never offered in a picker; a PO
+   *  born from sales orders says so itself. */
+  reasonCustomerSales: "Customer Sales",
   // ── P15 (Loo, 2026-08-04) — the item picker stops being one word per row ──
   /**
    * The picker's SKU column. **This is the card's first and worst defect**:
@@ -461,13 +464,13 @@ export const TO_ORDER_WORDS = {
  *
  * **THE MIRROR OF A DATABASE LIST, NOT A MENU SOMEBODY CHOSE.** The values are
  * `purchase_demands.purpose`'s CHECK, and the write door
- * (`purchasing_create_demand`, opened by 0323) names the same four. Three
- * places must agree — the CHECK, the function's own gate, and this — and 0322
- * is why: when the pool's reasons lived in four places and only two were
- * widened, every dropdown offered a word the server refused by name.
+ * (`purchasing_create_demand`, opened by 0323, widened by 0359) names the same
+ * five. Three places must agree — the CHECK, the function's own gate, and this
+ * — and 0322 is why: when the pool's reasons lived in four places and only two
+ * were widened, every dropdown offered a word the server refused by name.
  *
- * This array is therefore the ONLY list a control may render. `Spare Parts`
- * and `Other…` are ruled WORDS in `TO_ORDER_WORDS` and are deliberately not
+ * This array is therefore the ONLY list a control may render.
+ * `Other…` is a ruled WORD in `TO_ORDER_WORDS` and is deliberately not
  * here: neither has ever had a value to be stored as, and inventing one would
  * be a screen ruling on a business question ("other" than what?).
  *
@@ -481,6 +484,7 @@ export const DEMAND_PURPOSES = [
   { value: "display", label: TO_ORDER_WORDS.reasonDisplay },
   { value: "warranty", label: TO_ORDER_WORDS.reasonWarranty },
   { value: "office", label: TO_ORDER_WORDS.reasonOffice },
+  { value: "spare_parts", label: TO_ORDER_WORDS.reasonSpareParts },
 ] as const;
 
 export type DemandPurpose = (typeof DEMAND_PURPOSES)[number]["value"];
@@ -493,6 +497,19 @@ export const DEMAND_PURPOSE_VALUES = DEMAND_PURPOSES.map((p) => p.value) as read
 
 export function isDemandPurpose(v: unknown): v is DemandPurpose {
   return typeof v === "string" && DEMAND_PURPOSE_VALUES.includes(v);
+}
+
+/**
+ * What a PO's `purpose` (0361) prints as — the `Need for` fact on the PO
+ * surfaces. `customer_sales` is the customer lane's auto-stamp; the five typed
+ * purposes reuse the demand labels above (one dictionary, Law D). NULL — every
+ * PO issued before 0361, deliberately not backfilled — prints nothing, and the
+ * caller decides what nothing looks like.
+ */
+export function poPurposeLabelOf(v: string | null | undefined): string | null {
+  if (!v) return null;
+  if (v === "customer_sales") return TO_ORDER_WORDS.reasonCustomerSales;
+  return DEMAND_PURPOSES.find((p) => p.value === v)?.label ?? null;
 }
 
 /**

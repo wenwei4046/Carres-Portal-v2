@@ -6,6 +6,9 @@ import {
   abandonOrderInput,
   assignPartnerInput,
   attachDoInput,
+  codInstruction,
+  paymentApprovalOpensGate,
+  type DeliveryPaymentApproval,
   confirmProceedRequestInputSchema,
   ListOperationOrdersQuery,
   recheckStockInput,
@@ -26,6 +29,7 @@ import {
 } from "@carres/shared";
 // renderDoPdf moved to apps/web/src/lib/pdf/render.ts (Workers WASM ban).
 import type { DoTemplateData } from "../../lib/pdf/types";
+import { loadBookingContext } from "../../lib/booking-context";
 import { requireOperation, requireOperationOrPrincipal } from "../../lib/auth-guards";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { storageBlock } from "../../lib/storage-gate";
@@ -1803,6 +1807,40 @@ operationOrdersRouter.get("/:id/print-do-data", requireOperation, async (c) => {
   if (warehouseRow?.name) dealerContactParts.push(`Ship from: ${warehouseRow.name}`);
   const dealerContact: string | null = dealerContactParts.length > 0 ? dealerContactParts.join(" · ") : null;
 
+  // ── COD (0362, owner ruling 2026-08-19). A document issued under an
+  // APPROVED Delivery Payment Approval on an order still owing carries the
+  // owner's instruction. The figure is the order's outstanding through the ONE
+  // shared assembly (`loadBookingContext` → `bookingConfirmGate` → `orderMoney`)
+  // at render time — the balance the driver must see land before unloading.
+  // A paid order renders no line, approval or not.
+  let codLine: string | null = null;
+  {
+    const { data: approvalRows, error: paErr } = await sb
+      .from("order_delivery_payment_approvals")
+      .select("id, status, request_reason, requested_at, decided_at, decision_reason")
+      .eq("order_id", id);
+    if (paErr) {
+      const m = mapPgError(paErr);
+      return c.json(m.body, m.status);
+    }
+    const approvals: DeliveryPaymentApproval[] = (approvalRows ?? []).map(
+      (row: Record<string, unknown>) => ({
+        id: row.id as string,
+        status: row.status as DeliveryPaymentApproval["status"],
+        requestReason: row.request_reason as string,
+        requestedAt: (row.requested_at as string | null) ?? null,
+        decidedAt: (row.decided_at as string | null) ?? null,
+        decisionReason: (row.decision_reason as string | null) ?? null,
+      }),
+    );
+    if (paymentApprovalOpensGate(approvals)) {
+      const ctx = await loadBookingContext(sb, id, null);
+      if (ctx.ok && ctx.ctx.gate.outstanding > 0) {
+        codLine = codInstruction(ctx.ctx.gate.outstanding);
+      }
+    }
+  }
+
   const templateData: DoTemplateData = {
     do_number: String(printDoNumber),
     issue_date: issueDate,
@@ -1832,6 +1870,7 @@ operationOrdersRouter.get("/:id/print-do-data", requireOperation, async (c) => {
       };
     }),
     currency: "MYR",
+    cod_instruction: codLine,
   };
 
   return c.json(templateData);

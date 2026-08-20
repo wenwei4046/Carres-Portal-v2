@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   deliveryOrderStatusOf,
+  type DeliveryHandoverKind,
   type DeliveryOrderStatus,
   type OrderActionTone,
 } from "@carres/shared";
@@ -71,6 +72,7 @@ const STATUS_TONE: Record<DeliveryOrderStatus["kind"], OrderActionTone> = {
 function buildRow(
   r: DeliveryOrderRow,
   attemptsByDo: Map<string, DeliveryOrderAttemptRow[]>,
+  handoverByDoId: Map<string, DeliveryHandoverKind[]>,
 ): DoRegisterRow {
   const status = deliveryOrderStatusOf({
     voidedAt: r.voided_at,
@@ -80,6 +82,7 @@ function buildRow(
       reasonKey: a.reason_key,
       recordedAt: a.recorded_at,
     })),
+    handoverEvents: (handoverByDoId.get(r.id) ?? []).map((kind) => ({ kind })),
   });
   return {
     id: r.id,
@@ -114,7 +117,16 @@ export default function DeliveryOrdersRegister() {
       list.push(a);
       attemptsByDo.set(a.do_number, list);
     }
-    return (data?.deliveryOrders ?? []).map((r) => buildRow(r, attemptsByDo));
+    // The §4 handover facts (0363) — Received by Logistics lights the blue pill.
+    const handoverByDoId = new Map<string, DeliveryHandoverKind[]>();
+    for (const e of data?.handoverEvents ?? []) {
+      const list = handoverByDoId.get(e.delivery_order_id) ?? [];
+      list.push(e.kind);
+      handoverByDoId.set(e.delivery_order_id, list);
+    }
+    return (data?.deliveryOrders ?? []).map((r) =>
+      buildRow(r, attemptsByDo, handoverByDoId),
+    );
   }, [data]);
 
   const openDeliveryOrder = (r: DoRegisterRow) =>

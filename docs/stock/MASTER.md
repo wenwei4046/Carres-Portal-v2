@@ -3,8 +3,16 @@
 > **The only Stock document.** Overwritten when re-ruled; never versioned.
 > **You read `CLAUDE.md` and this file.**
 >
-> **Inventory and Ready Stock are ONE module, and that is measured, not chosen:** the portal has
-> a single `Stock` door with three tabs. Two masters would be two names for one screen.
+> **Inventory and Ready Stock are ONE module, and that is measured, not chosen.** Since
+> 2026-08-19 the module's pages live in the sidebar under the **`WAREHOUSE` heading**
+> (CARD-2026-08-19-warehouse-rail); the old single `Stock` door with three tabs is gone.
+> Two masters would still be two names for one module.
+>
+> **The owner-approved Warehouse Blueprint (22 items, reviewed item by item 2026-08-14)**
+> is the module's approved operating-model target — Unit as truth, NETS-executed physical
+> operation, Sites/custody, counts, transfers, consignment, permissions. Its full
+> persistence into this MASTER is pending the owner's blanket approval; **item 13
+> (navigation) is applied** by the rail card below.
 
 | I am working on | Read |
 |---|---|
@@ -24,14 +32,31 @@ Answer three questions and no more: **what is physically here · what moved · w
 for the shelf.**
 
 ### WHAT IS ON SCREEN TODAY
-ONE sidebar item, three tabs (`OperationStock.tsx`, 156 lines — the tab shell).
-*Measured 2026-08-05 from file sizes, routes and the shipped card records; **pages not read line
-by line.***
+**The `WAREHOUSE` sidebar heading with the module's pages as rows**
+(CARD-2026-08-19-warehouse-rail — Warehouse Blueprint item 13, under the Jess
+2026-08-19 SALES-template heading law):
 
 ```
-OperationStockOnHand.tsx    547   On hand    — the per-unit register, chip-filtered
-OperationMovements.tsx      885   In & out   — every movement
-OperationStockPlan.tsx      746   Ready stock — the plan, reorder points, K5's digest
+WAREHOUSE
+  On hand        ?tab=stock-onhand   — the per-unit register, chip-filtered
+  Ready stock    ?tab=stock-plan     — the plan, reorder points, K5's digest
+  In & out       ?tab=movements      — every movement
+  Transfers      Coming soon         — blueprint item 13.3, its own card
+  Counts         Coming soon         — blueprint item 13.4, its own card
+```
+
+- The three live rows keep K0's learned order; the rail never reshuffles. When
+  Ready stock folds into On hand Views (blueprint item 13.7) its row dies in
+  that card's own PR.
+- **No Report row, no Settings row** — the blueprint keeps both central.
+- The tab strip died with the rail move; `StockTabs.tsx` keeps drawing the ONE
+  destination-format header (壳画头), page words = the sidebar's own words.
+- Every `?tab=` address is unchanged — the door moved, not the address.
+
+```
+OperationStockOnHand.tsx    On hand    — the per-unit register, chip-filtered
+OperationMovements.tsx      In & out   — every movement
+OperationStockPlan.tsx      Ready stock — the plan, reorder points, K5's digest
 ```
 
 **`Inventory` and `Movements` are BANNED UI words.** The goods pool is **`Stock`** on any page,
@@ -50,6 +75,9 @@ ops_stock_items 135 · units on_hold 0 · ops_stock_pool_usage 0
 | Concern | The ONE home |
 |---|---|
 | the per-unit register | `ops_stock_items` — **the register is the authority, not a rollup** |
+| whose the goods are | `ops_stock_items.ownership` — `carres` or `supplier` + which supplier |
+| the Unit ID | minted by Stock when a purchase or consignment order is CONFIRMED |
+| where it stands, since when | the site and the display-start date, both on the unit |
 | the rolled-up balance | `stock_balances` via `ops_rollup_stock_balances` |
 | quarantine outcomes + status mapping | `packages/shared/src/stock-hold.ts` |
 | pool draw reasons (K4's dated ledger) | `ops_stock_pool_usage` + `POOL_USE_REASONS` |
@@ -68,6 +96,28 @@ ops_stock_items 135 · units on_hold 0 · ops_stock_pool_usage 0
 What is physically in a warehouse right now, per unit.
 
 ### FROZEN RULES
+- **A UNIT IS BORN WITH ITS ORDER, NOT WITH THE TRUCK** (Jess, 2026-08-18). Confirming a
+  purchase or consignment order mints one row per physical piece, `status='incoming'`, so the
+  numbers can go OUT on the order and the supplier can print them on its own label. Carres does
+  not print supplier labels. **`incoming` means ORDERED, never HELD** — this module already paid
+  for forgetting that once (§6: a broken unit sat in `incoming` and both the reorder engine and
+  the ready-stock plan read it as *coming*, inflating supply with goods that would never arrive).
+  Every arithmetic that answers *what can we sell* or *what must we still buy* treats `incoming`
+  as absent.
+- **A UNIT SAYS WHOSE IT IS** (Jess, 2026-08-18). `ownership` is `carres` or `supplier`, and on a
+  supplier row the supplier is named. Without it a consigned sofa standing in a showroom is
+  indistinguishable from one Carres paid for, and nothing can answer what is owed for what.
+  **Ownership never moves on a warehouse action** — not on a transfer, not on a count, not on a
+  status change. Only a Purchasing or Finance record moves it, and selling a `supplier` unit is
+  what tells Finance a payable now exists.
+- **DIFFERENT FABRIC IS DIFFERENT STOCK.** Three beige do not satisfy an order for grey. Whatever
+  the catalog does with variants above, the count below is kept per variant, and every pick reads
+  the count that matches what was actually ordered.
+- **A UNIT KNOWS WHERE IT STANDS AND SINCE WHEN.** The site (`Carres` · `AL` · `HOUZS`, extended in
+  Settings, never in code) and the display-start date, from which *"on display 187 days"* is
+  derived and never stored. **A slot code inside a site was refused** (Jess, 2026-08-18): with one
+  showroom the re-keying costs more than the answer, and a position nobody updates is worse than
+  no position. It becomes a real question at three or four outlets, not before.
 - **Every pick filters `status='free'`**, and the rollup counts only free + reserved.
 - **A record is drawn WHOLE.** A bulk record of N units that would over-reserve is skipped,
   never split — so a 555-unit pillow row reserved for one pillow takes all 555 out of free
@@ -76,6 +126,36 @@ What is physically in a warehouse right now, per unit.
 - **`Reserve`, never `Take`.** The goods do not leave; they are LOCKED until delivery, and an
   operator who believes stock has gone will not chase it. The past tense moved with it —
   *reserved N from stock*, never *took*.
+- **A UNIT'S CATEGORY IS THE CATALOG'S ANSWER AND NOBODY ELSE'S**
+  (CARD-2026-08-19-onhand-category-filter, closing this module's half of D9). The chain is
+  `ops_stock_items.sku → product_skus.sku → product_skus.model_id → product_models.category`,
+  read by the ONE shared reader every other gate already asks
+  (`apps/api/src/lib/sku-categories.ts`), so On hand can never disagree with the earliest-sell
+  floor or the goods gate about what a sofa is. **No screen and no shared function may
+  re-derive a category from a SKU STRING** — the prefix rule D9 was raised against was wrong
+  for every live SKU, and the free-text import SKUs are exactly the strings it mis-read
+  (`Microfiber Waterproof Mattress Protector-K` is not a mattress).
+- **A SKU THE CATALOG DOES NOT HOLD SAYS SO.** `/inventory` returns `category: null` and the
+  rail counts it under **`Not in catalog`** — never guessed, never folded into `Accessory`.
+  The other three list views do not ask and carry no `category` key at all: **absent and
+  `null` are different facts**, and a `null` there would claim the catalog was asked.
+
+### WHAT IS ON SCREEN TODAY — the left filter rail
+`Category` sits between the attention chips and `Status`, same additive-AND pill mechanics as
+the groups below it, filtered client-side off the one `/inventory` fetch. Its no-filter pill is
+**`Any`**, matching Condition and Supplier; `All` stays the Status bucket list's word.
+Words: `docs/COPY-STANDARD.md` → *The On hand Category filter words*.
+
+**Measured 2026-08-19 (production, re-measured in the build):** 136 records · 74 distinct SKUs ·
+49 records join the catalog (sofa 23 · bedframe 16 · mattress 10) · **87 do not (975 units)**.
+Every live row is TEST data (Constitution §6): the null bucket is honest display, **never a
+backfill, repair worklist or cleanup card.**
+
+> **NOT LAW — PROPOSAL, carrying its own falsifier.** The card proposed `All` for the
+> no-filter pill and `No catalog match` for the null bucket; this build shipped **`Any`** and
+> **`Not in catalog`** instead, on the rail's own existing conventions and this dictionary's
+> `Supplier not assigned` / `Address not given yet` pattern. **Falsifier: the owner's word on
+> her walk.** One sentence from Jess overturns either, and the change is a copy edit.
 
 # §4 · In & out
 

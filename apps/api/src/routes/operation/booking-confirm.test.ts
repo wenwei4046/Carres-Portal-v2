@@ -634,7 +634,7 @@ describe("POST /api/operation/orders/:id/booking/confirm", () => {
    *  control READ already shows the confirmed booking (a legal re-confirm),
    *  goods are received, no Finance exception, and `orders` accepts the
    *  idempotent do_number update. */
-  function autoIssueTables(financeRows: unknown[]) {
+  function autoIssueTables(financeRows: unknown[], paid = 2500) {
     const confirmedControl = {
       line_received: { [MATTRESS]: 1 },
       balance: null,
@@ -647,7 +647,7 @@ describe("POST /api/operation/orders/:id/booking/confirm", () => {
       data: {
         id: ORDER_ID,
         so: 1234,
-        paid: 0, // ⭐ owes the FULL RM 2,500 — money must not stop the mint
+        paid, // default paid in full — the 2026-08-19 money gate holds the mint otherwise
         do_number: null,
         ops_assigned_logistic: PARTNER_ID,
       },
@@ -677,12 +677,14 @@ describe("POST /api/operation/orders/:id/booking/confirm", () => {
         { data: confirmedControl, error: null },
       ),
       order_finance_exceptions: tableMock({ data: financeRows, error: null }),
+      // 0362 — the approval record. Empty: nothing asked.
+      order_delivery_payment_approvals: tableMock({ data: [], error: null }),
       // The repeat-letter lookup (0356): no prior document rows here.
       ops_delivery_orders: tableMock({ data: [], error: null }),
     });
   }
 
-  it("⭐ Slice 2 — confirming a ready order mints the DO by itself, money owing and all", async () => {
+  it("⭐ Slice 2 — confirming a ready, PAID order mints the DO by itself", async () => {
     const t = autoIssueTables([]);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue(makeSb(t) as any);
@@ -700,6 +702,17 @@ describe("POST /api/operation/orders/:id/booking/confirm", () => {
       expect.objectContaining({ do_number: expect.stringMatching(/^DO-\d{6}-\d{4}$/) }),
     );
     expect(t.orders.is).toHaveBeenCalledWith("do_number", null);
+  });
+
+  it("⭐ an OWING order confirms its booking fine — and mints NOTHING without an approval (2026-08-19)", async () => {
+    const t = autoIssueTables([], 0); // owes the full RM 2,500
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(makeSb(t) as any);
+    const res = await post(await makeJwt("operation"), OK_BODY);
+    expect(res.status).toBe(200); // the booking is never hostage to the courtesy
+    const body = (await res.json()) as { deliveryOrder: unknown };
+    expect(body.deliveryOrder).toBeNull();
+    expect(t.orders.update).not.toHaveBeenCalled();
   });
 
   it("⭐ Slice 2 — an OPEN Finance exception stops the auto-issue, and the confirm still succeeds", async () => {

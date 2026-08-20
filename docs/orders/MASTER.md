@@ -282,56 +282,28 @@ Requirements are plain sentences, GitHub-checks style, with the met count:
 **When every requirement is met the SYSTEM issues the DO.** There is **no Release button, no Approve
 button and no manual bypass** in any state; the gate node then shows the number and turns green.
 
-**⛔ SUPERSEDED — *"MONEY IS A GATE REQUIREMENT (decision B)"*.** The owner ruled **decision A** on
-2026-08-16, after the node-map implementation had already merged: **outstanding money does not block
-the DO, and an OPEN Finance exception is the only money blocker.** The paragraph below is preserved
-as the reasoning the shipped build was made on; **it no longer states target truth.** The correction
-slice is
-[`../cards/CARD-2026-08-16-money-gate-correction.md`](../cards/CARD-2026-08-16-money-gate-correction.md),
-`STATUS: QUEUED · IMPLEMENTATION: NOT APPROVED`.
+### THE MONEY REQUIREMENT — OWNER RULING 2026-08-19 · APPROVED / LOCKED
 
-> **The superseded reasoning, kept because it was honest and it was right about one thing.**
-> The design card proposed dropping money from the gate and blocking only on a "Finance-recorded
-> payment exception". That was put to the owner as a conflict rather than built, because three
-> current authorities and the shipped engine all said otherwise: §8 below, §7's four-way
-> `Issue delivery order` trigger, `docs/payment/MASTER.md` §6, and `order-actions.ts`
-> `deliveryHeldOnMoney`, which withholds `issue_delivery_order` outright while money holds.
-> **A gate that counted its requirements met while the server refused the DO would be the screen
-> telling a lie** (Architecture Law D — one derived fact, one arithmetic). The gate therefore asks
-> `orderMoney.holds`, the very predicate the action engine asks. The Finance-exception mechanism did
-> not exist in the repository and none was invented.
->
-> **Refusing to build an undefined mechanism was correct.** The owner has since defined it, so the
-> objection is answered rather than overruled. **Law D still binds the correction:** money may not
-> leave the canvas's gate while `deliveryOrderIssueGate` and `deliveryHeldOnMoney` still refuse on
-> it. Screen and server move together or the screen lies again — in the other direction.
-
-### THE MONEY REQUIREMENT IS REPLACED — OWNER RULING 2026-08-16 (decision A) · APPROVED / LOCKED
+**Money is a gate requirement again.** The 2026-08-16 "decision A" ruling — *outstanding money
+does not block the DO; an OPEN Finance exception is the only money blocker* — was **REVERSED by
+the owner on 2026-08-19** after a same-day incident (goods delivered, money uncollected, no
+approval). The gate's money line asks the same predicate the server and the 0362 database door
+ask (Law D — the guard that bound decision B, decision A and this ruling alike: the map and the
+engine may never disagree):
 
 ```
-RETIRED   `RM {amount} still to collect` as a gate requirement
-REPLACED  an OPEN Finance exception — the ONE money blocker
+outstanding = 0                                   → ✓ Money in full
+APPROVED Delivery Payment Approval, still owing   → ✓ COD approved — collect before unloading
+owing, request pending                            → ✗ … approval waiting for decision
+owing, nothing raised                             → ✗ … collect, or request a payment approval
 ```
 
-**A Finance exception is an explicit, Finance-created record linked to the Sales Order**, carrying
-**creator · reason · status · timestamps · clear evidence**. **Only Finance creates it; only Finance
-clears it.** `OPEN` blocks the DO gate; `CLEARED` removes the block. An outstanding balance — of any
-size, of any age — does not block, and neither does an uncollected storage fee.
+**The OPEN Finance exception (0355) is the SECOND, independent money requirement** — it blocks a
+fully-paid order, and an approval does not clear it. The full ruling, the approval record's
+definition and the COD terms live once in **§8 · Money on an order**.
 
-**It is a decision, never a derived state.** It may not be computed from a balance, or the gate this
-ruling removes grows straight back under another word. The full definition, its ownership
-consequences and what it supersedes live in **§8 · THE GATES**.
-
-✅ **BUILT AND PRODUCTION-VERIFIED 2026-08-17.** Migration `0355` applied and probed; the record,
-its two Finance-only doors, RLS and the no-delete trigger are live, and Slice 3 (PR #830) re-keyed
-the gate, the action engine, the canvas and the API onto it in one change. The authenticated walk
-record is in §8 below.
-
-**THE BALANCE FACT AND THE RELEASE DECISION ARE TWO FACTS.** A manager release MEETS the requirement
-and still prints what the customer owes:
-`Manager release recorded — RM 1,249.00 remains to collect`. **A release never erases or hides the
-outstanding amount.** An order whose value nobody has entered does not hold anything (§8 — unknown
-warns, never blocks): the gate reads `No price yet — money does not hold this delivery`.
+**An order whose value nobody has entered does not hold anything** (§8 — unknown warns, never
+blocks): the gate reads `No price yet — unknown never holds`.
 
 **A met goods requirement on PARTIAL goods** is allowed ONLY when an explicit partial-delivery scope
 exists **and is displayed** — `Goods ready for this delivery (1 Unit in, 2 Units still open)`. The
@@ -3857,13 +3829,23 @@ vehicle number and lift/registration requirements **for condominiums**.
 **Issuing the delivery order is NOT a person's action** (owner ruling 2026-08-16, blueprint
 card §3/§7 — this OVERWRITES the four-condition `Issue delivery order` action that ruled here).
 The SYSTEM issues the document at whichever door completes the gate — booking confirm · stock
-reserve · Finance-exception clear — under §8's requirements. **No Issue, Release or Approve
-button exists anywhere, and no worklist raises it as work.** The number stays the locked
-`DO-DDMMYY-NNNN` scheme seeded on the order id (a same-day re-issue for a superseded trip takes
-the scheme's repeat letter, `-B`), so a reprint always matches the signed original. A REBOOKED
-trip is a NEW document (card §6): an un-run document is voided `rescheduled` by the system; a
-failed one keeps its Delivery exception forever and simply stops being the active number; a
-delivered one is untouched history.
+reserve · Finance-exception clear · payment-approval approve — under §8's requirements. **No
+Issue, Release or Approve button exists anywhere, and no worklist raises it as work.** The
+number stays the locked `DO-DDMMYY-NNNN` scheme seeded on the order id (a same-day re-issue for
+a superseded trip takes the scheme's repeat letter, `-B`), so a reprint always matches the
+signed original. A REBOOKED trip is a NEW document (card §6): an un-run document is voided
+`rescheduled` by the system; a failed one keeps its Delivery exception forever and simply stops
+being the active number; a delivered one is untouched history.
+
+**`Request Delivery Order` — the ONE governed manual door (owner ruling 2026-08-19, card §5).**
+For outstation trips the partner schedules the customer, so the DO is needed BEFORE a confirmed
+booking exists. The door walks the SAME single issuing path with the SAME gates — goods
+Ready/Reserved, the §8 money gate, no OPEN Finance exception — merely without waiting for the
+booking-confirm trigger; a confirmed date that exists is still refused for Sunday and public
+holidays. It is never a free-form create: no editable customer, goods, price or number. If a
+gate fails, the door refuses and names the gate; the request and the issuance are recorded like
+every other issue event (`… — on Request Delivery Order`). It lives on the drawer's
+Delivery-order row.
 
 **`Deliver today`** — trigger: the confirmed date is today and nothing has been delivered ·
 completion: **Delivered**, or a **Delivery Exception carrying its reason** (customer
@@ -3930,14 +3912,15 @@ Partial · Paid · No price yet` from the one arithmetic and the collection cloc
 hand-keyed dropdown is retired (0347). A money state a human can type is a money state that can
 contradict the figure.
 
-### THE COLLECTION CLOCK — one arithmetic, T−3 · T−2 · T−1
-`packages/shared/src/collection-clock.ts`. The final deadline is **1 working day before the
+### THE COLLECTION CLOCK — one arithmetic, T−3 attention · T−2 deadline (re-ruled 2026-08-19)
+`packages/shared/src/collection-clock.ts`. The final deadline is **2 working days before the
 delivery** on the Mon–Sat delivery week with Malaysian public holidays, anchored on the
 **customer's confirmed day, else the promised date**; no anchor → no clock, because a step that
-cannot be late is not urgent. `t3` and `t2` are attention, **`t1` is the deadline** — logistics
-ask for the DO the evening before and the DO door refuses while money holds, so a balance
-uncollected at T−1 is a delivery about to slip. Two consumers, one module: the collections desk
-and the Work engine's `collect` / `issue_delivery_order` dues.
+cannot be late is not urgent. `t3` is attention, **`t2` is the deadline** — logistics takes the
+DO at T−1 and the DO door refuses while money holds (the 2026-08-19 money gate), so a balance
+uncollected at T−2 is a delivery about to slip; T−1 and later while owing is `late`. Two
+consumers, one module: the collections desk and the Work engine's `collect` due. The full
+ruling lives below in this section.
 
 ### `Collect RM {amount} from {customer}`
 Trigger: outstanding > RM 0 · completion: outstanding = RM 0 ·
@@ -3954,33 +3937,83 @@ saying who moved it.
 
 **A gate REFUSES an action. Display order only decides what is read first.**
 
-## ⭐ MONEY LEAVES THE DO GATE — OWNER RULING 2026-08-16 (decision A) · APPROVED / LOCKED
+## ⭐ MONEY IN FULL BEFORE DELIVERY — OWNER RULING 2026-08-19 · APPROVED / LOCKED
+## (SUPERSEDES the 2026-08-16 "decision A" money-leaves-the-gate ruling)
 
-**Outstanding money does not block the delivery order.** A customer balance, however large and
-however late, no longer refuses it. **An OPEN Finance exception is the ONE money blocker.**
+**Reversed on the owner's own evidence:** on 2026-08-19 an order was delivered with money
+uncollected and no approval — exactly the exposure the 2026-08-16 rule permitted. The SOP:
 
-The requirements that remain:
+```
+Money in full BEFORE delivery. That is the only default.
+Operation cannot proceed on its own word. The exception is a recorded
+approval — black and white in the system, never verbal.
+```
+
+**A Delivery Order issues only when, for the trip's Sales Order:**
 
 ```
 ✓ the customer has confirmed a delivery date AND a time slot
 ✓ the date is not a Sunday and not a Malaysian public holiday
 ✓ every goods line is reserved to this order (accessories pass automatically)
 ✓ logistics chosen
-✗ the money is collected            ← RETIRED by this ruling
-+ no OPEN Finance exception         ← the one money blocker that remains
+✓ outstanding = 0, OR an APPROVED Delivery Payment Approval covers the order
+✓ no OPEN Finance exception (0355 — NOT retired: the second blocker)
 ```
 
-**And the SYSTEM issues the DO when every requirement is met** — no Release button, no Approve
-button, no manual bypass, in any state.
+**And the SYSTEM issues the DO when every requirement is met** — no Issue, Release or Approve
+button on the DO path, in any state. Paid alone never issues a DO — the date and goods gates
+still hold (owner re-confirmed 2026-08-19: *"已付清也要有 ETA 才发 DO"*). The one governed
+manual door is `Request Delivery Order` (§7) — the same path, the same gates, merely not
+waiting for the booking-confirm trigger.
 
-### `Finance exception` — OWNER DEFINITION 2026-08-16 · APPROVED / LOCKED
+### `Delivery Payment Approval` — OWNER DEFINITION 2026-08-19 · APPROVED / LOCKED
+
+One append-only record owned by Sales Orders (`order_delivery_payment_approvals`, 0362), beside
+the Finance exception it mirrors:
 
 ```
-WHAT IT IS      an explicit record, linked to the Sales Order
+RAISE           Operation or the salesperson, on the order — reason required,
+                requester + time recorded. Raising changes nothing else.
+DECIDE          the configured approver ONLY — today that is Jess. The approver
+                list is DATA (principal role, or the delivery_payment_approver
+                duty on a position), so managers join later without a code change.
+                The decision records approver, time and reason, append-only.
+APPROVED        opens the money gate for that order's DOs
+PENDING/REFUSED keeps it shut
+```
+
+Nobody else may create, edit or delete a decision; deletion is refused by trigger and a decision
+is never re-decided (the 0355 pattern). **The database asserts the money law on the mint
+itself** (0362's `BEFORE INSERT` trigger on `ops_delivery_orders`): no document can be born for
+an owing order with no approved approval, whichever path writes it — including the legacy 0098
+dispatch backstop.
+
+### WHAT AN APPROVAL MEANS — COD, defined by the owner 2026-08-19
+
+```
+1. Goods load and travel to the customer's house.
+2. The customer may SEE the goods first — on the truck, before unloading.
+3. BEFORE the driver takes the goods down: the customer pays the full
+   balance by ONLINE TRANSFER. No cash.
+4. Transfer confirmed → unload and hand over.
+   Not paid → the goods do not come down; the trip returns.
+```
+
+Purpose: the customer can never hold the goods hostage — *"fix the problem first, then I pay"* —
+after installation. **The DO document prints the instruction** when issued under an approval and
+money is still owed: `COLLECT RM {amount} BY ONLINE TRANSFER BEFORE UNLOADING — NO CASH.`
+(registered in `COPY-STANDARD.md`; the amount is the live outstanding through the one
+arithmetic). A paid order's DO renders no COD line.
+
+### `Finance exception` — OWNER DEFINITION 2026-08-16 · APPROVED / LOCKED · the SECOND blocker
+
+```
+WHAT IT IS      an explicit record, linked to the Sales Order (0355)
 IT CARRIES      creator · reason · status · timestamps · clear evidence
 WHO CREATES     Finance, and only Finance
 WHO CLEARS      Finance, and only Finance
-STATUS OPEN     blocks the DO gate
+STATUS OPEN     blocks the DO gate — regardless of payment, and an approval
+                does NOT clear it
 STATUS CLEARED  removes the block
 ```
 
@@ -3990,71 +4023,79 @@ STATUS CLEARED  removes the block
 - **`clear evidence` is a required field, not a nicety.** A block liftable without saying why is the
   hand-keyed `payment_status` defect this MASTER already retired once.
 - **It is a decision, never a derived state.** Opening one is a judgement; owing money is a fact.
-  Deriving either from the other rebuilds the retired gate under a new name.
+  Deriving either from the other builds a second gate under a new name.
 - **It renders on the Order Route as a blocking fact with its reason**, through the existing gate
-  requirement grammar. It is **not** a new root branch and **not** an Overall Status.
+  requirement grammar — as does the money requirement.
 
-**WHAT THIS SUPERSEDES, stated exactly so nobody restores it by accident:**
+**SUPERSEDED RULINGS, stated exactly so nobody restores one by accident:**
 
-| Superseded rule | Where it ruled | Status |
+| Superseded rule | Ruled | Status |
 |---|---|---|
-| *"Issuing is refused unless … **the money is collected**"* | this section | **SUPERSEDED** |
-| *"An unpaid storage fee is part of the money, and there is no softer rule for it"* | this section | **SUPERSEDED as a DO blocker** — still owed, still collected, simply no longer holds the document |
-| *"The emergency override — the manager approves it, nobody else"* | this section | **SUPERSEDED.** With no money gate there is nothing to release, and the buttons are forbidden |
-| *"MONEY IS A GATE REQUIREMENT (decision B)"* | §0.1, and the shipped canvas | **SUPERSEDED** by this ruling |
-| *"issuing the DO is the hard gate"* | `../payment/MASTER.md` §6 | **SUPERSEDED** — reconciled there |
-| *"Issue Delivery Order is the only employee act"* | `../delivery/MASTER.md` §3 | **SUPERSEDED** — reconciled there |
+| *"outstanding money does not block the DO; an OPEN Finance exception is the ONLY money blocker"* (decision A) | 2026-08-16 | **REVERSED 2026-08-19** on the owner's evidence: same-day incident — goods delivered, money uncollected, no approval. The exception record survives as the SECOND blocker |
+| *"MONEY IS A GATE REQUIREMENT (decision B)"* | pre-2026-08-16 | **SUPERSEDED by decision A, then substantively restored 2026-08-19** — with the approval door decision B never had. Its Law-D guard (map and engine may never disagree) bound every version |
+| *"The emergency override — the manager approves it, nobody else"* | 2026-07-27 | **SUPERSEDED.** The approver is the OWNER (data-listed), the record is append-only, and it authorises COD terms — not a button on the DO path |
+| *"An unpaid storage fee … no softer rule"* as a separate blocker | 2026-07-27 | **FOLDED IN** — the storage fee rides `outstanding` through the one arithmetic, so it blocks exactly as goods money does |
 
-**WHAT SURVIVES, and it is the half that matters most:**
+**WHAT SURVIVES:**
 
-- **A RELEASE NEVER FORGIVES MONEY.** `orderMoney` still returns `holding` beside `outstanding`, and
-  the two facts are still printed apart. **The collect action survives delivery** exactly as it
-  always did — a delivered order that still owes keeps its action and its red dot. Goods moving has
-  never meant money forgiven, and it means it even less now that goods move by default.
+- **A RELEASE NEVER FORGIVES MONEY.** An APPROVED COD order still OWES: the collect action stays
+  open with its red dot, and the driver collects before unloading. **The collect action survives
+  delivery** exactly as it always did.
 - **The WAIVER is untouched.** Writing off a receivable remains a money decision, manager-gated,
-  owned by Money In, with amount, reason, actor and time. `storage_fee_override = 0` still means
-  *owes no storage fee*. A waiver is not a release and never was.
-- **An order whose value is UNKNOWN still never holds anything** — unknown warns, never blocks.
+  owned by Money In, with amount, reason, actor and time.
+- **An order whose value is UNKNOWN still never holds anything** — unknown warns, never blocks
+  (`orderMoney` reads an unpriced order's goods owing as 0).
 - **Operations is still told by the work itself.** No separate alert engine.
 
-### THE T−1 COLLECTION CLOCK SURVIVES — OWNER RULING 2026-08-16 · APPROVED / LOCKED
+### THE COLLECTION CLOCK MOVES TO T−2 — OWNER RULING 2026-08-19 · APPROVED / LOCKED
 
-**Keep the clock.** `packages/shared/src/collection-clock.ts` is unchanged: due = delivery − 1
-working day on the Mon–Sat delivery week with Malaysian public holidays, anchored on the customer's
-confirmed day, else the promised date; `t3`/`t2` attention, `t1` the deadline; no anchor, no clock.
+`packages/shared/src/collection-clock.ts` — same calendar (Mon–Sat + Malaysian public holidays),
+same anchor (customer-confirmed date, else promised), same no-anchor-no-clock rule. **Only the
+deadline day changed: `delivery − 2 working days`.**
 
-**Only its JUSTIFICATION retires.** It used to be explained by the DO door refusing while money
-held. **A balance now has a due date because it is owed, not because it holds goods.** Collection
-work runs **independently of the delivery**.
+```
+T−3  attention — chase begins
+T−2  DEADLINE — money in full (or the approval request is already raised)
+T−1  logistics takes the DO; the trip is scheduled
+T    delivery
+```
 
-### SLICE 3 · MONEY GATE CORRECTION — PRODUCTION-VERIFIED 2026-08-17 · AUTHENTICATED ACCEPTANCE PASSED
+The T−1 deadline was one day too late: logistics takes the DO at T−1 and the DO door refuses
+while money holds, so the money must already be settled before that day. `t1` is retired from
+the attention type — one working day out is already `late`. Both consumers (the collections
+desk, the Work engine's `collect` due) follow automatically because there is one arithmetic.
 
-**The retired rule is out of the code.** Delivered in one slice across all four surfaces (Law D),
-after migration `0355` was applied and verified in production:
+### CURRENT IMPLEMENTATION — DELIVERY MONEY GATE + OWNER APPROVAL + COD (card 2026-08-19)
 
-| PR | Merged as | Scope |
-|---|---|---|
-| #829 | `06b7d269` | Slice 1 — the Finance exception record, Finance-only doors, RLS, no-delete trigger (migration `0355`) |
-| #830 | `c737d83d` | Slice 3 — `deliveryOrderIssueGate` drops the money fields; `deliveryHeldOnFinanceException` replaces `deliveryHeldOnMoney`; `GateRequirementId` `"money"` → `"finance-exception"`; the issue endpoint reads `order_finance_exceptions`; the decision-B Law-D guard REWRITTEN, not deleted |
-| #831 | `264d44e5` | The stale Old Orders booking hint — money leaves the goods refusal sentence and states its own truth: *collection is still open; it does not block the delivery order* (found by the acceptance walk itself) |
+Built as one change across every reader (Law D), superseding the 2026-08-17 decision-A build
+and its acceptance walk (git holds that record; its "an owing order issues its DO" result is
+the behaviour this ruling reversed):
 
-**AUTHENTICATED PRODUCTION ACCEPTANCE — walked 2026-08-17 on `erp.carresofficial.com`, all PASS.**
-Staged end-to-end on **SO-1321** (JAGER-SS ×1 · RM 1,500 outstanding · NETS · confirmed
-Thu 20 Aug, Afternoon), built for the walk through the governed office/Stock/booking doors:
+- **Migration `0362`** — `order_delivery_payment_approvals` (append-only, no-delete trigger,
+  decided-stamped + decision-reasoned constraints), the two DEFINER doors
+  (`delivery_payment_approval_request` — operation/salesperson/principal;
+  `delivery_payment_approval_decide` — `delivery_payment_approver_gate()`: principal, or the
+  `delivery_payment_approver` duty as data), and the **database money door**: a `BEFORE INSERT`
+  trigger on `ops_delivery_orders` refusing a document for an owing order with no approved
+  approval (goods arithmetic mirrors `orderMoney`; the date-walked storage accrual stays in the
+  one shared TS arithmetic, asserted by the API gate).
+- **`deliveryOrderIssueGate`** takes `gate.outstanding` + `paymentApprovals` and refuses through
+  the shared spellings (`delivery-payment-approval.ts`); the Finance exception is the second,
+  independent refusal. `waitBookingConfirm: false` is the `Request Delivery Order` door's mode.
+- **The route canvas** gained the `money` gate requirement back (five requirements), asking the
+  same predicate — met by `Money in full` or `COD approved — collect before unloading`.
+- **The collections desk and Work dues** follow the T−2 clock automatically (one arithmetic;
+  `t1` retired from the attention type).
+- **`print-do-data`** carries `cod_instruction` when an approved approval exists and money is
+  still owed; the DO template prints it as a bordered band above the goods table.
+- **The approval doors on screen** live on the Sales Order object page's Money block (raise —
+  operation/sales; decide — the approver), and the drawer's Delivery-order row carries the
+  `Request Delivery Order` door.
 
-- An owing order issues its DO: **`DO-170826-5050`** minted over RM 1,500 outstanding, and the
-  worklist's next action switched to `Collect` — money left the GATE, never the worklist.
-- A Finance-opened exception refused the same order with the reason on screen:
-  *"Cannot issue the delivery order: Finance is holding this delivery: … — Finance clears it."*
-  The canvas gate read `3 of 4 requirements met` with the Finance line as the one unmet item.
-- Clearing it (evidence recorded) flipped the canvas to `4 of 4 · ✓ No Finance hold` and the DO
-  issued immediately after.
-- The database-layer permission probes passed as the REAL users: `operation` refused with `42501`
-  on open and on clear; blank evidence refused; `finance` opened and cleared. `app_role()` was
-  proven to resolve `operation` before the negative test counted.
-- The canvas held at ~1440px and ~920px; the route fan-in was observed requesting
-  `GET /api/finance/exceptions/:orderId` (200); worker `/health` and the served bundle matched the
-  exact merged SHAs at every step.
+PR/SHA and the authenticated production walk are recorded on the card
+([`../cards/CARD-2026-08-19-delivery-money-gate-approval.md`](../cards/CARD-2026-08-19-delivery-money-gate-approval.md));
+the owner walk (owing order blocked → request → approve → DO with COD line → clock at T−2) is
+owed to Jess — a build chat cannot perform login-gated acceptance.
 - One stale-cache false alarm was investigated and closed: a pre-deploy tab showed the old
   four-requirement gate; a fresh load of the same orders showed `✓ No Finance hold`. Stale bundle,
   not a regression.

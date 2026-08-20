@@ -318,11 +318,10 @@ export default function OperationMovements({ initialFilters, setTab, clearInitia
               ← Warehouse
             </button>
             <span className="mx-1.5 text-base-300">/</span>
-            <span>Movement log</span>
+            <span>In &amp; out</span>
           </div>
-          <h1 className="text-page font-display mt-1.5 text-base-900">
-            Stock in &amp; out history
-          </h1>
+          {/* The page word (`In & out`) is drawn by the destination header
+              (StockTabs, 壳画头) — no duplicate h1 below it. */}
           <div
             className="font-body text-body text-base-600 mt-1"
             data-testid="movements-summary"

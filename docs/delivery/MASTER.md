@@ -91,19 +91,18 @@ problems and history.
   that **the system issues the DO when its requirements are met**; it is no longer an employee act.
   The rest of that sentence stands and is reinforced: **never use Release or free-form Create DO**,
   and there is **no Release button and no Approve button** on this path (§15's dictionary entry
-  `Release → Issue Delivery Order` is unchanged and still binding). The money half of the
-  requirements also changed: **outstanding money no longer blocks the DO, and an OPEN Finance
-  exception is the only money blocker.** A Finance exception is an explicit Finance-created record
-  linked to the SO, with creator, reason, status, timestamps and clear evidence; **only Finance
-  creates or clears it**, `OPEN` blocks this gate and `CLEARED` removes the block. The full ruling
-  lives once in [`../orders/MASTER.md`](../orders/MASTER.md) §8, which owns the gate — Delivery
-  READS it and may never write it. Delivery remains the writer of the document and the owner of the
-  carrier, the trip derivation and the proof.
-  ✅ **BUILT AND PRODUCTION-VERIFIED.** The Finance exception record (migration `0355`, PR #829),
-  the decision-A gate re-key (PR #830) and automatic issuance on the booking-confirm and
-  finance-clear doors (PR #835) are live; the authenticated walks are recorded in
-  [`../orders/MASTER.md`](../orders/MASTER.md) §8 (SO-1321 · `DO-170826-5050` issued over an owing
-  balance; SO-1322 · `DO-180826-3035` issued by the system with no press).
+  `Release → Issue Delivery Order` is unchanged and still binding). The one governed manual door is
+  **`Request Delivery Order`** (owner ruling 2026-08-19) — the outstation trip's door, same single
+  issuing path and same gates, merely not waiting for the booking-confirm trigger.
+- ⭐ **THE MONEY HALF IS RE-RULED 2026-08-19 (SUPERSEDING 2026-08-16):** **money in full before
+  delivery is the only default** — a DO issues only when **outstanding = 0, or an APPROVED
+  Delivery Payment Approval covers the order (COD: full balance by online transfer before
+  unloading, no cash), and no OPEN Finance exception holds it.** The 0362 approval record, the
+  0355 Finance exception and the COD terms are defined once in
+  [`../orders/MASTER.md`](../orders/MASTER.md) §8, which owns the gate — Delivery READS it and may
+  never write it. A DO issued under an approval **prints the COD instruction** on the document.
+  Delivery remains the writer of the document and the owner of the carrier, the trip derivation
+  and the proof.
 - Issue rechecks permitted goods, split, Warehouse, address and applicable hold rules atomically,
   snapshots the scope and assigns the next owner. It does not create an actual delivery event.
   **These rechecks survive system issuance unchanged** — what changed is who triggers the act, not
@@ -122,12 +121,13 @@ number.
 - **Numbering** stays the locked `DO-DDMMYY-NNNN` scheme (`docNumber`, seeded on the order id):
   a retry, refresh or reprint returns the SAME number; a rebooked trip is a NEW document on its
   own issue date.
-- **Status is DERIVED, never stored** (`deliveryOrderStatusOf`, one arithmetic): the void stamp
-  and the `delivery_attempts` history matched to the document's number decide
-  `Created · Delivered · Delivery exception (+ its ONE reason) · Cancelled`.
-  `Out for delivery` is registered vocabulary awaiting the handover fact (§4's chain is approved
-  target, not built) — it is never derived from the calendar, because a departure nobody recorded
-  is not a fact.
+- **Status is DERIVED, never stored** (`deliveryOrderStatusOf`, one arithmetic): the void stamp,
+  the `delivery_attempts` history matched to the document's number and the §4 handover facts
+  (0363) decide `Created · Out for delivery · Delivered · Delivery exception (+ its ONE reason) ·
+  Cancelled`. **`Out for delivery` = the §4 chain's `Received by Logistics` fact with no result
+  recorded yet (BUILT 2026-08-19, slice 1)** — Ready for Handover alone derives nothing, Handed
+  Over alone derives nothing, a recorded result always outranks the derivation, and it is never
+  derived from the calendar, because a departure nobody recorded is not a fact.
 - **A failed document keeps its Delivery exception + reason FOREVER** — it is never rewritten as
   Delivered. When a new date is booked the system issues a NEW DO; the old one stays as history,
   both linked to the Sales Order.
@@ -165,6 +165,28 @@ One personal login may hold Warehouse, Logistics or both duties and switch betwe
 Work** and **Logistics Work** without logging out. Every event records person, company and active
 duty. No shared company login is allowed. Even when one authorised person performs both sides, the
 events and evidence remain separate.
+
+### BUILT 2026-08-19 — slice 1: the three facts that light `Out for delivery`
+(card `CARD-2026-08-19-warehouse-handover-chain`)
+
+The chain's last three steps are live as **append-only events on the Delivery Order**
+(`delivery_handover_events`, migration `0363`): `ready_for_handover → handed_over →
+received_by_logistics`, one pass per document (a rebooked trip is a NEW DO), ordered and
+deletion-refused at the database. Each event records person, company, **active duty word**
+(`warehouse` for Ready/Handed, `logistics` for the receipt — stamped by the act; no roster
+exists yet), time and proof link. The ONE door (`delivery_handover_record`) refuses an
+out-of-order fact, a duplicate fact and a voided document; **Handed Over requires the actual
+receiver and proof** (signature/photo/reply, bound to the exact event under
+`handover/{do_id}/` in the private proof bucket). A Logistics receipt may carry its OWN goods
+count — a discrepancy keeps both facts visible and overwrites neither (the investigation Work
+it should raise is a later slice). Every fact also lands on `order_history` in business words,
+so the Sales Order's History reads the same truth.
+
+**The acts live on the Delivery page's detail** (one next act at a time: `Mark ready for
+handover` · `Record handover` · `Confirm logistics receipt` — COPY-STANDARD registers all
+strings); the DO object page renders the same facts read-only in its **Warehouse handover**
+block and its History, with each recorder named. Picking · Checking · Packing detail steps,
+returned-goods receipt and discrepancy investigation Work remain approved target, not built.
 
 ## 5 · Customer contact, date, time and ETA
 
@@ -335,14 +357,17 @@ actions, More and Print. Applicable views are:
 Delivery History is actual delivery execution. History is the complete audit trail; they are not
 the same view. Cross-module links open the owner and never create a duplicate editor.
 
-**BUILT 2026-08 (blueprint card §5) — the first DO object page**, one read-only page whose blocks
-are, in order: `CUSTOMER · GOODS (this trip's lines only, human words first, SKU mono second) ·
-DELIVERY DETAILS · SOURCE SALES ORDER door · DELIVERY STATUS · DELIVERY PHOTO ·
-SIGNATURE / PROOF · LOAN COLLECTION (only when a loan exists) · HISTORY`, plus header
-`Print` (reprint = same number). Everything renders facts owned by other modules; **the page
-writes nothing.** Driver/vehicle render governed absences until a per-trip fact exists
-(`partner_fleet` is keyed to the partner, not the trip). The multi-view shape above remains the
-approved target this page grows into.
+**BUILT 2026-08 (blueprint card §5; Warehouse block added 2026-08-19, handover slice 1) — the
+first DO object page**, one read-only page whose blocks are, in order: `CUSTOMER · GOODS (this
+trip's lines only, human words first, SKU mono second) · DELIVERY DETAILS · SOURCE SALES ORDER
+door · DELIVERY STATUS · WAREHOUSE HANDOVER (the §4 facts with recorder, duty, company and
+proof — the Warehouse view's first slice) · DELIVERY PHOTO · SIGNATURE / PROOF ·
+LOAN COLLECTION (only when a loan exists) · HISTORY (now including each handover event)`, plus
+header `Print` (reprint = same number). Everything renders facts owned by other modules; **the
+page writes nothing** — the handover acts live on the Delivery page. Driver/vehicle render
+governed absences until a per-trip fact exists (`partner_fleet` is keyed to the partner, not the
+trip; a handover's recorded vehicle is that event's own fact). The multi-view shape above remains
+the approved target this page grows into.
 
 ## 10 · Daily operator journey, Work and Quick Rail
 

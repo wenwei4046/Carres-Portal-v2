@@ -5030,17 +5030,42 @@ function CompactField({ label, children }: { label: string; children: ReactNode 
  *  36px). Used by the Delivery card. */
 /**
  * C7 → SLICE 2 — the delivery order, in one row, and it is a FACT in both
- * states now.
+ * states.
  *
- * Issued → the number, plain; the document already exists. Not issued → the
- * kit's quiet dash: the SYSTEM issues the document itself the moment every
- * requirement is met (`docs/orders/MASTER.md` §8 — no Release button, no
- * Approve button, no manual bypass in any state), and the Order Route gate
- * already names any requirement still open. A button here would put a press
- * back on a step nobody performs.
+ * Issued → the number, a door to the document's page. Not issued → the words,
+ * because the SYSTEM issues the document itself the moment every requirement
+ * is met (`docs/orders/MASTER.md` §8 — no Issue, Release or Approve button in
+ * any state) — PLUS the one governed manual door the owner ruled 2026-08-19
+ * (card §5): `Request Delivery Order`, for the outstation trip whose partner
+ * schedules the customer, so the paper is needed BEFORE a confirmed booking
+ * exists. The door walks the SAME issuing path with the SAME gates — goods,
+ * money (0362) and the Finance exception — merely without waiting for the
+ * booking-confirm trigger. A refusal names the failing gate.
  */
-function DeliveryOrderRow({ doNumber }: { doNumber: string | null }) {
+function DeliveryOrderRow({
+  orderId,
+  doNumber,
+}: {
+  orderId: string;
+  doNumber: string | null;
+}) {
   const navigate = useNavigate();
+  const qc = useQueryClient();
+  const request = useMutation({
+    mutationFn: () =>
+      apiFetch<{ order: { do_number: string | null }; issued: boolean }>(
+        `/api/operation/orders/${encodeURIComponent(orderId)}/delivery-order/request`,
+        { method: "POST" },
+      ),
+    onSuccess: (res) => {
+      void qc.invalidateQueries({ queryKey: qk.operation.order(orderId) });
+      void qc.invalidateQueries({ queryKey: qk.operation.orders() });
+      if (res.order.do_number) {
+        toast.success(`Delivery order issued — ${res.order.do_number}`);
+      }
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
   return (
     <DRow k="Delivery order">
       {doNumber ? (
@@ -5055,11 +5080,21 @@ function DeliveryOrderRow({ doNumber }: { doNumber: string | null }) {
           {doNumber}
         </button>
       ) : (
-        /* An absent value reads as WORDS, never a dash (COPY-STANDARD
-           2026-08-15) — and the words say who acts next: nobody. */
-        <span className="text-meta text-base-500">
-          No delivery order yet — the system issues it when the goods, logistics
-          and date are ready
+        <span className="flex items-center gap-2 flex-wrap justify-end min-w-0">
+          {/* An absent value reads as WORDS, never a dash (COPY-STANDARD
+              2026-08-15) — and the words say who acts: the system, or this
+              one governed request door. */}
+          <span className="text-meta text-base-500">
+            No delivery order yet — the system issues it when the goods, money
+            and date are ready
+          </span>
+          <Btn
+            data-testid="request-delivery-order"
+            disabled={request.isPending}
+            onClick={() => request.mutate()}
+          >
+            Request Delivery Order
+          </Btn>
         </span>
       )}
     </DRow>
@@ -5241,10 +5276,10 @@ function BookingBlock({
           produce the paper by hand — the number was stamped by a DB trigger on
           the DISPATCH transition (0098), a day too late to hand over. One press
           now, the moment the customer's date is confirmed, and the SYSTEM
-          writes it. The row appears only when there is a trip to paper. */}
-      {(confirmed || doNumber) && (
-        <DeliveryOrderRow doNumber={doNumber} />
-      )}
+          writes it. The row always renders: an outstation trip needs its
+          paper BEFORE a confirmed booking exists (owner ruling 2026-08-19),
+          so the request door must be reachable in that state too. */}
+      <DeliveryOrderRow orderId={orderId} doNumber={doNumber} />
       {/* T8 — the second trip. A split order still owes the customer a group;
           this row is the ONLY place that says so, and it stays until that
           group is booked. The button re-opens the same confirm panel scoped to

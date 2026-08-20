@@ -71,8 +71,12 @@ const DO_NUMBER = docNumber({
 
 function tables(over?: {
   doNumber?: string | null;
+  /** `orders.paid`. Default = paid in full (the 2026-08-19 ruling: money in
+   *  full before delivery is the only default door). */
+  paid?: number;
   control?: Record<string, unknown> | null;
   financeExceptions?: Array<Record<string, unknown>>;
+  paymentApprovals?: Array<Record<string, unknown>>;
   afterUpdate?: Result;
   /** Numbers already on the order's DOCUMENT rows (0356) — the repeat-letter
    *  input: a voided or failed document keeps its number forever, so a
@@ -97,7 +101,7 @@ function tables(over?: {
         data: {
           id: ORDER_ID,
           so: 1234,
-          paid: 0, // owing in full — decision A: a balance never blocks
+          paid: over?.paid ?? 2500, // paid in full unless a test says otherwise
           do_number: over?.doNumber ?? null,
         },
         error: null,
@@ -118,12 +122,25 @@ function tables(over?: {
       data: over?.financeExceptions ?? [],
       error: null,
     }),
+    order_delivery_payment_approvals: tableMock({
+      data: over?.paymentApprovals ?? [],
+      error: null,
+    }),
     ops_delivery_orders: tableMock({
       data: (over?.existingDocuments ?? []).map((n) => ({ do_number: n })),
       error: null,
     }),
   };
 }
+
+const APPROVED_ROW = {
+  id: "00000000-0000-0000-0000-0000000ba00d",
+  status: "approved",
+  request_reason: "Outstation — partner schedules the customer",
+  requested_at: "2026-08-19T02:00:00Z",
+  decided_at: "2026-08-19T03:00:00Z",
+  decision_reason: "COD by online transfer before unloading",
+};
 
 describe("attemptDeliveryOrderIssue — the one issuing path", () => {
   it("a same-day re-issue steps to the repeat letter — a voided document keeps its number forever", async () => {
@@ -141,7 +158,7 @@ describe("attemptDeliveryOrderIssue — the one issuing path", () => {
     expect(t.orders.update).toHaveBeenCalledWith({ do_number: `${DO_NUMBER}-B` });
   });
 
-  it("issues when every requirement is met — over an outstanding balance, with the LOCKED scheme", async () => {
+  it("issues when every requirement is met — paid in full, with the LOCKED scheme", async () => {
     const t = tables();
     const sb = makeSb(t);
     const attempt = await attemptDeliveryOrderIssue(sb, ORDER_ID);
@@ -185,7 +202,75 @@ describe("attemptDeliveryOrderIssue — the one issuing path", () => {
     expect(t.orders.update).not.toHaveBeenCalled();
   });
 
-  it("an OPEN Finance exception blocks — the ONE money blocker (decision A)", async () => {
+  it("an outstanding balance blocks with no approval — the 2026-08-19 money gate", async () => {
+    const t = tables({ paid: 0 });
+    const sb = makeSb(t);
+    const attempt = await attemptDeliveryOrderIssue(sb, ORDER_ID);
+    expect(attempt.outcome).toBe("blocked");
+    expect(
+      attempt.outcome === "blocked" && attempt.reasons.join(" "),
+    ).toContain("still outstanding");
+    expect(t.orders.update).not.toHaveBeenCalled();
+  });
+
+  it("an APPROVED Delivery Payment Approval opens the money gate — COD issues the paper", async () => {
+    const t = tables({ paid: 0, paymentApprovals: [APPROVED_ROW] });
+    const sb = makeSb(t);
+    const attempt = await attemptDeliveryOrderIssue(sb, ORDER_ID);
+    expect(attempt).toEqual({ outcome: "issued", doNumber: DO_NUMBER });
+  });
+
+  it("a PENDING request keeps the gate shut — raising changes no gate", async () => {
+    const t = tables({
+      paid: 0,
+      paymentApprovals: [
+        { ...APPROVED_ROW, status: "pending", decided_at: null, decision_reason: null },
+      ],
+    });
+    const sb = makeSb(t);
+    const attempt = await attemptDeliveryOrderIssue(sb, ORDER_ID);
+    expect(attempt.outcome).toBe("blocked");
+    expect(
+      attempt.outcome === "blocked" && attempt.reasons.join(" "),
+    ).toContain("waiting for the approver");
+  });
+
+  // Outstation (card §5): goods ready and money in, but the partner has not
+  // scheduled the customer yet — no confirmed booking exists.
+  const OUTSTATION = {
+    booking_stage: "proposed",
+    confirmed_date: null,
+    confirmed_time_slot: null,
+  };
+
+  it("the Request Delivery Order door issues without a confirmed booking — same gates otherwise", async () => {
+    const blocked = await attemptDeliveryOrderIssue(
+      makeSb(tables({ control: OUTSTATION })),
+      ORDER_ID,
+    );
+    expect(blocked.outcome).toBe("blocked");
+
+    const t2 = tables({ control: OUTSTATION });
+    const requested = await attemptDeliveryOrderIssue(makeSb(t2), ORDER_ID, {
+      waitBookingConfirm: false,
+    });
+    expect(requested).toEqual({ outcome: "issued", doNumber: DO_NUMBER });
+  });
+
+  it("the Request Delivery Order door still refuses money — it is not a bypass", async () => {
+    const t = tables({ control: OUTSTATION, paid: 0 });
+    const sb = makeSb(t);
+    const attempt = await attemptDeliveryOrderIssue(sb, ORDER_ID, {
+      waitBookingConfirm: false,
+    });
+    expect(attempt.outcome).toBe("blocked");
+    expect(
+      attempt.outcome === "blocked" && attempt.reasons.join(" "),
+    ).toContain("still outstanding");
+    expect(t.orders.update).not.toHaveBeenCalled();
+  });
+
+  it("an OPEN Finance exception blocks a fully-paid order — the second blocker (0355 unchanged)", async () => {
     const t = tables({
       financeExceptions: [
         {
@@ -224,7 +309,7 @@ describe("attemptDeliveryOrderIssue — the one issuing path", () => {
       // (null = lost the race). 3rd: the re-read (the winner's number).
       if (calls === 1)
         return Promise.resolve({
-          data: { id: ORDER_ID, so: 1234, paid: 0, do_number: null },
+          data: { id: ORDER_ID, so: 1234, paid: 2500, do_number: null },
           error: null,
         });
       if (calls === 2) return Promise.resolve({ data: null, error: null });

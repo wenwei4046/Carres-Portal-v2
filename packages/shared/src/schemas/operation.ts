@@ -105,6 +105,27 @@ export const recordSendInput = z.object({
 }).strict();
 export type RecordSendInput = z.infer<typeof recordSendInput>;
 
+/**
+ * PO Revisions (0364, Jess 2026-08-18) — POST /api/operation/pos/:id/revise →
+ * `purchasing_revise_po`. A sent PO keeps its number and mints a version:
+ * EXISTING lines only, qty floored at `received_qty` (the RPC refuses with
+ * `received_floor` — the server is the floor's authority, this schema only
+ * shapes the wire), destination from the governed registry (null = follow the
+ * PO), and the reason is REQUIRED — the SQL door refuses without it, this
+ * mirror just fails faster.
+ */
+export const revisePoInput = z.object({
+  reason: z.string().min(1).max(300),
+  lines: z.array(
+    z.object({
+      lineId: z.string().uuid(),
+      qty: z.number().int().min(1),
+      destinationId: z.string().uuid().nullable(),
+    }).strict(),
+  ).min(1),
+}).strict();
+export type RevisePoInput = z.infer<typeof revisePoInput>;
+
 /** ONE company-wide supplier-message template. */
 export const setMessageTemplateInput = z.object({
   text: z.string().max(2000),
