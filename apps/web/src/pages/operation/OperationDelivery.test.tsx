@@ -16,7 +16,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
-import { DELIVERY_QUEUES } from "@carres/shared";
 import type {
   operationOrderListRow,
   operationOrdersListResponse,
@@ -130,15 +129,37 @@ afterEach(() => {
 });
 
 describe("OperationDelivery — the board holds delivery work, and only that", () => {
+  it("uses the governed Delivery Work shell without breadcrumb or relative-day copy", () => {
+    listState.data = { orders: [NEEDS_DATE] };
+    wrap(<OperationDelivery />);
+
+    expect(screen.getByText("Delivery Work")).toBeTruthy();
+    expect(screen.queryByText("Operations")).toBeNull();
+    expect(screen.queryByText(/\bToday\b/i)).toBeNull();
+  });
+
+  it("groups work under an actual calendar date and avoids generic work labels", () => {
+    listState.data = { orders: [NEEDS_DATE] };
+    wrap(<OperationDelivery />);
+
+    expect(screen.getByTestId("delivery-date-group").textContent).toMatch(
+      /Mon|Tue|Wed|Thu|Fri|Sat|Sun/,
+    );
+    expect(screen.getByTestId("delivery-row").textContent).toMatch(
+      /Ask NETS Logistics for the customer’s delivery date/i,
+    );
+    expect(screen.queryByText(/\bDue\b/i)).toBeNull();
+    expect(screen.queryByText(/Next Action/i)).toBeNull();
+    expect(screen.queryByText(/Priority/i)).toBeNull();
+  });
+
   it("lists an order whose next action is a delivery step", () => {
     listState.data = { orders: [NEEDS_LOGISTICS] };
     wrap(<OperationDelivery />);
     const rows = screen.getAllByTestId("delivery-row");
     expect(rows).toHaveLength(1);
     expect(within(rows[0]).getByText("SO-1201")).toBeTruthy();
-    // The pill is the LADDER's word, taken from the shared queue constant —
-    // never a string typed into this page.
-    expect(within(rows[0]).getByText(DELIVERY_QUEUES[0].label)).toBeTruthy();
+    expect(within(rows[0]).getByText("Choose a logistics partner.")).toBeTruthy();
   });
 
   it("leaves out an order the ladder says is NOT a delivery step yet", () => {
@@ -204,8 +225,7 @@ describe("OperationDelivery — the board holds delivery work, and only that", (
     const rows = screen.getAllByTestId("delivery-row");
     expect(rows).toHaveLength(1);
     expect(within(rows[0]).getByText("SO-1301")).toBeTruthy();
-    // "Assign logistics" — not the goods action that leads the Orders row.
-    expect(within(rows[0]).getByText(DELIVERY_QUEUES[0].label)).toBeTruthy();
+    expect(within(rows[0]).getByText("Choose a logistics partner.")).toBeTruthy();
   });
 
   it("CARD 3 Rule 2 — the booking call opens with the goods still coming", () => {
@@ -225,7 +245,9 @@ describe("OperationDelivery — the board holds delivery work, and only that", (
     // The SECOND step — "got stock or no stock, Logistics still starts the
     // conversation". The row prints the party-named line (C1), so the assertion
     // is on that; the queue word itself carries no party.
-    expect(within(rows[0]).getByText(/confirm delivery date/i)).toBeTruthy();
+    expect(
+      within(rows[0]).getByText(/Ask NETS Logistics for the customer’s delivery date/i),
+    ).toBeTruthy();
   });
 
   it("CARD 3 — but goods nobody has ordered still have no route to plan", () => {
@@ -360,11 +382,15 @@ describe("OperationDelivery — the board holds delivery work, and only that", (
     listState.data = { orders: [NEEDS_LOGISTICS, NEEDS_DATE] };
     wrap(<OperationDelivery />);
     expect(screen.getAllByTestId("delivery-row")).toHaveLength(2);
-    fireEvent.click(within(screen.getByTestId("delivery-queues")).getByText(DELIVERY_QUEUES[1].label));
+    fireEvent.click(
+      within(screen.getByTestId("delivery-queues")).getByText("Get customer delivery date"),
+    );
     const rows = screen.getAllByTestId("delivery-row");
     expect(rows).toHaveLength(1);
     expect(within(rows[0]).getByText("SO-1202")).toBeTruthy();
-    fireEvent.click(within(screen.getByTestId("listshell-active-chips")).getByText(DELIVERY_QUEUES[1].label));
+    fireEvent.click(
+      within(screen.getByTestId("listshell-active-chips")).getByText("Get customer delivery date"),
+    );
     expect(screen.getAllByTestId("delivery-row")).toHaveLength(2);
   });
 
@@ -493,7 +519,7 @@ describe("OperationDelivery — the calendar reads the booking, never the promis
     // The lead line is the run itself — the day arrived and nothing forbids
     // it. `Collect RM 2,455.00 🔒` is exactly what this pane printed before
     // decision A, and the lock's absence is the ruling made visible.
-    expect(within(detail).getByText("Deliver today")).toBeTruthy();
+    expect(within(detail).getByText("Deliver the goods to the customer.")).toBeTruthy();
     expect(within(detail).queryByText("🔒")).toBeNull();
   });
 
@@ -526,12 +552,13 @@ describe("OperationDelivery — the words", () => {
     expect(text).not.toMatch(/\bCarrier\b/i);
   });
 
-  it("takes its queue words from the shared constant, so it cannot grow a synonym", () => {
+  it("uses the approved plain-English work labels", () => {
     listState.data = { orders: [NEEDS_LOGISTICS, NEEDS_DATE] };
     wrap(<OperationDelivery />);
     const facet = screen.getByTestId("delivery-queues");
-    for (const q of DELIVERY_QUEUES) {
-      expect(within(facet).getByText(q.label)).toBeTruthy();
-    }
+    expect(within(facet).getByText("Choose logistics partner")).toBeTruthy();
+    expect(within(facet).getByText("Get customer delivery date")).toBeTruthy();
+    expect(within(facet).getByText("Deliver on scheduled date")).toBeTruthy();
+    expect(within(facet).getByText("Get delivery photo")).toBeTruthy();
   });
 });

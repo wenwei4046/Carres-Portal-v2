@@ -229,20 +229,6 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         badge: "orders",
         section: "Sales",
       },
-      // Delivery Orders (blueprint card, owner ruling 2026-08-16) — the DO
-      // REGISTER under SALES: which documents exist. The system issues them;
-      // the Delivery work page (Supply Chain) stays the execution view.
-      {
-        key: "delivery-orders",
-        label: "Delivery Orders",
-        // PackageCheck — a checked parcel: the issued delivery document. NOT
-        // FileText (Finance's Invoices already wears it in the same rail) and
-        // NOT Route (the Delivery work page's face) — two doors sharing one
-        // icon read as the same page.
-        icon: PackageCheck,
-        path: "/operation/delivery-orders",
-        section: "Sales",
-      },
       // Work (SO V2 CARD 10, owner ruling 2026-08-11) — My Work / Team Work:
       // two filters over the ONE open work set the Card 9 engine composes.
       // Sits directly under the register on the Constitution's own mission —
@@ -371,6 +357,13 @@ export const PORTAL_NAV: PortalNavGroup[] = [
        * sits below its hairline. NO Settings row: the header gear is the one
        * Settings entry (Jess, 2026-08-19). */
       { key: "delivery", label: "Delivery Work", icon: Route, section: "Delivery" },
+      {
+        key: "delivery-orders",
+        label: "Delivery Orders",
+        icon: PackageCheck,
+        path: "/operation/delivery-orders",
+        section: "Delivery",
+      },
       { key: "delivery-schedule", label: "Schedule", icon: CalendarDays, soon: true, section: "Delivery" },
       { key: "delivery-history", label: "Delivery History", icon: History, soon: true, section: "Delivery" },
       { key: "delivery-exceptions", label: "Exceptions", icon: CircleAlert, soon: true, section: "Delivery" },
