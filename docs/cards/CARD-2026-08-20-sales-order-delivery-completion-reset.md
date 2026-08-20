@@ -25,20 +25,47 @@ The Sales Order owns the customer order and promise. Delivery owns the trip,
 Delivery Order, logistics handover, delivery result and proof. Work owns the
 projection of the next action and its owner. One record has one home.
 
-The sidebar must therefore read:
+The sidebar uses the shipped 232px expandable-module grammar. A module is an
+icon + name + chevron parent row; one module is open at a time, and its child
+pages hang from rounded elbows. The selected child carries the 3px blue bar
+and blue wash. It is not the older uppercase-heading rail still described in
+`docs/ui/MASTER.md` §4.2; implementation must overwrite that stale paragraph
+with the later 2026-08-19 afternoon ruling already embodied by
+`PortalSidebar.tsx` and `portal-nav.ts`.
+
+When Sales Orders is open, the target rail reads:
 
 ```
-SALES
-└── Sales Orders
+▾  Sales
+   ├─▌ Sales Orders                 selected
+   └─  Old Orders (temporary)
+▸  Purchasing
+▸  Delivery
+▸  Warehouse
+▸  Customer Care
+▸  Master Data
+```
 
-DELIVERY
-├── Delivery Work
-├── Delivery Orders
-├── Schedule                 Coming soon until built
-├── Delivery History         Coming soon until built
-├── Exceptions               Coming soon until built
-├── Partners                 Coming soon until built
-└── Report                   Coming soon until built
+When Delivery Orders is open, the target rail reads:
+
+```
+▸  Sales
+▸  Purchasing
+▾  Delivery
+   ├─  Delivery Work
+   ├─▌ Delivery Orders              selected
+   ├─  Schedule
+   │     Coming soon
+   ├─  Delivery History
+   │     Coming soon
+   ├─  Exceptions
+   │     Coming soon
+   ├─  Partners
+   │     Coming soon
+   ├────────────────────────
+   └─  Report
+         Coming soon
+▸  Warehouse
 ```
 
 `Old Orders (temporary)` remains only until its governed cutover is complete.
@@ -46,6 +73,99 @@ It is not part of the target Sales Order information architecture.
 
 The URL may remain `/operation/delivery-orders`; moving a page to its owning
 module does not require breaking bookmarks.
+
+## 0.1 · Exact shell and header drawings
+
+These drawings are implementation contracts. They preserve the current Sales
+Order header instead of inventing another shell.
+
+### Sales Orders Register
+
+```
+┌────────────── 232px rail ──────────────┬──────────────────────────────────────────────────────────┐
+│ CARRES                            [◀]  │ Sales Orders                         Jump to…   🔔  ?  ⚙ │ 50
+│                                        ├──────────────────────────────────────────────────────────┤
+│  Dashboard                             │ + New Sales Order                             🔍  ⤓  ▥ │ 45
+│  Work                                  ├──────────────────────────────────────────────────────────┤
+│  Issue Tracker                         │ ▸ │ SO No │ Ordered │ Customer Delivery │ Customer │ …  │
+│                                        │───┼───────┼─────────┼───────────────────┼──────────┼────│
+│ ▾  Sales                               │ ▸ │ 1319  │ 12 Aug  │ 24 Sep            │ LIM…     │ …  │
+│    ├─▌ Sales Orders                    │ ▸ │ 1318  │ 11 Aug  │ Customer not sure  │ CARD-1   │ …  │
+│    └─  Old Orders (temporary)          ├──────────────────────────────────────────────────────────┤
+│ ▸  Purchasing                          │ 77 orders · Mattress 66 · Bedframe 36 · …                  │ 32
+│ ▸  Delivery                            └──────────────────────────────────────────────────────────┘
+│ ▸  Warehouse
+│ ▸  Customer Care
+│ ▸  Master Data
+│
+│ OP  operation@carres.com
+└────────────────────────────────────────┘
+```
+
+Header laws: the Register destination row is 50px and says `Sales Orders`
+without a repeated icon. The 45px work toolbar owns New, page Search, Export
+and Columns. `Jump to…`, alerts, help and settings remain global in row 1.
+
+### Sales Order Object
+
+```
+┌────────────── 232px rail ──────────────┬──────────────────────────────────────────────────────────┐
+│ ▾  Sales                               │ ← Sales Orders │ ▣ SO-1319 · LIM KUAN YANG                │ 44
+│    ├─▌ Sales Orders                    │                         Print ▾  Jump to…  🔔  ?  ⚙      │
+│    └─  Old Orders (temporary)          ├──────────────────────────────────────────────────────────┤
+│ ▸  Purchasing                          │ Order   Revisions   History   Order Route                  │ 36
+│ ▸  Delivery                            ├──────────────────────────────────────────────────────────┤
+│ ▸  Warehouse                           │                                                          │
+│                                        │  The active Order / Route / History content only.        │
+│                                        │  No second page title and no duplicate breadcrumb.       │
+└────────────────────────────────────────┴──────────────────────────────────────────────────────────┘
+```
+
+The SO number never truncates. The customer name is context and may truncate
+at medium width. The header remains the same in View and Edit.
+
+### Delivery Orders Register — after the ownership correction
+
+```
+┌────────────── 232px rail ──────────────┬──────────────────────────────────────────────────────────┐
+│ ▸  Sales                               │ Delivery Orders                      Jump to…  🔔  ?  ⚙ │ 50
+│ ▸  Purchasing                          ├──────────────────────────────────────────────────────────┤
+│ ▾  Delivery                            │                                              🔍  ⤓  ▥ │ 45
+│    ├─  Delivery Work                   ├──────────────────────────────────────────────────────────┤
+│    ├─▌ Delivery Orders                 │ DO No │ DO date │ SO No │ Customer │ Delivery date │ …  │
+│    ├─  Schedule                        │                                                           │
+│    │     Coming soon                   │  No `New DO`: the system issues the document.             │
+│    ├─  Delivery History                │                                                           │
+│    │     Coming soon                   └──────────────────────────────────────────────────────────┘
+│    ├─  Exceptions
+│    │     Coming soon
+│    ├─  Partners
+│    │     Coming soon
+│    ├────────────────────────
+│    └─  Report
+│          Coming soon
+└────────────────────────────────────────┘
+```
+
+The empty left side of the 45px toolbar is intentional: there is no human
+create action. Search, Export and Columns stay on the right.
+
+### Delivery Order Object
+
+```
+┌────────────── 232px rail ──────────────┬──────────────────────────────────────────────────────────┐
+│ ▾  Delivery                            │ ← Delivery Orders │ ▣ DO-200826-1234                     │ 44
+│    ├─  Delivery Work                   │                    · SO-1319 · LIM KUAN YANG              │
+│    ├─▌ Delivery Orders                 │                              Print  Jump to…  🔔  ?  ⚙  │
+│    └─  …                               ├──────────────────────────────────────────────────────────┤
+│                                        │ Customer · Goods · Delivery Details · Source Sales Order │
+│                                        │ Delivery Status · Photo · Proof · Handover · Loan · History│
+└────────────────────────────────────────┴──────────────────────────────────────────────────────────┘
+```
+
+The DO Object has no fake tab strip. It returns to Delivery Orders and links
+to its source Sales Order; it does not move back under Sales merely because it
+shows the SO number.
 
 ## 1 · Audit result — KEEP / FIX / COMPLETE
 
