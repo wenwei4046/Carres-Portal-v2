@@ -486,10 +486,10 @@ describe("PortalSidebar — the Sales Order cutover's two doors", () => {
     expect(child("orders").className).not.toContain("bg-kit-blue-3");
   });
 
-  it("Delivery Orders keeps its home under Sales (ruling 2026-08-16)", () => {
+  it("Delivery Orders is not under Sales (ruling 2026-08-20)", () => {
     renderAt("/operation/orders");
     const group = screen.getByTestId("nav-children-sales");
-    expect(group.contains(child("delivery-orders"))).toBe(true);
+    expect(group.querySelector("[data-testid='nav-child-delivery-orders']")).toBeNull();
   });
 });
 
@@ -622,7 +622,7 @@ describe("PortalSidebar — the Purchasing module's pages", () => {
  * the delivery-rail card it replaced).
  */
 describe("PortalSidebar — the Delivery module's pages", () => {
-  it("lists the six approved pages, in order, with Report under its hairline", () => {
+  it("lists the seven approved pages, in order, with Report under its hairline", () => {
     renderAt("/operation?tab=delivery");
     const rows = Array.from(
       screen
@@ -631,12 +631,20 @@ describe("PortalSidebar — the Delivery module's pages", () => {
     ).map((el) => el.textContent?.replace("Coming soon", "").trim());
     expect(rows).toEqual([
       "Delivery Work",
+      "Delivery Orders",
       "Schedule",
       "Delivery History",
       "Exceptions",
       "Partners",
       "Report",
     ]);
+  });
+
+  it("keeps Delivery Orders under Delivery", () => {
+    renderAt("/operation/delivery-orders");
+    const group = screen.getByTestId("nav-children-delivery");
+    expect(group.contains(child("delivery-orders"))).toBe(true);
+    expect(child("delivery-orders").className).toContain("bg-kit-blue-3");
   });
 
   it("`Delivery Work` is the existing page — same key, same route", () => {

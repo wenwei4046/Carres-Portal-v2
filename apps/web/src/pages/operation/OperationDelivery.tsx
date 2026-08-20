@@ -1,11 +1,10 @@
 import { useMemo, useState } from "react";
-import { ChevronRight, RefreshCw, Truck } from "lucide-react";
+import { RefreshCw, Truck } from "lucide-react";
 import {
   bookingDayOf,
   carrierDayLoads,
   carrierDayNote,
   daysInRange,
-  deliveryDueState,
   deliveryGroupLabel,
   deliveryRange,
   deliveryQueueForLabel,
@@ -46,6 +45,7 @@ import { SectionBand, SectionCard } from "@/components/SectionPanel";
 import BookingSpine from "./components/BookingSpine";
 import WarehouseHandoverBlock from "./components/WarehouseHandoverBlock";
 import OrderDetailDrawer from "./components/OrderDetailDrawer";
+import ModuleHeader from "./components/ModuleHeader";
 // The ladder and its inputs are IMPORTED from the Orders list, never re-derived.
 // T11's own law is "the same computed actions the Orders list shows, so the two
 // pages can never disagree" — the only way to guarantee that is to run ONE
@@ -107,6 +107,19 @@ const NO_LOGISTICS = "__none" as const;
  *  words, and a fact may state an absence but never carry a to-do word. */
 const NO_LOGISTICS_LABEL = "No logistics picked";
 
+function deliveryQueueDisplay(key: DeliveryQueueKey): string {
+  switch (key) {
+    case "assign":
+      return "Choose logistics partner";
+    case "chase":
+      return "Get customer delivery date";
+    case "deliver_today":
+      return "Deliver on scheduled date";
+    case "photo":
+      return "Get delivery photo";
+  }
+}
+
 type ViewKey = "queues" | "calendar";
 
 /** One row of the board: the order plus everything the panes ask of it. */
@@ -119,6 +132,7 @@ interface DeliveryRow {
   label: string;
   /** The action's ROW LINE, party named — what the operator reads (C1). */
   line: string;
+  actionKey: string;
   tone: "danger" | "warning" | "info" | "success" | "neutral";
   locked: boolean;
   dueIso: string | null;
@@ -301,6 +315,7 @@ export default function OperationDelivery() {
           // C11 — the RAW number; the words module prints it to the cent.
           amount: money.known ? money.outstanding : null,
         }),
+        actionKey: next.key,
         tone: next.tone,
         locked: !!next.locked,
         // CARD 3 (2026-08-11): `queueLeads` was computed above and never
@@ -375,7 +390,7 @@ export default function OperationDelivery() {
 
   const activeChips: ActiveChip[] = [
     ...[...queueFilter].map((k) => ({
-      label: QUEUE_DEFS.find((q) => q.key === k)?.label ?? k,
+      label: deliveryQueueDisplay(k),
       onClear: () =>
         setQueueFilter((prev) => {
           const n = new Set(prev);
@@ -396,32 +411,46 @@ export default function OperationDelivery() {
 
   return (
     <>
-      <ListPageShell
-        testId="operation-delivery"
-        breadcrumb={
-          <>
-            <span>Operations</span>
-            <ChevronRight size={12} className="text-base-300" />
-            <span className="text-base-600">Delivery</span>
-          </>
-        }
-        title={
-          <span className="inline-flex items-baseline gap-3">
-            <span>Delivery</span>
-            <span className="inline-flex items-center gap-1.5 text-meta font-normal text-base-400">
-              <span className="tabular-nums">Today {fmtDate(today)}</span>
+      <div className="flex h-full min-h-0 flex-col" data-testid="operation-delivery">
+        <ModuleHeader
+          testId="delivery-work-destination-header"
+          word="Delivery Work"
+          docTitle="Delivery Work — Carres"
+          destinationHeader
+        />
+        <div className="flex h-[45px] shrink-0 items-center gap-3 border-b border-base-200 bg-white px-3">
+          <div className="flex items-center gap-1 rounded-control border border-base-200 bg-white p-1" role="tablist">
+            {(["queues", "calendar"] as ViewKey[]).map((v) => (
               <button
-                type="button"
-                onClick={() => void ordersQ.refetch()}
-                title="Refresh"
-                aria-label="Refresh delivery board"
-                className="p-0.5 rounded hover:text-base-900 hover:bg-hovertint transition-colors"
+                key={v}
+                role="tab"
+                aria-selected={view === v}
+                onClick={() => setView(v)}
+                className={`rounded-control px-3 py-1 text-meta whitespace-nowrap ${
+                  view === v
+                    ? "bg-kit-blue-3 text-kit-blue-9 font-semibold"
+                    : "text-base-600 font-medium hover:bg-hovertint hover:text-base-900"
+                }`}
               >
-                <RefreshCw size={14} strokeWidth={2} />
+                {v === "queues" ? "Work list" : "Calendar"}
               </button>
-            </span>
-          </span>
-        }
+            ))}
+          </div>
+          <div className="ml-auto flex items-center gap-2 text-meta text-base-500 tabular-nums">
+            <span>{filtered.length} to do</span>
+            {lateCount > 0 && <span className="text-danger font-semibold">{lateCount} late</span>}
+            <button
+              type="button"
+              onClick={() => void ordersQ.refetch()}
+              title="Refresh"
+              aria-label="Refresh delivery work"
+              className="rounded-control p-1.5 text-base-500 hover:bg-hovertint hover:text-base-900"
+            >
+              <RefreshCw size={14} strokeWidth={2} />
+            </button>
+          </div>
+        </div>
+      <ListPageShell
         facetOpen={facetOpen}
         onFacetToggle={() => setFacetOpen((v) => !v)}
         facetWidthPx={210}
@@ -449,7 +478,7 @@ export default function OperationDelivery() {
                     return (
                       <FacetRow
                         key={key}
-                        label={def.label}
+                        label={deliveryQueueDisplay(key)}
                         // Numbers up front (COPY-STANDARD rule 3): "5 · 2 late".
                         value={s ? (s.late > 0 ? `${s.n} · ${s.late} late` : `${s.n}`) : "0"}
                         tone={s && s.late > 0 ? "danger" : undefined}
@@ -506,31 +535,7 @@ export default function OperationDelivery() {
             )}
           </>
         }
-        toolbar={
-          <div className="flex items-center gap-1 p-1 bg-base-100 rounded" role="tablist">
-            {(["queues", "calendar"] as ViewKey[]).map((v) => (
-              <button
-                key={v}
-                role="tab"
-                aria-selected={view === v}
-                onClick={() => setView(v)}
-                className={`px-3 py-1.5 text-meta rounded whitespace-nowrap ${
-                  view === v
-                    ? "bg-white text-base-900 font-semibold shadow-sm"
-                    : "text-base-600 font-medium hover:text-base-900"
-                }`}
-              >
-                {v === "queues" ? "Queues" : "Calendar"}
-              </button>
-            ))}
-          </div>
-        }
-        toolbarRight={
-          <span className="text-meta text-base-500 tabular-nums">
-            {filtered.length} to do
-            {lateCount > 0 && <span className="text-danger font-semibold"> · {lateCount} late</span>}
-          </span>
-        }
+        className="min-h-0"
       >
         {/* The 3-pane body: list ~420 · detail fills the rest. The facet rail is
             the shell's own aside, so the three panes share one frame with
@@ -581,6 +586,7 @@ export default function OperationDelivery() {
           </div>
         </div>
       </ListPageShell>
+      </div>
 
       {drawerId && (
         <OrderDetailDrawer orderId={drawerId} onClose={() => setDrawerId(null)} />
@@ -639,14 +645,6 @@ function FacetRow({
 /** Every action pill on this page is the ladder's own tone, mapped to the same
  *  status pill the Orders list MANAGE column uses (UI-KIT §A0 action law) — one
  *  colour language across the two pages. */
-const PILL_CLASS: Record<DeliveryRow["tone"], string> = {
-  danger: "pill-overdue",
-  warning: "pill-warning",
-  info: "pill-warning",
-  success: "pill-confirmed",
-  neutral: "pill-neutral",
-};
-
 function QueueList({
   rows,
   selectedId,
@@ -679,18 +677,67 @@ function QueueList({
       </div>
     );
   }
+  const groups = new Map<string, DeliveryRow[]>();
+  for (const row of rows) {
+    const date = row.dueIso ?? row.bookingIso ?? row.promisedIso ?? "";
+    const list = groups.get(date) ?? [];
+    list.push(row);
+    groups.set(date, list);
+  }
   return (
     <div className="flex-1 overflow-y-auto" data-testid="delivery-list">
-      {rows.map((r) => (
-        <QueueRow
-          key={r.order.id}
-          row={r}
-          selected={r.order.id === selectedId}
-          onSelect={() => onSelect(r.order.id)}
-        />
+      {[...groups.entries()].map(([date, datedRows]) => (
+        <section key={date || "date-not-set"}>
+          <div
+            className="sticky top-0 z-10 border-b border-base-200 bg-base-50 px-3 py-1.5 text-label font-semibold uppercase tracking-[0.04em] text-base-700"
+            data-testid="delivery-date-group"
+          >
+            {date ? fmtDate(date) : "Date not set"}
+          </div>
+          {datedRows.map((r) => (
+            <QueueRow
+              key={r.order.id}
+              row={r}
+              selected={r.order.id === selectedId}
+              onSelect={() => onSelect(r.order.id)}
+            />
+          ))}
+        </section>
       ))}
     </div>
   );
+}
+
+function deliveryWorkWords(row: DeliveryRow): { happened: string; action: string } {
+  const partner = row.logisticsName?.trim() || "the logistics partner";
+  switch (row.actionKey) {
+    case "assign_logistics":
+      return { happened: "No logistics partner", action: "Choose a logistics partner." };
+    case "confirm_delivery_date":
+      return {
+        happened: "No customer delivery date",
+        action: `Ask ${partner} for the customer’s delivery date.`,
+      };
+    case "arrange_new_delivery_date":
+    case "arrange_new_date":
+      return {
+        happened: "The goods were not delivered",
+        action: `Ask ${partner} for a new delivery date.`,
+      };
+    case "upload_delivery_photo":
+    case "upload_photo":
+      return {
+        happened: "No delivery photo",
+        action: `Ask ${partner} for the delivery photo.`,
+      };
+    case "deliver_today":
+      return {
+        happened: "Delivery is on this date",
+        action: "Deliver the goods to the customer.",
+      };
+    default:
+      return { happened: row.label, action: row.line };
+  }
 }
 
 function QueueRow({
@@ -702,8 +749,8 @@ function QueueRow({
   selected: boolean;
   onSelect: () => void;
 }) {
-  const due = deliveryDueState(row);
   const o = row.order;
+  const words = deliveryWorkWords(row);
   return (
     <button
       type="button"
@@ -716,36 +763,24 @@ function QueueRow({
     >
       <div className="flex items-center gap-2">
         <span className="font-mono text-body font-semibold text-base-900">SO-{o.so}</span>
-        <span
-          className={`ml-auto pill ${PILL_CLASS[row.tone]} shrink-0 max-w-[60%] truncate`}
-          title={row.line}
-        >
-          {row.locked && <span aria-hidden>🔒 </span>}
-          {row.line}
+        <span className={`truncate text-body text-base-700 ${cjkClassName(o.customer_name)}`}>
+          {displayCustomerName(o.customer_name) || "No customer name"}
         </span>
       </div>
-      <div className={`mt-0.5 text-body text-base-700 truncate ${cjkClassName(o.customer_name)}`}>
-        {displayCustomerName(o.customer_name) || "—"}
+      <div className={`mt-1 text-label ${row.overdue ? "font-semibold text-danger" : "text-base-600"}`}>
+        {words.happened}
       </div>
-      <div className="mt-0.5 flex items-center gap-1.5 text-meta text-base-500">
+      <div className="mt-0.5 text-body font-medium text-base-900">
+        {row.locked && <span aria-hidden>🔒 </span>}
+        {words.action}
+      </div>
+      <div className="mt-1 flex items-center gap-1.5 text-meta text-base-500">
         <span className="truncate">{row.logisticsName?.trim() || NO_LOGISTICS_LABEL}</span>
         {row.bookingIso && (
           <>
             <span aria-hidden>·</span>
             <span className="tabular-nums shrink-0">{fmtDate(row.bookingIso)}</span>
           </>
-        )}
-        {/* The step's OWN deadline (T7). A step with no anchor says nothing —
-            a TBD customer date has nothing to measure from, and a dash there
-            would read as a missing value rather than an honest silence. */}
-        {due !== "none" && row.dueIso && (
-          <span
-            className={`ml-auto shrink-0 tabular-nums ${
-              due === "late" ? "text-danger font-semibold" : "text-base-400"
-            }`}
-          >
-            {due === "late" ? `Late — was due ${fmtDate(row.dueIso)}` : `Due ${fmtDate(row.dueIso)}`}
-          </span>
         )}
       </div>
     </button>
@@ -1058,7 +1093,7 @@ function DeliveryDetail({
           holidays,
         })
       : [];
-  const due = deliveryDueState(row);
+  const words = deliveryWorkWords(row);
 
   return (
     <div className="flex flex-col" data-testid="delivery-detail">
@@ -1082,26 +1117,23 @@ function DeliveryDetail({
         </button>
       </div>
 
-      {/* What to do next — the SAME action line and tone the row and the Orders
-          list show, with the step's own deadline underneath. */}
+      {/* The date is the group/header fact. These two plain-English lines tell
+          a new operator what is wrong and exactly what to do. */}
       <div className="px-4 py-3 border-b border-base-100">
-        <div className="flex items-center gap-2">
-          <span className={`pill ${PILL_CLASS[row.tone]}`}>
-            {row.locked && <span aria-hidden>🔒 </span>}
-            {row.line}
-          </span>
-          {due !== "none" && row.dueIso && (
-            <span
-              className={`text-meta tabular-nums ${
-                due === "late" ? "text-danger font-semibold" : "text-base-500"
-              }`}
-            >
-              {due === "late"
-                ? `Late — was due ${fmtDate(row.dueIso)}`
-                : `Due ${fmtDate(row.dueIso)}`}
-            </span>
-          )}
+        <div className="text-label text-base-500">What happened</div>
+        <div className={`mt-0.5 text-body ${row.overdue ? "font-semibold text-danger" : "text-base-700"}`}>
+          {words.happened}
         </div>
+        <div className="mt-3 text-label text-base-500">What to do</div>
+        <div className="mt-0.5 text-body font-medium text-base-900">
+          {row.locked && <span aria-hidden>🔒 </span>}
+          {words.action}
+        </div>
+        {(row.dueIso ?? row.bookingIso ?? row.promisedIso) && (
+          <div className="mt-2 text-meta font-semibold tabular-nums text-base-700">
+            {fmtDate(row.dueIso ?? row.bookingIso ?? row.promisedIso ?? "")}
+          </div>
+        )}
       </div>
 
       {/* ⭐ CARD 3 — BEFORE YOU CALL (owner ruling 2026-08-13).

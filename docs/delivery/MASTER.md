@@ -281,22 +281,25 @@ append Root Cause later without rewriting the observation.
 
 ## 8 · Information architecture and templates
 
-**SIDEBAR — owner ruling 2026-08-16 (blueprint card; supersedes the SUPPLY CHAIN draft for the
-DO Register).** The **Delivery Orders Register lives under SALES**, beside Sales Orders — the
-register answers "which documents exist" for the order's own journey. The **Delivery work page
-stays under Supply Chain** as the execution view and writes nothing. Delivery applies the governed
-Shell, Register and Object Detail Templates and does not invent another UI system.
+**SIDEBAR — owner ruling 2026-08-20; PR #863 is the cross-module authority and supersedes the
+2026-08-16 Sales placement.** **Delivery Order belongs under the expandable Delivery module**, not
+Sales. The 232px PortalSidebar uses one module parent row (icon + name + chevron), opens only one
+module at a time, hangs child pages from rounded elbows and marks the selected child with a 3px
+blue bar plus blue wash. Delivery applies the governed Shell, Register and Object Detail Templates
+and does not invent another UI system.
 
 Delivery navigation (the rest is approved target):
 
-1. **Delivery Work** — actionable operational home (today: the Delivery page under Supply Chain);
-2. **Delivery Orders** — formal DO truth Register, under SALES · **BUILT**;
-3. **Schedule** — Week, Day and List by actual date;
-4. **Delivery History** — actual delivery results Register;
-5. **Exceptions** — problem, owner and explicit next action;
-6. **Partners** — Partner coverage, capability, contact and access;
-7. central **Settings → Delivery**;
-8. central **Reports → Delivery**.
+1. **Delivery Work** — actionable operational home;
+2. **Delivery Orders** — formal DO truth Register · **BUILT**;
+3. **Schedule** — Coming soon;
+4. **Delivery History** — Coming soon;
+5. **Exceptions** — Coming soon;
+6. **Partners** — Coming soon;
+7. divider, then **Report** — Coming soon.
+
+Sales contains **Sales Orders** and temporary **Old Orders** only. Central Settings retains the
+governed Delivery settings door.
 
 There is no separate Delivery dashboard, Fleet, Trips, Regions or Delivery Returns destination.
 KPI cards do not precede the work/Register.
@@ -323,8 +326,22 @@ Route. **The register shows NO owner, NO avatar and NO action sentence** — a r
 documents; work lives in My Work / Team Work. Rows open the DO object page; document numbers are
 doors (`DO → DO`, `SO → SO`).
 
-**Delivery Work defaults:** `Due · Work · DO No · Customer · Delivery Date · Warehouse · Logistics
-Partner · Owner · Waiting Since · Priority`. Every row presents one current primary action.
+**Delivery Work — first page BUILT 2026-08-20.** It is an operational workspace, not a truth
+Register. The destination header is 50px and says only **Delivery Work**, with the governed global
+utilities. The 45px work toolbar switches **Work list / Calendar**, shows work counts and Refresh.
+The work list groups rows under the actual governed weekday + calendar date (`Tue, 18 Aug`; include
+the year outside the current year). It never substitutes Today or Tomorrow and never exposes the
+generic employee labels Due, Next Action or Priority.
+
+Each row keeps object identity separate, then states two primary-school-English facts:
+
+1. **What happened** — for example `No customer delivery date`;
+2. **What to do** — for example `Ask NETS Logistics for the customer’s delivery date.`
+
+The detail pane repeats the same structured fact and action at a larger density. The date remains
+an authoritative calendar fact, not prose inside the action. Existing governed order/detail doors
+remain the completion path; this first page creates no second work store or free-form completion
+truth.
 
 **Delivery History defaults:** `Delivery Date · DO No · Customer · Logistics Partner · Result ·
 Failed Delivery Reason · Goods · Proof Status · Recorded By`.
