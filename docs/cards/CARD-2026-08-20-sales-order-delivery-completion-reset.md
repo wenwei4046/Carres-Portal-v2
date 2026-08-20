@@ -1,6 +1,6 @@
 STATUS: QUEUED
 DATE: 2026-08-20
-PR: pending
+PR: #863
 IMPLEMENTATION: APPROVED — owner commissioned Codex to take over, audit the shipped work, and complete the missing Sales Order → Delivery blueprint on 2026-08-20.
 SUPERSEDES ONLY: the navigation ruling that placed Delivery Orders under Sales, plus any claim that PRs #840–#843 completed every Sales Order → Delivery seam. The EXECUTED 2026-08-16 card and its implementation history remain immutable evidence.
 
