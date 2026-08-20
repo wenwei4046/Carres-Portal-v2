@@ -1,11 +1,12 @@
 STATUS: EXECUTED
+CARD: WAREHOUSE 1
 DATE: 2026-08-20
 PR: #878 — migration 0366, applied and production-verified 2026-08-20.
 CLOSURE: measured BUILT / VERIFIED evidence in docs/stock/MASTER.md §12.1.
 IMPLEMENTATION: APPROVED — Warehouse Blueprint persisted in docs/stock/MASTER.md
 and owner instructed 2026-08-20 to open the first two build Cards.
 
-# WAREHOUSE UNIT AUTHORITY FOUNDATION
+# WAREHOUSE — CARD 1 · UNIT AUTHORITY FOUNDATION
 
 **SCOPE — make the exact physical Unit register the one inventory authority, with the minimum
 facts required for NETS, another 3PL or future Carres Warehouse operation. NOTHING ELSE.**
@@ -104,4 +105,3 @@ The production system has one enforceable exact-Unit authority and one availabil
 All other modules read or link to it through their ownership seam. The implementing PR updates
 docs/stock/MASTER.md with measured BUILT / VERIFIED evidence and completes CI, merge, deployment
 and production SHA verification.
-

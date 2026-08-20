@@ -1,10 +1,11 @@
 STATUS: QUEUED — DEPENDS ON WAREHOUSE UNIT AUTHORITY FOUNDATION
+CARD: WAREHOUSE 2
 DATE: 2026-08-20
 PR: pending
 IMPLEMENTATION: APPROVED — Warehouse Blueprint persisted in docs/stock/MASTER.md
 and owner instructed 2026-08-20 to open the first two build Cards.
 
-# STOCK REGISTER — REPLACE ON HAND WITH THE APPROVED MASTER LIST
+# WAREHOUSE — CARD 2 · STOCK REGISTER
 
 **SCOPE — after the Unit Authority Foundation is production-verified, replace the legacy On hand
 surface with the approved Stock Register and left filter rail. NOTHING ELSE.**

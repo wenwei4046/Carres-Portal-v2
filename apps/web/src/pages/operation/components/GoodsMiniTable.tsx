@@ -30,7 +30,13 @@
  *   mono family (a code is scanned character by character); they lose the
  *   smaller size.
  *
- * ③ SELECTION IS A CAPABILITY, NOT A COPY. A page that BUYS from these lines
+ * ③ GRID LINES ARE THE READING GUIDE (owner correction 2026-08-20). The
+ *   child remains a bordered nested object, but its six columns must not float
+ *   in white space. Every header and value row carries the same visible
+ *   vertical dividers, and multiple goods lines carry matching horizontal
+ *   dividers, so the eye can follow one value to its heading without guessing.
+ *
+ * ④ SELECTION IS A CAPABILITY, NOT A COPY. A page that BUYS from these lines
  *   passes `selection` and gets the leading ☑ column; a truth register passes
  *   nothing and gets the same table without it (a register selects nothing).
  *   The header row never carries a checkbox — select-all belongs to the parent
@@ -182,7 +188,7 @@ export default function GoodsMiniTable({
             button family's uppercase tracking. The eye should not have to
             learn a second header style eight pixels below the first. */}
         <thead className="border-b border-base-200 bg-base-50">
-          <tr>
+          <tr className="divide-x divide-base-200">
             {/* THE HEADER ROW CARRIES NO CHECKBOX (owner ruling). Select-all is
                 the PARENT row's box — one whole-order switch, not two. */}
             {selection ? <th className="px-2 py-1.5" aria-label="Select goods line" /> : null}
@@ -206,9 +212,13 @@ export default function GoodsMiniTable({
           </tr>
         </thead>
         {/* LEVEL TWO — every value, 13px. */}
-        <tbody className="divide-y divide-base-100 text-body">
+        <tbody className="divide-y divide-base-200 text-body">
           {lines.map((line) => (
-            <tr key={line.key} data-testid={line.testId} className="align-top">
+            <tr
+              key={line.key}
+              data-testid={line.testId}
+              className="divide-x divide-base-200 align-top"
+            >
               {selection ? (
                 <td className="px-2 py-2 text-center">
                   {line.selectable ? (

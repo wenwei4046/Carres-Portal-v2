@@ -94,10 +94,11 @@ It surfaces important unresolved matters Jess did not ask about, but asks her on
 business decision that passes the Constitution's owner decision gate.
 
 This object/domain pass does not replace UI preflight. UI Dictionary/IA comes first; Carres
-semantics and ownership outrank external references; and actionable copy remains **WHO + ACTION +
-OBJECT + actual working day/date**, with WHO and source object rendered as structured context under
-the latest Owner Engine law rather than repeated in sentence text. The pass is a completeness check,
-not permission to build every capability or to write UI/application code in Plan mode.
+semantics and ownership outrank external references; and every action remains one structured
+contract: **owner context + short action + necessary object/recipient/result + actual working
+day/date**. Owner and source object render as structured context under the latest Owner Engine law;
+the sentence never repeats them when the surface already identifies them. The pass is a completeness
+check, not permission to build every capability or to write UI/application code in Plan mode.
 
 **OFFICIAL CARD NUMBERS ARE GOVERNANCE; BLUEPRINT PRECEDES BUILD HANDOFF.** The planner
 never invents an official Card number or status. The whole-domain audit is evidence, not a roadmap.
@@ -284,6 +285,54 @@ Blueprint, names the READY scope and closes; the later BUILD/DELIVERY lane decid
 | the components themselves | `apps/web/src/components/kit/**` |
 | the live look | **`/ui`** — public, lazy, its own chunk, so a kit reference never rides the operator's bundle |
 | the enforcement | `pnpm --filter @carres/web lint` + the kit source scans |
+
+## §2.1 · NEW-STAFF OPERATING LANGUAGE — OWNER RULING 2026-08-20 · APPROVED / LOCKED
+
+**The system knows the process; staff confirm facts, perform the stated act and record the result.**
+No employee-facing surface may depend on experience, memory, WhatsApp history, an unwritten office
+habit or asking a long-serving employee what comes next. Any authorised cover must be able to resume
+from the current structured facts without reconstructing the story outside Carres.
+
+English is the one official language for business fields, records, search, reports and documents.
+Employee-facing facts, warnings, actions, validation, empty states and prepared messages use
+**Primary School Standard English**:
+
+- one sentence carries one fact or one act;
+- aim for no more than about 12 words where the governed business terms allow it;
+- start actions with common verbs such as `Send`, `Call`, `Ask`, `Check`, `Choose`, `Save`, `Upload`
+  or `Add`;
+- keep required business words such as `Purchase Order`, `Supplier`, `Deliver To`, `Unit ID`,
+  `Invoice`, `Credit Note`, `Claim` and `Consignment`, and explain an unfamiliar term on demand;
+- never use a vague instruction such as `Process`, `Handle`, `Proceed accordingly`, `Action
+  required`, `Resolve discrepancy` or `Follow up`;
+- show an actual date such as `18 Aug 2026`, not `ASAP`, `Today`, `Tomorrow`, `T−2` or a date the
+  employee must calculate;
+- an error states the failed fact and the act that fixes it; a button states what pressing it does.
+
+Optional `What does this mean?` help may explain the official English in Chinese or Bahasa Malaysia.
+That help never changes the authoritative field, record, search term, report, message or document.
+Prefer governed choices (`Yes / No`, `Full / Partial`, `Good / Damaged`) and prepared messages over
+free typing. Notes remain free text only where the business needs them and should offer a short
+sentence pattern.
+
+An action-capable surface separates the current fact from the act:
+
+```
+Supplier invoice is missing
+[YJ] Ask the supplier to send the invoice by 18 Aug 2026
+```
+
+The first line says what is true. The second line starts with the act and says the smallest required
+object, recipient, result and actual date that are not already clear from the row/card header.
+`[YJ]` is a structured owner chip, never sentence text. The action record separately carries its
+trigger, owner rule, resolved owner, completion fact, governed date, source object and cover evidence.
+My Work normally omits the current employee's chip; Team Work places identity in the owner group;
+cover and handover show the necessary owner context. A reference Register may show the fact only.
+It never grows a duplicate action merely to satisfy this display grammar.
+
+This law simplifies execution; it does not remove permission, approval or separation of duties.
+The system may guide every authorised cover through the same steps while still preventing a
+requester from approving their own exception and preventing Operations from performing Finance's act.
 
 **Frozen and not to be reopened:** the spacing scale is **8 steps** (`2 4 6 8 12 16 24 32`) ·
 **`font-bold` (700) is deleted into 600** · **Lucide's stroke stays 2.**
