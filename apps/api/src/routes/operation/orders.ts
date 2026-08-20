@@ -514,13 +514,23 @@ operationOrdersRouter.get("/:id", requireOperation, async (c) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const skus = lines.map((l: any) => l.sku);
     if (skus.length > 0) {
+      // 0366 — from the unit register's one authority. `available` is the
+      // number that answers whether these goods can be promised; `on_hand` is
+      // what is physically at the Site and is not the same question.
       const { data: sb_rows, error: e_sb } = await sb
-        .from("stock_balances")
-        .select("sku, warehouse_id, qty, reserved")
+        .from("stock_sku_availability")
+        .select("sku, warehouse_id, on_hand, available, reserved")
         .eq("warehouse_id", order.warehouse_id)
         .in("sku", skus);
       if (e_sb) { const m = mapPgError(e_sb); return c.json(m.body, m.status); }
-      stockBalances = sb_rows ?? [];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      stockBalances = ((sb_rows ?? []) as any[]).map((r) => ({
+        sku: r.sku,
+        warehouse_id: r.warehouse_id,
+        qty: Number(r.on_hand ?? 0),
+        reserved: Number(r.reserved ?? 0),
+        available: Number(r.available ?? 0),
+      }));
     }
   }
 

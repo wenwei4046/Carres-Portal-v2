@@ -1,6 +1,7 @@
-STATUS: QUEUED
+STATUS: EXECUTED
 DATE: 2026-08-20
-PR: pending
+PR: #876 — migration 0366, applied and production-verified 2026-08-20.
+CLOSURE: measured BUILT / VERIFIED evidence in docs/stock/MASTER.md §12.1.
 IMPLEMENTATION: APPROVED — Warehouse Blueprint persisted in docs/stock/MASTER.md
 and owner instructed 2026-08-20 to open the first two build Cards.
 

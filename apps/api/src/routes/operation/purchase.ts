@@ -407,8 +407,9 @@ purchaseRouter.get("/today", requireOperation, async (c) => {
     if ((whRows ?? []).length === 1) klgWarehouseId = whRows![0].id as string;
 
     let stockQ = sb
-      .from("stock_balances")
-      .select("sku, qty, reserved, warehouse_id")
+      // 0366 — the one availability authority. Never qty − reserved.
+      .from("stock_sku_availability")
+      .select("sku, available, warehouse_id")
       .in("sku", demandSkus);
     if (klgWarehouseId) stockQ = stockQ.eq("warehouse_id", klgWarehouseId);
     const { data: stockRows, error: stockErr } = await stockQ;
@@ -417,7 +418,7 @@ purchaseRouter.get("/today", requireOperation, async (c) => {
       return c.json(m.body, m.status);
     }
     for (const r of stockRows ?? []) {
-      const free = Number(r.qty ?? 0) - Number(r.reserved ?? 0);
+      const free = Number((r as { available?: number }).available ?? 0);
       if (free <= 0) continue;
       const sku = r.sku as string;
       freeStockBySku[sku] = (freeStockBySku[sku] ?? 0) + free;

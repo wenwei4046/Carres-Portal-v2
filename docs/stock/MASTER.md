@@ -252,13 +252,68 @@ justifies it.
 
 ## 12 · Current implementation reality — evidence, not law
 
-The superseded implementation has one Stock entry with On hand, In & out and a reorder-planning
-page called Ready stock; ops_stock_items and stock_balances can diverge; bulk quantity rows, legacy
-on_hold, take-out and movement defects, reorder points and pool-usage rules exist.
+### 12.1 · BUILT / VERIFIED — the Unit authority foundation (0366, 2026-08-20)
 
-These are not approved business law. They are gaps to re-measure before any build. The old
-three-tab IA, wording, Ready stock meaning, generic Held stock or Quarantine, rollup authority,
-bulk sofa identity and claim-only issue route are superseded.
+`CARD-2026-08-20-warehouse-unit-authority` is built and applied. The exact physical Unit register
+`ops_stock_items` is now the one inventory authority, enforced in the database rather than by
+convention. Measured on production before the change, and again after it:
+
+| What the card required | How it is enforced now | Verified |
+|---|---|---|
+| One permanent Unit ID, never duplicated | `unit_code` NOT NULL, defaulted from `gen_unit_code()`, FULL unique index `ops_stock_items_unit_code_uq` (it was PARTIAL, and 88 of 136 live units carried no id at all) | duplicate insert refused |
+| Never reused after cancellation, delivery, return, write-off or disposal | ledger table `stock_unit_ids` — every id ever minted, never pruned; the generator asks the LEDGER, and a birth trigger re-registers | a written-off unit's id refused for reuse |
+| A row is never deleted | `stock_unit_identity_permanence` refuses every DELETE (0341 protected only committed units); `trg_po_units_follow_destination` now VOIDS surplus incoming units instead of deleting them | delete refused |
+| A replacement label keeps the original id | the same trigger refuses any change to `unit_code` | rename refused |
+| No bulk sofa row acts as several reservable Units | CHECK `ops_stock_items_bulk_never_reserved`; trigger refuses `qty > 1` when the CATALOG says the SKU is a sofa | bulk reservation refused |
+| Ownership: Carres Owned vs Supplier Consignment | `ownership` column + CHECK; consignment must name its supplier | — |
+| Site, operating party and role are separate | `warehouses` = Site; new `stock_operating_parties` = WHO HAS IT (`carres_warehouse`, `nets_warehouse`, `nets_delivery`, `pj_showroom`); `holder_party_id` on the Unit. NETS is a row, never hard-coded | two doors, neither moves the other |
+| Last verified date | `last_verified_at`, stamped only by `ops_stock_verify_unit` | — |
+| Append-only identity and physical event lineage | `stock_unit_events`, written by a TRIGGER on the register itself so no door can forget it; UPDATE and DELETE both refused | event edit refused |
+| ONE availability arithmetic | `unit_availability(status, needs_repair, hold_reason)` in SQL and `unitAvailability()` in `packages/shared/src/unit-availability.ts`, pinned to each other by 21 tests | six words, both sides |
+| Availability is never a stored number | view `stock_sku_availability` computes from the register on every read — it cannot be stale. A trigger-kept column was rejected: a second copy is still a second copy (Architecture Law D) | — |
+| Every derived total drills to the exact ids | view `stock_unit_availability_v` carries id, availability, lifecycle outcome, catalog category and source status | 74 (sku, site) rows all drill |
+| Negative stock impossible | availability is counted from units that exist; `stock_balances_qty_nonneg` | 0 impossible rows |
+| No generic Edit, Delete, Add stock, Remove stock or status selector | `ops_stock_items` lost its write policy entirely; `POST /api/ops/stock` ("+ Add stock"), `DELETE /:itemId`, `POST /api/operation/warehouse/adjust`, `operation_adjust_stock` and the `+ Adjust` modal are all gone | adjust refused in words |
+| One governed door per fact | `ops_stock_set_condition` · `refurbish` · `refurbish_complete` · `bind_units` · `unbind_unit` · `set_site` · `set_holder` · `set_ownership` · `verify_unit` · `book_in_units` · `set_thresholds` | — |
+| No second reservation writer | the two raw writers measured on live (POS post-receive labelling, the sofa-loan claim and its rollback) now go through `ops_stock_bind_units` / `ops_stock_unbind_unit`. Sales Order still decides WHICH unit; Stock only records it | — |
+| A stock total can never be hand-written | `stock_balances_derived_only` refuses any write to `qty`/`reserved` outside the rollup | hand-write refused |
+
+**The two arithmetics that did not agree, measured.** `ops_rollup_stock_balances` used `count(*)`,
+not `sum(qty)`, so the five live bulk rows (qty 2 · 555 · 15 · 319 · 2) counted as ONE unit each.
+They contribute **893 units**; the rollup saw 5. After the change the cache and the authority agree
+on every row (`cache_drift = 0`), and the live figures are 978 available · 2 reserved · 43 incoming
+across 74 (sku, site) rows.
+
+**`stock_balances` survives as a NON-AUTHORITATIVE CACHE, and nothing may read it as truth.**
+Eighteen live SECURITY DEFINER functions across Orders, Purchasing, Receiving and Delivery still
+read its `qty`/`reserved`; dragging them into a Warehouse foundation card would have been a worse
+change. So it lost its independence instead: no hand write, recomputed by statement trigger inside
+the same transaction as the change, and every screen that decides whether goods can be OFFERED —
+the alert RPC, the POS shortage feed, the warehouse totals, the stock summary, the order drawer,
+the purchase assembly and the PO-duty cron — now reads `stock_sku_availability`. Its
+`low_threshold`/`high_threshold` remain, because those are Settings and configuration is what
+survives go-live. **Retiring the cache entirely is the next card's work, not a gap in this one.**
+
+**`ended` never erases how a life ended.** `unit_lifecycle_outcome()` is a separate authoritative
+answer beside the availability word — `delivered` · `cancelled_before_receipt` · `written_off` ·
+`returned_to_supplier` · `active` — so Delivered / history can tell them apart without a second
+query or a second arithmetic. Physical disposal is not a fifth word until that fact is recorded.
+
+**Verification evidence.** Migration 0366 applied to production; its own sanity block passed. Eight
+negative controls were then run against production in a rolled-back transaction and all eight
+fired; the register was unchanged afterwards (136 units · 136 ledger ids · 0 events · 0 units
+without an identity). The applied SQL is executably identical to the repository file — normalised
+md5 `3955ccd7f936151d144a959afef4af22` on both sides. Local release gate: 2470 shared · 2293 API ·
+3144 web tests green, typecheck and build clean, no server secret in the web bundle.
+
+### 12.2 · Still not built
+
+The superseded three-tab Stock IA, the old wording, the planning-page meaning of Ready stock,
+generic Held stock or Quarantine, and the claim-only issue route are all still on screen and are
+still superseded. Transfers (PR #860), Counts, month-end, the Stock Register, Ready stock as
+eligible Units, Showroom Sites, the partner mobile surfaces and the reports in §11 remain
+**APPROVED TARGET / NOT BUILT**. `holder_party_id`, `ownership` and `last_verified_at` have their
+doors but no operator screen yet — the Stock Register card owns that presentation.
 
 ## 13 · Resolved contradictions and plan state
 
@@ -277,10 +332,15 @@ measured need, and assumed external cutover.
 **RESOLVED FROM AUTHORITY:** Unit authority, ownership seams, shared Work and UI grammar and
 upstream/downstream owners.
 
-**APPROVED TARGET / NOT BUILT:** this complete Warehouse operating model and UI.
+**APPROVED TARGET / NOT BUILT:** the rest of this Warehouse operating model and its UI — the
+destinations in §2, the journeys in §5, Issues/Counts/correction in §6, the pages in §7, month-end
+in §9 and the reports in §11.
 
-**BUILT / VERIFIED:** only the implementation evidence in §12, to be re-measured before build.
+**BUILT / VERIFIED:** the Unit authority foundation in §12.1 — one permanent identity, one
+availability arithmetic, one governed door per fact, and no ungoverned write path left on the
+register. Production-verified 2026-08-20.
 
 **REAL GAP / CONTRADICTION:** none requiring an owner decision.
 
-**OWNER DECISIONS:** none unresolved.
+**OWNER DECISIONS:** none unresolved. Owner walk of the Warehouse page is owed but does not block
+the next card: the only visible change is that `+ Adjust` is gone.

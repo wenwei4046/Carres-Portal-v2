@@ -419,8 +419,27 @@ describe("GET /api/operation/orders/:id", () => {
         case 'warehouses':
           chain.maybeSingle = vi.fn(() => promise(opts.warehouse ?? null));
           break;
-        case 'stock_balances':
-          chain.in = vi.fn(() => promise(opts.stockBalances ?? []));
+        // 0366 — the order drawer reads the unit register's one availability
+        // authority. Fixtures still describe a site as {qty, reserved}; the
+        // view's `on_hand`/`available` are derived here as the register does.
+        case 'stock_sku_availability':
+          chain.in = vi.fn(() =>
+            promise(
+              (opts.stockBalances ?? []).map((b: {
+                sku: string;
+                warehouse_id: string;
+                qty: number;
+                reserved: number;
+                available?: number;
+              }) => ({
+                sku: b.sku,
+                warehouse_id: b.warehouse_id,
+                on_hand: b.qty,
+                reserved: b.reserved,
+                available: b.available ?? b.qty - b.reserved,
+              })),
+            ),
+          );
           break;
         // These two are awaited at the END of a chain whose length varies
         // (`ops_stock_items` appends `.eq(warehouse)` only when the order has
@@ -495,6 +514,13 @@ describe("GET /api/operation/orders/:id", () => {
     expect(body.total).toBe(2 * 1500 + 1 * 800 + 4 * 50);
     expect(body.warehouse.name).toBe("KL HQ");
     expect(body.stockBalances).toHaveLength(2);
+    // 0366 — the drawer carries the register's `available` beside the on-hand
+    // count, so nothing downstream has to compute qty − reserved.
+    expect(body.stockBalances).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ sku: "BED-K-002", qty: 5, reserved: 0, available: 5 }),
+      ]),
+    );
     expect(body.pos).toHaveLength(1);
     expect(body.pos[0].lines).toHaveLength(1);
     expect(body.history).toHaveLength(1);

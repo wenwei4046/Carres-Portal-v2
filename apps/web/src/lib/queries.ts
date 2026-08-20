@@ -8,7 +8,6 @@ import {
 } from "@tanstack/react-query";
 import {
   type AbandonOrderInput,
-  type AdjustStockInput,
   type AssignPartnerInput,
   type AssignPickupPartnerInput,
   type AttachDoInput,
@@ -3162,8 +3161,13 @@ export interface operationOrderDetailWarehouse {
 export interface operationOrderDetailStockBalance {
   sku: string;
   warehouse_id: string;
+  /** 0366 — physically at this Site, from the unit register. NOT what may be
+   *  promised: a unit in repair counts here and can be offered to nobody. */
   qty: number;
   reserved: number;
+  /** 0366 — THE number that answers whether these goods can be promised.
+   *  Never compute it as `qty - reserved`. */
+  available: number;
 }
 export interface operationOrderDetailPoLine {
   id: string;
@@ -3437,17 +3441,13 @@ export interface operationRecheckStockResponse {
   warehouseId: string | null;
   shortages: { sku: string; short: number }[];
 }
-export interface operationAdjustStockResponse {
-  sku: string;
-  warehouse_id: string;
-  qty: number;
-  reserved: number;
-}
 /** Phase 4.5 Chunk 2 (T18/T21) — `GET /api/operation/stock-alerts` row shape.
- *  RPC `operation_stock_alerts()` returns rows where `(qty - reserved) <
+ *  RPC `operation_stock_alerts()` returns rows where `available <
  *  low_threshold`. The dashboard tile slices the top-3 by shortage; the
  *  warehouse page (Sprint D follow-up) drives a red-dot indicator off the
- *  count. `effective = qty - reserved`; `shortage = low_threshold - effective`. */
+ *  count. 0366: `effective` is the unit register's `available` — NOT
+ *  qty − reserved, which counted a unit in repair as sellable;
+ *  `shortage = low_threshold - effective`. */
 export interface operationStockAlertRow {
   sku: string;
   warehouse_id: string;
@@ -7159,33 +7159,9 @@ export function useReassignPoWarehouseMutation(
   });
 }
 
-/** Manual stock adjustment (positive=inbound, negative=damage/loss). Writes a
- *  stock_movements row + audit_log entry. */
-export function useAdjustStockMutation(
-  opts?: Partial<
-    UseMutationOptions<operationAdjustStockResponse, ApiError, AdjustStockInput>
-  >,
-) {
-  const qc = useQueryClient();
-  return useMutation<operationAdjustStockResponse, ApiError, AdjustStockInput>({
-    mutationFn: (input) =>
-      apiFetch<operationAdjustStockResponse>("/api/operation/warehouse/adjust", {
-        method: "POST",
-        body: JSON.stringify(input),
-      }),
-    ...opts,
-    onSuccess: async (...args) => {
-      await qc.invalidateQueries({ queryKey: qk.operation.warehouse(), exact: true });
-      // T42-pass3-C2 — stock-touching mutations must also bust the stock-alerts
-      // cache; otherwise the dashboard tile + CreatePOModal "Suggest from
-      // alerts" stay stale for up to 30s after qty/reserved change.
-      await qc.invalidateQueries({ queryKey: qk.operation.stockAlerts() });
-      await qc.invalidateQueries({ queryKey: ["operation", "movements"] });
-      await qc.invalidateQueries({ queryKey: qk.operation.dashboard(), exact: true });
-      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
-    },
-  });
-}
+// 0366 — `useAdjustStockMutation` IS GONE, with POST /api/operation/warehouse/
+// adjust and the `operation_adjust_stock` RPC behind it. Stock is counted from
+// the exact Units; there is no door that moves a total without naming one.
 
 // ---------------------------------------------------------------------------
 // Phase 5 — Finance hooks (queries + mutations)
