@@ -3138,6 +3138,11 @@ export interface operationOrderDetailLine {
   /** AutoCount PO number carried on the imported line (order_lines.source_po).
    *  Present ⇒ the order already has a PO — do NOT show "No PO" for it. */
   source_po?: string | null;
+  /** D9 (2026-08-20) — the CATALOG's category for this line's SKU, resolved
+   *  server-side by the same reader the free units use, because the loan filter
+   *  compares one against the other and a guess on EITHER side hides a real
+   *  unit. `null` = asked, no catalog row. ABSENT = older Worker. */
+  category?: string | null;
 }
 export interface operationOrderDetailAddon {
   addon_key: string;
@@ -3180,6 +3185,10 @@ export interface operationOrderDetailFreeUnit {
   poNo: string | null;
   sourceRef: string | null;
   dateIn: string | null;
+  /** D9 (2026-08-20) — the CATALOG's category, resolved server-side. `null` =
+   *  asked, no catalog row. ABSENT = an older Worker that does not send it, so
+   *  it is optional for the same reason `label` above is. */
+  category?: string | null;
 }
 export interface operationOrderDetailPo {
   id: string;

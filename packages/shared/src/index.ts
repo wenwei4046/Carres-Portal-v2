@@ -1686,6 +1686,9 @@ export { deriveSkuCode, normalizeSkuKey } from "./sku-code";
 export {
   lineClass,
   lineCategory,
+  // D9's Sales Order half (2026-08-20) — the catalog's category, parser as the
+  // named fallback. Prefer this over `lineCategory` in every new call site.
+  resolvedCategory,
   lineSize,
   stockMatchKey,
   accShort,

@@ -34,6 +34,8 @@ import { requireOperation, requireOperationOrPrincipal } from "../../lib/auth-gu
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { storageBlock } from "../../lib/storage-gate";
 import { userClient } from "../../lib/supabase";
+
+import { skuCategories } from "../../lib/sku-categories";
 import type { AppEnv } from "../../types";
 
 /**
@@ -594,14 +596,60 @@ operationOrdersRouter.get("/:id", requireOperation, async (c) => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const posWithLines = (pos ?? []).map((p: any) => ({ ...p, lines: poLinesByPo[p.id] ?? [] }));
 
+  // ── D9's SALES ORDER HALF ────────────────────────────────────────────────
+  // *"What kind of product is this?"* is the CATALOG's answer and nobody
+  // else's (ERP-ARCHITECTURE §3.1 · D9). `56239a3c` closed STOCK's half by
+  // making /inventory ask. This is the other half: the drawer's loan flow was
+  // deducing the category from the SKU TEXT in the browser, and it was not
+  // doing it cosmetically — `LoanPanel` FILTERS the free-unit list with the
+  // result, so a real sofa whose model name was absent from a hardcoded
+  // keyword list could not be offered as a loaner.
+  //
+  // BOTH sides carry it, because the filter compares one against the other:
+  // an unrecognised ORDER LINE contributes no category to match against, and
+  // an unrecognised FREE UNIT falls into the bucket the drawer deliberately
+  // excludes. A guess on either side hides a real unit.
+  //
+  // COST: ONE extra subrequest per 100 distinct SKUs — `skuCategories` chunks
+  // at 100 because the `in` list travels in the URL. Lines and units resolve
+  // in ONE call, not two. On the 2026-08-19 register (74 distinct SKUs) that
+  // is a single chunk.
+  //
+  // NOT folded into `resolveSkuLabels`, which already joins `product_models`
+  // for the name and could have carried this for free. `skuCategories` is the
+  // ONE category reader every other gate asks — the earliest-sell floor, the
+  // goods gate, /inventory — and a second copy of that join is a second answer
+  // waiting to disagree (ownership Law D). One subrequest is the price of one
+  // owner.
+  //
+  // It fails OPEN (an error returns an empty map), so a catalog outage degrades
+  // to `null` everywhere and the browser falls back to the parser exactly as it
+  // did before this existed. No new failure mode.
+  const categoryBySku = await skuCategories(sb, [
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ...lines.map((l: any) => l.sku as string),
+    ...freeUnits.map((u) => u.sku as string),
+  ]);
+  // `null`, never absent: this endpoint ASKED. An absent key would mean nobody
+  // asked, and the browser reads that difference (`resolvedCategory`).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const linesWithCategory = lines.map((l: any) => ({
+    ...l,
+    category: categoryBySku.get(l.sku) ?? null,
+  }));
+  const freeUnitsWithCategory = freeUnits.map((u) => ({
+    ...u,
+    category: categoryBySku.get(u.sku) ?? null,
+  }));
+
   return c.json({
     order,
-    lines,
+    lines: linesWithCategory,
     addons,
     total,
     warehouse,
     stockBalances,
-    freeUnits,
+    freeUnits: freeUnitsWithCategory,
     pos: posWithLines,
     history: historyRes.data ?? [],
     threads: threadsRes.data ?? [],
