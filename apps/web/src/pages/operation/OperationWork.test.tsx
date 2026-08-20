@@ -59,6 +59,7 @@ vi.mock("react-router-dom", async () => {
 });
 
 import OperationWork from "./OperationWork";
+import { fmtDate } from "@/lib/fmt-date";
 
 const TODAY = "2026-07-27"; // a Monday
 
@@ -127,11 +128,11 @@ const STAFF: OpsStaffListResponse = {
   myDuties: [],
 };
 
-function wrap(node: React.ReactNode) {
+function wrap(node: React.ReactNode, url = "/operation?tab=work") {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
-      <MemoryRouter initialEntries={["/operation?tab=work"]}>{node}</MemoryRouter>
+      <MemoryRouter initialEntries={[url]}>{node}</MemoryRouter>
     </QueryClientProvider>,
   );
 }
@@ -168,8 +169,12 @@ describe("OperationWork — two filters over the one open work set", () => {
     expect(screen.getByTestId("work-row-SO-1201-assign_logistics")).toBeInTheDocument();
     expect(screen.queryByTestId("work-row-SO-1202-assign_logistics")).toBeNull();
     // Grouped under a weekday+date header — never a bare Today.
-    // 2026-08-05 (Wed) − 3 working days on the Mon–Sat week = Sat 1 Aug.
-    expect(screen.getByTestId("work-day-2026-08-01")).toHaveTextContent("Sat 1 Aug");
+    // Owner re-ruling 2026-08-16 (blueprint card §7): `Assign logistics` is
+    // due within the ORDER day for a stock-source order with no PO — the
+    // fixture's placed_at, 1 Jul. Spelled by the ONE formatter.
+    expect(screen.getByTestId("work-day-2026-07-01")).toHaveTextContent(
+      fmtDate("2026-07-01"),
+    );
   });
 
   it("Team Work shows everyone and the owner chip scopes — one set, filtered", () => {
@@ -187,12 +192,14 @@ describe("OperationWork — two filters over the one open work set", () => {
     fireEvent.click(screen.getByTestId("work-view-team"));
     expect(screen.getByTestId("work-row-SO-1201-assign_logistics")).toBeInTheDocument();
     expect(screen.getByTestId("work-row-SO-1202-assign_logistics")).toBeInTheDocument();
-    // Scope to Yu Jun only.
-    fireEvent.click(screen.getByTestId(`work-owner-${OTHER_UID}`));
-    expect(screen.queryByTestId("work-row-SO-1201-assign_logistics")).toBeNull();
-    expect(screen.getByTestId("work-row-SO-1202-assign_logistics")).toBeInTheDocument();
-    // The row names its owner in Team view.
-    expect(screen.getByTestId("work-row-SO-1202-assign_logistics")).toHaveTextContent("Yu Jun");
+    // Blueprint card §7 — Team Work groups PER STAFF: the group header carries
+    // the full name and the counts that say WHAT they count.
+    const yuJun = screen.getByTestId(`work-owner-group-${OTHER_UID}`);
+    expect(yuJun).toHaveTextContent("Yu Jun");
+    expect(yuJun).toHaveTextContent("1 action to do");
+    // The person's own list holds their item; identity is the GROUP'S, so the
+    // row does not repeat it (ui/MASTER.md §5).
+    expect(yuJun.querySelector('[data-testid="work-row-SO-1202-assign_logistics"]')).toBeTruthy();
   });
 
   it("a manager lands on Team Work — the §2.2 starting view, not a wall", () => {
@@ -217,5 +224,66 @@ describe("OperationWork — two filters over the one open work set", () => {
     listState.data = { orders: [] };
     wrap(<OperationWork />);
     expect(screen.getByTestId("work-empty")).toHaveTextContent("every track is clear");
+  });
+});
+
+/**
+ * THE RAIL'S DEEP LINK (owner ruling 2026-08-15).
+ *
+ * The Quick Rail's Team panel previews each person's `open · overdue` and its
+ * rows link here scoped to that person. The link had nowhere to land: `scope`
+ * was already in the old rail's href and this page never read it, so a
+ * non-manager following `View Team Work` arrived on My Work. A link is a
+ * STARTING view exactly as the role default is — it seeds state, never owns it.
+ */
+describe("OperationWork — the rail deep-links into a person's work", () => {
+  it("`scope=team&owner=` lands on Team Work already scoped to that person", () => {
+    listState.data = {
+      orders: [
+        makeRow({ id: "a", so: 1201 }),
+        makeRow({
+          id: "b",
+          so: 1202,
+          ops_order_control: [{ assigned_staff: OTHER_UID } as never],
+        }),
+      ],
+    };
+    wrap(<OperationWork />, `/operation?tab=work&scope=team&owner=${OTHER_UID}`);
+    expect(screen.getByTestId("work-row-SO-1202-assign_logistics")).toBeInTheDocument();
+    expect(screen.queryByTestId("work-row-SO-1201-assign_logistics")).toBeNull();
+  });
+
+  it("the scoped landing is a default, not a wall — the operator can widen it", () => {
+    listState.data = {
+      orders: [
+        makeRow({ id: "a", so: 1201 }),
+        makeRow({
+          id: "b",
+          so: 1202,
+          ops_order_control: [{ assigned_staff: OTHER_UID } as never],
+        }),
+      ],
+    };
+    wrap(<OperationWork />, `/operation?tab=work&scope=team&owner=${OTHER_UID}`);
+    fireEvent.click(screen.getByTestId("work-owner-clear"));
+    expect(screen.getByTestId("work-row-SO-1201-assign_logistics")).toBeInTheDocument();
+  });
+
+  it("`scope=team` alone lands a non-manager on Team Work", () => {
+    listState.data = { orders: [makeRow({ id: "a", so: 1201 })] };
+    wrap(<OperationWork />, "/operation?tab=work&scope=team");
+    // The Team-only per-staff groups are what proves the view, not the rows.
+    expect(screen.getByTestId(`work-owner-group-${OP_UID}`)).toBeInTheDocument();
+  });
+
+  it("every count says WHAT it counts — `{n} actions to do` / `{n} late`, never a bare `open` (card §7)", () => {
+    listState.data = { orders: [makeRow({ id: "a", so: 1201 })] };
+    wrap(<OperationWork />, "/operation?tab=work&scope=team");
+    const group = screen.getByTestId(`work-owner-group-${OP_UID}`);
+    expect(group.textContent).toContain("1 action to do");
+    const shell = screen.getByTestId("operation-work");
+    // the 2026-08-14 `open · overdue` tally is SUPERSEDED by the card
+    expect(shell.textContent).not.toMatch(/\d+ open\b/);
+    expect(shell.textContent).not.toMatch(/\d+ overdue\b/);
   });
 });

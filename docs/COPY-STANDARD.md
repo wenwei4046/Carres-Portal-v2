@@ -40,32 +40,185 @@ Two hard beliefs behind the rules:
 | 9 | Zero jargon — **unless the team already says it** | requisition · expedite · MRP · `GRN` as a VERB | order · call · plan · check in · `GRN` as the DOCUMENT (see the document/act split) |
 | 10 | Cut a sentence if possible | `Please note that this order...` | `This order is 1 day late. Issue PO now.` |
 
+## Primary School Standard English — owner ruling 2026-08-14
+
+Every Portal instruction must be understandable the first time a new employee sees it. This is
+professional Plain English: clear, short and consistent. Formal documents keep correct business
+English; complexity is never used to make an instruction sound official.
+
+- Aim for no more than 12 words per sentence.
+- One sentence states one fact or one action.
+- Prefer common governed verbs: `Call`, `Ask`, `Check`, `Choose`, `Save`, `Upload`, `Record` and the
+  business-specific verbs in this standard.
+- Ban vague substitutes such as `Process`, `Handle`, `Proceed accordingly` and `Resolve` without
+  naming the concrete result.
+- Print full dates such as `18 Aug 2026`; actionable work also carries its governed weekday/date.
+- Errors name what is wrong and exactly how to fix it.
+- A button says what pressing it does: verb plus object.
+- Keep necessary business nouns (`Purchase Order`, `Supplier`, `Deliver To`, `Unit ID`, `Invoice`,
+  `Credit Note`, `Claim`, `Consignment`) and provide a simple first-use explanation through Help.
+- The official record is Simple English. Original customer, staff and partner words remain
+  preserved; optional Chinese/Bahasa Malaysia help explains but never creates a second truth.
+
+`Send` is banned from Portal action labels, buttons and Current Action copy. It hides the actor,
+channel, object, recipient and required result. Name the real act instead: `Email PO-2041 to Macio`,
+`Ask Lim for mattress photos`, `Upload delivery note`, or `Record TCF's reply`. `Open WhatsApp`
+names navigation only; opening the channel never proves that the business action is complete.
+
+## Two-Line Action Copy Standard — owner ruling 2026-08-14
+
+An actionable alert, Work row or detail-page current action uses:
+
+```text
+[Current fact/problem]
+[Action + object] · [recipient + required result]
+[Governed working weekday/date]
+[Verb + object button]
+```
+
+- Line 1 states what is true; the object identity stays in the governed row/card header or object
+  field and is not repeated when that context is already visible. Use normal register text size
+  and medium/semibold weight.
+- Line 2 identifies `ACTION + OBJECT · TO WHOM · WHAT IS NEEDED`; one size smaller and regular
+  weight. Never show a bare verb.
+- Owner is structured identity resolved by the action's Owner Rule. Show it as governed avatar,
+  metadata or Team Work group, never as repeated sentence text. My Work may omit the current
+  user's identity because scope already answers who.
+- The channel is named when transmission matters: `Email`, `WhatsApp`, `Call` or another governed
+  channel. `Send` remains banned.
+- Each line is one sentence. It should fit one desktop line but may wrap to two narrow-screen
+  lines; never ellipsize the party, amount, document or date needed to act.
+- Red is reserved for overdue, blocking, safety, custody or money risk. Missing routine data is
+  not made red merely to attract attention.
+- The row exposes one primary action. Parallel actions remain visible through the governed `+N`
+  expansion; no copy hides them.
+
+Example:
+
+```text
+Mattress measurement video is missing
+Ask Lim for the required video · Record their reply.
+Fri 14 Aug
+[Ask customer]
+```
+
+Further governed examples:
+
+```text
+PO-2041 Version 1 has not reached Macio
+Email PO-2041 Version 1 to Macio · Ask for delivery confirmation.
+
+Delivery note DO-883 is missing
+Upload Macio DO-883 · Link it to PO-2041.
+
+Macio has not replied
+Call Macio about PO-2041 · Record item availability.
+
+PO-2041 Deliver To has changed
+Email PO-2041 Version 2 to Macio · Ask them to use AL Sungai Buloh.
+
+Unit CU-000128 is damaged
+Hold CU-000128 · Add photos for Purchasing.
+
+PO-2041 price changed to RM1,250
+Check PO-2041 · Accept or reject RM1,250.
+
+Customer delivery is at risk
+Tell the responsible salesperson · Record the new date, 25 Aug 2026.
+```
+
+An action whose Owner Rule cannot resolve a person does not hide two actions in one line. Repairing
+the roster/duty/cover fact is the current action; the business follow-up becomes the next action:
+
+```text
+PO Duty has no holder
+Add today's PO Duty holder · The system must route PO-2041.
+[Open duty roster]
+```
+
+The two-line form is not forced onto ordinary History facts, completed records, small field
+validation or empty states. Their existing patterns below still govern them.
+
+## Work detail — five answers, not five compulsory boxes
+
+Opening an action must answer these five questions in this order:
+
+1. `What to do` — the single primary act.
+2. `Why` — the trigger/fact that made it necessary.
+3. `Files / details` — only when an artefact or information is required.
+4. `What to ask` — only when an external answer is required.
+5. `What happens next` — the next system consequence or reminder.
+
+Omit a section that does not apply; an empty heading teaches nothing. A complex execution still
+uses the governed maximum-four-step `What to do` block below.
+
 ## Action copy / work clarity law — owner ruling 2026-08-11
 
 When a surface represents something a human must handle, follow up, confirm, call, chase or do,
-the operator must understand all four parts at first read:
+the operator must understand all six parts at first read:
 
 ```
-WHO      responsible named person or team/station
-ACTION   concrete verb and measurable outcome
-OBJECT   named counterparty, document, order, goods or other business object
-WHEN     actual working weekday + date from the action's authoritative calendar
+WHO              responsible named person or team/station
+ACTION           concrete verb
+OBJECT           exact document, order, goods, evidence, amount or other business object
+RECIPIENT        party/person/team receiving the act or being contacted
+REQUIRED RESULT  answer, evidence, confirmation or decision that completes it
+WHEN             actual working weekday + date from the action's authoritative calendar
 ```
 
 Use the actual person or team when responsibility is known, the governed action verb, and the
-specific object the operator can recognise. `WHEN` follows `ACTION-FLOW-STANDARD.md` Law 2A: use
+specific object, recipient and required result the operator can recognise. `WHEN` follows
+`ACTION-FLOW-STANDARD.md` Law 2A: use
 the applicable Carres working calendar, exclude its public holidays/non-working days, and move a
 due date only according to that authoritative calendar. A governed action surface that requires a
 due day prints weekday + date; `Today`, `Tomorrow` or `T−2` alone is not enough.
 
 **Banned as substitutes for clear work:** `Follow up` · `Waiting` · `Need action` · vague
-`Chase`. These may describe neither a measurable act nor its object/date. A waiting condition is a
+`Chase`. These may describe neither a measurable act nor its object/recipient/result/date. A waiting condition is a
 fact, not an action, until a human must do something.
 
 This law does **not** turn every truth into work. Registers and module surfaces continue to show
-owned facts in factual language. Apply WHO + ACTION + OBJECT + WHEN only when the item is genuinely
+owned facts in factual language. Apply all six action parts only when the item is genuinely
 actionable. My Work, Team Work and every other action-bearing UI use this same formulation; they do
 not invent a shorter status-only dialect.
+
+### System-led action + Primary School Standard English — owner ruling 2026-08-14
+
+Purchasing, Sales Order, Service Case, Issue Tracker and every future module use one standard: the
+system holds process knowledge; a new employee confirms facts, performs the named action and records
+the result. No screen depends on written-English skill, old WhatsApp history or an experienced
+employee explaining what comes next.
+
+Official fields/documents remain English. Operator instructions use Primary School Standard English:
+one fact or action per sentence, about 12 words maximum, complete dates, and an error always says how
+to fix it. Chinese/Bahasa Malaysia may appear only under optional `What does this mean?` help and do
+not enter the official record.
+
+**A simple verb alone is not simple English; it is missing work.** Every action-bearing surface must
+expose:
+
+```
+STRUCTURED OWNER + STRUCTURED OBJECT + ACTION AND OBJECT + RECIPIENT + REQUIRED RESULT + WHEN
+```
+
+Use the portal-wide two-line shape when the row carries a fact plus action:
+
+```
+LINE 1  FACT / PROBLEM
+LINE 2  ACTION AND OBJECT + RECIPIENT + REQUIRED RESULT
+```
+
+The governed row/card structure supplies object identity and resolved owner without repeating either
+inside the semantic lines. The row/action context must also expose actual working weekday/date.
+`Call` · `Ask` · `Check` ·
+`Choose` · `Upload` · `Add` · `Send` · `Save` · `Follow up` · `Review` · `Handle` · `Resolve`
+alone are banned. If one line cannot fit, use labelled `Owner · Object · Contact · Do · Need`; keep
+Owner and Object as structured fields and omit nothing.
+
+Normal intake is guided factual questions and governed answers. The system generates the official
+English summary. A blank `What happened?`, `Action taken`, `Root cause`, `Prevention` or `Follow-up
+remark` textarea may be supplementary only; it can never be the main path or determine status,
+accountability or completion.
 
 **External reply evidence — owner ruling 2026-08-14.** For supplier and Logistics communication,
 `Message prepared`, `Message copied`, `WhatsApp opened` and `Sent` never complete a confirmation
@@ -80,20 +233,21 @@ the concrete answer, never a trust-based `Sent` checkbox.
 
 Every actionable list row ends with a plain-English sentence telling the reader the next action.
 The owner and due weekday/date may be adjacent governed fields when repeating them inside the
-sentence would harm scanning, but the row as a whole must expose all four parts. **Action sentence
-length ≤ 10 words.** Shape:
+sentence would harm scanning, but the row as a whole must expose all six parts. Use the shortest
+sentence that remains complete; about 12 words is the target, never a reason to omit recipient or
+required result. Shape:
 
-    [Responsible person/team] + [Verb] + [concrete object/name] + [working weekday/date]
+    [Owner] + [Verb and object] + [recipient] + [required result] + [working weekday/date]
 
 Examples (all pass):
 
-    ✔ Yu Jun · Issue PO-86 to Ohana · Wed 12 Aug.
-    ✔ Khor Yee · Check in PO-2041 goods · Thu 13 Aug.
-    ✔ Shasha · Call AL about SO-1318 · Fri 14 Aug.
+    ✔ Yu Jun · Send PO-86 to Ohana · Ask them to confirm delivery · Wed 12 Aug.
+    ✔ Khor Yee · Check in PO-2041 goods for Purchasing · Record full or partial · Thu 13 Aug.
+    ✔ Shasha · Call AL about SO-1318 · Record the delivery date · Fri 14 Aug.
 
 Anti-patterns (all fail):
 
-    ✘ Follow up.                               (no owner · object · date)
+    ✘ Follow up.                               (no owner · object · recipient · result · date)
     ✘ Waiting.                                 (a fact presented as work)
     ✘ Need action.                             (no action at all)
     ✘ Process order.                           (no name · no timing · abstract verb)
@@ -296,8 +450,16 @@ Fixed phrasings — reuse these, do not invent variants:
 - What is still owed: row `Second trip` → `Sofa still to deliver` +
   `Book second trip`, or `stock not in yet` when it cannot be booked.
 
-**Never** write "partial delivery", "split shipment", "back-order" or
-"consignment" on screen — say what goes and what follows, in furniture words.
+**Never** write "partial delivery", "split shipment" or "back-order" on screen — say what goes
+and what follows, in furniture words.
+
+**`consignment` IS UNBANNED ON THE PURCHASING AXIS, AND STILL BANNED HERE** (Jess, 2026-08-18).
+The ban was written to stop a DELIVERY being described as split; that meaning stays banned, and
+so does the word anywhere near a trip. But Carres genuinely holds supplier-owned furniture, the
+supplier calls it consignment, the agreement says consignment, and inventing a Carres-only word
+would leave staff translating in both directions. **`Consignment Order` · `Consignment Receipt`
+· `Consignment Return`** are the ruled document names. On a UNIT the fact is spelt
+**`Supplier Consignment`**, against **`Carres Owned`**. The word never describes a delivery.
 
 ## The dictionary — every visible word, audited (Jess 2026-07-27)
 
@@ -374,6 +536,15 @@ table are one-to-one, so a queue and a row can never spell one action two ways.
 | `Delay planning` | `Delay planning` | `Record the delay decision` | — (none: the row leaves by itself, and `Arrange new delivery date` says what happened) | `No supplier date lands after a promised date.` |
 | `Arrange new delivery date` | `Call {logistics} — arrange new delivery date` | `Record new date` | `New date recorded` | `No delayed order needs a new date.` |
 | `Collect RM {amount}` | `Collect RM {amount} from {customer}` | `Record payment` | `Payment recorded` | `Nothing outstanding.` |
+| — *(no queue: the §4 chain lives on the Delivery page's detail, one next act at a time)* | — *(same)* | `Mark ready for handover` | `Ready for handover recorded` | — *(the block renders only once a DO exists — no DO, no handover, no empty queue)* |
+| — *(same)* | — *(same)* | `Record handover` | `Handed over to {logistics}` | — *(same)* |
+| — *(same)* | — *(same)* | `Confirm logistics receipt` | `Received by logistics — out for delivery` | — *(same)* |
+
+**The handover chain's FACT words** (delivery MASTER §4, slice 1 shipped 2026-08-19): on screen a
+recorded fact reads `Ready for handover` · `Handed over` · `Received by logistics`, sentence case,
+with its recorder, duty word (`Warehouse` / `Logistics`), company and date. The receipt form's
+instruction sentence is `Logistics' own count — correct any quantity that differs; both counts
+stay on record.` — a discrepancy keeps both facts and overwrites neither.
 
 **PURCHASING** (docs/purchasing/MASTER.md):
 
@@ -385,6 +556,83 @@ table are one-to-one, so a queue and a row can never spell one action two ways.
 | `Check in` | `Check in from {supplier}` | `Check in` | `Checked in {n} of {m}` | `No goods arriving today. {supplier}'s next delivery is {date}.` |
 | `Confirm balance delivery date` | `Call {supplier} — confirm balance delivery date` | `Record balance date` | `Balance date recorded` | `Nothing short today.` |
 | `Confirm what happens next` | `Call {supplier} — confirm what happens next` | `Record what happens next` | `Supplier answer recorded` | `No claim is waiting for a supplier answer.` |
+| `Issue consignment order` | `Issue consignment order to {supplier}` | `Issue consignment order` | `Consignment order issued to {supplier}` | `No showroom is waiting for stock.` |
+| `Issue purchase return` | `Issue purchase return to {supplier}` | `Issue purchase return` | `Purchase return issued to {supplier}` | `Nothing is going back.` |
+| `Issue repair order` | `Issue repair order to {supplier}` | `Issue repair order` | `Repair order issued to {supplier}` | `Nothing is out for repair.` |
+| `Confirm collection date` | `Call {supplier} — confirm collection date` | `Record collection date` | `Collection date recorded` | `Nobody is waiting to be collected.` |
+| `Upload delivery note` | `Upload delivery note` | `Upload delivery note` | `Delivery note saved` | `Every receipt has its note.` |
+| `Check quantity difference` | `Check quantity difference` | `Record the correct count` | `Count recorded` | `Every count matches.` |
+| `Close claim` | `Close claim` | `Close claim` | `Claim closed` | `No claim is finished and waiting.` |
+| `Approve the purchase` | `Approve {n} {model} for {purpose}` | `Approve` · `Refuse` | `Approved — {n} {model}` | `Nothing waiting for you.` |
+| `Decide what the customer gets` | `Decide what {customer} gets` | `Save what we are doing` | `Recorded` | `No claim is waiting for a decision.` |
+| `Decide what happens to the item` | `Decide what happens to {unit}` | `Save what happened` | `Recorded` | `No item is waiting.` |
+| `Call about a late order` | `Call {salesperson} — {customer}'s goods will be late` | `Record what the customer decided` | `Customer decision recorded` | `No order is late.` |
+| `Check the SKU` | `Check the SKU with {supplier}` | `Publish the SKU` | `SKU published` | `Every request has its product.` |
+| `Check the supplier` | `Check the supplier for {model}` | `Save the supplier` | `Supplier saved` | `Every model has a supplier.` |
+| `Upload handover proof` | `Upload handover proof` | `Upload handover proof` | `Handover proof saved` | `Every handover has its proof.` |
+
+**MANUAL PURCHASE — the request's own words** (CARD-2026-08-18-manual-purchase, added on
+execution 2026-08-19; every string below is the card's own ruled text, recorded here so no
+screen respells it):
+
+| Where | The word |
+|---|---|
+| The page's create button | `+ New request` |
+| The create workspace title | `New request` |
+| Submit · abandon | `Send for approval` · `Cancel` |
+| The disabled Send NAMES its gap (the Receiving button law; first missing header fact wins, top-to-bottom) | `Send — pick a date` · `Send — say why` |
+| The form's fields | `Need for` · `Needed by` · `Deliver to` · `Raised by` · `Why` · `Items` · `Qty` · `Note` · `Supplier` · `+ Add line` · `Remove` |
+| The already-have block | `WHAT WE ALREADY HAVE` — `free stock` · `already on PO` · `still needed` (the arithmetic is PRINTED, never left to the reader) |
+| The register columns | `Ref` · `Need for` · `What` · `Qty` · `Deliver to` · `Needed by` · `Raised by` · `Status` |
+| The states | `Waiting for approval` · `Waiting for the SKU` · `Ready to order` · `Ordered` · `Arrived` · `Not going ahead` — `Waiting` always names what it waits ON; `Arrived` is a FACT the system observes, never a button |
+| The number series | `REQ-` (never `PR-` — 2990s prints PR for a purchase return) |
+| The consolidation OFFER | `Issue as one PO?` — with `Issue as one PO` · `Issue separately` both live on the same screen; an offer that cannot be declined is a gate wearing an offer's clothes |
+| The register's empty state | `No requests yet — press + New request to raise the first one.` (registered 2026-08-19 — the sentence shipped approved; its absence from this table was the defect) |
+
+**PO REVISIONS — the sent document's version** (CARD-2026-08-19-po-revisions, executing
+purchasing/MASTER.md §4's revision rule, Jess 2026-08-18 — *a sent PO is not overwritten, it is
+REVISED*; registered on execution so no screen respells them):
+
+| Where | The word |
+|---|---|
+| The panel title | `PO-2041 · Version 2` — **Version 1 prints nothing**: an unrevised PO is just the PO |
+| The door | `Revise` — beside `Print PDF`, an act on the document; only an open PO offers it |
+| The form's fields | `Qty` · `Destination` · `Why` |
+| The floor, stated inline where it binds | `{n} received` — grey while honoured, red when the draft breaks it |
+| Save | `Save Version {n}` — the button names the act's product |
+| The disabled Save NAMES its gap (the Receiving button law; first gap wins, the floor first) | `Save — below received` · `Save — nothing changed` · `Save — say why` |
+| The unshared version (DERIVED, work to do, never a stage) | `{po} Version {n} has not reached {supplier}` |
+| A silent qty / Deliver To edit on a shared PO, refused (the SQL door's own sentence, printed inline) | `A shared PO changes through Revise.` |
+| The history row | `Revised to Version {n} — {old → new changes} — {why}` |
+
+`Revision` stays off every screen for the SNAPSHOT store (0317's ruling holds — `Snapshot N` is
+the hand-over word); `Version` is the DOCUMENT changing, which is exactly what that ruling
+reserved the word for.
+
+**SIXTY-FIVE ACTIONS BECAME TWENTY, AND THAT WAS THE POINT** (Jess, 2026-08-18). *(Thirteen was
+this section's first count, taken before all eleven pages had been designed; seven more surfaced
+and the number is corrected here rather than defended.)* A blueprint
+draft named 65 distinct pieces of work across the register rails; 49 of them opened with a verb
+this portal does not have, and most were ONE act wearing four names — `Share PO PDF` ·
+`Share Claim with Supplier` · `Share Return with Supplier` · `Share Repair Order` are one act,
+and the act is **`Issue`**, because a document that has not reached its supplier is not issued
+yet. The merge is the reason the seven verbs are worth defending: **the count fell by 80% and
+nothing was lost.**
+
+**A SHARE IS NOT ITS OWN ACTION — `Issue` ALREADY CARRIES IT** (Jess, 2026-08-18). The row line
+has always read `Issue PO to {supplier}`: getting the document to the factory was never a second
+act, and a document the factory has not seen is not issued. **`Issue` stays open until an operator
+confirms which version went to whom on which channel**, and the button inside the form changes to
+`Record what you sent` — a form button, which needs no verb from the table. The same holds for a
+consignment order, a purchase return and a repair order. *(A separate `Check what was sent` was
+drafted and dropped: `Send` is banned, and stretching `Check` over it would have taught staff that
+`Check` means two different jobs.)*
+
+**`Return` HAS NO PURCHASING ENTRY, AND ITS ABSENCE IS RULED** (Jess, 2026-08-18). Bouncing an
+incomplete request back to whoever raised it was proposed and refused: a salesperson lives on
+the showroom floor, not in a queue, and work handed to them stops moving. **Operations calls
+them, gets the answer on the phone, and records it.** The general form — *the portal never waits
+on somebody who does not work in it* — binds every module.
 
 **SO-scoped Batch Purchase entrance** (2026-08-10):
 
@@ -509,10 +757,10 @@ headings it needs from this list and adds none.
 recorded here so the dictionary holds them too):
 
 - **A day row prints WEEKDAY + DATE — `Thu 6 Aug` — one format on every row.** Never a bare
-  weekday (`Monday` is ambiguous — which Monday?), never `Today` / `Tomorrow` on a rail
-  (relative words rot in screenshots and re-sort themselves overnight; the Delivery calendar's
-  three VIEWS keep their own ruled names — a view is not a day row). The full date stays on
-  hover.
+  weekday (`Monday` is ambiguous — which Monday?), never `Today` / `Tomorrow`. The full date
+  stays on hover. *(This row used to carve out an exception — "the Delivery calendar's three
+  VIEWS keep their own ruled names, a view is not a day row." **The owner deleted that
+  exception on 2026-08-15**; see the generalised ruling below.)*
 - **`Overdue`** — red, above the day rows, rendered only above zero.
 - **`Later`** — everything beyond a rolling window. Never `Next Week`, which starts lying on
   Thursday. Never `Upcoming` · `Future` · `Beyond`.
@@ -530,7 +778,7 @@ against.
 
 ### The verb dictionary — portal-wide (locked 2026-07-27)
 
-**SEVEN verbs, seven meanings. Every module uses these; no module invents an eighth.**
+**NINE verbs, nine meanings. Every module uses these; no module invents a tenth.**
 
 *(It was five until 2026-07-28. `Return` was added by Loo's ruling because R6 needed a word
 for "this record goes back to whoever produced it" and reached for `Send back`. **`Prepare`
@@ -538,7 +786,13 @@ was added 2026-07-29 and RETIRED 2026-07-30** with the Purchasing clean restart:
 purchase order is one act again, so the verb has no object left. **`Check` was added by Loo
 on 2026-08-05** — see the row below and the note under the table. **The bar for an eighth is
 the bar `Return` cleared: no existing verb fits, and the alternative is a module inventing
-its own.**)*
+its own.** **`Approve` and `Decide` were added by Jess on 2026-08-18 against that same bar,
+and the reasoning is recorded because it is the test the next one must pass.** Approving a
+purchase is not `Check` — nothing is missing that could be found out; somebody must PERMIT it.
+Choosing what a customer gets is not `Assign` either: **`Assign logistics` reads clearly
+because a party is being attached to a record, and staff already read the word that way — a
+decision between four outcomes attached to nobody is a different act, and one word carrying
+both is how a screen stops being readable.**)*
 
 **They govern WORKLIST ACTIONS, not form buttons.** A button inside a form that stores what
 you just typed is `Save`, and one that abandons it is `Cancel` — those are not actions, they
@@ -618,6 +872,8 @@ resolved at render time from what is on file — never a third blended word cove
 | **Close** | a case or claim is finished and its record is sealed | the record can no longer change |
 | **Return** | a record goes BACK to the party that produced it, for them to act on | the record is with them **and its state says so on their screen** |
 | **Check** | a fact the business needs is MISSING, and somebody must establish it — by any means | the fact is **recorded in the system**. Finding out and not writing it down completes nothing |
+| **Approve** | a person with the authority permits **a purchase nobody's customer ordered** | the answer is recorded, yes or no — and a `Refuse` carries a reason that goes back to whoever asked. **The label always names WHAT is approved; a bare `Approve` is not a label** |
+| **Decide** | Carres CHOOSES between several outcomes that all exist — nothing is being found out, and nobody outside is being asked | the choice is recorded |
 
 ### `Check` vs `Call`, and `Check` vs `Check in` (Loo, 2026-08-05)
 
@@ -696,6 +952,34 @@ to hand to logistics. Today `orders.do_number` is stamped by a DB trigger on the
 transition (0098) — a day too late to give logistics the paper they ask for the evening
 before. Card C7 moves the stamp to customer confirmation. Nobody ever authors a delivery
 order by hand.
+
+### The On hand Category filter words (card 2026-08-19)
+
+The `Category` heading itself is already governed above (*facts about the record*). These are
+the pill words underneath it on On hand's left rail. **The category is the CATALOG's answer**
+(ERP-ARCHITECTURE §3.1 · D9) — no screen derives one from a SKU string, so every word here is
+either a catalog value or the honest admission that there is none.
+
+| Meaning | Use exactly | Do NOT use |
+|---|---|---|
+| No category filter applied | **`Any`** | `All` — this rail already spends `All` on the Status bucket list, where it names a bucket. Two `All` pills stacked in one rail ask *"all of what?"* |
+| The catalog's own six values | **`Mattress` · `Bedframe` · `Sofa` · `Accessory` · `Service` · `Guarantee`**, in that order | count order · alphabetical order · any raw SKU word |
+| The SKU has no catalog row | **`Not in catalog`** | `No catalog match` · `Unknown` · `Uncategorised` · `Other` · `Other goods` — and above all never folded into `Accessory` |
+
+**Why `Not in catalog` and not `No catalog match`.** *Match* names the lookup the system just
+performed; this rail states a fact about the GOODS. It is the same shape as the two facts this
+dictionary already rules — **`Supplier not assigned`** and **`Address not given yet`** — and the
+same reason `Invalid SKU` and `Supplier error` are banned there: a screen reports what is true of
+the record, never what the query did.
+
+**It is display, never a worklist.** 87 of 136 live records (975 units) sit in this bucket, and
+they are free-text import SKUs. Every live row today is TEST data (Constitution §6), so the
+number is honest reporting — it raises no alert, and it is never a cleanup or backfill queue.
+
+**`Other goods` is NOT the fallback here.** That word is ruled for the Sales Order footer's
+category tally, where a line is known goods that simply has no tally word of its own. *We do not
+know what this is* is a different fact, and borrowing the word would hide 975 unknown units
+under a confident one.
 
 ### The Receiving Workspace's own words (locked 2026-08-03, Slice B)
 
@@ -813,6 +1097,29 @@ lag, not the other way round.
 **Every module fails the same way:** one `Exception` plus a `Reason`, never a family of
 different failure words.
 
+### A door that is planned but not open says `Coming soon` (Jess, 2026-08-18)
+
+**`Coming soon` is the ONE way the portal marks a page that is approved but not
+built.** It is the sidebar's own case: Purchasing lists all thirteen of its pages
+from the day the rail changes, and seven of them do not exist yet.
+
+| Situation | The words |
+|---|---|
+| A rail entry for a page that is approved but not built | **`Coming soon`**, on its own line under the name (measured 2026-08-19: beside the tag every unbuilt name truncates) |
+
+**Banned for the same fact:** `TBD` · `Not available` · `Not yet` · `In progress` ·
+`Soon` on its own · a greyed word with nothing beside it. Those are six sentences
+for one fact and a new hire has to learn all six.
+
+**The words are only half of it — the row may not be a control.** A `Coming soon`
+row is a `<span>` with no href, out of the tab order and `aria-disabled`. That is
+what keeps it inside `03-page-patterns.md:149` (*a control that opens nothing is a
+dead control*) while satisfying `:219` (*a control that is deliberately disabled
+must say why, on screen*). **There is no dead arrow because there is no arrow.**
+
+**It never carries a count**, not even zero — a number would claim work exists on
+a page that does not.
+
 ### A number is not a status until someone sets a target (locked 2026-07-27)
 
 A percentage, a count or a rate is a FACT. It gets a colour only when a human has set the
@@ -917,8 +1224,11 @@ Information Architecture and live in [`ERP-ARCHITECTURE.md`](ERP-ARCHITECTURE.md
 | Telling logistics to re-arrange a delayed delivery | **`Call {logistics} — arrange new delivery date`** | Call customer (stock delay) · Inform customer · Reschedule |
 | Call to fix delivery date + slot | **Call {customer} — book delivery date** | Schedule delivery · Chase · Call customer (book delivery) [old T2 spelling] |
 | The company responsible for customer contact/transport in Delivery | **Logistics Partner** · a named one reads `NETS Logistics` | Logistic · Carrier · Delivery partner |
-| The goods pool (any page/tab/label) | **Stock** | Inventory · Warehouse (as a menu word) |
-| Stock in/out history (tab/label) | **In & out** | Movements · Movement log (menu) · Ledger |
+| The goods pool (any page/tab/label) | **Stock** | Inventory · Warehouse (as the goods-pool word — `WAREHOUSE` is the module's rail HEADING since 2026-08-19, never the pool's name) |
+| The module's rail heading (CARD-2026-08-19-warehouse-rail) | **Warehouse** | Stock (as a heading) · Supply Chain |
+| Stock in/out history (page/label) | **In & out** | Movements · Movement log (menu) · Ledger |
+| The cross-site custody journey page (Warehouse Blueprint item 13, `Coming soon`) | **Transfers** | Movements · Relocations |
+| The formal unit-verification page (Warehouse Blueprint item 13, `Coming soon`) | **Counts** | Stocktake · Audit |
 | A logistics company's own working rules | **delivery rules** | Partner profile · SLA · Carrier config |
 | Notice logistics need before a delivery day | **working days notice** | Lead time · Cut-off · Booking window |
 | A date logistics are closed | **not running on** | Blackout · Unavailable · Out of service |
@@ -937,6 +1247,8 @@ Information Architecture and live in [`ERP-ARCHITECTURE.md`](ERP-ARCHITECTURE.md
 | An SO edit because the CUSTOMER asked for something different | **Customer change** | Amendment · Change request (that is the pending ASK, not the applied change) · Revision (that is the record it mints) |
 | A fulfilment-side substitution/recovery that does not create a new customer transaction | **Fulfilment replacement** | Customer change · Staff correction · Cancel and reorder |
 | Register date promised/requested for the customer | **Customer Delivery** | Promised · Delivery date (as this register header) · Current |
+| Register column of what the customer still owes | **Outstanding** | Balance — re-ruled 2026-08-15; `balance` is the goods word, two rows above |
+| Register column naming the selling showroom | **Showroom** | Outlet · Branch · Store |
 | Register destination summary | **Delivery Location** | Address · Location (ambiguous) · Ship-to |
 | Direct customer-order document identity | **SO No** | Doc. No. · Current |
 | Direct purchase-order document lineage | **PO No** | PO Doc No. · Current |
@@ -945,6 +1257,225 @@ Information Architecture and live in [`ERP-ARCHITECTURE.md`](ERP-ARCHITECTURE.md
 | Complete immutable versions of one SO | **Revisions** | History · Amendments |
 | Append-only events on one SO | **History** | Revisions · Activity (for this object view) |
 | Fact-derived document/fulfilment/obligation map | **Order Route** | Relationship Map · Journey · Workflow · Checklist · Status |
+
+### The customer-money word is `Outstanding` (owner ruling 2026-08-15)
+
+**`Outstanding` is what the CUSTOMER owes HQ** (`CLAUDE.md` §7). It was already this dictionary's
+word for a column of what is still owed; the ruling ends the last two places that said `Balance` —
+the Sales Order MONEY summary and the register's MONEY column.
+
+**`balance` stays the GOODS word** for what is still owed after a short delivery (the row in the
+canonical vocabulary below). The two facts were wearing one label. A stored key or test id keeps
+its name: renaming a label is a copy decision, renaming an identifier is a breaking change.
+
+| Concept | Canonical word | Do NOT use |
+|---|---|---|
+| What the customer still owes HQ, anywhere on screen | **`Outstanding`** | Balance · Balance owing · Amount due · Owing |
+
+### The delivery money gate, payment approval and COD words (owner ruling 2026-08-19)
+
+Money in full before delivery is the only default; the one exception is a recorded APPROVED
+Delivery Payment Approval, which means COD on the owner's exact terms. These are the governed
+spellings — the gate, the canvas, the object page, the drawer and the DO document all read them
+from the shared modules (`delivery-payment-approval.ts` · `delivery-order.ts`), never a local
+rewording.
+
+| Meaning | Use exactly | Do NOT use |
+|---|---|---|
+| The manual DO door (outstation — partner schedules the customer) | **`Request Delivery Order`** | Issue DO · Create DO · Generate DO · Release |
+| The approval object / the Money-block label | **`Delivery payment approval`** | Payment exception · Money release · COD request |
+| The raise door on the order | **`Request payment approval`**, reason field **`Reason`**, submit **`Send request`** | Ask Jess · Escalate · Apply for release |
+| The approver's two verbs | **`Approve`** · **`Refuse`**, reason field **`Decision reason`** | Reject · Deny · OK |
+| The approved state, everywhere it renders | **`COD approved — collect before unloading`** | Released · Money waived · Approved to deliver |
+| A raised, undecided request | **`Waiting for decision`** (gate line: `… approval waiting for decision`) | Pending approval · In review |
+| ⭐ The DO document's instruction, printed when issued under an approval and still owing | **`COLLECT RM {amount} BY ONLINE TRANSFER BEFORE UNLOADING — NO CASH.`** | any softer or reworded version — these are the owner's words |
+| The gate refusal, nothing raised | **`RM {amount} is still outstanding — collect it in full, or request a payment approval.`** | Money not collected · Balance due |
+| The gate refusal, request pending | **`RM {amount} is still outstanding — a payment approval is waiting for the approver's decision.`** | — |
+| Route gate, money met | **`Money in full`** · under approval **`COD approved — collect before unloading`** | Paid · Settled |
+| Route gate, unpriced order | **`No price yet — unknown never holds`** | Money does not hold this delivery |
+| The drawer's absence sentence | **`No delivery order yet — the system issues it when the goods, money and date are ready`** | the 2026-08-16 version without `money` |
+
+### The Sales Order register and object words (owner ruling 2026-08-15)
+
+| Meaning | Use exactly | Do NOT use |
+|---|---|---|
+| The register's search placeholder | **`Search sales orders…`** | `SO number, customer, phone or item…` — the box is a governed 200px, so the long form clipped at every width, not only a narrow one |
+| The register's eighth default column | **`Showroom`** | Outlet · Branch · Store |
+| The footer's category tally | the governed words only — `Mattress · Bedframe · Sofa · Pillow · Mattress protector · Topper · Footrest · Service · Other goods` | any raw SKU word, and above all `M.P` — the AutoCount sheet's abbreviation. Anything not positively recognised is **`Other goods`**, never dropped from the count |
+| Copy this order into a new one, from the object page | **`Copy to new Sales Order`** | Duplicate · Clone · New from this |
+| The object MONEY card's door to the collections desk | **`Open this order in Payments`** | View payments · Go to Payments · Collect |
+| Payments' chip for that scope | **`Sales Order SO-{n}`** | Filtered by order · Order scope |
+| Order Route, a promise with no trip arranged | **`Customer date {date} · Delivery not arranged`** | `Promised this day, no date yet` — retired 2026-08-15: it named a day and denied it in one line |
+| Order Route, no promise at all | **`No delivery date`** | any second spelling — this is the same governed value the Register prints |
+| Order Route first-layer heading | **`Order tracks`** | Overall status · Order status · Still owed |
+| Order Route conditional linked-case heading | **`Linked problems`** | Service track · Other track · Exceptions |
+| Order Route delivery-gate heading | **`Delivery release`** | Release checklist · Delivery status |
+| Delivery release is blocked | **`Not ready for delivery`** | Cannot proceed · On hold · Blocked |
+| Delivery release is clear | **`Ready for delivery`** | All done · Released · Complete |
+| A required purchasing document does not exist | **`No Purchase Order yet`** | PO: — · Waiting Purchasing |
+| A route document door | **`Open {document number}`** | an unexplained ↗ · View document · Go to document |
+
+### The Sales Order entry-gate words (owner ruling 2026-08-15)
+
+Two rules refuse an order at entry, and each refusal names what is wrong and exactly how to fix it
+(the Error pattern above). **`(TBD)`, `Confirm later` and `For Further Notice` are RETIRED** — a
+new Sales Order always carries a real Customer Delivery date.
+
+| Meaning | Use exactly | Do NOT use |
+|---|---|---|
+| Step 3's standing note under the date picker | **`Ask the customer for the date before you save the order. An order without a delivery date cannot be filed.`** | Confirm later · TBD · For Further Notice · Optional |
+| The wizard refuses a dateless step | **`Delivery date — ask the customer for the date, then pick it`** | `Delivery — pick a date, or tick 'Confirm later'` |
+| The wizard refuses a missing production start | **`Proceed date — pick the day production should start`** | …`or tick 'Confirm later'` |
+| The create door refuses a dateless order | **`Delivery date is required. Ask the customer for the date before you save the order.`** | `delivery date is required unless marked TBD` |
+| The cart refuses a service-only order | **`This order has no product — add the product this service belongs to`** | Invalid cart · Nothing to sell · Add an item |
+| The create door refuses a service-only order | **`A Sales Order must contain a product. Add the product this service belongs to, or open a Service Case instead.`** | Bad request · Service not allowed |
+
+### The Sales Order object page words (owner ruling 2026-08-15)
+
+The object page is ONE page in ONE state, so the words that named a MODE are retired with it.
+**`Edit`, `Edit operational details`, `Order context` and `Save changes` no longer appear on the
+object page** — nothing announces permission to type into a field that is already typeable. The
+Register's context menu keeps the word `Edit` only because it names a destination, and that
+destination is the same one `View` opens.
+
+| Meaning | Use exactly | Do NOT use |
+|---|---|---|
+| The bar that appears when something has changed | **`⚠ {n} changes`** with **`Discard`** and **`Save`** | Unsaved changes · You have edits · Save changes · Apply |
+| The mark on the document preview while changes are unsaved | **`UNSAVED`** | Draft · Preview · Not saved yet |
+| A submitted amendment, above the document | **`⚠ Amendment pending approval: delivery date → {date}`** | Pending change · Proposed · Awaiting sign-off |
+| The three-field section that moves the promised date | **`Amend delivery date`**, with the note **`creates a Revision · needs approval`** | Change delivery date · Reschedule · Postpone |
+| Its three fields, in order | **`Amend date (from customer)`** · **`Amended delivery date`** · **`Amend reason`** (required) | Request date · New date · Notes · Remark |
+| Why the emergency contact is collected | **`Used only if we cannot reach the customer on delivery day`** | Next of kin · In case of emergency · Backup contact |
+| The management-only door on Sales ownership | **`Change salesperson — needs approval`** | Request ownership change (that stays the FORM's title) · Reassign · Change owner |
+| Report a problem, now inside `More actions` | **`Report a problem`** | Raise an issue · Log a complaint · New Service Case |
+| The delivery address the customer has not given yet | **`Address not given yet`** | Unknown · Fill in later · TBC |
+| Billing that repeats the delivery address | **`Billing address same as delivery`** | Same as above · Use delivery address |
+| The stair-carry count, when the salesperson named none | the field's own hint **`Empty = every item`** | Auto · All · Default |
+| The auto-detected customer type, before a dial-able phone | **`Not known yet`** | — · N/A · Unknown |
+
+`Customer type (auto)`, `Existing customer`, `New customer` and `Checking…` are the Sales
+Portal's own words and are printed unchanged on the object page — one fact, one spelling.
+
+| Meaning | Use exactly | Do NOT use |
+|---|---|---|
+| Printing while the form is dirty | **`You have unsaved changes — printing the saved version`** | Save first · Unsaved · Print anyway |
+
+### The Order Route words (owner ruling 2026-08-16 — OVERWRITES the 2026-08-15 version)
+
+**The route is ONE NODE MAP.** The 2026-08-15 words for a three-section stack (`ORDER TRACKS`,
+`GOODS ROUTES`, `DELIVERY RELEASE`) are retired with the layout that carried them; this table is
+the only current version.
+
+**`CURRENT` is the Route's position word, and it belongs to a ROUTE.** `YOU ARE HERE` stays
+**REJECTED**: a Sales Order stands in up to three places at once, so a phrase that says *here* has
+to point at one of them and be wrong about the others.
+
+| Meaning | Use exactly | Do NOT use |
+|---|---|---|
+| The whole surface | **`Order Route`** | Timeline · Journey · Progress · Flow chart · Diagram |
+| A node's heading | **`SALES ORDER`** · **`PURCHASING`** · **`SUPPLIER`** · **`RECEIVING`** · **`STOCK`** · **`LOGISTICS`** · **`DELIVERY DATE`** · **`MONEY`** · **`DELIVERY ORDER`** · **`DELIVER`** · **`DELIVERY PHOTO`** · **`LOAN`** | Step · Stage · Task · any renaming of these |
+| Where the work stands on a route | **`CURRENT`** | `YOU ARE HERE` (rejected) · Now · Active · Here |
+| The conditional exception strip beside the map | **`LINKED PROBLEMS`** | Issues · Exceptions · Service · Alerts — and never a node |
+| The convergence gate | **`DELIVERY ORDER`** | Release gate · Ready check · Can we deliver |
+| Its two headlines | **`NOT READY FOR DELIVERY`** / **`READY FOR DELIVERY`** | Blocked · Not ready · OK to go · Cleared |
+| The requirement count | **`{k} of {n} requirements met`** | {n} blockers · {n} still open · Everything done |
+| The issued document | **`{DO number}`** + **`Delivery order issued`** | Released · Approved · Done |
+| The zoom controls | **`Zoom out`** · **`Zoom in`** · **`Fit the whole route`** (aria-labels) | Reset · Recenter · 100% |
+
+**THE GATE REQUIREMENTS — one plain sentence each, with the count that makes them countable.**
+
+| Requirement | Use exactly | Do NOT use |
+|---|---|---|
+| Goods partly ready | **`Goods not ready ({n} of {m})`** | Partial · Incomplete · Some ready |
+| Goods all ready | **`Goods ready ({n} Units)`** | Ready (alone) |
+| Goods ready for a scoped partial trip | **`Goods ready for this delivery ({n} Units in, {m} Units still open)`** | Ready (alone) — a met requirement on partial goods must show its scope |
+| No company chosen | **`No logistics chosen`** | No carrier · Unassigned · TBC |
+| A company is chosen | **`Logistics chosen ({name})`** | Assigned · Booked |
+| No agreed day | **`Date + slot not confirmed`** | No booking · Unscheduled · TBC · Appointment not confirmed |
+| An agreed day | **`Date + slot confirmed`** | Booked · Scheduled |
+| Finance is not holding the delivery | **`No Finance hold`** | Money cleared · Paid enough |
+| An OPEN Finance exception holds it | **`Finance is holding this delivery: {reason} — Finance clears it`** | Payment outstanding · Unpaid · On hold · a derived balance sentence |
+| Nobody has priced the order | **`No price yet — money does not hold this delivery`** | RM 0 · Unpriced · — |
+| The agreed day is a Sunday | **`Date falls on a Sunday — pick another day`** | Invalid date · Not a working day |
+| The agreed day is a public holiday | **`Date falls on a public holiday — pick another day`** | Closed · Holiday · Not available |
+
+**⭐ MONEY LEFT THE GATE (owner ruling 2026-08-16, decision A — supersedes decision B).**
+Outstanding money does not block the delivery order; **an OPEN Finance exception is the ONE money
+blocker**, stated with its reason and its owner because Finance is the only party that can clear
+it. The retired `RM {amount} still to collect` gate requirement and the manager-release sentence
+went with the gate they described; the collect ACTION and its amount live on unchanged in the
+worklist. `docs/orders/MASTER.md` §8 carries the ruling.
+
+**THE MISSING-FACT PHRASES — primary-school English, never a dash.** A node nobody has reached says
+what has not happened yet, in the plainest words available:
+
+| Node | Use exactly | Do NOT use |
+|---|---|---|
+| No Purchase Order covers this quantity | **`No Purchase Order yet`** | `PO: —` · No PO · Not ordered · Pending |
+| The supplier has not confirmed a ready date | **`Ready date not confirmed`** | ETA unknown · TBC · — |
+| Nothing has been received against the PO | **`Not received yet`** | Not received · GRN: — · Outstanding |
+| Part of the PO arrived | **`{n} of {m} received`** | Partial · {n}/{m} |
+| Units are short on the line | **`{n} of {m} Units ready`** + **`Waiting for purchase`** | Units not created yet · No stock · Not allocated |
+| No company chosen yet | **`No logistics chosen yet`** | No carrier · Unassigned |
+| Nobody has agreed a delivery day | **`Date + slot not confirmed`** | Appointment not confirmed · No booking · TBC |
+| Not delivered | **`Not delivered yet`** | Pending · Open · In progress |
+| No photo on file | **`No delivery photo yet`** | No photo · Missing · — |
+| The photo is on file | **`Uploaded by {name}`** + **`Uploaded: {date}`** | Done · Complete |
+| A loan item is out | **`{n} {item} on loan to customer`** + **`Collect back on delivery day`** | On loan · Lent · Outstanding loan |
+| A loan is still out after delivery | **`Loan not collected back`** | Overdue loan · Not returned |
+| A line a Revision removed | **`{item} · Qty {n}`** + **`Cancelled · Rev {n}`** | Removed · Deleted · Void |
+
+**BANNED on this surface, as everywhere:** `No data` · `No results` · `Not available`. Every empty
+state answers three things — what is missing, why, and who does what next.
+
+**THE NODE ACTION LINE USES THE QUEUE WORD, and the queue word is the one this dictionary already
+owns.** The node is compact and the fact line above it already names the amount or the document, so
+the instruction is the short form and never repeats the party or the number.
+
+| Node | Action line | Where the word comes from |
+|---|---|---|
+| PURCHASING, no PO | **`Issue PO`** | the action dictionary — the ONE act that creates a Purchase Order |
+| SUPPLIER | **`Confirm ready date`** | the action dictionary |
+| RECEIVING | **`Check in`** | the act on arriving GOODS — **never `Receive`**, which this dictionary bans as a verb |
+| STOCK | **`Create the Units`** | the Stock act |
+| LOGISTICS | **`Assign logistics`** | the action dictionary |
+| DELIVERY DATE | **`Confirm delivery date`** | the action dictionary |
+| MONEY | **`Collect`** | the action dictionary's queue word; the amount is on the fact line above |
+| DELIVER, after a failed run | **`Arrange new delivery date`** | the action dictionary |
+| DELIVERY PHOTO | **`Upload delivery photo`** | the action dictionary |
+| LOAN | **`Collect the loan item`** | NEW, registered here 2026-08-16 — the generic form of the card's `Collect the loan sofa`, because a loan is not always a sofa |
+
+**🔴 FIXED IN THE SAME PR (2026-08-16):** the shipped Route said **`Receive the goods`** on its
+RECEIVING station. `Receive` as a verb has been banned since 2026-07-27 — the act is `Check in` —
+and the string reached production because it was written on a surface nobody cross-checked against
+this table. It now reads `Check in`.
+
+**A ROUTE DATE ALWAYS CARRIES ITS MEANING.** The label says WHICH fact the day belongs to, and the
+day itself is spelled by `fmtDate` under the year rule (`Wed, 12 Aug`). **A bare date never ships.**
+The source may contain a full timestamp; the Route prints only the governed date. ISO timestamps
+such as `2026-08-12T04:38:44.852046+00:00` never appear to staff. The Sales Order node is evidence
+inside the object already open, so it has no circular `Open SO-{n} →` action.
+
+| Fact | Prints |
+|---|---|
+| The day the order was taken | **`Ordered: {date}`** |
+| The day the customer asked for | **`Customer requested: {date}`** |
+| The day the delivery is due | **`Due: {date}`** |
+| The day the Purchase Order was issued | **`Issued: {date}`** |
+| What the supplier confirmed | **`Estimated ready: {date}`** |
+| The day the goods arrived | **`Received: {date}`** |
+| The agreed delivery day | **`Delivery appointment: {date}`** |
+| The booked day, before it happens | **`Scheduled: {date}`** |
+| The day it was delivered | **`Delivered: {date}`** |
+| The day the photo went on file | **`Uploaded: {date}`** |
+
+**THE EDGE WORDS.** A connector may carry a small grey label, and only these:
+**`goods`** · **`(same line)`** · **`delivery`** · **`money`** · **`loan`** ·
+**`{item} · Qty {n}`** · **`{n} to buy from factory`** · **`collect back`**.
+
+**`Logistics Partner`, never `Carrier`** — already this dictionary's word for the delivery module,
+restated here because the Route names the party on the delivery side and a second spelling on a new
+surface is how a dictionary splits.
 
 ### The Sales Order amendment words
 
@@ -1070,6 +1601,151 @@ are unchanged (`Open WhatsApp` · `Open WhatsApp group`).
 Every word above is ruled. No terminology placeholder is left in Purchasing, and a chat that finds
 one has found a document that was missed.
 
+## ⭐ THE YEAR RULE — owner ruling 2026-08-15 (Chai), portal-wide
+
+**`Wed, 12 Aug`. The year appears only when it is not the current year.**
+
+```
+Wed, 12 Aug        a date in the year the operator is living in
+Fri, 15 Jan 27     a date that is not — and now the year IS the news
+```
+
+**One formatter, ERP-wide.** `fmtDate()` in `@/lib/fmt-date` — Register columns, object dates,
+Order Route, Activity, Calendar day headers and chips, Work rows, every one of them. There is no
+second date formatter and no page may compose one.
+
+**Why the year goes.** Nine dates in ten on an operational screen are this year. A `26` repeated
+down a column answers nothing and costs width in the one column that has none to spare — and
+because it is always there, it stops being read. **Dropping it turns the year into a signal:**
+the moment `27` appears, it is carrying the whole meaning, and the operator sees it.
+
+**Why the WEEKDAY never goes.** The no-relative-date-words rule above means an operator reads
+the day off the date itself. `12 Aug` does not say whether the truck moves on a working day;
+`Wed, 12 Aug` does. The year is context the reader already has; the weekday is not.
+
+**THE ONE EXCEPTION: a PRINTED DOCUMENT always carries its year** — `fmtDate(iso, { year:
+"always" })`. A screen is read today, so "this year" is a fact the reader is holding. A service
+note or a receipt is printed, filed and re-read in a later year by a customer or a technician
+who is holding nothing, and `Request Date: Wed, 12 Aug` has lost a fact the document exists to
+carry. **It is an option ON the one formatter, never a second formatter.**
+
+**The compact spelling is the ruled date LESS ITS WEEKDAY, not a second rule.** `fmtDateShort()`
+prints `12 Aug` / `15 Jan 27` for a date inside a sentence — `received 12 Aug`, `due 12 Aug` —
+where the sentence already says what the day is for. It reads the year off the SAME predicate
+`fmtDate` does, so the two can never disagree about a day. A date COLUMN always uses `fmtDate`.
+
+**`fmtMonth()` is untouched: `Jul 2026`.** It names a PERIOD in a switcher, where two adjacent
+entries may sit either side of a year boundary and the year is what tells them apart.
+
+**A BUSINESS ENGINE SPELLS NO DATES — it hands its caller DAYS and no words.** This is the same
+rule the `dayWord()` deletion established, and it caught a fifth spelling: `workDayLabel` in
+`packages/shared` fed the Work rows and Work day headings through `toLocaleDateString` (banned
+above), dropped the comma so a Work row and a Register cell named one day two ways, and printed
+NO year ever — indistinguishable from this rule until the work is due in another year, at which
+point the heading hid the one fact that made it urgent. It is deleted, with `WorkItem.dueLabel`
+and `WorkDayGroup.label`. A `WorkDayGroup` now carries `dayIso`, and the screen spells it.
+
+**Enforcement is structural.** The year is decided in ONE predicate that every spelling in the
+module calls, `fmtDayChip` is deleted, and the three page-local no-year formatters built by
+string surgery on top of these — `railDayLabel` in To Order and Purchase Orders, `dayMon` in the
+Order Detail drawer — are deleted with it. `work-engine.test.ts` asserts the engine exports no
+label function and its items carry no label field. They were regexing off a year the formatter should
+never have printed; the compensation is now the rule. `fmt-date.test.ts` pins the clock and
+asserts the module exports exactly three functions, so a fourth spelling cannot be added quietly.
+
+**A test may never hard-code a dated spelling.** "This year" moves. An expectation written as
+`"Wed, 12 Aug 26"` asserts the wrong thing for half of every year and starts failing on 1
+January with nothing deployed. Build the expected string with `fmtDate()`, or pin the clock.
+
+## ⭐ CUSTOMER NAME — CAPITALIZE UP ONLY — owner ruling 2026-08-15 (Chai)
+
+**Raise a word's first letter. Never lower a letter that is already raised.**
+
+```
+jimmy          →  Jimmy
+mei emi        →  Mei Emi
+KJ NG          →  KJ NG            ← initials survive
+LIM KUAN YANG  →  LIM KUAN YANG    ← unchanged
+```
+
+**Why one-directional.** A title-caser that lowercases the tail is guessing that the capital was
+an accident. On a Malaysian customer list that guess is wrong often enough to be a defect: `KJ`,
+`TCF`, `AL` and the `Sdn Bhd` company forms are initials and acronyms, and `Kj Ng` is not the
+reader's name. **Raising a letter can only ever fix a name typed in a hurry; lowering one can
+destroy a name that was typed correctly.** So the rule only moves in the safe direction.
+
+**Display only. The record keeps exactly what was typed.** This never runs on write, never
+reaches an import, and no migration normalises the column. It is a lens, not a correction —
+which is also why it must have ONE home: a name shown three ways on three screens reads as three
+customers. `displayCustomerName()` in `@/lib/customer-name`, and no page-local copy. The one
+that existed — `properCase` in To Order — had the WRONG rule and is deleted.
+
+**Where it applies — EVERY surface that names a customer, owner ruling 2026-08-15.** The
+Register's Customer column and its search, filter and export · the object header and CUSTOMER
+card · Payments · Order Route · Activity · Work rows · the Quick Rail's Team, Calendar and Work
+peeks · the Delivery workspace · **the WhatsApp greeting** · **every PDF document**.
+
+**The WhatsApp greeting obeys the same rule.** `titleCaseName()` used to soften `LEE WEI YANG`
+into `Lee Wei Yang` for politeness. The owner ruled it out, because the same guess that softens
+a shouted name also turns `KJ NG` into `Kj Ng` — **and a message addressed to `Kj` is addressed
+to nobody.** The function is DELETED rather than re-pointed at the shared helper: a second name
+for one rule is how two rules come back. `salutationOf()` calls `displayCustomerName`, and the
+preferred-name field still wins over both.
+
+**A PDF prints what the screen prints,** and the helper is applied **in the TEMPLATE, not in the
+payload each caller assembles.** That placement is the rule, not an implementation detail: there
+are many doors into a document — the workspace, Payments, a regenerated historical PDF — and a
+rule applied at each door is a rule that one new door will miss. Applied at the render, every
+door and every later regeneration passes through it. A document whose casing disagrees with the
+register it was raised from reads as a different customer.
+
+**The ONE place it does not apply, and the boundary is deliberate: an EDIT field.** An input
+stays on the raw stored value, because a cased field writes its casing back to the record on
+save — which is the one thing this rule forbids. Display-only means display-only.
+
+**Enforcement is structural.** `wa-templates.test.ts` asserts the module exports no second
+casing entry point. `pdf/customer-name-display.test.ts` scans every `*-template.tsx` source —
+not a render, because a render test only sees the branches its fixture reaches, and a signature
+caption is exactly the branch a fixture forgets — and fails if any customer name reaches a
+render unwrapped.
+
+## ⭐ NO RELATIVE DATE WORDS — owner ruling 2026-08-15, portal-wide
+
+**A date on screen names its actual day. `Today` and `Tomorrow` are not dates.**
+
+The ban already existed in three places — the delivery word table, the rail day-row rule and
+the 2026-08-14 delivery execution words. Each carved out its own exception, and the exceptions
+were where the words survived. **The owner generalised the rule and deleted the carve-outs.**
+
+| Where | Print | Never |
+|---|---|---|
+| A day heading / schedule group | **`Sat, 15 Aug`** (`fmtDate`) | `TODAY · 15 AUG 26` · `Today` · `Tomorrow` |
+| A day CHIP | **`Sat, 15 Aug`** (`fmtDate` — the same string) | `Today` · `Tomorrow` |
+| A range that spans days | **`This week`** | `Next 7 days` · `Week view` · `Upcoming` |
+
+**The chip row used to name a second formatter, and no longer can.** `fmtDayChip` existed
+because a ~100px chip could not afford the year; THE YEAR RULE below drops the year from every
+current-year date, so the chip's spelling and the portal's spelling became one string and the
+second function is DELETED. A single-day chip also lost its hover: the full ruled date is now on
+the chip's face, and a tooltip that repeats — or says less than — the thing it explains is a
+defect, not a courtesy. A SPAN chip keeps its hover, because `This week` names no date.
+
+**Why it is not a style preference.** A relative word is true only on the day it is read. It
+rots in a screenshot, it re-sorts itself overnight, and an operator reading `Tomorrow` on a
+chip at 00:05 is reading a lie about the day the truck moves. **`This week` survives because it
+is a SPAN, not a day** — no date can spell it, and it stays true for its whole range.
+
+**THE ONE EXCEPTION, and it is a different fact: a HISTORY group.** `Today · Yesterday ·
+Earlier` remain the ruled headings for an append-only history (`ui/MASTER.md` §6.4 ⑦), because
+a history group is *recomputed live over the past* — an event correctly moves from `Today` to
+`Yesterday` as time passes, and the grouping never claims a specific day. A FUTURE date labelled
+`Tomorrow` is a claim about one day, and that is what this rule bans. **Do not "fix" the history
+headings, and do not cite them as licence for a relative future date.**
+
+**Enforcement is structural, not vigilance.** `dayWord()` — the shared helper whose only product
+was `Today` / `Tomorrow` — is DELETED, and `DeliveryRange` no longer carries a `label` field.
+A range hands its caller DAYS and no word, so there is nothing left for a screen to print.
+
 ## The delivery calendar words (T10, locked with Jess 2026-07-27)
 
 A calendar day answers ONE question: **which trucks move that day.** A day is
@@ -1079,7 +1755,7 @@ split them.
 
 | Concept | Canonical word | Do NOT use |
 |---|---|---|
-| The three calendar views | **Today · Tomorrow · This week** | Next 7 days · Week view · Upcoming |
+| The three calendar views | **`Sat, 15 Aug` · `Sun, 16 Aug` · `This week`** — the two single-day views name their day (owner, 2026-08-15; this row read `Today · Tomorrow · This week` until then) | `Today` · `Tomorrow` · Next 7 days · Week view · Upcoming |
 | The customer said yes to this date | **Confirmed** (+ the slot, e.g. `12pm–3pm`) | Booked · Locked · Scheduled |
 | Only logistics have named this date | **Logistics' date** | Provisional · Tentative · ETA · Pencilled in · Carrier's date |
 | Promised on this day, no booking yet | **Promised this day, no date yet** | Unscheduled · Not booked · Unbooked · Pending · anything with "needs" |
@@ -1135,6 +1811,31 @@ Fixed phrasings — reuse, never invent a variant:
 
 **Never** write "access restrictions", "site constraints", "delivery window policy" or
 "lift booking required" on screen. Say what the building is and how long the truck has.
+
+## The Delivery Order DOCUMENT words (blueprint card, owner ruling 2026-08-16)
+
+The Delivery Orders Register (SALES sidebar) and the DO object page speak these words and no
+others. The status set is the document's own lifecycle — registered here and in
+`STATUS-STANDARD.md`; the ONE arithmetic is `deliveryOrderStatusOf` in `packages/shared`.
+
+| Meaning | Use exactly | Do NOT use |
+|---|---|---|
+| The sidebar door / register | **Delivery Orders** | DOs · Deliveries · Dispatch |
+| A fresh document, no run yet | **Created** | New · Open · Pending |
+| Goods received by logistics, not yet resulted (derived from the §4 chain's `Received by logistics` fact, 0363 — never from the calendar) | **Out for delivery** | In transit · Dispatched · On the way |
+| The trip completed | **Delivered** | Done · Complete · Closed |
+| The trip did not complete | **Delivery exception** + its ONE reason from the T4 Reason Library | Failed · Problem · a second word list |
+| A voided document | **Cancelled** + `Order cancelled` / `Rescheduled` | Deleted · Void · Removed |
+| No date on the document | **No delivery date yet** | — · TBC · N/A |
+| The register's empty state | **No delivery orders yet — the system issues one when a trip's goods, logistics and date are ready. The Order Route on each Sales Order shows what is still open.** | No data · No results |
+| An order's row before the document exists (drawer / detail) | **No delivery order yet — the system issues it when the goods, logistics and date are ready** | — · Not issued · a button |
+| The reprint promise (Print hover) | **Reprint carries the same number** | Duplicate · Copy |
+
+The T4 Reason Library gained the card's four remaining exception reasons —
+`Goods damaged` · `Wrong goods` · `Delivery photo missing` · `Loan not collected back` — in the
+library itself (`delivery-reasons.ts`), never as a second list. **No Release, Approve or Issue
+button exists anywhere on this surface**: the SYSTEM issues the document
+(`../orders/MASTER.md` §8).
 
 ## The Delivery module words (T11, locked with Jess 2026-07-27)
 
@@ -1207,15 +1908,65 @@ the ruling's phrase stays in the documents and the screen keeps the word it has.
 `On hand` (what's here now) · `Ready stock` (how much to keep — a PLAN about
 the same goods, never a second pool) · `In & out` (when things moved).
 "Inventory" and "Movements" are banned UI words (POD treatment); internal
-keys/routes keep their names.
+keys/routes keep their names. **Since CARD-2026-08-19-warehouse-rail the three
+questions are sidebar rows under the `WAREHOUSE` heading** (Warehouse Blueprint
+item 13) — the words are unchanged; only the door moved.
 
 **Aligning Purchase and Orders panels:** the Orders panel uses **Placed**
 for the pre-Proceed state (customer ordered, ETA not confirmed). The
-Purchase panel's ① stage fires AFTER Sales clicks Proceed, so it is called
-**Send**, not "Place" — otherwise a new hire sees "Place" on two panels
-meaning two different things.
+Purchase panel's ① stage fires AFTER Sales clicks Proceed, so it uses the governed
+**Issue PO** action. `Send` is not restored as a stage or action name.
 
 ---
+
+## ⭐ AN ABSENT VALUE READS AS WORDS — owner ruling 2026-08-15
+
+**A `—` on either side of a change arrow is a dash pretending to be a value.** The reader
+cannot tell an empty field from a value that failed to load, and `— → —` says nothing at all.
+
+```
+✔  No payment status → Paid          ✘  — → Paid
+✔  Tue, 21 Jul 26 → No logistics' date   ✘  21/07/2026 → —
+```
+
+**The pattern: `No {the field's own ruled label, lowercased}`.** The field name supplies the
+noun, so the phrase says WHICH fact was missing. It is not one shared word for every field:
+an Activity feed renders `status` and `payment_status` side by side, and a bare `No status`
+on both would be ambiguous on its own screen.
+
+This does not replace the ruled absence FACTS that already exist and name their own subject —
+`Address not set` · `No logistics picked` · `Supplier not assigned` · `No date`. Those stay.
+This rule covers the generic case: a change event whose before or after simply did not exist.
+
+**And a `—` standing in for a whole missing record gets words too**: an activity row with no
+order reads `No order`, never a dash.
+
+## ⭐ NO INTERNAL ENUM ON SCREEN — owner ruling 2026-08-15
+
+**No database word reaches an operator.** This is the state-vocabulary law that
+`PLAN_STATUS_LABEL` and `EMERGENCY_STATUS_LABEL` already enforce, stated once for everyone:
+every stored value is translated through the dictionary before it is printed, and that includes
+the values inside an EVENT, not just the ones in a column.
+
+| Stored | Prints |
+|---|---|
+| `place` | **`Placed`** |
+| `proceed_order` | **`Proceed`** |
+| `delivered` | **`Delivered`** |
+| `cancelled` | **`Cancelled`** |
+
+*Measured on production 2026-08-15: the Quick Rail's Activity panel was rendering
+`Status changed — place → proceed_order` on 35 live events.*
+
+**A raw value is never "close enough" because it is readable.** `proceed_order` is not a word
+this business uses; `1000.00` is not the money spelling (`RM 1,000.00`); `2026-08-28` is not
+the date spelling (`Fri, 28 Aug 26`). **An event value is formatted by its FIELD's own kind** —
+status through the dictionary, dates through `fmtDate`, money through `fmtMoney`.
+
+**An action the event taxonomy never declared prints `Activity`, not its key.** De-underscoring
+a raw key (`stock_flag_repair` → `stock flag repair`) puts the database's vocabulary on screen
+to describe an event the portal cannot name. An undeclared type is an engineering defect, and
+the row still carries its order, its person and its time.
 
 ## The Work module words (SO V2 Card 10, owner ruling 2026-08-11)
 
@@ -1228,9 +1979,30 @@ weekday+date spelling (`Thu 6 Aug`). Only these strings are the page's own:
 | The sidebar door / page | **Work** | Tasks · To-do · Queue · Dashboard |
 | The two filters over the one set | **My Work · Team Work** | My tasks · Everyone · All work |
 | Work with no anchor date yet | **No date** | Unscheduled · Someday · TBD |
-| The open/late tally | **{n} open · {n} late** | Total · Outstanding |
+| The tally — page, staff group and rail row | **{n} actions to do · {n} late** | **{n} open · {n} overdue** (superseded) · Total · Outstanding |
+| A row's due date, on line 2 | **due {fmtDate}** (`due Wed, 20 Aug`) | Today · Tomorrow · a bare date |
+| A late row's line 2 | **Late — was due {fmtDate}** (the original due never moves) | Overdue by · Delayed |
 | The clear state | **No open work — every track is clear.** | All done · Empty |
-| Late work | **{n} working days late** (the original due stays printed) | Overdue by · Delayed |
+
+> **⭐ EVERY COUNT SAYS WHAT IT COUNTS — owner ruling 2026-08-16 (blueprint card §7), and it
+> OVERWRITES the 2026-08-14/15 `open · overdue` tally.** A bare `open` beside a number told a
+> low-English operator nothing; `{n} actions to do · {n} late` says the thing itself. The rail's
+> Team peek and the Work page speak the same pair.
+
+**THE TWO-LINE WORK ROW HAS ONE MAPPING (card §7).** Line 1 is the action's registered SHORT
+display — **the dictionary's own QUEUE word**, no second definition of any act. Line 2 carries
+names · document numbers · the due date, and only line 2 does.
+
+**TWO NEW ACTS — registered by the blueprint card (owner-approved 2026-08-16):**
+
+| Act | Queue / line 1 | Owner rule | Due |
+|---|---|---|---|
+| The loan comes back on the trip | **Collect the loan item** (the 2026-08-16 generic form — a loan is not always a sofa) | Delivery staff | the delivery day itself |
+| Finance lifts the one money blocker | **Resolve the payment exception** | the Finance owner — only Finance clears it, with evidence | immediately |
+
+Neither is ever a button on a register or an object page; they are WORK, composed from the
+module facts (`ops_sofa_loans` · `order_finance_exceptions`) by the Work engine. A duty with no
+roster holder yet shows its DUTY WORD where a name cannot stand — never a hand-picked person.
 
 **System work has NO Done button** — an item leaves when its owning module
 records the completion fact. A human follow-up stays `ops_tasks`, labelled
@@ -1239,10 +2011,12 @@ human, and is the only explicitly completable thing.
 ## Numbers, dates, money
 
 - **Numbers**: tabular-nums font (`tabular-nums` class). `3 units` / `12 orders`.
-- **Dates**: use `fmtDate()` from `@/lib/fmt-date` → `19 Jul 26, Sun`. Never
-  hand-format. Never `toLocaleDateString`. See UI-KIT §A0 date law.
-- **Relative time** (`today`, `2 days ago`) is allowed ONLY in headers or
-  lead lines that render live — never in stored text.
+- **Dates**: use `fmtDate()` from `@/lib/fmt-date` → `Sun, 19 Jul`. Never
+  hand-format. Never `toLocaleDateString`. See THE YEAR RULE below.
+- **Relative time**: `Today` / `Tomorrow` are BANNED as a date — see the
+  no-relative-date-words ruling above. A live-recomputed HISTORY group
+  (`Today · Yesterday · Earlier`) is the one exception, and it is never in
+  stored text.
 - **Currency**: `RM 1,250.00`. Never `$` or `MYR` in row text.
 
 ### A money figure is never rounded to make a column tidy (Loo, 2026-07-28)

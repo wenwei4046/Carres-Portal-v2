@@ -43,6 +43,7 @@ import {
   validateDeliveryLeadTime,
   type LeadTimeViolation,
 } from "../lib/lead-time";
+import { validateOrderHasGoods } from "../lib/sku-categories";
 import { recomputeAndExplodeSofaBuildLines } from "../lib/sofa-recompute";
 import { recomputeOptionPickLines } from "../lib/option-picks-recompute";
 import { recomputeSpecialAddonLines } from "../lib/special-addons-recompute";
@@ -624,6 +625,17 @@ ordersRouter.post("/", async (c) => {
     const skus = parsed.data.lines.map((l) => l.sku);
     const violation = await validateDeliveryLeadTime(sb, skus, parsed.data.delivery.date);
     if (violation) return c.json(leadTimeBody(violation), 422);
+  }
+
+  // ⛔ A SALES ORDER MUST CONTAIN GOODS — owner ruling 2026-08-15. The cart
+  // gate refuses this in the wizard; this is the same rule at the door, so a
+  // curl cannot file a service-only "sale". Standalone service is a Service
+  // Case and belongs to the Service channel.
+  {
+    const goods = await validateOrderHasGoods(sb, parsed.data.lines.map((l) => l.sku));
+    if (goods) {
+      return c.json({ error: "rule_violation", code: goods.code, message: goods.message }, 422);
+    }
   }
 
   // 0185 (free items) — free-item-campaign claims + anti-tamper, FIRST. A line

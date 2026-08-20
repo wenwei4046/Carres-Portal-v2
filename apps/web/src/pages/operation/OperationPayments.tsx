@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -31,6 +32,7 @@ import { apiFetch } from "@/lib/api";
 import { cjkClassName } from "@/lib/cjk";
 import { rm } from "@/lib/format-currency";
 import { fmtDate } from "@/lib/fmt-date";
+import { displayCustomerName } from "@/lib/customer-name";
 import { orderStatusPill } from "@/lib/status-pill";
 import { useOrderPayments, useRecordPayment } from "@/lib/queries";
 import { renderReceiptPdf } from "@/lib/pdf/render";
@@ -356,7 +358,7 @@ interface Row {
   /** CARD 4 — the collection clock: the final deadline (1 working day before
    *  the delivery) and where today stands against it. */
   collectDueIso: string | null;
-  collectAttention: "none" | "t3" | "t2" | "t1" | "late";
+  collectAttention: "none" | "t3" | "t2" | "late";
   lastChasedAt: string | null;
 }
 
@@ -385,6 +387,7 @@ function inQueue(r: Row, q: QueueKey): boolean {
 
 export default function OperationPayments() {
   const qc = useQueryClient();
+  const [params, setParams] = useSearchParams();
   const [view, setView] = useState<"owing" | "all">("owing");
   const [facetOpen, setFacetOpen] = useState(true);
   const [queueFilter, setQueueFilter] = useState<Set<QueueKey>>(new Set());
@@ -485,7 +488,8 @@ export default function OperationPayments() {
       return {
         id: r.id,
         so: r.so,
-        customer: r.customer_name,
+        /* Capitalize up, once at the row — owner ruling 2026-08-15. */
+        customer: displayCustomerName(r.customer_name),
         phone: r.customer_phone,
         region: regionBucket(r.customer_address ?? null),
         ref: (r.source_ref ?? []).filter(Boolean),
@@ -517,10 +521,22 @@ export default function OperationPayments() {
     });
   }, [data, today]);
 
-  const baseRows = useMemo(
-    () => (view === "all" ? rows : rows.filter(isOwingRow)),
-    [rows, view],
-  );
+  /**
+   * ⭐ THE SALES ORDER'S DOOR INTO THIS DESK — owner ruling 2026-08-15.
+   *
+   * `?so=1318` scopes the desk to ONE order. It is a READ scope and nothing
+   * else: no writer, no new query, no second money truth — the Sales Order
+   * summarises money and this page owns collection (ownership Law C).
+   *
+   * The scope overrides the `To collect` view on purpose. An order that is
+   * already paid in full would otherwise open to an empty desk, and "the
+   * order you asked for is not here" is the one answer a door may not give.
+   */
+  const scopedSo = params.get("so");
+  const baseRows = useMemo(() => {
+    if (scopedSo) return rows.filter((r) => String(r.so) === scopedSo);
+    return view === "all" ? rows : rows.filter(isOwingRow);
+  }, [rows, view, scopedSo]);
 
   const visible = useMemo(() => {
     let r = baseRows;
@@ -591,6 +607,22 @@ export default function OperationPayments() {
 
   // ── Active chips (each multi-select pick = one ✕-able chip) ─────────────────
   const activeChips: ActiveChip[] = [];
+  /* The Sales Order scope wears the SAME chip as every other narrowing, so the
+     operator can see it and clear it with the control they already know. */
+  if (scopedSo) {
+    activeChips.push({
+      label: `Sales Order SO-${scopedSo}`,
+      onClear: () =>
+        setParams(
+          (prev) => {
+            const next = new URLSearchParams(prev);
+            next.delete("so");
+            return next;
+          },
+          { replace: true },
+        ),
+    });
+  }
   for (const q of queueFilter) {
     const def = QUEUES.find((x) => x.key === q);
     activeChips.push({
@@ -607,6 +639,14 @@ export default function OperationPayments() {
     setQueueFilter(new Set());
     setPayFilter(new Set());
     setRegionFilter(new Set());
+    setParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("so");
+        return next;
+      },
+      { replace: true },
+    );
   };
 
   if (isError) {
@@ -970,17 +1010,17 @@ function PaymentRow({
                       {r.overdue ? "overdue" : "promised"} {fmtDate(r.dueDate)}
                     </span>
                   )}
-                  {/* CARD 4 — the balance deadline: 1 working day before the
-                      delivery, because logistics ask for the DO the evening
-                      before and the DO door refuses while money holds. */}
+                  {/* The balance deadline (owner ruling 2026-08-19): 2 working
+                      days before the delivery — logistics takes the DO at T−1,
+                      so the money must already be settled before that day. */}
                   {r.collectDueIso && (
                     <span
                       className={
                         r.collectAttention === "late"
                           ? "text-danger font-semibold"
-                          : r.collectAttention === "t1"
+                          : r.collectAttention === "t2"
                             ? "text-danger"
-                            : r.collectAttention === "t2" || r.collectAttention === "t3"
+                            : r.collectAttention === "t3"
                               ? "text-warning"
                               : "text-base-500"
                       }

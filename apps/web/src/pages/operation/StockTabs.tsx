@@ -1,89 +1,58 @@
 import type { ReactNode } from "react";
-import { Link, useLocation } from "react-router-dom";
-import { Boxes, ArrowLeftRight, ClipboardList, type LucideIcon } from "lucide-react";
+import { useLocation } from "react-router-dom";
+import ModuleHeader from "./components/ModuleHeader";
 
 /**
- * StockTabs — the shared top tab bar for the merged Stock module (K0,
- * Jess 2026-07-27; same pattern as PurchasingTabs, the 2026-07-21 merge).
+ * StockTabs — the ONE fixed header row of the Warehouse module
+ * (Shell pattern, Loo 2026-08-02: "壳画头" — the shell draws the header,
+ * pages never do).
  *
- * One warehouse, three questions:
- *   • On hand     → `/operation?tab=stock-onhand`  (what's here now)
- *   • Ready stock → `/operation?tab=stock-plan`    (how much to keep) — K2
- *   • In & out    → `/operation?tab=movements`     (when things moved)
+ * ── THE TAB STRIP IS GONE (CARD-2026-08-19-warehouse-rail) ──────────────────
  *
- * Ready stock sits in the MIDDLE exactly as K0 reserved it. It is a PLAN about
- * the same goods, never a second pool.
+ * The Warehouse Blueprint (item 13) gives the module its pages in the SIDEBAR
+ * under a WAREHOUSE heading, exactly as Purchasing's strip died on 2026-08-18:
+ * a tab strip cannot grow to the blueprint's map (Transfers · Counts join it),
+ * and the rail already lists every approved page from day one.
  *
- * Word law (COPY-STANDARD): the user-facing word is "Stock"; "Inventory" and
- * "Movements" are banned UI words. The in/out page's own h1 already reads
- * "Stock in & out history" — the tab label just says the same thing.
+ * **This file stays, and keeps drawing the header** — the shell law is not
+ * being touched and all three pages import it. Only the strip is deleted.
+ * The header prints the page's own name in the destination format
+ * (`ModuleHeader destinationHeader`, owner ruling 2026-08-15) — the sidebar
+ * heading already says WAREHOUSE, so no `Warehouse ·` prefix is drawn.
+ *
+ * The active page is derived from the `?tab=` value exactly as before; every
+ * route and every `?tab=` value is unchanged — this moved the DOOR, not the
+ * address.
+ *
+ * Word law (COPY-STANDARD): the page words are the SIDEBAR's own words
+ * (`portal-nav.ts`) — `On hand` · `Ready stock` · `In & out`. "Inventory" and
+ * "Movements" remain banned UI words; the goods pool is still `Stock`.
  */
 
-type StockTab = "on-hand" | "ready" | "in-out";
+type StockPage = "on-hand" | "ready" | "in-out";
 
-interface TabDef {
-  key: StockTab;
-  label: string;
-  to: string;
-  icon: LucideIcon;
-}
-
-const TABS: TabDef[] = [
-  { key: "on-hand", label: "On hand", to: "/operation?tab=stock-onhand", icon: Boxes },
-  { key: "ready", label: "Ready stock", to: "/operation?tab=stock-plan", icon: ClipboardList },
-  { key: "in-out", label: "In & out", to: "/operation?tab=movements", icon: ArrowLeftRight },
-];
+/** The page word printed as the destination header. These are the SIDEBAR's
+ *  own words (`portal-nav.ts`) — a page word is never invented here. */
+const PAGE_WORD: Record<StockPage, string> = {
+  "on-hand": "On hand",
+  ready: "Ready stock",
+  "in-out": "In & out",
+};
 
 export default function StockTabs({ right }: { right?: ReactNode } = {}) {
   const location = useLocation();
   const tabParam = new URLSearchParams(location.search).get("tab");
-  const active: StockTab =
+  const active: StockPage =
     tabParam === "movements" ? "in-out" : tabParam === "stock-plan" ? "ready" : "on-hand";
+  const activeLabel = PAGE_WORD[active];
 
   return (
-    <div
-      className="shrink-0 bg-white border-b border-base-200 px-6"
-      role="tablist"
-      aria-label="Stock"
-      data-testid="stock-tabs"
-    >
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex gap-1">
-          {TABS.map((t) => {
-            const isActive = t.key === active;
-            return (
-              <Link
-                key={t.key}
-                to={t.to}
-                role="tab"
-                aria-selected={isActive}
-                data-testid={`stock-tab-${t.key}`}
-                className={[
-                  "relative flex items-center gap-1.5 px-4 py-3 text-body transition-colors border-b-2 -mb-px",
-                  isActive
-                    ? "border-primary text-base-900 font-semibold"
-                    : "border-transparent text-base-600 font-medium hover:text-base-900",
-                ].join(" ")}
-              >
-                <t.icon
-                  size={14}
-                  strokeWidth={2}
-                  className={isActive ? "text-primary" : "text-base-400"}
-                />
-                {t.label}
-              </Link>
-            );
-          })}
-        </div>
-        {right && (
-          <div
-            className="shrink-0 flex items-center gap-2 pr-1"
-            data-testid="stock-tabs-right"
-          >
-            {right}
-          </div>
-        )}
-      </div>
-    </div>
+    <ModuleHeader
+      testId="stock-tabs"
+      word={activeLabel}
+      docTitle={`${activeLabel} · Warehouse — Carres`}
+      destinationHeader
+      right={right}
+    />
   );
 }

@@ -56,7 +56,11 @@ export type LineClass = CoreCat | "acc" | "unknown";
  */
 const ACCESSORY_TYPES: readonly { name: string; test: RegExp }[] = [
   { name: "Pillow", test: /pillow/ },
-  { name: "M.P", test: /protector|protect|\bm\.?p\b/ },
+  // The NAME is the governed word (`COPY-STANDARD.md`: "mattress protector"),
+  // never the AutoCount import code. `M.P` is the supplier sheet's abbreviation
+  // and it stays on the RIGHT of this line — the TEST reads it, the screen
+  // never prints it.
+  { name: "Mattress protector", test: /protector|protect|\bm\.?p\b/ },
   { name: "Disposal", test: /disposal|dispose/ },
   { name: "Service", test: /floor|lift|stair|transport|delivery|charge|install/ },
   { name: "Topper", test: /topper/ },
@@ -130,6 +134,55 @@ export function lineClass(sku: string): LineClass {
  * give `unknown` its own header and DELETE this function. It exists to keep one
  * lie in one place with its address written on it, not to be lived with.
  */
+/**
+ * ⭐ THE CATALOG'S ANSWER FIRST — the parser only where the catalog is silent.
+ *
+ * D9 (`ERP-ARCHITECTURE.md:28`): *"what kind of product is this?"* had three
+ * answers and no owner, and the one that is right — the CATALOG — was never
+ * asked. `56239a3c` (PR #859) closed Stock's half by making `/inventory` read
+ * `sku -> product_skus -> product_models.category` through the one shared
+ * reader. This is the Sales Order half: the drawer's loan flow was still
+ * deducing the category from the SKU TEXT in the browser, and it was not doing
+ * it cosmetically — it was FILTERING WAREHOUSE STOCK with the result.
+ *
+ * Two arguments, and the second one is deliberately three-valued:
+ *
+ *   category === undefined   ABSENT. Nobody asked. The payload came from an
+ *                            endpoint that does not carry the field, or from a
+ *                            Worker built before it did. Parse, exactly as
+ *                            before — this is the version-skew branch and the
+ *                            only one that is purely defensive.
+ *   category === null        ASKED, and the catalog holds no row for this SKU.
+ *   category === "sofa"      ASKED and ANSWERED. The catalog wins outright; no
+ *                            keyword list is consulted, ever.
+ *
+ * **Why `null` still falls through to the parser, which looks like the defect
+ * this function exists to remove.** It is a measured decision, not an
+ * oversight. On 2026-08-19 the catalog held a row for 49 of 74 distinct live
+ * SKUs; the other 87 records — 975 units — do not join
+ * (`CARD-2026-08-19-onhand-category-filter`). Treating `null` as "not this
+ * category" would drop nearly the whole warehouse out of the loan picker in one
+ * commit, which is a far larger regression than the guess it removes. So the
+ * parser keeps that bucket, and the bucket shrinks every time someone keys a
+ * product into the catalog. **The day it is empty, this branch and
+ * `lineCategory` die together** — that is the exit condition, and it is the
+ * reason the two cases are written apart even though they return the same thing
+ * today.
+ *
+ * A catalog value this codebase has no core word for (a future `accessory`,
+ * `service`, anything Settings adds) reads as `acc`, never as a core good:
+ * an unknown word must not be able to substitute for a sofa.
+ */
+export function resolvedCategory(sku: string, category?: string | null): CoreCat | "acc" {
+  // ABSENT — version skew. Nobody asked; the parser is all there is.
+  if (category === undefined) return lineCategory(sku);
+  // ASKED, catalog silent. See the measured reason above; this is the branch
+  // that deletes itself once the catalog is populated.
+  if (category === null) return lineCategory(sku);
+  const c = category.trim().toLowerCase();
+  return c === "sofa" || c === "bedframe" || c === "mattress" ? (c as CoreCat) : "acc";
+}
+
 export function lineCategory(sku: string): CoreCat | "acc" {
   const c = lineClass(sku);
   return c === "unknown" ? "acc" : c;
@@ -184,8 +237,12 @@ export function stockMatchKey(sku: string): string {
 }
 
 /** Short proper TYPE name for a non-core line — the list shows these instead of
- *  a generic "accessories" (Loo: show Pillow / M.P / Disposal by name). The
- *  drawer shows the full original name; this is the short form. */
+ *  a generic "accessories" (Loo: show Pillow / Mattress protector / Disposal by
+ *  name). The drawer shows the full original name; this is the short form.
+ *
+ *  **What this returns is SCREEN COPY** (the Sales Orders register footer
+ *  prints it verbatim), so every name in `ACCESSORY_TYPES` is a governed word.
+ */
 export function accShort(sku: string): string {
   const named = accessoryType(sku);
   if (named) return named;
@@ -215,7 +272,7 @@ export function lineKind(sku: string): ItemKind {
 
 /**
  * Display sequence rank for an order line (Jess 2026-06-22): always list in the
- * order mattress → bedframe → sofa → pillow → M.P → service / others. Lower
+ * order mattress → bedframe → sofa → pillow → protector → service / others. Lower
  * sorts first; ties keep their original order (Array.sort is stable). Use as
  * `lines.sort((a, b) => lineSortRank(a.sku) - lineSortRank(b.sku))`.
  *
@@ -231,7 +288,7 @@ export function lineSortRank(sku: string): number {
   if (cat === "unknown") return 3;
   const name = accShort(sku);
   if (name === "Pillow") return 4;
-  if (name === "M.P") return 5;
+  if (name === "Mattress protector") return 5;
   if (name === "Disposal" || name === "Service") return 7; // service last
   return 6; // other accessories (Topper / Footrest / …) before service
 }
@@ -241,7 +298,7 @@ export function lineSortRank(sku: string): number {
  *   • core furniture (Mattress / Bedframe / Sofa) → its SUPPLIER name — it's made
  *     to order and sits at the supplier until received. Current core suppliers:
  *     mattress = Nice Future, bedframe + sofa = Ohana ([[supplier-core-mapping]]).
- *   • accessory goods (Pillow / M.P / Topper / Footrest) → "Carres Klang" — kept
+ *   • accessory goods (Pillow / Mattress protector / Topper / Footrest) → "Carres Klang" — kept
  *     as ready warehouse stock.
  *   • service charges (No Lift / Disposal / floor) → null — no physical location.
  * It's only a DEFAULT — the drawer dropdown lets the operator override per line.

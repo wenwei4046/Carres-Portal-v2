@@ -11,6 +11,7 @@
  */
 
 import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
+import { displayCustomerName } from "@/lib/customer-name";
 import { NOTO_SANS_SC_FAMILY } from "./fonts/noto";
 import { DocHeader } from "./letterhead";
 import type { ReceiptTemplateData } from "./types";
@@ -95,7 +96,7 @@ export function ReceiptTemplate(data: ReceiptTemplateData) {
 
         <View style={styles.party}>
           <Text style={styles.partyLabel}>Received From</Text>
-          <Text style={styles.partyName}>{customer.name || "—"}</Text>
+          <Text style={styles.partyName}>{displayCustomerName(customer.name) || "—"}</Text>
         </View>
 
         <View style={styles.detailBlock}>

@@ -4,6 +4,7 @@ import { ArrowRight, BookmarkPlus, X, Trash2, Minus, Pencil, Plus, Gift, Ticket,
 import type { CatalogResponse, PwpCodeDto, PwpDiscoverDto, PwpRuleDto } from "@carres/shared";
 import { rm } from "@/lib/format-currency";
 import {
+  cartGoodsIssue,
   step2Valid,
   step2FirstDisposalIssue,
   type DraftLine,
@@ -234,8 +235,12 @@ export default function CartDrawer({
   const addonSub = cartAddonSubtotal(draft.addons);
   const total = lineSub + addonSub;
   const items = cartItemCount(draft.lines);
-  const ready = step2Valid(draft);
-  const blockReason = step2FirstDisposalIssue(draft);
+  /* ⛔ A SALES ORDER MUST CONTAIN GOODS (owner ruling 2026-08-15) — a cart of
+     nothing but service/guarantee lines cannot leave this drawer. The create
+     door re-runs the same rule against the catalog and is the authority. */
+  const goodsIssue = cartGoodsIssue(draft, catalog);
+  const ready = step2Valid(draft) && goodsIssue === null;
+  const blockReason = goodsIssue ?? step2FirstDisposalIssue(draft);
   const empty = draft.lines.length === 0 && draft.addons.length === 0;
 
   return (

@@ -73,17 +73,10 @@ export default function OperationStockPlan() {
 
   return (
     <>
-      <StockTabs />
-      <div className="px-9 py-8 pb-14" data-testid="operation-stock-plan">
-        <div className="mb-5 flex items-start justify-between gap-4">
-          <div>
-            <div className="kicker">HQ · Operations · Carres Klang</div>
-            <h1 className="text-page font-display mt-1.5">Ready stock</h1>
-            <div className="text-body text-base-600 mt-1.5">
-              How much to keep on the floor next month. Everyone asks, the
-              manager cuts, the COO approves — then Operations orders it.
-            </div>
-          </div>
+      {/* The destination header draws the page word (壳画头); the month
+          selector and status pill live in its right slot. */}
+      <StockTabs
+        right={
           <div className="flex items-center gap-2 shrink-0">
             <select
               value={period}
@@ -107,7 +100,9 @@ export default function OperationStockPlan() {
               </span>
             ) : null}
           </div>
-        </div>
+        }
+      />
+      <div className="px-9 py-8 pb-14" data-testid="operation-stock-plan">
 
         {/* K5 — the review layer, FIRST on the tab. The card's Done-when is
             "the COO opens one tab and knows what needs attention today", so

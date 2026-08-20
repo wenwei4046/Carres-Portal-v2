@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import { fmtMoney } from "@carres/shared";
+import { accShort, fmtMoney } from "@carres/shared";
 import OperationOrdersControl, {
   buildOrdersCsv,
   buildOrdersPrintHtml,
@@ -19,6 +19,7 @@ import OperationOrdersControl, {
   compareOrderSortValues,
   ORDER_SORTABLE_COLUMNS,
   ORDER_FILTER_COLUMNS,
+  CATEGORY_OPTS,
 } from "./OperationOrdersControl";
 import type {
   StockInfo,
@@ -1201,12 +1202,35 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     listHookState.data = { orders: [makeRow(partial)] };
   }
 
+  /**
+   * ⭐ THE ACCESSORY FACET'S LABEL **IS** ITS MATCH KEY.
+   *
+   * `orderHasAcc` compares `accShort(sku)` for equality, so the moment the
+   * displayed word and the vocabulary word drift apart the facet silently
+   * filters to ZERO — no error, no empty state, just a category that finds
+   * nothing. That is exactly what happened when `accShort` stopped saying
+   * `M.P`, and nothing in this suite noticed. This test ties the two together.
+   */
+  it("every accessory CATEGORY facet says the word accShort returns, and still matches on it", () => {
+    const cases = [
+      { key: "pillow", sku: "Essential Memory Pillow(L)" },
+      { key: "mp", sku: "Microfiber Waterproof Mattress Protector-K" },
+    ];
+    for (const { key, sku } of cases) {
+      const opt = CATEGORY_OPTS.find((c) => c.key === key);
+      expect(opt, `no CATEGORY option keyed ${key}`).toBeTruthy();
+      expect(opt!.label).toBe(accShort(sku));
+      expect(opt!.match(makeRow({ id: key, so: 1, order_lines: [{ sku, qty: 1 }] }))).toBe(true);
+    }
+    expect(CATEGORY_OPTS.map((c) => c.label)).not.toContain("M.P");
+  });
+
   it("catQty classifies core lines by category — MS / BF / Sofa (services + accessories excluded) (A1)", () => {
     const lines = [
       { sku: "MS01-L1201S-Q", qty: 2 }, // Mattress, Queen → core
       { sku: "BF02-1013", qty: 1 }, // Bedframe, no size → core
       { sku: "Pillow", qty: 3 }, // accessory — not a core category
-      { sku: "Microfiber Waterproof Mattress Protector-K", qty: 1 }, // → M.P, accessory
+      { sku: "Microfiber Waterproof Mattress Protector-K", qty: 1 }, // → Mattress protector, accessory
       { sku: "Sofa Disposal", qty: 1 }, // → Disposal, SERVICE
     ];
     // Accessories + service never count towards a core category.
@@ -2368,7 +2392,12 @@ describe("nextActionOf (C2)", () => {
     expect(openActionsOf(o, { state: "ready" }, [])).toEqual([]);
   });
 
-  it("ready + carrier + customer confirmed + owing balance → Collect, held (🔒)", () => {
+  it("⭐ ready + carrier + confirmed + owing balance → Collect leads, open and UNLOCKED (decision A + Slice 2)", () => {
+    // Until 2026-08-16 this exact shape read `Collect, locked: true` — the
+    // balance held the delivery. Decision A retired that lock, and Slice 2
+    // then retired the press: the SYSTEM issues the paper at the door that
+    // completes the gate, so the collection is the one act a person still
+    // owes here, and it rides as an ordinary open action.
     const o = makeRow({
       id: "x",
       so: 1,
@@ -2376,9 +2405,11 @@ describe("nextActionOf (C2)", () => {
       ops_order_control: { ...BOOKED, balance: 2248 },
     });
     expect(nextActionOf(o, { state: "ready" }, [])).toMatchObject({
-      label: "Collect",
-      locked: true,
+      key: "collect",
     });
+    const collect = openActionsOf(o, { state: "ready" }, []).find((a) => a.key === "collect");
+    expect(collect).toBeTruthy();
+    expect(collect?.locked).toBeUndefined();
   });
 
   // ── C5 · the money hold reads the number that exists ──────────────────────
@@ -2387,7 +2418,7 @@ describe("nextActionOf (C2)", () => {
   // them owed RM 56,859. It now reads the shared `orderMoney` — the priced
   // lines against `orders.paid` — the SAME rule the server's booking gate asks.
 
-  it("SO-1256's shape: priced lines with a 50% deposit → held (🔒)", () => {
+  it("SO-1256's shape: priced lines with a 50% deposit → open Collect, no lock (decision A)", () => {
     const o = makeRow({
       id: "x",
       so: 1256,
@@ -2397,10 +2428,12 @@ describe("nextActionOf (C2)", () => {
       paid: 2124,
       ops_order_control: { ...BOOKED },
     });
-    expect(nextActionOf(o, { state: "ready" }, [])).toMatchObject({
-      label: "Collect",
-      locked: true,
-    });
+    // The C5 lesson survives: the figure comes from the shared `orderMoney`
+    // over the priced lines, never the dead `balance` column. What changed is
+    // the consequence — the deposit gap raises the collect, it holds nothing.
+    const collect = openActionsOf(o, { state: "ready" }, []).find((a) => a.key === "collect");
+    expect(collect).toMatchObject({ key: "collect", track: "money" });
+    expect(collect?.locked).toBeUndefined();
   });
 
   it("SO-1209's shape: paid in full → NOT held, and the day is simply ahead", () => {
@@ -2447,17 +2480,18 @@ describe("nextActionOf (C2)", () => {
     expect(nextActionOf(o, { state: "ready" }, []).locked).toBeFalsy();
   });
 
-  it("ready + carrier + customer confirmed + owing storage → held", () => {
+  it("ready + carrier + confirmed + owing storage → still not held (decision A)", () => {
+    // An uncollected storage fee is money, and money no longer holds the
+    // delivery — the fee stays owed, the collect stays open, the truck goes.
     const o = makeRow({
       id: "x",
       so: 1,
       ops_assigned_logistic: "p1",
       ops_order_control: { ...BOOKED, storage_fee_msbf: 150 },
     });
-    expect(nextActionOf(o, { state: "ready" }, [])).toMatchObject({
-      label: "Collect",
-      locked: true,
-    });
+    const collect = openActionsOf(o, { state: "ready" }, []).find((a) => a.key === "collect");
+    expect(collect).toBeTruthy();
+    expect(collect?.locked).toBeUndefined();
   });
 
   // ── C9 · the manager's release (Jess 2026-07-27) ──
@@ -2553,26 +2587,25 @@ describe("nextActionOf (C2)", () => {
     expect(openActionsOf(o, { state: "ready" }, [])).toEqual([]);
   });
 
-  // ── C7 · the last act before the truck (Jess 2026-07-27) ──
-  it("arranged, paid, and NO delivery order yet → Issue delivery order", () => {
-    // Before C7 this row sat in no queue at all and read `Delivering`. It has
-    // one thing left to do, and it is the paper logistics asks for the evening
-    // before — which used to be typed by hand, after dispatch.
+  // ── C7 → SLICE 2 · the last act before the truck is NOBODY'S act ──
+  it("⭐ arranged and NO delivery order yet → the quiet fact, never a press (Slice 2)", () => {
+    // C7 made this row a one-press action. The owner ruling
+    // (`docs/orders/MASTER.md` §8) then removed the press itself: the SYSTEM
+    // issues the document at the door that completes the gate, so the row is
+    // C3's quiet `Delivering` fact again and no queue asks a person for it.
     const o = makeRow({
       id: "x",
       so: 1,
       ops_assigned_logistic: "p1",
       ops_order_control: { ...BOOKED },
     });
-    expect(nextActionOf(o, { state: "ready" }, []).label).toBe(
-      "Issue delivery order",
-    );
-    expect(openActionsOf(o, { state: "ready" }, []).map((a) => a.key)).toEqual([
-      "issue_delivery_order",
-    ]);
+    expect(nextActionOf(o, { state: "ready" }, []).label).toBe("Delivering");
+    expect(openActionsOf(o, { state: "ready" }, [])).toEqual([]);
   });
 
-  it("owing balance beats Deliver today (PayHold: never arrange a delivery we may not make)", () => {
+  it("⭐ Deliver today beats an owing balance (decision A retired PayHold-on-money)", () => {
+    // The exact inversion of the retired PayHold test: the goods go on the
+    // day, and the collection rides beside the run as an open action.
     const o = makeRow({
       id: "x",
       so: 1,
@@ -2580,9 +2613,10 @@ describe("nextActionOf (C2)", () => {
       ops_order_control: { ...BOOKED, confirmed_date: inDays(0), balance: 2248 },
     });
     expect(nextActionOf(o, { state: "ready" }, [])).toMatchObject({
-      label: "Collect",
-      locked: true,
+      key: "deliver_today",
     });
+    const collect = openActionsOf(o, { state: "ready" }, []).find((a) => a.key === "collect");
+    expect(collect?.locked).toBeUndefined();
   });
 
   // ── T7 · the delivery photo is the last outstanding act on a closed order ──

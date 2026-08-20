@@ -15,7 +15,7 @@ import {
   type JWK,
   type KeyLike,
 } from "jose";
-import { docNumber, fmtMoney } from "@carres/shared";
+import { docNumber } from "@carres/shared";
 import app from "../../index";
 import { _setJwksForTesting } from "../../middleware/auth";
 
@@ -124,13 +124,16 @@ function post(jwt: string | null) {
   );
 }
 
-/** Everything §3 asks for: the customer confirmed a future date + slot, the
- *  mattress is reserved to the SO, and the order is paid in full. */
+/** Everything the gate asks for: the customer confirmed a future date + slot,
+ *  the mattress is reserved to the SO, and Finance has opened nothing. `paid`
+ *  stays adjustable so the decision-A tests can prove an owing order passes. */
 function tables(over?: {
   orderRead?: Result;
   control?: Record<string, unknown>;
   paid?: number;
   lineReceived?: Record<string, number> | null;
+  financeExceptions?: Array<Record<string, unknown>>;
+  paymentApprovals?: Array<Record<string, unknown>>;
 }) {
   const control = {
     line_received: over?.lineReceived === undefined ? { [MATTRESS]: 1 } : over.lineReceived,
@@ -167,6 +170,18 @@ function tables(over?: {
     order_addons: tableMock({ data: [], error: null }),
     ops_order_control: tableMock({ data: control, error: null }),
     ops_stock_items: tableMock({ data: [], error: null }),
+    // Decision A (0355) — the gate's one money question, read from the owning
+    // table. Empty by default: Finance has opened nothing.
+    ops_delivery_orders: tableMock({ data: [], error: null }),
+    order_finance_exceptions: tableMock({
+      data: over?.financeExceptions ?? [],
+      error: null,
+    }),
+    // 0362 — the approval record beside it. Empty by default: nothing asked.
+    order_delivery_payment_approvals: tableMock({
+      data: over?.paymentApprovals ?? [],
+      error: null,
+    }),
   };
 }
 
@@ -263,21 +278,82 @@ describe("POST /api/operation/orders/:id/delivery-order", () => {
     expect(((await res.json()) as { message: string }).message).toContain(MATTRESS);
   });
 
-  it("422 when money is still owed — THE gate C9 said this card owns", async () => {
+  it("⭐ 422 on an outstanding balance with no approval — the 2026-08-19 money gate", async () => {
+    /* Paid 1000 of 2500. Under the 2026-08-16 ruling this issued; the owner
+     * REVERSED it on 2026-08-19 after a same-day incident: money in full
+     * before delivery, or a recorded approval. */
     const t = tables({ paid: 1000 });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue(makeSb(t) as any);
     const res = await post(await makeJwt("operation"));
     expect(res.status).toBe(422);
-    /* Asserted THROUGH `fmtMoney`, not against a hand-typed number. The gate
-     * builds its sentence with that function (packages/shared delivery-order.ts
-     * :114), so a literal here is a second spelling of the money law — and it
-     * was already a wrong one: the message reads "RM 1,500.00" on any Node with
-     * full ICU, so this line had never passed on this machine. Through the
-     * formatter it cannot drift from the law, and it cannot depend on which
-     * ICU data the runtime shipped with. */
-    expect(((await res.json()) as { message: string }).message).toContain(fmtMoney(1500));
+    expect(((await res.json()) as { message: string }).message).toContain(
+      "still outstanding",
+    );
+  });
+
+  it("⭐ an APPROVED Delivery Payment Approval opens the gate over the balance — COD", async () => {
+    const t = tables({
+      paid: 1000,
+      paymentApprovals: [
+        {
+          id: "pa-1",
+          status: "approved",
+          request_reason: "Outstation — partner schedules the customer",
+          requested_at: "2026-08-19T02:00:00Z",
+          decided_at: "2026-08-19T03:00:00Z",
+          decision_reason: "COD by online transfer before unloading",
+        },
+      ],
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(makeSb(t) as any);
+    const res = await post(await makeJwt("operation"));
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { issued: boolean }).issued).toBe(true);
+  });
+
+  it("⭐ 422 on an OPEN Finance exception — the second blocker, even fully paid (0355 unchanged)", async () => {
+    const t = tables({
+      paid: 2500, // fully paid, and Finance still says stop — the two are independent
+      financeExceptions: [
+        {
+          id: "fe-1",
+          status: "open",
+          reason: "Chargeback under investigation",
+          opened_at: "2026-08-16T02:00:00Z",
+          cleared_at: null,
+          clear_evidence: null,
+        },
+      ],
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(makeSb(t) as any);
+    const res = await post(await makeJwt("operation"));
+    expect(res.status).toBe(422);
+    const message = ((await res.json()) as { message: string }).message;
+    expect(message).toContain("Finance is holding this delivery");
+    expect(message).toContain("Chargeback under investigation");
     expect(t.orders.update).not.toHaveBeenCalled();
+  });
+
+  it("a CLEARED exception no longer refuses", async () => {
+    const t = tables({
+      financeExceptions: [
+        {
+          id: "fe-1",
+          status: "cleared",
+          reason: "Chargeback under investigation",
+          opened_at: "2026-08-16T02:00:00Z",
+          cleared_at: "2026-08-16T06:00:00Z",
+          clear_evidence: "Bank confirmed the reversal — ref 8821",
+        },
+      ],
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(makeSb(t) as any);
+    const res = await post(await makeJwt("operation"));
+    expect(res.status).toBe(200);
   });
 
   it("422 on a Sunday booking — §5's hard calendar block, asked again at the last step", async () => {

@@ -78,22 +78,63 @@ LAYER 2 · DISPLAY      picks which ONE goes first in the table row.
 
 The old ladder's ordering survives ONLY as input to Layer 2.
 
-## Law 2 — every action carries six things
+## Law 2 — every action is a structured contract
 
-A thing is not an action unless all six exist. If one is missing, the design is not
+A thing is not an action unless every fact below exists. If one is missing, the design is not
 finished — do not build it.
 
 | | |
 |---|---|
 | **Trigger** | the condition that makes it appear, computed from stored data |
-| **Label** | verb + clear object; name the party whenever an outside party is involved (COPY-STANDARD) |
+| **Owner rule** | the governed role/duty/responsibility rule that owns this kind of action |
+| **Resolved owner** | the person calculated from the owner rule; structured identity, never sentence text |
+| **Action** | verb + clear object; name the party only when that outside party is needed to perform the action (COPY-STANDARD) |
 | **Checklist** | the steps that close it — each one DERIVED from a stored signal or an INPUT the system stores |
 | **Completion** | a condition the SYSTEM measures. Never "someone says they did it" |
 | **Due** | when it turns late, in **working days** |
-| **Task Owner** | assigned automatically by the module that raised the action; it may change hands |
+| **Source object** | the canonical object identity; stored as a link, not repeated inside the action sentence |
+| **Cover rule** | roster/buddy-cover resolution; preserves both normal owner and today's cover evidence |
 
-**Case Owner** is separate and is never written on an action: one person owns the customer's
-case from start to finish and never changes, while task owners come and go.
+**AN ACTION HAS AN OWNER. A SALES ORDER DOES NOT HAVE ONE UNIVERSAL OWNER.** One SO may raise
+several simultaneous actions, each with a different owner rule. Never add a permanent generic
+`Owner` column to the SO and never degrade the resolved owner into free text inside the action.
+Manager assignment is the exception, not the normal routing mechanism.
+
+The UI is generated from the structured facts; it never saves a second free-text action truth.
+Object identity belongs to the row/card header. Owner identity belongs to metadata/avatar. The
+action sentence contains only the action. Due comes from its named calendar and completion remains
+the authoritative closing fact.
+
+Display density changes; the contract does not:
+
+- **Register:** when action context is admitted, show the resolved-owner avatar chip separately
+  from the sentence. Hover names the person. Do not repeat SO, customer or staff already present in
+  the row. A reference-only Register may show the factual warning alone and leave the full action
+  to Object Detail / Work.
+- **My Work:** the staff member already knows the work is theirs, so omit their own avatar by
+  default. Show owner context only for cover, handover or exceptional ownership.
+- **Team Work:** group actions under the resolved owner's identity and workload summary; do not
+  repeat that identity on every action.
+- **Cover:** Work routes today's action to the resolved cover while preserving normal owner and
+  cover evidence. Cover never rewrites the source object's ownership.
+
+**Case Owner**, where a module genuinely defines one, remains separate. It is never substituted
+for an action's owner rule and never written into the action sentence.
+
+## Law 2.1 — two-line action copy
+
+Every Register warning, Current Action and Work row uses one shared reading order:
+
+```
+LINE 1  FACT OR PROBLEM
+LINE 2  ACTION + OBJECT + REQUIRED RECIPIENT/RESULT
+```
+
+Line 1 answers **what is wrong?** Line 2 answers **what do I do?** Use Primary School English,
+one action per sentence and the governed dictionary. Do not repeat an SO number, customer name or
+owner name already visible in the row or object context. The owner is structured information,
+shown separately by the UI. Add a recipient only when staff need it to perform the action and it
+is not already unambiguous from context.
 
 ## Law 2A — THREE calendars, and every action names which one it counts on
 
@@ -176,8 +217,10 @@ two distances from a commitment, and the order is commitment descending:
 **`Send PO to {supplier}` used to be this rung's first action and is RETIRED** (Loo,
 2026-07-29), **and so is `Prepare PO` with the Draft PO it produced** (Loo, 2026-07-30 — the
 Purchasing clean restart). Raising a purchase order is ONE act: `Issue PO` creates the formal
-PO and nothing is stored before it. **The verb `Send` is retired with the old name and stays
-banned from reuse** — `docs/COPY-STANDARD.md` is the canonical home for both words.
+PO and nothing is stored before it. **`Send PO` stays banned as a substitute for that creation
+act.** `Send` is also banned from every Portal action label: the copy must identify the actual
+channel or governed act, object, named party and required recorded result. The canonical rule is
+in `docs/COPY-STANDARD.md`.
 
 **`Delay planning` sits at the TOP of rung 2, immediately above the call it guards**
 (added 2026-07-28 — C8 found that Law 4 ranked it nowhere at all). It is the decision

@@ -15,10 +15,34 @@ try {
 }
 const altered = changed.filter((line) => !line.startsWith("A\t"));
 if (altered.length) throw new Error(`Committed migrations are immutable; only new files are allowed:\n${altered.join("\n")}`);
+/**
+ * A dollar-quoted body is CODE THIS MIGRATION DEFINES, not SQL it runs.
+ *
+ * The guard below exists to stop a migration from destroying production data
+ * while it applies. A `delete from` inside `create function … $$ … $$` does
+ * nothing at apply time: it is the application's own statement, guarded by its
+ * own role checks, floors and transaction, and it runs when a user acts.
+ *
+ * Without this, the guard forbids ever AMENDING an RPC that prunes rows — and
+ * the repository already ships several (`sales_order_save_revision` since 0340,
+ * `sales_order_create` since 0327, the purchasing and rental writers). The
+ * teeth are unchanged: a bare `drop table` / `truncate` / `delete from` at
+ * migration level still fails, and so does one inside a `do $$ … $$` block,
+ * which IS executed on apply.
+ */
+function stripFunctionBodies(sql) {
+  return sql
+    .replace(/\bdo\s+\$([A-Za-z_][A-Za-z0-9_]*)?\$[\s\S]*?\$\1?\$/gi, (m) => m)
+    .replace(
+      /\bcreate\s+(?:or\s+replace\s+)?function\b[\s\S]*?\$([A-Za-z_][A-Za-z0-9_]*)?\$[\s\S]*?\$\1?\$/gi,
+      "create function <body omitted>",
+    );
+}
+
 for (const line of changed.filter((entry) => entry.startsWith("A\t"))) {
   const file = line.slice(2);
   const sql = await readFile(file, "utf8");
-  if (/\b(drop\s+(table|schema|column)|truncate|delete\s+from)\b/i.test(sql)) {
+  if (/\b(drop\s+(table|schema|column)|truncate|delete\s+from)\b/i.test(stripFunctionBodies(sql))) {
     throw new Error(`${file} contains destructive SQL and requires the governed manual review/apply path.`);
   }
 }

@@ -1010,10 +1010,12 @@ export function orderActionSignalsOf(
     // (Delay planning opens on the overshoot, as the radar always did).
     delayDecision: ovlOf(o)?.delay_decision ?? null,
     delayDecisionEtaIso: ovlOf(o)?.delay_decision_eta ?? null,
-    // C9 — two different questions. `owing` raises the money ACTION; `holds`
-    // is the 🔒 on the delivery, and a manager's release parts them.
+    // Decision A (2026-08-16) — `owing` still raises the money ACTION, but a
+    // balance no longer locks the delivery, so `moneyHolds` is retired. The
+    // one lock left is an OPEN Finance exception; this temporary cutover
+    // surface does not read that table, so it shows no lock — the server-side
+    // issue gate reads it directly and remains the enforcement.
     moneyOwing: money.owing,
-    moneyHolds: money.holds,
   };
 }
 
@@ -1314,7 +1316,11 @@ export const ORDER_FILTER_COLUMNS: ReadonlySet<string> = new Set([
 
 /** A row with no value in a filtered column still has to be selectable —
  *  Excel's `(Blanks)`, in this portal's words (COPY-STANDARD: never a code). */
-export const F_NO_VALUE = " none";
+// The NUL is written as an ESCAPE, never as a raw byte in this file. A literal
+// one makes the whole 6,000-line file grep as "Binary file ... matches", so
+// every content search silently skips it. The runtime value is identical; the
+// sentinel still cannot collide with real data, which is why it is a NUL.
+export const F_NO_VALUE = "\u0000none";
 
 export type OrderSortValue = string | number;
 
@@ -1475,7 +1481,7 @@ function orderHasAcc(o: operationOrderListRow, name: string): boolean {
     (l) => lineCategory(l.sku) === "acc" && accShort(l.sku) === name,
   );
 }
-const CATEGORY_OPTS: {
+export const CATEGORY_OPTS: {
   key: string;
   label: string;
   match: (o: operationOrderListRow) => boolean;
@@ -1484,7 +1490,11 @@ const CATEGORY_OPTS: {
   { key: "bedframe", label: "Bedframe", match: (o) => orderHasCore(o, "bedframe") },
   { key: "sofa", label: "Sofa", match: (o) => orderHasCore(o, "sofa") },
   { key: "pillow", label: "Pillow", match: (o) => orderHasAcc(o, "Pillow") },
-  { key: "mp", label: "M.P", match: (o) => orderHasAcc(o, "M.P") },
+  /* The KEY stays `mp` — it is the saved-filter identifier, not a word the
+     operator reads. The LABEL and the `accShort` sentinel are the governed
+     word (`COPY-STANDARD.md`), and they must move together: the match is an
+     equality against what `accShort` returns. */
+  { key: "mp", label: "Mattress protector", match: (o) => orderHasAcc(o, "Mattress protector") },
 ];
 
 /** Primary supplier of an order = the supplier of its FIRST core line
@@ -1641,9 +1651,12 @@ function itemTags(
         name: `${CORE_LABEL[cat]}${e.size ? `(${e.size})` : ""}`,
       });
   }
-  // Accessories ordered pillow → M.P → others, then service last (Jess: fixed
-  // item sequence). Core already ordered via CORE_ORDER above.
-  const accRank = (name: string) => (name === "Pillow" ? 0 : name === "M.P" ? 1 : 2);
+  // Accessories ordered pillow → mattress protector → others, then service
+  // last (Jess: fixed item sequence). Core already ordered via CORE_ORDER
+  // above. The names compared here come from `accShort`, so they are the
+  // governed words.
+  const accRank = (name: string) =>
+    name === "Pillow" ? 0 : name === "Mattress protector" ? 1 : 2;
   const restSorted = [...rest.entries()].sort(
     (a, b) => accRank(a[0]) - accRank(b[0]),
   );
@@ -1653,7 +1666,8 @@ function itemTags(
   return out;
 }
 
-/** Tag display label — ALWAYS qty-prefixed ("1× M.P", "2× Disposal"), no qty-1
+/** Tag display label — ALWAYS qty-prefixed ("1× Mattress protector",
+ *  "2× Disposal"), no qty-1
  *  exemption (Jess P1: the standard format). The only bare tag is the
  *  single-category CORE de-dup, decided at render time. */
 function tagLabel(t: { kind: ItemKind; qty: number; name: string }): string {

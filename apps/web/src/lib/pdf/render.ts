@@ -11,8 +11,8 @@
  * additional `renderXxxPdf` exports.
  */
 
-import type { ReactElement } from "react";
-import { pdf } from "@react-pdf/renderer";
+import { createElement, type ReactElement } from "react";
+import { Document, pdf } from "@react-pdf/renderer";
 import { SalesOrderTemplate } from "./sales-order-template";
 import { InvoiceTemplate } from "./invoice-template";
 import { DoTemplate } from "./do-template";
@@ -21,6 +21,7 @@ import { PickupEventTemplate } from "./pickup-event-template";
 import { ReceiptTemplate } from "./receipt-template";
 import { ExtensionAgreementTemplate } from "./extension-agreement-template";
 import { LoanNoteTemplate } from "./loan-note-template";
+import { RegisterListTemplate, type RegisterListTemplateData } from "./register-list-template";
 import { registerNotoSansSC } from "./fonts/noto";
 import type {
   DoTemplateData,
@@ -41,6 +42,29 @@ async function toBlob(element: ReactElement): Promise<Blob> {
 
 export function renderSalesOrderPdf(data: SalesOrderTemplateData): Promise<Blob> {
   return toBlob(SalesOrderTemplate(data));
+}
+
+/**
+ * MANY Sales Orders, one file — the batch the operator prints after ticking
+ * rows. Each order keeps the GOVERNED single-order page, unmodified: this
+ * lifts each template's one `<Page>` out of its own `<Document>` and puts them
+ * all in one. Nothing about the page is re-authored here, so
+ * `docs/pdf/SO-PDF-STANDARD.md` still describes exactly what prints.
+ *
+ * The template's header and footer read `subPageNumber` / `subPageTotalPages`
+ * rather than the document-wide counters, so order 7 of 69 still shows its own
+ * letterhead and its own `Page 1 of 2`. For a single order the two are equal,
+ * so the one-order PDF is byte-identical to before.
+ */
+export function renderCombinedSalesOrderPdf(list: SalesOrderTemplateData[]): Promise<Blob> {
+  const pages = list.map((data, i) => {
+    const doc = SalesOrderTemplate(data) as ReactElement<{ children: ReactElement }>;
+    return createElement(
+      doc.props.children.type,
+      { ...doc.props.children.props, key: `so-${i}` },
+    );
+  });
+  return toBlob(createElement(Document, null, ...pages) as ReactElement);
 }
 
 export function renderInvoicePdf(data: InvoiceTemplateData): Promise<Blob> {
@@ -69,6 +93,13 @@ export function renderDoPdf(data: DoTemplateData): Promise<Blob> {
  *  loaner). Rendered on-demand from the ops_sofa_loans row + order. */
 export function renderLoanNotePdf(data: LoanNoteTemplateData): Promise<Blob> {
   return toBlob(LoanNoteTemplate(data));
+}
+
+/** A Register's CURRENT VIEW as a document — not a business document, so it
+ *  carries no letterhead, terms or signature block. Its cells are the same
+ *  derived text the Excel export writes. */
+export function renderRegisterListPdf(data: RegisterListTemplateData): Promise<Blob> {
+  return toBlob(RegisterListTemplate(data));
 }
 
 export function renderPoPdf(data: PoTemplateData): Promise<Blob> {

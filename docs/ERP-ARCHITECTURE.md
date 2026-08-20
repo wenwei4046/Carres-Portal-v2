@@ -26,6 +26,7 @@ production. **Every single one is the same defect wearing different clothes:**
 | D4 | Two storage arithmetics for one order | Two owners for one number |
 | D5 | A carrier's global working days edited from inside one customer's order | Orders **wrote another module's configuration** |
 | D9 | The Sofa facet reads **0** while 10 of 28 live orders carry a sofa; the storage rate resolves to neither on **every** live order | *"What kind of product is this?"* has **three answers and no owner** — and the one that is right (the catalog) is never asked |
+| | **D9 — two of the three answers now ask the catalog.** `56239a3c` (PR #859, 2026-08-19) moved **Stock/On hand** onto `sku → product_skus → product_models.category` through the one shared reader (`apps/api/src/lib/sku-categories.ts`). 2026-08-20 moved the **Sales Order** answer the same way: the order-detail endpoint carries `category` on both the lines and the free units, and the drawer's loan flow reads it through `resolvedCategory` instead of parsing the SKU text. That half was never cosmetic — `LoanPanel` FILTERS warehouse stock with the result, so a real sofa absent from a hardcoded keyword list could not be offered as a loaner. **🔴 THE THIRD ANSWER IS STILL ITS OWN: the storage rate.** D9 does not close until it asks too. **And the parser is not dead** — `resolvedCategory` still falls back to `lineClass` when the catalog holds no row for a SKU, because 975 live units are in that bucket (2026-08-19); the fallback is scheduled to die with the bucket, not before. | |
 
 **None of them is a missing feature. Every one is an unowned record.**
 
@@ -50,13 +51,15 @@ ISSUE TRACKER = ACCOUNTABILITY + MEMORY + LEARNING
 ```
 
 Modules own and preserve the transactional facts. Work reads those facts and presents the
-actionable layer as **WHO + ACTION + OBJECT + WHEN (actual working weekday/date)**, using the
+actionable layer as **structured Owner + structured Object + Fact/Problem + Action/Object + required
+Recipient/Result + WHEN (actual working weekday/date)**, using the
 authoritative wording in `COPY-STANDARD.md` and calendar in `ACTION-FLOW-STANDARD.md`; it never
 creates a second operational status or writes another module's completion fact. Truth is not
 forced into action wording: if nobody must do anything, it remains a fact in its owning module.
 The Issue Tracker does not replace SO, PO, Unit, Delivery or Payment truth. It preserves what
 happened, accountability, financial consequence, recovery and the learning that survives into
-meeting, training and SOP.
+meeting, training and SOP. Its approved operating model lives once in
+[`issue-tracker/MASTER.md`](issue-tracker/MASTER.md).
 
 The approved end-to-end Sales Order V2 target, its implementation state and its restart order
 live once in [`orders/MASTER.md`](orders/MASTER.md), immediately after the Card 1 production
@@ -104,6 +107,31 @@ ownership:** the source module reads or links to the owner; it never gains a sec
 lifecycle checklist, object-level reference capability matrix, evidence/output discipline and
 Plan/Design restart. This blueprint supplies the ownership map that pass must use.
 
+### Law F · An action has an owner; a business object does not have one universal action owner
+
+**OWNER ENGINE — OWNER-APPROVED / LOCKED 2026-08-14.** A Sales Order, Purchase Order, Delivery,
+Payment or Service Case may carry a stable PIC or accountable owner, but that identity does not
+own every action created from the object. Each open action resolves its own owner from the
+authoritative business rule and current roster:
+
+```
+missing customer commitment       → responsible salesperson
+issue PO / confirm supplier date  → current PO Duty
+receive goods                     → current GRN Duty
+collect customer balance          → Payment ownership rule
+confirm delivery appointment      → Delivery ownership rule
+```
+
+The rule resolves automatically. Staff do not assign routine work order by order. People owns the
+roster, duty and buddy/cover facts; the Work Engine applies them so absence changes who sees today's
+work without changing the underlying business record or rewriting its history. A manager may see or
+filter the resolved owner, but Work never creates a second assignment truth.
+
+Keep these identities separate: object PIC/accountability · action owner · fault owner · cost
+bearer · service provider. A module may summarise another module's action and owner, but the module
+that owns the trigger and completion fact owns the owner rule. `ACTION-FLOW-STANDARD.md` defines the
+shared action contract; `ui/MASTER.md` defines how the resolved owner appears.
+
 > **The ownership test used by all five laws, and the one V1 needed and did not have:**
 > ```
 > Does this screen CREATE, CHANGE or CLOSE the record?
@@ -129,13 +157,21 @@ is a VIEW of a module, and it says so.
 | **Stock** | *What do we physically hold, and where?* |
 | **Delivery** | *How do the goods reach the customer?* |
 | **Money In** | *What has the customer paid, and what is still owed?* |
-| **Supplier Claim** | *What does a supplier owe us for a bad delivery?* |
-| **Service** | *What is wrong after the customer received it?* |
+| **Supplier Claim** | *What does a supplier owe us for an item problem?* |
+| **Service** | *What customer problem needs coordinated follow-up, and is the customer finished?* |
+| **Guarantee / Service Package** | *What item-level entitlement exists, when does it run, and what has it consumed?* |
+| **Rental / Subscription** | *What recurring agreement, asset, money schedule and included service does the customer hold?* |
 | **People** | *Who does the work, and what are they owed?* |
+| **Issue Tracker** | *What went wrong, who contributed, what did it cost, and what must Carres learn?* |
 
-**Ten modules. Two of them do not exist as owners today, and that is the finding:**
-**Catalog** owns a question three other files answer for themselves (D9), and **Receiving**
-owns a record Orders was also writing (D2).
+These are business authorities, not a promise of one navigation door per row. **Catalog still has
+no canonical module MASTER; that is a current authority gap, not permission for another module to
+invent Catalog truth.** Receiving and Supplier Claim remain responsibilities governed inside the
+Purchasing MASTER until an approved re-ruling gives either a separate MASTER.
+
+Workspace is deliberately absent from this ownership table. Dashboard and Work are cross-module
+projections and own no business outcome. Their current complete design is still
+`docs/workspace/BLUEPRINT.md` **PROPOSAL FOR OWNER REVIEW**, not approved module law.
 
 ---
 
@@ -149,9 +185,10 @@ object; sometimes it is an accepted ERP operation (`Receiving`); cross-cutting s
 ```
 WORKSPACE
 ├── Dashboard
-└── Work
-    ├── My Work
-    └── Team Work
+├── Work
+│   ├── My Work
+│   └── Team Work
+└── Issue Tracker
 
 SALES
 ├── Sales Orders
@@ -163,7 +200,13 @@ SUPPLY CHAIN
 │   ├── Manual Purchase
 │   ├── Purchase Orders
 │   ├── Receiving
-│   └── Supplier Claims
+│   ├── Supplier Claims
+│   ├── Purchase Returns
+│   ├── Repair Orders
+│   ├── Display Requests
+│   ├── Consignment Orders
+│   ├── Consignment Receipts
+│   └── Consignment Returns
 ├── Warehouse
 │   ├── Stock
 │   ├── Ready stock
@@ -195,8 +238,46 @@ a second settings home. `Old Orders` is a temporary cutover door and is not part
 The right Quick Rail is governed by `ui/MASTER.md`; it never adds duplicate module destinations or
 business truth.
 
+*`Receiving`, not `Goods Receipts` (SHIPPED 2026-08-18).* The approved page list wrote the
+document name; this section's own rule names a page after the JOB, and `Receiving` is named
+here as the accepted ERP operation. `docs/purchasing/MASTER.md:768` also bans the letters
+`GRN` from a tab forever. The document is still a Goods Receipt; the door is Receiving.
+
 **This is navigation, not workflow.** How the operator moves between these pages — which one
 feeds which — is the module MASTER's, and it changes when the business changes.
+
+**A MODULE'S PAGES LIVE IN THE RAIL, AND THE WHOLE MAP IS SHOWN FROM DAY ONE**
+(Jess, 2026-08-18 — SHIPPED). A 44px tab strip is a good home for three siblings and a bad
+home for eleven: it scrolls sideways, it cannot show a count without shouting, and it cannot
+group. The module's sidebar item EXPANDS in place instead — **one rail, not two**, because a
+second left column would spend ~430px of a 1440px screen on navigation before the first
+column of data (a 232px rail plus a page's own 200px right rail).
+
+**Every approved page is listed before it exists.** The rail is the module's MAP, and a map
+showing four of eleven roads teaches the operators a shape that is about to change under them
+seven more times. An unbuilt entry prints **`Coming soon`** and **is not a control** — a
+`<span>` with no href, out of the tab order, `aria-disabled`. `03-page-patterns.md:149` bans
+a control that opens nothing; there is no dead arrow because there is no arrow. `:219` of the
+same file requires a deliberately disabled control to say why on screen, and `Coming soon` is
+that sentence (`COPY-STANDARD.md` — the ONE word for it, never `TBD`, never `Not available`).
+
+**An entry goes live in its own page's PR by exactly two edits: drop the flag, and the span
+becomes a link.** Nothing is added later and no order is renegotiated, so the rail never
+reshuffles under a staff member who has learned it.
+
+**The cost, stated:** thirteen purchasing entries plus the module rows overflow a laptop rail,
+so it scrolls. Accepted. The one defect that may not survive is landing on a rail whose
+highlighted row is off screen, so the active row is brought into view on mount.
+
+**A DOCUMENT EARNS A DOOR WHEN A HUMAN LOOKS FOR IT BY NAME** (Jess, 2026-08-18). Purchasing's
+five pages became eleven, and the reason is measured rather than stylistic: **Carres runs three
+operations staff who each do every job**, so nothing may depend on remembering which workspace
+hides which document. The old rule — expose modules, reveal documents inside them — still binds
+everywhere the second condition fails. Nothing gets a page because it exists; it gets one because
+somebody has to find it again. Two proposed pages were refused on exactly that test: a module-local
+`Work` page (Work is ONE cross-module surface) and `Purchase Demands` (two lanes already produce
+every demand; a third view becomes a third place to press Issue, and it is a report instead).
+
 
 ---
 
@@ -413,8 +494,8 @@ do not chase payment for goods you cannot deliver).
 ## 3.8 · SUPPLIER CLAIM
 
 **OWNS**
-- The **claim** — born from a receiving exception, bound to its PO line, SKU and supplier
-  forever.
+- The **claim workstream** — opened under one Service Case when evidence indicates supplier
+  responsibility, bound to its PO line, SKU and supplier forever.
 - What we asked, what the supplier answered, **Carres' own resolution**, and the item's outcome.
 - The claim's own money: what the supplier owes us, completed on **external evidence** (their
   credit-note or debit-note number), never a tick-box.
@@ -422,32 +503,45 @@ do not chase payment for goods you cannot deliver).
 **ACTIONS** — ask the supplier · record their answer · decide the customer resolution · decide
 the item outcome · split a claim · close it.
 
-**SUMMARISES** — the purchase order · the receiving session that opened it · the customer order
-waiting on the goods.
+**SUMMARISES** — its parent Service Case · the purchase order · the receiving or downstream
+event that found the problem · the customer order waiting on the goods, when applicable.
 
-**LINKS TO** — Receiving · Purchasing · Stock · the customer order.
+**LINKS TO** — Service Case · Receiving · Purchasing · Stock · the customer order.
 
-> **A claim has no create button and never will** — it is born from a receiving exception. **In
-> V2 it gains a SECOND entrance from Service** (a fault found after delivery), which today has
-> no route at all. **One engine, two entrances** — the shape SAP, Oracle and Dynamics all use.
+> **A claim has no independent create button.** Staff report the problem where they discover it;
+> the system opens or links one Service Case and, when supplier responsibility is in scope,
+> creates the Supplier Claim workstream for Purchasing. `Supplier Claims` is Purchasing's work
+> view of those workstreams, not a second case register and not a second intake form.
 
 ---
 
 ## 3.9 · SERVICE
 
 **OWNS**
-- The **case** — a customer problem after delivery: its evidence, its deadline, its follow-ups
-  and the customer's own confirmation that it is finished.
+- The **case** — the one parent record for a customer-affecting problem that requires evidence,
+  remedy, communication or follow-up, whether first found by Customer Care, Delivery, Warehouse,
+  Receiving, Purchasing or Finance.
+- The shared evidence, affected item/order/document links, parties, Work, decisions, deadlines,
+  history and completion evidence.
 
-**ACTIONS** — file a case with its required evidence · drive its steps · explain a delay ·
-close it on the customer's word.
+**ACTIONS** — report a problem in context · route Work to the responsible teams · drive its
+steps · generate required execution documents · explain a delay · close only when every
+required party/outcome is complete.
 
-**SUMMARISES** — the customer order it is about · the item · the guarantee covering it.
+**SUMMARISES** — every linked source and execution document; it does not become the accounting,
+stock, purchasing or delivery authority for those transactions.
 
-**LINKS TO** — the customer order · Supplier Claim (when the factory is at fault) · Stock.
+**LINKS TO** — Customer/Sales Order · Delivery Order/event · Warehouse/Stock · PO/Receiving ·
+Supplier Claim · Payment/Refund · Guarantee, as applicable.
 
-> **A case is finished when the CUSTOMER is** — never when a dropdown changes. Kept from V1
-> verbatim; it is why the module refused a `closed_at` column.
+> **ONE INTAKE RULE:** normal work stays in its owning module. When something abnormal needs
+> evidence, another owner, later follow-up, investigation, hold, remedy or recovery, staff press
+> `Report Problem` on the record already in front of them. The system decides whether the facts
+> require a Service Case, an Operational Issue, an owning-module exception, or linked records;
+> staff do not choose a module or document type first.
+>
+> **A customer-facing case is finished when the CUSTOMER is, and all required internal or
+> external outcomes are complete** — never merely when a dropdown changes.
 
 ---
 

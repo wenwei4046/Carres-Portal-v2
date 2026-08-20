@@ -5,6 +5,7 @@ import SettingsWorkspace from "./SettingsWorkspace";
 
 vi.mock("./SalesOrderSettings", () => ({ default: () => <div>Sales settings</div> }));
 vi.mock("./OperationPurchasingSettings", () => ({ default: () => <div>Purchasing settings</div> }));
+vi.mock("./IssueTrackerSettings", () => ({ default: () => <div>Issue settings</div> }));
 
 describe("SettingsWorkspace navigation", () => {
   it("uses canonical central module routes from a nested settings destination", () => {
@@ -24,6 +25,7 @@ describe("SettingsWorkspace navigation", () => {
       "href",
       "/operation/settings/purchasing",
     );
+    expect(screen.getByRole("link", { name: "Issue Tracker Settings" })).toHaveAttribute("href", "/operation/settings/issue-tracker");
     expect(screen.getByText("Sales Orders", { selector: "[data-settings-group]" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Sales Order Settings" })).toHaveAttribute("aria-current", "page");
   });

@@ -1,5 +1,4 @@
 import type { ReactNode } from "react";
-import { ClipboardList } from "lucide-react";
 import ModuleHeader from "./components/ModuleHeader";
 
 /**
@@ -14,10 +13,9 @@ export default function DestinationHeader({ right }: { right?: ReactNode }) {
   return (
     <ModuleHeader
       testId="sales-orders-destination-header"
-      icon={ClipboardList}
       word="Sales Orders"
       docTitle="Sales Orders — Carres"
-      renderedHeight44
+      destinationHeader
       right={right}
     />
   );

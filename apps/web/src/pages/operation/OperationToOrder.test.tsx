@@ -322,12 +322,13 @@ describe("the PO Schedule — a purchase calendar, not a menu", () => {
     expect(within(nav).getByTestId("to-order-overdue")).toHaveTextContent("4");
     // Rolling from Thursday: Fri · Mon · Wed — 3 configured days, 3 rows, no
     // Today (Thursday is not a PO day), no stale Monday. Each row prints
-    // weekday + DATE in one format (Loo, 2026-08-06: `Fri 31 Jul`, never a
-    // bare weekday), and the full spelling stays on the hover.
-    expect(within(nav).getByTestId("to-order-day-2026-07-31")).toHaveTextContent("Fri 31 Jul");
+    // weekday + DATE in one format (Loo, 2026-08-06: never a bare weekday) —
+    // and since the 2026-08-15 year ruling that format is literally `fmtDate`,
+    // because the hand-composed `railDayLabel` it used to need was deleted.
+    expect(within(nav).getByTestId("to-order-day-2026-07-31")).toHaveTextContent(fmtDate("2026-07-31"));
     expect(within(nav).getByTestId("to-order-day-2026-07-31")).toHaveTextContent("0");
-    expect(within(nav).getByTestId("to-order-day-2026-08-03")).toHaveTextContent("Mon 3 Aug");
-    expect(within(nav).getByTestId("to-order-day-2026-08-05")).toHaveTextContent("Wed 5 Aug");
+    expect(within(nav).getByTestId("to-order-day-2026-08-03")).toHaveTextContent(fmtDate("2026-08-03"));
+    expect(within(nav).getByTestId("to-order-day-2026-08-05")).toHaveTextContent(fmtDate("2026-08-05"));
     // Never the bare weekday word alone.
     expect(within(nav).queryByText(/^Friday$/)).toBeNull();
     // The hover keeps the full date.
@@ -343,9 +344,9 @@ describe("the PO Schedule — a purchase calendar, not a menu", () => {
     // that is the block above, counting a different thing.
     expect(within(nav).getByText(W.categoryHeading)).toBeInTheDocument();
     expect(within(nav).getByTestId("to-order-cat-all")).not.toHaveTextContent("Orders");
-    expect(within(nav).getByTestId("to-order-create-purchase")).toHaveTextContent(
-      W.createPurchase,
-    );
+    // CARD-2026-08-18-manual-purchase §1: `+ Create Purchase` LEFT this rail
+    // for the Manual Purchase page. The door is the module rail's own entry.
+    expect(within(nav).queryByTestId("to-order-create-purchase")).toBeNull();
     expect(document.querySelector("h1")).toBeNull();
   });
 
@@ -427,7 +428,7 @@ describe("the grid — business language only", () => {
   it("T1 — an ITEM row leaves the identity cells blank; the order line fills them", async () => {
     await loaded();
     fireEvent.click(screen.getByTestId("to-order-overdue"));
-    // PETER's order: the group line says SO-1207 · Peter · the date; his two
+    // PETER's order: the group line says SO-1207 · PETER · the date; his two
     // item rows say none of it — the fact is stated once, in its column.
     const rows = [...document.querySelectorAll('[data-kit="data-row"]')];
     expect(rows.length).toBeGreaterThan(0);
@@ -447,7 +448,7 @@ describe("the grid — business language only", () => {
       expect(tds[4]?.textContent ?? "").toBe("");
     }
     const sheet = screen.getByTestId("to-order-sheet");
-    expect((sheet.textContent ?? "").match(/Peter/g)?.length).toBe(1);
+    expect((sheet.textContent ?? "").match(/PETER/g)?.length).toBe(1);
   });
 
   it("speaks the CUSTOMER's date — red when past, a dash when TBD, sorted soonest first", async () => {
@@ -582,9 +583,11 @@ describe("the Excel reflexes — header sort, per-column filters", () => {
     expect(sheet().getByText("SO-1300")).toBeInTheDocument();
     expect(sheet().queryByText("SO-1204")).toBeNull();
     fireEvent.click(screen.getByTestId("table-filter-clear-so"));
-    // Customer speaks the display spelling — `PETER` is typed, `Peter` reads.
+    // Customer speaks the display spelling. CAPITALIZE UP ONLY (owner ruling
+    // 2026-08-15): `PETER` is typed and `PETER` reads — the display rule raises
+    // a first letter and never lowers one, so a name in capitals survives.
     fireEvent.click(screen.getByTestId("table-filter-customer"));
-    fireEvent.click(screen.getByLabelText("Peter"));
+    fireEvent.click(screen.getByLabelText("PETER"));
     expect(sheet().getByText("SO-1207")).toBeInTheDocument();
     expect(sheet().queryByText("SO-1300")).toBeNull();
   });
@@ -874,429 +877,9 @@ describe("Issue — the grid is the receipt, the bar is the report", () => {
   });
 });
 
-describe("+ Create Purchase — the dialog stops guessing (P15)", () => {
-  /**
-   * The picker renders through the kit's `DataTable` (§0.1 — a hand-rolled
-   * table is a violation the guard counts). A row is found BY ITS SKU CELL,
-   * which is the assertion this card is about anyway: if the code is not
-   * rendered the row cannot be addressed, and defect 1 is back.
-   */
-  const pickRow = (sku: string) =>
-    screen.getByText(sku, { selector: ".font-mono" }).closest("tr")!;
-
-  async function openDialog() {
-    await loaded();
-    fireEvent.click(screen.getByTestId("to-order-create-purchase"));
-    const dialog = await screen.findByTestId("to-order-create-dialog");
-    await waitFor(() => expect(pickRow("5539-CNR")).toBeTruthy());
-    return dialog;
-  }
-
-  it("asks SIX things — the five that were right, plus the Source", async () => {
-    const dialog = await openDialog();
-
-    // Item · Quantity · Deliver To · Required By · Remark were correct and are
-    // untouched. `Required By` and `Destination` are Loo's own ruling and the
-    // card forbids changing them.
-    for (const w of [W.itemLabel, W.itemsColQty, W.destination, W.requiredBy, W.remark]) {
-      expect(within(dialog).getByText(w)).toBeInTheDocument();
-    }
-    // THE SIXTH — P15's defect 2. `Reason` is the mirror's own word for the
-    // field the frozen list calls Source; nothing new is spelt.
-    expect(within(dialog).getByText(W.reason)).toBeInTheDocument();
-
-    // Category was never asked and still is not.
-    expect(within(dialog).queryByText("Category")).toBeNull();
-    // Nothing disabled, no placeholder promise.
-    expect(screen.queryByText(W.nextUpdate)).toBeNull();
-  });
-
-  it("DEFECT 1 — four SKUs that share the word Booqit are told apart", async () => {
-    const dialog = await openDialog();
-
-    // The label alone is ambiguous FOUR ways, which is the live measurement.
-    expect(within(dialog).getAllByText("Booqit")).toHaveLength(4);
-    // The SKU is what distinguishes them, and every one of them is on screen.
-    for (const sku of ["5539-L(RHF)", "5539-2NA", "5539-CNR", "5539-Console"]) {
-      expect(within(dialog).getByText(sku)).toBeInTheDocument();
-    }
-    // ...under a header that says what the column is.
-    expect(within(dialog).getByText(W.pickerColSku)).toBeInTheDocument();
-
-    // ONE WORD, ONE THING. The ambiguous column is headed `Model` — the grid's
-    // own word for this value — because the FIELD is already `Item`, and one
-    // word labelling two things in one dialog is the defect this card is
-    // fixing in another form.
-    expect(within(dialog).getAllByText(W.itemLabel)).toHaveLength(1);
-    expect(within(dialog).getByText(W.colModel)).toBeInTheDocument();
-  });
-
-  it("DEFECT 3 — the picker carries the stock numbers, headed by their own words", async () => {
-    const dialog = await openDialog();
-
-    for (const w of [W.pickerColOnHand, W.pickerColReserved, W.pickerColFree]) {
-      expect(within(dialog).getByText(w)).toBeInTheDocument();
-    }
-    // The row an operator would read before buying: 5 on hand, none spoken
-    // for, 5 free — so buying more may be unnecessary.
-    const row = pickRow("5539-CNR");
-    expect(row).toHaveTextContent("5539-CNR");
-    expect(row).toHaveTextContent("5");
-    // ...and a SKU with nothing in the warehouse says zero rather than blank.
-    expect(pickRow("5539-2NA")).toHaveTextContent("0");
-  });
-
-  it("DEFECT 4 — the supplier appears on pick, as a FACT and never a chooser", async () => {
-    const dialog = await openDialog();
-
-    // Nothing claimed before an item is picked.
-    // P19 — the testid gained the line's index, because the supplier is a fact
-    // about ONE line and a dialog now holds several. The ASSERTION is P15's,
-    // byte for byte; only the row it addresses is named.
-    expect(within(dialog).queryByTestId("cp-supplier-0")).toBeNull();
-
-    fireEvent.click(pickRow("SONIC-S"));
-    expect(within(dialog).getByTestId("cp-supplier-0")).toHaveTextContent("Nice Future");
-
-    // IT IS NOT A CONTROL. The supplier is derived by the server from the SKU
-    // (Jess, 2026-08-03); a client that could name it could name the wrong
-    // factory, so there is no input, no select and no button for it.
-    const supplier = within(dialog).getByTestId("cp-supplier-0");
-    expect(supplier.querySelector("input,select,button")).toBeNull();
-  });
-
-  it("DEFECT 2 — the Source is chosen and it is what gets posted", async () => {
-    await openDialog();
-    fireEvent.click(pickRow("SONIC-S"));
-
-    // The four the store can record. Spare Parts and Other… are ruled WORDS
-    // with no database value, so they are absent rather than greyed — a
-    // control offering a word the server refuses by name is the disease 0322
-    // had to repair on the stock pool's reasons.
-    // Opened by KEYBOARD: jsdom@25 has no `PointerEvent`, so a synthesised
-    // pointerDown is an Event React ignores and a Radix listbox silently never
-    // opens — D0.5b paid for that once already.
-    const trigger = document.getElementById("cp-purpose")!;
-    fireEvent.keyDown(trigger, { key: "Enter" });
-    // Scoped to the LIST, because the trigger renders the chosen value too and
-    // `Ready Stock` is legitimately on screen twice while the list is open.
-    const list = await screen.findByRole("listbox");
-    for (const w of [W.reasonReadyStock, W.reasonDisplay, W.reasonWarranty, W.reasonOffice]) {
-      expect(within(list).getByText(w)).toBeInTheDocument();
-    }
-    expect(within(list).queryByText(W.reasonSpareParts)).toBeNull();
-    expect(within(list).queryByText(W.reasonOther)).toBeNull();
-
-    fireEvent.click(within(list).getByText(W.reasonWarranty));
-
-    apiFetch.mockClear();
-    fireEvent.click(screen.getByTestId("to-order-create-submit"));
-    await waitFor(() => {
-      const post = apiFetch.mock.calls.find(
-        (c) => (c[1] as RequestInit | undefined)?.method === "POST",
-      );
-      expect(post).toBeTruthy();
-      const sent = JSON.parse(String((post![1] as RequestInit).body));
-      expect(sent.purpose).toBe("warranty");
-      expect(sent.sku).toBe("SONIC-S");
-      // NO SUPPLIER ON THE WIRE. There is no key to send and no parameter to
-      // send it to — the RPC derives it.
-      expect(sent).not.toHaveProperty("supplier");
-      expect(sent).not.toHaveProperty("supplierId");
-    });
-  });
-
-  it("Save is refused until an item is picked", async () => {
-    await loaded();
-    fireEvent.click(screen.getByTestId("to-order-create-purchase"));
-    await screen.findByTestId("to-order-create-dialog");
-
-    // No item yet → the commit is refused. A demand with no product is not a
-    // demand, and the button says so by being unavailable rather than failing.
-    expect(screen.getByTestId("to-order-create-submit")).toBeDisabled();
-  });
-});
-
-/**
- * P19 — Create Purchase takes many lines (Loo, 2026-08-05).
- *
- * The whole card is the FORM. `purchase_demands` is one row per SKU by the
- * frozen model, so N lines is N rows from one submit and nothing in the schema
- * or the api route moved. What these tests hold is therefore the two things a
- * form can get wrong: that the HEADER is asked once and reaches every row, and
- * that a partial failure behaves like the page's own frozen Issue — **what
- * succeeded stays created.**
- */
-describe("+ Create Purchase — many lines, one submit (P19)", () => {
-  const pickRow = (sku: string) =>
-    screen.getByText(sku, { selector: ".font-mono" }).closest("tr")!;
-
-  /** Fill line `i`: focus it, search, pick, then type the quantity and remark. */
-  function fillLine(i: number, sku: string, qty?: string, remark?: string) {
-    fireEvent.focus(document.getElementById(`cp-item-${i}`)!);
-    fireEvent.click(pickRow(sku));
-    if (qty !== undefined) {
-      fireEvent.change(document.getElementById(`cp-qty-${i}`)!, { target: { value: qty } });
-    }
-    if (remark !== undefined) {
-      fireEvent.change(document.getElementById(`cp-remark-${i}`)!, {
-        target: { value: remark },
-      });
-    }
-  }
-
-  async function openDialog() {
-    await loaded();
-    fireEvent.click(screen.getByTestId("to-order-create-purchase"));
-    await screen.findByTestId("to-order-create-dialog");
-    await waitFor(() => expect(pickRow("5539-CNR")).toBeTruthy());
-  }
-
-  const posted = () =>
-    apiFetch.mock.calls
-      .filter((c) => (c[1] as RequestInit | undefined)?.method === "POST")
-      .map((c) => JSON.parse(String((c[1] as RequestInit).body)));
-
-  it("three items go in on ONE submit, as three demands — the card's own case", async () => {
-    await openDialog();
-
-    fillLine(0, "SONIC-S", "2", "showroom floor");
-    fireEvent.click(screen.getByTestId("to-order-line-add"));
-    fillLine(1, "5539-CNR", "1", "");
-    fireEvent.click(screen.getByTestId("to-order-line-add"));
-    fillLine(2, "5539-2NA", "4", "left corner");
-
-    apiFetch.mockClear();
-    fireEvent.click(screen.getByTestId("to-order-create-submit"));
-
-    await waitFor(() => expect(posted()).toHaveLength(3));
-    const sent = posted();
-
-    // THE LINES CARRY WHAT IS PER-LINE...
-    expect(sent.map((s) => [s.sku, s.qty, s.remark])).toEqual([
-      ["SONIC-S", 2, "showroom floor"],
-      ["5539-CNR", 1, null],
-      ["5539-2NA", 4, "left corner"],
-    ]);
-    // ...and EVERY ONE carries the header, which was asked once. This is the
-    // half a multi-line form gets wrong: a header field that silently reaches
-    // only the first row.
-    for (const s of sent) {
-      expect(s.destinationId).toBe(KLANG);
-      expect(s.purpose).toBe("ready_stock");
-      // No supplier on the wire, on any row — P15's rule, per line now.
-      expect(s).not.toHaveProperty("supplier");
-      expect(s).not.toHaveProperty("supplierId");
-      // ❌ a price column. Purchasing prices nothing here.
-      expect(s).not.toHaveProperty("price");
-      expect(s).not.toHaveProperty("cost");
-    }
-    // Nothing is left open once every line is a record.
-    await waitFor(() => expect(screen.queryByTestId("to-order-create-dialog")).toBeNull());
-  });
-
-  it("WHAT SUCCEEDED STAYS CREATED — a bad line keeps its row, the good ones do not roll back", async () => {
-    await openDialog();
-    fillLine(0, "SONIC-S", "2");
-    fireEvent.click(screen.getByTestId("to-order-line-add"));
-    fillLine(1, "5539-CNR", "1");
-    fireEvent.click(screen.getByTestId("to-order-line-add"));
-    fillLine(2, "5539-2NA", "3");
-
-    // The MIDDLE line is refused, so the assertion cannot pass by the run
-    // simply stopping at the first failure.
-    apiFetch.mockImplementation((path: string, init?: RequestInit) => {
-      const b = init?.body ? JSON.parse(String(init.body)) : undefined;
-      if (init?.method === "POST" && b?.sku === "5539-CNR") {
-        return Promise.reject(new Error("sku_has_no_supplier"));
-      }
-      return route(path, b);
-    });
-
-    fireEvent.click(screen.getByTestId("to-order-create-submit"));
-
-    // The failure names its OWN row, in the server's own words.
-    const failed = await screen.findByTestId("to-order-line-failed-1");
-    expect(failed).toHaveTextContent("sku_has_no_supplier");
-
-    // The two that worked are RECORDS. They say so, and they no longer offer a
-    // Remove — nothing in this form can un-make a row the server accepted.
-    expect(screen.getByTestId("to-order-line-created-0")).toHaveTextContent(W.createdWord);
-    expect(screen.getByTestId("to-order-line-created-2")).toHaveTextContent(W.createdWord);
-    expect(screen.queryByTestId("to-order-line-remove-0")).toBeNull();
-    expect(screen.queryByTestId("to-order-line-remove-2")).toBeNull();
-    // ...and the one that failed keeps its way out.
-    expect(screen.getByTestId("to-order-line-remove-1")).toBeInTheDocument();
-
-    // THE DIALOG STAYS. A form that closed here would have reported nothing.
-    expect(screen.getByTestId("to-order-create-dialog")).toBeInTheDocument();
-  });
-
-  it("pressing Create again retries ONLY the line that failed — a record is never posted twice", async () => {
-    await openDialog();
-    fillLine(0, "SONIC-S", "2");
-    fireEvent.click(screen.getByTestId("to-order-line-add"));
-    fillLine(1, "5539-CNR", "1");
-
-    let refuse = true;
-    apiFetch.mockImplementation((path: string, init?: RequestInit) => {
-      const b = init?.body ? JSON.parse(String(init.body)) : undefined;
-      if (init?.method === "POST" && b?.sku === "5539-CNR" && refuse) {
-        return Promise.reject(new Error("boom"));
-      }
-      return route(path, b);
-    });
-
-    fireEvent.click(screen.getByTestId("to-order-create-submit"));
-    await screen.findByTestId("to-order-line-failed-1");
-
-    // The factory is fixed; the operator presses the same button again. There
-    // is no second control — the button that made the attempt repeats it.
-    refuse = false;
-    apiFetch.mockClear();
-    fireEvent.click(screen.getByTestId("to-order-create-submit"));
-
-    await waitFor(() => expect(posted()).toHaveLength(1));
-    // ONE call, and it is the failed line. Re-posting SONIC-S would have
-    // bought the showroom two sofas for one decision.
-    expect(posted()[0].sku).toBe("5539-CNR");
-    await waitFor(() => expect(screen.queryByTestId("to-order-create-dialog")).toBeNull());
-  });
-
-  it("a line can be added and removed, and removing the last leaves one empty line", async () => {
-    await openDialog();
-
-    fireEvent.click(screen.getByTestId("to-order-line-add"));
-    fireEvent.click(screen.getByTestId("to-order-line-add"));
-    expect(screen.getAllByTestId(/^to-order-create-line-\d+$/)).toHaveLength(3);
-
-    fireEvent.click(screen.getByTestId("to-order-line-remove-2"));
-    expect(screen.getAllByTestId(/^to-order-create-line-\d+$/)).toHaveLength(2);
-
-    // Removing every line leaves ONE empty line, never an unusable form — a
-    // dialog with no rows has no way back.
-    fireEvent.click(screen.getByTestId("to-order-line-remove-1"));
-    fireEvent.click(screen.getByTestId("to-order-line-remove-0"));
-    const left = screen.getAllByTestId(/^to-order-create-line-\d+$/);
-    expect(left).toHaveLength(1);
-    expect(document.getElementById("cp-item-0")).toHaveValue("");
-    expect(screen.getByTestId("to-order-create-submit")).toBeDisabled();
-  });
-
-  it("a half-filled line holds the button rather than being silently dropped", async () => {
-    await openDialog();
-    fillLine(0, "SONIC-S", "1");
-    expect(screen.getByTestId("to-order-create-submit")).toBeEnabled();
-
-    // A row carrying a remark and NO item: posting the others and closing would
-    // throw that typing away without saying so, so the button waits.
-    fireEvent.click(screen.getByTestId("to-order-line-add"));
-    fireEvent.change(document.getElementById("cp-remark-1")!, {
-      target: { value: "the one with the taller legs" },
-    });
-    expect(screen.getByTestId("to-order-create-submit")).toBeDisabled();
-
-    // An UNTOUCHED trailing row is the empty row at the bottom of every ERP
-    // grid, and is ignored rather than held against the operator.
-    fireEvent.change(document.getElementById("cp-remark-1")!, { target: { value: "" } });
-    expect(screen.getByTestId("to-order-create-submit")).toBeEnabled();
-  });
-
-  it("at most ONE picker is open, and it belongs to the line being filled", async () => {
-    await openDialog();
-    /* The dialog's only table is the picker: Radix marks the rest of the page
-     * `aria-hidden` while a modal is open, so the grid behind it is not in the
-     * accessibility tree and cannot be miscounted here. */
-    const pickers = () => screen.queryAllByRole("table").length;
-
-    // A freshly opened dialog behaves exactly as the single-line version did.
-    expect(pickers()).toBe(1);
-
-    // The new line takes the picker WITH it — the first does not keep a copy.
-    fireEvent.click(screen.getByTestId("to-order-line-add"));
-    expect(pickers()).toBe(1);
-    expect(within(screen.getByTestId("to-order-create-lines")).getAllByRole("table"))
-      .toHaveLength(1);
-
-    // Focus moves it back. Two open result tables cannot be REPRESENTED: the
-    // state is a single id, not a set.
-    fireEvent.focus(document.getElementById("cp-item-0")!);
-    expect(pickers()).toBe(1);
-
-    // ...and once the focused line names its item there is no picker at all,
-    // which is what makes room for the next line rather than stacking tables.
-    fillLine(0, "SONIC-S");
-    expect(pickers()).toBe(0);
-
-    // Focusing the empty line brings exactly one back.
-    fireEvent.focus(document.getElementById("cp-item-1")!);
-    expect(pickers()).toBe(1);
-  });
-
-  it("each line searches its OWN needle — one shared list would show the last thing typed", async () => {
-    await openDialog();
-    fillLine(0, "SONIC-S");
-
-    fireEvent.click(screen.getByTestId("to-order-line-add"));
-    fireEvent.change(document.getElementById("cp-item-1")!, {
-      target: { value: "5539-CNR" },
-    });
-    await waitFor(() =>
-      expect(screen.queryByText("SONIC-S", { selector: ".font-mono" })).toBeNull(),
-    );
-    // Line 0 keeps its pick while line 1 is filtered to something else.
-    expect(document.getElementById("cp-item-0")).toHaveValue("Sonic S");
-    expect(screen.getByText("5539-CNR", { selector: ".font-mono" })).toBeInTheDocument();
-  });
-
-  it("the header is asked ONCE and the line words are typed once", async () => {
-    await openDialog();
-    fireEvent.click(screen.getByTestId("to-order-line-add"));
-    fireEvent.click(screen.getByTestId("to-order-line-add"));
-
-    const dialog = screen.getByTestId("to-order-create-dialog");
-    // Three lines, and still exactly one of each header field. Source,
-    // Destination and Required By are per PURCHASE, never per line — the
-    // card's Must-NOT names all three.
-    for (const w of [W.reason, W.destination, W.requiredBy]) {
-      expect(within(dialog).getAllByText(w)).toHaveLength(1);
-    }
-    expect(dialog.querySelectorAll("#cp-purpose")).toHaveLength(1);
-    expect(dialog.querySelectorAll("#cp-dest")).toHaveLength(1);
-    expect(dialog.querySelectorAll("#cp-required")).toHaveLength(1);
-
-    // The three line words head the grid once, and every row's controls take
-    // them as their accessible name rather than repeating the ink.
-    for (const w of [W.itemLabel, W.itemsColQty, W.remark]) {
-      expect(within(dialog).getAllByText(w)).toHaveLength(1);
-    }
-    for (let i = 0; i < 3; i++) {
-      expect(document.getElementById(`cp-item-${i}`)).toHaveAttribute(
-        "aria-label",
-        W.itemLabel,
-      );
-      expect(document.getElementById(`cp-qty-${i}`)).toHaveAttribute(
-        "aria-label",
-        W.itemsColQty,
-      );
-      expect(document.getElementById(`cp-remark-${i}`)).toHaveAttribute(
-        "aria-label",
-        W.remark,
-      );
-    }
-  });
-
-  it("the surface is the kit's WIDE modal — a line list, not a question", async () => {
-    await openDialog();
-    const modal = document.querySelector('[data-kit="modal"]')!;
-    // 600px, measured on the live dialog: at 512 the picker's SKU column holds
-    // 126.8px for a 144.0px code, and P15's whole point is that the code is
-    // what tells four SKUs apart. The class is the kit's config key, never a
-    // number typed here.
-    expect(modal.className).toContain("max-w-modal-wide");
-    expect(modal.className).not.toContain("max-w-modal ");
-  });
-});
+/* The P15 + P19 dialog contracts moved to `OperationManualPurchase.test.tsx`
+ * with the dialog itself (CARD-2026-08-18-manual-purchase §1): the retired
+ * 600px container took its tests to the page that now owns the door. */
 
 describe("the seven fixes — Excel completeness", () => {
   it("header select-all unticks the visible sheet, and ticks it back", async () => {
@@ -1599,13 +1182,13 @@ describe("the group header — one line per customer order", () => {
     // ella's order has one build; PETER's has two — and PETER is named ONCE.
     const groups = [...document.querySelectorAll('[data-kit="data-group"]')];
     expect(groups.length).toBeGreaterThan(0);
-    const peter = groups.find((g) => /Peter/.test(g.textContent ?? ""));
+    const peter = groups.find((g) => /PETER/.test(g.textContent ?? ""));
     expect(peter).toBeTruthy();
     expect(peter!.textContent).toContain("SO-1207");
     expect(peter!.textContent).toContain(fmtDate("2026-08-13"));
     // …and the whole sheet says his name exactly once, not once per piece.
     const sheet = screen.getByTestId("to-order-sheet");
-    expect((sheet.textContent ?? "").match(/Peter/g)?.length).toBe(1);
+    expect((sheet.textContent ?? "").match(/PETER/g)?.length).toBe(1);
   });
 
   it("says `Partly ordered` only when SOME of the order is on a purchase order", async () => {
@@ -2335,7 +1918,10 @@ describe("the page offers no way to delete a demand", () => {
       // itself.
       .replace(/\$\{[^{}]*\}/g, ":id");
 
-  const src = [scan("OperationToOrder.tsx"), scan("CreatePurchaseDialog.tsx")].join("\n");
+  /* CARD-2026-08-18-manual-purchase: the dialog retired and the create door
+   * moved to `OperationManualPurchase.tsx`. The scan's scope follows the code
+   * so its ASSERTION can stay exactly what it was — same rule as P14 above. */
+  const src = [scan("OperationToOrder.tsx"), scan("OperationManualPurchase.tsx")].join("\n");
 
   /**
    * THE VISIBLE-WORD HALF IS ASSERTED AGAINST THE WORDS MODULE, NOT THE PAGE
@@ -2375,10 +1961,13 @@ describe("the page offers no way to delete a demand", () => {
    * It is listed rather than excluded by a filter: this assertion's value is
    * that it names EVERY path, so a door added quietly is a failure.
    */
-  it("the only demand doors the page opens are create, cancel and the picker read", () => {
+  it("the only demand doors the pages open are cancel and the picker read", () => {
+    // The bare CREATE door left with the dialog (CARD-2026-08-18-manual-
+    // purchase §1): the Manual Purchase page raises a REQUEST through
+    // `purchasing/requests` — its own test names those doors — and only the
+    // picker's read is shared. Cancel stays the grid's own act.
     const paths = [...src.matchAll(/to-order\/demand[a-z:/-]*/g)].map((m) => m[0]);
     expect([...new Set(paths)].sort()).toEqual([
-      "to-order/demand",
       "to-order/demand/:id/cancel",
       "to-order/demand/pick-items",
     ]);
@@ -2540,7 +2129,7 @@ describe("P18 · the proceed date on the group header", () => {
     await loaded();
     fireEvent.click(screen.getByTestId("to-order-overdue"));
 
-    const peter = groupOf(/Peter/);
+    const peter = groupOf(/PETER/);
     expect(peter).toBeTruthy();
     expect(peter!.textContent).toContain(fmtDateShort("2026-08-01"));
     // The whole point of Loo's ruling: no parenthesised count, and above all no
@@ -2676,17 +2265,17 @@ describe("T1 · the aligned order line", () => {
     await loaded();
     fireEvent.click(screen.getByTestId("to-order-overdue"));
 
-    const peter = groupOf(/Peter/)!;
+    const peter = groupOf(/PETER/)!;
     const tds = [...peter.querySelectorAll("td")];
     // ⊞ gutter · ☑ · SO No. · Customer · Delivery · the 3-col middle span ·
     // PO No. · filler — TEN cols, EIGHT cells (the span merges three).
     // The FACT under its HEADER is the whole card: each sits in its own cell.
     const texts = tds.map((t) => (t.textContent ?? "").trim());
     expect(texts).toContain("SO-1207");
-    expect(texts).toContain("Peter");
+    expect(texts).toContain("PETER");
     expect(texts).toContain(fmtDate("2026-08-13"));
     // …three separate cells, never one concatenated sentence.
-    expect(texts.some((t) => t.includes("SO-1207") && t.includes("Peter"))).toBe(false);
+    expect(texts.some((t) => t.includes("SO-1207") && t.includes("PETER"))).toBe(false);
   });
 
   it("the group ☑ ticks and unticks ALL its builds — one press, one meaning", async () => {

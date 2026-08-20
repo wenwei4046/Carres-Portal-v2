@@ -4,7 +4,6 @@ import {
   carrierDayLoads,
   carrierDayNote,
   daysInRange,
-  dayWord,
   deliveryRange,
   DELIVERY_RANGE_KEYS,
   inRange,
@@ -24,7 +23,8 @@ import {
 import { orderBookingDay } from "@/lib/order-booking";
 import { cjkClassName } from "@/lib/cjk";
 import { locationForAddress } from "@/lib/region";
-import { fmtDateShort } from "@/lib/fmt-date";
+import { fmtDate, fmtDateShort } from "@/lib/fmt-date";
+import { displayCustomerName } from "@/lib/customer-name";
 
 /**
  * CalendarPanel — right-rail Calendar (Jess COO ask, extended 2026-07-23):
@@ -47,10 +47,29 @@ import { fmtDateShort } from "@/lib/fmt-date";
  * on it and nothing booked is real work — it is simply not a delivery, so it
  * never counts as one. It is listed as what it is, under the call that fixes it.
  *
- * Today / Tomorrow / This week (T10) select a RANGE of days; clicking a day in
- * the grid selects that one day. Exactly one of the two is active at a time.
+ * The three range chips select a RANGE of days; clicking a day in the grid
+ * selects that one day. Exactly one of the two is active at a time.
+ *
+ * **NO RELATIVE DATE WORDS (owner ruling 2026-08-15).** The two single-day
+ * chips and every day heading name the actual weekday + date. `Today` and
+ * `Tomorrow` are only true on the day they are read — they rot in a
+ * screenshot and re-sort themselves overnight — so the delivery word table's
+ * existing ban now reaches the rail as well. `This week` stays: it is a SPAN,
+ * not a day, and no date can spell it.
+ *
+ * **The chip now carries the SAME string as every other date (owner ruling
+ * 2026-08-15, THE YEAR RULE).** It used to need its own compact spelling
+ * because the year would not fit; the year is no longer printed for a
+ * current-year date, so the chip's form and the portal's form are one string
+ * and `fmtDayChip` is deleted.
  */
 const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"];
+
+/** The chip's own text. A single-day range names its day; the span keeps the
+ *  one ruled span word. This is the only place the three chips are worded. */
+function rangeChipLabel(key: DeliveryRangeKey, fromIso: string): string {
+  return key === "week" ? "This week" : fmtDate(fromIso);
+}
 
 
 function ymd(d: Date): string {
@@ -117,7 +136,7 @@ export default function CalendarPanel() {
       const entry: DayDelivery = {
         orderId: o.id,
         so: o.so,
-        customer: o.customer_name,
+        customer: displayCustomerName(o.customer_name),
         partnerId: carrier.id,
         partnerName: carrier.name,
         kind: booking.kind,
@@ -211,6 +230,7 @@ export default function CalendarPanel() {
             <button
               key={key}
               type="button"
+              data-testid={`calendar-range-${key}`}
               onClick={() => {
                 setRange(key);
                 setPicked(null);
@@ -218,9 +238,13 @@ export default function CalendarPanel() {
                 const [y, m] = r.fromIso.split("-").map(Number);
                 if (y && m) setView({ y, m: m - 1 });
               }}
+              /* A SPAN still needs its hover — `This week` names no date.
+                 A single-day chip does NOT: THE YEAR RULE (owner ruling
+                 2026-08-15) put the full ruled date on the chip face, so a
+                 hover could only ever repeat it or, worse, say less. */
               title={
                 r.fromIso === r.toIso
-                  ? fmtDateShort(r.fromIso)
+                  ? undefined
                   : `${fmtDateShort(r.fromIso)} – ${fmtDateShort(r.toIso)}`
               }
               className={`flex-1 flex items-center justify-center gap-1 rounded-lg px-2 py-1 text-label font-semibold transition-colors ${
@@ -229,7 +253,7 @@ export default function CalendarPanel() {
                   : "bg-white text-base-500 border border-base-200 hover:bg-hovertint"
               }`}
             >
-              <span>{r.label}</span>
+              <span className="truncate">{rangeChipLabel(key, r.fromIso)}</span>
               {n > 0 && <span className="tabular-nums font-semibold">{n > 99 ? "99+" : n}</span>}
             </button>
           );
@@ -332,12 +356,14 @@ export default function CalendarPanel() {
           // On a multi-day range an empty day is noise; on ONE day it is the
           // answer ("nothing that day") and must still be said out loud.
           if (shownDays.length > 1 && dayIsEmpty(day)) return null;
-          const word = dayWord(day, todayKey);
           const loads = carrierDayLoads(dayDeliveries, day, rulesByPartner);
           return (
             <div key={day} data-testid={`calendar-day-${day}`}>
+              {/* The heading is the DAY, spelled the one ruled way. It used to
+                  read `TODAY · 15 AUG 26`, and the relative half was the only
+                  part an operator read — on the wrong morning it was a lie. */}
               <div className="text-label uppercase tracking-[0.05em] text-base-500 mb-2">
-                {word ? `${word} · ${fmtDateShort(day)}` : fmtDateShort(day)}
+                {fmtDate(day)}
               </div>
 
               {dayIsEmpty(day) && shownDays.length === 1 && (
@@ -347,10 +373,14 @@ export default function CalendarPanel() {
                 <DaySection
                   title="Receiving"
                   tone="text-success"
+                  // `· ETA today` used to close this line. It was a banned
+                  // word AND false: the row renders under whichever day it
+                  // falls on, so on a multi-day range it said "today" about
+                  // tomorrow. The day heading above already states the day.
                   items={dayReceive.map((r) => ({
                     key: `r-${r.poId}`,
                     main: `${r.poId} · ${supplierName(r.supplierId, null)}`,
-                    sub: `${r.units} unit${r.units === 1 ? "" : "s"} · ETA today`,
+                    sub: `${r.units} unit${r.units === 1 ? "" : "s"}`,
                   }))}
                 />
               )}

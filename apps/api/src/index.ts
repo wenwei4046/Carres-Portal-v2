@@ -20,6 +20,9 @@ import operationOrdersFeedRouter from "./routes/operation/orders-feed";
 import operationSuppliersOverviewRouter from "./routes/operation/suppliers-overview";
 import operationBadgesRouter from "./routes/operation/badges";
 import operationDashboardRouter from "./routes/operation/dashboard";
+// `Jump to…` — the document half of the ONE global navigate-only command
+// surface (ui/MASTER, APPROVED / LOCKED 2026-08-11). Read-only, no create.
+import jumpRouter from "./routes/operation/jump";
 import operationMovementsRouter from "./routes/operation/movements";
 import correctionWorkRouter from "./routes/operation/correction-work";
 import operationOrdersRouter from "./routes/operation/orders";
@@ -35,8 +38,11 @@ import procurementTabsRouter from "./routes/operation/procurement-tabs";
 import dispatchCustomerLegRouter from "./routes/operation/dispatch-customer-leg";
 import deliveryChainRouter from "./routes/operation/delivery-chain";
 import orderControlRouter from "./routes/operation/order-control";
+import deliveryOrdersRouter from "./routes/operation/delivery-orders";
+import paymentApprovalsRouter from "./routes/operation/payment-approvals";
 import purchaseRouter from "./routes/operation/purchase";
 import toOrderRouter from "./routes/operation/to-order";
+import manualPurchaseRouter from "./routes/operation/manual-purchase";
 import purchasingSettingsRouter from "./routes/operation/purchasing-settings";
 import opsStaffRouter from "./routes/operation/staff";
 import poDutyRouter from "./routes/operation/po-duty";
@@ -66,6 +72,7 @@ import financePaymentsRouter from "./routes/finance/payments";
 import financeReportsRouter from "./routes/finance/reports";
 import financeInvoicesRouter from "./routes/finance/invoices";
 import financeRefundsRouter from "./routes/finance/refunds";
+import financeExceptionsRouter from "./routes/finance/exceptions";
 import financeReconciliationRouter from "./routes/finance/reconciliation";
 import supplierActivityRouter from "./routes/supplier/activity";
 import supplierMeRouter from "./routes/supplier/me";
@@ -95,6 +102,7 @@ import opsStockEmergencyRouter from "./routes/ops/stock-emergency";
 import snRouter from "./routes/ops/service-notes";
 // Migration 0210 — Service Cases (case parent layer above Service Notes).
 import scRouter from "./routes/ops/service-cases";
+import issuesRouter from "./routes/ops/issues";
 // Migration 0162 — ops cockpit: Keep notes + Tasks board.
 import opsNotesRouter from "./routes/ops/notes";
 import opsTasksRouter from "./routes/ops/tasks";
@@ -175,6 +183,7 @@ api.route("/account", accountRouter);
 api.route("/guarantees", guaranteesRouter);
 api.route("/operation/badges", operationBadgesRouter);
 api.route("/operation/dashboard", operationDashboardRouter);
+api.route("/operation/jump", jumpRouter);
 api.route("/operation/movements", operationMovementsRouter);
 api.route("/operation/orders", operationOrdersRouter);
 // STAGE 3 card 3.4 — durable correction work, read by the RECEIVING module.
@@ -184,6 +193,9 @@ api.route("/operation/orders", resumeDispatchRouter);
 api.route("/operation/orders", deliveryChainRouter);
 // 0159 P2 control overlay — GET + PUT /:id/control
 api.route("/operation/orders", orderControlRouter);
+api.route("/operation/delivery-orders", deliveryOrdersRouter);
+// 0362 — the Delivery Payment Approval: raise · decide · read (owner ruling 2026-08-19)
+api.route("/operation/payment-approvals", paymentApprovalsRouter);
 // 0184 balance job — payment ledger + storage collect / waiver / delivery gate
 api.route("/operation/orders", orderPaymentsRouter);
 // 0223 Stripe online collection — POST/GET /orders/:id/stripe/checkout[/:sid]
@@ -194,6 +206,8 @@ api.route("/operation/orders", bulkCompleteRouter);
 api.route("/operation/payments", operationPaymentsRouter);
 api.route("/operation/purchase", purchaseRouter);
 api.route("/operation/purchase/to-order", toOrderRouter);
+// Manual Purchase requests (0359) — the typed lane's header + lines + register.
+api.route("/operation/purchasing/requests", manualPurchaseRouter);
 // P1 (0303) — Purchasing → Settings: the numbers the ordering engine reads.
 api.route("/operation/purchasing/settings", purchasingSettingsRouter);
 // 0232 staff assignment pool — GET / + PUT /:userId
@@ -230,6 +244,9 @@ api.route("/finance/payments", financePaymentsRouter);
 api.route("/finance/reports", financeReportsRouter);
 api.route("/finance/invoices", financeInvoicesRouter);
 api.route("/finance/refunds", financeRefundsRouter);
+// The one money blocker on a delivery order (0355, owner ruling 2026-08-16).
+// Mounted before the catch-all `/finance` reconciliation router below.
+api.route("/finance/exceptions", financeExceptionsRouter);
 api.route("/finance", financeReconciliationRouter);
 api.route("/supplier/activity", supplierActivityRouter);
 api.route("/supplier/me", supplierMeRouter);
@@ -248,6 +265,7 @@ api.route("/ops/stock-plan", opsStockPlanRouter);
 api.route("/ops/stock-emergency", opsStockEmergencyRouter);
 api.route("/ops/service-notes", snRouter);
 api.route("/ops/service-cases", scRouter);
+api.route("/ops/issues", issuesRouter);
 api.route("/ops/notes", opsNotesRouter);
 api.route("/ops/tasks", opsTasksRouter);
 api.route("/operation/supplier-claims", supplierClaimsRouter);

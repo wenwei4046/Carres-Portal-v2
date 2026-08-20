@@ -15,6 +15,11 @@ import { TopBarIcons } from "./GlobalTopBar";
  *   dark at the SAME size as the tabs (GitHub's weighting: weight, never
  *   size), no hover, no click. The icon is the module's ONE face, shared with
  *   its sidebar item.
+ * - `page` = the page word, printed after the nameplate as `Purchasing ·
+ *   Receiving`. A module whose pages live in the SIDEBAR (Purchasing, from
+ *   2026-08-18) has no tab strip, so without this the header would no longer
+ *   say which page you are on. Quiet weight — the nameplate is the wall sign
+ *   and the page word is the room, not a second sign.
  * - `children` = the module's tab strip (navigation between sibling pages).
  *   Stage pickers and searches are the PAGE's — they live in the page
  *   toolbar, never here.
@@ -31,25 +36,33 @@ export default function ModuleHeader({
   testId,
   icon: Icon,
   word,
+  page,
   docTitle,
   right,
   children,
-  renderedHeight44 = false,
+  destinationHeader = false,
 }: {
   testId: string;
-  /** The module's one face — the same Lucide icon as its sidebar item. */
-  icon: LucideIcon;
+  /** The module's one face — the same Lucide icon as its sidebar item.
+   *  Optional: the Destination Header drops it (owner ruling 2026-08-15) so the
+   *  word alone carries the identity at 24px. Tab-strip module headers keep it. */
+  icon?: LucideIcon;
   /** The module word on the nameplate (an existing sidebar word, never new). */
   word: string;
+  /** The page word, printed `{word} · {page}`. For modules whose pages live in
+   *  the sidebar rather than a tab strip. */
+  page?: string;
   /** document.title while this module is on screen. */
   docTitle: string;
   /** Page-meta slot (freshness stamp / refresh) — before the global icons. */
   right?: ReactNode;
   /** The module's tab strip, when it has sibling pages. */
   children?: ReactNode;
-  /** DestinationHeader's measured 44px includes the bottom rule. Existing
-      module headers retain their original 44px content row + rule. */
-  renderedHeight44?: boolean;
+  /** The Destination Header's rendered 50px includes the bottom rule — owner
+      ruling 2026-08-15, grown from 44 so a 24px identity keeps 8.5px of air
+      above and below. Existing tab-strip module headers keep their 44px content
+      row + rule and their 13px word. */
+  destinationHeader?: boolean;
 }) {
   useEffect(() => {
     document.title = docTitle;
@@ -61,17 +74,27 @@ export default function ModuleHeader({
   return (
     <div
       className={`shrink-0 bg-white border-b border-base-200 px-6 ${
-        renderedHeight44 ? "box-border h-11" : ""
+        destinationHeader ? "box-border h-[50px]" : ""
       }`}
       data-testid={testId}
     >
-      <div className={`flex items-center gap-4 ${renderedHeight44 ? "h-full" : "h-11"}`}>
+      <div className={`flex items-center gap-4 ${destinationHeader ? "h-full" : "h-11"}`}>
         <span
-          className="shrink-0 flex items-center gap-1.5 text-body font-semibold text-base-900 select-none cursor-default"
+          className={`shrink-0 flex items-center gap-1.5 font-semibold text-base-900 select-none cursor-default ${
+            destinationHeader ? "text-page" : "text-body"
+          }`}
           data-testid={`${testId}-module-word`}
         >
-          <Icon size={15} strokeWidth={2} className="text-base-700" />
+          {Icon && <Icon size={15} strokeWidth={2} className="text-base-700" />}
           {word}
+          {page && (
+            <span
+              className="font-medium text-base-600"
+              data-testid={`${testId}-page-word`}
+            >
+              · {page}
+            </span>
+          )}
         </span>
         {children != null && (
           <>

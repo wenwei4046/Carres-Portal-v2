@@ -1,5 +1,6 @@
 import {
   LayoutDashboard,
+  ArrowLeftRight,
   ClipboardList,
   ShoppingBag,
   Boxes,
@@ -13,6 +14,7 @@ import {
   ArrowDownLeft,
   ArrowUpRight,
   FileText,
+  PackageCheck,
   Undo2,
   Scale,
   BarChart3,
@@ -30,6 +32,9 @@ import {
   UserCheck,
   History,
   ListTodo,
+  CircleAlert,
+  CalendarDays,
+  Library,
   type LucideIcon,
 } from "lucide-react";
 import type { Role } from "@carres/shared/domain";
@@ -67,6 +72,61 @@ export type PortalArea = "operation" | "finance" | "hr" | "principal";
 /** Operation badge keys surfaced as nav counters (reuses the 0083 unread set). */
 export type PortalBadge = "orders" | "procurement" | "service-notes";
 
+export type PortalSection =
+  | "Workspace"
+  | "Sales"
+  | "Purchasing"
+  | "Delivery"
+  | "Warehouse"
+  | "Finance"
+  | "Customer Care"
+  | "Master Data"
+  | "Admin";
+
+/** Rail order of the sections. The queue index's own order, unchanged. */
+export const SECTION_ORDER: ReadonlyArray<PortalSection> = [
+  "Workspace",
+  "Sales",
+  "Purchasing",
+  "Delivery",
+  "Warehouse",
+  "Finance",
+  "Customer Care",
+  "Master Data",
+  "Admin",
+];
+
+/**
+ * A MODULE — one expandable parent row carrying its pages (Jess, 2026-08-19).
+ *
+ * A section listed here draws a parent row: icon + name + chevron, its pages
+ * hanging beneath it on rounded elbows. A section NOT listed here has no
+ * parent row and its pages stay plain top-level rows — `Workspace`
+ * (Dashboard · Work · Issue Tracker, ruled plain by the card) and `Finance`,
+ * whose single `Payments` page would otherwise hide behind a chevron that
+ * reveals one row of the same name. A control that opens nothing new is the
+ * dead control `docs/03-page-patterns.md:149` bans.
+ *
+ * The icon is the module's ONE face — the same law the Purchasing `ShoppingBag`
+ * already followed (Loo, 2026-08-02). Children carry no icon at all now, so
+ * each module's flagship page lends its face to the module and no two rows in
+ * the rail wear the same picture.
+ */
+export interface PortalModule {
+  section: PortalSection;
+  label: string;
+  icon: LucideIcon;
+}
+
+export const PORTAL_MODULES: ReadonlyArray<PortalModule> = [
+  { section: "Sales", label: "Sales", icon: ClipboardList },
+  { section: "Purchasing", label: "Purchasing", icon: ShoppingBag },
+  { section: "Delivery", label: "Delivery", icon: Route },
+  { section: "Warehouse", label: "Warehouse", icon: Boxes },
+  { section: "Customer Care", label: "Customer Care", icon: LifeBuoy },
+  { section: "Master Data", label: "Master Data", icon: Library },
+];
+
 export interface PortalNavItem {
   /** routing key:
    *  - operation/principal → the `?tab=` value consumed by that shell
@@ -95,8 +155,27 @@ export interface PortalNavItem {
   /** optional per-item narrowing of the group's roles — the item shows only
    *  for these roles. */
   roles?: ReadonlyArray<Role>;
-  /** ERP Shell V1 responsibility heading within a real portal area. */
-  section?: "Workspace" | "Sales" | "Supply Chain" | "Finance" | "Customer Care" | "Master Data" | "Admin";
+  /** The MODULE this page belongs to (`PORTAL_MODULES`).
+   *
+   *  ⭐ A MODULE IS AN EXPANDABLE PARENT ROW, NOT A HEADING (Jess, 2026-08-19
+   *  afternoon — CARD-2026-08-19-sidebar-expandable-modules). She saw the
+   *  shipped uppercase headings in production and re-ruled the same day: every
+   *  module is an ICON + NAME + CHEVRON row that expands its pages beneath it,
+   *  each child hanging off a rounded elbow. This supersedes the morning's
+   *  "a module is a HEADING, never a parent row".
+   *
+   *  The field stays on the PAGE rather than nesting pages inside a parent
+   *  object on purpose: `visibleItems` keeps meaning "the PAGES this role may
+   *  open", which is what `JumpTo` composes its destinations from. Grouping is
+   *  presentation (`navBlocks`), so no page is added, renamed or reordered by
+   *  the module rows drawn on top of them. */
+  section?: PortalSection;
+  /** APPROVED, NOT BUILT (sidebar card §2). Renders as a NON-CONTROL saying
+   *  `Coming soon` on its own line — no href, out of the tab order. */
+  soon?: true;
+  /** a hairline above this entry — Report is a PORTAL page, not the
+   *  module's own (`docs/ERP-ARCHITECTURE.md` §2.1). */
+  dividerAbove?: true;
 }
 
 export interface PortalNavGroup {
@@ -133,6 +212,20 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         badge: "orders",
         section: "Sales",
       },
+      // Delivery Orders (blueprint card, owner ruling 2026-08-16) — the DO
+      // REGISTER under SALES: which documents exist. The system issues them;
+      // the Delivery work page (Supply Chain) stays the execution view.
+      {
+        key: "delivery-orders",
+        label: "Delivery Orders",
+        // PackageCheck — a checked parcel: the issued delivery document. NOT
+        // FileText (Finance's Invoices already wears it in the same rail) and
+        // NOT Route (the Delivery work page's face) — two doors sharing one
+        // icon read as the same page.
+        icon: PackageCheck,
+        path: "/operation/delivery-orders",
+        section: "Sales",
+      },
       // Work (SO V2 CARD 10, owner ruling 2026-08-11) — My Work / Team Work:
       // two filters over the ONE open work set the Card 9 engine composes.
       // Sits directly under the register on the Constitution's own mission —
@@ -140,6 +233,7 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       // worked out*. The page writes nothing; a row opens the owning module's
       // workspace.
       { key: "work", label: "Work", icon: ListTodo, section: "Workspace" },
+      { key: "issue-tracker", label: "Issue Tracker", icon: CircleAlert, path: "/operation/issues", section: "Workspace" },
       // ⭐ THE TEMPORARY DOOR (SALES-ORDER-CUTOVER, owner 2026-08-10).
       //
       // The old Orders control table is NOT deleted and NOT hidden — it keeps
@@ -159,30 +253,46 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         path: "/operation/old-orders",
         section: "Sales",
       },
-      // Purchasing (2026-07-21) — the THREE procurement rails (To Order / the
-      // Purchase Order register / Receiving) collapsed into ONE sidebar item.
-      // Its click target is the default tab, To Order (`?tab=purchase`); the
-      // shared PurchasingTabs bar at the top of each page switches between the
-      // three. `activeFor` keeps the item lit across all three routes.
-      // R2 (2026-07-27) added a FOURTH tab — Claims (what the supplier still
-      // owes us). Still no new sidebar item: the receiving & claim queue's own
-      // rule, and a claim is what a receiving produces.
+      /* PURCHASING IS A HEADING, NOT A PARENT ROW (Jess, 2026-08-19 —
+       * CARD-2026-08-19-purchasing-rail-corrections §1, ruled on a production
+       * screenshot). SALES is the template and it has TWO layers: a group
+       * heading, then the pages. The `Purchasing` parent row shipped by the
+       * sidebar card is deleted; its pages ARE the doors, at the same indent
+       * as `Sales Orders`.
+       *
+       * Everything else the sidebar card ruled HOLDS: the entries, their order
+       * and their words never reshuffle; `Coming soon` entries are
+       * non-controls; a count means work waiting and zero prints nothing;
+       * Report sits below a hairline. An entry still goes live in ITS OWN
+       * page's PR by exactly two edits: drop `soon`, and the row becomes a
+       * link.
+       *
+       * NO SETTINGS ROW (Jess, 2026-08-19 afternoon, amending the same card):
+       * "Settings should be at the header settings, not every panel got one
+       * setting." The rail door is DELETED; the header gear is the ONE entry
+       * (GlobalTopBar → /operation/settings/purchasing). The page and its
+       * server gate are unchanged — only this door died. */
+      { key: "purchase", label: "SO Batch Purchase", icon: ShoppingBag, section: "Purchasing" },
+      { key: "manual-purchase", label: "Manual Purchase", icon: ClipboardList, section: "Purchasing" },
       {
-        key: "purchasing",
-        label: "Purchasing",
-        // ShoppingBag = the MODULE's one face (sidebar + header nameplate,
-        // Loo 2026-08-02); ClipboardCheck stays the To Order TAB's icon —
-        // the two used to share one icon and read as the same thing.
-        icon: ShoppingBag,
-        tab: "purchase",
-        activeFor: [
-          "tab:purchase",
-          "tab:receiving",
-          "tab:claims",
-          "path:/operation/procurement",
-        ],
-        section: "Supply Chain",
+        // `operation:procurement` counts POs in the Pickup-action bucket —
+        // this is the page that bucket belongs to.
+        key: "purchase-orders",
+        label: "Purchase Orders",
+        icon: FileText,
+        path: "/operation/procurement",
+        badge: "procurement",
+        section: "Purchasing",
       },
+      { key: "receiving", label: "Receiving", icon: PackageCheck, section: "Purchasing" },
+      { key: "claims", label: "Supplier Claims", icon: Scale, section: "Purchasing" },
+      { key: "purchase-returns", label: "Purchase Returns", icon: Undo2, soon: true, section: "Purchasing" },
+      { key: "repair-orders", label: "Repair Orders", icon: ArrowUpRight, soon: true, section: "Purchasing" },
+      { key: "display-requests", label: "Display Requests", icon: Store, soon: true, section: "Purchasing" },
+      { key: "consignment-orders", label: "Consignment Orders", icon: ArrowDownLeft, soon: true, section: "Purchasing" },
+      { key: "consignment-receipts", label: "Consignment Receipts", icon: BadgeCheck, soon: true, section: "Purchasing" },
+      { key: "consignment-returns", label: "Consignment Returns", icon: Undo2, soon: true, section: "Purchasing" },
+      { key: "purchasing-report", label: "Report", icon: BarChart3, dividerAbove: true, section: "Purchasing" },
       // Delivery (T11, Jess 2026-07-27) — **the ONE new menu item in the whole
       // build plan**; every other line upgrades an existing door, and its place
       // in the rail is the one the queue index draws (Orders · Purchasing ·
@@ -190,22 +300,38 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       // reasons and photos stay behind the order drawer's server-side gates, so
       // this door shows the delivery work and hands over to the same drawer the
       // Orders list opens.
-      { key: "delivery", label: "Delivery", icon: Route, section: "Supply Chain" },
-      // Stock (K0, Jess 2026-07-27) — the two stock doors merged into ONE
-      // entry, same shape as the Purchasing merge above: one warehouse, three
-      // questions (On hand · Ready stock [joins at K2] · In & out). Click
-      // target = On hand; the shared StockTabs bar at the top of each page
-      // switches between them. Word law (COPY-STANDARD): the user-facing word
-      // is "Stock" — "Inventory"/"Movements" are banned UI words; the old tab
-      // keys stay live so existing links keep working.
-      {
-        key: "stock",
-        label: "Stock",
-        icon: Boxes,
-        tab: "stock-onhand",
-        activeFor: ["tab:stock-onhand", "tab:stock-plan", "tab:movements"],
-        section: "Supply Chain",
-      },
+      /* THE DELIVERY MODULE'S PAGES (owner-approved 2026-08-19, carried into
+       * CARD-2026-08-19-sidebar-expandable-modules from the delivery-rail card
+       * it replaced). `Delivery Work` IS the existing Delivery page — keyed
+       * and routed exactly as today; only its door moved under the module row
+       * and it wears the governed name. The other five are approved and
+       * unbuilt, so they are non-controls printing `Coming soon`, and Report
+       * sits below its hairline. NO Settings row: the header gear is the one
+       * Settings entry (Jess, 2026-08-19). */
+      { key: "delivery", label: "Delivery Work", icon: Route, section: "Delivery" },
+      { key: "delivery-schedule", label: "Schedule", icon: CalendarDays, soon: true, section: "Delivery" },
+      { key: "delivery-history", label: "Delivery History", icon: History, soon: true, section: "Delivery" },
+      { key: "delivery-exceptions", label: "Exceptions", icon: CircleAlert, soon: true, section: "Delivery" },
+      { key: "delivery-partners", label: "Partners", icon: Network, soon: true, section: "Delivery" },
+      { key: "delivery-report", label: "Report", icon: BarChart3, soon: true, dividerAbove: true, section: "Delivery" },
+      /* WAREHOUSE IS A HEADING, NOT A PARENT ROW (Warehouse Blueprint item 13,
+       * owner-approved; applied 2026-08-19 under the Jess 2026-08-19 SALES
+       * template — CARD-2026-08-19-warehouse-rail). K0's single merged `Stock`
+       * row becomes the module's pages in the rail. The three built pages keep
+       * their `?tab=` addresses; `Transfers` and `Counts` are blueprint pages
+       * printing `Coming soon` until their own PRs. The blueprint keeps
+       * Reports and Settings central: NO Report row, NO Settings row here.
+       * The three live rows keep K0's learned order (On hand · Ready stock ·
+       * In & out) — the rail never reshuffles under an operator; when Ready
+       * stock folds into On hand Views (blueprint item 13.7) its row dies in
+       * that card's own PR. Word law (COPY-STANDARD): "Inventory" and
+       * "Movements" stay banned UI words; the goods pool is still `Stock` on
+       * any page — `Warehouse` is the MODULE heading, not the pool word. */
+      { key: "stock", label: "On hand", icon: Boxes, tab: "stock-onhand", section: "Warehouse" },
+      { key: "stock-plan", label: "Ready stock", icon: ClipboardList, section: "Warehouse" },
+      { key: "movements", label: "In & out", icon: ArrowLeftRight, section: "Warehouse" },
+      { key: "transfers", label: "Transfers", icon: Truck, soon: true, section: "Warehouse" },
+      { key: "counts", label: "Counts", icon: ScrollText, soon: true, section: "Warehouse" },
       { key: "payments", label: "Payments", icon: Wallet, section: "Finance" },
       // Rental base (0247-0249, Loo 2026-07-25) — rent-to-own agreements +
       // the deployed-unit asset registry. Dormant until the POS rental lane.
@@ -388,9 +514,14 @@ export function visibleItems(
 }
 
 /** The href a nav item points at. */
-export function navItemHref(group: PortalNavGroup, item: PortalNavItem): string {
-  if (group.area === "finance") return item.financePath ?? group.base;
-  if (item.path) return item.path; // operation path-driven section
+export function navItemHref(
+  group: PortalNavGroup,
+  item: PortalNavItem,
+): string {
+  if (group.area === "finance") {
+    return (item as PortalNavItem).financePath ?? group.base;
+  }
+  if (item.path) return item.path; // path-driven section or page
   return `${group.base}?tab=${item.tab ?? item.key}`;
 }
 
@@ -398,4 +529,50 @@ export function navItemHref(group: PortalNavGroup, item: PortalNavItem): string 
 export function areaDefaultHref(group: PortalNavGroup): string {
   if (group.area === "finance") return "/finance/dashboard";
   return `${group.base}?tab=${group.defaultTab}`;
+}
+
+/** One row-group of the rail: an expandable module, or a lone plain page. */
+export type NavBlock =
+  | { kind: "plain"; item: PortalNavItem }
+  | { kind: "module"; module: PortalModule; pages: PortalNavItem[] };
+
+/**
+ * The rail's shape: the pages a role may see, grouped into module blocks.
+ *
+ * Presentation only — it never adds, renames or reorders a page. Sections keep
+ * `SECTION_ORDER`; pages keep their order inside a section; an area with no
+ * sections at all (Finance · HR · Admin) comes out as plain rows in its
+ * declared order, exactly as it renders today.
+ *
+ * A module needs at least TWO pages to earn its parent row. One page behind a
+ * chevron is a control that reveals a row of the same name, and the operator
+ * pays a click to learn nothing.
+ */
+export function navBlocks(
+  group: PortalNavGroup,
+  role: Role | null,
+): NavBlock[] {
+  const items = visibleItems(group, role);
+  const bySection = new Map<PortalSection | "__none__", PortalNavItem[]>();
+  for (const item of items) {
+    const key = item.section ?? "__none__";
+    const bucket = bySection.get(key);
+    if (bucket) bucket.push(item);
+    else bySection.set(key, [item]);
+  }
+
+  const sections = [...bySection.keys()].sort((a, b) => {
+    const ai = SECTION_ORDER.indexOf(a as PortalSection);
+    const bi = SECTION_ORDER.indexOf(b as PortalSection);
+    return (ai < 0 ? SECTION_ORDER.length : ai) - (bi < 0 ? SECTION_ORDER.length : bi);
+  });
+
+  const out: NavBlock[] = [];
+  for (const section of sections) {
+    const pages = bySection.get(section)!;
+    const module = PORTAL_MODULES.find((m) => m.section === section);
+    if (module && pages.length > 1) out.push({ kind: "module", module, pages });
+    else for (const item of pages) out.push({ kind: "plain", item });
+  }
+  return out;
 }

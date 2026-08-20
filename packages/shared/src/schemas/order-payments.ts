@@ -145,9 +145,20 @@ export function isLivePayment(p: { voided_at?: string | null }): boolean {
   return p.voided_at == null;
 }
 
+/**
+ * NO `paid` FIELD, deliberately (2026-08-17). It used to carry Σ of every row
+ * REGARDLESS OF KIND, and it had zero readers — measured across `apps/` and
+ * `packages/`. That is not merely dead weight, it is a loaded gun: goods money
+ * and a storage collection are different debts with different clocks and
+ * different gates, and the whole codebase is arranged to keep them apart. The
+ * first person to reach for an innocent-looking "total paid" would have got
+ * them silently added together.
+ *
+ * Whoever needs "how much has this order received" must say WHICH money:
+ * `byKind.payment + byKind.deposit` for goods, `storageCollected` for storage.
+ * Being made to name it is the point.
+ */
 export interface PaymentSummary {
-  /** Σ of every ledger row (all kinds) — for the "total received" display. */
-  paid: number;
   byKind: Record<PaymentKind, number>;
   /** Order-goods balance still owed = bill − (payment + deposit), floored at 0. */
   outstanding: number;
@@ -170,17 +181,13 @@ export function summarizePayments(
   bill: number,
 ): PaymentSummary {
   const byKind: Record<PaymentKind, number> = { payment: 0, deposit: 0, storage: 0 };
-  let paid = 0;
   for (const p of payments) {
     if (!isLivePayment(p)) continue;
-    const amt = Number(p.amount) || 0;
-    byKind[p.kind] = (byKind[p.kind] ?? 0) + amt;
-    paid += amt;
+    byKind[p.kind] = (byKind[p.kind] ?? 0) + (Number(p.amount) || 0);
   }
   const goodsPaid = byKind.payment + byKind.deposit;
   const safeBill = Number(bill) || 0;
   return {
-    paid,
     byKind,
     outstanding: safeBill > 0 ? Math.max(0, safeBill - goodsPaid) : 0,
     storageCollected: byKind.storage,

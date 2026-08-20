@@ -54,22 +54,49 @@ import {
 import Money from "@/components/Money";
 import { apiFetch, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { renderDoPdf, renderSalesOrderPdf } from "@/lib/pdf/render";
-import type { DoTemplateData, SalesOrderTemplateData } from "@/lib/pdf/types";
-import { useOperationOrders, useSalesOrderExpansion } from "@/lib/queries";
+import { renderCombinedSalesOrderPdf, renderSalesOrderPdf } from "@/lib/pdf/render";
+import type { SalesOrderTemplateData } from "@/lib/pdf/types";
+import {
+  useDeliveryOrdersRegister,
+  useOperationOrders,
+  useSalesOrderExpansion,
+} from "@/lib/queries";
 import CancelSalesOrderDialog from "./CancelSalesOrderDialog";
 import DestinationHeader from "./DestinationHeader";
+import GoodsMiniTable, { categoryWord, type GoodsMiniLine } from "./components/GoodsMiniTable";
 import { lineConfigBits } from "../dealer/new-order/special-addons-picker";
 import { isRental, lineName, type MoneyState } from "./sales-order-facts";
-import { missingDeliveryDateGuidance } from "./sales-order-guidance";
+import {
+  deliveryDateToBeConfirmedGuidance,
+  missingDeliveryDateGuidance,
+} from "./sales-order-guidance";
 import {
   buildRegisterRow,
   defaultOnFor,
   moneyText,
+  MUTED_ABSENCES,
   REGISTER_FIELDS,
   type RegisterField,
   type RegisterRow,
 } from "./sales-order-columns";
+
+/**
+ * ⭐ AN ABSENCE IS QUIETER THAN A FACT — owner ruling 2026-08-15 (Chai).
+ *
+ * `Not recorded` / `Not given` keep their words — a blank may never carry two
+ * meanings — and lose their weight. A `PO No` column of eight absences and two
+ * real documents used to read as ten facts; muted, the two documents are the
+ * only things the eye lands on. Everything else prints exactly as before, so
+ * this is presentation, not a second string.
+ */
+function absenceAware(text: string) {
+  if (!MUTED_ABSENCES.has(text)) return text;
+  return (
+    <span className="text-kit-slate-9" data-absence="true">
+      {text}
+    </span>
+  );
+}
 
 /** ONE cell, ONE fact. A money state is a number or a sentence, never nothing. */
 function moneyCell(state: MoneyState) {
@@ -105,7 +132,7 @@ function toGridColumn(
     sortable: true,
     defaultHidden: !defaultOnFor(f, role),
     chooserGroup: f.group,
-    accessor: (r) => f.text(r),
+    accessor: (r) => absenceAware(f.text(r)),
     searchValue: (r) => f.text(r),
     filterValue: (r) => f.text(r),
     ...(f.sortBy
@@ -156,7 +183,7 @@ function toGridColumn(
       ...base,
       accessor: (r) =>
         r.poNumbers.length === 0 ? (
-          f.text(r)
+          absenceAware(f.text(r))
         ) : (
           <span className="inline-flex gap-1.5">
             {r.poNumbers.map((po) => (
@@ -179,21 +206,43 @@ function toGridColumn(
   if (f.key === "do_number") {
     return {
       ...base,
-      accessor: (r) =>
-        r.o.do_number ? (
+      /* The SO-to-DO relationship comes from the Delivery document ledger,
+         never the one-number mirror on `orders`. One document opens its
+         object; many open Delivery's register filtered to this SO. */
+      accessor: (r) => {
+        if (r.deliveryOrders.length === 0) {
+          return <span className="text-kit-slate-9">No delivery order yet</span>;
+        }
+        if (r.deliveryOrders.length === 1) {
+          const deliveryOrder = r.deliveryOrders[0]!;
+          return (
+            <button
+              type="button"
+              className="font-medium text-blue-700 underline-offset-2 hover:underline"
+              onClick={(event) => {
+                event.stopPropagation();
+                navigate(
+                  `/operation/delivery-orders/${encodeURIComponent(deliveryOrder.do_number)}`,
+                );
+              }}
+            >
+              {deliveryOrder.do_number}
+            </button>
+          );
+        }
+        return (
           <button
             type="button"
             className="font-medium text-blue-700 underline-offset-2 hover:underline"
             onClick={(event) => {
               event.stopPropagation();
-              void openDeliveryOrderPdf(r.id, r.o.do_number!);
+              navigate(`/operation/delivery-orders?order=${encodeURIComponent(r.id)}`);
             }}
           >
-            {r.o.do_number}
+            {r.deliveryOrders.length} Delivery Orders
           </button>
-        ) : (
-          f.text(r)
-        ),
+        );
+      },
     };
   }
   if (f.key === "customer") {
@@ -219,19 +268,41 @@ function toGridColumn(
       ...base,
       accessor: (r) => {
         if (r.customerDelivery) return f.text(r);
+        /* THE 8 vs THE 3 — owner ruling 2026-08-15, docs/orders/MASTER.md.
+           `delivery_date_tbd` already records that the customer WAS asked and
+           answered *not yet*; the screen was discarding it and printing the
+           same warning on all eleven. A customer who has answered is not work
+           to do, so this reads as a plain fact: one line, no action clause and
+           no amber — amber is reserved for the three nobody has asked. */
+        if (r.o.delivery_date_tbd) {
+          const tbd = deliveryDateToBeConfirmedGuidance({
+            customer: r.customer,
+            salesperson: r.o.salespersons?.name,
+            phone: r.phone,
+          });
+          return (
+            <span className="block min-w-0 truncate text-base-600" title={tbd.detail}>
+              {tbd.fact}
+            </span>
+          );
+        }
         const guidance = missingDeliveryDateGuidance({
           so: r.so,
           customer: r.customer,
           salesperson: r.o.salespersons?.name,
           phone: r.phone,
         });
+        /* ⭐ THE FACT ALONE — owner ruling 2026-08-18, and it OVERWRITES the
+           two-line action guidance that used to render here: a register lists
+           documents; actions live in My Work / Team Work / the Order Route.
+           The amber problem line stays because it is a FACT about the row
+           (nobody has asked this customer), and the full who/phone/ask detail
+           still rides the hover and the workspace panel — what leaves the
+           cell is the instruction clause. */
         return (
-          <span className="block min-w-0">
+          <span className="block min-w-0" title={guidance.detail}>
             <span data-attention="warning" className="block truncate font-semibold text-kit-amber-11">
               {guidance.problem}
-            </span>
-            <span className="block truncate text-meta font-normal text-base-600">
-              {guidance.action}
             </span>
           </span>
         );
@@ -268,21 +339,25 @@ function toGridColumn(
  * ▸ EXPAND HAS EXACTLY ONE JOB (CLAUDE.md §2): the order's own lines, each
  * with its name, quantity and price — a fixed sub-table, not a second grid
  * engine. The reader who needs more opens the document.
+ *
+ * The BOX is `GoodsMiniTable`, written once and shared; this function's whole
+ * job is turning one order into the strings that box prints. A truth register
+ * passes no `selection`, so the ☑ column does not exist here (owner ruling
+ * 2026-08-15: a register selects nothing).
  */
 function ExpandedLines({ row }: { row: RegisterRow }) {
   const lines = row.o.order_lines ?? [];
   const addons = row.o.order_addons ?? [];
   const expansion = useSalesOrderExpansion(row.o.id);
   if (lines.length === 0 && addons.length === 0) {
-    return <div className="px-10 py-2 text-meta text-base-500">No items on this order</div>;
+    return <div className="px-2 py-2 text-body text-base-500">No items on this order</div>;
   }
   const categoryOf = (line: (typeof lines)[number]) => {
     const fromAttrs = typeof line.attrs?.category === "string" ? line.attrs.category : "";
     const fromSku = line.sku.includes(":") ? line.sku.split(":", 1)[0] : "";
     const classified = lineClass(line.sku);
     const classifiedLabel = classified === "acc" ? "Accessory" : classified === "unknown" ? "Other goods" : classified;
-    const category = fromAttrs || fromSku || classifiedLabel;
-    return category.replace(/[_-]+/g, " ").toUpperCase();
+    return categoryWord(fromAttrs || fromSku || classifiedLabel);
   };
   const configOf = (line: (typeof lines)[number]) => {
     const attrs = line.attrs ?? {};
@@ -308,32 +383,48 @@ function ExpandedLines({ row }: { row: RegisterRow }) {
     return facts;
   };
   const factsByLine = new Map((expansion.data?.lines ?? []).map((l) => [l.lineId, l]));
+  /* The goods lines, then the services — the same order the document prints. */
+  const miniLines: GoodsMiniLine[] = [
+    ...lines.map((line, index): GoodsMiniLine => {
+      const fact = factsByLine.get(line.id ?? "");
+      const detail = configOf(line);
+      return {
+        key: line.id ?? `${line.sku}-${index}`,
+        testId: `expanded-good-${line.sku}`,
+        category: categoryOf(line),
+        unitIds: fact?.unitIds ?? [],
+        unitAbsence: "Not allocated",
+        /* A single destination prints its name alone; only a SPLIT earns the
+           quantity, because `×1` on a one-route line is noise. */
+        deliverTo: (fact?.deliverTo ?? []).map((d) =>
+          (fact?.deliverTo.length ?? 0) > 1 ? `${d.name} ×${d.qty}` : d.name,
+        ),
+        deliverToAbsence: expansion.isLoading ? "Loading…" : "Not recorded",
+        sku: line.sku,
+        qty: line.qty,
+        item: lineName(line),
+        ...(detail.length ? { itemDetail: detail.join(" · ") } : {}),
+        selectable: true,
+      };
+    }),
+    /* A Service buys nothing from a factory and allocates no Unit — the
+       dash is the shipped ruling here, not an invented `Not applicable`. */
+    ...addons.map((addon, index): GoodsMiniLine => ({
+      key: `addon-${index}`,
+      category: "Service",
+      unitIds: [],
+      unitAbsence: "—",
+      deliverTo: [],
+      deliverToAbsence: "—",
+      sku: addon.addon_key ?? "",
+      qty: addon.qty,
+      item: addon.addon_key?.replace(/[_-]+/g, " ") ?? "Add-on",
+      selectable: false,
+    })),
+  ];
   return (
-    <div className="px-10 py-3" data-testid="row-expansion">
-      <div className="overflow-x-auto rounded-control border border-base-200 bg-white">
-        <table className="w-full min-w-[860px] table-fixed text-left text-body" aria-label={`Goods on SO-${row.o.so}`}>
-          <colgroup><col className="w-28" /><col className="w-36" /><col className="w-36" /><col className="w-16" /><col /><col className="w-52" /></colgroup>
-          <thead className="border-b border-base-200 bg-base-50 text-label font-semibold text-base-600">
-            <tr>{["Category", "Unit ID", "SKU", "Qty", "Item", "Deliver To"].map((label) => <th key={label} className="px-3 py-2">{label}</th>)}</tr>
-          </thead>
-          <tbody className="divide-y divide-base-100">
-            {lines.map((line, index) => {
-              const fact = factsByLine.get(line.id ?? "");
-              return <tr key={line.id ?? `${line.sku}-${index}`} data-testid={`expanded-good-${line.sku}`} className="align-top">
-                <td className="px-3 py-2 text-label font-semibold text-base-600">{categoryOf(line)}</td>
-                <td className="px-3 py-2 font-mono text-meta">{fact?.unitIds.length ? fact.unitIds.map((id) => <div key={id}>{id}</div>) : "Not allocated"}</td>
-                <td className="px-3 py-2 font-mono text-meta">{line.sku}</td>
-                <td className="px-3 py-2 tabular-nums">{line.qty}</td>
-                <td className="px-3 py-2"><div className="font-medium text-base-900">{lineName(line)}</div>{configOf(line).length ? <div className="mt-0.5 text-meta text-base-600">{configOf(line).join(" · ")}</div> : null}</td>
-                <td className="px-3 py-2">{fact?.deliverTo.length ? fact.deliverTo.map((d) => <div key={`${d.name}-${d.qty}`}>{fact.deliverTo.length > 1 ? `${d.name} ×${d.qty}` : d.name}</div>) : expansion.isLoading ? "Loading…" : "Not recorded"}</td>
-              </tr>;
-            })}
-            {addons.map((addon, index) => <tr key={`addon-${index}`} className="align-top">
-              <td className="px-3 py-2 text-label font-semibold text-base-600">SERVICE</td><td className="px-3 py-2">—</td><td className="px-3 py-2 font-mono text-meta">{addon.addon_key}</td><td className="px-3 py-2 tabular-nums">{addon.qty}</td><td className="px-3 py-2">{addon.addon_key?.replace(/[_-]+/g, " ") ?? "Add-on"}</td><td className="px-3 py-2">—</td>
-            </tr>)}
-          </tbody>
-        </table>
-      </div>
+    <div data-testid="row-expansion">
+      <GoodsMiniTable label={`Goods on SO-${row.o.so}`} lines={miniLines} />
     </div>
   );
 }
@@ -344,6 +435,33 @@ function ExpandedLines({ row }: { row: RegisterRow }) {
  * server-side (`/sales-order-data`, RLS-scoped); the browser renders and
  * opens the blob. READ-ONLY: nothing is written anywhere.
  */
+/**
+ * The batch behind `Print N sales orders` — the 2990 shape, in Carres terms:
+ * the operator ticks rows and gets the REAL documents, not a picture of the
+ * list. Each order's data is assembled server-side under RLS exactly as the
+ * single-order print does, so a row the user may not read cannot enter the
+ * file; the browser then renders one PDF carrying one governed page per order.
+ * READ-ONLY.
+ */
+async function printSalesOrders(rows: Array<{ id: string; so: number }>): Promise<void> {
+  if (rows.length === 0) return;
+  try {
+    const bundles: SalesOrderTemplateData[] = [];
+    for (const r of rows) {
+      bundles.push(
+        await apiFetch<SalesOrderTemplateData>(`/api/orders/${r.id}/sales-order-data`),
+      );
+    }
+    const blob = await renderCombinedSalesOrderPdf(bundles);
+    const url = URL.createObjectURL(blob);
+    window.open(url, "_blank");
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  } catch (error) {
+    const message = error instanceof ApiError ? error.message : String(error);
+    toast.error(`Printing ${rows.length} sales orders failed: ${message}`);
+  }
+}
+
 async function openSalesOrderPdf(orderId: string, so: number): Promise<void> {
   try {
     const data = await apiFetch<SalesOrderTemplateData>(
@@ -356,21 +474,6 @@ async function openSalesOrderPdf(orderId: string, so: number): Promise<void> {
   } catch (e) {
     const msg = e instanceof ApiError ? e.message : String(e);
     toast.error(`Sales Order SO-${so} PDF failed: ${msg}`);
-  }
-}
-
-async function openDeliveryOrderPdf(orderId: string, doNumber: string): Promise<void> {
-  try {
-    const data = await apiFetch<DoTemplateData>(
-      `/api/operation/orders/${orderId}/print-do-data`,
-    );
-    const blob = await renderDoPdf(data);
-    const url = URL.createObjectURL(blob);
-    window.open(url, "_blank");
-    setTimeout(() => URL.revokeObjectURL(url), 60_000);
-  } catch (error) {
-    const message = error instanceof ApiError ? error.message : String(error);
-    toast.error(`Delivery Order ${doNumber} PDF failed: ${message}`);
   }
 }
 
@@ -392,10 +495,25 @@ export default function SalesOrdersRegister() {
   const { data, isLoading, isError, error, refetch } = useOperationOrders(
     serverSearch ? { search: serverSearch } : {},
   );
+  const deliveryOrdersQuery = useDeliveryOrdersRegister();
+
+  const deliveryOrdersBySalesOrder = useMemo(() => {
+    const grouped = new Map<string, NonNullable<typeof deliveryOrdersQuery.data>["deliveryOrders"]>();
+    for (const deliveryOrder of deliveryOrdersQuery.data?.deliveryOrders ?? []) {
+      if (!deliveryOrder.order_id) continue;
+      const current = grouped.get(deliveryOrder.order_id) ?? [];
+      current.push(deliveryOrder);
+      grouped.set(deliveryOrder.order_id, current);
+    }
+    return grouped;
+  }, [deliveryOrdersQuery.data]);
 
   const all = useMemo<RegisterRow[]>(
-    () => (data?.orders ?? []).filter((o) => !isRental(o)).map(buildRegisterRow),
-    [data],
+    () =>
+      (data?.orders ?? [])
+        .filter((o) => !isRental(o))
+        .map((o) => buildRegisterRow(o, deliveryOrdersBySalesOrder.get(o.id) ?? [])),
+    [data, deliveryOrdersBySalesOrder],
   );
 
   /* The scope is the register's population; the engine's search and ▽s narrow
@@ -414,8 +532,13 @@ export default function SalesOrdersRegister() {
     () => REGISTER_FIELDS.map((f) => toGridColumn(f, role, navigate)),
     [navigate, role],
   );
-  /* v2 intentionally resets the superseded nine-column Stage A layout. */
-  const storageKey = `carres.salesOrders.register.v2.${role ?? "anon"}`;
+  /* The version resets a SUPERSEDED default. v2 dropped Stage A's nine
+     columns; v3 was the owner's eight (2026-08-15); v4 (owner ruling
+     2026-08-18) retires the duplicate `Promised` column and brings every
+     saved layout back to the ruled eight — a browser that had hidden
+     `DO No` or opened `Promised` would otherwise replay that layout
+     forever on the one machine that matters. */
+  const storageKey = `carres.salesOrders.register.v4.${role ?? "anon"}`;
 
   /* ── SELECTION — the REGISTER LAW's clause: ticks feed Export and nothing
      else. Header checkbox = select all visible / clear (the engine says which). */
@@ -432,12 +555,12 @@ export default function SalesOrdersRegister() {
   }, []);
 
   /* ROW OPENS A FULL PAGE (closed ruling — the panel is superseded).
-     Double-click and the menu's Open both land on the workspace VIEW route;
-     Edit lands on the same route with `?edit=1`, which Stage 1's workspace
-     reads as nothing (read-only stage) and Stage 2 wires to the form. */
+     ⛔ `?edit=1` IS RETIRED — owner ruling 2026-08-15. The object page has one
+     state with its fields already editable, so there is no second URL to send
+     the operator to: View and Edit are the same destination, and the menu keeps
+     both words only because 2990's operators reach for both. */
   const openWorkspace = useCallback(
-    (r: RegisterRow, edit?: boolean) =>
-      navigate(`/operation/orders/so/${r.id}${edit ? "?edit=1" : ""}`),
+    (r: RegisterRow) => navigate(`/operation/orders/so/${r.id}`),
     [navigate],
   );
   const onRowDoubleClick = useCallback((r: RegisterRow) => openWorkspace(r), [openWorkspace]);
@@ -447,7 +570,7 @@ export default function SalesOrdersRegister() {
   const contextMenu = useCallback(
     (r: RegisterRow): DataGridContextMenuItem[] => [
       { label: "View", onClick: () => openWorkspace(r) },
-      { label: "Edit", onClick: () => openWorkspace(r, true) },
+      { label: "Edit", onClick: () => openWorkspace(r) },
       { label: "Preview PDF", onClick: () => void openSalesOrderPdf(r.id, r.so) },
       { label: "Print PDF", onClick: () => void openSalesOrderPdf(r.id, r.so) },
       {
@@ -473,16 +596,7 @@ export default function SalesOrdersRegister() {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <DestinationHeader right={
-        <button
-          type="button"
-          data-testid="new-sales-order"
-          onClick={() => navigate("/operation/orders/so/new")}
-          className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-pill bg-kit-blue-9 px-3 text-meta font-semibold text-white hover:opacity-90"
-        >
-          <Plus size={14} strokeWidth={2.25} /> New Sales Order
-        </button>
-      } />
+      <DestinationHeader />
 
       {cancelTarget && (
         <CancelSalesOrderDialog
@@ -499,17 +613,23 @@ export default function SalesOrdersRegister() {
         />
       )}
 
-      <div className="flex min-h-0 flex-1 flex-col p-3 pt-4" data-testid="register-column">
-        {isError ? (
+      {/* 8px outer frame gap — REGISTER STATUS FOOTER law, docs/ui/MASTER.md. */}
+      <div className="flex min-h-0 flex-1 flex-col p-2" data-testid="register-column">
+        {isError || deliveryOrdersQuery.isError ? (
           <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 bg-white">
             <p className="text-body text-base-700">The register could not be loaded</p>
-            {(error as Error | undefined)?.message ? (
-              <p className="text-meta text-base-500">{(error as Error).message}</p>
+            {((error ?? deliveryOrdersQuery.error) as Error | undefined)?.message ? (
+              <p className="text-meta text-base-500">
+                {((error ?? deliveryOrdersQuery.error) as Error).message}
+              </p>
             ) : null}
             <button
               type="button"
               className="rounded-md border border-base-200 bg-white px-3 py-1.5 text-meta font-medium text-base-700 hover:bg-base-50"
-              onClick={() => void refetch()}
+              onClick={() => {
+                void refetch();
+                void deliveryOrdersQuery.refetch();
+              }}
             >
               Try again
             </button>
@@ -522,10 +642,21 @@ export default function SalesOrdersRegister() {
             storageKey={storageKey}
             rowKey={(r) => r.id}
             exportName="Sales Orders"
-            searchPlaceholder="SO number, customer, phone or item…"
-            isLoading={isLoading}
+            /* The search box is a governed 200px at EVERY width (REGISTER LAW
+               2), so the old four-item placeholder clipped to `SO number,
+               custome…` on a narrow window and on a wide one alike — it was
+               never a breakpoint problem. A placeholder that fits is the fix;
+               the search itself still matches SO number, customer, phone and
+               item, and the ▽ per-column filters say so column by column. */
+            searchPlaceholder="Search sales orders…"
+            isLoading={isLoading || deliveryOrdersQuery.isLoading}
             emptyMessage={rows.length === 0 ? "No orders yet" : "No matching sales orders."}
             groupBanner={false}
+            /* Optional columns may widen the sheet (MASTER §0.1), so the row's
+               identity pins: ☐ · ▸ · SO No stay against the left edge while
+               the rest scrolls under them. An engine capability, never a
+               page-local hack (`docs/ui/MASTER.md` §4). */
+            stickyIdentity
             chooserGroupOrder={[
               "Document",
               "Customer",
@@ -546,6 +677,24 @@ export default function SalesOrdersRegister() {
               onToggleAll: toggleAll,
             }}
             outputActions={[{ label: "Print", onClick: () => window.print() }]}
+            selectionActions={[
+              {
+                label: (n) => `Print ${n} sales order${n === 1 ? "" : "s"}`,
+                onClick: (picked) => {
+                  void printSalesOrders(picked as unknown as RegisterRow[]);
+                },
+              },
+            ]}
+            toolbarStart={
+              <button
+                type="button"
+                data-testid="new-sales-order"
+                onClick={() => navigate("/operation/orders/so/new")}
+                className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-full bg-kit-blue-9 px-3 text-meta font-semibold text-white hover:opacity-90"
+              >
+                <Plus size={14} strokeWidth={2.25} /> New Sales Order
+              </button>
+            }
             statusSummary={(filtered, selectedRows) => (
               <RegisterResultSummary
                 filtered={filtered}
@@ -558,6 +707,49 @@ export default function SalesOrdersRegister() {
       </div>
     </div>
   );
+}
+
+/**
+ * ⭐ THE FOOTER SPEAKS THE DICTIONARY, AND IT COUNTS EVERYTHING IT SEES.
+ *
+ * Owner ruling 2026-08-15: no unruled abbreviation may print here. The old
+ * shape had TWO defects and only one of them was the abbreviation:
+ *
+ * · `accShort`'s fallback capitalises the SKU's first word, so a line nothing
+ *   recognised could print a supplier's code — `M.P`, `Leg`, `Mp001`. The
+ *   words below are the ONLY ones that reach the screen, so an unruled string
+ *   is now impossible by construction rather than by luck.
+ * · the previous ORDER array was ALSO the filter, so any label outside it was
+ *   silently DROPPED — a `Disposal` line and every unrecognised accessory
+ *   vanished from a tally that claims to describe the filtered result. A
+ *   footer that under-counts is worse than one that abbreviates: it is a
+ *   number the operator trusts and cannot reproduce.
+ *
+ * Anything not positively recognised is `Other goods` — governed, honest, and
+ * still counted.
+ */
+const FOOTER_WORDS = [
+  "Mattress",
+  "Bedframe",
+  "Sofa",
+  "Pillow",
+  "Mattress protector",
+  "Topper",
+  "Footrest",
+  "Service",
+  "Other goods",
+] as const;
+
+function footerWord(sku: string): (typeof FOOTER_WORDS)[number] {
+  if (lineKind(sku) === "service") return "Service";
+  const cls = lineClass(sku);
+  if (cls === "mattress") return "Mattress";
+  if (cls === "bedframe") return "Bedframe";
+  if (cls === "sofa") return "Sofa";
+  const short = accShort(sku);
+  return (FOOTER_WORDS as readonly string[]).includes(short)
+    ? (short as (typeof FOOTER_WORDS)[number])
+    : "Other goods";
 }
 
 function RegisterResultSummary({
@@ -573,15 +765,7 @@ function RegisterResultSummary({
   const counts = new Map<string, number>();
   for (const row of scope) {
     for (const line of row.o.order_lines ?? []) {
-      const kind = lineKind(line.sku);
-      const cls = lineClass(line.sku);
-      const label = kind === "service" ? "Service"
-        : cls === "mattress" ? "Mattress"
-        : cls === "bedframe" ? "Bedframe"
-        : cls === "sofa" ? "Sofa"
-        : cls === "unknown" ? "Other goods"
-        : accShort(line.sku);
-      counts.set(label, (counts.get(label) ?? 0) + Number(line.qty || 0));
+      counts.set(footerWord(line.sku), (counts.get(footerWord(line.sku)) ?? 0) + Number(line.qty || 0));
     }
     for (const addon of row.o.order_addons ?? []) {
       counts.set("Service", (counts.get("Service") ?? 0) + Number(addon.qty || 0));
@@ -593,7 +777,12 @@ function RegisterResultSummary({
     : filtered.length === total
       ? `${filtered.length} ${orderWord}`
       : `${filtered.length} of ${total} orders`;
-  const order = ["Mattress", "Bedframe", "Sofa", "Pillow", "M.P", "Topper", "Footrest", "Service", "Other goods"];
-  const parts = order.filter((label) => (counts.get(label) ?? 0) > 0).map((label) => `${label} ${counts.get(label)}`);
-  return <span>{[countWord, ...parts].join(" · ")}</span>;
+  const parts = FOOTER_WORDS.filter((label) => (counts.get(label) ?? 0) > 0).map(
+    (label) => `${label} ${counts.get(label)}`,
+  );
+  /* One unwrapped line by law (REGISTER STATUS FOOTER), so a long tally on a
+     narrow window truncates instead of pushing a second row into the frame —
+     and the full sentence rides the title. */
+  const line = [countWord, ...parts].join(" · ");
+  return <span className="block truncate" title={line}>{line}</span>;
 }

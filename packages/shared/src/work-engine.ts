@@ -113,11 +113,20 @@ export const ORDER_WORK_RULES: readonly WorkRule[] = [
   {
     key: "issue_delivery_order",
     module: "orders",
-    trigger: "date + slot confirmed · core goods ready · money passed · DO not issued",
-    owner: "the order's PIC",
+    // SLICE 2 (owner ruling, `docs/orders/MASTER.md` §8): "money passed" left
+    // this trigger with decision A, and the PIC left the owner slot with
+    // automation — when every requirement holds, the SYSTEM issues the
+    // document at the door that completed the gate (booking confirm · stock
+    // reserve · finance clear). No Release button, no Approve button, no
+    // manual bypass. The rule stays registered because the five-part
+    // discipline covers every completion fact the engines read — but it is
+    // never raised as a person's work (`order-actions.ts` stopped asking).
+    trigger:
+      "date + slot confirmed · core goods ready · no OPEN Finance exception · DO not issued",
+    owner: "the SYSTEM — issued automatically the moment the last requirement lands",
     action: orderActionQueue("issue_delivery_order"),
     dueRule:
-      "1 working day before the confirmed date (logistics ask for the DO the evening before) — the collection clock's own due arithmetic",
+      "immediate — the same act that completes the gate issues the document",
     completionFact: "the document exists (orders.do_number)",
   },
   {
@@ -146,8 +155,29 @@ export const ORDER_WORK_RULES: readonly WorkRule[] = [
     owner: "the order's PIC",
     action: orderActionQueue("collect"),
     dueRule:
-      "T−1 working day before the delivery (confirmed, else promised) — the Card 4 collection clock; T−3/T−2 attention",
+      "T−2 working days before the delivery (confirmed, else promised) — the collection clock, deadline re-ruled 2026-08-19 (logistics takes the DO at T−1); T−3 attention",
     completionFact: "outstanding = RM 0 through the one money arithmetic (orderMoney over orders.paid)",
+  },
+  // ── The blueprint card's two NEW acts (owner-approved 2026-08-16, §7) ──
+  {
+    key: "collect_loan_item",
+    module: "orders",
+    trigger: "a loan item is still out (ops_sofa_loans, on_loan) and the delivery day has arrived",
+    owner:
+      "Delivery staff (blueprint card owner rule) — no delivery-staff roster fact exists yet, so no person resolves and the duty word stands (the canvas's measured-boundary rule)",
+    action: orderActionQueue("collect_loan_item"),
+    dueRule: "the delivery day itself (confirmed date, else the recorded delivery)",
+    completionFact: "the loan row reads returned (ops_sofa_loans.status, 0209/0217)",
+  },
+  {
+    key: "resolve_payment_exception",
+    module: "orders",
+    trigger: "an OPEN Finance exception holds the delivery (order_finance_exceptions, 0355)",
+    owner:
+      "the Finance owner (blueprint card owner rule) — only Finance clears it; no finance roster fact exists yet, so no person resolves and the duty word stands",
+    action: orderActionQueue("resolve_payment_exception"),
+    dueRule: "immediately — an open exception is holding a delivery today",
+    completionFact: "the exception reads cleared, with its evidence (order_finance_exceptions.status)",
   },
 ];
 
@@ -187,7 +217,11 @@ export const MODULE_WORK_RULES: readonly WorkRule[] = [
     key: "receiving.check_in",
     module: "receiving",
     trigger: "goods have an arrival promise and no posted Receiving Session covers them",
-    owner: "the month's GRN-duty holder (ops_po_duty offset−1; never the PO holder)",
+    // `offset−1` used to stand here with no direction, and it was read
+    // backwards where it mattered. The rota reaches FORWARD: GRN duty for a
+    // month is the NEXT month's `ops_po_duty` row (`grnDutyMonth`) — see
+    // `purchasing/MASTER.md` §2.2, whose table is the evidence.
+    owner: "the month's GRN-duty holder (ops_po_duty, the FOLLOWING month; never the PO holder)",
     action: "Check in",
     dueRule: "the promised arrival day",
     completionFact: "a posted Receiving Session (warehouse_receipts + receiving_events 'posted')",
@@ -219,38 +253,43 @@ export interface WorkItem {
   action: string;
   /** WHO — the PIC's name when the roster names one, else the honest gap. */
   ownerName: string | null;
+  /** The OWNER RULE's duty word when no person resolves (blueprint card §7 —
+   *  Delivery staff · Finance have no roster fact yet, so the duty stands
+   *  where a name cannot; the canvas's measured-boundary rule). */
+  ownerDuty?: string;
   tone: OrderOpenAction["tone"];
   locked: boolean;
   broken: boolean;
   /** The ACTUAL working day, ISO. Null = this step has no anchor yet. */
   dueIso: IsoDate | null;
-  /** `Thu 6 Aug` — the rail law: weekday + date, one format, never a bare
-   *  Today/Tomorrow. */
-  dueLabel: string | null;
   /** Working days past the ORIGINAL due (0 = not late). The due never moves. */
   workingDaysLate: number;
 }
 
-/** `Thu 6 Aug` — the ONE spelling for a work due date (Loo 2026-08-06's rail
- *  law). en-GB gives `Thu, 6 Aug` — the comma is dropped to match the frozen
- *  rails. */
-export function workDayLabel(iso: IsoDate | null): string | null {
-  if (!iso) return null;
-  const d = new Date(`${iso}T00:00:00`);
-  if (Number.isNaN(d.getTime())) return null;
-  const wd = d.toLocaleDateString("en-GB", { weekday: "short" });
-  const day = d.getDate();
-  const mon = d.toLocaleDateString("en-GB", { month: "short" });
-  return `${wd} ${day} ${mon}`;
-}
+/*
+ * `workDayLabel` is DELETED (THE YEAR RULE, owner ruling 2026-08-15), and with
+ * it `WorkItem.dueLabel` and `WorkDayGroup.label`.
+ *
+ * It was a FIFTH date spelling, and every property of it was wrong once the
+ * rule was written down. It reached for `toLocaleDateString`, which
+ * COPY-STANDARD bans outright. It dropped the comma, so a Work row and a
+ * Register cell named one day two ways. And it printed NO year, ever — which
+ * looks identical to the new rule until the work is due in another year, at
+ * which point the heading hides the single fact that makes it urgent.
+ *
+ * The fix is the one this repository already made when it deleted `dayWord()`:
+ * **a business engine hands its caller DAYS and no words.** `WorkDayGroup`
+ * carries `dayIso` (null = the anchorless group) and the screen spells it
+ * through the one formatter. There is nothing left here for a date to be
+ * spelled wrongly in.
+ */
 
 // ─── Card 10 — the surface's grouping, one rule ──────────────────────────────
 
 export interface WorkDayGroup<T extends WorkItem = WorkItem> {
-  /** ISO day, or null for the no-anchor group (always LAST). */
+  /** ISO day, or null for the no-anchor group (always LAST). The screen
+   *  spells it — `fmtDate(dayIso)`, or the ruled words `No date` when null. */
   dayIso: IsoDate | null;
-  /** `Mon 17 Aug`, or the ruled words `No date` for anchorless work. */
-  label: string;
   items: T[];
   late: number;
 }
@@ -282,7 +321,6 @@ export function groupWorkItemsByDay<T extends WorkItem>(
     const arr = sortItems(byDay.get(day)!);
     return {
       dayIso: day,
-      label: workDayLabel(day) ?? day,
       items: arr,
       late: arr.filter((i) => i.workingDaysLate > 0).length,
     };
@@ -290,7 +328,6 @@ export function groupWorkItemsByDay<T extends WorkItem>(
   if (dateless.length > 0) {
     groups.push({
       dayIso: null,
-      label: "No date",
       items: sortItems(dateless),
       late: 0,
     });
@@ -309,6 +346,18 @@ export interface OrderWorkContext {
   deliveredAtIso: string | null;
   delayDetectedAtIso: string | null;
   delayDecisionAtIso: string | null;
+  /** Owner re-ruling 2026-08-16 (blueprint card §7, supersedes the
+   *  3-working-days law): `Assign logistics` is due WITHIN THE DAY the PO is
+   *  issued — the EARLIEST PO's issue day (Card 3: logistics is assigned
+   *  early, the moment purchase starts). */
+  poIssuedAtIso?: string | null;
+  /** Stock-source orders with no PO: due within the ORDER day. */
+  placedAtIso?: string | null;
+  /** Blueprint card §7 — the two composed facts the ladder does not carry
+   *  (one action per track is the ladder's own law; the Work feed lists every
+   *  governed item). */
+  loanOutstanding?: boolean;
+  financeExceptionHolds?: boolean;
 }
 
 /**
@@ -326,8 +375,14 @@ export function workItemsForOrder(
   const officeOpts: WorkingDayOptions = { ...opts, offDays: OFFICE_OFF_DAYS };
   const dueOf = (key: OrderActionKey): IsoDate | null => {
     switch (key) {
-      case "assign_logistics":
-        return deliveryStepDueIso("assign", ctx.promisedDateIso, opts);
+      case "assign_logistics": {
+        // Owner re-ruling 2026-08-16 (blueprint card §7): due WITHIN THE DAY
+        // the PO is issued; a stock-source order with no PO — within the
+        // order day. The old 3-working-days-before-the-customer-date law is
+        // SUPERSEDED.
+        const anchor = ctx.poIssuedAtIso ?? ctx.placedAtIso ?? null;
+        return anchor ? (anchor.slice(0, 10) as IsoDate) : null;
+      }
       case "confirm_delivery_date":
         return deliveryStepDueIso("chase", ctx.promisedDateIso, opts, leads);
       case "deliver_today":
@@ -355,6 +410,15 @@ export function workItemsForOrder(
           todayIso,
           opts,
         ).dueIso;
+      case "collect_loan_item":
+        // The delivery day itself (blueprint card §7): the loan comes back on
+        // the trip. Confirmed day, else the day it was actually delivered.
+        return (ctx.confirmedDateIso ?? ctx.deliveredAtIso)?.slice(0, 10) as
+          | IsoDate
+          | undefined ?? null;
+      case "resolve_payment_exception":
+        // Immediately — an OPEN exception is holding a delivery today.
+        return todayIso.slice(0, 10) as IsoDate;
       default:
         // issue_po / confirm_ready_date: the purchasing engine owns those
         // clocks on its own surfaces — a second spelling here is the defect.
@@ -362,7 +426,34 @@ export function workItemsForOrder(
     }
   };
 
-  return open.map((a) => {
+  const composeExtra = (): OrderOpenAction[] => {
+    // Blueprint card §7 — the ladder holds one action per track by ITS law;
+    // the Work feed additionally lists these two governed items, composed
+    // from the module facts the rules above name (Card 9: Work reads module
+    // facts and produces governed action).
+    const extra: OrderOpenAction[] = [];
+    if (ctx.financeExceptionHolds) {
+      extra.push({
+        key: "resolve_payment_exception",
+        track: "money",
+        tone: "warning",
+      });
+    }
+    if (
+      ctx.loanOutstanding &&
+      (ctx.deliveredAtIso ||
+        (ctx.confirmedDateIso && ctx.confirmedDateIso.slice(0, 10) <= todayIso.slice(0, 10)))
+    ) {
+      extra.push({
+        key: "collect_loan_item",
+        track: "delivery",
+        tone: "info",
+      });
+    }
+    return extra;
+  };
+
+  return [...open, ...composeExtra()].map((a) => {
     const dueIso = dueOf(a.key);
     const today = todayIso.slice(0, 10);
     const late =
@@ -375,18 +466,26 @@ export function workItemsForOrder(
               : opts,
           )
         : 0;
+    // The two composed keys route to duties with no roster fact yet — the
+    // duty word stands where a name cannot (never a hand-picked person).
+    const duty =
+      a.key === "collect_loan_item"
+        ? "Delivery staff"
+        : a.key === "resolve_payment_exception"
+          ? "Finance"
+          : null;
     return {
       ruleKey: a.key,
       module: "orders" as const,
       soRef: `SO-${ctx.so}`,
       orderId: ctx.orderId,
       action: orderActionQueue(a.key),
-      ownerName: ctx.picName,
+      ownerName: duty ? null : ctx.picName,
+      ...(duty ? { ownerDuty: duty } : {}),
       tone: a.tone,
       locked: !!a.locked,
       broken: !!a.broken,
       dueIso,
-      dueLabel: workDayLabel(dueIso),
       workingDaysLate: late,
     };
   });

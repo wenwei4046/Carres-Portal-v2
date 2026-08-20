@@ -66,7 +66,6 @@ import {
   effectiveGuaranteeStatus,
   deliveryDateGapFact,
   orderActionButton,
-  orderActionDone,
   updateOrderInputSchema,
   type OpsStockListResponse,
   type OpsOrderControl,
@@ -103,7 +102,6 @@ import {
   useVoidPayment,
   useSaveOrderControl,
   useConfirmBooking,
-  useIssueDeliveryOrder,
   usePartnerBookingCheck,
   useSetPartnerDeliveryRules,
   useDeliveryPhotos,
@@ -116,6 +114,7 @@ import {
 } from "@/lib/queries";
 import { cjkClassName } from "@/lib/cjk";
 import { fmtDate, fmtDateShort } from "@/lib/fmt-date";
+import { displayCustomerName } from "@/lib/customer-name";
 import { orderStatusPill } from "@/lib/status-pill";
 import { locationForAddress } from "@/lib/region";
 import { lineReadiness, readinessCounts } from "@/lib/line-readiness";
@@ -129,10 +128,10 @@ import {
   buildSupplierReminder,
   rmAmount,
   salutationOf,
-  titleCaseName,
 } from "@/lib/wa-templates";
 import {
   lineCategory,
+  resolvedCategory,
   lineSize,
   lineKind,
   lineSortRank,
@@ -703,9 +702,11 @@ function PanelMenu({
 
 /** Tiny status counter for a panel header — tighter than the full `.pill` so up
  *  to three fit on one header row. Colours track the locked stock vocab. */
-/** "23 Aug" — the chip's day-month form (Loo's D1 chip spec: no year, no
- *  weekday; the full "24 Aug 26" date-law form stays on the card rows). */
-const dayMon = (iso: string) => fmtDateShort(iso).replace(/\s\d{2}$/, "");
+/* `dayMon` is DELETED (owner ruling 2026-08-15). Loo's D1 chip spec — day and
+ * month, no year, no weekday — was implemented by regexing the year back off
+ * `fmtDateShort`. THE YEAR RULE means `fmtDateShort` already answers "23 Aug"
+ * for a current-year date, and answers "15 Jan 27" for the one case where the
+ * regex was hiding the fact that mattered. The chips call it directly. */
 
 /** Chip form of a time slot: "Afternoon (12pm–3pm)" → "12pm–3pm"; free text
  *  passes through unchanged. */
@@ -1481,8 +1482,14 @@ function DrawerBody({
   // Combine duplicate-SKU lines into ONE row (Jess: don't repeat the same item),
   // then list mattress → bedframe → sofa → pillow → M.P → service.
   const orderedLines = Object.values(
-    lines.reduce<Record<string, { sku: string; qty: number }>>((acc, l) => {
-      const e = acc[l.sku] ?? { sku: l.sku, qty: 0 };
+    lines.reduce<Record<string, { sku: string; qty: number; category?: string | null }>>((acc, l) => {
+      // D9 (2026-08-20) — the CATALOG's category rides through the merge. It is
+      // a property of the SKU, so every duplicate row carries the same value:
+      // seed it once and never overwrite. `e.category ?? l.category` would be
+      // wrong — it turns a legitimate `null` (asked, catalog silent) into a
+      // later row's `undefined` (nobody asked), and those two mean different
+      // things downstream.
+      const e = acc[l.sku] ?? { sku: l.sku, qty: 0, category: l.category };
       e.qty += Number(l.qty || 0);
       acc[l.sku] = e;
       return acc;
@@ -2340,7 +2347,7 @@ function DrawerBody({
   if (balanceOwing) {
     chaseRows.push({
       key: "customer",
-      label: order.customer_name ? titleCaseName(order.customer_name) : "Customer",
+      label: order.customer_name ? displayCustomerName(order.customer_name) : "Customer",
       sub: `${RM(moneyOutstanding)} outstanding`,
       urgency: balanceGate === "hold" ? "overdue" : "attention",
       onAct: (tone) => copyChase("customer", tone),
@@ -3618,9 +3625,16 @@ function DrawerBody({
               orderCategories={[
                 // CORE categories only — a loaner substitutes a mattress /
                 // bedframe / sofa; "acc" would let keyword-missed units leak in.
+                //
+                // D9, 2026-08-20: `resolvedCategory` asks the CATALOG first and
+                // only parses the SKU text where the catalog is silent. The
+                // "keyword-missed" the comment above worries about is exactly
+                // what that fixes — and it had a second, unstated cost: a line
+                // the keyword list missed contributed NOTHING to this set, so
+                // its own category could not be matched by any free unit.
                 ...new Set(
                   goodsLines
-                    .map((l) => lineCategory(l.sku))
+                    .map((l) => resolvedCategory(l.sku, l.category))
                     .filter((c) => c !== "acc"),
                 ),
               ]}
@@ -4064,7 +4078,7 @@ function DrawerBody({
                   )
                     return (
                       <MiniBadge tone="ready">
-                        confirmed {dayMon(form.control.confirmed_date)}
+                        confirmed {fmtDateShort(form.control.confirmed_date)}
                         {form.control.confirmed_time_slot
                           ? ` · ${shortSlot(form.control.confirmed_time_slot)}`
                           : ""}
@@ -4074,7 +4088,7 @@ function DrawerBody({
                   if (eta)
                     return (
                       <MiniBadge tone="waiting">
-                        not confirmed · logistics said {dayMon(eta)}
+                        not confirmed · logistics said {fmtDateShort(eta)}
                       </MiniBadge>
                     );
                   // C1 (Jess 2026-07-27): T1 banned "Unscheduled" and this badge
@@ -4652,7 +4666,7 @@ function CustomerIdentityCard({
     return (
       <div
         className="kpi-box grid place-items-center py-2"
-        title={`${order.customer_name ? titleCaseName(order.customer_name) : "—"} · #${order.so} · ${statusWord}`}
+        title={`${order.customer_name ? displayCustomerName(order.customer_name) : "—"} · #${order.so} · ${statusWord}`}
       >
         <span className="size-[34px] rounded-full grid place-items-center shrink-0 bg-base-100 text-base-500">
           <User size={18} strokeWidth={2} aria-hidden="true" />
@@ -4671,7 +4685,7 @@ function CustomerIdentityCard({
             className={`block text-body font-semibold leading-tight ${cjkClassName(order.customer_name ?? "")}`}
             title={order.customer_name ?? undefined}
           >
-            {order.customer_name ? titleCaseName(order.customer_name) : "—"}
+            {order.customer_name ? displayCustomerName(order.customer_name) : "—"}
           </span>
           <span className="mt-0.5 flex items-center gap-1.5 min-w-0 flex-wrap">
             {/* The ONE black element on the page — the order id badge. */}
@@ -5029,17 +5043,18 @@ function CompactField({ label, children }: { label: string; children: ReactNode 
  *  base-500 uppercase 11/600 — READABLE, not the washed base-300; value base-900;
  *  36px). Used by the Delivery card. */
 /**
- * C7 — the delivery order, in one row.
+ * C7 → SLICE 2 — the delivery order, in one row, and it is a FACT in both
+ * states.
  *
- * Not issued → ONE button, and it is the dictionary's own BUTTON word so this
- * file spells no verb. Issued → the number, as a plain fact; there is nothing
- * to press, because the document already exists.
- *
- * **The gate is the server's** (`docs/ORDERS-WORKING-FLOW.md` §5 — goods
- * reserved, money collected, no Sunday or public holiday). This row does not
- * re-implement it: a client-side copy is a second engine, and the two would
- * disagree the first time either changed. So the button stays live and the 422
- * comes back as the sentence that names what is missing.
+ * Issued → the number, a door to the document's page. Not issued → the words,
+ * because the SYSTEM issues the document itself the moment every requirement
+ * is met (`docs/orders/MASTER.md` §8 — no Issue, Release or Approve button in
+ * any state) — PLUS the one governed manual door the owner ruled 2026-08-19
+ * (card §5): `Request Delivery Order`, for the outstation trip whose partner
+ * schedules the customer, so the paper is needed BEFORE a confirmed booking
+ * exists. The door walks the SAME issuing path with the SAME gates — goods,
+ * money (0362) and the Finance exception — merely without waiting for the
+ * booking-confirm trigger. A refusal names the failing gate.
  */
 function DeliveryOrderRow({
   orderId,
@@ -5048,34 +5063,53 @@ function DeliveryOrderRow({
   orderId: string;
   doNumber: string | null;
 }) {
-  const issue = useIssueDeliveryOrder(orderId, {
-    // COPY-STANDARD's DONE MESSAGE for this action, read from the dictionary
-    // mirror rather than typed here, plus the number the document carries.
-    onSuccess: (res) =>
-      toast.success(
-        `${orderActionDone("issue_delivery_order")} — ${res.order.do_number}`,
+  const navigate = useNavigate();
+  const qc = useQueryClient();
+  const request = useMutation({
+    mutationFn: () =>
+      apiFetch<{ order: { do_number: string | null }; issued: boolean }>(
+        `/api/operation/orders/${encodeURIComponent(orderId)}/delivery-order/request`,
+        { method: "POST" },
       ),
-    onError: (e) =>
-      toast.error(
-        e instanceof ApiError ? e.message : "Couldn't issue the delivery order",
-      ),
+    onSuccess: (res) => {
+      void qc.invalidateQueries({ queryKey: qk.operation.order(orderId) });
+      void qc.invalidateQueries({ queryKey: qk.operation.orders() });
+      if (res.order.do_number) {
+        toast.success(`Delivery order issued — ${res.order.do_number}`);
+      }
+    },
+    onError: (e: Error) => toast.error(e.message),
   });
   return (
     <DRow k="Delivery order">
       {doNumber ? (
-        <span className="font-mono text-body font-semibold text-base-900">
-          {doNumber}
-        </span>
-      ) : (
-        <Btn
-          variant="box"
-          size="sm"
-          disabled={issue.isPending}
-          title="The system writes the delivery order and stamps its number — nobody types one by hand"
-          onClick={() => issue.mutate()}
+        /* The number is a DOOR to the document's own page (§0.1: DO → DO). */
+        <button
+          type="button"
+          className="font-mono text-body font-semibold text-blue-700 underline-offset-2 hover:underline"
+          onClick={() =>
+            navigate(`/operation/delivery-orders/${encodeURIComponent(doNumber)}`)
+          }
         >
-          {orderActionButton("issue_delivery_order")}
-        </Btn>
+          {doNumber}
+        </button>
+      ) : (
+        <span className="flex items-center gap-2 flex-wrap justify-end min-w-0">
+          {/* An absent value reads as WORDS, never a dash (COPY-STANDARD
+              2026-08-15) — and the words say who acts: the system, or this
+              one governed request door. */}
+          <span className="text-meta text-base-500">
+            No delivery order yet — the system issues it when the goods, money
+            and date are ready
+          </span>
+          <Btn
+            data-testid="request-delivery-order"
+            disabled={request.isPending}
+            onClick={() => request.mutate()}
+          >
+            Request Delivery Order
+          </Btn>
+        </span>
       )}
     </DRow>
   );
@@ -5178,8 +5212,14 @@ function BookingBlock({
         : "goods not all reserved",
     );
   else if (!goodsReadyHint && !tripGroups) gateHints.push("goods not all reserved");
-  if (balanceOwingHint)
-    gateHints.push(`RM ${outstandingHint.toFixed(2)} outstanding`);
+  // Decision A (owner ruling 2026-08-16, docs/orders/MASTER.md §8) — money no
+  // longer blocks the delivery order, so it may not ride the "cannot be
+  // issued" sentence above. It gets its own honest line: the collection stays
+  // open, and the paper issues regardless. Same voice as the server's own
+  // warning ("collection is still open").
+  const moneyHint = balanceOwingHint
+    ? `RM ${outstandingHint.toFixed(2)} outstanding — collection is still open; it does not block the delivery order`
+    : null;
   const FIELD =
     "rounded border border-base-300 bg-white px-1.5 py-0.5 text-body text-base-900 outline-none hover:border-base-400 focus:border-primary";
   return (
@@ -5250,10 +5290,10 @@ function BookingBlock({
           produce the paper by hand — the number was stamped by a DB trigger on
           the DISPATCH transition (0098), a day too late to hand over. One press
           now, the moment the customer's date is confirmed, and the SYSTEM
-          writes it. The row appears only when there is a trip to paper. */}
-      {(confirmed || doNumber) && (
-        <DeliveryOrderRow orderId={orderId} doNumber={doNumber} />
-      )}
+          writes it. The row always renders: an outstation trip needs its
+          paper BEFORE a confirmed booking exists (owner ruling 2026-08-19),
+          so the request door must be reachable in that state too. */}
+      <DeliveryOrderRow orderId={orderId} doNumber={doNumber} />
       {/* T8 — the second trip. A split order still owes the customer a group;
           this row is the ONLY place that says so, and it stays until that
           group is booked. The button re-opens the same confirm panel scoped to
@@ -5409,6 +5449,13 @@ function BookingBlock({
             <div className="text-right text-meta text-warning py-0.5">
               Not ready yet: {gateHints.join(" · ")} — the delivery order cannot
               be issued until these are cleared
+            </div>
+          )}
+          {/* Money is a separate sentence because it is a separate truth
+              (decision A): it warns, it never blocks the paper. */}
+          {moneyHint && (
+            <div className="text-right text-meta text-warning py-0.5">
+              {moneyHint}
             </div>
           )}
         </DRow>

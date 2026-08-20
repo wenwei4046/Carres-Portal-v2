@@ -33,6 +33,7 @@
  */
 
 import { Document, Image, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
+import { displayCustomerName } from "@/lib/customer-name";
 import { NOTO_SANS_SC_FAMILY } from "./fonts/noto";
 import { CARRES_COMPANY } from "./letterhead";
 import type { DoTemplateData } from "./types";
@@ -149,6 +150,18 @@ const styles = StyleSheet.create({
   signImage: { width: mm(55), height: mm(14), objectFit: "contain" },
   signCaption: { fontSize: 6.5, color: GREY, lineHeight: 1 },
   ackLine: { fontSize: 7, color: GREY, lineHeight: 1.3, marginTop: mm(2.5), paddingHorizontal: mm(4) },
+
+  // ── the COD band (0362, owner ruling 2026-08-19) — the one ruled
+  //    exception to "a delivery doc never talks money": the driver's
+  //    instruction, loud enough that goods cannot come down past it. ──
+  codBand: {
+    borderWidth: 1.4,
+    borderColor: "#000000",
+    paddingVertical: mm(2.2),
+    paddingHorizontal: mm(3),
+    marginBottom: mm(4),
+  },
+  codText: { fontSize: 10.5, fontWeight: 700, letterSpacing: 0.4 },
 
   // ── footer (fixed) — §9 ──
   footer: {
@@ -306,7 +319,7 @@ export function DoTemplate(data: DoTemplateData) {
             <Text style={styles.blockLabel}>Deliver To</Text>
             <View style={{ marginTop: mm(1.5) }}>
               {([
-                ["Name", customer.name],
+                ["Name", displayCustomerName(customer.name)],
                 ["Address", deliveryAddress],
                 ["Tel", customer.phone],
                 /* who the driver calls when the customer is unreachable */
@@ -335,6 +348,14 @@ export function DoTemplate(data: DoTemplateData) {
             </View>
           </View>
         </View>
+        {/* ── COD (0362) — issued under the owner's approval and still owing:
+            the goods may be SEEN on the truck, but they come down only after
+            the full balance lands by online transfer. No cash. ── */}
+        {data.cod_instruction ? (
+          <View style={styles.codBand} minPresenceAhead={30}>
+            <Text style={styles.codText}>{data.cod_instruction}</Text>
+          </View>
+        ) : null}
         {/* ── items — quantity only; a delivery doc never talks money.
             Non-sofa lines share ONE table; each sofa SET gets its own page
             below — rows + drawing together, the PO law's one-set-per-page. ── */}
@@ -475,7 +496,7 @@ export function DoTemplate(data: DoTemplateData) {
           <View style={styles.signZone}>
             <View style={styles.signBox}>
               {podSigned ? <Image src={pod!.signature_url!} style={styles.signImage} /> : null}
-              <Text style={styles.signCaption}>Customer Signature · {customer.name}</Text>
+              <Text style={styles.signCaption}>Customer Signature · {displayCustomerName(customer.name)}</Text>
             </View>
           </View>
           <Text style={styles.ackLine}>

@@ -502,3 +502,64 @@ export function ordinalLabel(n: number): string {
       return `${n}th`;
   }
 }
+
+/* ── PO REVISIONS — a sent PO keeps its number and mints a version ──────────
+ *
+ * Jess, 2026-08-18 (purchasing/MASTER.md §4 FROZEN RULES): cancel-and-reissue
+ * puts TWO numbers for ONE job in the factory's hands, and a factory reads two
+ * numbers as two jobs. A change KEEPS the number and mints `PO-2041 ·
+ * Version 2`; the floor is `received_qty` per line; adding items is a NEW PO
+ * and stopping is the whole PO (Cancel).
+ *
+ * These words live HERE (Law 7): the panel title, the disabled Save's gap
+ * names, and the unshared-version sentence are one spelling for every screen
+ * that ever prints them. COPY-STANDARD's PURCHASING block registers each.
+ */
+
+/** `Version 2` for the panel title's ` · Version 2` — and NOTHING for
+ *  Version 1: an unrevised PO is just the PO, and printing `Version 1`
+ *  everywhere would teach operators the word means nothing. */
+export function poVersionLabelOf(
+  version: number | null | undefined,
+): string | null {
+  return version != null && version > 1 ? `Version ${version}` : null;
+}
+
+/** What a revise Save is missing, top-to-bottom — the Receiving button law:
+ *  a disabled button NAMES its gap, and the first gap wins. The floor outranks
+ *  everything (it is the ruling's own red line), then the empty change set,
+ *  then the missing reason. Returns null when Save may run. */
+export function poReviseSaveGapOf(input: {
+  belowFloorSku: string | null;
+  nothingChanged: boolean;
+  reasonEmpty: boolean;
+}): string | null {
+  if (input.belowFloorSku != null) return "Save — below received";
+  if (input.nothingChanged) return "Save — nothing changed";
+  if (input.reasonEmpty) return "Save — say why";
+  return null;
+}
+
+/** `PO-2041 Version 2 has not reached Ohana` — COPY-STANDARD's governed
+ *  sentence, DERIVED and never stored: the current version was minted after
+ *  the last observed hand-over (or nothing was ever handed over). Version 1
+ *  never raises it — before the first revise, the share story is the existing
+ *  `Issue` ladder's, not this sentence's. */
+export function poUnsharedVersionNoticeOf(
+  po: {
+    id: string;
+    version?: number | null;
+    revised_at?: string | null;
+    sends?: readonly { sent_at: string }[] | null;
+  },
+  supplierName: string,
+): string | null {
+  const version = po.version ?? 1;
+  if (version <= 1 || !po.revised_at) return null;
+  const lastSend = (po.sends ?? []).reduce<string | null>(
+    (max, s) => (max == null || s.sent_at > max ? s.sent_at : max),
+    null,
+  );
+  if (lastSend != null && lastSend > po.revised_at) return null;
+  return `${po.id} Version ${version} has not reached ${supplierName}`;
+}

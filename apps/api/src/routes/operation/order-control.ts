@@ -8,12 +8,7 @@ import {
   signDeliveryPhotoUploadInput,
   attachDeliveryPhotoInput,
   type DeliveryPhoto,
-  bookingConfirmGate,
   deliveryAttemptRecordInputSchema,
-  deliveryOrderIssueGate,
-  docNumber,
-  orderActionDone,
-  storageHold,
   isSundayIso,
   type BookingGateResult,
   partnerBookingWarnings,
@@ -24,7 +19,6 @@ import {
   deliveryGroupLabel,
   deliveryScopeSentence,
   type DeliveryGroupKey,
-  stockMatchKey,
   stockEtaImportInput,
   matchStockRows,
   aggregateStorageFeesByRef,
@@ -44,6 +38,11 @@ import {
   type SofaLoanDto,
   type BalancePayStatus,
 } from "@carres/shared";
+import { loadBookingContext } from "../../lib/booking-context";
+import {
+  attemptDeliveryOrderIssue,
+  todayIsoMYT,
+} from "../../lib/delivery-order-issue";
 import { requireDuty } from "../../lib/duties";
 import { mapPgError } from "../../lib/route-helpers";
 import { adminClient, userClient } from "../../lib/supabase";
@@ -83,140 +82,16 @@ function requireOperationOrPrincipal(
   }
 }
 
-/**
- * The order's booking facts + the ONE goods/money reading of it.
- *
- * C7 extracted this from the confirm route so that route and the new
- * delivery-order route cannot answer "is this trip ready?" two different ways.
- * That is not tidiness: C5 and C9 each found the SAME number being read two
- * ways by two surfaces, one card apart, and both times the two disagreed on a
- * live order.
- */
-interface BookingContext {
-  order: {
-    id: string;
-    so: number;
-    paid: number | string | null;
-    do_number: string | null;
-    /** CARD 3 (0346) — the company currently assigned to carry this order. The
-     *  appointment stamps it at confirmation; it is never re-read afterwards. */
-    ops_assigned_logistic?: string | null;
-    delivery_partner_id?: string | null;
-  };
-  control: Record<string, unknown> | null;
-  lines: { sku: string; qty: number; unit_price: number | null }[];
-  gate: BookingGateResult;
-}
-type Loaded =
-  | { ok: true; ctx: BookingContext }
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  | { ok: false; body: any; status: any };
-
-async function loadBookingContext(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  sb: any,
-  orderId: string,
-  deliverGroups: DeliveryGroupKey[] | null | undefined,
-): Promise<Loaded> {
-  // C5 (2026-07-27): `paid` rides this select because it is the money truth —
-  // the only figure a live payment path writes. C7 adds `do_number`, which is
-  // the delivery order's own completion signal.
-  const { data: order, error: orderErr } = await sb
-    .from("orders")
-    // CARD 3 (0346): the assignment rides this select so the confirm door can
-    // stamp the carrier the customer's appointment is agreed WITH.
-    .select("id, so, paid, do_number, ops_assigned_logistic, delivery_partner_id")
-    .eq("id", orderId)
-    .maybeSingle();
-  if (orderErr) {
-    const m = mapPgError(orderErr);
-    return { ok: false, body: m.body, status: m.status };
-  }
-  if (!order) throw new HTTPException(404, { message: "Order not found" });
-  const soRef = `SO-${order.so}`;
-
-  // C5: the `order_payments` read is GONE. It holds zero rows and no live
-  // payment path writes it, so summing it made "collected" RM 0 for every
-  // order and the gate refused bookings for customers who had already paid.
-  const [linesRes, addonsRes, controlRes, reservedRes] = await Promise.all([
-    sb.from("order_lines").select("sku, qty, unit_price").eq("order_id", orderId),
-    sb.from("order_addons").select("qty, unit_price").eq("order_id", orderId),
-    sb
-      .from("ops_order_control")
-      .select(
-        // C9 — the storage columns ride this select because an uncollected
-        // storage fee holds a delivery exactly as an unpaid balance does.
-        "line_received, balance, booking_stage, booking_groups, confirmed_date, confirmed_time_slot, confirmed_partner_id, customer_confirmed_at, customer_confirmed_by, delivery_trips, storage_from, storage_fee_override, storage_fee_msbf, storage_fee_sof, storage_collected_at, storage_waiver_status",
-      )
-      .eq("order_id", orderId)
-      .maybeSingle(),
-    sb
-      .from("ops_stock_items")
-      .select("sku, qty")
-      .eq("status", "reserved")
-      .eq("reserved_ref", soRef),
-  ]);
-  for (const r of [linesRes, addonsRes, controlRes, reservedRes]) {
-    if (r.error) {
-      const m = mapPgError(r.error);
-      return { ok: false, body: m.body, status: m.status };
-    }
-  }
-
-  const lines = (linesRes.data ?? []) as {
-    sku: string;
-    qty: number;
-    unit_price: number | null;
-  }[];
-  const sum = (rows: { qty: number; unit_price: number | null }[]) =>
-    rows.reduce((s, r) => s + Number(r.unit_price ?? 0) * Number(r.qty ?? 0), 0);
-  // C9 — the storage fee is part of the ONE money number, through the one rule
-  // the ladder and the dispatch gate also ask. A manager's release lifts the
-  // HOLD and leaves the fee owed, which is why the gate reads `holding`.
-  const ctrl = (controlRes.data ?? null) as Record<string, unknown> | null;
-  const hold = storageHold({
-    storageFrom: (ctrl?.storage_from as string | null) ?? null,
-    override: (ctrl?.storage_fee_override as number | string | null) ?? null,
-    importedMsbf: (ctrl?.storage_fee_msbf as number | string | null) ?? null,
-    importedSof: (ctrl?.storage_fee_sof as number | string | null) ?? null,
-    skus: lines.map((l) => l.sku),
-    asOf: new Date().toISOString().slice(0, 10),
-    collectedAt: (ctrl?.storage_collected_at as string | null) ?? null,
-    waiverStatus: (ctrl?.storage_waiver_status as string | null) ?? null,
-  });
-  const money = {
-    lineSum: sum(lines),
-    addonSum: sum(
-      (addonsRes.data ?? []) as { qty: number; unit_price: number | null }[],
-    ),
-    paid: (order as { paid?: number | string | null }).paid ?? 0,
-    controlBalance: (ctrl?.balance as number | string | null) ?? null,
-    storageOwing: hold.owing,
-    storageReleased: hold.released,
-  };
-  const reservedQtyByKey: Record<string, number> = {};
-  for (const u of (reservedRes.data ?? []) as { sku: string; qty: number | null }[]) {
-    const k = stockMatchKey(u.sku);
-    reservedQtyByKey[k] = (reservedQtyByKey[k] ?? 0) + Number(u.qty ?? 1);
-  }
-
-  const gate = bookingConfirmGate({
-    lines: lines.map((l) => ({ sku: l.sku, qty: Number(l.qty || 0) })),
-    lineReceived: (ctrl?.line_received as Record<string, number> | null) ?? null,
-    reservedQtyByKey,
-    money,
-    deliverGroups,
-  });
-  return { ok: true, ctx: { order, control: ctrl, lines, gate } };
-}
 
 /**
  * The goods + money sentences, phrased as WARNINGS.
  *
  * C7 moved the hard refusal onto issuing (`docs/ORDERS-WORKING-FLOW.md` §5), so
- * these no longer stop a confirmation — they tell the operator what the
- * delivery order will refuse if nobody clears it. Same facts, same figures, one
- * step later.
+ * these no longer stop a confirmation. Decision A (owner ruling 2026-08-16)
+ * then took money out of that refusal too — so the money sentence may WARN
+ * that collection is open, but it may no longer claim the delivery order will
+ * refuse: it will not. §8's surviving rule — agreeing a date WARNS about
+ * money — is exactly this line.
  */
 function bookingGateWarnings(gate: BookingGateResult): string[] {
   const out: string[] = [];
@@ -230,10 +105,10 @@ function bookingGateWarnings(gate: BookingGateResult): string[] {
     const goods = gate.holding - gate.storageOwing;
     out.push(
       goods > 0 && gate.storageOwing > 0
-        ? `RM ${goods.toFixed(2)} outstanding and RM ${gate.storageOwing.toFixed(2)} of storage fee not collected — the delivery order cannot be issued until both are collected.`
+        ? `RM ${goods.toFixed(2)} outstanding and RM ${gate.storageOwing.toFixed(2)} of storage fee not collected — collection is still open.`
         : gate.storageOwing > 0
-          ? `Storage fee of RM ${gate.storageOwing.toFixed(2)} not collected — collect it, or a manager releases the delivery.`
-          : `RM ${gate.holding.toFixed(2)} outstanding — the delivery order cannot be issued until it is collected.`,
+          ? `Storage fee of RM ${gate.storageOwing.toFixed(2)} not collected — collection is still open.`
+          : `RM ${gate.holding.toFixed(2)} outstanding — collection is still open.`,
     );
   }
   return out;
@@ -558,12 +433,96 @@ orderControlRouter.post("/:id/booking/confirm", async (c) => {
     partnerWarnings = [];
   }
 
+  // ⭐ BLUEPRINT CARD §6 — A REBOOKED TRIP IS A NEW DOCUMENT. If the order
+  // already carries a document and the booking just recorded no longer matches
+  // it (a new date, a new slot, or a delivered first trip making way for the
+  // second), the old document steps aside so the system can issue the new one:
+  //   · a document with NO run yet is VOIDED (rescheduled) — reason, actor and
+  //     time on the record, through the ONE void door;
+  //   · a document whose run FAILED keeps its Delivery exception FOREVER — it
+  //     is never voided and never rewritten; it simply stops being the active
+  //     number;
+  //   · a DELIVERED document is history and is left untouched.
+  // In every case the mirror column empties so the idempotent mint can write
+  // the new number. FAIL-SOFT: a supersede hiccup never undoes the booking.
+  try {
+    const { data: activeOrder } = await sb
+      .from("orders")
+      .select("id, do_number")
+      .eq("id", idCheck.data)
+      .maybeSingle();
+    const activeNumber = (activeOrder?.do_number as string | null) ?? null;
+    if (activeNumber) {
+      const { data: doc } = await sb
+        .from("ops_delivery_orders")
+        .select("id, do_number, delivery_date, time_slot, voided_at")
+        .eq("do_number", activeNumber)
+        .maybeSingle();
+      const sameBooking =
+        doc &&
+        (doc.delivery_date as string | null) === confirmedDate &&
+        ((doc.time_slot as string | null) ?? null) ===
+          (confirmedTimeSlot ?? null);
+      if (doc && !doc.voided_at && !sameBooking) {
+        const { data: runs } = await sb
+          .from("delivery_attempts")
+          .select("result")
+          .eq("do_number", activeNumber);
+        const hasRun = (runs ?? []).length > 0;
+        if (!hasRun) {
+          // Un-run document: the trip it authorised no longer exists.
+          await sb.rpc("delivery_order_void", {
+            p_do_id: doc.id,
+            p_reason: "rescheduled",
+          });
+        }
+        const delivered = (runs ?? []).some(
+          (r: { result: string }) => r.result === "delivered",
+        );
+        if (!delivered || hasRun) {
+          // Clear the mirror so the mint below can write the new number.
+          // (A delivered doc also clears when a NEW booking differs — that is
+          // the split second trip asking for its own paper.)
+          await sb
+            .from("orders")
+            .update({ do_number: null })
+            .eq("id", idCheck.data)
+            .eq("do_number", activeNumber);
+        }
+      }
+    }
+  } catch {
+    // Not superseded — the old number stands and no new document mints; the
+    // booking itself is already recorded.
+  }
+
+  // SLICE 2 — the system issues the delivery order itself the moment the last
+  // requirement lands, and for most orders that moment is THIS confirmation
+  // (goods reserve early, Finance exceptions are rare). FAIL-SOFT, the same
+  // rule as the annotation and partner-check writes above: an issuance hiccup
+  // must never undo or refuse the booking the operator just recorded — the
+  // facts persist, and the next door (or the manual backstop) issues it.
+  let deliveryOrder: { do_number: string | null; issued: boolean } | null = null;
+  try {
+    const attempt = await attemptDeliveryOrderIssue(sb, idCheck.data);
+    if (attempt.outcome === "issued" || attempt.outcome === "already") {
+      deliveryOrder = {
+        do_number: attempt.doNumber,
+        issued: attempt.outcome === "issued",
+      };
+    }
+  } catch {
+    // Not issued yet — the gate facts persist and the next door tries again.
+  }
+
   // C7 — the goods/money sentences ride the SUCCESS response now. They are the
   // same figures the old 422 carried; what changed is that they no longer cost
   // the customer their confirmed date. `gateWarnings` is a new key, so an older
   // browser simply does not read it (the same degradation rule as
-  // `partnerWarnings`).
-  return c.json({ control: data, partnerWarnings, gateWarnings });
+  // `partnerWarnings`). `deliveryOrder` (Slice 2) degrades the same way: set
+  // only when the confirmation completed the gate and the system issued (or
+  // found) the document.
+  return c.json({ control: data, partnerWarnings, gateWarnings, deliveryOrder });
 });
 
 /**
@@ -816,89 +775,84 @@ orderControlRouter.post("/:id/delivery-order", async (c) => {
   const idCheck = ORDER_ID.safeParse(c.req.param("id"));
   if (!idCheck.success) throw new HTTPException(404, { message: "Order not found" });
 
+  // SLICE 2 — the door is a BACKSTOP, not the trigger: the system issues the
+  // document itself the moment the last requirement lands (booking confirm ·
+  // stock reserve · finance clear). This POST remains for the rare order whose
+  // last fact flipped through a path with no hook, and for a client asking for
+  // the number it already knows exists. Same gate, same mint, same idempotence
+  // — `attemptDeliveryOrderIssue` is the ONE issuing path.
   const sb = userClient(c.env, auth.jwt);
-  // The trip's scope is the one ALREADY booked (`booking_groups`), never a
-  // caller's opinion: this route issues the paper for the trip the customer
-  // confirmed, and it does not get to decide what that trip carries.
-  const first = await loadBookingContext(sb, idCheck.data, null);
-  if (!first.ok) return c.json(first.body, first.status);
-  const bookedScope =
-    (first.ctx.control?.booking_groups as DeliveryGroupKey[] | null) ?? null;
-  const loaded = bookedScope
-    ? await loadBookingContext(sb, idCheck.data, bookedScope)
-    : first;
-  if (!loaded.ok) return c.json(loaded.body, loaded.status);
-  const { order, control, gate } = loaded.ctx;
-
-  // Already issued → hand back the same number. Not an error: the operator
-  // pressing twice wants the document, and a second number would be a second
-  // document for one trip.
-  if (order.do_number) {
-    return c.json({ order: { id: order.id, do_number: order.do_number }, issued: false });
+  const attempt = await attemptDeliveryOrderIssue(sb, idCheck.data);
+  switch (attempt.outcome) {
+    case "issued":
+      return c.json({
+        order: { id: idCheck.data, do_number: attempt.doNumber },
+        issued: true,
+      });
+    case "already":
+      return c.json({
+        order: { id: idCheck.data, do_number: attempt.doNumber },
+        issued: false,
+      });
+    case "blocked":
+      return c.json(
+        {
+          error: "delivery_order_gate",
+          code: "delivery_order_gate",
+          message: `Cannot issue the delivery order: ${attempt.reasons.join(" ")}`,
+        },
+        422,
+      );
+    case "error":
+      return c.json(attempt.body, attempt.status);
   }
+});
 
-  const issue = deliveryOrderIssueGate({
-    bookingConfirmed: (control?.booking_stage as string | null) === "confirmed",
-    confirmedDateIso: (control?.confirmed_date as string | null) ?? null,
-    confirmedTimeSlot: (control?.confirmed_time_slot as string | null) ?? null,
-    gate,
-    holidays: myHolidaySet(),
+/**
+ * POST /:id/delivery-order/request — the `Request Delivery Order` door
+ * (owner ruling 2026-08-19, card §5). Outstation trips need the document
+ * BEFORE a customer-confirmed booking exists, because the partner schedules
+ * the customer. The door walks the SAME single issuing path with the SAME
+ * gates — goods Ready/Reserved, the money gate (0362) and no OPEN Finance
+ * exception — merely without waiting for the booking-confirm trigger. It is
+ * never a free-form create: no editable customer, goods, price or number, and
+ * a refusal names the failing gate.
+ */
+orderControlRouter.post("/:id/delivery-order/request", async (c) => {
+  const auth = c.var.auth;
+  requireOperationOrPrincipal(auth.role);
+
+  const idCheck = ORDER_ID.safeParse(c.req.param("id"));
+  if (!idCheck.success) throw new HTTPException(404, { message: "Order not found" });
+
+  const sb = userClient(c.env, auth.jwt);
+  const attempt = await attemptDeliveryOrderIssue(sb, idCheck.data, {
+    waitBookingConfirm: false,
   });
-  if (!issue.ok) {
-    return c.json(
-      {
-        error: "delivery_order_gate",
-        code: "delivery_order_gate",
-        message: `Cannot issue the delivery order: ${issue.reasons.join(" ")}`,
-      },
-      422,
-    );
+  switch (attempt.outcome) {
+    case "issued":
+      return c.json({
+        order: { id: idCheck.data, do_number: attempt.doNumber },
+        issued: true,
+      });
+    case "already":
+      return c.json({
+        order: { id: idCheck.data, do_number: attempt.doNumber },
+        issued: false,
+      });
+    case "blocked":
+      return c.json(
+        {
+          error: "delivery_order_gate",
+          code: "delivery_order_gate",
+          message: `Cannot issue the delivery order: ${attempt.reasons.join(" ")}`,
+          reasons: attempt.reasons,
+        },
+        422,
+      );
+    case "error":
+      return c.json(attempt.body, attempt.status);
   }
-
-  // The document date is TODAY — the day it is issued and handed over, which is
-  // what the locked scheme's DDMMYY segment means.
-  const doNumber = docNumber({
-    prefix: "DO",
-    date: todayIsoMYT(),
-    seed: order.id,
-    digits: 4,
-  });
-  // `is("do_number", null)` makes the mint idempotent at the DATABASE, not just
-  // in the read above: two operators pressing at the same moment cannot produce
-  // two numbers, and the loser re-reads the winner's.
-  const { data: updated, error } = await sb
-    .from("orders")
-    .update({ do_number: doNumber })
-    .eq("id", idCheck.data)
-    .is("do_number", null)
-    .select("id, do_number")
-    .maybeSingle();
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
-  if (!updated) {
-    const { data: raced } = await sb
-      .from("orders")
-      .select("id, do_number")
-      .eq("id", idCheck.data)
-      .maybeSingle();
-    return c.json({ order: raced ?? { id: idCheck.data, do_number: null }, issued: false });
-  }
-
-  // The audit line. FAIL-SOFT, the same door and the same rule as T4/T6/T8: an
-  // annotation hiccup must never undo a document that has been issued.
-  try {
-    await sb.rpc("operation_add_annotation", {
-      p_order_id: idCheck.data,
-      p_content: `${orderActionDone("issue_delivery_order")} — ${doNumber}`,
-      p_tag: null,
-    });
-  } catch {
-    // Recorded nowhere else is better than refusing a document that exists.
-  }
-
-  return c.json({ order: updated, issued: true });
 });
 
 // ── T9 · logistic partner rules (migration 0283) ────────────────────────────
@@ -914,13 +868,6 @@ orderControlRouter.post("/:id/delivery-order", async (c) => {
 //
 // The warning text is composed by the SHARED engine, so the pre-check below and
 // the confirm response say the same sentence (no second wording).
-
-/** Today in MYT. The Worker's clock is UTC; between 16:00 and midnight UTC that
- *  is already tomorrow in Klang, and "you cannot book a date in the past" must
- *  not fire a day early (or late) because of it. */
-function todayIsoMYT(): string {
-  return new Date(Date.now() + 8 * 3_600_000).toISOString().slice(0, 10);
-}
 
 interface PartnerCheck {
   partner: { id: string; name: string } | null;

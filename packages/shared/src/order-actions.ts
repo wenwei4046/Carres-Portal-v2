@@ -156,13 +156,19 @@ export interface OrderActionSignals {
    * future delay on the order forever.
    */
   delayDecisionEtaIso?: string | null;
-  /** C9 — money still HOLDS the delivery (`orderMoney.holds`). Normally the
-   *  same answer as `moneyOwing`; they part company on one order, and that
-   *  order is the whole point of the card: a manager has released a delivery
-   *  over an uncollected storage fee, so the 🔒 comes off while the collection
-   *  stays on the worklist. Omit it and the lock reads `moneyOwing`, which is
-   *  exactly the pre-C9 behaviour. */
-  moneyHolds?: boolean;
+  /**
+   * ⭐ Decision A (owner ruling 2026-08-16, `docs/orders/MASTER.md` §8) — an
+   * OPEN Finance exception is the ONLY thing money can do to a delivery.
+   * `financeExceptionHolds(exceptions)` over `order_finance_exceptions`
+   * (0355) is the ONE predicate; this signal carries its answer, and the
+   * caller never derives it from a balance — `moneyOwing` above still raises
+   * the collect ACTION, but it no longer locks anything.
+   *
+   * Omitted = false: a surface that has not read the table shows no lock,
+   * which is the honest default — the server-side gate reads the table itself
+   * and remains the enforcement either way.
+   */
+  financeExceptionHolds?: boolean;
 }
 
 function action(
@@ -253,32 +259,28 @@ function newDateArranged(s: OrderActionSignals): boolean {
 }
 
 /**
- * C3 — the money LOCK, as ONE predicate both tracks ask.
+ * C3's lock, re-keyed by decision A (owner ruling 2026-08-16) — the delivery
+ * is held by an OPEN FINANCE EXCEPTION, never by the balance.
  *
- * Everything for the trip is arranged and the customer still owes: the delivery
- * may not be made. Before C3 this was a `Confirm delivery` action carrying a 🔒;
- * that action is retired (see `deliveryAction`), so the lock moves onto the
- * thing that actually has to happen — collecting the money. The two tracks read
- * ONE predicate so the delivery track can never fall silent while the money
- * track forgets to say why.
+ * Everything for the trip is arranged and Finance has said stop: the delivery
+ * may not be made. The predicate is `financeExceptionHolds` — the same one the
+ * issue gate and the route canvas ask (`finance-exception.ts`), so the three
+ * surfaces can never disagree about an order (Law D).
  *
- * Reading a delivery signal here does not break Law 1: independence is about
- * OUTPUTS. The lock REMOVES no action from the list — `collect` is open either
- * way, and it is a gate, which Law 4 keeps ("Money still LOCKS").
- *
- * C9 lives inside this one question: it asks whether money still HOLDS, not
- * whether it is owed. A manager may have released this delivery over an
- * uncollected storage fee, and a released delivery is one you ARE allowed to
- * make — so the goods go, the 🔒 comes off, and the collection stays on the
- * worklist as an ordinary open action.
+ * What C3 got right survives whole: ONE predicate, both tracks; the lock
+ * REMOVES no action from the list — `collect` is open whenever money is owed,
+ * lock or no lock, and it survives delivery. What decision A retires is the
+ * KEY: `moneyHolds ?? moneyOwing` asked whether the customer still owed,
+ * and a balance — of any size, of any age — no longer stops a truck. Only
+ * Finance's explicit, evidenced decision does, and only Finance clears it.
  */
-function deliveryHeldOnMoney(s: OrderActionSignals): boolean {
+function deliveryHeldOnFinanceException(s: OrderActionSignals): boolean {
   return (
     !s.completed &&
     s.goodsReady &&
     s.hasLogistics &&
     s.bookingConfirmed &&
-    (s.moneyHolds ?? s.moneyOwing)
+    (s.financeExceptionHolds ?? false)
   );
 }
 
@@ -291,23 +293,24 @@ function deliveryHeldOnMoney(s: OrderActionSignals): boolean {
  * fact instead of a verb nobody can close, and the drawer's list is one row
  * shorter.
  *
- * It is deliberately FALSE while the money HOLDS the delivery: printing
+ * It is deliberately FALSE while FINANCE HOLDS the delivery: printing
  * "Delivering 27 Jul" over an order the server will refuse to send would be the
  * screen telling a lie. In that case the money track carries the row, locked.
- * C9's released order is not that case — the goods go on the day — but it still
- * has an open `collect`, so the row shows that action and never reaches here.
+ * A plain outstanding balance is NOT that case any more (decision A) — the
+ * goods go on the day, the fact prints, and the open `collect` rides beside it
+ * on the money track.
  */
 export function orderIsDelivering(s: OrderActionSignals): boolean {
   if (s.completed || !s.goodsReady || !s.hasLogistics || !s.bookingConfirmed)
     return false;
-  if (s.moneyHolds ?? s.moneyOwing) return false;
-  // C7 — everything is arranged EXCEPT the paper the logistics company asks for
-  // the evening before. That is a real act by a real human, so it is an action
-  // and this is not the quiet fact yet. UNKNOWN (null) stays the fact: absent
-  // signal, absent claim. The date condition mirrors the action's own trigger
-  // exactly — refusing the fact where no action is raised would leave the row
-  // printing `Done` on an order that is nothing of the sort.
-  if (s.deliveryOrderIssued === false && s.confirmedDateIso) return false;
+  if (s.financeExceptionHolds ?? false) return false;
+  // C7 withheld the fact while the paper was a human's pending act. SLICE 2
+  // removed the act itself — the SYSTEM issues the document at the door that
+  // completes the gate — so an all-arranged order with the number still
+  // landing is the transient it always was, and `Delivering` is the truth
+  // again (C3's original rule). A Finance hold still refuses the fact above;
+  // a goods gap raises its own goods action; and a calendar-refused date is
+  // named by the route canvas's gate, which owns that narration.
   // A confirmed date that is today or past is not "still ahead" — those are
   // `Deliver today` and the broken-run escalation, both real actions.
   return !(s.confirmedDateIso && s.confirmedDateIso <= s.todayIso);
@@ -348,14 +351,12 @@ function deliveryAction(s: OrderActionSignals): OrderOpenAction | null {
   if (!s.bookingConfirmed)
     return action("confirm_delivery_date", "delivery", "info");
 
-  // Booked and HELD on money — the PayHold law (T7): you do not arrange, and
-  // you do not run, a delivery you are not allowed to make. The delivery track
-  // therefore says nothing at all, exactly as it did when this was a locked
-  // `Confirm delivery` sitting in front of the date split; the money track
-  // carries the row and carries the 🔒 (`deliveryHeldOnMoney`). C9's release is
-  // honoured inside that predicate: a released delivery is one you ARE allowed
-  // to make, so the track carries on to the date split below.
-  if (deliveryHeldOnMoney(s)) return null;
+  // Booked and HELD by Finance — the same shape as the old PayHold law (T7):
+  // you do not arrange, and you do not run, a delivery you are not allowed to
+  // make. The delivery track says nothing at all while the hold stands; the
+  // money track carries the row and carries the 🔒. What changed is WHO can
+  // hold it (decision A): an OPEN Finance exception, never the balance.
+  if (deliveryHeldOnFinanceException(s)) return null;
 
   // T7: a confirmed booking is not one resting state — its own date splits it.
   if (s.confirmedDateIso) {
@@ -368,22 +369,19 @@ function deliveryAction(s: OrderActionSignals): OrderOpenAction | null {
       return action("deliver_today", "delivery", "info");
   }
 
-  // C7 — the delivery order. Its trigger is `docs/ORDERS-WORKING-FLOW.md` §3's
-  // four conditions, and every one of them is already TRUE by the time control
-  // reaches this line, which is why the test below reads so short:
-  //   · a customer-confirmed date AND slot — 0277's CHECK makes the slot ride
-  //     the date, and `bookingConfirmed` was required above;
-  //   · core goods ready — the one condition the delivery track does NOT
-  //     require of its earlier rungs (you assign a company for goods still in
-  //     production), so it is asked here explicitly;
-  //   · the payment condition passed — `deliveryHeldOnMoney` returned above on
-  //     a held order, and it holds exactly when the goods are ready, so
-  //     reaching here WITH `goodsReady` means money does not hold.
-  // Ranked in Law 4's rung 4 behind the call that produces the date, and it
-  // deliberately sits AFTER the date split: on the day itself `Deliver today`
-  // is rung 1 and must lead, and the delivery act carries the document anyway.
-  if (s.goodsReady && s.deliveryOrderIssued === false && s.confirmedDateIso)
-    return action("issue_delivery_order", "delivery", "info");
+  // C7 → SLICE 2 — the delivery order is NO LONGER A PERSON'S ACTION. The
+  // owner ruling (`docs/orders/MASTER.md` §8) is that the SYSTEM issues the
+  // document the moment every requirement is met — no Release button, no
+  // Approve button, no manual bypass in any state — and the server does
+  // exactly that at the door that completes the gate (booking confirm ·
+  // stock reserve · finance clear). An order that reaches this line with the
+  // paper still missing is either mid-issuance (transient) or gate-refused
+  // for a reason another surface already names (goods raise their own goods
+  // action; a Finance hold locks the money track; a calendar-refused date is
+  // narrated by the route canvas's gate) — raising a button here would put a
+  // press back on a step nobody performs. The row prints C3's quiet
+  // `Delivering` fact instead, exactly as it did before the paper was a
+  // human's act.
 
   // Everything arranged for a future day: NOT an action (C3, Jess 2026-07-27).
   // There is nothing for a human to do until the day, so the row prints the
@@ -399,8 +397,10 @@ function deliveryAction(s: OrderActionSignals): OrderOpenAction | null {
  */
 function moneyAction(s: OrderActionSignals): OrderOpenAction | null {
   if (!s.moneyOwing) return null;
-  // C3 — the 🔒 the ladder has always shown, now on the action that clears it.
-  return deliveryHeldOnMoney(s)
+  // The 🔒 now means Finance said stop (decision A) — a plain balance shows an
+  // open collect with no lock, because collecting no longer stands between the
+  // goods and the truck.
+  return deliveryHeldOnFinanceException(s)
     ? action("collect", "money", "warning", { locked: true })
     : action("collect", "money", "warning");
 }
@@ -458,6 +458,13 @@ const DISPLAY_RANK: Record<OrderActionKey, number> = {
   // 5 · money — last on purpose, and it is not a demotion: 催钱前先看货. It is
   // always in this list and always in the Owing filter.
   collect: 50,
+  // The blueprint card's two composed WORK items (2026-08-16). The ladder
+  // itself never raises them (one action per track is its law); the Work feed
+  // composes them from module facts. Ranked for map totality and for any
+  // surface that sorts a mixed list: the blocker precedes the collect it
+  // blocks, and the loan collection is the run's own remaining act.
+  collect_loan_item: 12,
+  resolve_payment_exception: 49,
   // FACTS, never raised as actions; ranked only so the map stays total.
   done: 90,
   delivering: 91,

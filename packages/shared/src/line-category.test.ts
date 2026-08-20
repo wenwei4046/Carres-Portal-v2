@@ -4,6 +4,7 @@ import {
   accessoryType,
   lineCategory,
   lineClass,
+  resolvedCategory,
   lineKind,
   lineSortRank,
 } from "./line-category";
@@ -139,7 +140,7 @@ describe("lineKind — the safety answer", () => {
 describe("accShort", () => {
   it("speaks the recognised type, and falls back to the first word otherwise", () => {
     expect(accShort("Memory Foam Pillow")).toBe("Pillow");
-    expect(accShort("Mattress Protector-Q")).toBe("M.P");
+    expect(accShort("Mattress Protector-Q")).toBe("Mattress protector");
     expect(accShort("Carress Footrest-K")).toBe("Footrest");
     expect(accShort("Microfiber Cloth")).toBe("Microfiber");
   });
@@ -155,7 +156,7 @@ describe("lineSortRank", () => {
     );
   });
 
-  it("keeps the frozen order mattress → bedframe → sofa → pillow → M.P → service", () => {
+  it("keeps the frozen order mattress → bedframe → sofa → pillow → protector → service", () => {
     const ranks = [
       "mattress:FirmCare-K",
       "bedframe:Hilton",
@@ -221,5 +222,77 @@ describe("lineReadiness — the claim D9 removed", () => {
     const counts = readinessCounts(lines);
     expect(counts.ready).toBe(0);
     expect(counts.unknown).toBe(5);
+  });
+});
+
+/**
+ * D9's SALES ORDER HALF (2026-08-20) — `resolvedCategory`.
+ *
+ * `56239a3c` closed STOCK's half: /inventory reads the CATALOG instead of the
+ * SKU text. The drawer's loan flow was the other half, and it was not a
+ * cosmetic guess — `LoanPanel` FILTERS the free-unit list with the answer, so
+ * a real sofa the keyword list missed could not be offered as a loaner.
+ *
+ * The SKUs below are the same production strings the block above uses. They are
+ * the proof that this is not hypothetical: every one of them is a sofa module
+ * that `lineClass` reads as `unknown`.
+ */
+describe("resolvedCategory — the catalog first, the parser only where it is silent", () => {
+  const MISSED = MISREAD_SOFA_MODULES[0]; // "5539-1A(LHF)" — a real sofa module
+
+  it("the headline: a sofa the keyword list cannot see is a sofa when the catalog says so", () => {
+    // What the parser thinks, unchanged and still wrong:
+    expect(lineClass(MISSED)).toBe("unknown");
+    expect(lineCategory(MISSED)).toBe("acc");
+    // What the catalog says, and what now decides:
+    expect(resolvedCategory(MISSED, "sofa")).toBe("sofa");
+  });
+
+  it("EVERY production misread resolves correctly once the catalog holds the row", () => {
+    for (const sku of MISREAD_SOFA_MODULES) {
+      expect(lineCategory(sku)).toBe("acc"); // the defect, still there in the parser
+      expect(resolvedCategory(sku, "sofa")).toBe("sofa"); // and routed around
+    }
+  });
+
+  it("the catalog OUTRANKS the keyword list, it does not merely fill gaps", () => {
+    // "Microfiber Waterproof Mattress Protector-K" is the string the prefix rule
+    // mis-read; the parser gets it right by a narrow accessory word. If the
+    // catalog ever disagrees, the CATALOG wins — that is what one owner means.
+    expect(lineCategory("hk55-3seater")).toBe("sofa");
+    expect(resolvedCategory("hk55-3seater", "mattress")).toBe("mattress");
+  });
+
+  it("ABSENT means nobody asked — the parser answers, exactly as before", () => {
+    // Version skew: a browser on this build talking to a Worker that does not
+    // send the field. Not "no category" — no question.
+    expect(resolvedCategory("hk55-3seater")).toBe("sofa");
+    expect(resolvedCategory(MISSED)).toBe("acc");
+  });
+
+  it("null means asked-and-silent, and TODAY that still falls to the parser", () => {
+    // Deliberate and measured, not an oversight: 975 live units do not join the
+    // catalog (2026-08-19). Treating null as "not this category" would drop
+    // nearly the whole warehouse out of the loan picker in one commit.
+    //
+    // ⚠️ THIS TEST IS THE EXIT CONDITION. When the catalog is populated, this
+    // expectation is what changes — flip it to "unknown/acc" and delete the
+    // null branch. A green suite must not be able to hide that decision.
+    expect(resolvedCategory("hk55-3seater", null)).toBe("sofa");
+    expect(resolvedCategory(MISSED, null)).toBe("acc");
+  });
+
+  it("a catalog word with no core meaning can never substitute for a sofa", () => {
+    // Settings can add category words this codebase has never heard of. An
+    // unknown word reads as `acc` — a loaner must not be able to arrive because
+    // nobody taught the frontend a new noun.
+    expect(resolvedCategory(MISSED, "accessory")).toBe("acc");
+    expect(resolvedCategory(MISSED, "service")).toBe("acc");
+    expect(resolvedCategory(MISSED, "")).toBe("acc");
+  });
+
+  it("catalog values are compared case- and whitespace-insensitively", () => {
+    expect(resolvedCategory(MISSED, "Sofa")).toBe("sofa");
+    expect(resolvedCategory(MISSED, "  BEDFRAME ")).toBe("bedframe");
   });
 });

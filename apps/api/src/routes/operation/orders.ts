@@ -6,6 +6,9 @@ import {
   abandonOrderInput,
   assignPartnerInput,
   attachDoInput,
+  codInstruction,
+  paymentApprovalOpensGate,
+  type DeliveryPaymentApproval,
   confirmProceedRequestInputSchema,
   ListOperationOrdersQuery,
   recheckStockInput,
@@ -26,10 +29,13 @@ import {
 } from "@carres/shared";
 // renderDoPdf moved to apps/web/src/lib/pdf/render.ts (Workers WASM ban).
 import type { DoTemplateData } from "../../lib/pdf/types";
+import { loadBookingContext } from "../../lib/booking-context";
 import { requireOperation, requireOperationOrPrincipal } from "../../lib/auth-guards";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { storageBlock } from "../../lib/storage-gate";
 import { userClient } from "../../lib/supabase";
+
+import { skuCategories } from "../../lib/sku-categories";
 import type { AppEnv } from "../../types";
 
 /**
@@ -232,7 +238,7 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
       // `invoiced_at`, `payment_method` and `installment_months`. Nothing here
       // is another module's record, nothing is computed. Purely additive: the
       // old control table selects none of these and is unaffected.
-      "id, so, status, operation_stage, warehouse_id, customer_name, customer_phone, customer_address, customer_email, customer_billing, customer_emergency, customer_address_line1, customer_address_line2, customer_address_city, customer_address_state, customer_address_postcode, building_type:entry_data->fields->>building_type, delivery_floor, delivery_has_lift, channel, placed_at, delivery_date, delivery_date_tbd, proceed_date, source_system, source_ref, ops_assigned_logistic, delivery_partner_id, request_for_delivery_at, partner_accepted_at, partner_rejected_at, partner_rejected_reason, do_number, invoice_no, invoiced_at, payment_method, installment_months, dispatched_at, delivered_at, outlet_id, salesperson_id, dealer_id, paid, dealers(name), outlets(name), salespersons(name), delivery_partners!orders_delivery_partner_id_fkey(id, name), order_lines(id, sku, qty, unit_price, attrs, source_po), order_addons(addon_key, qty, unit_price), order_supplier_threads(id, supplier_id, category, operation_stage, po_id, delivery_partner_id, delivery_partners(id, name), confirm_delivery_date, request_for_delivery_at, partner_accepted_at, partner_rejected_at), order_annotations(content, tag, created_at), ops_order_control(customer_request, action_for_logistic, carres_remark, warehouse_remark, logistic_eta, balance, payment_status, storage_from, storage_fee_override, storage_fee_msbf, storage_fee_sof, storage_paid, storage_collected_at, storage_waiver_status, called_customer, line_etas, line_stock_status, assigned_staff, booking_stage, confirmed_date, confirmed_time_slot, delivery_photos, booking_groups, delay_decision, delay_decision_eta, delay_decision_at, delay_detected_at, delay_detected_eta)",
+      "id, so, status, operation_stage, warehouse_id, customer_name, customer_phone, customer_address, customer_email, customer_billing, customer_emergency, customer_address_line1, customer_address_line2, customer_address_city, customer_address_state, customer_address_postcode, building_type:entry_data->fields->>building_type, delivery_floor, delivery_has_lift, channel, placed_at, delivery_date, delivery_date_tbd, proceed_date, source_system, source_ref, ops_assigned_logistic, delivery_partner_id, request_for_delivery_at, partner_accepted_at, partner_rejected_at, partner_rejected_reason, do_number, invoice_no, invoiced_at, payment_method, installment_months, dispatched_at, delivered_at, outlet_id, salesperson_id, dealer_id, paid, dealers(name), outlets(name), salespersons(name), delivery_partners!orders_delivery_partner_id_fkey(id, name), order_lines(id, sku, qty, unit_price, attrs, source_po), order_addons(addon_key, qty, unit_price), order_supplier_threads(id, supplier_id, category, operation_stage, po_id, delivery_partner_id, delivery_partners(id, name), confirm_delivery_date, request_for_delivery_at, partner_accepted_at, partner_rejected_at, purchase_orders(placed_at)), order_finance_exceptions(status), ops_sofa_loans(status), order_annotations(content, tag, created_at), ops_order_control(customer_request, action_for_logistic, carres_remark, warehouse_remark, logistic_eta, balance, payment_status, storage_from, storage_fee_override, storage_fee_msbf, storage_fee_sof, storage_paid, storage_collected_at, storage_waiver_status, called_customer, line_etas, line_stock_status, assigned_staff, booking_stage, confirmed_date, confirmed_time_slot, delivery_photos, booking_groups, delay_decision, delay_decision_eta, delay_decision_at, delay_detected_at, delay_detected_eta)",
     )
     // Pipeline v2 (C3): include `status='place'` rows so the FE kanban can
     // render the "Placed" column. proceed_order + delivered preserved as
@@ -419,7 +425,11 @@ operationOrdersRouter.get("/:id", requireOperation, async (c) => {
       // THIS payload; every whitelisted field must ride the wire or a Save
       // would silently null what it never saw: customer_email, the five
       // structured address parts (0230), delivery_floor, delivery_has_lift.
-      "id, so, source_ref, source_system, status, operation_stage, warehouse_id, customer_name, customer_phone, customer_email, customer_address, customer_address_unknown, customer_address_line1, customer_address_line2, customer_address_city, customer_address_state, customer_address_postcode, customer_emergency, customer_billing, customer_billing_same, entry_data, delivery_date, delivery_date_tbd, proceed_date, delivery_floor, delivery_has_lift, placed_at, do_number, do_note, dispatched_at, delivered_at, delivery_partner_id, ops_assigned_logistic, delivery_stops, dealer_id, outlet_id, invoice_no, invoiced_at, paid, salesperson_id, dealers(name), outlets(name), salespersons(name)",
+      // 2026-08-15 (OBJECT PAGE V2) — the object page's form IS the Sales
+      // Portal's form, so every question the portal asks must ride this wire
+      // or the field would render blank and a Save would null it: the 0200
+      // demographics and the 0104 stair-carry count.
+      "id, so, source_ref, source_system, status, operation_stage, warehouse_id, customer_name, customer_phone, customer_email, customer_address, customer_address_unknown, customer_address_line1, customer_address_line2, customer_address_city, customer_address_state, customer_address_postcode, customer_emergency, customer_billing, customer_billing_same, customer_race, customer_gender, customer_birthday, entry_data, delivery_date, delivery_date_tbd, proceed_date, delivery_floor, delivery_has_lift, delivery_stair_items, placed_at, do_number, do_note, dispatched_at, delivered_at, delivery_partner_id, ops_assigned_logistic, delivery_stops, dealer_id, outlet_id, invoice_no, invoiced_at, paid, salesperson_id, dealers(name), outlets(name), salespersons(name)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -436,7 +446,7 @@ operationOrdersRouter.get("/:id", requireOperation, async (c) => {
   // `confirm_delivery_date`, `request_for_delivery_at`, `partner_accepted_at`,
   // `partner_rejected_at`) that previously lived on the PO. Drawer reads
   // `threads[].delivery_partner_id` for the partner-assignment hint.
-  const [linesRes, addonsRes, historyRes, threadsRes] = await Promise.all([
+  const [linesRes, addonsRes, historyRes, threadsRes, controlRes] = await Promise.all([
     // 2026-05-10 (Loo) — also pull `attrs` so the OrderDetailDrawer's
     // "+ Issue POs" navigate-to-procurement flow can carry color/gap/fabric
     // into CreatePOModal's cascade picker without a second round-trip.
@@ -451,6 +461,15 @@ operationOrdersRouter.get("/:id", requireOperation, async (c) => {
         "id, supplier_id, category, operation_stage, po_id, delivery_partner_id, confirm_delivery_date, request_for_delivery_at, partner_accepted_at, partner_rejected_at",
       )
       .eq("order_id", id),
+    // 2026-08-16 (ORDER ROUTE NODE MAP) — the delivery-photo ledger (0280).
+    // Read-only and kept OFF the `order` object on purpose: the workspace EDIT
+    // form seeds its draft from `order`, and an overlay column riding that
+    // payload is a field a Save could try to write.
+    sb
+      .from("ops_order_control")
+      .select("delivery_photos")
+      .eq("order_id", id)
+      .maybeSingle(),
   ]);
   if (linesRes.error) { const m = mapPgError(linesRes.error); return c.json(m.body, m.status); }
   if (addonsRes.error) { const m = mapPgError(addonsRes.error); return c.json(m.body, m.status); }
@@ -548,7 +567,14 @@ operationOrdersRouter.get("/:id", requireOperation, async (c) => {
   // admits operation + principal, so no new endpoint carries the file.
   const { data: pos, error: e_pos } = await sb
     .from("purchase_orders")
-    .select("id, supplier_id, warehouse_id, status, sup_status, so, so_refs, eta_date, do_file_path")
+    // 2026-08-15 (Order Route V2) — `placed_at` and `expected_ready_date` are
+    // the two dates the Route's `✓` stations must be able to NAME: a station
+    // is complete only when it can show its document number AND its labelled
+    // date (`PO-2048 · Issued: …`, `Estimated ready: …`). Read-only additions
+    // to a select the drawer already makes; no new query, no new writer.
+    .select(
+      "id, supplier_id, warehouse_id, status, sup_status, so, so_refs, eta_date, placed_at, expected_ready_date, do_file_path",
+    )
     .or(`so.eq.${order.so},so_refs.cs.{${order.so}}`);
   if (e_pos) { const m = mapPgError(e_pos); return c.json(m.body, m.status); }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -570,17 +596,66 @@ operationOrdersRouter.get("/:id", requireOperation, async (c) => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const posWithLines = (pos ?? []).map((p: any) => ({ ...p, lines: poLinesByPo[p.id] ?? [] }));
 
+  // ── D9's SALES ORDER HALF ────────────────────────────────────────────────
+  // *"What kind of product is this?"* is the CATALOG's answer and nobody
+  // else's (ERP-ARCHITECTURE §3.1 · D9). `56239a3c` closed STOCK's half by
+  // making /inventory ask. This is the other half: the drawer's loan flow was
+  // deducing the category from the SKU TEXT in the browser, and it was not
+  // doing it cosmetically — `LoanPanel` FILTERS the free-unit list with the
+  // result, so a real sofa whose model name was absent from a hardcoded
+  // keyword list could not be offered as a loaner.
+  //
+  // BOTH sides carry it, because the filter compares one against the other:
+  // an unrecognised ORDER LINE contributes no category to match against, and
+  // an unrecognised FREE UNIT falls into the bucket the drawer deliberately
+  // excludes. A guess on either side hides a real unit.
+  //
+  // COST: ONE extra subrequest per 100 distinct SKUs — `skuCategories` chunks
+  // at 100 because the `in` list travels in the URL. Lines and units resolve
+  // in ONE call, not two. On the 2026-08-19 register (74 distinct SKUs) that
+  // is a single chunk.
+  //
+  // NOT folded into `resolveSkuLabels`, which already joins `product_models`
+  // for the name and could have carried this for free. `skuCategories` is the
+  // ONE category reader every other gate asks — the earliest-sell floor, the
+  // goods gate, /inventory — and a second copy of that join is a second answer
+  // waiting to disagree (ownership Law D). One subrequest is the price of one
+  // owner.
+  //
+  // It fails OPEN (an error returns an empty map), so a catalog outage degrades
+  // to `null` everywhere and the browser falls back to the parser exactly as it
+  // did before this existed. No new failure mode.
+  const categoryBySku = await skuCategories(sb, [
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ...lines.map((l: any) => l.sku as string),
+    ...freeUnits.map((u) => u.sku as string),
+  ]);
+  // `null`, never absent: this endpoint ASKED. An absent key would mean nobody
+  // asked, and the browser reads that difference (`resolvedCategory`).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const linesWithCategory = lines.map((l: any) => ({
+    ...l,
+    category: categoryBySku.get(l.sku) ?? null,
+  }));
+  const freeUnitsWithCategory = freeUnits.map((u) => ({
+    ...u,
+    category: categoryBySku.get(u.sku) ?? null,
+  }));
+
   return c.json({
     order,
-    lines,
+    lines: linesWithCategory,
     addons,
     total,
     warehouse,
     stockBalances,
-    freeUnits,
+    freeUnits: freeUnitsWithCategory,
     pos: posWithLines,
     history: historyRes.data ?? [],
     threads: threadsRes.data ?? [],
+    /* An absent overlay row is UNKNOWN, not "no photo": the Route says
+       `No delivery photo yet` only on an explicit empty ledger. */
+    control: controlRes.error ? null : (controlRes.data ?? null),
   });
 });
 
@@ -625,6 +700,25 @@ const revisionHeaderInput = z
     proceed_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
     delivery_floor: z.number().int().min(0).optional(),
     delivery_has_lift: z.boolean().optional(),
+    /**
+     * 0354 — the rest of what the Sales Portal asks. The object page's form IS
+     * that form (owner ruling 2026-08-15), so a question the portal asks and
+     * this door refuses is a field the operator can read and never fix.
+     *
+     * `.strict()` above is still the guard that matters: goods, price,
+     * `delivery_date` and attribution are NOT here, and the RPC refuses them
+     * again on its own side.
+     */
+    customer_race: z.string().nullable().optional(),
+    customer_gender: z.string().nullable().optional(),
+    customer_birthday: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+    customer_address_unknown: z.boolean().optional(),
+    customer_billing_same: z.boolean().optional(),
+    delivery_stair_items: z.number().int().min(0).nullable().optional(),
+    /** 0219's bag — the building type and the operator's own configured
+     *  fields. Values only; a null CLEARS one key, and the RPC merges rather
+     *  than replacing so an unrelated save never erases a retired field. */
+    entry_fields: z.record(z.string().nullable()).optional(),
   })
   .strict();
 
@@ -1464,6 +1558,17 @@ const amendmentSubmitInput = z.object({
     })
     .strict(),
   reason: z.string().trim().min(1, "An amendment says why").max(500),
+  /**
+   * The day the CUSTOMER asked — `Amend date (from customer)` on the object
+   * page (owner ruling 2026-08-15). Not `submitted_at`: a change phoned in on
+   * Monday and typed on Thursday is a Monday request. Optional so the goods
+   * proposal, which has no such field, submits an unchanged body.
+   */
+  customerAskedOn: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .nullable()
+    .optional(),
 });
 
 operationOrdersRouter.get("/:id/amendment", requireOperation, async (c) => {
@@ -1492,6 +1597,7 @@ operationOrdersRouter.post("/:id/amendment", requireOperation, async (c) => {
     p_order_id: c.req.param("id"),
     p_proposed: parsed.data.proposed,
     p_reason: parsed.data.reason ?? null,
+    p_customer_asked_on: parsed.data.customerAskedOn ?? null,
   });
   if (error) {
     const m = mapPipelineV2Error(error);
@@ -1646,13 +1752,46 @@ operationOrdersRouter.get("/:id/print-do-data", requireOperation, async (c) => {
   // never once have worked. The document is now produced by pressing
   // `Issue delivery order` once the customer's date is confirmed, which is what
   // this sentence says.
-  if (!order.do_number) {
+  // Blueprint card 2026-08-16 — a REPRINT names its document. `?do_number=`
+  // asks for one specific document of this order (the DO object page's Print);
+  // it must exist in the DO register (0356) for THIS order, so a stray number
+  // cannot borrow another order's goods. Without the param the behaviour is
+  // unchanged: the order's current document prints.
+  const requestedDo = c.req.query("do_number") ?? null;
+  let printDoNumber: string | null = order.do_number ?? null;
+  let printIssuedAt: string | null = null;
+  if (requestedDo) {
+    const { data: doRow, error: doErr } = await sb
+      .from("ops_delivery_orders")
+      .select("do_number, issued_at")
+      .eq("order_id", id)
+      .eq("do_number", requestedDo)
+      .maybeSingle();
+    if (doErr) {
+      const m = mapPgError(doErr);
+      return c.json(m.body, m.status);
+    }
+    if (!doRow) {
+      return c.json(
+        {
+          error: "not_found",
+          code: "do_not_found",
+          message: "That delivery order does not belong to this Sales Order.",
+        },
+        404,
+      );
+    }
+    printDoNumber = doRow.do_number as string;
+    printIssuedAt = (doRow.issued_at as string | null) ?? null;
+  }
+
+  if (!printDoNumber) {
     return c.json(
       {
         error: "rule_violation",
         code: "do_missing",
         message:
-          "No delivery order for this trip yet — press Issue delivery order first.",
+          "No delivery order for this trip yet — the system issues it when the goods, logistics and date are ready.",
       },
       422,
     );
@@ -1692,8 +1831,11 @@ operationOrdersRouter.get("/:id/print-do-data", requireOperation, async (c) => {
   // Map DB rows → DoTemplateData. Currency values are MYR major units (per types.ts contract).
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const ord: any = order;
-  // Issue date: prefer delivered_at (when DO was attached), fall back to placed_at. ISO yyyy-mm-dd.
-  const issueIso = ord.delivered_at ?? ord.placed_at ?? new Date().toISOString();
+  // Issue date: the DOCUMENT's own issue stamp when a specific document was
+  // asked for (0356); else prefer delivered_at (when DO was attached), fall
+  // back to placed_at. ISO yyyy-mm-dd.
+  const issueIso =
+    printIssuedAt ?? ord.delivered_at ?? ord.placed_at ?? new Date().toISOString();
   const issueDate = String(issueIso).slice(0, 10);
 
   const dealerRow = ord.dealers ?? null;
@@ -1713,8 +1855,42 @@ operationOrdersRouter.get("/:id/print-do-data", requireOperation, async (c) => {
   if (warehouseRow?.name) dealerContactParts.push(`Ship from: ${warehouseRow.name}`);
   const dealerContact: string | null = dealerContactParts.length > 0 ? dealerContactParts.join(" · ") : null;
 
+  // ── COD (0362, owner ruling 2026-08-19). A document issued under an
+  // APPROVED Delivery Payment Approval on an order still owing carries the
+  // owner's instruction. The figure is the order's outstanding through the ONE
+  // shared assembly (`loadBookingContext` → `bookingConfirmGate` → `orderMoney`)
+  // at render time — the balance the driver must see land before unloading.
+  // A paid order renders no line, approval or not.
+  let codLine: string | null = null;
+  {
+    const { data: approvalRows, error: paErr } = await sb
+      .from("order_delivery_payment_approvals")
+      .select("id, status, request_reason, requested_at, decided_at, decision_reason")
+      .eq("order_id", id);
+    if (paErr) {
+      const m = mapPgError(paErr);
+      return c.json(m.body, m.status);
+    }
+    const approvals: DeliveryPaymentApproval[] = (approvalRows ?? []).map(
+      (row: Record<string, unknown>) => ({
+        id: row.id as string,
+        status: row.status as DeliveryPaymentApproval["status"],
+        requestReason: row.request_reason as string,
+        requestedAt: (row.requested_at as string | null) ?? null,
+        decidedAt: (row.decided_at as string | null) ?? null,
+        decisionReason: (row.decision_reason as string | null) ?? null,
+      }),
+    );
+    if (paymentApprovalOpensGate(approvals)) {
+      const ctx = await loadBookingContext(sb, id, null);
+      if (ctx.ok && ctx.ctx.gate.outstanding > 0) {
+        codLine = codInstruction(ctx.ctx.gate.outstanding);
+      }
+    }
+  }
+
   const templateData: DoTemplateData = {
-    do_number: String(ord.do_number),
+    do_number: String(printDoNumber),
     issue_date: issueDate,
     order_id: String(ord.id),
     // Order code shown to dealer = `SO-${so}` (matches existing UI conventions).
@@ -1742,6 +1918,7 @@ operationOrdersRouter.get("/:id/print-do-data", requireOperation, async (c) => {
       };
     }),
     currency: "MYR",
+    cod_instruction: codLine,
   };
 
   return c.json(templateData);

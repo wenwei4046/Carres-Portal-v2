@@ -8,14 +8,20 @@ import {
 } from "./delivery-reasons";
 
 describe("DELIVERY_REASONS (T4 Reason Library v1)", () => {
-  it("carries the 12 ratified v1 reasons + Card 5's two at-the-door reasons, unique keys", () => {
+  it("carries v1's 12 + Card 5's two at-the-door reasons + the DO blueprint's four, unique keys", () => {
     // v1's 12 (T4) + `customer_rejected_goods` + `delivery_failed`
-    // (SO V2 Card 5, 0344 — the delivery-attempt exception reads this library).
-    expect(DELIVERY_REASONS).toHaveLength(14);
-    expect(new Set(DELIVERY_REASONS.map((r) => r.key)).size).toBe(14);
-    expect(DELIVERY_REASON_KEYS).toHaveLength(14);
+    // (SO V2 Card 5, 0344 — the delivery-attempt exception reads this library)
+    // + the Delivery Order blueprint card's four (owner-approved 2026-08-16):
+    // goods_damaged · wrong_goods · photo_missing · loan_not_collected.
+    expect(DELIVERY_REASONS).toHaveLength(18);
+    expect(new Set(DELIVERY_REASONS.map((r) => r.key)).size).toBe(18);
+    expect(DELIVERY_REASON_KEYS).toHaveLength(18);
     expect(DELIVERY_REASON_KEYS).toContain("customer_rejected_goods");
     expect(DELIVERY_REASON_KEYS).toContain("delivery_failed");
+    expect(DELIVERY_REASON_KEYS).toContain("goods_damaged");
+    expect(DELIVERY_REASON_KEYS).toContain("wrong_goods");
+    expect(DELIVERY_REASON_KEYS).toContain("photo_missing");
+    expect(DELIVERY_REASON_KEYS).toContain("loan_not_collected");
   });
 
   it("responsibility follows the category by law", () => {

@@ -108,8 +108,15 @@ import {
   rangeValue,
 } from "@/lib/excel-date-filter";
 import { fmtDate, fmtDateShort } from "@/lib/fmt-date";
+import { displayCustomerName } from "@/lib/customer-name";
 import { qk } from "@/lib/queries";
-import CreatePurchaseDialog, { type Destination } from "./CreatePurchaseDialog";
+/** A deliver-to option the payload carries. Lived in the retired
+ *  CreatePurchaseDialog; the grid's own destination cell still needs it. */
+interface Destination {
+  id: string;
+  name: string;
+  isDefault: boolean;
+}
 import PurchasingTabs from "./PurchasingTabs";
 
 // ── Wire types ──────────────────────────────────────────────────────────────
@@ -270,23 +277,18 @@ function clockLabel(ms: number): string {
 }
 
 /**
- * `Fri 7 Aug` — a rail day row's word (Loo, 2026-08-06: weekday + date on
- * EVERY row, one format; never a bare weekday, never Today/Tomorrow). The
- * full spelling stays on the hover (`countWord`). Composed from the portal's
- * own two date spellings — the weekday off `fmtDate`, the day+month off
- * `fmtDateShort` less its year — so no third date format is invented.
+ * `Fri, 7 Aug` — a rail day row's word. `railDayLabel` is DELETED (owner ruling
+ * 2026-08-15): it composed a no-year date by slicing the weekday off `fmtDate`
+ * and regexing the year off `fmtDateShort`, which is a fourth date spelling
+ * built out of two others. THE YEAR RULE makes the no-year form the formatter's
+ * own answer, so the rail calls `fmtDate` like everything else.
  */
-function railDayLabel(iso: string): string {
-  return `${fmtDate(iso).slice(0, 3)} ${fmtDateShort(iso).replace(/ \d{2}$/, "")}`;
-}
-
-/** `mee yee` → `Mee Yee`, `PETER` → `Peter` — display only, the record keeps
- *  what was typed. */
-function properCase(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/(^|[\s\-\/])([a-z])/g, (_m, sep, ch) => sep + ch.toUpperCase());
-}
+/* `properCase` is DELETED (owner ruling 2026-08-15). It lowercased the whole
+ * string before raising each word, so `KJ NG` came out `Kj Ng` and
+ * `LIM KUAN YANG` came out `Lim Kuan Yang` — a customer's initials rewritten
+ * by a page-local copy of a rule that now has ONE home. See
+ * `@/lib/customer-name`: capitalize UP only, never down.
+ */
 
 /**
  * P12 — the `purchase_demands` row behind a grid row, or `null`.
@@ -423,7 +425,6 @@ export default function OperationToOrder() {
   const [rowPo, setRowPo] = useState<ReadonlyMap<string, string>>(new Map());
   const [results, setResults] = useState<ReadonlyMap<string, GroupResult>>(new Map());
   const [creating, setCreating] = useState(false);
-  const [dialogOpen, setDialogOpen] = useState(false);
   const [issueReviewOpen, setIssueReviewOpen] = useState(false);
   const [commercialDecisions, setCommercialDecisions] = useState<
     ReadonlyMap<string, CommercialDecision>
@@ -1257,7 +1258,7 @@ export default function OperationToOrder() {
     const vals = [...new Set(base.map((r) => r.customer ?? F_NONE))].sort();
     return vals.map((v) => ({
       value: v,
-      label: v === F_NONE ? "—" : properCase(v),
+      label: v === F_NONE ? "—" : displayCustomerName(v),
     }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inView, colFilters]);
@@ -1795,8 +1796,8 @@ export default function OperationToOrder() {
             </span>
           ) : null
         ) : r.customer ? (
-          <span className="block truncate text-kit-slate-12" title={properCase(r.customer)}>
-            {properCase(r.customer)}
+          <span className="block truncate text-kit-slate-12" title={displayCustomerName(r.customer)}>
+            {displayCustomerName(r.customer)}
           </span>
         ) : null,
       },
@@ -1847,7 +1848,7 @@ export default function OperationToOrder() {
           partly || (g && g.pos.length > 0) ? (
             <span className="flex items-center gap-2 min-w-0">
               {partly ? (
-                <span className="shrink-0 rounded-pill bg-kit-amber-3 px-2 py-0.5 text-label text-kit-amber-11">
+                <span className="shrink-0 rounded-full bg-kit-amber-3 px-2 py-0.5 text-label text-kit-amber-11">
                   {W.partlyOrdered}
                 </span>
               ) : null}
@@ -1934,7 +1935,7 @@ export default function OperationToOrder() {
               active={viewSet.has(day)}
               onClick={() => toggleView(day)}
               testId={`to-order-day-${day}`}
-              name={railDayLabel(day)}
+              name={fmtDate(day)}
               count={String(timeCounts.get(day)?.size ?? 0)}
               countWord={`${ordersHeadline(timeCounts.get(day)?.size ?? 0)} · ${fmtDate(day)}`}
             />
@@ -1971,19 +1972,11 @@ export default function OperationToOrder() {
             />
           ))}
 
-          <div className="my-2 border-t border-kit-slate-6" />
-
-          {/* The manual entrance — always present (Loo: the door may never
-              be missing). The dialog is real; its SAVE arrives with the
-              unified purchase_demands card. */}
-          <button
-            type="button"
-            onClick={() => setDialogOpen(true)}
-            data-testid="to-order-create-purchase"
-            className="flex w-full items-center gap-1 px-2 py-1.5 rounded-control text-body text-kit-slate-11 hover:bg-kit-slate-3 text-left"
-          >
-            + {W.createPurchase}
-          </button>
+          {/* The manual entrance LEFT this page for `Manual Purchase`
+              (CARD-2026-08-18-manual-purchase §1): this grid now answers ONE
+              question — what have customers ordered that we still have to
+              buy. Loo's "the door may never be missing" holds at the module
+              level: the door is the rail's own Manual Purchase entry. */}
         </aside>
 
         {/* ── The Excel Workspace: one toolbar, one grid. ─────────────────
@@ -2633,13 +2626,6 @@ export default function OperationToOrder() {
           })}
         </div>
       </Modal>
-
-      <CreatePurchaseDialog
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        destinations={destinations}
-        onCreated={() => void q.refetch()}
-      />
 
       {/* P12 — the confirm step for `Cancel`. The page REFETCHES rather than
           hiding the row itself: a cancel takes the whole remainder, so the row

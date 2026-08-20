@@ -26,6 +26,36 @@ export function monthKeyMYT(now: Date = new Date()): string {
 }
 
 /**
+ * The month whose PO-duty row IS this month's GRN duty.
+ *
+ * **THE DUTY MODEL** (`purchasing/MASTER.md` §2.2, Jess 2026-07-24, LOCKED):
+ * two rotating duties offset by ONE month over one rota, so the person who
+ * ORDERS never RECEIVES — segregation of duties in a three-person office.
+ *
+ * ```
+ *         PO duty (issue + call)    GRN duty (receive)
+ * Jul     Shasha                    Yu Jun
+ * Aug     Yu Jun                    Khor Yee
+ * Sep     Khor Yee                  Shasha
+ * ```
+ *
+ * Read the table down a column: July's GRN holder is Yu Jun, who is August's
+ * PO holder. **GRN duty for month M is the rota row of month M+1** — the NEXT
+ * month, not the previous one. `work-engine.ts` and the Team panel both said
+ * "offset−1" and reached BACKWARDS, which is why the panel printed
+ * `Not assigned` forever: the roster the API returns starts at the current
+ * month, so a past month was never in it to be found.
+ *
+ * One rota, one arithmetic, no second table and no second API.
+ */
+export function grnDutyMonth(month: string): string {
+  const [y, m] = month.slice(0, 7).split("-").map(Number);
+  if (!y || !m) return month;
+  const next = m === 12 ? { y: y + 1, m: 1 } : { y, m: m + 1 };
+  return `${next.y}-${String(next.m).padStart(2, "0")}`;
+}
+
+/**
  * PO days (MYT weekday). **P1 (2026-07-28): the days are a SETTING now** —
  * `purchasing_settings.po_days`, edited on Purchasing → Settings. There is
  * deliberately no default parameter: a caller that cannot supply the setting
@@ -114,6 +144,22 @@ export const opsPoDutyResponseSchema = z.object({
     })
     .nullable(),
   roster: z.array(opsPoDutyRosterEntrySchema).optional(),
+  /** The month whose rota row IS this month's GRN duty — `grnDutyMonth()`.
+   *  Sent so the Team panel's edit door writes the right row instead of
+   *  re-deriving the offset on the client. */
+  grnMonth: z.string().optional(),
+  /** Who receives goods this month. DERIVED from the same rota, never a
+   *  second store (`purchasing/MASTER.md` §2.2). Null only while the whole
+   *  duty layer is dormant. */
+  grnHolder: z
+    .object({
+      userId: z.string().uuid(),
+      email: z.string(),
+      name: z.string().nullable(),
+      assignedBy: z.string().uuid().nullable(),
+    })
+    .nullable()
+    .optional(),
 });
 export type OpsPoDutyResponse = z.infer<typeof opsPoDutyResponseSchema>;
 

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { CalendarDays, Users, Flag, ScrollText, X, type LucideIcon } from "lucide-react";
+import { CalendarDays, Users, ListTodo, ScrollText, X, type LucideIcon } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useActiveOrder } from "@/lib/active-order";
@@ -28,7 +28,13 @@ const TABS: { key: Panel; label: string; icon: LucideIcon; active: string }[] = 
   // Team FIRST (Jess 2026-07-19: "team put at first, after only calendar").
   { key: "team", label: "Team", icon: Users, active: "bg-success-soft text-success" },
   { key: "calendar", label: "Calendar", icon: CalendarDays, active: "bg-info-soft text-info" },
-  { key: "tasks", label: "My Work", icon: Flag, active: "bg-warning-soft text-warning" },
+  // My Work wears the SAME icon as the left navigation's `Work` destination
+  // (`portal-nav.ts`, ListTodo) — owner ruling 2026-08-15. The rail is that
+  // destination's peek (ui/MASTER.md §5), and a peek that wears a different
+  // face than the door it previews reads as a different feature. The Flag it
+  // replaced was borrowed from the Orders follow-up column, which is a
+  // different system entirely.
+  { key: "tasks", label: "My Work", icon: ListTodo, active: "bg-warning-soft text-warning" },
   // Activity = the open order's history timeline (Jess 2026-06-30: moved off the
   // page into the rail, after the flag). Shows only when an order is open.
   { key: "activity", label: "Activity", icon: ScrollText, active: "bg-base-100 text-base-700" },
