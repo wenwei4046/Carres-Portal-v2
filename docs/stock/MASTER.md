@@ -350,7 +350,8 @@ answer beside the availability word — `delivered` · `cancelled_before_receipt
 `returned_to_supplier` · `active` — so Delivered / history can tell them apart without a second
 query or a second arithmetic. Physical disposal is not a fifth word until that fact is recorded.
 
-**Three migrations, because self-review and review each found a real hole before merge.**
+**Four migrations, because self-review and review each found a real hole before merge. Every one of
+them was found by looking again, not by a failing test — which is the point of Law 4.**
 
 | | What it does | Why it exists |
 |---|---|---|
@@ -358,15 +359,21 @@ query or a second arithmetic. Physical disposal is not a fifth word until that f
 | **0367** | revokes the write grants on the five objects 0366 created | **found by self-review.** 0366 §10 revoked INSERT/UPDATE/DELETE on the register and the cache by name, but assumed a NEW table starts with no write grant. Supabase's `ALTER DEFAULT PRIVILEGES` hands `authenticated` ALL on every new table in `public`, so all five came out carrying INSERT/UPDATE/DELETE/TRUNCATE. RLS still refused the three tables — but `stock_unit_availability_v` is a simple view over one table and therefore **auto-updatable**, a latent second door onto the inventory authority. 0366's sanity block checked policies and never checked grants, which is why it passed. 0367 revokes, and asserts grants from here on. It also revokes TRUNCATE, which empties a table without firing the row trigger that refuses a delete |
 | **0368** | the three named numbers above, and widens the bulk guard from sofa-only to sofa/bedframe/mattress | **found by review.** `available` overstated promisable stock ~11x; and two of the five live bulk records (`DIVAN ONLY (K)`, `SONIC-L1202S-Q`) are furniture, which a sofa-only guard never covered. The guard asks the CATALOG, so a SKU the catalog does not hold cannot be judged and passes — at go-live the catalog is configuration that survives, so every real SKU has a row; today none of the five does, which is why the sofa-only guard never fired on any of them |
 
-**Verification evidence.** All three migrations applied to production; each sanity block passed.
+| **0369** | every bucket in `stock_sku_availability` is `coalesce(..., 0)`; `anon` loses its SELECT on all seven objects; the sanity block is rewritten NULL-safe and carries its own negative control | **found by review, and the sharpest of the three.** 0366 counted rows (`count(*) filter`, which returns 0 for an empty group); 0368 had to SUM `qty` so a bulk record contributes 555 rather than 1 — and `sum(...) filter` returns **NULL** for an empty group. Measured: `reserved` NULL on 73 of 74 rows, `bulk_on_hand` on 69, `incoming` on 50. Worse, 0368's own reconciliation guard was written `where sellable <> available + bulk_on_hand`, and a NULL on either side makes that predicate NULL — neither true nor false — so it never raised. **The predicate evaluated to NULL on all 74 rows: the guard was not passing, it was not testing anything.** A test believed to hold while the thing it guards is broken. 0369's guards use `is distinct from` and one of them is a deliberate negative control that proves the reconciliation check CAN fail |
+
+**Verification evidence.** All four migrations applied to production; each sanity block passed.
 Eight negative controls were run against production in a rolled-back transaction after 0366 —
 duplicate id · delete · id reuse after write-off · rename · bulk reservation · hand-written total ·
 the retired adjust door · editing a unit event — and **all eight fired**; the register was unchanged
 afterwards (136 units · 136 ledger ids · 0 events · 0 units without an identity). After 0367 the
 seven Warehouse objects carry SELECT and nothing else. After 0368 the three numbers reconcile
-(85 + 893 = 978) and `stock_balances` did not move (`cache_moved = 0`). Each applied SQL is
-executably identical to its repository file, reconciled by comment-stripped md5 —
-0366 `3955ccd7f936151d144a959afef4af22`, 0367 `a98022030312d9071a60b3b2c55d1ada`.
+(85 + 893 = 978) and `stock_balances` did not move (`cache_moved = 0`). After 0369, across the same
+74 rows: **0 NULL buckets** in any of the eight columns, the reconciliation guard passes for real
+and its negative control proves it can fail, and **0 grants of any kind remain to `anon`** on the
+seven objects. Live figures unchanged throughout: on_hand 980 · available 85 · bulk_on_hand 893 ·
+sellable 978 · reserved 2 · incoming 43. 0366 and 0367 were reconciled against their repository
+files by comment-stripped md5 (`3955ccd7f936151d144a959afef4af22` and
+`a98022030312d9071a60b3b2c55d1ada`).
 Local release gate: shared, API and web suites green, typecheck and build clean, no server secret in
 the web bundle.
 
