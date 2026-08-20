@@ -420,7 +420,7 @@ PARALLEL TRACKS      Sales Order (8)
 REFERENCE ONLY       Purchase Order · Supplier Claim
                        work is the first tab; the rest are Versions / History / Order Route
 ONE SCROLL           Goods Receipt · Purchase Return · Repair Order · Display Request ·
-                       Manual Purchase · the three Consignment documents
+                       Manual Purchase Request · the governed Consignment documents
 ```
 **The test, and it is mechanical: would a staff member open this tab on an ordinary Tuesday?**
 Yes and it runs beside the others → reason one. No, but they would hunt for it when something
@@ -456,87 +456,91 @@ shipped code, and stated the opposite.)*
 
 ---
 
-# §4.2 · MODULE NAVIGATION — APPROVED / SHIPPED, Jess 2026-08-18
+# §4.2 · MODULE NAVIGATION — CURRENT GRAMMAR SHIPPED PR #861; PURCHASING TREE APPROVED 2026-08-20
 
-### THE PAGES OF A MODULE LIVE IN THE RAIL — UNDER A HEADING, NEVER A PARENT ROW
+### ONE PORTAL RAIL; A MODULE IS AN EXPANDABLE ROW
 
-**Corrected by Jess on a production screenshot, 2026-08-19
-(CARD-2026-08-19-purchasing-rail-corrections): the "expands in place" parent row
-shipped and was overruled on sight.** SALES is the template and it has TWO
-layers: a group HEADING, then the pages. A module is a heading — `PURCHASING`
-replaced the umbrella word `SUPPLY CHAIN`, the `Purchasing` parent row is
-deleted, and the pages sit at the same indent as `Sales Orders`. Delivery
-carries its own heading until it restructures. **Stock restructured 2026-08-19
-(CARD-2026-08-19-warehouse-rail): the merged `Stock` row became the `WAREHOUSE`
-heading** with its pages as rows — `On hand` · `Ready stock` · `In & out` live,
-`Transfers` · `Counts` printing `Coming soon` (Warehouse Blueprint item 13).
-The blueprint keeps Reports and Settings central, so WAREHOUSE lists **no
-Report row and no Settings row**. Its strip died the same way Purchasing's did:
-`StockTabs` keeps drawing the ONE header row in the destination format. A
-module still does not open a second left column, and it does not keep a tab
-strip once it has more than a handful of pages.
+PR #861 replaced the short-lived uppercase-heading model with the current shared grammar: one
+module icon + name + chevron row, with its pages hanging from quiet rounded elbows. The existing
+`PortalSidebar` is the only left navigation surface: 232px expanded and 60px collapsed. A module
+never opens a second sidebar, flyout or duplicate tab strip.
 
-```
-▾ Purchasing
-    SO Batch Purchase      4
-    Manual Purchase             Coming soon
-    Purchase Orders        3
-    Receiving              1
-    Supplier Claims
-    …
-    ─────────────────────
-    Report
-    Settings
+Purchasing has enough permanent destinations to require one further level. Its module row toggles
+the entire tree without navigating. `Purchasing Home` and `My Purchasing Work` are direct rows;
+`REQUESTS`, `BUY`, `RECEIVE`, `PROBLEMS` and `CONSIGNMENT` are independent full-row accordion
+headers. More than one group may remain open. The active destination's group opens automatically
+and may not hide the active destination. Purchasing parent/group state is remembered per signed-in
+user.
+
+```text
+Purchasing                                               ▾
+│  Purchasing Home
+│  My Purchasing Work
+│
+│  REQUESTS                                              ▸
+│  BUY                                                   ▾
+│  │  Purchase Demands
+│  │  SO Batch Purchase                         ← current
+│  │  Purchase Orders
+│  RECEIVE                                               ▸
+│  PROBLEMS                                              ▸
+│  CONSIGNMENT                                           ▸
 ```
 
-**Why not a second column.** The portal rail is 232px and a working page already
-carries a 200px right rail (§5). A module rail between them spends ~430px of a
-1440px screen on navigation before the first column of data.
-
-**Why not a tab strip.** A 44px strip is a good home for three siblings and a bad
-home for eleven: it scrolls sideways, it cannot show a count without shouting, and
-it cannot group. **The header row stays** — the shell still draws it (壳画头), and
-the nameplate gains the page word (`Purchasing · Receiving`) so the header still
-says where you are once the strip is gone.
+This is navigation only. The 200px `STATUS / WORK TO DO` rail belongs inside an individual Work
+Surface and never becomes a second module sidebar. A Purchasing Listing follows the Sales Orders
+Register shell; its compact Destination Header shows the current page word once, at the same
+size/weight, without a leading icon or `Purchasing ·` prefix. Formal Object Detail alone may use
+the approved 50% work + 50% live-PDF surface.
 
 ### FROZEN RULES
 
-- **Every module's pages are always on screen** (2026-08-19, with the heading
-  correction — the accordion died with the parent row; SALES' pages never hid
-  and Purchasing's do not either).
-- **The whole map is listed from day one.** An approved page appears before it is
-  built. A map showing four of eleven roads teaches a shape that is about to
-  change under the operator seven more times.
-- **An unbuilt entry is NOT A CONTROL.** A `<span>` with no href, out of the tab
-  order, `aria-disabled`, printing **`Coming soon`** (`COPY-STANDARD.md`). This is
-  what keeps it inside `03-page-patterns.md:149` (*a control that opens nothing is
-  a dead control* — there is no arrow to be dead) while satisfying `:219` (*a
-  deliberately disabled control must say why, on screen*).
-- **Going live is two edits, in that page's own PR:** drop the flag, the span
-  becomes a link. **Nothing is added later and no order is renegotiated**, so the
-  rail never reshuffles under a staff member who has learned it.
-- **A count means rows a human must act on, never how many rows the table holds**,
-  and **nothing is printed at zero.** A zero badge is a daily invitation to check a
-  page with nothing on it.
-- **The parent carries no count of its own.** Summing its children produces a
-  figure that matches no page and no queue.
-- **A manager-only page is gated by the SERVER**, not by the role: the rail asks
-  the same RPC that guards the page. A caller who may not enter does not see the
-  door.
-- **Collapsed, the LIVE pages show as icons — exactly like the SALES pages —
-  and an unbuilt page shows nothing** (2026-08-19: with no parent row there is
-  no single module icon; a `Coming soon` entry is not a control and gets no
-  icon-only ghost).
-- **The rail overflows, and that is the accepted cost of the whole map.** The one
-  defect that may not survive is landing on a rail whose highlighted row is off
-  screen: **the active row is brought into view on mount** — `block: "nearest"`,
-  visible rather than centred, and never re-run on navigation, which would yank the
-  rail while the operator is reading further down it.
+- **The full row toggles.** The Purchasing module row and every group header respond across their
+  complete width; the module click does not silently open the first page.
+- **The complete map is present from day one.** An approved but unbuilt destination is a `<span>`
+  with no href, outside the tab order, `aria-disabled`, and prints `Coming soon` using the existing
+  two-line non-control treatment. It has no hover, active bar, count or fake page.
+- **Existing useful destinations remain reachable.** This tree may rename/reposition a real door,
+  but it may not replace a live page with an unbuilt row or delete the existing Purchasing Report
+  before its separate central-report consolidation.
+- **ALWAYS EXACTLY ONE VISIBLE ACTIVE INDICATION — APPROVED / LOCKED (the shared module
+  active-indication law; Purchasing is not an exception to it).** The rail never says nothing about
+  where the operator is standing, and never says it twice. The one indication moves with what is on
+  screen:
 
-*Built: `apps/web/src/pages/portal/portal-nav.ts` (`PortalNavChild`) ·
-`PortalSidebar.tsx` · `operation/PurchasingTabs.tsx` · `operation/StockTabs.tsx`
-(destination header since CARD-2026-08-19-warehouse-rail) ·
-`operation/components/ModuleHeader.tsx` (`page` prop).*
+  | What is visible | What carries `kit-blue-3` + the `kit-blue-9` line |
+  |---|---|
+  | The Purchasing tree is OPEN | **only the exact current child row**; the module parent and every group header stay neutral |
+  | The Purchasing tree is SHUT while the current page belongs to Purchasing | **the Purchasing parent row** |
+  | The rail is collapsed to 60px while the current page belongs to Purchasing | **the Purchasing module icon** |
+
+  An open module parent or group header is never a second blue row; a shut parent standing on its
+  own page is never a neutral one. Grouping a module's Listing rows is presentation and does not
+  give that module its own selection rule.
+- **Wire-line, never boxes.** Reuse PR #861's measured elbow geometry and governed 1px neutral
+  lines. Nested groups extend that geometry one level; no heavy outline, boxed section, card,
+  popover or shadow is introduced.
+- **No destination icons.** Purchasing owns one module icon. Direct rows, group rows and Listing
+  rows carry no individual leading icons.
+- **Counts mean human work waiting**, never document totals, and zero prints nothing. The module
+  parent and group headers do not sum hidden work into a second queue number.
+- **Collapsed mode stays 60px** and shows the module's one icon; children/group headers disappear.
+  Expanded/collapsed rail width keeps the existing `ops-sidebar-collapsed` law.
+- **A collapsed module icon opens a NAMED destination, never "the first live row".** A module's
+  landing page is a capability in its own right and may not be a side effect of the order its rows
+  happen to sit in. Purchasing's 60px icon links to **`SO Batch Purchase`**
+  (`/operation?tab=purchase`) until `Purchasing Home` is built, at which point that page's own
+  approved scope may change the module landing destination. Jump To ordering is unaffected — it
+  lists pages, and a landing choice is not a page.
+- **The active row is brought into view** without centring or animation. The brand/collapse area
+  stays fixed at the top, the signed-in user stays fixed at the bottom, and only the middle
+  destination region scrolls.
+- **Settings stays in the Page Header gear.** No Purchasing Settings row is added to the rail.
+
+*Current shared implementation: `apps/web/src/pages/portal/portal-nav.ts` ·
+`PortalSidebar.tsx` · `operation/PurchasingTabs.tsx` · `operation/StockTabs.tsx` ·
+`operation/components/ModuleHeader.tsx`. Purchasing's nested grouping is an approved target, not
+yet built.*
 
 # §5 · The right rail
 
@@ -728,9 +732,10 @@ own decision and its own card.**
 
 **TABS ARE AVOIDED BY DEFAULT — APPROVED / LOCKED.** Separate business jobs, owned records
 or destinations are separate portal-navigation entries and pages; they are never compressed
-into a module tab strip. Purchasing is the explicit reference: SO Batch Purchase · Manual
-Purchase · Purchase Orders · Receiving · Supplier Claim are individual destinations, with no
-Purchasing tabs and no substitute second navigation row.
+into a module tab strip. Purchasing is the explicit reference: `SO Batch Purchase` · `Manual
+Purchase Requests` · `Purchase Orders` · `Goods Receipts` · `Supplier Claims` are individual
+destinations inside its governed sidebar tree, with no Purchasing tabs and no substitute second
+navigation row.
 
 **TAB ADMISSION LAW — APPROVED / LOCKED.** A tab row is not a standard Register layer. Tabs
 are admitted only when every tab remains inside the same owned business object, the same

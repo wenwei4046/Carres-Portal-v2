@@ -196,17 +196,29 @@ SALES
 
 SUPPLY CHAIN
 ├── Purchasing
-│   ├── SO Batch Purchase
-│   ├── Manual Purchase
-│   ├── Purchase Orders
-│   ├── Receiving
-│   ├── Supplier Claims
-│   ├── Purchase Returns
-│   ├── Repair Orders
-│   ├── Display Requests
-│   ├── Consignment Orders
-│   ├── Consignment Receipts
-│   └── Consignment Returns
+│   ├── Purchasing Home
+│   ├── My Purchasing Work          filtered view of the shared Work Engine
+│   ├── REQUESTS
+│   │   ├── New Supplier Requests
+│   │   ├── New SKU Requests
+│   │   ├── Display Requests
+│   │   └── Manual Purchase Requests
+│   ├── BUY
+│   │   ├── Purchase Demands
+│   │   ├── SO Batch Purchase
+│   │   └── Purchase Orders
+│   ├── RECEIVE
+│   │   └── Goods Receipts
+│   ├── PROBLEMS
+│   │   ├── Supplier Claims
+│   │   ├── Purchase Returns
+│   │   └── Repair Orders
+│   └── CONSIGNMENT
+│       ├── Consignment Overview
+│       ├── Consignment Orders
+│       ├── Consignment Receipts
+│       ├── Consignment Returns
+│       └── Consignment Sale Notices
 ├── Warehouse
 │   ├── Stock
 │   ├── Ready stock
@@ -238,20 +250,19 @@ a second settings home. `Old Orders` is a temporary cutover door and is not part
 The right Quick Rail is governed by `ui/MASTER.md`; it never adds duplicate module destinations or
 business truth.
 
-*`Receiving`, not `Goods Receipts` (SHIPPED 2026-08-18).* The approved page list wrote the
-document name; this section's own rule names a page after the JOB, and `Receiving` is named
-here as the accepted ERP operation. `docs/purchasing/MASTER.md:768` also bans the letters
-`GRN` from a tab forever. The document is still a Goods Receipt; the door is Receiving.
+**`Goods Receipts` is the exact Purchasing destination word.** It names the governed record
+operators need to find again; the work inside that destination is still receiving. The internal
+letters `GRN` remain banned from navigation and staff-facing status copy.
 
 **This is navigation, not workflow.** How the operator moves between these pages — which one
 feeds which — is the module MASTER's, and it changes when the business changes.
 
-**A MODULE'S PAGES LIVE IN THE RAIL, AND THE WHOLE MAP IS SHOWN FROM DAY ONE**
-(Jess, 2026-08-18 — SHIPPED). A 44px tab strip is a good home for three siblings and a bad
-home for eleven: it scrolls sideways, it cannot show a count without shouting, and it cannot
-group. The module's sidebar item EXPANDS in place instead — **one rail, not two**, because a
-second left column would spend ~430px of a 1440px screen on navigation before the first
-column of data (a 232px rail plus a page's own 200px right rail).
+**A MODULE'S PAGES LIVE IN THE RAIL, AND THE WHOLE MAP IS SHOWN FROM DAY ONE.** The shared
+module row expands in place: one rail, not a second module sidebar or a long tab strip. Purchasing
+adds one nested level because its complete map contains direct Home/Work doors and five recognisable
+operator groups: REQUESTS, BUY, RECEIVE, PROBLEMS and CONSIGNMENT. Each group expands independently;
+the active destination's group remains open. The exact interaction and wire-line grammar live in
+`docs/ui/MASTER.md` §4.2.
 
 **Every approved page is listed before it exists.** The rail is the module's MAP, and a map
 showing four of eleven roads teaches the operators a shape that is about to change under them
@@ -265,18 +276,16 @@ that sentence (`COPY-STANDARD.md` — the ONE word for it, never `TBD`, never `N
 becomes a link.** Nothing is added later and no order is renegotiated, so the rail never
 reshuffles under a staff member who has learned it.
 
-**The cost, stated:** thirteen purchasing entries plus the module rows overflow a laptop rail,
-so it scrolls. Accepted. The one defect that may not survive is landing on a rail whose
-highlighted row is off screen, so the active row is brought into view on mount.
+**The cost, stated:** the complete Purchasing tree can exceed a laptop rail, so only the middle
+destination region scrolls. The active row is brought into view without centring or animation;
+the brand/collapse area and signed-in user remain fixed.
 
-**A DOCUMENT EARNS A DOOR WHEN A HUMAN LOOKS FOR IT BY NAME** (Jess, 2026-08-18). Purchasing's
-five pages became eleven, and the reason is measured rather than stylistic: **Carres runs three
-operations staff who each do every job**, so nothing may depend on remembering which workspace
-hides which document. The old rule — expose modules, reveal documents inside them — still binds
-everywhere the second condition fails. Nothing gets a page because it exists; it gets one because
-somebody has to find it again. Two proposed pages were refused on exactly that test: a module-local
-`Work` page (Work is ONE cross-module surface) and `Purchase Demands` (two lanes already produce
-every demand; a third view becomes a third place to press Issue, and it is a report instead).
+**A DOCUMENT EARNS A DOOR WHEN A HUMAN LOOKS FOR IT BY NAME.** Carres runs three operations staff
+who each do every Purchasing job, so findability may not depend on memory. `My Purchasing Work`
+therefore exposes a Purchasing-filtered view of the one shared Work Engine; it owns no duplicate
+task truth. `Purchase Demands` is the authoritative demand Register but has no Issue authority;
+`SO Batch Purchase` remains the sole Purchase Order creation workspace. Named doors improve
+findability without multiplying action engines or business truth.
 
 
 ---

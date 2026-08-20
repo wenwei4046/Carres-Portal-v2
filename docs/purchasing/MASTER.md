@@ -51,40 +51,82 @@ Sales Order  ····read···▶ SO Batch Purchase ─┐
                           Manual Purchase   ─┘
 ```
 
-```
-Sales        Sales Order         every customer order. SALES owns it.
+```text
+Purchasing
+├── Purchasing Home
+├── My Purchasing Work
+├── REQUESTS
+│   ├── New Supplier Requests
+│   ├── New SKU Requests
+│   ├── Display Requests
+│   └── Manual Purchase Requests
+├── BUY
+│   ├── Purchase Demands
+│   ├── SO Batch Purchase
+│   └── Purchase Orders
+├── RECEIVE
+│   └── Goods Receipts
+├── PROBLEMS
+│   ├── Supplier Claims
+│   ├── Purchase Returns
+│   └── Repair Orders
+└── CONSIGNMENT
+    ├── Consignment Overview
+    ├── Consignment Orders
+    ├── Consignment Receipts
+    ├── Consignment Returns
+    └── Consignment Sale Notices
 
-Purchasing   SO Batch Purchase       customer orders PURCHASING still has to act on
-             Manual Purchase         purchases nobody's customer asked for:
-                                     Ready Stock · Display · Office · Spare Parts
-             Purchase Orders         every issued PO, whichever lane bore it
-             Goods Receipts          what physically arrived, one door
-             Supplier Claims         the exception a receiving produced
-             Purchase Returns        goods formally going back to the supplier
-             Repair Orders           a Carres unit out for repair, the SAME unit back
-             Display Requests        what a showroom needs, raised by Sales
-             Consignment Orders      supplier-owned goods placed with Carres
-             Consignment Receipts    a filtered view of Goods Receipts, not a second engine
-             Consignment Returns     the supplier collecting its own goods back
-
-Reports and Settings are PORTAL pages, not Purchasing pages
-(`../ERP-ARCHITECTURE.md` §2.1).
+Report and Settings remain PORTAL responsibilities. The existing Purchasing Report door stays
+below its hairline until report consolidation has its own approved scope. Settings remains only in
+the governed Page Header gear (`../ERP-ARCHITECTURE.md` §2.1).
 ```
 
 **PURCHASING HAS NO MODULE TABS** (Loo, 2026-08-11 — **APPROVED / LOCKED**).
-`SO Batch Purchase` · `Manual Purchase` · `Purchase Orders` · `Receiving` ·
-`Supplier Claim` are separate operator jobs and separate destinations. They are not sibling
+`SO Batch Purchase` · `Manual Purchase Requests` · `Purchase Orders` · `Goods Receipts` ·
+`Supplier Claims` are separate operator jobs and separate destinations. They are not sibling
 views of one record or one work surface, so they must not be placed in a shared tab strip.
 Purchasing navigation exposes each destination individually through the governed portal
 navigation. A page may not recreate the old `PurchasingTabs` strip as a second navigation.
 
-**THE RAIL IS A HEADING AND THE MANUAL PURCHASE RAIL IS LEFT (Jess, 2026-08-19
-— corrections card, ruled on production screenshots).** The sidebar lists this
-module's pages under a `PURCHASING` heading exactly like SALES — no parent row,
-no `SUPPLY CHAIN` umbrella (`ui/MASTER.md` §4.2 carries the law). And Manual
-Purchase's QUEUES + NEED FOR rail sits on the LEFT at 200px like its measured
-siblings (SO Batch §3, Receiving, Claims); the RIGHT side belongs to the
-supervision widgets.
+**PURCHASING IS ONE EXPANDABLE MODULE ROW WITH A TWO-LEVEL LISTING TREE (Jess,
+2026-08-20 — APPROVED / LOCKED after the 2026-08-19 production correction and PR #861).** The
+existing 232px/60px `PortalSidebar` remains the only left navigation surface. Clicking anywhere on
+the `Purchasing` row expands or hides the complete Purchasing tree; it does not create another
+sidebar, flyout, tab strip or page-owned navigation column. `Purchasing Home` and `My Purchasing
+Work` are direct children. `REQUESTS`, `BUY`, `RECEIVE`, `PROBLEMS` and `CONSIGNMENT` are full-row
+group headers, each independently expandable; more than one group may remain open. The group that
+contains the current page opens automatically and may not hide that page. Open state is remembered
+per signed-in user.
+
+The tree extends PR #861's approved wire-line language: one module icon, child rows without icons,
+quiet 1px connectors/elbows and separators, no heavy boxes/cards/popovers/shadows. The 200px
+`STATUS / WORK TO DO` rail remains inside an individual page and never becomes portal navigation.
+
+**ALWAYS EXACTLY ONE VISIBLE ACTIVE INDICATION — APPROVED / LOCKED.** Purchasing follows the
+shared module active-indication law (`../ui/MASTER.md`); grouping its Listing rows is presentation
+and does not earn it a selection rule of its own. The rail never says nothing about where the
+operator is standing, and never says it twice:
+
+```
+tree OPEN                        →  only the exact current child row is blue
+                                    (module parent and group headers stay neutral)
+tree SHUT, current page is ours  →  the Purchasing PARENT row is blue
+60px collapsed, page is ours     →  the Purchasing ICON is blue
+```
+
+An open module or group header never becomes a second active row; a shut parent standing on its
+own page is never a neutral one.
+
+**THE 60px ICON OPENS A NAMED DESTINATION — APPROVED / LOCKED.** The collapsed Purchasing icon
+links to **`SO Batch Purchase`** (`/operation?tab=purchase`), the module's existing landing
+destination. It is never derived from "the first live row": a module's landing page is a
+capability in its own right and may not move because the order of the rows around it changed. When
+`Purchasing Home` is built, that page's own approved scope may change this destination. Jump To
+ordering is untouched — it lists pages, and a landing choice is not a page.
+
+Manual Purchase's `QUEUES + NEED FOR` rail remains on the LEFT at 200px like its measured siblings
+(SO Batch §3, Receiving, Claims); the RIGHT side belongs to supervision widgets.
 
 **PURCHASING SETTINGS ENTRY — THE HEADER GEAR IS THE ONE DOOR (Jess, 2026-08-19, amending the
 corrections card in place).** *"Settings should be at the header settings, not every panel got
@@ -97,19 +139,17 @@ reached from here, and the hairline is what stops that convenience reading as ow
 Toolbars and `…` still do not repeat the door; the manager gate and audit requirements remain
 authoritative.
 
-**ELEVEN PAGES, AND WHY IT IS NOT FIVE** (Jess, 2026-08-18). The five-page tree was argued
-from information architecture: expose modules, then reveal documents inside them. Jess
-overturned it from the operator's side — **three staff who each do every job cannot be asked
-to remember which workspace hides which document.** A document a human must find again BY NAME
-gets a permanent door. The IA argument survives everywhere else: nothing gets a page because
-it exists, only because somebody looks for it twice.
+**THE COMPLETE MAP IS PERMANENT, BUT OWNERSHIP DOES NOT DUPLICATE.** Three staff who each do every
+job cannot be asked to remember which workspace hides which document. Every governed request,
+buying, receipt, problem and consignment object therefore has a named Listing destination from day
+one. An unbuilt destination remains a truthful `Coming soon` non-control until its own approved
+scope makes it live; the map never silently points to a fake Register.
 
-**TWO PROPOSED PAGES WERE REFUSED, and each refusal is the rule.**
-`My Purchasing Work` — Work is ONE cross-module surface (`../workspace/MASTER.md`); the same
-person receives in September and buys in August, and three module Work pages make them rank
-their own day. `Purchase Demands` — demand already has exactly TWO lanes, and a third surface
-over the same rows becomes a third place to press Issue. It is a Portal report,
-`Outstanding to Buy`, read-only.
+`My Purchasing Work` is a Purchasing-filtered view over the one shared Work Engine Action contract.
+It stores no task/status and never outranks the user's cross-module My Work. `Purchase Demands` is
+the authoritative demand Register and has no independent Issue authority: it inspects and prepares
+the governed demand; `SO Batch Purchase` remains the sole PO creation workspace. These destinations
+therefore improve findability without creating a second action engine, demand remainder or PO door.
 
 **SALES ORDERS IS NOT A PURCHASING TAB** (Loo, 2026-08-06 — his refinement of
 the same day's ruling). Purchasing READS the sales orders; it does not carry
@@ -324,9 +364,9 @@ breadcrumb, title, icon row or module-tab strip.
 > order header?"*). `PurchasingTabs` had kept drawing the 13px `Purchasing · {page}`
 > module-word pair after the strip died — the code lagging this section, not a second law.
 > It now renders `ModuleHeader destinationHeader` with the page's own word (`SO Batch
-> Purchase` · `Manual Purchase` · …), the SAME component and geometry Sales Orders and
+> Purchase` · `Manual Purchase Requests` · `Goods Receipts` · …), the SAME component and geometry Sales Orders and
 > Delivery Orders draw (50px, 24px word, no icon, no `Purchasing ·` prefix — the sidebar's
-> PURCHASING heading already answers which module you are in).
+> Purchasing module row already answers which module you are in).
 
 **One Workspace template**: 200px navigation rail → kit `DataTable` listing (for FINDING —
 sort, filter, search) → 400px workspace pane (where the WORK happens). Receiving, Purchase

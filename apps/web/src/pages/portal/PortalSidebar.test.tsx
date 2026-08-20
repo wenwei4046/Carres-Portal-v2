@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation } from "react-router-dom";
 
 /**
  * PortalSidebar — role-filtered area accordion (Unified Internal Portal,
@@ -13,9 +13,15 @@ import { MemoryRouter } from "react-router-dom";
  */
 
 let mockRole: string | null = "operation";
+// Purchasing remembers its drawers PER SIGNED-IN USER, so the tests need to be
+// able to be nobody, be one person, then be another.
+let mockUserId: string | null = null;
 vi.mock("@/lib/auth", () => ({
   useAuth: (selector: (s: { role: string | null; session: unknown }) => unknown) =>
-    selector({ role: mockRole, session: { user: { email: "x@carres.com" } } }),
+    selector({
+      role: mockRole,
+      session: { user: { email: "x@carres.com", id: mockUserId ?? undefined } },
+    }),
 }));
 
 // The rail self-fetches badges / the pending count; stub them so no network.
@@ -30,20 +36,36 @@ vi.mock("@/lib/queries", () => ({
 
 import PortalSidebar from "./PortalSidebar";
 
+/** Prints the live URL, so a control can be proved NOT to have navigated. */
+function LocationProbe() {
+  const location = useLocation();
+  return (
+    <output data-testid="location-probe">
+      {location.pathname}
+      {location.search}
+    </output>
+  );
+}
+
 function renderAt(path: string) {
   return render(
     <MemoryRouter initialEntries={[path]}>
       <PortalSidebar />
+      <LocationProbe />
     </MemoryRouter>,
   );
 }
 
 const module_ = (slug: string) => screen.getByTestId(`nav-module-${slug}`);
 const child = (key: string) => screen.getByTestId(`nav-child-${key}`);
+const group_ = (key: string) => screen.getByTestId(`nav-group-${key}`);
+const drawerKey = (userId: string) => `carres:portal-sidebar:purchasing:v1:${userId}`;
 
 beforeEach(() => {
   mockRole = "operation";
   mockBadges = undefined;
+  mockUserId = null;
+  localStorage.clear();
 });
 
 describe("PortalSidebar — role visibility", () => {
@@ -215,18 +237,23 @@ describe("the accordion", () => {
  * the exact defect the drawing exists to avoid.
  */
 describe("the elbow connectors", () => {
+  /* DELIVERY IS THE FLAT MODULE NOW. Purchasing grew a nested level under
+   * CARD-2026-08-20, so the one-level contract is proved on the module that
+   * still has one level — six pages, Report under its hairline, which is the
+   * exact shape Purchasing used to have. Purchasing's own nesting is proved in
+   * its own describe below. */
   it("every child row carries its own elbow", () => {
-    renderAt("/operation?tab=purchase");
-    const group = screen.getByTestId("nav-children-purchasing");
+    renderAt("/operation?tab=delivery");
+    const group = screen.getByTestId("nav-children-delivery");
     const rows = group.querySelectorAll("[data-testid^='nav-child-']");
     const elbows = group.querySelectorAll("[data-testid^='nav-elbow-']");
-    expect(rows.length).toBe(12);
+    expect(rows.length).toBe(6);
     expect(elbows.length).toBe(rows.length);
   });
 
   it("every elbow turns at its own row's middle", () => {
-    renderAt("/operation?tab=purchase");
-    const group = screen.getByTestId("nav-children-purchasing");
+    renderAt("/operation?tab=delivery");
+    const group = screen.getByTestId("nav-children-delivery");
     for (const el of group.querySelectorAll<HTMLElement>("[data-testid^='nav-elbow-']")) {
       // Capped at the row's centre; the number is only what it reaches UP by.
       expect(el.style.height).toMatch(/^calc\(50% \+ \d+px\)$/);
@@ -238,15 +265,15 @@ describe("the elbow connectors", () => {
    * past the group. Every child but the last carries the trunk on to the next
    * one; the last carries none, so the drawing simply stops there. */
   it("the trunk stops at the last child — it carries on from every other", () => {
-    renderAt("/operation?tab=purchase");
-    const group = screen.getByTestId("nav-children-purchasing");
+    renderAt("/operation?tab=delivery");
+    const group = screen.getByTestId("nav-children-delivery");
     const rows = group.querySelectorAll("[data-testid^='nav-child-']");
     const trunks = group.querySelectorAll("[data-testid^='nav-trunk-']");
-    expect(rows.length).toBe(12);
+    expect(rows.length).toBe(6);
     expect(trunks.length).toBe(rows.length - 1);
     // Report is last, and nothing hangs below it.
-    expect(screen.getByTestId("nav-elbow-purchasing-report")).toBeInTheDocument();
-    expect(screen.queryByTestId("nav-trunk-purchasing-report")).not.toBeInTheDocument();
+    expect(screen.getByTestId("nav-elbow-delivery-report")).toBeInTheDocument();
+    expect(screen.queryByTestId("nav-trunk-delivery-report")).not.toBeInTheDocument();
   });
 
   it("a selected child still shows the elbow it hangs from", () => {
@@ -256,8 +283,8 @@ describe("the elbow connectors", () => {
   });
 
   it("the trunk hangs from the module ICON's centre, and the elbow turns into the row", () => {
-    renderAt("/operation?tab=purchase");
-    const elbow = screen.getByTestId("nav-elbow-receiving");
+    renderAt("/operation?tab=delivery");
+    const elbow = screen.getByTestId("nav-elbow-delivery-schedule");
     // px-3.5 (14) + half a 16px icon = 22; the 1px line is centred on it.
     expect(elbow.style.left).toBe("21.5px");
     expect(elbow.style.width).toBe("11px");
@@ -265,10 +292,10 @@ describe("the elbow connectors", () => {
   });
 
   it("a child is decoration-free for a screen reader — the elbow is aria-hidden", () => {
-    renderAt("/operation?tab=purchase");
-    expect(screen.getByTestId("nav-elbow-receiving").getAttribute("aria-hidden")).toBe(
-      "true",
-    );
+    renderAt("/operation?tab=delivery");
+    expect(
+      screen.getByTestId("nav-elbow-delivery-schedule").getAttribute("aria-hidden"),
+    ).toBe("true");
   });
 });
 
@@ -340,7 +367,8 @@ describe("the active page — governed blue, never flame", () => {
 
   it("an inactive child carries no selection colour, and reads one weight lighter", () => {
     renderAt("/operation?tab=receiving");
-    const row = child("claims");
+    // `Report` is the sibling that is always on screen — it hangs in no drawer.
+    const row = child("purchasing-report");
     expect(row.className).not.toContain("bg-kit-blue-3");
     expect(row.className).toContain("font-normal");
     expect(row.querySelector(".bg-kit-blue-9")).toBeNull();
@@ -494,126 +522,467 @@ describe("PortalSidebar — the Sales Order cutover's two doors", () => {
 });
 
 /**
- * THE PURCHASING PAGES ARE THE MODULE'S MAP (Jess, 2026-08-18) — all of them,
- * from day one, because a map showing four of eleven roads teaches three
- * operators a shape that is about to change under them seven more times.
+ * ⭐ THE PURCHASING MAP — FIVE NAMED DRAWERS INSIDE ONE MODULE
+ * (Jess, 2026-08-20 — CARD-2026-08-20-purchasing-sidebar-groups).
+ *
+ * PR #861's module accordion is EXTENDED, never rebuilt. What changed is that
+ * eighteen destinations stopped being scannable as one flat list: a new hire
+ * could not tell which row held a request, a buying document, a receipt, a
+ * supplier problem or a consignment paper. Now the module opens onto two
+ * direct rows, five named drawers and Report.
  */
-describe("PortalSidebar — the Purchasing module's pages", () => {
-  const LIVE = [
-    "SO Batch Purchase",
-    "Manual Purchase",
-    "Purchase Orders",
-    "Receiving",
-    "Supplier Claims",
-    "Report",
-  ];
-  const SOON = [
-    "Purchase Returns",
-    "Repair Orders",
-    "Display Requests",
-    "Consignment Orders",
-    "Consignment Receipts",
-    "Consignment Returns",
-  ];
-
-  it("lists every page while the module is open", () => {
+describe("PortalSidebar — the Purchasing map", () => {
+  it("opens onto two direct rows, five drawers and Report — nothing else", () => {
     renderAt("/operation?tab=purchase");
-    for (const word of [...LIVE, ...SOON]) {
-      expect(screen.getByText(word)).toBeInTheDocument();
-    }
-  });
-
-  it("lists them in the approved order of purchasing/MASTER.md §1", () => {
-    renderAt("/operation?tab=purchase");
-    const rows = Array.from(
-      screen
-        .getByTestId("nav-children-purchasing")
-        .querySelectorAll("[data-testid^='nav-child-']"),
-    ).map((el) => el.textContent?.replace("Coming soon", "").trim());
+    const tree = screen.getByTestId("nav-children-purchasing");
+    const rows = Array.from(tree.children)
+      // Report's hairline is a bare rule with no words of its own.
+      .filter((row) => (row.textContent ?? "").trim() !== "")
+      .map((row) => {
+        const groupButton = row.querySelector("[data-testid^='nav-group-']");
+        if (groupButton) return groupButton.textContent?.trim();
+        return row.textContent?.replace("Coming soon", "").trim();
+      });
     expect(rows).toEqual([
-      "SO Batch Purchase",
-      "Manual Purchase",
-      "Purchase Orders",
-      "Receiving",
-      "Supplier Claims",
-      "Purchase Returns",
-      "Repair Orders",
-      "Display Requests",
-      "Consignment Orders",
-      "Consignment Receipts",
-      "Consignment Returns",
+      "Purchasing Home",
+      "My Purchasing Work",
+      "REQUESTS",
+      "BUY",
+      "RECEIVE",
+      "PROBLEMS",
+      "CONSIGNMENT",
       "Report",
     ]);
+    // Report is a PORTAL page, not the module's own — it keeps its hairline.
+    expect(tree.querySelector(".border-t")).not.toBeNull();
   });
 
-  it("the two renames are live and the old words appear nowhere", () => {
-    renderAt("/operation?tab=purchase");
-    expect(screen.getByText("SO Batch Purchase")).toBeInTheDocument();
-    expect(screen.getByText("Supplier Claims")).toBeInTheDocument();
+  it("fills the open drawer with its own approved pages, in order", () => {
+    renderAt("/operation?tab=purchase"); // BUY is forced open by the route
+    const rows = Array.from(
+      screen
+        .getByTestId("nav-group-children-purchasing-buy")
+        .querySelectorAll("[data-testid^='nav-child-']"),
+    ).map((el) => el.textContent?.replace("Coming soon", "").trim());
+    expect(rows).toEqual(["Purchase Demands", "SO Batch Purchase", "Purchase Orders"]);
+  });
+
+  it("the two renames are live, and the old words appear nowhere", () => {
+    renderAt("/operation?tab=receiving");
+    expect(screen.getByText("Goods Receipts")).toBeInTheDocument();
+    expect(screen.queryByText("Receiving")).not.toBeInTheDocument();
+    expect(screen.queryByText(/GRN/)).not.toBeInTheDocument();
+    fireEvent.click(group_("purchasing-requests"));
+    expect(screen.getByText("Manual Purchase Requests")).toBeInTheDocument();
+    expect(screen.queryByText("Manual Purchase")).not.toBeInTheDocument();
     expect(screen.queryByText("To Order")).not.toBeInTheDocument();
     expect(screen.queryByText("Claims")).not.toBeInTheDocument();
   });
 
-  it("`Receiving` keeps its word — no `Goods Receipts`, no `GRN`", () => {
-    renderAt("/operation?tab=purchase");
-    expect(screen.getByText("Receiving")).toBeInTheDocument();
-    expect(screen.queryByText("Goods Receipts")).not.toBeInTheDocument();
-    expect(screen.queryByText(/GRN/)).not.toBeInTheDocument();
+  it("a live row IS a link, on its exact current address", () => {
+    renderAt("/operation?tab=receiving");
+    const row = child("receiving");
+    expect(row.tagName).toBe("A");
+    expect(row.getAttribute("href")).toBe("/operation?tab=receiving");
+    expect(row.textContent).not.toContain("Coming soon");
+    expect(child("purchasing-report")).toHaveAttribute(
+      "href",
+      "/operation?tab=purchasing-report",
+    );
   });
 
-  it("an unbuilt entry is NOT a control — no href, not focusable, says why", () => {
+  it("`Purchase Orders` still links to its nested path, not to a ?tab=", () => {
     renderAt("/operation?tab=purchase");
+    expect(child("purchase-orders").getAttribute("href")).toBe("/operation/procurement");
+  });
+
+  it("an unbuilt row is NOT a control — no href, not focusable, says why", () => {
+    renderAt("/operation?tab=purchase");
+    fireEvent.click(group_("purchasing-consignment"));
     for (const key of [
-      "purchase-returns",
-      "repair-orders",
-      "display-requests",
-      "consignment-orders",
-      "consignment-receipts",
-      "consignment-returns",
+      "purchasing-home",
+      "purchasing-work",
+      "purchase-demands",
+      "consignment-overview",
+      "consignment-sale-notices",
     ]) {
       const row = child(key);
-      expect(row.tagName).toBe("SPAN");
+      expect(row.tagName, key).toBe("SPAN");
       expect(row.getAttribute("href")).toBeNull();
       expect(row.getAttribute("role")).not.toBe("link");
       expect(row.getAttribute("tabindex")).toBe("-1");
       expect(row.getAttribute("aria-disabled")).toBe("true");
       expect(row.textContent).toContain("Coming soon");
-      // The name owns its line; the reason stacks under it (measured
-      // 2026-08-19 — beside the tag every unbuilt name truncated).
+      // The name owns its line; the reason stacks under it.
       expect(row.className).toContain("flex-col");
-      expect(row.querySelector(".truncate")?.textContent ?? "").not.toContain(
-        "Coming soon",
-      );
     }
   });
 
-  it("a live entry IS a link and does not say `Coming soon`", () => {
-    renderAt("/operation?tab=purchase");
-    const row = child("receiving");
-    expect(row.tagName).toBe("A");
-    expect(row.getAttribute("href")).toBe("/operation?tab=receiving");
-    expect(row.textContent).not.toContain("Coming soon");
-  });
-
-  it("`Purchase Orders` links to its nested path, not to a ?tab=", () => {
-    renderAt("/operation?tab=purchase");
-    expect(child("purchase-orders").getAttribute("href")).toBe("/operation/procurement");
-  });
-
-  it("no unbuilt entry renders a count, and none renders a `0`", () => {
+  it("no unbuilt row renders a count, and none renders a `0`", () => {
     mockBadges = { orders: 0, procurement: 0, serviceNotes: 0, lpRejected: 0 };
     renderAt("/operation?tab=purchase");
-    for (const word of SOON) {
-      const row = screen.getByText(word).closest("[data-testid^='nav-child-']");
-      expect(row?.querySelector("[data-testid^='nav-badge-']")).toBeNull();
-      expect(row?.textContent).not.toMatch(/\b0\b/);
+    const tree = screen.getByTestId("nav-children-purchasing");
+    for (const row of tree.querySelectorAll("[data-soon='1']")) {
+      expect(row.querySelector("[data-testid^='nav-badge-']")).toBeNull();
+      expect(row.textContent).not.toMatch(/\b0\b/);
     }
   });
 
-  it("a nested path page wins — Receiving does not light next to Purchase Orders", () => {
+  it("a nested path page wins — Goods Receipts does not light next to Purchase Orders", () => {
     renderAt("/operation/procurement");
     expect(child("purchase-orders").className).toContain("bg-kit-blue-3");
-    expect(child("receiving").className).not.toContain("bg-kit-blue-3");
+    expect(screen.queryByTestId("nav-child-receiving")).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * THE PURCHASING ROW IS A DRAWER HANDLE, NOT A DOOR. Clicking it reveals the
+ * map and leaves the URL where it was — with eighteen destinations, the
+ * operator clicks this row to LOOK far more often than to travel.
+ */
+describe("PortalSidebar — the Purchasing parent toggles without navigating", () => {
+  it("a click changes the tree and does NOT change the URL", () => {
+    renderAt("/operation");
+    const before = screen.getByTestId("location-probe").textContent;
+    fireEvent.click(module_("purchasing"));
+    expect(screen.getByTestId("location-probe")).toHaveTextContent(before ?? "");
+    expect(screen.getByTestId("nav-children-purchasing")).toBeInTheDocument();
+    expect(module_("purchasing").getAttribute("aria-expanded")).toBe("true");
+  });
+
+  it("the whole row is one button carrying its own aria-expanded", () => {
+    renderAt("/operation");
+    const row = module_("purchasing");
+    expect(row.tagName).toBe("BUTTON");
+    expect(row.getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("opening Purchasing still shuts the module that was open", () => {
+    renderAt("/operation/orders");
+    expect(screen.getByTestId("nav-children-sales")).toBeInTheDocument();
+    fireEvent.click(module_("purchasing"));
+    expect(screen.getByTestId("nav-children-purchasing")).toBeInTheDocument();
+    expect(screen.queryByTestId("nav-children-sales")).not.toBeInTheDocument();
+  });
+
+  it("shutting Purchasing while standing on a Purchasing page is allowed", () => {
+    renderAt("/operation?tab=receiving");
+    expect(screen.getByTestId("nav-children-purchasing")).toBeInTheDocument();
+    fireEvent.click(module_("purchasing"));
+    expect(screen.queryByTestId("nav-children-purchasing")).not.toBeInTheDocument();
+    expect(screen.getByTestId("location-probe")).toHaveTextContent(
+      "/operation?tab=receiving",
+    );
+  });
+
+  /* ⭐ ALWAYS EXACTLY ONE VISIBLE ACTIVE INDICATION (owner review, 2026-08-20).
+   * Open, the child carries it. Shut, the parent carries it. Never both, and
+   * never neither — a rail that says nothing about where you are standing is
+   * the defect this rule exists to stop. */
+  it("shutting the tree moves the light onto the Purchasing parent", () => {
+    renderAt("/operation?tab=receiving");
+    // Open: the parent is neutral and the child carries the light.
+    expect(module_("purchasing").className).not.toContain("bg-kit-blue-3");
+    expect(child("receiving").className).toContain("bg-kit-blue-3");
+
+    fireEvent.click(module_("purchasing")); // shut it, still on Goods Receipts
+    expect(module_("purchasing").className).toContain("bg-kit-blue-3");
+    expect(module_("purchasing").querySelector(".bg-kit-blue-9")).not.toBeNull();
+  });
+
+  it("never both — the parent goes neutral again the moment the tree reopens", () => {
+    renderAt("/operation?tab=receiving");
+    fireEvent.click(module_("purchasing")); // shut
+    fireEvent.click(module_("purchasing")); // and open again
+    expect(module_("purchasing").className).not.toContain("bg-kit-blue-3");
+    expect(child("receiving").className).toContain("bg-kit-blue-3");
+  });
+
+  it("open tree: exactly ONE row is selected — never parent + drawer + page", () => {
+    renderAt("/operation?tab=receiving");
+    expect(module_("purchasing").className).not.toContain("bg-kit-blue-3");
+    expect(group_("purchasing-receive").className).not.toContain("bg-kit-blue-3");
+    const lit = screen
+      .getByTestId("nav-children-purchasing")
+      .querySelectorAll(".bg-kit-blue-3");
+    expect(lit.length).toBe(1);
+    expect(child("receiving").className).toContain("bg-kit-blue-3");
+  });
+
+  it("arriving by URL opens Purchasing so the destination is never hidden", () => {
+    renderAt("/operation?tab=claims");
+    expect(module_("purchasing").getAttribute("aria-expanded")).toBe("true");
+    expect(child("claims").className).toContain("bg-kit-blue-3");
+  });
+
+  /* BOTH ENTRANCES, ONE DESTINATION. `/operation/to-order` is still a live
+   * in-page link; it may not light a second row. */
+  it("/operation/to-order opens Purchasing + BUY and selects only SO Batch Purchase", () => {
+    renderAt("/operation/to-order");
+    expect(module_("purchasing").getAttribute("aria-expanded")).toBe("true");
+    expect(group_("purchasing-buy").getAttribute("aria-expanded")).toBe("true");
+    expect(child("purchase").className).toContain("bg-kit-blue-3");
+    expect(child("purchase-orders").className).not.toContain("bg-kit-blue-3");
+    const lit = screen
+      .getByTestId("nav-children-purchasing")
+      .querySelectorAll(".bg-kit-blue-3");
+    expect(lit.length).toBe(1);
+  });
+});
+
+/**
+ * FIVE DRAWERS, EACH OPENING ALONE. A buyer works out of two of them all day,
+ * and a rail that keeps shutting one behind their back is a rail that gets
+ * fought.
+ */
+describe("PortalSidebar — the Purchasing drawers", () => {
+  it("each drawer is a full-width button with its own aria-expanded", () => {
+    renderAt("/operation?tab=purchase");
+    for (const key of [
+      "purchasing-requests",
+      "purchasing-buy",
+      "purchasing-receive",
+      "purchasing-problems",
+      "purchasing-consignment",
+    ]) {
+      const row = group_(key);
+      expect(row.tagName, key).toBe("BUTTON");
+      expect(row.getAttribute("aria-expanded"), key).not.toBeNull();
+      expect(row.className).toContain("w-full");
+    }
+  });
+
+  it("the word is a LABEL rank — 11px semibold uppercase, never a destination", () => {
+    renderAt("/operation?tab=purchase");
+    const row = group_("purchasing-buy");
+    expect(row.className).toContain("text-label");
+    expect(row.className).toContain("font-semibold");
+    expect(row.className).toContain("uppercase");
+    expect(row.getAttribute("href")).toBeNull();
+  });
+
+  it("opening one drawer does NOT shut another", () => {
+    renderAt("/operation?tab=purchase"); // BUY forced open
+    fireEvent.click(group_("purchasing-problems"));
+    expect(screen.getByText("SO Batch Purchase")).toBeVisible();
+    expect(screen.getByText("Supplier Claims")).toBeVisible();
+    fireEvent.click(group_("purchasing-consignment"));
+    expect(screen.getByText("SO Batch Purchase")).toBeVisible();
+    expect(screen.getByText("Supplier Claims")).toBeVisible();
+    expect(screen.getByText("Consignment Returns")).toBeVisible();
+  });
+
+  it("a drawer opened by hand shuts again on the next click", () => {
+    renderAt("/operation?tab=purchase");
+    fireEvent.click(group_("purchasing-problems"));
+    expect(screen.getByTestId("nav-group-children-purchasing-problems")).toBeInTheDocument();
+    fireEvent.click(group_("purchasing-problems"));
+    expect(
+      screen.queryByTestId("nav-group-children-purchasing-problems"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("the drawer holding the current page opens itself and REFUSES to shut", () => {
+    renderAt("/operation?tab=receiving");
+    const receive = group_("purchasing-receive");
+    expect(receive.getAttribute("aria-expanded")).toBe("true");
+    expect(receive.getAttribute("aria-disabled")).toBe("true");
+    fireEvent.click(receive);
+    expect(group_("purchasing-receive").getAttribute("aria-expanded")).toBe("true");
+    expect(child("receiving")).toBeInTheDocument();
+  });
+
+  it("a drawer you are NOT standing in stays an ordinary handle", () => {
+    renderAt("/operation?tab=receiving");
+    expect(group_("purchasing-buy").getAttribute("aria-disabled")).toBeNull();
+  });
+
+  it("the drawer's children hang one level deeper, off their own trunk", () => {
+    renderAt("/operation?tab=purchase");
+    const nested = screen.getByTestId("nav-elbow-purchase");
+    const topLevel = screen.getByTestId("nav-elbow-purchasing-report");
+    // The module's own trunk stays on the icon's centre (21.5px); the drawer's
+    // children hang from the drawer word's left edge, further right.
+    expect(topLevel.style.left).toBe("21.5px");
+    expect(Number.parseFloat(nested.style.left)).toBeGreaterThan(21.5);
+    expect(nested.style.borderBottomLeftRadius).toBe("9px");
+    expect(nested.getAttribute("aria-hidden")).toBe("true");
+  });
+
+  it("a drawer hangs off the module's trunk exactly as a page does", () => {
+    renderAt("/operation?tab=purchase");
+    const elbow = screen.getByTestId("nav-elbow-purchasing-buy");
+    expect(elbow.style.left).toBe("21.5px");
+    expect(elbow.style.borderBottomLeftRadius).toBe("9px");
+    // The module trunk carries on past the whole drawer to reach the next row.
+    expect(screen.getByTestId("nav-trunk-purchasing-buy")).toBeInTheDocument();
+    // CONSIGNMENT is the last drawer, but Report hangs below it — so it does
+    // carry the trunk on; Report itself is the row that ends the line.
+    expect(screen.queryByTestId("nav-trunk-purchasing-report")).not.toBeInTheDocument();
+  });
+
+  /* ⭐ THE 60px ICON GOES WHERE IT IS TOLD, NOT WHERE ROW ORDER PUTS IT
+   * (owner review, 2026-08-20). Deriving it from the first live row moved the
+   * module's landing page the moment grouping reordered the rail. */
+  it("the collapsed Purchasing icon links to SO Batch Purchase, and lights on any Purchasing page", () => {
+    localStorage.setItem("ops-sidebar-collapsed", "1");
+    try {
+      renderAt("/operation?tab=receiving");
+      const icon = screen.getByTitle("Purchasing") as HTMLAnchorElement;
+      // NOT `Manual Purchase Requests`, which is the first live row now.
+      expect(icon).toHaveAttribute("href", "/operation?tab=purchase");
+      // Standing on Goods Receipts still lights the module's one icon.
+      expect(icon.className).toContain("bg-kit-blue-3");
+      expect(icon.querySelector(".bg-kit-blue-9")).not.toBeNull();
+    } finally {
+      localStorage.removeItem("ops-sidebar-collapsed");
+    }
+  });
+
+  it("collapsed to 60px, every direct/drawer/listing row disappears", () => {
+    localStorage.setItem("ops-sidebar-collapsed", "1");
+    try {
+      renderAt("/operation?tab=receiving");
+      expect(screen.getByTitle("Purchasing")).toBeInTheDocument();
+      expect(screen.queryByTestId("nav-group-purchasing-buy")).not.toBeInTheDocument();
+      expect(screen.queryByText("BUY")).not.toBeInTheDocument();
+      expect(screen.queryByText("Goods Receipts")).not.toBeInTheDocument();
+      expect(screen.queryByText("Purchasing Home")).not.toBeInTheDocument();
+    } finally {
+      localStorage.removeItem("ops-sidebar-collapsed");
+    }
+  });
+});
+
+/**
+ * THE DRAWERS ARE REMEMBERED, PER SIGNED-IN USER. Two people share a machine
+ * in the office, and one operator's open drawers are not the other's.
+ */
+describe("PortalSidebar — Purchasing remembers its drawers", () => {
+  it("writes the exact versioned user-id key, and only presentation state", () => {
+    mockUserId = "user-a";
+    renderAt("/operation");
+    fireEvent.click(module_("purchasing"));
+    fireEvent.click(group_("purchasing-problems"));
+    const raw = localStorage.getItem(drawerKey("user-a"));
+    expect(raw).not.toBeNull();
+    const stored = JSON.parse(raw as string);
+    expect(stored).toEqual({ moduleOpen: true, openGroups: ["purchasing-problems"] });
+    expect(Object.keys(stored).sort()).toEqual(["moduleOpen", "openGroups"]);
+  });
+
+  it("restores them on the next load", () => {
+    mockUserId = "user-a";
+    localStorage.setItem(
+      drawerKey("user-a"),
+      JSON.stringify({ moduleOpen: true, openGroups: ["purchasing-consignment"] }),
+    );
+    renderAt("/operation");
+    expect(module_("purchasing").getAttribute("aria-expanded")).toBe("true");
+    expect(group_("purchasing-consignment").getAttribute("aria-expanded")).toBe("true");
+    expect(group_("purchasing-buy").getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("user B does not inherit user A's open drawers", () => {
+    localStorage.setItem(
+      drawerKey("user-a"),
+      JSON.stringify({ moduleOpen: true, openGroups: ["purchasing-consignment"] }),
+    );
+    mockUserId = "user-b";
+    renderAt("/operation");
+    expect(module_("purchasing").getAttribute("aria-expanded")).toBe("false");
+    expect(localStorage.getItem(drawerKey("user-b"))).toBeNull();
+  });
+
+  it("nobody signed in — the rail still works, and writes nothing", () => {
+    mockUserId = null;
+    renderAt("/operation");
+    fireEvent.click(module_("purchasing"));
+    expect(screen.getByTestId("nav-children-purchasing")).toBeInTheDocument();
+    expect(Object.keys(localStorage).filter((k) => k.includes("purchasing"))).toEqual([]);
+  });
+
+  it("malformed storage falls back safely — it never breaks navigation", () => {
+    mockUserId = "user-a";
+    localStorage.setItem(drawerKey("user-a"), "{not json");
+    renderAt("/operation?tab=claims");
+    // The route still wins, the drawer still opens, the page is still lit.
+    expect(module_("purchasing").getAttribute("aria-expanded")).toBe("true");
+    expect(child("claims").className).toContain("bg-kit-blue-3");
+  });
+
+  /* THE SAFETY RULE WINS OVER A STORED CLOSED STATE. Landing on a page the
+   * rail is hiding is the one defect this may not ship. */
+  it("a stored CLOSED module still opens when you arrive on a Purchasing page", () => {
+    mockUserId = "user-a";
+    localStorage.setItem(
+      drawerKey("user-a"),
+      JSON.stringify({ moduleOpen: false, openGroups: [] }),
+    );
+    renderAt("/operation?tab=receiving");
+    expect(module_("purchasing").getAttribute("aria-expanded")).toBe("true");
+    expect(child("receiving")).toBeInTheDocument();
+  });
+
+  /* A remembered Purchasing drawer may never hide the module you are actually
+   * standing in — that would be the same defect from the other direction. */
+  it("a remembered OPEN Purchasing never hides another module's current page", () => {
+    mockUserId = "user-a";
+    localStorage.setItem(
+      drawerKey("user-a"),
+      JSON.stringify({ moduleOpen: true, openGroups: ["purchasing-buy"] }),
+    );
+    renderAt("/operation/orders");
+    expect(screen.getByTestId("nav-children-sales")).toBeInTheDocument();
+    expect(screen.queryByTestId("nav-children-purchasing")).not.toBeInTheDocument();
+    expect(child("orders").className).toContain("bg-kit-blue-3");
+  });
+
+  /* ⭐ SWITCHING USER WITHOUT REMOUNTING (owner review, 2026-08-20).
+   *
+   * The rail is not torn down when the signed-in user changes, so the drawer
+   * memory has to follow the user IN PLACE. This is the case that exposed the
+   * dependency gap: loading B's (empty) state replaced A's, but the rule that
+   * forces the module open for the page you are standing on was keyed only on
+   * the active route — which had not changed — so B was left looking at a rail
+   * that was hiding B's own current page. */
+  it("user B does not inherit A's drawers, and still gets their own page shown", () => {
+    localStorage.setItem(
+      drawerKey("user-a"),
+      JSON.stringify({
+        moduleOpen: true,
+        openGroups: ["purchasing-consignment", "purchasing-problems"],
+      }),
+    );
+    mockUserId = "user-a";
+    const view = renderAt("/operation?tab=receiving");
+    expect(group_("purchasing-consignment").getAttribute("aria-expanded")).toBe("true");
+    expect(group_("purchasing-problems").getAttribute("aria-expanded")).toBe("true");
+
+    // Same mounted component — only the signed-in user changes.
+    mockUserId = "user-b";
+    view.rerender(
+      <MemoryRouter initialEntries={["/operation?tab=receiving"]}>
+        <PortalSidebar />
+        <LocationProbe />
+      </MemoryRouter>,
+    );
+
+    // A's drawers did not travel.
+    expect(group_("purchasing-consignment").getAttribute("aria-expanded")).toBe("false");
+    expect(group_("purchasing-problems").getAttribute("aria-expanded")).toBe("false");
+    // ...and B is still shown the page B is standing on.
+    expect(module_("purchasing").getAttribute("aria-expanded")).toBe("true");
+    expect(group_("purchasing-receive").getAttribute("aria-expanded")).toBe("true");
+    expect(child("receiving").className).toContain("bg-kit-blue-3");
+    // B's own storage was not written by merely arriving.
+    expect(localStorage.getItem(drawerKey("user-b"))).toBeNull();
+  });
+
+  it("the route it opens on is never written to storage", () => {
+    mockUserId = "user-a";
+    renderAt("/operation?tab=receiving");
+    expect(localStorage.getItem(drawerKey("user-a"))).toBeNull();
   });
 });
 

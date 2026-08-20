@@ -11,6 +11,7 @@ import {
 } from "@/lib/queries";
 import {
   visibleGroups,
+  visibleItems,
   navBlocks,
   navItemHref,
   areaDefaultHref,
@@ -20,6 +21,18 @@ import {
   type PortalNavItem,
   type PortalSection,
 } from "./portal-nav";
+import {
+  purchasingChildBlocks,
+  activePurchasingGroup,
+  parsePurchasingSidebarState,
+  serializePurchasingSidebarState,
+  purchasingSidebarStorageKey,
+  PURCHASING_LANDING_KEY,
+  EMPTY_PURCHASING_SIDEBAR_STATE,
+  type PurchasingChildBlock,
+  type PurchasingPageGroupKey,
+  type PurchasingSidebarStateV1,
+} from "./purchasing-sidebar";
 
 const COLLAPSE_KEY = "ops-sidebar-collapsed";
 
@@ -48,6 +61,40 @@ const ROW_GAP = 2;
 const ICON_TO_ROW_BOTTOM = (36 - MODULE_ICON) / 2;
 /** a `dividerAbove` hairline: 2px gap + 4px margin + 1px rule + 4px + 2px. */
 const DIVIDER_GAP = 13;
+
+/* ── ONE NESTED LEVEL, DERIVED — NEVER MEASURED AGAIN
+ * (CARD-2026-08-20-purchasing-sidebar-groups).
+ *
+ * A Purchasing GROUP is a row sitting at the module's own child indent, so its
+ * children repeat the same drawing one level down. Every number below comes
+ * out of the shipped constants above; guessing a second set of x positions is
+ * how two levels of the same tree drift apart. */
+const GROUP_ROW_H = 28; // text-label (11/14) + 7px above and below
+/** the module's elbow turns into the group row at the group WORD's middle. */
+const GROUP_TRUNK_TO_ROW_BOTTOM = GROUP_ROW_H / 2;
+/** the nested trunk hangs from the group word's own left edge... */
+const GROUP_ELBOW_X = CHILD_PAD_L;
+/** ...and its children clear the elbow by the same 4px the module level uses. */
+const GROUP_CHILD_PAD_L = CHILD_PAD_L + ELBOW_W + 4;
+
+/** Where one level of children hangs: the trunk's x, the text's indent, and
+ *  how far the FIRST child has to reach up to touch what it hangs from. */
+type ChildGeom = { elbowX: number; padL: number; firstGap: number };
+/** children of a MODULE — the trunk drops from the module icon's centre. */
+const MODULE_GEOM: ChildGeom = {
+  elbowX: ELBOW_X,
+  padL: CHILD_PAD_L,
+  firstGap: ROW_GAP + ICON_TO_ROW_BOTTOM,
+};
+/** children of a GROUP — the trunk starts at the group row's BOTTOM, so the
+ *  line never runs through the word it hangs from. */
+const GROUP_GEOM: ChildGeom = {
+  elbowX: GROUP_ELBOW_X,
+  padL: GROUP_CHILD_PAD_L,
+  firstGap: ROW_GAP,
+};
+
+const PURCHASING: PortalSection = "Purchasing";
 
 /**
  * Unified Internal Portal sidebar (2026-06-30, Loo).
@@ -259,15 +306,137 @@ export default function PortalSidebar() {
   const [override, setOverride] = useState<
     { at: string; section: PortalSection | "" } | null
   >(null);
-  const openSection: PortalSection | null =
+
+  /* ── PURCHASING REMEMBERS ITS DRAWERS, PER SIGNED-IN USER ────────────────
+   * (CARD-2026-08-20-purchasing-sidebar-groups.)
+   *
+   * Eighteen destinations behind five drawers is only kind if the operator
+   * does not have to re-open theirs every morning. So Purchasing's parent and
+   * group choices persist — PRESENTATION ONLY, and keyed on the auth user id,
+   * because two people share a machine in the office.
+   *
+   * What is NOT stored: the active route, the active key, any count, any
+   * business status. Where you are standing is derived from the URL every
+   * render; a rail preference may never become a second source of truth. */
+  const userId = session?.user?.id ?? null;
+  const storageKey = userId ? purchasingSidebarStorageKey(userId) : null;
+  const [purchasingState, setPurchasingState] = useState<PurchasingSidebarStateV1>(
+    EMPTY_PURCHASING_SIDEBAR_STATE,
+  );
+
+  // Signing in, or switching user, LOADS that user's own state — never the
+  // previous one's. No id (not signed in yet) → memory only, never written.
+  useEffect(() => {
+    if (!storageKey) {
+      setPurchasingState(EMPTY_PURCHASING_SIDEBAR_STATE);
+      return;
+    }
+    try {
+      setPurchasingState(parsePurchasingSidebarState(localStorage.getItem(storageKey)));
+    } catch {
+      setPurchasingState(EMPTY_PURCHASING_SIDEBAR_STATE);
+    }
+  }, [storageKey]);
+
+  /** A HUMAN turned this handle — remember it. */
+  function writePurchasingState(next: PurchasingSidebarStateV1) {
+    setPurchasingState(next);
+    if (!storageKey) return;
+    try {
+      localStorage.setItem(storageKey, serializePurchasingSidebarState(next));
+    } catch {
+      /* a full or blocked storage may not break the rail */
+    }
+  }
+
+  /** Another module took the rail. Memory only: the operator did not choose
+   *  to shut Purchasing, so their stored preference is not overwritten. */
+  function closePurchasingForOtherModule() {
+    setPurchasingState((prev) => (prev.moduleOpen ? { ...prev, moduleOpen: false } : prev));
+  }
+
+  // The Purchasing pages this role may open, and which one is showing.
+  const purchasingPages = useMemo(
+    () =>
+      activeGroup
+        ? visibleItems(activeGroup, role).filter((item) => item.section === PURCHASING)
+        : [],
+    [activeGroup, role],
+  );
+  const activePurchasingKey = activeGroup
+    ? purchasingPages.find((page) => isItemActive(activeGroup, page))?.key ?? null
+    : null;
+  /** The drawer holding the page you are on. Derived, forced open, never stored. */
+  const forcedGroup = activePurchasingGroup(purchasingPages, activePurchasingKey);
+
+  /* ARRIVING ON A PURCHASING PAGE OPENS PURCHASING — the safety rule that wins
+   * over a stored closed state. A URL, a ⌘K jump or an in-page link must never
+   * land you on a page the rail is hiding. It is not persisted: the operator
+   * did not choose it, the route did. */
+  //
+  // `storageKey` is a dependency on purpose. Switching user re-runs the LOAD
+  // effect above and replaces the state with the new user's (often empty) one
+  // — so this rule has to run again for the incoming user, or an operator who
+  // signs in while standing on a Purchasing page lands on a rail that is
+  // hiding their own page.
+  useEffect(() => {
+    if (!activePurchasingKey) return;
+    setPurchasingState((prev) => (prev.moduleOpen ? prev : { ...prev, moduleOpen: true }));
+  }, [activePurchasingKey, storageKey]);
+
+  /* THE ONE OPEN MODULE. The shipped location rule still decides for every
+   * other module; Purchasing alone answers to its own remembered handle. The
+   * order matters: a module holding the page you are STANDING on always wins,
+   * so a remembered Purchasing drawer can never hide the row you are on. */
+  const baseOpen: PortalSection | null =
     override?.at === here ? override.section || null : activeModuleSection;
+  const openSection: PortalSection | null =
+    baseOpen !== null && baseOpen !== PURCHASING
+      ? baseOpen
+      : purchasingState.moduleOpen
+        ? PURCHASING
+        : null;
+
+  const isGroupOpen = (key: PurchasingPageGroupKey) =>
+    key === forcedGroup || purchasingState.openGroups.includes(key);
+
+  /** A drawer opens and shuts on its own — opening one never shuts another.
+   *  The drawer you are STANDING in cannot be shut: that would hide the page
+   *  you are on, which is the one thing the rail may not do. */
+  function togglePurchasingGroup(key: PurchasingPageGroupKey) {
+    if (key === forcedGroup) return;
+    const open = purchasingState.openGroups.includes(key);
+    writePurchasingState({
+      moduleOpen: purchasingState.moduleOpen,
+      openGroups: open
+        ? purchasingState.openGroups.filter((g) => g !== key)
+        : [...purchasingState.openGroups, key],
+    });
+  }
 
   function toggleModule(group: PortalNavGroup, block: Extract<NavBlock, { kind: "module" }>) {
+    /* ⭐ THE PURCHASING ROW IS A DRAWER HANDLE, NOT A DOOR (Jess, 2026-08-20).
+     *
+     * Every other module opens its first live page, because clicking it is how
+     * you GO there. Purchasing cannot: its first row is `Purchasing Home`,
+     * which is not built, and eighteen destinations mean the operator clicks
+     * this row to LOOK — to find which drawer their job is in — far more often
+     * than to travel. So it reveals the map and leaves the URL exactly where
+     * it was. It still shuts whatever other module was open: one module at a
+     * time is the shipped accordion's rule and it holds. */
+    if (block.module.section === PURCHASING) {
+      const next = openSection !== PURCHASING;
+      setOverride({ at: here, section: "" }); // the location rule steps aside
+      writePurchasingState({ ...purchasingState, moduleOpen: next });
+      return;
+    }
     if (openSection === block.module.section) {
       setOverride({ at: here, section: "" }); // shut, on purpose, right here
+      closePurchasingForOtherModule();
       return;
     }
     setOverride({ at: here, section: block.module.section });
+    closePurchasingForOtherModule();
     // Expanding also OPENS the module — its first live page. An all-unbuilt
     // module has nothing to open, so it only expands.
     const first = block.pages.find((p) => !p.soon);
@@ -275,6 +444,30 @@ export default function PortalSidebar() {
       fireMarkSeen(first.badge);
       navigate(navItemHref(group, first));
     }
+  }
+
+  /**
+   * WHERE A COLLAPSED MODULE ICON GOES.
+   *
+   * ⭐ NOT "the first live row" (owner review, 2026-08-20). Deriving the
+   * destination from row order means the module's landing page silently moves
+   * the day a page above it goes live — grouping Purchasing had already
+   * dragged its icon from `SO Batch Purchase` to `Manual Purchase Requests`
+   * without anyone deciding that. Purchasing names its landing page instead,
+   * and it stays named until `Purchasing Home` is built and its own approved
+   * scope changes it. Every other module keeps first-live-row until it has a
+   * reason not to.
+   */
+  function moduleLandingPage(
+    block: Extract<NavBlock, { kind: "module" }>,
+  ): PortalNavItem | undefined {
+    if (block.module.section === PURCHASING) {
+      const named = block.pages.find(
+        (p) => p.key === PURCHASING_LANDING_KEY && !p.soon,
+      );
+      if (named) return named;
+    }
+    return block.pages.find((p) => !p.soon);
   }
 
   /** Work waiting inside a module, for the row that has hidden its children. */
@@ -307,11 +500,12 @@ export default function PortalSidebar() {
     child: PortalNavItem,
     index: number,
     isLast: boolean,
+    geom: ChildGeom = MODULE_GEOM,
   ) {
     const gapAbove = child.dividerAbove
       ? DIVIDER_GAP
       : index === 0
-        ? ROW_GAP + ICON_TO_ROW_BOTTOM
+        ? geom.firstGap
         : ROW_GAP;
 
     const elbow = (
@@ -322,7 +516,7 @@ export default function PortalSidebar() {
           data-testid={`nav-elbow-${child.key}`}
           className="absolute pointer-events-none border-kit-slate-6"
           style={{
-            left: ELBOW_X - 0.5,
+            left: geom.elbowX - 0.5,
             top: -gapAbove,
             width: ELBOW_W,
             // Down to the row's MIDDLE, where it turns.
@@ -346,7 +540,7 @@ export default function PortalSidebar() {
             data-testid={`nav-trunk-${child.key}`}
             className="absolute pointer-events-none border-kit-slate-6"
             style={{
-              left: ELBOW_X - 0.5,
+              left: geom.elbowX - 0.5,
               top: "50%",
               bottom: -ROW_GAP,
               borderLeftWidth: 1,
@@ -364,7 +558,7 @@ export default function PortalSidebar() {
       return (
         <Fragment key={child.key}>
           {child.dividerAbove && (
-            <div className="mr-3.5 my-1 border-t border-base-100" style={{ marginLeft: CHILD_PAD_L }} />
+            <div className="mr-3.5 my-1 border-t border-base-100" style={{ marginLeft: geom.padL }} />
           )}
           <div className="relative">
             {elbow}
@@ -374,7 +568,7 @@ export default function PortalSidebar() {
               aria-disabled="true"
               tabIndex={-1}
               className={`${row} flex-col items-start text-base-400 font-normal cursor-default select-none`}
-              style={{ paddingLeft: CHILD_PAD_L }}
+              style={{ paddingLeft: geom.padL }}
             >
               <span className="min-w-0 w-full truncate">{child.label}</span>
               <span className="text-label text-base-400">Coming soon</span>
@@ -388,7 +582,7 @@ export default function PortalSidebar() {
     return (
       <Fragment key={child.key}>
         {child.dividerAbove && (
-          <div className="mr-3.5 my-1 border-t border-base-100" style={{ marginLeft: CHILD_PAD_L }} />
+          <div className="mr-3.5 my-1 border-t border-base-100" style={{ marginLeft: geom.padL }} />
         )}
         <div className="relative">
           {elbow}
@@ -402,7 +596,7 @@ export default function PortalSidebar() {
                 ? `${row} items-center gap-2 bg-kit-blue-3 text-base-900 font-medium`
                 : `${row} items-center gap-2 text-base-600 font-normal hover:bg-hovertint`
             }
-            style={{ paddingLeft: CHILD_PAD_L }}
+            style={{ paddingLeft: geom.padL }}
           >
             {active && (
               <span
@@ -417,6 +611,99 @@ export default function PortalSidebar() {
           </Link>
         </div>
       </Fragment>
+    );
+  }
+
+  /**
+   * A DRAWER — one named group of Purchasing pages
+   * (CARD-2026-08-20-purchasing-sidebar-groups).
+   *
+   * It hangs off the module's trunk exactly as a page does, and then repeats
+   * the drawing one level down for its own children. THE WORD IS A LABEL RANK,
+   * NOT A DESTINATION: 11px semibold uppercase, quiet grey, no wash — because
+   * the only blue row in this rail is the exact page you are on.
+   *
+   * Each drawer opens and shuts alone: opening BUY does not shut PROBLEMS. A
+   * buyer works out of two drawers all day, and a rail that keeps closing one
+   * of them behind their back is a rail that gets fought.
+   *
+   * The drawer holding the current page is FORCED open and refuses to shut —
+   * `aria-disabled` says so rather than leaving a handle that silently does
+   * nothing. Hiding the row you are standing on is the one thing §4.2 refuses.
+   */
+  function renderPurchasingGroup(
+    group: PortalNavGroup,
+    block: Extract<PurchasingChildBlock, { kind: "group" }>,
+    index: number,
+    isLastBlock: boolean,
+  ) {
+    const open = isGroupOpen(block.group.key);
+    const forced = forcedGroup === block.group.key;
+    const gapAbove = index === 0 ? MODULE_GEOM.firstGap : ROW_GAP;
+    return (
+      <div key={block.group.key} className="relative">
+        {/* The MODULE's elbow, turning into this group's word. */}
+        <span
+          aria-hidden="true"
+          data-testid={`nav-elbow-${block.group.key}`}
+          className="absolute pointer-events-none border-kit-slate-6"
+          style={{
+            left: ELBOW_X - 0.5,
+            top: -gapAbove,
+            width: ELBOW_W,
+            height: gapAbove + GROUP_TRUNK_TO_ROW_BOTTOM,
+            borderLeftWidth: 1,
+            borderBottomWidth: 1,
+            borderBottomLeftRadius: ELBOW_R,
+            zIndex: 1,
+          }}
+        />
+        {/* The module's trunk carrying on PAST this whole drawer — children
+         * and all — to reach the next row at the module's level. */}
+        {!isLastBlock && (
+          <span
+            aria-hidden="true"
+            data-testid={`nav-trunk-${block.group.key}`}
+            className="absolute pointer-events-none border-kit-slate-6"
+            style={{
+              left: ELBOW_X - 0.5,
+              top: GROUP_TRUNK_TO_ROW_BOTTOM,
+              bottom: -ROW_GAP,
+              borderLeftWidth: 1,
+              zIndex: 1,
+            }}
+          />
+        )}
+        <button
+          type="button"
+          data-testid={`nav-group-${block.group.key}`}
+          aria-expanded={open}
+          aria-disabled={forced || undefined}
+          onClick={() => togglePurchasingGroup(block.group.key)}
+          className={`relative w-full text-left pr-3.5 py-[7px] rounded-control text-label font-semibold uppercase tracking-[0.16em] flex items-center gap-1.5 ${
+            forced ? "text-base-500 cursor-default" : "text-base-500 hover:text-base-700"
+          }`}
+          style={{ paddingLeft: CHILD_PAD_L }}
+        >
+          <span className="flex-1 truncate">{block.group.label}</span>
+          <ChevronDown
+            size={11}
+            aria-hidden="true"
+            className={`shrink-0 text-base-400 transition-transform ${open ? "" : "-rotate-90"}`}
+          />
+        </button>
+
+        {open && (
+          <div
+            data-testid={`nav-group-children-${block.group.key}`}
+            className="flex flex-col gap-0.5 mt-0.5"
+          >
+            {block.pages.map((child, i) =>
+              renderChild(group, child, i, i === block.pages.length - 1, GROUP_GEOM),
+            )}
+          </div>
+        )}
+      </div>
     );
   }
 
@@ -477,7 +764,17 @@ export default function PortalSidebar() {
     // nothing (NavBadge), because a zero badge is a daily invitation to check
     // a page with nothing on it.
     const sum = expanded ? 0 : moduleBadgeSum(block);
-    // Lit only when it has swallowed the page you are on.
+    const isPurchasing = module.section === PURCHASING;
+    /* ⭐ ALWAYS EXACTLY ONE VISIBLE ACTIVE INDICATION (owner review, 2026-08-20
+     * — amending this Card's first draft, which let the Purchasing parent stay
+     * neutral while its tree was shut and so left the rail saying NOTHING about
+     * where you were standing).
+     *
+     *   tree OPEN   → only the exact child row is blue; parent and group neutral
+     *   tree SHUT   → the parent row is blue, because it has swallowed your page
+     *   60px rail   → the module icon is blue
+     *
+     * Purchasing is NOT an exception to this: one rule, every module. */
     const lit = holdsActive && !expanded;
     const base =
       "relative w-full text-left px-3.5 py-[9px] rounded-control text-body font-medium flex items-center gap-[11px]";
@@ -521,9 +818,15 @@ export default function PortalSidebar() {
             data-testid={`nav-children-${module.section.toLowerCase().replace(/\s+/g, "-")}`}
             className="flex flex-col gap-0.5 mt-0.5"
           >
-            {pages.map((child, i) =>
-              renderChild(group, child, i, i === pages.length - 1),
-            )}
+            {isPurchasing
+              ? purchasingChildBlocks(pages).map((block_, i, blocks) =>
+                  block_.kind === "page"
+                    ? renderChild(group, block_.item, i, i === blocks.length - 1)
+                    : renderPurchasingGroup(group, block_, i, i === blocks.length - 1),
+                )
+              : pages.map((child, i) =>
+                  renderChild(group, child, i, i === pages.length - 1),
+                )}
           </div>
         )}
       </div>
@@ -582,9 +885,7 @@ export default function PortalSidebar() {
             // thirteen pages by guessing thirteen icons.
             (activeGroup ? navBlocks(activeGroup, role) : []).map((block) => {
               const target =
-                block.kind === "plain"
-                  ? block.item
-                  : block.pages.find((p) => !p.soon);
+                block.kind === "plain" ? block.item : moduleLandingPage(block);
               // An unbuilt page is not a control and gets no icon.
               if (!target) return null;
               const label = block.kind === "plain" ? block.item.label : block.module.label;
