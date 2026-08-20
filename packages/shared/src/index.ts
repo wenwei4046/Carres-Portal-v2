@@ -1118,6 +1118,7 @@ export {
   UNIT_OWNERSHIP_LABEL,
   unitAvailability,
   isUnitAvailable,
+  isUnitBindable,
   unitLifecycleOutcome,
   type UnitAvailability,
   type UnitLifecycleOutcome,

@@ -1144,8 +1144,10 @@ describe("GET /api/operation/pos/awaiting-stock-shortage", () => {
       sku: string;
       qty: number;
       reserved: number;
-      /** 0366 — what may actually be OFFERED. Defaults to qty − reserved. */
+      /** 0366 — exact Units a Sales Order can BIND. Defaults to qty − reserved. */
       available?: number;
+      /** 0368 — available + bulk pieces on the floor; what replenishment asks. */
+      sellable?: number;
     }[];
     pos?: { status: string; so: number | null; so_refs: number[] | null }[];
   }) {
@@ -1235,7 +1237,8 @@ describe("GET /api/operation/pos/awaiting-stock-shortage", () => {
             promise(
               (opts.stockBalances ?? []).map((b) => ({
                 sku: b.sku,
-                available: b.available ?? b.qty - b.reserved,
+                // 0368 — this feed decides what to BUY, so it reads `sellable`.
+                sellable: b.sellable ?? b.available ?? b.qty - b.reserved,
               })),
             ),
           );

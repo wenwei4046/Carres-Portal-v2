@@ -269,9 +269,10 @@ convention. Measured on production before the change, and again after it:
 | Site, operating party and role are separate | `warehouses` = Site; new `stock_operating_parties` = WHO HAS IT (`carres_warehouse`, `nets_warehouse`, `nets_delivery`, `pj_showroom`); `holder_party_id` on the Unit. NETS is a row, never hard-coded | two doors, neither moves the other |
 | Last verified date | `last_verified_at`, stamped only by `ops_stock_verify_unit` | — |
 | Append-only identity and physical event lineage | `stock_unit_events`, written by a TRIGGER on the register itself so no door can forget it; UPDATE and DELETE both refused | event edit refused |
-| ONE availability arithmetic | `unit_availability(status, needs_repair, hold_reason)` in SQL and `unitAvailability()` in `packages/shared/src/unit-availability.ts`, pinned to each other by 21 tests | six words, both sides |
+| ONE availability arithmetic | `unit_availability(status, needs_repair, hold_reason)` in SQL and `unitAvailability()` in `packages/shared/src/unit-availability.ts`, pinned to each other by tests | six words, both sides |
 | Availability is never a stored number | view `stock_sku_availability` computes from the register on every read — it cannot be stale. A trigger-kept column was rejected: a second copy is still a second copy (Architecture Law D) | — |
 | Every derived total drills to the exact ids | view `stock_unit_availability_v` carries id, availability, lifecycle outcome, catalog category and source status | 74 (sku, site) rows all drill |
+| A bulk record is never mistaken for promisable stock | `stock_sku_availability` carries THREE named numbers (0368) | 85 bindable · 893 bulk · 978 sellable |
 | Negative stock impossible | availability is counted from units that exist; `stock_balances_qty_nonneg` | 0 impossible rows |
 | No generic Edit, Delete, Add stock, Remove stock or status selector | `ops_stock_items` lost its write policy entirely; `POST /api/ops/stock` ("+ Add stock"), `DELETE /:itemId`, `POST /api/operation/warehouse/adjust`, `operation_adjust_stock` and the `+ Adjust` modal are all gone | adjust refused in words |
 | One governed door per fact | `ops_stock_set_condition` · `refurbish` · `refurbish_complete` · `bind_units` · `unbind_unit` · `set_site` · `set_holder` · `set_ownership` · `verify_unit` · `book_in_units` · `set_thresholds` | — |
@@ -294,17 +295,80 @@ the purchase assembly and the PO-duty cron — now reads `stock_sku_availability
 `low_threshold`/`high_threshold` remain, because those are Settings and configuration is what
 survives go-live. **Retiring the cache entirely is the next card's work, not a gap in this one.**
 
+**THREE NAMED NUMBERS, because there are three questions (0368).** 0366 shipped ONE `available`
+and it answered two of them at once — the defect this whole card exists to remove, found by review
+before merge. `ops_stock_items_bulk_never_reserved` forbids a `qty > 1` record from ever being
+reserved, yet `available` summed those records: it said **978** where **85** could actually be
+promised. Corrected to:
+
+| Number | The question it answers | Live 2026-08-20 |
+|---|---|---|
+| `available` | which exact Units can a Sales Order BIND right now | **85** |
+| `bulk_on_hand` | pieces present in a `qty > 1` record — real goods no exact-Unit promise can name | **893** in 5 records |
+| `sellable` | must we BUY more? (`available + bulk_on_hand`) | **978** |
+| `on_hand` | what is physically at this Site, reserved and controlled included | **980** |
+
+`sellable` is what the reorder alert, the POS shortage feed, the purchase assembly, the PO-duty cron
+and the Stock page's sellable column read — a shelf holding 555 pillows needs no purchase order,
+whether or not a pillow carries an identity. `available` is what an exact-Unit promise reads.
+Nothing computes `on_hand - reserved`. `stock_balances.qty` deliberately did NOT move: it tracks
+`sellable + reserved`, which is the free + reserved membership it has meant since 0137.
+
+**THE ONE THING THIS CARD SURFACED AND DID NOT DECIDE — an owner question.** 893 real pieces
+(pillows, mattress protectors) sit in 5 bulk records, and **no Sales Order can bind any of them to a
+customer**, because a record standing for 555 anonymous pieces cannot carry one customer's promise.
+Splitting them into 893 Units was proposed and rejected here: MASTER §3 requires an identity for
+every sofa and every independently saleable or replaceable module, the id is printed by the SUPPLIER
+on its own label, and Carres does not label 555 pillows one at a time — minting 893 ids would change
+how Carres operates, which is Jess's call and not a migration's. The card also forbids a backfill
+over imported rows, and every live row is test data.
+
+So the question stands, and it is a real operating choice, not an engineering one:
+
+```
+AUTHORITY SEARCHED       Stock MASTER §3 (Unit identity, supplier-printed label) ·
+                         §4 (availability) · Card §2/§6 · Constitution §6 (clean start)
+WHY NOT ALREADY RESOLVED the approved model requires identity for FURNITURE and is silent on
+                         whether an accessory piece carries one
+TWO REAL OPTIONS         (a) every accessory piece is a Unit with a supplier-printed id -
+                             honest binding, but the supplier must label pillows one by one
+                         (b) accessory demand is satisfied WITHOUT exact-Unit binding -
+                             no labelling burden, but the Sales Order can never promise a
+                             specific pillow and Stock needs a quantity-draw door for them
+RECOMMENDATION           (b). The labelling cost in (a) falls on the supplier for goods nobody
+                         traces individually, and the operator gains nothing from it.
+OPERATIONAL CONSEQUENCE  under (b) a later card owes Stock a governed quantity-draw door for
+                         bulk records; until then those pieces are visible and countable but
+                         not promisable, which is exactly what the screens now say.
+```
+
+Nothing is blocked on the answer: the numbers are honest either way, and both options build on the
+same Unit authority.
+
 **`ended` never erases how a life ended.** `unit_lifecycle_outcome()` is a separate authoritative
 answer beside the availability word — `delivered` · `cancelled_before_receipt` · `written_off` ·
 `returned_to_supplier` · `active` — so Delivered / history can tell them apart without a second
 query or a second arithmetic. Physical disposal is not a fifth word until that fact is recorded.
 
-**Verification evidence.** Migration 0366 applied to production; its own sanity block passed. Eight
-negative controls were then run against production in a rolled-back transaction and all eight
-fired; the register was unchanged afterwards (136 units · 136 ledger ids · 0 events · 0 units
-without an identity). The applied SQL is executably identical to the repository file — normalised
-md5 `3955ccd7f936151d144a959afef4af22` on both sides. Local release gate: 2470 shared · 2293 API ·
-3144 web tests green, typecheck and build clean, no server secret in the web bundle.
+**Three migrations, because self-review and review each found a real hole before merge.**
+
+| | What it does | Why it exists |
+|---|---|---|
+| **0366** | the foundation above | the card |
+| **0367** | revokes the write grants on the five objects 0366 created | **found by self-review.** 0366 §10 revoked INSERT/UPDATE/DELETE on the register and the cache by name, but assumed a NEW table starts with no write grant. Supabase's `ALTER DEFAULT PRIVILEGES` hands `authenticated` ALL on every new table in `public`, so all five came out carrying INSERT/UPDATE/DELETE/TRUNCATE. RLS still refused the three tables — but `stock_unit_availability_v` is a simple view over one table and therefore **auto-updatable**, a latent second door onto the inventory authority. 0366's sanity block checked policies and never checked grants, which is why it passed. 0367 revokes, and asserts grants from here on. It also revokes TRUNCATE, which empties a table without firing the row trigger that refuses a delete |
+| **0368** | the three named numbers above, and widens the bulk guard from sofa-only to sofa/bedframe/mattress | **found by review.** `available` overstated promisable stock ~11x; and two of the five live bulk records (`DIVAN ONLY (K)`, `SONIC-L1202S-Q`) are furniture, which a sofa-only guard never covered. The guard asks the CATALOG, so a SKU the catalog does not hold cannot be judged and passes — at go-live the catalog is configuration that survives, so every real SKU has a row; today none of the five does, which is why the sofa-only guard never fired on any of them |
+
+**Verification evidence.** All three migrations applied to production; each sanity block passed.
+Eight negative controls were run against production in a rolled-back transaction after 0366 —
+duplicate id · delete · id reuse after write-off · rename · bulk reservation · hand-written total ·
+the retired adjust door · editing a unit event — and **all eight fired**; the register was unchanged
+afterwards (136 units · 136 ledger ids · 0 events · 0 units without an identity). After 0367 the
+seven Warehouse objects carry SELECT and nothing else. After 0368 the three numbers reconcile
+(85 + 893 = 978) and `stock_balances` did not move (`cache_moved = 0`). Each applied SQL is
+executably identical to its repository file, reconciled by comment-stripped md5 —
+0366 `3955ccd7f936151d144a959afef4af22`, 0367 `a98022030312d9071a60b3b2c55d1ada`.
+Local release gate: shared, API and web suites green, typecheck and build clean, no server secret in
+the web bundle.
 
 ### 12.2 · Still not built
 
@@ -342,5 +406,8 @@ register. Production-verified 2026-08-20.
 
 **REAL GAP / CONTRADICTION:** none requiring an owner decision.
 
-**OWNER DECISIONS:** none unresolved. Owner walk of the Warehouse page is owed but does not block
-the next card: the only visible change is that `+ Adjust` is gone.
+**OWNER DECISIONS:** one, surfaced by this card and stated in full in §12.1 — **does an accessory
+piece carry a Unit identity, or is accessory demand satisfied without exact-Unit binding?**
+Recommendation: without binding, plus a governed quantity-draw door in a later card. Nothing is
+blocked on the answer. Owner walk of the Warehouse page is also owed and does not block the next
+card either: the only visible change is that `+ Adjust` is gone.

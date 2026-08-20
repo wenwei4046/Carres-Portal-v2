@@ -225,10 +225,11 @@ describe("GET /api/operation/purchase/today — assembly", () => {
       { sku: "MAT-K", qty: 1, received_qty: 0, purchase_orders: { status: "open" } },
     ];
     const warehouses = [{ id: "wh-klg", name: "Carres Klang" }];
-    // 0366 — free stock comes from the unit register's one availability
-    // authority (`stock_sku_availability.available`), not qty − reserved off a
+    // 0368 — free stock comes from the unit register's one availability
+    // authority. Purchasing asks what must be BOUGHT, so it reads `sellable`
+    // (exact Units plus bulk pieces on the floor), not qty − reserved off a
     // hand-adjustable total.
-    const stock = [{ sku: "BF-K", available: 3, warehouse_id: "wh-klg" }];
+    const stock = [{ sku: "BF-K", sellable: 3, warehouse_id: "wh-klg" }];
 
     // Catalog facts are resolved in a SEPARATE product_skus read (no FK
     // order_lines→product_skus, so no embed). Mock it by sku.

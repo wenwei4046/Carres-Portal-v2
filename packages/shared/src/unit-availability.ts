@@ -138,16 +138,43 @@ export const UNIT_OWNERSHIP_LABEL: Record<UnitOwnership, string> = {
 
 /**
  * One (sku, site) row of `public.stock_sku_availability` — the ONE surface any
- * screen asks how much it may offer. `available` is the answer; never compute
- * `onHand - reserved`, which counts a Unit in repair as sellable.
+ * screen asks how much it has. It carries THREE named numbers because there are
+ * three different questions, and 0366 shipped one number answering two of them:
+ * `available` summed bulk records that `ops_stock_items_bulk_never_reserved`
+ * forbids from ever being reserved, so it said 978 where 85 could actually be
+ * promised (measured on production 2026-08-20).
+ *
+ *   available     exact Units a Sales Order can BIND right now
+ *   bulkOnHand    real pieces present in a qty > 1 record — sellable in
+ *                 principle, but no exact-Unit promise can name one of them
+ *   sellable      available + bulkOnHand — what REPLENISHMENT asks: a shelf
+ *                 holding 555 pillows needs no purchase order
+ *   onHand        everything physically at the Site, reserved and controlled
+ *                 units included
+ *
+ * Never compute `onHand - reserved` (it counts a Unit in repair as sellable),
+ * and never use `available` to decide whether to buy.
  */
 export interface SkuAvailability {
   sku: string;
   warehouseId: string | null;
   onHand: number;
   available: number;
+  bulkOnHand: number;
+  sellable: number;
   reserved: number;
   notAvailable: number;
   incoming: number;
   inTransit: number;
+}
+
+/** Can this exact Unit be bound to a Sales Order? A bulk record stands for N
+ *  anonymous pieces, so it can never carry ONE customer's promise. */
+export function isUnitBindable(unit: {
+  status: string | null | undefined;
+  needsRepair?: boolean | null;
+  holdReason?: string | null;
+  qty?: number | null;
+}): boolean {
+  return isUnitAvailable(unit) && (unit.qty ?? 1) === 1;
 }

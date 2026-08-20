@@ -37,7 +37,7 @@ operationStockRouter.get("/", async (c) => {
     // Settings; it may not answer how much we can offer.
     sb
       .from("stock_sku_availability")
-      .select("sku, warehouse_id, on_hand, available, reserved"),
+      .select("sku, warehouse_id, on_hand, sellable, reserved"),
     sb.from("stock_balances").select("sku, low_threshold"),
     sb
       .from("product_skus")
@@ -59,7 +59,7 @@ operationStockRouter.get("/", async (c) => {
 
   const warehouses = (warehousesRes.data ?? []).map((w) => ({ id: w.id, name: w.name }));
 
-  type Balance = { qty: number; reserved: number; available: number };
+  type Balance = { qty: number; reserved: number; sellable: number };
   const balanceMap = new Map<string, Map<string, Balance>>();
   const lowThresholdMap = new Map<string, number>();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -73,7 +73,7 @@ operationStockRouter.get("/", async (c) => {
     perSku.set(b.warehouse_id, {
       qty: Number(b.on_hand ?? 0),
       reserved: Number(b.reserved ?? 0),
-      available: Number(b.available ?? 0),
+      sellable: Number(b.sellable ?? 0),
     });
   });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -97,10 +97,13 @@ operationStockRouter.get("/", async (c) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const model = Array.isArray((s as any).product_models) ? (s as any).product_models[0] : (s as any).product_models;
     const perWh = balanceMap.get(s.sku) ?? new Map<string, Balance>();
-    // 0366 — `available` is SUMMED from the authority, never derived as
-    // qty − reserved: that arithmetic counted a unit in repair as sellable.
+    // 0368 — SUMMED from the authority, never derived as qty − reserved (that
+    // counted a unit in repair as sellable). This column is what the operator
+    // can SELL, so it reads `sellable` (exact Units plus bulk pieces on the
+    // floor); `available` alone answers the narrower "which exact Unit can a
+    // Sales Order bind", which is the drawer's question, not this page's.
     const available = Array.from(perWh.values()).reduce(
-      (acc, b) => acc + b.available,
+      (acc, b) => acc + b.sellable,
       0,
     );
     return {

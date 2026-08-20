@@ -6,6 +6,7 @@ import {
   UNIT_LIFECYCLE_OUTCOMES,
   UNIT_OWNERSHIPS,
   isUnitAvailable,
+  isUnitBindable,
   unitAvailability,
   unitLifecycleOutcome,
 } from "./unit-availability";
@@ -118,5 +119,52 @@ describe("unitLifecycleOutcome — availability never erases how a life ended", 
       ].sort(),
     );
     expect([...UNIT_OWNERSHIPS]).toEqual(["carres_owned", "supplier_consignment"]);
+  });
+});
+
+describe("isUnitBindable — a bulk record can never carry one customer's promise", () => {
+  it("an exact free Unit is bindable", () => {
+    expect(isUnitBindable({ status: "free", needsRepair: false, qty: 1 })).toBe(true);
+    expect(isUnitBindable({ status: "free", needsRepair: false })).toBe(true);
+  });
+
+  it("a bulk record is available but NOT bindable — the gap 0368 closed", () => {
+    const bulk = { status: "free", needsRepair: false, qty: 555 };
+    // It is genuinely on the floor and genuinely unbroken...
+    expect(unitAvailability(bulk)).toBe("available");
+    expect(isUnitAvailable(bulk)).toBe(true);
+    // ...and no exact-Unit promise can name one of its 555 pieces.
+    expect(isUnitBindable(bulk)).toBe(false);
+  });
+
+  it("nothing unavailable is bindable, however small the record", () => {
+    for (const status of ["incoming", "transferred", "reserved", "on_hold", "sold"]) {
+      expect(isUnitBindable({ status, qty: 1 })).toBe(false);
+    }
+    expect(isUnitBindable({ status: "free", needsRepair: true, qty: 1 })).toBe(false);
+  });
+
+  it("sellable is available plus bulk, and available alone never decides a purchase", () => {
+    // The production shape on 2026-08-20: 85 exact Units and 5 bulk records
+    // holding 893 pieces. `available` said 978 and 85 could be promised.
+    const units = [
+      ...Array.from({ length: 85 }, () => ({ status: "free", needsRepair: false, qty: 1 })),
+      { status: "free", needsRepair: false, qty: 555 },
+      { status: "free", needsRepair: false, qty: 319 },
+      { status: "free", needsRepair: false, qty: 15 },
+      { status: "free", needsRepair: false, qty: 2 },
+      { status: "free", needsRepair: false, qty: 2 },
+    ];
+    const sum = (f: (u: (typeof units)[number]) => boolean) =>
+      units.filter(f).reduce((n, u) => n + u.qty, 0);
+
+    const available = sum(isUnitBindable);
+    const sellable = sum(isUnitAvailable);
+    const bulkOnHand = sellable - available;
+
+    expect(available).toBe(85);
+    expect(bulkOnHand).toBe(893);
+    expect(sellable).toBe(978);
+    expect(available + bulkOnHand).toBe(sellable);
   });
 });

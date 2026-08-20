@@ -686,7 +686,7 @@ operationPosRouter.get("/awaiting-stock-shortage", requireOperation, async (c) =
     // 0366 — the shortage feed decides what we still have to BUY, so it must
     // read what we can actually offer. `stock_balances` is a non-authoritative
     // cache now; `stock_sku_availability` counts the exact units.
-    sb.from("stock_sku_availability").select("sku, available"),
+    sb.from("stock_sku_availability").select("sku, sellable"),
   ]);
   if (linesRes.error) {
     const m = mapPgError(linesRes.error);
@@ -771,9 +771,12 @@ operationPosRouter.get("/awaiting-stock-shortage", requireOperation, async (c) =
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   for (const r of (stockRes.data ?? []) as any[]) {
     const sku = String(r.sku);
-    // Never qty − reserved: that counted a unit in repair as sellable and
-    // under-ordered by exactly the units nobody could ship.
-    const avail = Number(r.available ?? 0);
+    // 0368 — `sellable`, not `available`. This feed decides what to BUY, and a
+    // shelf holding 555 pillows needs no purchase order even though no pillow
+    // carries an identity. (`available` counts only exact Units a Sales Order
+    // can BIND, which is a different question.) Never qty − reserved either:
+    // that counted a unit in repair as sellable.
+    const avail = Number(r.sellable ?? 0);
     availBySku.set(sku, (availBySku.get(sku) ?? 0) + avail);
   }
 
