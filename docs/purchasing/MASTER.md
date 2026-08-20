@@ -1133,18 +1133,21 @@ RIGHT 400px  WORKING HEADER → REFERENCE LAYER → SUPPLIER FOLLOW-UP →
 **Controls** `po-date-open`/`-form`/`-input`/`-save`/`-reason`/`-remarks`/`-extend` ·
 `po-ready-date-open`/`-input` · `po-print-pdf` · `po-open-whatsapp` · `po-open-email` ·
 `po-copy-message` · `po-wa-toggle` · `po-save-template` · `po-history` · `po-activity` ·
-`po-panel-items` · `po-panel-close` · `po-overdue` · `po-arrival-gap`
+`po-panel-items` · `po-panel-close` · `po-overdue` · `po-arrival-gap` · `po-version` ·
+`po-unshared` · `po-revise-open`/`-form`/`-line-{i}`/`-qty-{i}`/`-destination-{i}`/
+`-floor-{i}`/`-reason`/`-save`/`-cancel`/`-error`
 
 ### API + DATA
 `GET /operation/pos` · `/:id/print-data` · `/:id/receiving` · `/:id/source-orders` ·
 `/:id/units` · `/awaiting-stock-shortage` · `/report` · `POST /` · `/batch` · `/:id/ready-date`
-· `/:id/tomorrow-delivery` · `/:id/sends` · `/:id/cancel` · `/:id/office-receive` ·
+· `/:id/tomorrow-delivery` · `/:id/sends` · `/:id/revise` · `/:id/cancel` · `/:id/office-receive` ·
 `/:id/assign-pickup-partner` · `/:id/reassign-warehouse` · `/:id/chase-event` ·
 `POST /lines/:lineId/balance-date` · `/destination` · `/ops-remark` · `/split` ·
 `PUT /message-template`
 
-Tables: `purchase_orders` **24** · `purchase_order_lines` **38** · `po_history` **23** ·
-`po_sends` **3** · `po_revisions` **2** · `po_supplier_promises` **6**
+Tables: `purchase_orders` **24** · `purchase_order_lines` **38** · `po_history` **26** ·
+`po_sends` **5** · `po_revisions` **3** · `po_supplier_promises` **6**
+*(counts re-measured 2026-08-19, the revision card's own baseline)*
 
 ### Deliver To — owner-locked operating rule (2026-08-14)
 
@@ -1191,6 +1194,19 @@ records it.
   excess goes back through a Purchase Return first. (2990s proves both halves in production:
   `PurchaseOrderDetail.tsx:621` snapshots the prior version into `po_revisions`, and approve-po
   409s `received_floor` at `:639`.) Adding items is still a NEW PO; stopping is still the whole PO.
+  **SHIPPED 2026-08-19** (CARD-2026-08-19-po-revisions, migration 0364): `purchasing_revise_po`
+  — reason required IN SQL, author from auth, the floor refuses with `received_floor` (409),
+  the PRIOR version snapshotted into `po_revisions` (0312's exact snapshot shape, so
+  `purchasing_record_send`'s changed-since-last-send comparison is untouched) with `reason` +
+  `created_by`, `purchase_orders.version` + `revised_at`, one `po_history` row printing old →
+  new. The panel title reads `PO-2041 · Version 2` (Version 1 prints nothing) and the panel's
+  `Revise` door takes the stage with the floor stated inline; the disabled Save names its gap.
+  `{po} Version {n} has not reached {supplier}` is DERIVED — `revised_at` newer than the latest
+  send — never stored. A trigger closes the silent doors: once any send exists, a direct line
+  qty / destination write refuses with `A shared PO changes through Revise.` (the Deliver To
+  after-send rule made structural; a SPLIT on a shared PO is refused too — revise cannot split
+  yet, its own card). The two-step share's STEP TWO (`Record what you sent`) remains ruled but
+  unbuilt — this card mints the version fact that step will answer about.
 - **The portal never claims it sent anything.** Pressing a channel button records
   `{Channel} opened · Snapshot N` — a click is all the system observed. Print writes no history,
   moves no status and has no limit.

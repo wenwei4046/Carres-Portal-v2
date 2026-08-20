@@ -119,7 +119,10 @@ describe("the empty query", () => {
       "Sales OrdersOperations",
       "On handOperations",
       "PaymentsOperations",
-      "DeliveryOperations",
+      // `Delivery Work` since the Delivery module's pages joined the rail
+      // (CARD-2026-08-19-sidebar-expandable-modules) — same key, same route,
+      // the governed name.
+      "Delivery WorkOperations",
     ]);
     expect(labels.filter((l) => l === "SuppliersOperations")).toHaveLength(1);
     expect(screen.getByText("Recent")).toBeInTheDocument();
