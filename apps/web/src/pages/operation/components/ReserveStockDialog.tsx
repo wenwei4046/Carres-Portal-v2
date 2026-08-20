@@ -37,6 +37,12 @@ export interface ReserveFreeUnit {
    *  reason as `location`; absent reads as 1, which under-states a reserve
    *  level warning rather than inventing one. */
   qty?: number | null;
+  /** The CATALOG's category for this unit's SKU (D9, 2026-08-20), resolved
+   *  server-side by the one shared reader. `null` = the catalog was asked and
+   *  holds no row; the key ABSENT = this payload's endpoint does not carry it.
+   *  Read it through `resolvedCategory`, never `lineCategory` — the difference
+   *  between the two is a real sofa disappearing from the loan picker. */
+  category?: string | null;
 }
 
 interface Props {

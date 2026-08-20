@@ -5,7 +5,7 @@ import Btn from "@/components/Btn";
 import { toast } from "sonner";
 import { apiFetch, ApiError } from "@/lib/api";
 import { fmtDate } from "@/lib/fmt-date";
-import { lineCategory, stockMatchKey } from "@/lib/line-category";
+import { resolvedCategory, stockMatchKey } from "@/lib/line-category";
 import type { ReserveFreeUnit } from "./ReserveStockDialog";
 import PoolReasonPicker, { usePoolDrawReason } from "./PoolReasonPicker";
 
@@ -137,7 +137,11 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
     const want = new Set(tokenize(sku));
     return units
       .filter((u) =>
-        loanMode ? lineCategory(u.sku) === "sofa" : stockMatchKey(u.sku) === matchKey,
+        loanMode
+          ? // D9, 2026-08-20 — the catalog's word, not the SKU text. Same
+            // filter-hides-a-real-unit failure as LoanPanel one screen over.
+            resolvedCategory(u.sku, u.category) === "sofa"
+          : stockMatchKey(u.sku) === matchKey,
       )
       .map((u) => {
         const ut = tokenize(u.sku);
