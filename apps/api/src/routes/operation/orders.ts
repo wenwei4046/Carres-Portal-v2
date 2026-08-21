@@ -683,6 +683,13 @@ const revisionLineInput = z.object({
   sku: z.string().trim().min(1, "A line needs a SKU"),
   qty: z.number().int().min(1, "Qty must be at least 1"),
   unit_price: z.number().min(0, "Unit price must be 0 or more"),
+  /** The line's CONFIGURATION — sofa fabric, bedframe colour/gap, the cascade
+   *  payload Create-PO reads. Honoured by the CREATE door only (0374); the
+   *  SAVE door keeps a line's attrs by matching on `id`, so it neither needs
+   *  nor accepts them here. Absent stays NULL: a line with no configuration
+   *  must not gain an empty object that later code reads as "configured, with
+   *  nothing in it". */
+  attrs: z.record(z.unknown()).optional(),
 });
 
 /**

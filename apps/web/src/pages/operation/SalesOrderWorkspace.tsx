@@ -146,6 +146,9 @@ interface DraftLine {
   sku: string;
   qty: number;
   unit_price: number;
+  /** The line's CONFIGURATION — sofa fabric, bedframe colour/gap, the cascade
+   *  payload Create-PO reads. Carried so a COPY does not strip it (0374). */
+  attrs?: Record<string, unknown>;
 }
 interface Draft {
   customer_name: string;
@@ -1046,6 +1049,7 @@ export default function SalesOrderWorkspace() {
             sku: line.sku,
             qty: line.qty,
             unit_price: line.unit_price,
+            ...(line.attrs ? { attrs: line.attrs } : {}),
           })),
         });
         const emergency = parseEmergencyContact(copied.customer_emergency);
@@ -1140,6 +1144,7 @@ export default function SalesOrderWorkspace() {
         sku: l.sku,
         qty: l.qty,
         unit_price: Number(l.unit_price),
+        ...(l.attrs ? { attrs: l.attrs } : {}),
       })),
     };
     setDraft(next);
@@ -1328,6 +1333,11 @@ export default function SalesOrderWorkspace() {
         sku: l.sku.trim(),
         qty: l.qty,
         unit_price: l.unit_price,
+        /* 0374 — a line born here MAY carry its configuration. Nothing on this
+           form authors attrs yet, so today this only survives a COPY: copying a
+           configured order used to silently strip the fabric, colour and gap
+           off every line and hand Purchasing a PO it could not autofill. */
+        ...(l.attrs ? { attrs: l.attrs } : {}),
       }));
 
   const validateDraft = (needDealer: boolean): string | null => {
