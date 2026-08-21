@@ -3,11 +3,16 @@ DATE: 2026-08-20
 PR: https://github.com/wenwei4046/Carres-Portal-v2/pull/879 — squash-merged as `7e969aba`
 IMPLEMENTATION: SHIPPED. No migration (this card writes none).
 
-DEPLOY PROOF, checked directly rather than trusted from the workflow — all five surfaces report
-`7e969aba62ee84a61c8bdb35f34536e26891fd13`: erp · pos · carres-portal.pages.dev ·
-carres-pos.pages.dev · api `/health`. The deployed `erp` bundle carries the endpoint path and
-every governed string (`Purchase Demands` · `Search purchase demands…` · the six state words ·
-`Open SO Batch Purchase` · `No purchase demands.`).
+DEPLOY PROOF, checked directly rather than trusted from the workflow. All five surfaces reported
+`7e969aba` at merge — erp · pos · carres-portal.pages.dev · carres-pos.pages.dev · api `/health`
+— and the deployed `erp` bundle carried the endpoint path and every governed string.
+
+**RE-VERIFIED AFTER `main` MOVED.** `68dc8f8b` (another card's docs-only closure) landed on top and
+redeployed; all five surfaces now report `68dc8f8b9c84fe86e8ff064be44e7ebecefb748b` and the
+Register is still there — same bundle hash `index-CoEDFDT1.js`, endpoint and governed strings
+present. Recorded because *"production-verified at SHA X"* stops being a statement about
+production the moment `main` moves, and a docs-only commit changing nothing is an assumption, not
+a measurement.
 
 GATE: shared 2476/2476 (+24) · api 2307/2307 (+19) · web 3184/3184 (+23) · typecheck clean ·
 `pnpm lint` design-standard clean and guard §6.6 back at 301 = clean `main` · build clean · no
