@@ -58,6 +58,9 @@ import {
   displayGuaranteeId,
   EMERGENCY_RELATIONSHIPS,
   lineClass,
+  MAX_DELIVERY_FLOOR,
+  maxLeadDaysFor,
+  minDeliveryDateISO,
   orderMoney,
   parseEmergencyContact,
   receivingRecordNo,
@@ -925,15 +928,16 @@ export default function SalesOrderWorkspace() {
   /** sku → what the CATALOG says it is. The one lookup both new fields read,
    *  so the name hint and the price hint can never disagree (Law D). */
   const catalogBySku = useMemo(() => {
-    const out = new Map<string, { price: number; label: string }>();
+    const out = new Map<string, CatalogSkuFact>();
     const bundle = catalogQ.data;
     if (!bundle) return out;
-    const modelName = new Map(bundle.models.map((m) => [m.id, m.name]));
+    const model = new Map(bundle.models.map((m) => [m.id, m]));
     for (const sku of bundle.skus) {
-      const name = modelName.get(sku.modelId) ?? "";
+      const m = model.get(sku.modelId);
       out.set(sku.sku, {
         price: sku.price,
-        label: [name, sku.variant].filter(Boolean).join(" · "),
+        label: [m?.name ?? "", sku.variant].filter(Boolean).join(" · "),
+        category: m?.category ?? null,
       });
     }
     return out;
@@ -1304,6 +1308,17 @@ export default function SalesOrderWorkspace() {
     delivery_date_tbd: draft.delivery_date_tbd,
   });
 
+  /* The cart's floor, from the CATALOG's categories — recomputed as lines
+   * change, exactly as the POS wizard does it. */
+  const earliestPromise = useMemo(
+    () =>
+      earliestPromiseISO(
+        draft.lines.map((l) => catalogBySku.get(l.sku.trim())?.category),
+        catalogQ.data?.earliestSellDays,
+      ),
+    [draft.lines, catalogBySku, catalogQ.data?.earliestSellDays],
+  );
+
   const draftLinesPayload = () =>
     draft.lines
       .filter((l) => l.sku.trim().length > 0)
@@ -1321,6 +1336,16 @@ export default function SalesOrderWorkspace() {
      * sold it. */
     if (needDealer && !draft.salesperson_id) return "A salesperson is required";
     if (needDealer && draftLinesPayload().length === 0) return "An order needs at least one item";
+    /* The delivery date is a PROMISE (orders/MASTER — THE THREE DELIVERY
+     * DATES). A date inside the production lead is a promise the factory
+     * cannot keep, and the POS has refused it since 2026-05-22 — this door
+     * now refuses it too, with the same arithmetic rather than a second one. */
+    if (draft.delivery_date && earliestPromise && draft.delivery_date < earliestPromise) {
+      return `Delivery is too soon — the earliest this cart can be promised is ${fmtDate(earliestPromise)}`;
+    }
+    if (draft.proceed_date && draft.delivery_date && draft.proceed_date > draft.delivery_date) {
+      return "The proceed date is after the delivery date";
+    }
     return null;
   };
 
@@ -1853,6 +1878,12 @@ export default function SalesOrderWorkspace() {
           {mode === "create" ? (
             <div data-pos-field="deliveryDate">
               <DatePicker id="so-promised" label="Customer Delivery" value={draft.delivery_date}
+                hint={earliestPromise ? `Earliest ${fmtDate(earliestPromise)} — production lead` : undefined}
+                error={
+                  draft.delivery_date && earliestPromise && draft.delivery_date < earliestPromise
+                    ? `Too soon — earliest is ${fmtDate(earliestPromise)}`
+                    : undefined
+                }
                 onChange={(iso) => setField("delivery_date", iso)} />
             </div>
           ) : (
@@ -1866,12 +1897,27 @@ export default function SalesOrderWorkspace() {
           )}
           <div data-pos-field="proceedDate">
             <DatePicker id="so-proceed" label="Proceed date" value={draft.proceed_date}
+              error={
+                draft.proceed_date && draft.delivery_date && draft.proceed_date > draft.delivery_date
+                  ? "After the delivery date"
+                  : undefined
+              }
               onChange={(iso) => setField("proceed_date", iso)} />
           </div>
           <div data-pos-field="stairCarry">
-            <Input id="so-floor" label="Floor" type="number" min={0}
+            {/* Carres does not stair-carry above floor 3 (MAX_DELIVERY_FLOOR).
+                The POS has clamped this since the wizard was written; this door
+                accepted any number, so an office-keyed order could promise a
+                carry nobody performs. */}
+            <Input id="so-floor" label="Floor" type="number" min={0} max={MAX_DELIVERY_FLOOR}
+              hint={`Stair carry up to floor ${MAX_DELIVERY_FLOOR}`}
               value={String(draft.delivery_floor)}
-              onChange={(e) => setField("delivery_floor", Math.max(0, Number(e.target.value) || 0))} />
+              onChange={(e) =>
+                setField(
+                  "delivery_floor",
+                  Math.min(MAX_DELIVERY_FLOOR, Math.max(0, Number(e.target.value) || 0)),
+                )
+              } />
           </div>
           <Input id="so-stair-items" label="Items needing stair carry" type="number" min={0}
             hint="Empty = every item"
@@ -2605,10 +2651,42 @@ function itemRows(
   }));
 }
 
+/**
+ * THE EARLIEST DATE THIS CART MAY BE PROMISED — the same floor the POS applies.
+ *
+ * A made item has a factory behind it, so a delivery date sooner than the
+ * production lead is a promise Carres cannot keep. The POS has refused those
+ * dates since 2026-05-22; the office create door did not, so an order keyed
+ * here could carry a date the same order keyed at POS could not.
+ *
+ * The categories come from the CATALOG (D9) — never from the SKU text — and a
+ * SKU the catalog does not hold contributes NO category, which is honest: we
+ * cannot know its lead, so it must not invent one. `maxLeadDaysFor` then
+ * returns 0 for a cart of nothing but accessories/services/unknowns, and the
+ * floor is simply today.
+ *
+ * Returns the ISO date, or null when nothing gates.
+ */
+export function earliestPromiseISO(
+  categories: readonly (string | null | undefined)[],
+  earliestSellDays: number | undefined,
+  today: Date = new Date(),
+): string | null {
+  if (!earliestSellDays) return null;
+  const lead = maxLeadDaysFor(
+    categories.filter((c): c is string => typeof c === "string" && c.length > 0),
+    earliestSellDays,
+  );
+  return lead > 0 ? minDeliveryDateISO(lead, today) : null;
+}
+
 /** What the CATALOG says a SKU is, for the create door's two hints. */
 export interface CatalogSkuFact {
   price: number;
   label: string;
+  /** `product_models.category` — the CATALOG's answer (D9), and the input the
+   *  lead-time floor is computed from. `null` = the catalog holds no row. */
+  category?: string | null;
 }
 
 /**
