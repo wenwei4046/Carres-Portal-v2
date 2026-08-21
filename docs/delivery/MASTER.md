@@ -288,15 +288,24 @@ module at a time, hangs child pages from rounded elbows and marks the selected c
 blue bar plus blue wash. Delivery applies the governed Shell, Register and Object Detail Templates
 and does not invent another UI system.
 
-Delivery navigation (the rest is approved target):
+**DELIVERY NAVIGATION — owner ruling 2026-08-21 (CARD-2026-08-21-delivery-01-sidebar). This
+OVERWRITES the seven-row list of 2026-08-19.** The module carries exactly TWO children, and both
+of them open:
 
-1. **Delivery Work** — actionable operational home;
-2. **Delivery Orders** — formal DO truth Register · **BUILT**;
-3. **Schedule** — Coming soon;
-4. **Delivery History** — Coming soon;
-5. **Exceptions** — Coming soon;
-6. **Partners** — Coming soon;
-7. divider, then **Report** — Coming soon.
+1. **Delivery Work** — actionable operational home · **BUILT** · `/operation?tab=delivery`;
+2. **Delivery Orders** — formal DO truth Register · **BUILT** · `/operation/delivery-orders`.
+
+There is no third row, no hairline and no `Coming soon` label anywhere in this module. The elbow
+trunk ends at **Delivery Orders**.
+
+`Schedule`, `Delivery History`, `Exceptions`, `Partners` and `Report` were rows an operator could
+read, count and want, and every one of them refused the click. Five dead controls in a module with
+two working pages do not teach *not yet*; they teach that the rail cannot be trusted.
+
+**The capabilities are NOT retired.** §7 below still holds Delivery History, Exceptions and
+Partners as approved targets with their column defaults, and Report stays central under Reports
+consolidation. They are simply not NAVIGATION until they are pages. **A row returns to this rail
+in the PR that makes it answer** — never before it.
 
 Sales contains **Sales Orders** and temporary **Old Orders** only. Central Settings retains the
 governed Delivery settings door.

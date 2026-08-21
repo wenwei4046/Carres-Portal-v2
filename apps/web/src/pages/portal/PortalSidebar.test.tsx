@@ -167,8 +167,8 @@ describe("a module is an expandable PARENT ROW, never a heading", () => {
 });
 
 /**
- * ONE MODULE OPEN AT A TIME — thirteen purchasing pages and six delivery
- * pages cannot stack, and the module you are standing in is the open one.
+ * ONE MODULE OPEN AT A TIME — eighteen purchasing pages and a Warehouse
+ * module cannot stack, and the module you are standing in is the open one.
  */
 describe("the accordion", () => {
   it("the module holding the current page is open on a direct URL load", () => {
@@ -237,17 +237,18 @@ describe("the accordion", () => {
  * the exact defect the drawing exists to avoid.
  */
 describe("the elbow connectors", () => {
-  /* DELIVERY IS THE FLAT MODULE NOW. Purchasing grew a nested level under
+  /* DELIVERY IS THE FLAT MODULE NOW — TWO pages since
+   * CARD-2026-08-21-delivery-01-sidebar. Purchasing grew a nested level under
    * CARD-2026-08-20, so the one-level contract is proved on the module that
-   * still has one level — seven pages, Report under its hairline, which is the
-   * exact shape Purchasing used to have. Purchasing's own nesting is proved in
-   * its own describe below. */
+   * still has one level. Two children is the SHORTEST run that can still prove
+   * the drawing: one elbow that carries the trunk on, one that ends it.
+   * Purchasing's own nesting is proved in its own describe below. */
   it("every child row carries its own elbow", () => {
     renderAt("/operation?tab=delivery");
     const group = screen.getByTestId("nav-children-delivery");
     const rows = group.querySelectorAll("[data-testid^='nav-child-']");
     const elbows = group.querySelectorAll("[data-testid^='nav-elbow-']");
-    expect(rows.length).toBe(7);
+    expect(rows.length).toBe(2);
     expect(elbows.length).toBe(rows.length);
   });
 
@@ -269,11 +270,13 @@ describe("the elbow connectors", () => {
     const group = screen.getByTestId("nav-children-delivery");
     const rows = group.querySelectorAll("[data-testid^='nav-child-']");
     const trunks = group.querySelectorAll("[data-testid^='nav-trunk-']");
-    expect(rows.length).toBe(7);
+    expect(rows.length).toBe(2);
     expect(trunks.length).toBe(rows.length - 1);
-    // Report is last, and nothing hangs below it.
-    expect(screen.getByTestId("nav-elbow-delivery-report")).toBeInTheDocument();
-    expect(screen.queryByTestId("nav-trunk-delivery-report")).not.toBeInTheDocument();
+    // `Delivery Orders` is last, and nothing hangs below it.
+    expect(screen.getByTestId("nav-elbow-delivery-orders")).toBeInTheDocument();
+    expect(screen.queryByTestId("nav-trunk-delivery-orders")).not.toBeInTheDocument();
+    // ...and the row above it DOES carry the line on.
+    expect(screen.getByTestId("nav-trunk-delivery")).toBeInTheDocument();
   });
 
   it("a selected child still shows the elbow it hangs from", () => {
@@ -284,7 +287,7 @@ describe("the elbow connectors", () => {
 
   it("the trunk hangs from the module ICON's centre, and the elbow turns into the row", () => {
     renderAt("/operation?tab=delivery");
-    const elbow = screen.getByTestId("nav-elbow-delivery-schedule");
+    const elbow = screen.getByTestId("nav-elbow-delivery-orders");
     // px-3.5 (14) + half a 16px icon = 22; the 1px line is centred on it.
     expect(elbow.style.left).toBe("21.5px");
     expect(elbow.style.width).toBe("11px");
@@ -294,7 +297,7 @@ describe("the elbow connectors", () => {
   it("a child is decoration-free for a screen reader — the elbow is aria-hidden", () => {
     renderAt("/operation?tab=delivery");
     expect(
-      screen.getByTestId("nav-elbow-delivery-schedule").getAttribute("aria-hidden"),
+      screen.getByTestId("nav-elbow-delivery-orders").getAttribute("aria-hidden"),
     ).toBe("true");
   });
 });
@@ -1015,26 +1018,25 @@ describe("PortalSidebar — Purchasing remembers its drawers", () => {
 });
 
 /**
- * THE DELIVERY MODULE (owner-approved 2026-08-19, carried into this card from
- * the delivery-rail card it replaced).
+ * THE DELIVERY MODULE — TWO PAGES, BOTH OF THEM OPEN
+ * (CARD-2026-08-21-delivery-01-sidebar, owner ruling 2026-08-21).
+ *
+ * This OVERWRITES the seven-row list of 2026-08-19. Five of those rows —
+ * Schedule, Delivery History, Exceptions, Partners, Report — were readable,
+ * countable and dead, and a rail that refuses five of its seven clicks teaches
+ * an operator to stop trusting the rail. The capabilities are not retired
+ * (`docs/delivery/MASTER.md` §7 still holds them as approved targets); they are
+ * simply not NAVIGATION until they are pages.
  */
 describe("PortalSidebar — the Delivery module's pages", () => {
-  it("lists the seven approved pages, in order, with Report under its hairline", () => {
+  it("lists exactly two pages, in order", () => {
     renderAt("/operation?tab=delivery");
     const rows = Array.from(
       screen
         .getByTestId("nav-children-delivery")
         .querySelectorAll("[data-testid^='nav-child-']"),
-    ).map((el) => el.textContent?.replace("Coming soon", "").trim());
-    expect(rows).toEqual([
-      "Delivery Work",
-      "Delivery Orders",
-      "Schedule",
-      "Delivery History",
-      "Exceptions",
-      "Partners",
-      "Report",
-    ]);
+    ).map((el) => el.textContent?.trim());
+    expect(rows).toEqual(["Delivery Work", "Delivery Orders"]);
   });
 
   it("keeps Delivery Orders under Delivery", () => {
@@ -1052,7 +1054,24 @@ describe("PortalSidebar — the Delivery module's pages", () => {
     expect(row.className).toContain("bg-kit-blue-3");
   });
 
-  it("the four middle pages and Report are non-controls saying `Coming soon`", () => {
+  it("`Delivery Orders` keeps its own path, and lights only itself", () => {
+    renderAt("/operation/delivery-orders");
+    expect(child("delivery-orders")).toHaveAttribute(
+      "href",
+      "/operation/delivery-orders",
+    );
+    // Standing on the Register, `Delivery Work` is NOT lit.
+    expect(child("delivery").className).not.toContain("bg-kit-blue-3");
+  });
+
+  it("standing on Delivery Work does not light the Register", () => {
+    renderAt("/operation?tab=delivery");
+    expect(child("delivery-orders").className).not.toContain("bg-kit-blue-3");
+  });
+
+  /* THE RETIRED ROWS ARE GONE FROM THE DOM, not hidden. A `Coming soon` label
+   * anywhere in this module is the exact defect the card removed. */
+  it("no retired child and no `Coming soon` survives in Delivery", () => {
     renderAt("/operation?tab=delivery");
     for (const key of [
       "delivery-schedule",
@@ -1061,11 +1080,19 @@ describe("PortalSidebar — the Delivery module's pages", () => {
       "delivery-partners",
       "delivery-report",
     ]) {
-      const row = child(key);
-      expect(row.tagName).toBe("SPAN");
-      expect(row.getAttribute("aria-disabled")).toBe("true");
-      expect(row.textContent).toContain("Coming soon");
+      expect(screen.queryByTestId(`nav-child-${key}`)).toBeNull();
     }
+    const group = screen.getByTestId("nav-children-delivery");
+    expect(group.textContent).not.toContain("Coming soon");
+    for (const word of ["Schedule", "Delivery History", "Exceptions", "Partners"]) {
+      expect(within(group).queryByText(word)).toBeNull();
+    }
+  });
+
+  it("the module still opens on its own named destination, not a dead row", () => {
+    renderAt("/operation");
+    fireEvent.click(module_("delivery"));
+    expect(child("delivery").className).toContain("bg-kit-blue-3");
   });
 });
 

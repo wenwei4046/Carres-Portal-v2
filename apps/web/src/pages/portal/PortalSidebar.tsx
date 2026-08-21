@@ -116,8 +116,8 @@ const PURCHASING: PortalSection = "Purchasing";
  * reference screenshots). Every module draws an ICON + NAME + CHEVRON row and
  * its pages hang beneath it, each on its own rounded elbow. This SUPERSEDES
  * the same morning's uppercase-heading rail: she saw the headings in
- * production and re-ruled. One module is open at a time — thirteen purchasing
- * pages and six delivery pages cannot stack — and the module you are standing
+ * production and re-ruled. One module is open at a time — eighteen purchasing
+ * pages and a Warehouse module cannot stack — and the module you are standing
  * in is the open one when the rail loads.
  *
  * Collapse (ported from main's 2026-06-29 operation sidebar, now portal-wide):

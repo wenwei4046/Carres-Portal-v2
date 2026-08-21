@@ -33,7 +33,6 @@ import {
   History,
   ListTodo,
   CircleAlert,
-  CalendarDays,
   Library,
   type LucideIcon,
 } from "lucide-react";
@@ -351,14 +350,25 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       // reasons and photos stay behind the order drawer's server-side gates, so
       // this door shows the delivery work and hands over to the same drawer the
       // Orders list opens.
-      /* THE DELIVERY MODULE'S PAGES (owner-approved 2026-08-19, carried into
-       * CARD-2026-08-19-sidebar-expandable-modules from the delivery-rail card
-       * it replaced). `Delivery Work` IS the existing Delivery page — keyed
-       * and routed exactly as today; only its door moved under the module row
-       * and it wears the governed name. The other five are approved and
-       * unbuilt, so they are non-controls printing `Coming soon`, and Report
-       * sits below its hairline. NO Settings row: the header gear is the one
-       * Settings entry (Jess, 2026-08-19). */
+      /* THE DELIVERY MODULE'S PAGES — TWO, and both of them open
+       * (CARD-2026-08-21-delivery-01-sidebar, owner ruling 2026-08-21). This
+       * OVERWRITES the seven-row list of 2026-08-19: `Schedule`,
+       * `Delivery History`, `Exceptions`, `Partners` and `Report` were five
+       * rows an operator could read, count and want, and every one of them
+       * refused the click. A door that is drawn and cannot be opened teaches
+       * the rail is unreliable, and it taught that lesson five times in a
+       * module that has exactly two working pages.
+       *
+       * The capabilities are NOT retired — `docs/delivery/MASTER.md` §7 still
+       * holds Delivery History, Exceptions and Partners as approved targets,
+       * and Report stays central. They are simply not NAVIGATION until they
+       * are pages. A row returns here in the PR that makes it answer.
+       *
+       * `Delivery Work` IS the existing Delivery page — same key, same
+       * `?tab=delivery` route; `Delivery Orders` keeps its own path. No
+       * hairline and no Report row survive: nothing is left to divide from.
+       * NO Settings row: the header gear is the one Settings entry
+       * (Jess, 2026-08-19). */
       { key: "delivery", label: "Delivery Work", icon: Route, section: "Delivery" },
       {
         key: "delivery-orders",
@@ -367,11 +377,6 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         path: "/operation/delivery-orders",
         section: "Delivery",
       },
-      { key: "delivery-schedule", label: "Schedule", icon: CalendarDays, soon: true, section: "Delivery" },
-      { key: "delivery-history", label: "Delivery History", icon: History, soon: true, section: "Delivery" },
-      { key: "delivery-exceptions", label: "Exceptions", icon: CircleAlert, soon: true, section: "Delivery" },
-      { key: "delivery-partners", label: "Partners", icon: Network, soon: true, section: "Delivery" },
-      { key: "delivery-report", label: "Report", icon: BarChart3, soon: true, dividerAbove: true, section: "Delivery" },
       /* WAREHOUSE IS A HEADING, NOT A PARENT ROW (Warehouse Blueprint item 13,
        * owner-approved; applied 2026-08-19 under the Jess 2026-08-19 SALES
        * template — CARD-2026-08-19-warehouse-rail). K0's single merged `Stock`
