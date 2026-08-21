@@ -394,6 +394,26 @@ md5 — every one an exact match, so what production runs is what the repository
 | 0370 | `07357039f1ad66aa1bd11163a1aa43d4` |
 | 0371 | `a45dea200a0556fea6bd060ae812b690` |
 
+**Card §6 coverage, item by item.** Each row says how it is proven, not that it is.
+
+| Card §6 requires | Proven by | Result |
+|---|---|---|
+| duplicate and reused Unit IDs are refused | production negative controls ①③ — duplicate insert, and reuse of a written-off unit's id | both refused |
+| traceable goods cannot be an over-reserving bulk row | CHECK `ops_stock_items_bulk_never_reserved` + the catalog-driven trigger; negative control ⑤ | refused |
+| Carres Owned and Supplier Consignment stay distinct | production controls — a third word refused, consignment-without-supplier refused, consignment-with-supplier persists, default is `carres_owned` | 4 of 4 fired |
+| Site and operating party change independently | route tests: two doors, and neither call carries the other's parameter | green |
+| Sales Order reservation reflected with no second Stock writer | the register has no write policy; the two raw writers now call `ops_stock_bind_units`; route test asserts no direct `.update()` | green |
+| incoming, in-transit, protected and reserved absent from available | live view query — rows that are `available` while not free/sound/unreserved/undamaged | **0 leaks** |
+| every derived total drills to the exact contributing ids | live query comparing each `available` against the sum of its own contributing unit rows | **0 that do not drill** |
+| direct or unauthorised writes and deletes are refused | negative controls ②④⑥⑧ + the grant assertions in 0367/0369 | all refused |
+| existing Purchasing, Receiving, Orders and Delivery tests green | full API suite | 2293 green |
+
+**The one item this card does NOT prove: "incomplete".** Card §6 asks that an *incomplete* Unit be
+absent from available results. Missing components/packages is not a fact the register records — there
+is no column for it and no door that sets one — so nothing here can enforce it. `damaged` and the
+protection reasons cover the adjacent cases. Recording completeness is Receiving's scan surface
+(MASTER §5) and belongs to that card; it is named here so it is not mistaken for shipped.
+
 **Local release gate:** shared (2474) and API (2293) suites fully green; typecheck, lint, build
 clean; no server secret in the web bundle. The web suite is green on 265 of 266 files. The one
 exception is **pre-existing flakiness this card did not cause and did not fix**:
