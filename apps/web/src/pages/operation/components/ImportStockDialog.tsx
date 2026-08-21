@@ -230,7 +230,7 @@ export default function ImportStockDialog({
           <div className="rounded-[4px] border border-base-200 bg-base-50 px-3 py-2.5">
             <div className="text-strong text-green-700">{created} line(s) booked in</div>
             <div className="text-body text-base-600 mt-0.5">
-              at Carres Klang · the On Hand list has refreshed.
+              at Carres Klang · the Stock list has refreshed.
             </div>
           </div>
           <div className="flex justify-end">

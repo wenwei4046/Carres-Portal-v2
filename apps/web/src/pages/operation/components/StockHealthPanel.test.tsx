@@ -117,13 +117,25 @@ describe("the digest", () => {
     expect(screen.queryByTestId(`health-row-${PILLOW}`)).toBeNull();
   });
 
+  /* UPDATED 2026-08-21 — CARD-2026-08-20-stock-register follow-up.
+   *
+   * This sentence used to say "the Reorder card under On hand". That page was
+   * renamed to Stock and de-routed, which made the instruction name a
+   * destination that no longer existed AND could not be reached — found by
+   * grepping the SERVED production bundle, not by any page test.
+   *
+   * The Reorder card now sits on THIS page, above this panel, which is where a
+   * reorder point belongs: Ready stock is the page that asks "must we buy
+   * more?". The sentence points at it. The test still checks what it always
+   * checked — that the panel TEACHES where the number is set — because that is
+   * the behaviour worth holding, not the old wording. */
   it("teaches where the two numbers are set", async () => {
     serve(response());
     renderPanel();
     fireEvent.click(await screen.findByTestId("health-count-unrated"));
-    expect(screen.getByTestId("health-rows-unrated").textContent).toContain(
-      "Reorder card under On hand",
-    );
+    const text = screen.getByTestId("health-rows-unrated").textContent ?? "";
+    expect(text).toContain("Reorder card above");
+    expect(text).not.toContain("On hand");
   });
 
   it("shows both of the COO's numbers on a rated row", async () => {

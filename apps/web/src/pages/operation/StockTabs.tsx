@@ -25,7 +25,7 @@ import ModuleHeader from "./components/ModuleHeader";
  * address.
  *
  * Word law (COPY-STANDARD): the page words are the SIDEBAR's own words
- * (`portal-nav.ts`) — `On hand` · `Ready stock` · `In & out`. "Inventory" and
+ * (`portal-nav.ts`) — `Stock` · `Ready stock` · `In & out`. "Inventory" and
  * "Movements" remain banned UI words; the goods pool is still `Stock`.
  */
 
@@ -34,7 +34,10 @@ type StockPage = "on-hand" | "ready" | "in-out";
 /** The page word printed as the destination header. These are the SIDEBAR's
  *  own words (`portal-nav.ts`) — a page word is never invented here. */
 const PAGE_WORD: Record<StockPage, string> = {
-  "on-hand": "On hand",
+  /* `Stock`, not `On hand` — CARD-2026-08-20-stock-register renamed the
+   * destination. This is the FALLBACK branch for an unrecognised `?tab=`, so it
+   * must not print a page word the portal no longer has. */
+  "on-hand": "Stock",
   ready: "Ready stock",
   "in-out": "In & out",
 };

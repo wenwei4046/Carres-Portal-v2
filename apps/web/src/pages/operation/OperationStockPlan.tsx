@@ -19,6 +19,13 @@ import StockTabs from "./StockTabs";
 import UrgentRestockPanel from "./components/UrgentRestockPanel";
 import PoolUsagePanel from "./components/PoolUsagePanel";
 import StockHealthPanel from "./components/StockHealthPanel";
+/* RELOCATED 2026-08-21 — CARD-2026-08-20-stock-register follow-up. The
+ * reorder points used to live on the On hand page, which that card
+ * replaced with the Stock Register. Ready stock is where a reorder point
+ * belongs anyway: this page already asks "must we buy more?", and
+ * StockHealthPanel below already tells the operator to set the number
+ * here. The card moved; nothing about it changed. */
+import ReorderStockCard from "./components/ReorderStockCard";
 
 /**
  * Ready stock — the monthly plan (card K2, migration 0287).
@@ -110,6 +117,7 @@ export default function OperationStockPlan() {
             renders outside the plan's loading and error branches for the same
             reason the urgent lane does: it must still answer on a day the
             monthly cycle fails to load. */}
+        <ReorderStockCard />
         <StockHealthPanel />
 
         {isLoading ? (

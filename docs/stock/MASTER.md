@@ -494,14 +494,23 @@ claim-only issue route remain superseded. Transfers (PR #860), Counts, month-end
 eligible Units, Showroom Sites, the partner mobile surfaces and the reports in §11 remain
 **APPROVED TARGET / NOT BUILT**.
 
-**`OperationStockOnHand.tsx` IS DE-ROUTED, NOT DELETED, AND THE REASON IS A DEPENDENCY.** No
-operator can reach it. It is kept because TWO capabilities still live only there:
-`ReorderStockCard` (the K1 reorder points, migration 0286 — the one door where a reorder point and
-lead days are set) and `ImportStockDialog` (the Klg Warehouse sheet import). Deleting the file would
-destroy both without replacing them, and an existing useful capability defaults to KEEP. Their
-homes are **Ready stock** (reorder points) and **Settings/Maintenance** (the sheet import) — a
-relocation this card's scope excluded. **The file dies in the PR that gives those two a home, and
-that is the next Warehouse scope.**
+**`OperationStockOnHand.tsx` IS DE-ROUTED, NOT DELETED.** No operator can reach it. ONE capability
+still lives only there — `ImportStockDialog`, the Klg Warehouse sheet import — and deleting the file
+would destroy it without replacing it (an existing useful capability defaults to KEEP). Its home is
+**Settings/Maintenance**. The file dies in the PR that gives the import a door.
+
+**THE REORDER CARD MOVED, AND THE PRODUCTION BUNDLE IS WHY.** The de-routing was verified by
+grepping the SERVED bundle for `On hand`, and it came back **2**, not 0. One was a dead fallback
+word in `StockTabs`. The other was live operator copy on the **Ready stock** page:
+*"Set when to buy on the Reorder card under On hand"* — naming a destination that no longer existed
+AND had just been made unreachable by this very card. A page-local test asserting the word was gone
+from the NEW page could never have caught it; only reading what production actually serves did.
+
+So `ReorderStockCard` was relocated to **Ready stock**, where a reorder point belongs — that page
+already asks *must we buy more?*, and the sentence telling the operator to set the number is on it.
+The sentence now says "the Reorder card above" and points at something real. **A dangling
+instruction is a defect: the card followed the sentence rather than making the sentence follow the
+card.**
 
 0366's five governed doors that could legitimately live on Unit Detail — `ops_stock_set_site` ·
 `set_holder` · `set_ownership` · `verify_unit` · `set_condition` — are **NOT wired**. Each needs its

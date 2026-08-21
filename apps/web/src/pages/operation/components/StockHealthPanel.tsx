@@ -143,8 +143,8 @@ export default function StockHealthPanel() {
           )}
           {openRung === "unrated" && rows.length > 0 ? (
             <div className="text-meta text-base-600 pt-2">
-              Set when to buy on the Reorder card under On hand, and how low it
-              may go under &ldquo;How low it may go&rdquo; below.
+              Set when to buy on the Reorder card above, and how low it may go
+              under &ldquo;How low it may go&rdquo; below.
             </div>
           ) : null}
         </div>

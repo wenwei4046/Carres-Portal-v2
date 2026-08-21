@@ -21,20 +21,19 @@ import ReorderStockCard from "./components/ReorderStockCard";
  * the word `On hand` is gone from every operator surface, which is the card's
  * §6 acceptance line.
  *
- * IT IS NOT DELETED, AND THAT IS DELIBERATE. Two capabilities still live ONLY
- * here and nowhere else in the portal:
+ * IT IS NOT DELETED, AND THAT IS DELIBERATE. ONE capability still lives only
+ * here: `ImportStockDialog`, the Klg Warehouse sheet import. Deleting the file
+ * would destroy it without replacing it, and an existing useful capability
+ * defaults to KEEP (CLAUDE.md §4). Its home is Settings/Maintenance, and this
+ * file dies in the PR that gives the import a door.
  *
- *   · `ReorderStockCard`   — the K1 reorder points (migration 0286). The one
- *                            door where the reorder point and lead days are set.
- *   · `ImportStockDialog`  — the Klg Warehouse sheet import.
- *
- * Deleting the file would destroy both without replacing them, and an existing
- * useful capability defaults to KEEP (CLAUDE.md §4, Plan/Design Research Law).
- * Their proper homes are Ready stock (reorder points) and Settings/Maintenance
- * (the sheet import) — a relocation this card's scope explicitly excludes, and
- * one that needs its own acceptance boundary rather than being smuggled in.
- * The gap is recorded in docs/stock/MASTER.md; this file dies in the PR that
- * gives those two a home.
+ * `ReorderStockCard` NO LONGER counts — it MOVED to Ready stock on 2026-08-21.
+ * De-routing this page had left a live sentence on Ready stock telling the
+ * operator to "set the number on the Reorder card under On hand", pointing at a
+ * destination that no longer existed and could not be reached. A dangling
+ * instruction is a defect, so the card followed the sentence rather than the
+ * sentence following the card. Ready stock is where a reorder point belonged
+ * anyway: that page already asks "must we buy more?".
  *
  * Everything below is the superseded surface, unchanged.
  *
