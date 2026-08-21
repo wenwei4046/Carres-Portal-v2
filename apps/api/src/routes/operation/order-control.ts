@@ -1639,7 +1639,7 @@ orderControlRouter.get("/:id/loans", async (c) => {
   const { data, error } = await sb
     .from("ops_sofa_loans")
     .select(
-      "id, order_id, source, category, item_id, do_number, status, loaned_at, returned_at, returned_to_supplier_at, supplier_id, borrowed_sku, borrowed_label, notes, out_route, out_partner_id, dispatched_at, arrived_warehouse_at, loan_note_no, loan_note_signed_at, supplier_return_due, supplier_return_ref, ops_stock_items(sku, condition, po_no), suppliers(name), delivery_partners(name)",
+      "id, order_id, source, category, item_id, do_number, status, loaned_at, returned_at, returned_to_supplier_at, supplier_id, borrowed_sku, borrowed_label, notes, out_route, out_partner_id, dispatched_at, arrived_warehouse_at, loan_note_no, loan_note_signed_at, supplier_return_due, supplier_return_ref, ops_stock_items(unit_code, sku, condition, po_no), suppliers(name), delivery_partners(name)",
     )
     .eq("order_id", idCheck.data)
     .order("loaned_at", { ascending: false });
@@ -1655,6 +1655,7 @@ orderControlRouter.get("/:id/loans", async (c) => {
 function mapLoanRow(r: unknown): SofaLoanDto {
   const row = r as Record<string, unknown> & {
     ops_stock_items?: {
+      unit_code?: string | null;
       sku?: string | null;
       condition?: string | null;
       po_no?: string | null;
@@ -1669,6 +1670,9 @@ function mapLoanRow(r: unknown): SofaLoanDto {
     category: (row.category as string | null) ?? null,
     item_id: (row.item_id as string | null) ?? null,
     item_sku: row.ops_stock_items?.sku ?? null,
+    /* The label on the piece, not the row's primary key — a loan block that
+       prints a uuid tells the operator nothing they can check in a house. */
+    item_unit_code: row.ops_stock_items?.unit_code ?? null,
     item_condition: row.ops_stock_items?.condition ?? null,
     item_po: row.ops_stock_items?.po_no ?? null,
     supplier_id: (row.supplier_id as string | null) ?? null,
@@ -1756,7 +1760,7 @@ orderControlRouter.post("/:id/loan-sofa", async (c) => {
   }
   const { data: claimed, error: readErr } = await sb
     .from("ops_stock_items")
-    .select("id, sku, condition, po_no")
+    .select("id, unit_code, sku, condition, po_no")
     .eq("id", itemId)
     .maybeSingle();
   if (readErr || !claimed) {
@@ -1807,6 +1811,7 @@ orderControlRouter.post("/:id/loan-sofa", async (c) => {
     category: null,
     item_id: loan.item_id as string,
     item_sku: (claimed.sku as string | null) ?? null,
+    item_unit_code: (claimed.unit_code as string | null) ?? null,
     item_condition: (claimed.condition as string | null) ?? null,
     item_po: (claimed.po_no as string | null) ?? null,
     supplier_id: null,
@@ -1943,7 +1948,7 @@ orderControlRouter.post("/:id/loan-update", async (c) => {
     .eq("id", loanId)
     .eq("order_id", orderId)
     .select(
-      "id, order_id, source, category, item_id, do_number, status, loaned_at, returned_at, returned_to_supplier_at, supplier_id, borrowed_sku, borrowed_label, notes, out_route, out_partner_id, dispatched_at, arrived_warehouse_at, loan_note_no, loan_note_signed_at, supplier_return_due, supplier_return_ref, ops_stock_items(sku, condition, po_no), suppliers(name), delivery_partners(name)",
+      "id, order_id, source, category, item_id, do_number, status, loaned_at, returned_at, returned_to_supplier_at, supplier_id, borrowed_sku, borrowed_label, notes, out_route, out_partner_id, dispatched_at, arrived_warehouse_at, loan_note_no, loan_note_signed_at, supplier_return_due, supplier_return_ref, ops_stock_items(unit_code, sku, condition, po_no), suppliers(name), delivery_partners(name)",
     )
     .single();
   if (error) {

@@ -2862,6 +2862,17 @@ export interface operationOrderListRow {
   /** Purchase-order identities linked by purchase_orders.so / so_refs. */
   po_numbers?: string[];
   delivery_partner_id: string | null;
+  /**
+   * DELIVERY CARD 02 (2026-08-21) — the multi-leg Delivery Journey
+   * (`orders.delivery_stops`, migration 0156). Delivery Work renders ONE ROW
+   * PER LEG, because leg 1 reaching the named JB warehouse is not the event the
+   * Singapore customer is waiting for. `null`/absent or a single stop means
+   * single-leg and the order is one scope — which is every live order today
+   * (measured 2026-08-21: 0 of 90 open orders carry a chain). Optional, so a
+   * browser on this build against an older Worker simply reads every order as
+   * single-leg instead of crashing.
+   */
+  delivery_stops?: DeliveryStop[] | null;
   /** Migration 0147 (item h, 2026-05-23) — order-level LP request/accept/reject
    *  state. Set by `operation_confirm_proceed_request_v3` when Operation
    *  picks an LP at Accept Proceed; the LP then accepts (partner_accepted_at)
@@ -2934,6 +2945,13 @@ export interface operationOrderListRow {
 
 export interface SalesOrderExpansionResponse {
   defaultDeliverTo: string | null;
+  /**
+   * DELIVERY CARD 02 (2026-08-21) — WHERE each allocated Unit is and WHO has
+   * it, from Stock's own record. Optional: a browser on this build against an
+   * older Worker reads it as absent and the expansion prints its governed
+   * absence rather than a place nobody recorded.
+   */
+  place?: Array<{ unitCode: string; siteName: string | null; holderName: string | null }>;
   lines: Array<{
     lineId: string;
     sku: string;

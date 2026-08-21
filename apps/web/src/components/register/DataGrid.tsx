@@ -1405,6 +1405,12 @@ function DataGridInner<T>({
                   <button
                     type="button"
                     aria-label={isExpanded ? "Collapse row" : "Expand row"}
+                    /* The disclosure has to ANNOUNCE its state, not only its
+                       label: a screen reader lands on the chevron and must be
+                       told whether the goods below it are already open. One
+                       attribute in the ENGINE gives every register the same
+                       answer — a page-local disclosure could not (Law 13). */
+                    aria-expanded={isExpanded}
                     onClick={(e) => {
                       e.stopPropagation();
                       toggleExpand(expandKey);

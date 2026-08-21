@@ -2360,9 +2360,13 @@ describe("GET /api/operation/orders/:id/expansion", () => {
         { po_id: "PO-2032", sku: "B1201S-K", qty: 1, destination_id: "al" },
       ],
       ops_stock_items: [
-        { unit_code: "id-001", sku: "B1201S-K" },
-        { unit_code: "id-002", sku: "B1201S-K" },
+        { unit_code: "id-001", sku: "B1201S-K", warehouse_id: "wh-klang", holder_party_id: null },
+        { unit_code: "id-002", sku: "B1201S-K", warehouse_id: "wh-klang", holder_party_id: "party-nets" },
       ],
+      /* DELIVERY CARD 02 — Where and Who has it come from Stock's own two
+         lookup tables, never from a name copied onto the Unit. */
+      warehouses: [{ id: "wh-klang", name: "Carres Klang Warehouse" }],
+      stock_operating_parties: [{ id: "party-nets", name: "NETS Warehouse" }],
     };
     const from = vi.fn((table: string) => {
       const data = rows[table];
@@ -2381,6 +2385,13 @@ describe("GET /api/operation/orders/:id/expansion", () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({
       defaultDeliverTo: "Carres Klang",
+      /* WHERE each Unit is and WHO has it — the SAME Units the lines already
+         name, resolved to Stock's own names. Delivery Work reads this block;
+         the Sales Orders register ignores it. */
+      place: [
+        { unitCode: "id-001", siteName: "Carres Klang Warehouse", holderName: null },
+        { unitCode: "id-002", siteName: "Carres Klang Warehouse", holderName: "NETS Warehouse" },
+      ],
       lines: [{
         lineId: "line-1",
         sku: "B1201S-K",
