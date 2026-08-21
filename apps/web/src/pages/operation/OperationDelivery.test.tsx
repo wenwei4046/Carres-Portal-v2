@@ -43,6 +43,9 @@ let docsState: {
   refetch: ReturnType<typeof vi.fn>;
 };
 let expansionState: { data: SalesOrderExpansionResponse | undefined; isLoading: boolean };
+/** Keyed by order id — the ONLY way to prove an expansion shows its OWN goods
+ *  and not the row above it (the card's own acceptance line). */
+let expansionByOrder: Record<string, SalesOrderExpansionResponse> | null = null;
 let loansState: { data: { loans: unknown[] } | undefined };
 
 vi.mock("@/lib/queries", async () => {
@@ -52,7 +55,10 @@ vi.mock("@/lib/queries", async () => {
     useOperationOrders: () => ordersState,
     useDeliveryPartners: () => partnersState,
     useDeliveryOrdersRegister: () => docsState,
-    useSalesOrderExpansion: () => expansionState,
+    useSalesOrderExpansion: (orderId: string | null) =>
+      expansionByOrder
+        ? { data: expansionByOrder[orderId ?? ""], isLoading: false }
+        : expansionState,
     useOrderLoans: () => loansState,
   };
 });
@@ -125,6 +131,7 @@ beforeEach(() => {
     refetch: vi.fn(),
   };
   expansionState = { data: { defaultDeliverTo: null, place: [], lines: [] }, isLoading: false };
+  expansionByOrder = null;
   loansState = { data: { loans: [] } };
   localStorage.clear();
   vi.useFakeTimers();
@@ -275,10 +282,28 @@ describe("the listing", () => {
     expect(headers).not.toContain("Next Action");
   });
 
-  it("says a document has not been issued rather than inventing a status", () => {
+  it("says a document has not been issued rather than inventing a status word", () => {
     wrap(<OperationDelivery />);
-    expect(screen.getByText("No delivery order yet")).toBeTruthy();
-    expect(screen.getByText("Not issued yet")).toBeTruthy();
+    /* ONE governed sentence in BOTH cells — `DO No` asks which document and
+       `Delivery Status` asks what state, and until the system issues one both
+       answers are the same fact. No new vocabulary is minted for it. */
+    expect(screen.getAllByText("No delivery order yet")).toHaveLength(2);
+    expect(screen.queryByText("Not issued yet")).toBeNull();
+  });
+
+  it("keeps the two Customer Delivery absences apart", () => {
+    ordersState.data = {
+      orders: [
+        order({ id: "a", so: 1322, delivery_date: null, delivery_date_tbd: false }),
+        order({ id: "b", so: 1323, delivery_date: null, delivery_date_tbd: true }),
+      ],
+    };
+    wrap(<OperationDelivery />);
+    // Nobody has asked this customer …
+    expect(screen.getByText("No delivery date")).toBeTruthy();
+    // … and this one HAS been asked and answered "not yet". Different facts,
+    // and both words are the portal's own, not this page's.
+    expect(screen.getByText("To be confirmed")).toBeTruthy();
   });
 
   it("prints the DO number as a door once the system has issued one", () => {
@@ -386,6 +411,54 @@ describe("▸ has exactly one job", () => {
     expect(within(box).queryByRole("textbox")).toBeNull();
     expect(within(box).queryByRole("combobox")).toBeNull();
     expect(within(box).queryByRole("button", { name: /save/i })).toBeNull();
+  });
+
+  it("opens on the keyboard, and two expansions carry their OWN goods", () => {
+    ordersState.data = {
+      orders: [
+        order({
+          id: "a",
+          so: 1322,
+          order_lines: [{ id: "l-a", sku: "mattress:M-AAA", qty: 1, label: "Serena · King" }],
+        }),
+        order({
+          id: "b",
+          so: 1323,
+          order_lines: [{ id: "l-b", sku: "sofa:S-BBB", qty: 1, label: "Rialto · 3 seater" }],
+        }),
+      ],
+    };
+    expansionByOrder = {
+      a: {
+        defaultDeliverTo: null,
+        place: [{ unitCode: "UNIT-AAA", siteName: "Carres Klang", holderName: null }],
+        lines: [{ lineId: "l-a", sku: "mattress:M-AAA", unitIds: ["UNIT-AAA"], deliverTo: [] }],
+      },
+      b: {
+        defaultDeliverTo: null,
+        place: [{ unitCode: "UNIT-BBB", siteName: "NETS Warehouse", holderName: null }],
+        lines: [{ lineId: "l-b", sku: "sofa:S-BBB", unitIds: ["UNIT-BBB"], deliverTo: [] }],
+      },
+    };
+    wrap(<OperationDelivery />);
+
+    /* The chevron is a real button, so the keyboard reaches it and Enter opens
+       it — no key handler of this page's own. */
+    const [first, second] = screen.getAllByRole("button", { name: "Expand row" });
+    first!.focus();
+    expect(document.activeElement).toBe(first);
+    fireEvent.keyDown(first!, { key: "Enter", code: "Enter" });
+    fireEvent.click(first!);
+    fireEvent.click(second!);
+
+    const boxes = screen.getAllByTestId("delivery-scope-expansion");
+    expect(boxes).toHaveLength(2);
+    // Two mini-tables, each carrying only its own scope's Unit and item.
+    expect(screen.getAllByTestId("goods-mini-table")).toHaveLength(2);
+    expect(within(boxes[0]!).getByText("UNIT-AAA")).toBeTruthy();
+    expect(within(boxes[0]!).queryByText("UNIT-BBB")).toBeNull();
+    expect(within(boxes[1]!).getByText("UNIT-BBB")).toBeTruthy();
+    expect(within(boxes[1]!).queryByText("UNIT-AAA")).toBeNull();
   });
 
   it("draws the Loan block only when a loan is actually out", () => {

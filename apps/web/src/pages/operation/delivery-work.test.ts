@@ -127,7 +127,7 @@ describe("delivery scopes and journey legs", () => {
   });
 
   it("speaks a leg's status in the DOCUMENT's five words, never `Pending`", () => {
-    expect(legStatusOf({ status: "pending" }).label).toBe(DW.notIssuedYet);
+    expect(legStatusOf({ status: "pending" }).label).toBe(DW.noDeliveryOrder);
     expect(legStatusOf({ status: "picked_up" }).label).toBe("Out for delivery");
     // Leg 1 handing over at the named JB warehouse IS that leg's delivery.
     expect(legStatusOf({ status: "handed_off" }).label).toBe("Delivered");
@@ -230,6 +230,15 @@ describe("the DELIVERY DATE rail", () => {
     expect(rail.map((r) => r.count)).toEqual([1, 1, 1, 1]);
   });
 
+  it("keeps a PICKED day on the rail after its last scope moves away", () => {
+    /* Otherwise the row vanishes while its choice is still on the URL, and the
+       operator is left with an empty listing and no control to undo it. */
+    const rail = buildDateRail(rows, TODAY, (iso) => `printed:${iso}`, new Set(["2026-09-01"]));
+    const stranded = rail.find((r) => r.label === "printed:2026-09-01");
+    expect(stranded).toBeDefined();
+    expect(stranded!.count).toBe(0);
+  });
+
   it("never prints a relative day word", () => {
     const rail = buildDateRail(rows, TODAY, (iso) => `printed:${iso}`);
     for (const item of rail) {
@@ -263,6 +272,13 @@ describe("the LOGISTICS rail", () => {
     const rail = buildLogisticsRail(rows, partners);
     expect(rail.find((r) => r.label === "TSDD")?.count).toBe(1);
     expect(rail.find((r) => r.label === "QUIET CO")).toBeUndefined();
+  });
+
+  it("keeps a PICKED ungoverned partner on the rail after its last scope moves away", () => {
+    const rail = buildLogisticsRail(build([order({ id: "a", so: 1301 })]), [], new Set(["TSDD"]));
+    const stranded = rail.find((r) => r.label === "TSDD");
+    expect(stranded).toBeDefined();
+    expect(stranded!.count).toBe(0);
   });
 
   it("counts the NETS scopes assigned through triage, not only the formal ones", () => {
