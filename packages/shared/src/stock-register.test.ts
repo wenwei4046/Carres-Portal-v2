@@ -80,7 +80,28 @@ describe("the default view is CURRENT units (Card §1)", () => {
 });
 
 describe("Changed reads the PHYSICAL event ledger, never updated_at (Card §3)", () => {
-  const now = new Date("2026-08-21T15:00:00+08:00"); // a Friday
+  /**
+   * ⚠ THESE FIXTURES ARE BUILT FROM `now`, NOT WRITTEN AS FIXED OFFSETS.
+   *
+   * The first version of this block used `+08:00` literals and passed locally
+   * while FAILING on CI, which runs UTC — `changedWithin` compares against LOCAL
+   * midnight (the operator's today is the browser's, which is the whole point),
+   * so a fixed instant lands on a different side of the boundary in a different
+   * zone. That is the same defect ENGINEERING §7 records for the Windows path
+   * separator: green on the machine that reported, red on the machine that ran.
+   *
+   * Building each timestamp from `now` in LOCAL terms tests the actual rule —
+   * "since local midnight", "since local Monday" — in any timezone.
+   */
+  const now = new Date(2026, 7, 21, 15, 0, 0); // local Friday 21 Aug 2026, 15:00
+
+  /** A local wall-clock instant, offset from `now` by whole days. */
+  function localAt(daysFromNow: number, h: number, m: number): string {
+    const d = new Date(now);
+    d.setDate(d.getDate() + daysFromNow);
+    d.setHours(h, m, 0, 0);
+    return d.toISOString();
+  }
 
   it("a Unit that has never moved is in no time scope", () => {
     const u = unit({ lastEventAt: null });
@@ -89,20 +110,24 @@ describe("Changed reads the PHYSICAL event ledger, never updated_at (Card §3)",
     expect(changedWithin(u, "month", now)).toBe(false);
   });
 
-  it("today means since local midnight", () => {
-    expect(changedWithin(unit({ lastEventAt: "2026-08-21T00:30:00+08:00" }), "today", now)).toBe(true);
-    expect(changedWithin(unit({ lastEventAt: "2026-08-20T23:30:00+08:00" }), "today", now)).toBe(false);
+  it("today means since LOCAL midnight, in whatever zone the operator is in", () => {
+    expect(changedWithin(unit({ lastEventAt: localAt(0, 0, 30) }), "today", now)).toBe(true);
+    expect(changedWithin(unit({ lastEventAt: localAt(-1, 23, 30) }), "today", now)).toBe(false);
   });
 
   it("this week starts MONDAY, not Sunday", () => {
-    // 2026-08-17 is the Monday of this week; 2026-08-16 the Sunday before it.
-    expect(changedWithin(unit({ lastEventAt: "2026-08-17T09:00:00+08:00" }), "week", now)).toBe(true);
-    expect(changedWithin(unit({ lastEventAt: "2026-08-16T09:00:00+08:00" }), "week", now)).toBe(false);
+    // `now` is a Friday, so Monday is 4 days back and the Sunday before it is 5.
+    expect(changedWithin(unit({ lastEventAt: localAt(-4, 9, 0) }), "week", now)).toBe(true);
+    expect(changedWithin(unit({ lastEventAt: localAt(-5, 9, 0) }), "week", now)).toBe(false);
   });
 
   it("this month starts on the 1st", () => {
-    expect(changedWithin(unit({ lastEventAt: "2026-08-01T00:00:00+08:00" }), "month", now)).toBe(true);
-    expect(changedWithin(unit({ lastEventAt: "2026-07-31T23:59:00+08:00" }), "month", now)).toBe(false);
+    const firstOfMonth = new Date(now);
+    firstOfMonth.setDate(1);
+    firstOfMonth.setHours(0, 0, 0, 0);
+    const lastOfPrevMonth = new Date(firstOfMonth.getTime() - 60_000);
+    expect(changedWithin(unit({ lastEventAt: firstOfMonth.toISOString() }), "month", now)).toBe(true);
+    expect(changedWithin(unit({ lastEventAt: lastOfPrevMonth.toISOString() }), "month", now)).toBe(false);
   });
 
   it("a malformed timestamp is not a match, and does not throw", () => {
@@ -141,7 +166,7 @@ describe("the catalog answers the category, and says so when it cannot", () => {
 });
 
 describe("rail sections combine; one selection applies within a section (Card §3)", () => {
-  const now = new Date("2026-08-21T15:00:00+08:00");
+  const now = new Date(2026, 7, 21, 15, 0, 0);
   const rows = [
     unit({ id: "a", availability: "available", ownership: "carres_owned", category: "sofa" }),
     unit({ id: "b", availability: "reserved", ownership: "carres_owned", category: "sofa" }),
