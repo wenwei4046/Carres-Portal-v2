@@ -2,7 +2,7 @@
 
 **Module:** Delivery · **Sequence:** 01
 **Owner ruling:** Jess, 2026-08-21
-**Status:** EXECUTED — PR #882, merged, deployed, production-verified
+**Status:** EXECUTED — PR #884, merged as `52118bfe`, deployed, production-verified
 
 ---
 
@@ -70,5 +70,12 @@ route, no token and no shell dimension was touched.
 - [x] Each route highlights only its correct child.
 - [x] `PortalSidebar` tests pass — 113/113 in the portal suite, 3203/3203 web-wide.
 - [x] Web typecheck and production build pass.
-- [x] PR created, CI green, merged, deployed, production reports the merged SHA.
-- [x] Production screenshot at 1440px attached to the PR thread.
+- [x] PR created, CI green, merged, deployed. All five surfaces
+      (`carres-portal` · `carres-pos` Pages, ERP + POS canonical, API Worker)
+      report `52118bfe74ce16d2101f3d5dc59e8be06042e9b1`, and `origin/main`'s tip
+      was still that SHA at the moment of the proof.
+- [x] Authenticated production walk at a 1440px layout, signed in as
+      `operation@carres.com`, on both routes. The rail's own DOM was asserted,
+      not eyeballed: two children, two elbows, ONE trunk (so the line ends at
+      `Delivery Orders`), zero retired keys, zero `Coming soon`, and exactly one
+      lit child per route. Proof is in the PR thread.

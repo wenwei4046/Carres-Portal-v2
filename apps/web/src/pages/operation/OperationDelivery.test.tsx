@@ -1,81 +1,86 @@
 /**
- * OperationDelivery — T11, the Delivery module page (the LAST card of line ①).
+ * DELIVERY WORK — the manual planning workspace, held as tests.
+ * `CARD-2026-08-21-delivery-02-work-layout`.
  *
- * T11 is assembly, so these tests pin the two things assembly can get wrong:
+ * The arithmetic is pinned in `delivery-work.test.ts`. What THIS file holds is
+ * everything that could only go wrong once the numbers reach the screen:
  *
- *  1. **The board must not become a second opinion.** A row appears here only
- *     because the SAME `nextActionOf` the Orders list runs said a delivery step
- *     is next — so a money-held order (🔒 Confirm) is absent, a stock-blocked
- *     order is absent, and the pill says exactly what the Orders list says.
- *  2. **The module writes nothing.** Every action leaves through `Open order`.
- *
- * Plus the words: the queue labels come from the shared constant (no synonym),
- * and no banned word (POD · Unscheduled · Carrier) reaches the screen.
+ *  1. **The old page is gone and cannot come back.** No `Work list` / `Calendar`
+ *     switch, no KPI preamble, no Refresh, no action-card wall, no permanent
+ *     detail pane, no `Due` / `Next Action` / `Priority` / `Today`.
+ *  2. **The shape** — one 50px Destination Header, one 200px local rail, one
+ *     expandable register.
+ *  3. **The approved column order**, exactly.
+ *  4. **▸ has one job** — this scope's goods, and only its own.
+ *  5. **Nothing writes.** No `New DO` / `Issue` / `Release` / `Approve`.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import type {
-  operationOrderListRow,
-  operationOrdersListResponse,
-  operationStockResponse,
+  DeliveryOrderRow,
   DeliveryPartnersListResponse,
+  operationOrderListRow,
+  SalesOrderExpansionResponse,
 } from "@/lib/queries";
 
-let listState: {
-  data: operationOrdersListResponse | undefined;
+let ordersState: {
+  data: { orders: operationOrderListRow[] } | undefined;
   isLoading: boolean;
+  isError: boolean;
+  error: unknown;
   refetch: ReturnType<typeof vi.fn>;
 };
 let partnersState: { data: DeliveryPartnersListResponse | undefined };
-let stockState: { data: operationStockResponse | undefined };
-let briefState: { data: unknown };
+let docsState: {
+  data:
+    | { deliveryOrders: DeliveryOrderRow[]; attempts: []; handoverEvents: [] }
+    | undefined;
+  isLoading: boolean;
+  isError: boolean;
+  error: unknown;
+  refetch: ReturnType<typeof vi.fn>;
+};
+let expansionState: { data: SalesOrderExpansionResponse | undefined; isLoading: boolean };
+let loansState: { data: { loans: unknown[] } | undefined };
 
 vi.mock("@/lib/queries", async () => {
   const actual = await vi.importActual<typeof import("@/lib/queries")>("@/lib/queries");
   return {
     ...actual,
-    useOperationOrders: () => listState,
+    useOperationOrders: () => ordersState,
     useDeliveryPartners: () => partnersState,
-    useOperationStock: () => stockState,
-    // CARD 3 — the detail pane's booking brief is a server read; the page only
-    // renders it. Its arithmetic is pinned in packages/shared/booking-brief.test
-    // and its composition in apps/api booking-brief.test.
-    useOrderBookingBrief: () => briefState,
+    useDeliveryOrdersRegister: () => docsState,
+    useSalesOrderExpansion: () => expansionState,
+    useOrderLoans: () => loansState,
   };
 });
 
-vi.mock("./components/OrderDetailDrawer", () => ({
-  default: ({ orderId, onClose }: { orderId: string; onClose: () => void }) => (
-    <div data-testid="drawer-stub" data-order-id={orderId}>
-      <button onClick={onClose}>close</button>
-    </div>
-  ),
-}));
-
 import OperationDelivery from "./OperationDelivery";
 
-// 2026-07-27 is a Monday; 2026-08-01 a Saturday.
-const TODAY = "2026-07-27";
+const TODAY = "2026-08-21"; // a Friday
 
-function makeRow(
-  partial: Partial<operationOrderListRow> & { id: string; so: number },
+function order(
+  over: Partial<operationOrderListRow> & { id: string; so: number },
 ): operationOrderListRow {
   return {
     status: "proceed_order",
     operation_stage: "ready_to_dispatch",
     warehouse_id: null,
-    customer_name: "Kong Chai Yin",
-    customer_phone: null,
-    customer_address: null,
-    placed_at: "2026-07-01T00:00:00Z",
-    delivery_date: "2026-08-05",
+    customer_name: "kong chai yin",
+    customer_phone: "0162389000",
+    customer_address: "12 Jalan Damai, Klang",
+    customer_address_city: "Klang",
+    customer_address_state: "Selangor",
+    building_type: "Condominium",
+    placed_at: "2026-08-01T00:00:00Z",
+    delivery_date: "2026-08-30",
     delivery_date_tbd: false,
     source_system: null,
-    source_ref: null,
+    source_ref: ["CR0854"],
     ops_assigned_logistic: null,
-    order_lines: [],
+    order_lines: [{ id: "l-1", sku: "mattress:M1401F-K", qty: 1, label: "Serena · King" }],
     delivery_partner_id: null,
     request_for_delivery_at: null,
     partner_accepted_at: null,
@@ -90,22 +95,9 @@ function makeRow(
     dealers: { name: "Carres KL" },
     order_supplier_threads: [],
     order_annotations: [],
-    ...partial,
+    ...over,
   };
 }
-
-/** Stock is in (ready_to_dispatch) and nobody is carrying it yet ⇒ the ladder
- *  answers "Assign logistic" — the first delivery queue. */
-const NEEDS_LOGISTICS = makeRow({ id: "a", so: 1201, customer_name: "ella" });
-
-/** Assigned, but the customer has not confirmed ⇒ the second queue. */
-const NEEDS_DATE = makeRow({
-  id: "b",
-  so: 1202,
-  customer_name: "PETER",
-  delivery_partner_id: "p-nets",
-  delivery_partners: { id: "p-nets", name: "NETS Logistics" },
-});
 
 function wrap(node: React.ReactNode) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -117,448 +109,336 @@ function wrap(node: React.ReactNode) {
 }
 
 beforeEach(() => {
-  listState = { data: { orders: [] }, isLoading: false, refetch: vi.fn() };
+  ordersState = {
+    data: { orders: [] },
+    isLoading: false,
+    isError: false,
+    error: null,
+    refetch: vi.fn(),
+  };
   partnersState = { data: { partners: [] } };
-  stockState = { data: undefined };
-  briefState = { data: undefined };
+  docsState = {
+    data: { deliveryOrders: [], attempts: [], handoverEvents: [] },
+    isLoading: false,
+    isError: false,
+    error: null,
+    refetch: vi.fn(),
+  };
+  expansionState = { data: { defaultDeliverTo: null, place: [], lines: [] }, isLoading: false };
+  loansState = { data: { loans: [] } };
+  localStorage.clear();
   vi.useFakeTimers();
-  vi.setSystemTime(new Date(`${TODAY}T09:00:00`));
+  vi.setSystemTime(new Date(`${TODAY}T09:00:00+08:00`));
 });
 afterEach(() => {
   vi.useRealTimers();
 });
 
-describe("OperationDelivery — the board holds delivery work, and only that", () => {
-  it("uses the governed Delivery Work shell without breadcrumb or relative-day copy", () => {
-    listState.data = { orders: [NEEDS_DATE] };
-    wrap(<OperationDelivery />);
-
-    expect(screen.getByText("Delivery Work")).toBeTruthy();
-    expect(screen.queryByText("Operations")).toBeNull();
-    expect(screen.queryByText(/\bToday\b/i)).toBeNull();
+describe("the old three-pane page is gone", () => {
+  beforeEach(() => {
+    ordersState.data = { orders: [order({ id: "a", so: 1322 })] };
   });
 
-  it("groups work under an actual calendar date and avoids generic work labels", () => {
-    listState.data = { orders: [NEEDS_DATE] };
+  it("carries no Work list / Calendar switch, no KPI preamble and no Refresh", () => {
     wrap(<OperationDelivery />);
-
-    expect(screen.getByTestId("delivery-date-group").textContent).toMatch(
-      /Mon|Tue|Wed|Thu|Fri|Sat|Sun/,
-    );
-    expect(screen.getByTestId("delivery-row").textContent).toMatch(
-      /Ask NETS Logistics for the customer’s delivery date/i,
-    );
-    expect(screen.queryByText(/\bDue\b/i)).toBeNull();
-    expect(screen.queryByText(/Next Action/i)).toBeNull();
-    expect(screen.queryByText(/Priority/i)).toBeNull();
+    expect(screen.queryByText("Work list")).toBeNull();
+    expect(screen.queryByText("Calendar")).toBeNull();
+    expect(screen.queryByRole("button", { name: /refresh/i })).toBeNull();
+    expect(screen.queryByTestId("delivery-queues")).toBeNull();
+    expect(screen.queryByTestId("delivery-detail")).toBeNull();
   });
 
-  it("lists an order whose next action is a delivery step", () => {
-    listState.data = { orders: [NEEDS_LOGISTICS] };
+  it("never shows a generic employee label or a relative day word", () => {
     wrap(<OperationDelivery />);
-    const rows = screen.getAllByTestId("delivery-row");
-    expect(rows).toHaveLength(1);
-    expect(within(rows[0]).getByText("SO-1201")).toBeTruthy();
-    expect(within(rows[0]).getByText("Choose a logistics partner.")).toBeTruthy();
+    const text = document.body.textContent ?? "";
+    expect(text).not.toMatch(/\bDue\b/);
+    expect(text).not.toMatch(/Next Action/i);
+    expect(text).not.toMatch(/Priority/i);
+    expect(text).not.toMatch(/\bToday\b/);
+    expect(text).not.toMatch(/\bTomorrow\b/);
+    expect(text).not.toMatch(/\bPending\b/);
   });
 
-  it("leaves out an order the ladder says is NOT a delivery step yet", () => {
-    // No PO anywhere and no stock ⇒ the ladder answers "Order PO". Goods first:
-    // you do not arrange the delivery of goods nobody has ordered.
-    listState.data = {
+  it("offers no door that would write a Delivery Order", () => {
+    wrap(<OperationDelivery />);
+    for (const word of [/New DO/i, /^Issue$/i, /Release/i, /Approve/i]) {
+      expect(screen.queryByRole("button", { name: word })).toBeNull();
+    }
+  });
+});
+
+describe("the shape", () => {
+  it("draws one 50px Destination Header saying only Delivery Work", () => {
+    wrap(<OperationDelivery />);
+    const header = screen.getByTestId("delivery-work-destination-header");
+    expect(header.className).toContain("h-[50px]");
+    expect(
+      within(header).getByTestId("delivery-work-destination-header-module-word").textContent,
+    ).toBe("Delivery Work");
+  });
+
+  it("draws the 200px local rail and one listing beside it", () => {
+    wrap(<OperationDelivery />);
+    expect(screen.getByTestId("delivery-work-rail").className).toContain("w-[200px]");
+    expect(screen.getByTestId("delivery-work-listing")).toBeTruthy();
+  });
+
+  it("orders the DELIVERY DATE rail: no confirmed date, date passed, then real days", () => {
+    ordersState.data = {
       orders: [
-        makeRow({
+        order({ id: "a", so: 1322 }),
+        order({
+          id: "b",
+          so: 1323,
+          ops_order_control: { booking_stage: "confirmed", confirmed_date: "2026-08-19" },
+        }),
+        order({
           id: "c",
-          so: 1203,
-          operation_stage: "placed",
-          status: "place",
-          order_lines: [{ sku: "mattress:MAT-1", qty: 1 }],
+          so: 1324,
+          ops_order_control: { booking_stage: "confirmed", confirmed_date: "2026-08-24" },
         }),
       ],
     };
     wrap(<OperationDelivery />);
-    expect(screen.queryAllByTestId("delivery-row")).toHaveLength(0);
-    expect(screen.getByText(/An order joins this board the moment/)).toBeTruthy();
+    const rail = screen.getByTestId("delivery-work-rail");
+    const labels = within(rail)
+      .getAllByRole("button")
+      .map((b) => b.textContent ?? "");
+    expect(labels[0]).toContain("No confirmed date");
+    expect(labels[1]).toContain("Date passed");
+    expect(labels[2]).toContain("Mon, 24 Aug");
   });
 
-  it("leaves out a money-held order — you do not arrange a delivery you may not make", () => {
-    // Stock in, logistics assigned, customer confirmed, but RM 2,455 owing ⇒
-    // the ladder answers a LOCKED "Confirm", which is not a delivery queue.
-    listState.data = {
+  it("keeps every governed Logistics Partner on the rail at zero", () => {
+    wrap(<OperationDelivery />);
+    for (const name of ["NETS", "AL", "TEOW", "TT", "EU", "SSY", "HOUZS"]) {
+      expect(screen.getByTestId(`delivery-logistics-${name}`)).toBeTruthy();
+    }
+    expect(screen.getByTestId("delivery-logistics-all")).toBeTruthy();
+  });
+
+  it("combines the date and the logistics filter into one question", () => {
+    ordersState.data = {
       orders: [
-        makeRow({
-          id: "d",
-          so: 1204,
-          delivery_partner_id: "p-nets",
-          delivery_partners: { id: "p-nets", name: "NETS Logistics" },
-          ops_order_control: {
-            booking_stage: "confirmed",
-            confirmed_date: "2026-08-05",
-            balance: 2455,
-          },
+        order({
+          id: "a",
+          so: 1322,
+          delivery_partners: { id: "p-nets", name: "NETS" },
+          ops_order_control: { booking_stage: "confirmed", confirmed_date: "2026-08-24" },
+        }),
+        order({
+          id: "b",
+          so: 1323,
+          delivery_partners: { id: "p-al", name: "AL" },
+          ops_order_control: { booking_stage: "confirmed", confirmed_date: "2026-08-24" },
         }),
       ],
     };
     wrap(<OperationDelivery />);
-    expect(screen.queryAllByTestId("delivery-row")).toHaveLength(0);
-  });
+    expect(screen.getByText("SO-1322")).toBeTruthy();
+    expect(screen.getByText("SO-1323")).toBeTruthy();
 
-  // ── CARD 3 · early logistics + the T−3 call (owner ruling 2026-08-13) ─────
-  //
-  // The board used to be scoped by `nextActionOf` — the ONE action that LEADS
-  // the row across all three tracks. Law 4 ranks goods work above delivery
-  // preparation, so every order whose goods were not yet in was invisible on
-  // the logistics operator's own page. That made two permanent rules
-  // unreachable in practice, and production showed it: 51 orders with
-  // logistics assigned, ZERO customer appointments ever confirmed.
-  //
-  // Membership now reads the DELIVERY TRACK of the same Layer-1 output. These
-  // three tests are the rules, one each.
+    fireEvent.click(screen.getByTestId("delivery-date-2026-08-24"));
+    fireEvent.click(screen.getByTestId("delivery-logistics-NETS"));
 
-  /** PO placed, goods still at the factory (`in_production` ⇒ awaiting). */
-  const inProduction = (partial: Partial<operationOrderListRow> & { id: string; so: number }) =>
-    makeRow({ operation_stage: "in_production", ...partial });
-
-  it("CARD 3 Rule 1 — an order still in production reaches the assign queue", () => {
-    listState.data = { orders: [inProduction({ id: "c3a", so: 1301 })] };
-    wrap(<OperationDelivery />);
-    const rows = screen.getAllByTestId("delivery-row");
-    expect(rows).toHaveLength(1);
-    expect(within(rows[0]).getByText("SO-1301")).toBeTruthy();
-    expect(within(rows[0]).getByText("Choose a logistics partner.")).toBeTruthy();
-  });
-
-  it("CARD 3 Rule 2 — the booking call opens with the goods still coming", () => {
-    listState.data = {
-      orders: [
-        inProduction({
-          id: "c3b",
-          so: 1302,
-          delivery_partner_id: "p-nets",
-          delivery_partners: { id: "p-nets", name: "NETS Logistics" },
-        }),
-      ],
-    };
-    wrap(<OperationDelivery />);
-    const rows = screen.getAllByTestId("delivery-row");
-    expect(rows).toHaveLength(1);
-    // The SECOND step — "got stock or no stock, Logistics still starts the
-    // conversation". The row prints the party-named line (C1), so the assertion
-    // is on that; the queue word itself carries no party.
-    expect(
-      within(rows[0]).getByText(/Ask NETS Logistics for the customer’s delivery date/i),
-    ).toBeTruthy();
-  });
-
-  it("CARD 3 — but goods nobody has ordered still have no route to plan", () => {
-    // The ruling's own trigger is "Ready Stock route known OR Purchase Order
-    // placed". An open `Issue PO` is neither, so the assign step waits — Rule 1
-    // forbids waiting for the goods to be READY, not for them to be BOUGHT.
-    listState.data = {
-      orders: [
-        makeRow({
-          id: "c3c",
-          so: 1303,
-          operation_stage: "placed",
-          status: "place",
-          order_lines: [{ sku: "mattress:MAT-1", qty: 1 }],
-        }),
-      ],
-    };
-    wrap(<OperationDelivery />);
-    expect(screen.queryAllByTestId("delivery-row")).toHaveLength(0);
-  });
-
-  it("CARD 3 — the detail pane hands Logistics the facts for the call", () => {
-    listState.data = { orders: [inProduction({ id: "c3d", so: 1304 })] };
-    briefState.data = {
-      brief: {
-        orderId: "c3d",
-        soRef: "SO-1304",
-        promisedDateIso: "2026-08-05",
-        promisedIsTbd: false,
-        stockEtaIso: "2026-08-12",
-        expectedScope: ["bed"],
-        expectedScopeLabel: "Bed set",
-        lines: [],
-        goodsIn: [],
-        goodsNotIn: [
-          { sku: "mattress:MAT-1", committedQty: 2, allocatedQty: 0, shortQty: 2, expectedInIso: "2026-08-12", isIn: false, group: "bed" },
-        ],
-        assignedLogistics: null,
-        appointment: null,
-        carrierDrift: false,
-        contactDueIso: "2026-07-31",
-        contactWindow: "upcoming",
-        contactOverdue: false,
-      },
-    };
-    wrap(<OperationDelivery />);
-    fireEvent.click(screen.getAllByTestId("delivery-row")[0]);
-    const pane = screen.getByTestId("delivery-detail");
-    expect(within(pane).getByText("Before you call")).toBeTruthy();
-    // The promised deadline, the expected arrival and what is NOT in — the
-    // three facts the ruling says Operations provides, present while the
-    // warehouse is empty.
-    expect(within(pane).getByText(/Call by/)).toBeTruthy();
-    expect(within(pane).getByText("Not in yet")).toBeTruthy();
-    expect(within(pane).getByText(/mattress:MAT-1 ×2/)).toBeTruthy();
-  });
-
-  it("CARD 3 — a reassignment after the customer agreed is SHOWN, not swallowed", () => {
-    listState.data = {
-      orders: [
-        makeRow({
-          id: "c3e",
-          so: 1305,
-          delivery_partner_id: "p-houzs",
-          delivery_partners: { id: "p-houzs", name: "HOUZS" },
-          // A booked day that has come and gone with no delivery — the broken
-          // commitment, so the order is on the board and its pane is reachable.
-          ops_order_control: {
-            booking_stage: "confirmed",
-            confirmed_date: "2026-07-20",
-            confirmed_time_slot: "Morning (9am–12pm)",
-          },
-        }),
-      ],
-    };
-    briefState.data = {
-      brief: {
-        orderId: "c3e",
-        soRef: "SO-1305",
-        promisedDateIso: "2026-08-05",
-        promisedIsTbd: false,
-        stockEtaIso: null,
-        expectedScope: [],
-        expectedScopeLabel: "",
-        lines: [],
-        goodsIn: [],
-        goodsNotIn: [],
-        assignedLogistics: { partnerId: "p-houzs", partnerName: "HOUZS" },
-        appointment: {
-          dateIso: "2026-07-20",
-          slot: "Morning (9am–12pm)",
-          carrier: { partnerId: "p-nets", partnerName: "NETS Logistics" },
-          scope: [],
-          scopeLabel: "",
-          confirmedAt: null,
-        },
-        carrierDrift: true,
-        contactDueIso: "2026-07-31",
-        contactWindow: "done",
-        contactOverdue: false,
-      },
-    };
-    wrap(<OperationDelivery />);
-    fireEvent.click(screen.getAllByTestId("delivery-row")[0]);
-    const pane = screen.getByTestId("delivery-detail");
-    // The confirmed line names the company the customer AGREED WITH…
-    expect(within(pane).getByText(/NETS Logistics · confirmed/)).toBeTruthy();
-    // …and the drift is stated with its fix, never swallowed.
-    expect(
-      within(pane).getByText(/Assigned to HOUZS since the customer agreed this day with/),
-    ).toBeTruthy();
-  });
-
-  it("counts each queue in the facet rail, with its own late tail", () => {
-    listState.data = {
-      orders: [
-        NEEDS_LOGISTICS,
-        NEEDS_DATE,
-        // Promised 3 days ago with nobody assigned: the assign step's deadline
-        // (3 working days BEFORE the promise) is long gone → 1 late.
-        makeRow({ id: "e", so: 1205, delivery_date: "2026-07-24" }),
-      ],
-    };
-    wrap(<OperationDelivery />);
-    const facet = screen.getByTestId("delivery-queues");
-    // "2 · 1 late" — numbers up front (COPY-STANDARD rule 3).
-    expect(within(facet).getByText("2 · 1 late")).toBeTruthy();
-    expect(within(facet).getByText("1")).toBeTruthy();
-  });
-
-  it("filters to one queue when its facet row is picked, and clears from the chip", () => {
-    listState.data = { orders: [NEEDS_LOGISTICS, NEEDS_DATE] };
-    wrap(<OperationDelivery />);
-    expect(screen.getAllByTestId("delivery-row")).toHaveLength(2);
-    fireEvent.click(
-      within(screen.getByTestId("delivery-queues")).getByText("Get customer delivery date"),
-    );
-    const rows = screen.getAllByTestId("delivery-row");
-    expect(rows).toHaveLength(1);
-    expect(within(rows[0]).getByText("SO-1202")).toBeTruthy();
-    fireEvent.click(
-      within(screen.getByTestId("listshell-active-chips")).getByText("Get customer delivery date"),
-    );
-    expect(screen.getAllByTestId("delivery-row")).toHaveLength(2);
-  });
-
-  it("puts the late row first — delivery risk, not the order's overall slack", () => {
-    listState.data = {
-      orders: [
-        makeRow({ id: "f", so: 1210, delivery_date: "2026-09-30" }),
-        makeRow({ id: "g", so: 1211, delivery_date: "2026-07-24" }),
-      ],
-    };
-    wrap(<OperationDelivery />);
-    const rows = screen.getAllByTestId("delivery-row");
-    expect(within(rows[0]).getByText("SO-1211")).toBeTruthy();
+    expect(screen.getByText("SO-1322")).toBeTruthy();
+    expect(screen.queryByText("SO-1323")).toBeNull();
   });
 });
 
-describe("OperationDelivery — the detail pane states facts and hands over", () => {
-  it("opens the order drawer rather than editing anything here", () => {
-    listState.data = { orders: [NEEDS_DATE] };
-    wrap(<OperationDelivery />);
-    fireEvent.click(screen.getAllByTestId("delivery-row")[0]);
-    fireEvent.click(screen.getByText("Open order"));
-    expect(screen.getByTestId("drawer-stub").getAttribute("data-order-id")).toBe("b");
+describe("the listing", () => {
+  beforeEach(() => {
+    ordersState.data = { orders: [order({ id: "a", so: 1322 })] };
   });
 
-  it("says nothing about a logistics company that never gave us rules", () => {
-    listState.data = { orders: [NEEDS_DATE] };
-    partnersState.data = { partners: [{ id: "p-nets", name: "NETS Logistics", contact: null, zones: null }] };
+  it("shows the approved default columns, in the approved order", () => {
     wrap(<OperationDelivery />);
-    fireEvent.click(screen.getAllByTestId("delivery-row")[0]);
-    const detail = screen.getByTestId("delivery-detail");
-    // Absent data means "we never asked" — never "it's fine" (the T9 law).
-    expect(within(detail).getByText("No delivery rules recorded for NETS Logistics.")).toBeTruthy();
+    const headers = screen
+      .getAllByRole("columnheader")
+      .map((h) => h.textContent?.trim() ?? "")
+      .filter(Boolean);
+    expect(headers).toEqual([
+      "SO / Ref",
+      "Customer",
+      "Customer Delivery",
+      "Delivery Location",
+      "Building",
+      "Logistics Partner",
+      "Confirmed Delivery",
+      "Confirmed Time",
+      "Goods",
+      "DO No",
+      "Delivery Status",
+    ]);
+    // A register finds documents; it never names an owner or an action.
+    expect(headers).not.toContain("Owner");
+    expect(headers).not.toContain("Next Action");
   });
 
-  it("prints the rules a logistics company DID give us", () => {
-    listState.data = { orders: [NEEDS_DATE] };
-    partnersState.data = {
-      partners: [
+  it("says a document has not been issued rather than inventing a status", () => {
+    wrap(<OperationDelivery />);
+    expect(screen.getByText("No delivery order yet")).toBeTruthy();
+    expect(screen.getByText("Not issued yet")).toBeTruthy();
+  });
+
+  it("prints the DO number as a door once the system has issued one", () => {
+    ordersState.data = {
+      orders: [order({ id: "a", so: 1322, do_number: "DO-210826-0001" })],
+    };
+    docsState.data = {
+      deliveryOrders: [
         {
-          id: "p-nets",
-          name: "NETS Logistics",
-          contact: null,
-          zones: null,
-          booking_lead_days: 2,
-          daily_capacity: 8,
+          id: "do-1",
+          do_number: "DO-210826-0001",
+          issued_at: "2026-08-20T00:00:00Z",
+          trip_groups: null,
+          delivery_date: "2026-08-26",
+          time_slot: "12pm–3pm",
+          logistics_partner: "NETS",
+          voided_at: null,
+          void_reason: null,
+          orders: { id: "a", so: 1322, customer_name: "kong chai yin" },
+        },
+      ],
+      attempts: [],
+      handoverEvents: [],
+    };
+    wrap(<OperationDelivery />);
+    expect(screen.getByRole("button", { name: "DO-210826-0001" })).toBeTruthy();
+    /* The document's own confirmed day and slot, not the SO's promise. The
+       day is asserted INSIDE the listing: the rail carries the same date as
+       its own bucket, and a bare text match would pass on the rail alone. */
+    const listing = screen.getByTestId("delivery-work-listing");
+    expect(within(listing).getByText("Wed, 26 Aug")).toBeTruthy();
+    expect(within(listing).getByText("12pm–3pm")).toBeTruthy();
+    expect(within(listing).getByText("Created")).toBeTruthy();
+  });
+
+  it("counts SCOPES in the footer, legs included", () => {
+    ordersState.data = {
+      orders: [
+        order({
+          id: "a",
+          so: 1322,
+          delivery_stops: [
+            {
+              leg: 1,
+              partner_id: "p-teow",
+              partner_name: "TEOW",
+              from_loc: "Klang WH",
+              to_loc: "JB transit",
+              status: "pending",
+            },
+            {
+              leg: 2,
+              partner_id: "p-ssy",
+              partner_name: "SSY",
+              from_loc: "JB transit",
+              to_loc: "Singapore customer",
+              status: "pending",
+            },
+          ],
+        }),
+      ],
+    };
+    wrap(<OperationDelivery />);
+    expect(screen.getByText("2 delivery scopes")).toBeTruthy();
+    expect(screen.getByText(/Leg 1 · Klang WH → JB transit/)).toBeTruthy();
+    expect(screen.getByText(/Leg 2 · JB transit → Singapore customer/)).toBeTruthy();
+  });
+});
+
+describe("▸ has exactly one job", () => {
+  it("announces its state and opens THIS scope's goods and physical facts", () => {
+    ordersState.data = { orders: [order({ id: "a", so: 1322 })] };
+    expansionState.data = {
+      defaultDeliverTo: null,
+      place: [{ unitCode: "CAR-000123", siteName: "Carres Klang", holderName: null }],
+      lines: [
+        {
+          lineId: "l-1",
+          sku: "mattress:M1401F-K",
+          unitIds: ["CAR-000123"],
+          deliverTo: [{ name: "Carres Klang", qty: 1 }],
         },
       ],
     };
     wrap(<OperationDelivery />);
-    fireEvent.click(screen.getAllByTestId("delivery-row")[0]);
-    const detail = screen.getByTestId("delivery-detail");
-    expect(within(detail).getByText("2 working days notice")).toBeTruthy();
-    expect(within(detail).getByText("8 deliveries a day")).toBeTruthy();
+
+    const chevron = screen.getByRole("button", { name: "Expand row" });
+    expect(chevron.getAttribute("aria-expanded")).toBe("false");
+    fireEvent.click(chevron);
+    expect(
+      screen.getByRole("button", { name: "Collapse row" }).getAttribute("aria-expanded"),
+    ).toBe("true");
+
+    const box = screen.getByTestId("delivery-scope-expansion");
+    expect(within(box).getByTestId("goods-mini-table")).toBeTruthy();
+    expect(within(box).getByText("CAR-000123")).toBeTruthy();
+
+    const facts = within(box).getByTestId("delivery-scope-facts");
+    expect(facts.textContent).toContain("Where");
+    expect(facts.textContent).toContain("Carres Klang");
+    expect(facts.textContent).toContain("Who has it");
+    expect(facts.textContent).toContain("Stock ETA");
+
+    // No second Delivery form hides inside the disclosure.
+    expect(within(box).queryByRole("textbox")).toBeNull();
+    expect(within(box).queryByRole("combobox")).toBeNull();
+    expect(within(box).queryByRole("button", { name: /save/i })).toBeNull();
   });
 
-  it("stays silent about a delivery photo it cannot substantiate", () => {
-    // No overlay row at all ⇒ the ledger is UNKNOWN, not "no photo" (T6/T7).
-    listState.data = { orders: [NEEDS_DATE] };
+  it("draws the Loan block only when a loan is actually out", () => {
+    ordersState.data = { orders: [order({ id: "a", so: 1322 })] };
     wrap(<OperationDelivery />);
-    fireEvent.click(screen.getAllByTestId("delivery-row")[0]);
-    const detail = screen.getByTestId("delivery-detail");
-    expect(within(detail).getByText("Open the order to see the delivery photo.")).toBeTruthy();
-    expect(within(detail).queryByText(/No delivery photo yet/)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Expand row" }));
+    expect(screen.queryByTestId("delivery-scope-loan")).toBeNull();
+  });
+
+  it("names the loaned Unit, not its database key", () => {
+    ordersState.data = { orders: [order({ id: "a", so: 1322 })] };
+    loansState.data = {
+      loans: [
+        {
+          id: "loan-1",
+          order_id: "a",
+          source: "warehouse",
+          item_id: "11111111-1111-1111-1111-111111111111",
+          item_unit_code: "CAR-000999",
+          item_sku: "sofa:SOF-2",
+          status: "on_loan",
+          loaned_at: "2026-08-10T00:00:00Z",
+          borrowed_label: null,
+          supplier_name: null,
+        },
+      ],
+    };
+    wrap(<OperationDelivery />);
+    fireEvent.click(screen.getByRole("button", { name: "Expand row" }));
+    const loan = screen.getByTestId("delivery-scope-loan");
+    expect(within(loan).getByText("CAR-000999")).toBeTruthy();
+    expect(within(loan).getByText("Carres Warehouse")).toBeTruthy();
+    expect(loan.textContent).not.toContain("11111111-1111");
   });
 });
 
-describe("OperationDelivery — the calendar reads the booking, never the promise", () => {
-  it("shows a promised-but-unbooked order as work, not as a delivery", () => {
-    listState.data = { orders: [makeRow({ id: "h", so: 1220, delivery_date: TODAY })] };
+describe("empty, loading and error all speak inside the listing", () => {
+  it("says there are no delivery scopes rather than showing a blank sheet", () => {
     wrap(<OperationDelivery />);
-    fireEvent.click(screen.getByText("Calendar"));
-    const day = screen.getByTestId(`delivery-day-${TODAY}`);
-    expect(within(day).getByText("No deliveries booked this day.")).toBeTruthy();
-    expect(within(day).getByText("Promised this day, no date yet")).toBeTruthy();
-    expect(within(day).getByText(/Call Kong Chai Yin — book delivery date/)).toBeTruthy();
+    expect(
+      within(screen.getByTestId("delivery-work-listing")).getByText("No delivery scopes"),
+    ).toBeTruthy();
   });
 
-  it("puts a confirmed booking on its own day and names the slot", () => {
-    listState.data = {
-      orders: [
-        makeRow({
-          id: "i",
-          so: 1221,
-          delivery_partner_id: "p-nets",
-          delivery_partners: { id: "p-nets", name: "NETS Logistics" },
-          ops_order_control: {
-            booking_stage: "confirmed",
-            confirmed_date: TODAY,
-            confirmed_time_slot: "Afternoon (12pm–3pm)",
-          },
-        }),
-      ],
-    };
+  it("puts the failure and its retry inside the listing area", () => {
+    ordersState.isError = true;
+    ordersState.error = new Error("boom");
     wrap(<OperationDelivery />);
-    fireEvent.click(screen.getByText("Calendar"));
-    const day = screen.getByTestId(`delivery-day-${TODAY}`);
-    expect(within(day).getByText("12pm–3pm")).toBeTruthy();
-  });
-
-  it("⭐ an owing order stays ON the board, and its calendar chip opens the same detail (decision A)", () => {
-    // Until 2026-08-16 this fixture was the money-held truck: off the queue,
-    // findable only through the calendar, its detail carrying `Collect … 🔒`.
-    // Decision A retired the money hold, so the same order is now simply a
-    // booked delivery — on the board, unlocked, with its collection still open.
-    listState.data = {
-      orders: [
-        makeRow({
-          id: "k",
-          so: 1223,
-          delivery_partner_id: "p-nets",
-          delivery_partners: { id: "p-nets", name: "NETS Logistics" },
-          ops_order_control: {
-            booking_stage: "confirmed",
-            confirmed_date: TODAY,
-            balance: 2455,
-          },
-        }),
-      ],
-    };
-    wrap(<OperationDelivery />);
-    expect(screen.queryAllByTestId("delivery-row")).toHaveLength(1);
-    fireEvent.click(screen.getByText("Calendar"));
-    fireEvent.click(within(screen.getByTestId(`delivery-day-${TODAY}`)).getByText("SO-1223"));
-    const detail = screen.getByTestId("delivery-detail");
-    // The lead line is the run itself — the day arrived and nothing forbids
-    // it. `Collect RM 2,455.00 🔒` is exactly what this pane printed before
-    // decision A, and the lock's absence is the ruling made visible.
-    expect(within(detail).getByText("Deliver the goods to the customer.")).toBeTruthy();
-    expect(within(detail).queryByText("🔒")).toBeNull();
-  });
-
-  it("calls a logistics-only date what it is — never green, never 'carrier'", () => {
-    listState.data = {
-      orders: [
-        makeRow({
-          id: "j",
-          so: 1222,
-          delivery_partner_id: "p-nets",
-          delivery_partners: { id: "p-nets", name: "NETS Logistics" },
-          ops_order_control: { booking_stage: "provisional", logistic_eta: TODAY },
-        }),
-      ],
-    };
-    wrap(<OperationDelivery />);
-    fireEvent.click(screen.getByText("Calendar"));
-    const day = screen.getByTestId(`delivery-day-${TODAY}`);
-    expect(within(day).getByText("Logistics' date")).toBeTruthy();
-  });
-});
-
-describe("OperationDelivery — the words", () => {
-  it("never renders a banned word (POD · Unscheduled · Not booked · Carrier · Chase supplier)", () => {
-    listState.data = { orders: [NEEDS_LOGISTICS, NEEDS_DATE] };
-    const { container } = wrap(<OperationDelivery />);
-    const text = container.textContent ?? "";
-    expect(text).not.toMatch(/\bPOD\b|Proof of Delivery/i);
-    expect(text).not.toMatch(/Unscheduled|Not booked|need booking/i);
-    expect(text).not.toMatch(/\bCarrier\b/i);
-  });
-
-  it("uses the approved plain-English work labels", () => {
-    listState.data = { orders: [NEEDS_LOGISTICS, NEEDS_DATE] };
-    wrap(<OperationDelivery />);
-    const facet = screen.getByTestId("delivery-queues");
-    expect(within(facet).getByText("Choose logistics partner")).toBeTruthy();
-    expect(within(facet).getByText("Get customer delivery date")).toBeTruthy();
-    expect(within(facet).getByText("Deliver on scheduled date")).toBeTruthy();
-    expect(within(facet).getByText("Get delivery photo")).toBeTruthy();
+    const listing = screen.getByTestId("delivery-work-listing");
+    expect(within(listing).getByText("Delivery Work could not be loaded")).toBeTruthy();
+    fireEvent.click(within(listing).getByRole("button", { name: "Try again" }));
+    expect(ordersState.refetch).toHaveBeenCalled();
+    // The rail survives the failure — it is the page, not the result.
+    expect(screen.getByTestId("delivery-work-rail")).toBeTruthy();
   });
 });

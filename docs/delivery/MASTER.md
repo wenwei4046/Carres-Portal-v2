@@ -335,22 +335,58 @@ Route. **The register shows NO owner, NO avatar and NO action sentence** — a r
 documents; work lives in My Work / Team Work. Rows open the DO object page; document numbers are
 doors (`DO → DO`, `SO → SO`).
 
-**Delivery Work — first page BUILT 2026-08-20.** It is an operational workspace, not a truth
-Register. The destination header is 50px and says only **Delivery Work**, with the governed global
-utilities. The 45px work toolbar switches **Work list / Calendar**, shows work counts and Refresh.
-The work list groups rows under the actual governed weekday + calendar date (`Tue, 18 Aug`; include
-the year outside the current year). It never substitutes Today or Tomorrow and never exposes the
-generic employee labels Due, Next Action or Priority.
+**Delivery Work — the manual planning workspace. OWNER RULING 2026-08-21, BUILT
+(`CARD-2026-08-21-delivery-02-work-layout`). This OVERWRITES the 2026-08-20 first page.** The
+three-pane action-card screen is deleted, not deprecated beside this: the `Work list / Calendar`
+switch, the KPI/count preamble, the Refresh control, the action-card wall, the permanent detail
+pane and the third working column are gone, and no Delivery surface carries the generic employee
+labels `Due`, `Next Action` or `Priority`. That page answered *who should be nagged today*, which
+is My Work / Team Work's question; this one answers the logistics question — **everything going out
+on a given day, who is carrying it, and what is still missing.**
 
-Each row keeps object identity separate, then states two primary-school-English facts:
+It is an operational workspace, not a truth Register, and it **writes nothing**: no `New DO`, no
+`Issue`, no `Release`, no `Approve`. §3's ruling is unchanged — the system issues the document.
 
-1. **What happened** — for example `No customer delivery date`;
-2. **What to do** — for example `Ask NETS Logistics for the customer’s delivery date.`
+```
+one 50px Destination Header  ·  Delivery Work
+200px local rail             ·  DELIVERY DATE + LOGISTICS, page-owned FILTERING
+one expandable DataGrid      ·  the Sales Orders engine, density and toolbar
+```
 
-The detail pane repeats the same structured fact and action at a larger density. The date remains
-an authoritative calendar fact, not prose inside the action. Existing governed order/detail doors
-remain the completion path; this first page creates no second work store or free-form completion
-truth.
+**The rail.** `DELIVERY DATE` lists `No confirmed date`, then `Date passed`, then the actual
+weekday + calendar dates ascending — **never Today, never Tomorrow.** `LOGISTICS` lists `All`, then
+the governed partners **NETS · AL · TEOW · TT · EU · SSY · HOUZS in that order and visible at zero**,
+then any other partner while it is genuinely carrying a scope, then `No logistics picked` when
+scopes have none. The two groups COMBINE, each group's counts are computed over the rows the other
+has already narrowed, and counts are **delivery scopes or Journey legs, never whole Sales Orders.**
+Choices ride the URL (`?date=` · `?logistics=`).
+
+**One parent row = one Delivery scope, or one Journey leg.** A Singapore order's two legs are two
+rows, each with its own Logistics Partner, day and result: leg 1 completing means the goods reached
+the named JB warehouse, which is not the event the Singapore customer is waiting for. A delivered
+order leaves the workspace — that is Delivery Orders and Delivery History.
+
+**Default columns, in this order:**
+
+```
+▸ · SO / Ref · Customer · Customer Delivery · Delivery Location · Building · Logistics Partner ·
+Confirmed Delivery · Confirmed Time · Goods · DO No · Delivery Status
+```
+
+`SO / Ref` is the sticky identity column and stays visible through horizontal scroll; SO No opens
+the Sales Order and DO No the Delivery Order. Before the system issues a document the cells read
+`No delivery order yet` and `Not issued yet`. **No Owner column, no avatar, no action sentence.**
+Dates print the actual weekday + date. `Confirmed Delivery` is Delivery's own operational date —
+the document's when one exists, else the confirmed booking; a carrier's provisional date is never
+printed as confirmed. `Phone` and `Delivery address` ship in the chooser, off by default.
+
+**▸ has exactly one job:** that scope's goods and physical facts. The shared Goods mini-table
+(`Category · Unit ID · Deliver To · SKU · Qty · Item`), then read-only `Where` · `Who has it` ·
+`Stock ETA`, then the Loan block (`Unit ID · Item · With customer since · Return destination`) and
+only when a loan is genuinely out. **No editable field, no Partner selector, no Save, no second
+Delivery form.** Stock owns Where/Who has it/Stock ETA, Sales Orders owns the customer, address,
+promise and ordered goods, Payment owns the release gate; Delivery Work reads them and creates no
+duplicate truth.
 
 **Delivery History defaults:** `Delivery Date · DO No · Customer · Logistics Partner · Result ·
 Failed Delivery Reason · Goods · Proof Status · Recorded By`.

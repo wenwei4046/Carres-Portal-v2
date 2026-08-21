@@ -107,6 +107,11 @@ export const sofaLoanSchema = z.object({
   // warehouse source — the loaned own-stock unit
   item_id: z.string().uuid().nullable(),
   item_sku: z.string().nullable(),
+  /** The loaned Unit's PERMANENT Carres Unit ID — the code on the label, and
+   *  the only identity an operator can read off the piece in the customer's
+   *  house. `item_id` is a database key and was never that (DELIVERY CARD 02,
+   *  2026-08-21). Null for a supplier borrow: nothing of ours went out. */
+  item_unit_code: z.string().nullable().default(null),
   item_condition: z.string().nullable(),
   // the loaned own-stock unit's original PO (traceability on the loan card) —
   // joined from ops_stock_items; null for supplier borrows (nothing purchased).
