@@ -87,6 +87,7 @@ import { renderSalesOrderPdf } from "@/lib/pdf/render";
 import type { SalesOrderTemplateData } from "@/lib/pdf/types";
 import { useAuth } from "@/lib/auth";
 import {
+  useCatalog,
   useCreateSalesOrder,
   useCustomerTypeProbe,
   useDecidePaymentApproval,
@@ -906,6 +907,37 @@ export default function SalesOrderWorkspace() {
   }, [params, setParams]);
 
   const detailQ = useOperationOrder(isNew ? copyFrom : (orderId ?? null));
+  /* ── THE CREATE DOOR ASKS THE CATALOG (2026-08-21) ───────────────────────
+   * Until now this door took a SKU as free text: a typo produced a line no
+   * stock, PO or readiness engine could recognise, and creation still
+   * succeeded. The POS never had that hole because it only ever offers SKUs
+   * the catalog holds.
+   *
+   * Fetched ONLY in create mode — the document view has no SKU field, and the
+   * bundle is the same 5-minute-cached response the POS already pulls, so an
+   * operator who walks POS → Ops pays for it once.
+   *
+   * `admin: true` is deliberate: the office door must be able to write a line
+   * for a SKU that is not on sale at POS (a discontinued model still being
+   * fulfilled, a service line), and the admin bundle is the one that carries
+   * them. */
+  const catalogQ = useCatalog({ admin: true, enabled: isNew });
+  /** sku → what the CATALOG says it is. The one lookup both new fields read,
+   *  so the name hint and the price hint can never disagree (Law D). */
+  const catalogBySku = useMemo(() => {
+    const out = new Map<string, { price: number; label: string }>();
+    const bundle = catalogQ.data;
+    if (!bundle) return out;
+    const modelName = new Map(bundle.models.map((m) => [m.id, m.name]));
+    for (const sku of bundle.skus) {
+      const name = modelName.get(sku.modelId) ?? "";
+      out.set(sku.sku, {
+        price: sku.price,
+        label: [name, sku.variant].filter(Boolean).join(" · "),
+      });
+    }
+    return out;
+  }, [catalogQ.data]);
   const revisionsQ = useSalesOrderRevisions(isNew ? null : (orderId ?? null));
   const goodsTruthQ = useSalesOrderExpansion(isNew ? "" : (orderId ?? ""));
   const amendmentQ = useSalesOrderAmendment(isNew ? null : (orderId ?? null));
@@ -2078,15 +2110,35 @@ export default function SalesOrderWorkspace() {
         <span className="hidden" data-pos-field="orderAddons" aria-hidden="true" />
         {mode === "create" ? (
           <div className="flex flex-col gap-2">
-            {draft.lines.map((l) => (
+            {/* Every SKU the catalog holds, offered as a typeahead. A `datalist`
+                SUGGESTS without refusing: the office must still be able to
+                write a line for an AutoCount import or a not-yet-catalogued
+                product (975 live units are in that bucket), so an unlisted SKU
+                stays typeable — it simply stops being the silent default. */}
+            <datalist id="so-sku-catalog">
+              {[...catalogBySku.entries()].map(([sku, info]) => (
+                <option key={sku} value={sku}>{info.label}</option>
+              ))}
+            </datalist>
+            {draft.lines.map((l) => {
+              const known = catalogBySku.get(l.sku.trim());
+              const priceHint = catalogPriceHint(known, l.unit_price);
+              return (
               <div key={l.key} className="grid grid-cols-[1fr_84px_120px_32px] items-end gap-2">
                 <Input id={`so-sku-${l.key}`} label="SKU" value={l.sku}
-                  onChange={(e) => setLine(l.key, { sku: e.target.value })} />
+                  list="so-sku-catalog"
+                  hint={known ? known.label : l.sku.trim() ? "Not in catalog" : undefined}
+                  onChange={(e) => {
+                    const sku = e.target.value;
+                    const hit = catalogBySku.get(sku.trim());
+                    setLine(l.key, skuEditPatch(sku, hit, l.unit_price));
+                  }} />
                 <Input id={`so-qty-${l.key}`} label="Qty" type="number" min={1}
                   value={String(l.qty)}
                   onChange={(e) => setLine(l.key, { qty: Math.max(1, Number(e.target.value) || 1) })} />
                 <Input id={`so-price-${l.key}`} label="Unit price (RM)" type="number" min={0}
                   value={String(l.unit_price)}
+                  hint={priceHint}
                   onChange={(e) => setLine(l.key, { unit_price: Math.max(0, Number(e.target.value) || 0) })} />
                 <button
                   type="button"
@@ -2097,7 +2149,8 @@ export default function SalesOrderWorkspace() {
                   <Trash2 size={14} />
                 </button>
               </div>
-            ))}
+              );
+            })}
             <div>
               <Button size="sm" variant="neutral"
                 onClick={() => setDraft((d) => ({ ...d, lines: [...d.lines, { key: nextKey(), sku: "", qty: 1, unit_price: 0 }] }))}>
@@ -2550,6 +2603,50 @@ function itemRows(
     qty: l.qty,
     total: Number(l.unit_price) * Number(l.qty),
   }));
+}
+
+/** What the CATALOG says a SKU is, for the create door's two hints. */
+export interface CatalogSkuFact {
+  price: number;
+  label: string;
+}
+
+/**
+ * The price hint under a create-mode line — SHOWN, never enforced.
+ *
+ * `product_skus.price` is the CATALOG's number and only the principal may set
+ * it (0175). `order_lines.unit_price` is the ORDER's number, and an order may
+ * legitimately sell at a different figure — a discount, a bundle, a goodwill
+ * price. So a difference is worth SAYING and never worth refusing: this
+ * returns hint text, never an error, because a red field reads as a refusal
+ * and red has one job (late / act now).
+ *
+ * `undefined` = the catalog has no row for this SKU, so there is nothing to
+ * compare against and the field stays quiet.
+ */
+export function catalogPriceHint(
+  known: CatalogSkuFact | undefined,
+  unitPrice: number,
+): string | undefined {
+  if (!known) return undefined;
+  const shown = `Catalog RM ${known.price.toFixed(2)}`;
+  return known.price === unitPrice ? shown : `${shown} — this line differs`;
+}
+
+/**
+ * What changes on the line when the operator edits the SKU field.
+ *
+ * Fills a BLANK price from the catalog; never overwrites one already typed.
+ * `0` is this field's empty state — a fresh line starts there — not a decision
+ * to sell for nothing, so filling it is completion rather than correction. Once
+ * a real number is in, the catalog stops touching it.
+ */
+export function skuEditPatch(
+  sku: string,
+  known: CatalogSkuFact | undefined,
+  currentUnitPrice: number,
+): { sku: string; unit_price?: number } {
+  return known && currentUnitPrice === 0 ? { sku, unit_price: known.price } : { sku };
 }
 
 /**
