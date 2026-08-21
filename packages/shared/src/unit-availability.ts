@@ -41,6 +41,13 @@ export const UNIT_AVAILABILITY_LABEL: Record<UnitAvailability, string> = {
   ended: "Delivered / history",
 };
 
+/** A condition that CONTROLS the Unit rather than describing it. R4 releases a
+ *  quarantined unit back to `free` keeping the condition it was released with,
+ *  so a damaged unit can be `free` and sound and still unsellable — the case
+ *  the To Order engine closed in 2026-08 and the one 0371 closed here. The
+ *  other four (`new`, `exhibition`, `old`, `refurbished`) are all sellable. */
+const CONTROLLED_CONDITIONS = new Set(["damaged"]);
+
 /** Statuses that mean the Unit's life ended — it is history, never stock. */
 const ENDED_STATUSES = new Set([
   "sold",
@@ -61,6 +68,7 @@ export function unitAvailability(unit: {
   status: string | null | undefined;
   needsRepair?: boolean | null;
   holdReason?: string | null;
+  condition?: string | null;
 }): UnitAvailability {
   const status = unit.status ?? "";
   if (ENDED_STATUSES.has(status)) return "ended";
@@ -68,7 +76,11 @@ export function unitAvailability(unit: {
   if (status === "incoming") return "incoming";
   if (status === "reserved") return "reserved";
   if (status === "on_hold") return "not_available";
-  if (status === "free") return unit.needsRepair ? "not_available" : "available";
+  if (status === "free") {
+    if (unit.needsRepair) return "not_available";
+    if (CONTROLLED_CONDITIONS.has(unit.condition ?? "")) return "not_available";
+    return "available";
+  }
   return "not_available";
 }
 
@@ -77,6 +89,7 @@ export function isUnitAvailable(unit: {
   status: string | null | undefined;
   needsRepair?: boolean | null;
   holdReason?: string | null;
+  condition?: string | null;
 }): boolean {
   return unitAvailability(unit) === "available";
 }
@@ -174,6 +187,7 @@ export function isUnitBindable(unit: {
   status: string | null | undefined;
   needsRepair?: boolean | null;
   holdReason?: string | null;
+  condition?: string | null;
   qty?: number | null;
 }): boolean {
   return isUnitAvailable(unit) && (unit.qty ?? 1) === 1;

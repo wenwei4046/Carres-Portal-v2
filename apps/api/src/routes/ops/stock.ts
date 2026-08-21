@@ -1010,6 +1010,9 @@ function shape(rows: RawRow[]) {
       status: r.status,
       needsRepair: r.needs_repair,
       holdReason: r.hold_reason,
+      // 0371 — condition is part of the arithmetic: a damaged unit released
+      // back to `free` is controlled, not sellable.
+      condition: r.condition,
     }),
     lifecycleOutcome: unitLifecycleOutcome(r.status),
     createdAt: r.created_at,

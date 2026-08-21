@@ -269,7 +269,7 @@ convention. Measured on production before the change, and again after it:
 | Site, operating party and role are separate | `warehouses` = Site; new `stock_operating_parties` = WHO HAS IT (`carres_warehouse`, `nets_warehouse`, `nets_delivery`, `pj_showroom`); `holder_party_id` on the Unit. NETS is a row, never hard-coded | two doors, neither moves the other |
 | Last verified date | `last_verified_at`, stamped only by `ops_stock_verify_unit` | — |
 | Append-only identity and physical event lineage | `stock_unit_events`, written by a TRIGGER on the register itself so no door can forget it; UPDATE and DELETE both refused | event edit refused |
-| ONE availability arithmetic | `unit_availability(status, needs_repair, hold_reason)` in SQL and `unitAvailability()` in `packages/shared/src/unit-availability.ts`, pinned to each other by tests | six words, both sides |
+| ONE availability arithmetic | `unit_availability(status, needs_repair, hold_reason, condition)` in SQL and `unitAvailability()` in `packages/shared/src/unit-availability.ts`, pinned to each other by tests | six words, both sides |
 | Availability is never a stored number | view `stock_sku_availability` computes from the register on every read — it cannot be stale. A trigger-kept column was rejected: a second copy is still a second copy (Architecture Law D) | — |
 | Every derived total drills to the exact ids | view `stock_unit_availability_v` carries id, availability, lifecycle outcome, catalog category and source status | 74 (sku, site) rows all drill |
 | A bulk record is never mistaken for promisable stock | `stock_sku_availability` carries THREE named numbers (0368) | 85 bindable · 893 bulk · 978 sellable |
@@ -350,9 +350,10 @@ answer beside the availability word — `delivered` · `cancelled_before_receipt
 `returned_to_supplier` · `active` — so Delivered / history can tell them apart without a second
 query or a second arithmetic. Physical disposal is not a fifth word until that fact is recorded.
 
-**Five migrations, because self-review and review kept finding real holes. Every one was found by
-looking again, not by a failing test — which is the point of Law 4. Two of the five (0369, 0370)
-exist because a guard I had described as protecting the numbers could not fire at all.**
+**Six migrations, because self-review and review kept finding real holes. Every one was found by
+looking again, not by a failing test — which is the point of Law 4. Two of them (0369, 0370) exist
+because a guard described as protecting the numbers could not fire at all, and one (0371) because
+the new authority disagreed with the oldest reader it was meant to replace.**
 
 | | What it does | Why it exists |
 |---|---|---|
@@ -364,7 +365,9 @@ exist because a guard I had described as protecting the numbers could not fire a
 
 | **0370** | the rollup upserts every pair (no `> 0` predicate), then RE-READS what it wrote and raises if it disagrees with the register | **found by review, and it had already caused harm.** During the window between 0368 and 0369 the view returned NULL for empty buckets, and the rollup's two predicates both read `(sellable + reserved)`: `NULL > 0` is NULL, so the INSERT skipped the row and the follow-up `update ... set qty = 0 where not exists (... > 0)` matched it and **zeroed it**. The cache said Carres held **5** units where the register held **980** — and eighteen SECURITY DEFINER functions read that cache. Repaired by re-running the rollup (980 = 980, 0 drifted rows). But the real defect was that a function whose whole job is to keep two numbers equal could write a wrong answer and return success, so it now proves its own answer and a disagreement aborts the statement that caused it |
 
-**Verification evidence.** All five migrations applied to production; each sanity block passed.
+| **0371** | `unit_availability()` gains CONDITION, and the three-argument signature is dropped | **found by review, comparing the new authority against the oldest free-stock reader in the repo.** `readFreeStock` in the To Order engine has excluded damaged goods since 2026-08-04, and said why: R4 releases a quarantined unit back to `free` keeping the condition it was released with, so a damaged unit can be free, sound and unsellable. 0366's arithmetic never asked about condition — so the moment a damaged unit is released, the AUTHORITY would offer a unit every other reader refuses. Live exposure is zero today (0 damaged units; live conditions are `new` and `exhibition`), which is the same reason To Order closed it early. The old signature is DROPPED rather than defaulted: a fourth parameter with a default leaves the wrong call resolvable, which is how this existed in the first place |
+
+**Verification evidence.** All six migrations applied to production; each sanity block passed.
 Eight negative controls were run against production in a rolled-back transaction after 0366 —
 duplicate id · delete · id reuse after write-off · rename · bulk reservation · hand-written total ·
 the retired adjust door · editing a unit event — and **all eight fired**; the register was unchanged
@@ -379,7 +382,7 @@ rows), and healing was proven end to end in a rolled-back transaction against pr
 was zeroed deliberately, ONE unit was touched, and the statement trigger restored all 980 units for
 the whole Site.
 
-**All five applied migrations were reconciled against their repository files** by comment-stripped
+**All six applied migrations were reconciled against their repository files** by comment-stripped
 md5 — every one an exact match, so what production runs is what the repository says:
 
 | Migration | md5 (repo == applied) |
@@ -389,6 +392,7 @@ md5 — every one an exact match, so what production runs is what the repository
 | 0368 | `c13fbeab0f2cb7fa4772bf9b46be3d96` |
 | 0369 | `c9860a6375a0d89ebb0bc6e954170a38` |
 | 0370 | `07357039f1ad66aa1bd11163a1aa43d4` |
+| 0371 | `a45dea200a0556fea6bd060ae812b690` |
 
 **Local release gate:** shared (2474) and API (2293) suites fully green; typecheck, lint, build
 clean; no server secret in the web bundle. The web suite is green on 265 of 266 files. The one

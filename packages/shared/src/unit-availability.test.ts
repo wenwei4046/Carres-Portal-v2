@@ -63,6 +63,33 @@ describe("unitAvailability — the one arithmetic", () => {
     expect(isUnitAvailable({ status: "transferred" })).toBe(false);
   });
 
+  it("a DAMAGED unit released back to free is controlled, not sellable (0371)", () => {
+    // R4 releases a quarantined unit back to `free` keeping the condition it
+    // was released with. The To Order engine has excluded damaged goods since
+    // 2026-08; 0366's arithmetic did not ask about condition at all, so the
+    // authority would have offered a unit every other reader refuses.
+    expect(unitAvailability({ status: "free", needsRepair: false, condition: "damaged" }))
+      .toBe("not_available");
+    expect(isUnitAvailable({ status: "free", needsRepair: false, condition: "damaged" }))
+      .toBe(false);
+    expect(isUnitBindable({ status: "free", needsRepair: false, condition: "damaged", qty: 1 }))
+      .toBe(false);
+  });
+
+  it("the four sellable conditions stay sellable", () => {
+    for (const condition of ["new", "exhibition", "old", "refurbished"]) {
+      expect(unitAvailability({ status: "free", needsRepair: false, condition }))
+        .toBe("available");
+    }
+  });
+
+  it("condition only controls a FREE unit — it never overrides a stronger fact", () => {
+    // A damaged unit that is already sold is history, not "not available".
+    expect(unitAvailability({ status: "sold", condition: "damaged" })).toBe("ended");
+    expect(unitAvailability({ status: "reserved", condition: "damaged" })).toBe("reserved");
+    expect(unitAvailability({ status: "incoming", condition: "damaged" })).toBe("incoming");
+  });
+
   it("an unknown status is never offered — the arithmetic fails closed", () => {
     expect(unitAvailability({ status: "something_new" })).toBe("not_available");
     expect(unitAvailability({ status: null })).toBe("not_available");
