@@ -242,7 +242,11 @@ describe("Sales Order object template contract", () => {
     /* Before this card the structured parts were editable while the printed
        `customer_address` stayed on whatever was imported. */
     expect(workspace).toContain("const addressString = (d: Draft, was: Draft)");
-    expect(workspace).toContain("customer_address: addressString(draft, baseline)");
+    /* 2026-08-21: the string passes through autoCapitalize on its way out —
+       still the ONE addressString fact, first letters lifted (Jess's
+       "auto capitalized" ask). The contract is that addressString remains the
+       single source; the wrapper does not add a second one. */
+    expect(workspace).toContain("customer_address: autoCapitalize(addressString(draft, baseline)");
     expect(workspace).toContain("address: addressString(draft, baseline)");
     expect(workspace).not.toContain('id="so-address" label="Address"');
     /* A CLEAR HAPPENS ONLY WHEN SOMEBODY CLEARS IT — an order that arrived

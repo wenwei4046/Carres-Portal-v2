@@ -1285,15 +1285,15 @@ export default function SalesOrderWorkspace() {
   };
 
   const safeCorrectionPayload = (): Record<string, unknown> => ({
-    customer_name: draft.customer_name.trim(),
+    customer_name: autoCapitalize(draft.customer_name.trim()),
     customer_phone: draft.customer_phone.trim() || null,
     customer_email: draft.customer_email.trim() || null,
     customer_race: draft.customer_race.trim() || null,
     customer_gender: draft.customer_gender.trim() || null,
     customer_birthday: draft.customer_birthday || null,
-    customer_address: addressString(draft, baseline).trim() || null,
-    customer_address_line1: draft.customer_address_line1.trim() || null,
-    customer_address_line2: draft.customer_address_line2.trim() || null,
+    customer_address: autoCapitalize(addressString(draft, baseline).trim()) || null,
+    customer_address_line1: autoCapitalize(draft.customer_address_line1.trim()) || null,
+    customer_address_line2: autoCapitalize(draft.customer_address_line2.trim()) || null,
     customer_address_city: draft.customer_address_city.trim() || null,
     customer_address_state: draft.customer_address_state.trim() || null,
     customer_address_postcode: draft.customer_address_postcode.trim() || null,
@@ -1356,6 +1356,12 @@ export default function SalesOrderWorkspace() {
     }
     if (draft.proceed_date && draft.delivery_date && draft.proceed_date > draft.delivery_date) {
       return "The proceed date is after the delivery date";
+    }
+    /* Building type is DELIVERY's fact — stairs, lift access, van parking all
+     * hang off it (Jess, 2026-08-21: it must be filled, delivery needs it).
+     * An unknown address cannot demand one; a known address must say. */
+    if (!draft.customer_address_unknown && !draft.building_type) {
+      return "Building type is required — pick what kind of building the delivery goes to";
     }
     return null;
   };
@@ -2060,7 +2066,12 @@ export default function SalesOrderWorkspace() {
               draft.customer_address_state || null,
               draft.customer_address_city || null,
             ).map((pc) => ({ value: pc, label: pc }))} />
-          <Select id="so-building-type" label="Building type"
+          <Select id="so-building-type" label="Building type" required
+            error={
+              !draft.customer_address_unknown && !draft.building_type
+                ? "Required for delivery"
+                : undefined
+            }
             value={draft.building_type || undefined}
             onValueChange={(v) => setField("building_type", v)}
             options={BUILDING_TYPE_OPTIONS.map((b) => ({ value: b, label: b }))} />
@@ -2739,6 +2750,20 @@ export function addressCascadePatch(
   return level === "state"
     ? { customer_address_state: value, customer_address_city: "", customer_address_postcode: "" }
     : { customer_address_city: value, customer_address_postcode: "" };
+}
+
+/**
+ * First letter of every word up, the rest left alone (Jess, meeting 1:
+ * "auto capitalized" — customer name and address).
+ *
+ * ONLY the first letter moves. "jalan ketumbar" → "Jalan Ketumbar", but
+ * "SS2", "12-3a" and "McKenzie" keep every character the operator typed —
+ * lowercasing the remainder would mangle exactly the tokens Malaysian
+ * addresses are full of. Applied at the payload, not on keystroke, so typing
+ * is never fought mid-word.
+ */
+export function autoCapitalize(s: string): string {
+  return s.replace(/(^|[\s/(-])([a-z])/g, (_, sep: string, ch: string) => sep + ch.toUpperCase());
 }
 
 /** What the CATALOG says a SKU is, for the create door's two hints. */

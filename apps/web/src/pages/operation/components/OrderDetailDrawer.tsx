@@ -155,7 +155,6 @@ import {
   LogisticEtaField,
   StorageCollectWaiver,
   StorageExtensionRow,
-  RemarkControlField,
   OrderControlSaveBar,
   FieldGrid,
   FieldRow,
@@ -3503,27 +3502,24 @@ function DrawerBody({
                 </tbody>
               </table>
             </div>
-            {/* Panel footer (doesn't scroll): linked POs (GRN) + warehouse remark. */}
-            <div className="border-t border-base-100 px-3 py-2 space-y-2 shrink-0">
-              {pos.length > 0 && (
-                <div>
-                  <div className="label mb-1">Linked POs</div>
-                  <div className="border border-base-100 rounded-[6px]">
-                    {pos.map((po, i) => (
-                      <PoRow key={po.id} po={po} divider={i > 0} />
-                    ))}
-                  </div>
+            {/* Panel footer (doesn't scroll): linked POs (GRN).
+                The free-text `Warehouse remark` box was RETIRED here (Loo,
+                2026-08-21): free-text remarks go; a special case carries a
+                STRUCTURED reason instead (cancel 0350 · PO delay
+                PO_DELAY_REASONS · supplier dates 0310), and hand-written
+                follow-up belongs in Activity & notes, which is append-only,
+                tagged, and reaches the dashboard. The `warehouse_remark`
+                COLUMN stays — history is never deleted for a UI retirement. */}
+            {pos.length > 0 && (
+              <div className="border-t border-base-100 px-3 py-2 shrink-0">
+                <div className="label mb-1">Linked POs</div>
+                <div className="border border-base-100 rounded-[6px]">
+                  {pos.map((po, i) => (
+                    <PoRow key={po.id} po={po} divider={i > 0} />
+                  ))}
                 </div>
-              )}
-              <FieldGrid>
-                <RemarkControlField
-                  form={form}
-                  field="warehouse_remark"
-                  label="Warehouse remark"
-                  placeholder="Note for the warehouse team"
-                />
-              </FieldGrid>
-            </div>
+              </div>
+            )}
           </Panel>
           </SectionCard>
 
