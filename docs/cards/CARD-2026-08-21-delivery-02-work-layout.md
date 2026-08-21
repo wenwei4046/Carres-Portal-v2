@@ -97,6 +97,14 @@ No migration. No RLS change. No other module's page, register or navigation.
    card fixes the eleven DEFAULT columns and does not forbid hidden ones. A
    planner arranging a day phones the customer and tells a driver where to go.
    They cost nothing until switched on.
+3. **`Delivery Status` reuses `No delivery order yet` rather than minting a
+   status word.** Constitution §2 forbids a word `docs/COPY-STANDARD.md` has not
+   approved, and until the system issues a document `which document` and `what
+   state` are the same fact. If Jess wants a distinct status word for the
+   pre-issuance state, that is one string and one line to change.
+4. **`No time agreed` is a NEW absence**, written in the portal's established
+   absence form (`No <the exact thing>` — `No delivery date`, `No delivery order
+   yet`, `No price yet`). Recorded here rather than presented as pre-approved.
 
 ## 7 · Measured before building (production, 2026-08-21 — all TEST data)
 

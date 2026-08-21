@@ -282,10 +282,28 @@ describe("the listing", () => {
     expect(headers).not.toContain("Next Action");
   });
 
-  it("says a document has not been issued rather than inventing a status", () => {
+  it("says a document has not been issued rather than inventing a status word", () => {
     wrap(<OperationDelivery />);
-    expect(screen.getByText("No delivery order yet")).toBeTruthy();
-    expect(screen.getByText("Not issued yet")).toBeTruthy();
+    /* ONE governed sentence in BOTH cells — `DO No` asks which document and
+       `Delivery Status` asks what state, and until the system issues one both
+       answers are the same fact. No new vocabulary is minted for it. */
+    expect(screen.getAllByText("No delivery order yet")).toHaveLength(2);
+    expect(screen.queryByText("Not issued yet")).toBeNull();
+  });
+
+  it("keeps the two Customer Delivery absences apart", () => {
+    ordersState.data = {
+      orders: [
+        order({ id: "a", so: 1322, delivery_date: null, delivery_date_tbd: false }),
+        order({ id: "b", so: 1323, delivery_date: null, delivery_date_tbd: true }),
+      ],
+    };
+    wrap(<OperationDelivery />);
+    // Nobody has asked this customer …
+    expect(screen.getByText("No delivery date")).toBeTruthy();
+    // … and this one HAS been asked and answered "not yet". Different facts,
+    // and both words are the portal's own, not this page's.
+    expect(screen.getByText("To be confirmed")).toBeTruthy();
   });
 
   it("prints the DO number as a door once the system has issued one", () => {

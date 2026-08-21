@@ -127,7 +127,7 @@ describe("delivery scopes and journey legs", () => {
   });
 
   it("speaks a leg's status in the DOCUMENT's five words, never `Pending`", () => {
-    expect(legStatusOf({ status: "pending" }).label).toBe(DW.notIssuedYet);
+    expect(legStatusOf({ status: "pending" }).label).toBe(DW.noDeliveryOrder);
     expect(legStatusOf({ status: "picked_up" }).label).toBe("Out for delivery");
     // Leg 1 handing over at the named JB warehouse IS that leg's delivery.
     expect(legStatusOf({ status: "handed_off" }).label).toBe("Delivered");

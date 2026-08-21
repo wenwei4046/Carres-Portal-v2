@@ -94,6 +94,10 @@ import ModuleHeader from "./components/ModuleHeader";
 import GoodsMiniTable, { categoryWord, type GoodsMiniLine } from "./components/GoodsMiniTable";
 import { RailGroup, RailItem } from "./components/workspace-rail";
 import { lineName } from "./sales-order-facts";
+import {
+  DATE_TO_BE_CONFIRMED_CELL,
+  DATE_TO_BE_CONFIRMED_FULL,
+} from "./sales-order-guidance";
 import { stockEtaOf } from "./OperationOrdersControl";
 import {
   buildDateRail,
@@ -380,7 +384,7 @@ export default function OperationDelivery() {
            never be mistaken for a duplicate. */
         key: "so",
         label: "SO / Ref",
-        width: 160,
+        width: 150,
         sortable: true,
         filterType: "numbering",
         chooserGroup: "Document",
@@ -418,7 +422,7 @@ export default function OperationDelivery() {
       {
         key: "customer",
         label: "Customer",
-        width: 180,
+        width: 170,
         sortable: true,
         chooserGroup: "Customer",
         accessor: (r) => (
@@ -439,25 +443,33 @@ export default function OperationDelivery() {
         filterType: "date",
         chooserGroup: "Dates",
         dateValue: (r) => r.customerDeliveryIso,
+        /* THE 8 vs THE 3 (owner ruling 2026-08-15): a customer who HAS been
+           asked and answered "not yet" is a different fact from one nobody has
+           asked, and the portal already owns both words. Neither is amber
+           here — this listing states facts and carries no action clause. */
         accessor: (r) =>
           r.customerDeliveryIso ? (
             fmtDate(r.customerDeliveryIso)
+          ) : r.customerDateTbd ? (
+            <span title={DATE_TO_BE_CONFIRMED_FULL}>
+              <Absent>{DATE_TO_BE_CONFIRMED_CELL}</Absent>
+            </span>
           ) : (
-            <Absent>{r.customerDateTbd ? DW.customerDateTbd : DW.noCustomerDate}</Absent>
+            <Absent>{DW.noCustomerDate}</Absent>
           ),
         searchValue: (r) => (r.customerDeliveryIso ? fmtDate(r.customerDeliveryIso) : DW.noCustomerDate),
         filterValue: (r) =>
           r.customerDeliveryIso
             ? fmtDate(r.customerDeliveryIso)
             : r.customerDateTbd
-              ? DW.customerDateTbd
+              ? DATE_TO_BE_CONFIRMED_CELL
               : DW.noCustomerDate,
         sortFn: (a, b) => (a.customerDeliveryIso ?? "").localeCompare(b.customerDeliveryIso ?? ""),
       },
       {
         key: "location",
         label: "Delivery Location",
-        width: 180,
+        width: 170,
         sortable: true,
         chooserGroup: "Customer",
         accessor: (r) => (
@@ -474,7 +486,7 @@ export default function OperationDelivery() {
            committing a two-man van. */
         key: "building",
         label: "Building",
-        width: 130,
+        width: 120,
         sortable: true,
         filterType: "enum",
         chooserGroup: "Customer",
@@ -486,7 +498,7 @@ export default function OperationDelivery() {
       {
         key: "logistics",
         label: "Logistics Partner",
-        width: 150,
+        width: 140,
         sortable: true,
         filterType: "enum",
         chooserGroup: "Delivery",
@@ -514,7 +526,7 @@ export default function OperationDelivery() {
       {
         key: "confirmed_time",
         label: "Confirmed Time",
-        width: 130,
+        width: 120,
         sortable: true,
         filterType: "enum",
         chooserGroup: "Delivery",
@@ -525,7 +537,7 @@ export default function OperationDelivery() {
       {
         key: "goods",
         label: "Goods",
-        width: 240,
+        width: 220,
         sortable: true,
         chooserGroup: "Items",
         accessor: (r) => (
@@ -566,7 +578,7 @@ export default function OperationDelivery() {
       {
         key: "delivery_status",
         label: "Delivery Status",
-        width: 180,
+        width: 170,
         sortable: true,
         filterType: "enum",
         chooserGroup: "Document",
@@ -586,10 +598,10 @@ export default function OperationDelivery() {
               ) : null}
             </span>
           ) : (
-            <Absent>{DW.notIssuedYet}</Absent>
+            <Absent>{DW.noDeliveryOrder}</Absent>
           ),
-        searchValue: (r) => r.status?.label ?? DW.notIssuedYet,
-        filterValue: (r) => r.status?.label ?? DW.notIssuedYet,
+        searchValue: (r) => r.status?.label ?? DW.noDeliveryOrder,
+        filterValue: (r) => r.status?.label ?? DW.noDeliveryOrder,
       },
       {
         /* Off by default. A planner arranging a day phones the customer, and

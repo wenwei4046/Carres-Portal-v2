@@ -73,12 +73,24 @@ export const DW = {
   datePassed: "Date passed",
   /** No Logistics Partner on the scope yet — a fact, never `Unassigned`. */
   noLogistics: "No logistics picked",
+  /**
+   * ⭐ ONE SENTENCE, USED IN BOTH CELLS, AND THAT IS DELIBERATE.
+   *
+   * The card rules this exact string for `DO No`. `Delivery Status` reuses it
+   * rather than minting a second one, because Constitution §2 forbids a word
+   * the dictionary has not approved and because the two columns are genuinely
+   * answering the same fact when no document exists: `DO No` asks *which
+   * document*, `Delivery Status` asks *what state* — and until the system
+   * issues one, both answers are "there is not a document yet". A dedicated
+   * status word is an owner call, not this card's to invent.
+   */
   noDeliveryOrder: "No delivery order yet",
-  notIssuedYet: "Not issued yet",
   noCustomerDate: "No delivery date",
-  customerDateTbd: "Customer will confirm the date",
   notGiven: "Not given",
   notRecorded: "Not recorded",
+  /** The portal's established absence FORM — `No <the exact thing>`, as in
+   *  `No delivery date` and `No delivery order yet`. Flagged in the card as a
+   *  new absence for Jess to confirm, never as pre-approved vocabulary. */
   noTime: "No time agreed",
   noGoods: "No items on this order",
   /** The expansion's read-only physical facts (Stock and Warehouse own them). */
@@ -174,7 +186,7 @@ export function legStatusOf(stop: Pick<DeliveryStop, "status">): DeliveryOrderSt
     case "issue":
       return { kind: "exception", label: "Delivery exception", reasonLabel: null };
     default:
-      return { kind: "created", label: DW.notIssuedYet, reasonLabel: null };
+      return { kind: "created", label: DW.noDeliveryOrder, reasonLabel: null };
   }
 }
 
