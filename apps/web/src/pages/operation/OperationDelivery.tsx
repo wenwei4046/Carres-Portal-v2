@@ -355,12 +355,18 @@ export default function OperationDelivery() {
         rows.filter((r) => matchesLogistics(r, logisticsSet)),
         today,
         (iso) => fmtDate(iso),
+        dateSet,
       ),
-    [rows, logisticsSet, today],
+    [rows, logisticsSet, today, dateSet],
   );
   const logisticsRail = useMemo(
-    () => buildLogisticsRail(rows.filter((r) => matchesDate(r, dateSet, today)), partners),
-    [rows, dateSet, today, partners],
+    () =>
+      buildLogisticsRail(
+        rows.filter((r) => matchesDate(r, dateSet, today)),
+        partners,
+        logisticsSet,
+      ),
+    [rows, dateSet, today, partners, logisticsSet],
   );
 
   const visible = useMemo(

@@ -402,13 +402,23 @@ export function buildDateRail(
   rows: DeliveryScopeRow[],
   todayIso: string,
   fmt: (iso: string) => string,
+  /* ⭐ A PICKED ROW NEVER DISAPPEARS. The rail draws only the days that hold
+     scopes, so a day whose last scope moves away would vanish while its choice
+     was still on the URL — leaving an empty listing and no visible control to
+     undo it. A chosen day stays on the rail at 0 until the operator unpicks it. */
+  picked: ReadonlySet<string> = new Set(),
 ): RailItem[] {
   const counts = new Map<string, number>();
   for (const r of rows) {
     const key = dateBucketOf(r, todayIso);
     counts.set(key, (counts.get(key) ?? 0) + 1);
   }
-  const days = [...counts.keys()]
+  const days = [
+    ...new Set([
+      ...counts.keys(),
+      ...[...picked].filter((k) => k !== NO_DATE_KEY && k !== DATE_PASSED_KEY),
+    ]),
+  ]
     .filter((k) => k !== NO_DATE_KEY && k !== DATE_PASSED_KEY)
     .sort();
   return [
@@ -433,6 +443,9 @@ export function buildDateRail(
 export function buildLogisticsRail(
   rows: DeliveryScopeRow[],
   partners: { id: string; name: string }[],
+  /* Same rule as the date rail: an ungoverned partner is admitted only while
+     it is carrying something, EXCEPT while it is the operator's own choice. */
+  picked: ReadonlySet<string> = new Set(),
 ): RailItem[] {
   const countByName = new Map<string, number>();
   let none = 0;
@@ -449,12 +462,19 @@ export function buildLogisticsRail(
     label: name,
     count: countByName.get(name) ?? 0,
   }));
-  const extra = partners
-    .map((p) => p.name)
-    .filter((name) => !governed.has(name) && (countByName.get(name) ?? 0) > 0)
+  const extra = [...new Set([...partners.map((p) => p.name), ...picked])]
+    .filter(
+      (name) =>
+        name !== NO_LOGISTICS_KEY &&
+        !governed.has(name) &&
+        ((countByName.get(name) ?? 0) > 0 || picked.has(name)),
+    )
     .sort((a, b) => a.localeCompare(b))
     .map((name) => ({ key: name, label: name, count: countByName.get(name) ?? 0 }));
-  const tail = none > 0 ? [{ key: NO_LOGISTICS_KEY, label: DW.noLogistics, count: none }] : [];
+  const tail =
+    none > 0 || picked.has(NO_LOGISTICS_KEY)
+      ? [{ key: NO_LOGISTICS_KEY, label: DW.noLogistics, count: none }]
+      : [];
   return [...items, ...extra, ...tail];
 }
 
