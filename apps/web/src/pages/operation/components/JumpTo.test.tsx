@@ -147,7 +147,14 @@ describe("what typing searches", () => {
     // Purchase` (BUY). Same three doors, same three routes.
     expect(
       matchDestinations(permittedDestinations("operation"), "purch").map((d) => d.label),
-    ).toEqual(["Purchase Orders", "Manual Purchase Requests", "SO Batch Purchase"]);
+      // `Purchase Demands` joined on 2026-08-20 — it is a BUILT door now
+      // (CARD-2026-08-20-purchase-demands), so Jump to must reach it.
+    ).toEqual([
+      "Purchase Demands",
+      "Purchase Orders",
+      "Manual Purchase Requests",
+      "SO Batch Purchase",
+    ]);
   });
 
   it("a document result prints its number, its type and the identifying party", async () => {

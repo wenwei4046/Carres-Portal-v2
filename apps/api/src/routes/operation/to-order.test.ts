@@ -1865,17 +1865,24 @@ describe("P18 · the proceed date rides the To Order wire", () => {
   });
 
   it("the order reads NAME the column — the mock cannot prove this, PostgREST needs it", () => {
-    const src = readFileSync(
-      join(dirname(fileURLToPath(import.meta.url)), "to-order.ts"),
-      "utf8",
-    )
-      .replace(/\/\*[\s\S]*?\*\//g, "")
-      .replace(/(^|[^:])\/\/.*$/gm, "$1");
+    const here = dirname(fileURLToPath(import.meta.url));
+    const strip = (path: string) =>
+      readFileSync(path, "utf8")
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/(^|[^:])\/\/.*$/gm, "$1");
+    // CARD-2026-08-20 — the demand read moved to `lib/purchase-demand-read.ts`
+    // (Purchase Demands reads the same recomputation), so the guard follows it
+    // rather than shrinking: the whole point is that NO orders read anywhere in
+    // this engine may drop the column.
+    const src =
+      strip(join(here, "to-order.ts")) +
+      "\n" +
+      strip(join(here, "..", "..", "lib", "purchase-demand-read.ts"));
 
-    // Every `.from("orders").select(...)` in this file must ask for it. There
-    // are TWO: the demand read, and the ordered/receipt read-back — and the
-    // second is not optional, because an order whose every line is bought has no
-    // demand rows left, so its group is receipts alone.
+    // Every `.from("orders").select(...)` in the engine must ask for it: the
+    // demand read, the ordered/receipt read-back and the scoped SO lens — and
+    // the second is not optional, because an order whose every line is bought
+    // has no demand rows left, so its group is receipts alone.
     const selects = [
       ...src.matchAll(/\.from\(\s*"orders"\s*\)\s*\n?\s*\.select\(\s*([\s\S]*?)\)\s*\n?\s*\./g),
     ].map((m) => m[1]!);

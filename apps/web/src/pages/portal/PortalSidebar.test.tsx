@@ -602,7 +602,8 @@ describe("PortalSidebar — the Purchasing map", () => {
     for (const key of [
       "purchasing-home",
       "purchasing-work",
-      "purchase-demands",
+      // `purchase-demands` LEFT this list on 2026-08-20 — it is a real page now
+      // (CARD-2026-08-20-purchase-demands), and its own assertion is below.
       "consignment-overview",
       "consignment-sale-notices",
     ]) {
@@ -713,6 +714,33 @@ describe("PortalSidebar — the Purchasing parent toggles without navigating", (
     renderAt("/operation?tab=claims");
     expect(module_("purchasing").getAttribute("aria-expanded")).toBe("true");
     expect(child("claims").className).toContain("bg-kit-blue-3");
+  });
+
+  /* CARD-2026-08-20-purchase-demands — the newest BUY page. Its rail row must
+   * be a real control on its governed address, BUY must open by itself, and
+   * exactly one thing may be lit. */
+  it("Purchase Demands is a real link on its governed address", () => {
+    renderAt("/operation?tab=purchase-demands");
+    const row = child("purchase-demands");
+    expect(row.tagName).toBe("A");
+    expect(row.getAttribute("href")).toBe("/operation?tab=purchase-demands");
+    expect(row.textContent).not.toContain("Coming soon");
+    expect(row.getAttribute("aria-disabled")).toBeNull();
+  });
+
+  it("arriving at Purchase Demands opens Purchasing + BUY and lights ONE row", () => {
+    renderAt("/operation?tab=purchase-demands");
+    expect(module_("purchasing").getAttribute("aria-expanded")).toBe("true");
+    expect(group_("purchasing-buy").getAttribute("aria-expanded")).toBe("true");
+    expect(child("purchase-demands").className).toContain("bg-kit-blue-3");
+    // The sibling that used to own this drawer stays dark.
+    expect(child("purchase").className).not.toContain("bg-kit-blue-3");
+    expect(module_("purchasing").className).not.toContain("bg-kit-blue-3");
+    expect(group_("purchasing-buy").className).not.toContain("bg-kit-blue-3");
+    const lit = screen
+      .getByTestId("nav-children-purchasing")
+      .querySelectorAll(".bg-kit-blue-3");
+    expect(lit.length).toBe(1);
   });
 
   /* BOTH ENTRANCES, ONE DESTINATION. `/operation/to-order` is still a live
