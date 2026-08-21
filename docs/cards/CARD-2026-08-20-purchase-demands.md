@@ -1,7 +1,34 @@
-STATUS: QUEUED
+STATUS: EXECUTED — merged and deployed 2026-08-21; owner walk still owed
 DATE: 2026-08-20
-PR: pending
-IMPLEMENTATION: APPROVED TARGET — build and deliver autonomously; no Owner Decision remains
+PR: https://github.com/wenwei4046/Carres-Portal-v2/pull/879 — squash-merged as `7e969aba`
+IMPLEMENTATION: SHIPPED. No migration (this card writes none).
+
+DEPLOY PROOF, checked directly rather than trusted from the workflow — all five surfaces report
+`7e969aba62ee84a61c8bdb35f34536e26891fd13`: erp · pos · carres-portal.pages.dev ·
+carres-pos.pages.dev · api `/health`. The deployed `erp` bundle carries the endpoint path and
+every governed string (`Purchase Demands` · `Search purchase demands…` · the six state words ·
+`Open SO Batch Purchase` · `No purchase demands.`).
+
+GATE: shared 2476/2476 (+24) · api 2307/2307 (+19) · web 3184/3184 (+23) · typecheck clean ·
+`pnpm lint` design-standard clean and guard §6.6 back at 301 = clean `main` · build clean · no
+server secret in `apps/web/dist` · `ci:migrations` 378 filenames / 0 migrations.
+
+TWO PROOFS BEYOND THE TESTS, because "byte-identical" is a claim and not a result:
+· all 51 `c.json(...)` payload sites in `to-order.ts` are character-identical to `2eb69322`;
+· diffing the moved code, the ONLY lines that left the original are declarations that gained
+  `export`, the orders `select` that gained `salesperson_id`, and the `if (!c) continue` that
+  became the named `SKU not found` row. Zero arithmetic lines changed.
+
+STILL OWED — the §8 authenticated production walk at 1440×900 and 1130×820. It needs Jess's
+login; a build chat can prove the SHA, the bundle and the public surfaces, not a logged-in screen.
+
+🟡 RECORDED, NOT FIXED — `Ready Stock` counts PIECES while a Sales Order binds UNITS
+(`readFreeStock` sums each register record's `qty`). Correcting it on this surface alone would
+mint the second arithmetic this card exists to prevent; the ruling is `docs/stock/MASTER.md`
+§12.1 and the fix belongs in `readFreeStock` so both Purchasing surfaces move together. Written
+up in `docs/purchasing/MASTER.md` §3.1.
+
+CARD 2 (SO Batch Purchase) IS NOT STARTED AND IS NOT MARKED BY THIS WORK.
 
 # PURCHASE DEMANDS — the complete customer-demand Register
 
