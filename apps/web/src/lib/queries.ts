@@ -5260,6 +5260,11 @@ export interface SaveRevisionLineInput {
   sku: string;
   qty: number;
   unit_price: number;
+  /** The line's CONFIGURATION (sofa fabric, bedframe colour/gap, the cascade
+   *  payload Create-PO reads). Honoured by the CREATE door only (migration
+   *  0374) — the SAVE door keeps a line's attrs by matching on `id`. Absent
+   *  stays NULL rather than becoming `{}`. */
+  attrs?: Record<string, unknown>;
 }
 export interface SaveRevisionInput {
   header?: Record<string, unknown>;
