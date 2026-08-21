@@ -91,7 +91,7 @@ import {
 } from "@/lib/queries";
 import { DataGrid, type DataGridColumn, type DataGridContextMenuItem } from "@/components/register/DataGrid";
 import ModuleHeader from "./components/ModuleHeader";
-import GoodsMiniTable, { categoryWord, type GoodsMiniLine } from "./components/GoodsMiniTable";
+import GoodsMiniTable, { goodsCategoryOf, type GoodsMiniLine } from "./components/GoodsMiniTable";
 import { RailGroup, RailItem } from "./components/workspace-rail";
 import { lineName } from "./sales-order-facts";
 import {
@@ -164,11 +164,11 @@ function ScopeExpansion({ row }: { row: DeliveryScopeRow }) {
       return {
         key: line.id ?? `${line.sku}-${index}`,
         testId: `delivery-good-${line.sku}`,
-        category: categoryWord(
-          (typeof line.attrs?.category === "string" ? line.attrs.category : "") ||
-            (line.sku.includes(":") ? line.sku.split(":", 1)[0]! : "") ||
-            "Other goods",
-        ),
+        /* ONE answer for this cell, shared with the Sales Orders register.
+           This page's own copy used to stop before `lineClass` and printed
+           `Other goods` on all 90 live rows while the register, reading the
+           same line, printed `Mattress`. */
+        category: goodsCategoryOf(line),
         unitIds: fact?.unitIds ?? [],
         unitAbsence: "Not allocated",
         deliverTo: (fact?.deliverTo ?? []).map((d) =>

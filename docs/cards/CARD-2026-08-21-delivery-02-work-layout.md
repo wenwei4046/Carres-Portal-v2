@@ -79,6 +79,10 @@ no Partner selector, no Save.
 | `apps/api/src/routes/operation/order-control.ts` | the loan read joins `unit_code` — a loan block may not print a database key |
 | `packages/shared/src/schemas/sofa-loan.ts` | `item_unit_code` on the loan DTO |
 | `apps/web/src/lib/queries.ts` | `delivery_stops` on the list row; `place` on the expansion response |
+| `apps/web/src/pages/operation/OperationApp.tsx` | `?tab=delivery` added to the GlobalTopBar suppression list — found on the production walk |
+| `apps/web/src/pages/operation/components/GoodsMiniTable.tsx` | `goodsCategoryOf` extracted — the box now owns the `Category` string, so two pages cannot answer it differently |
+| `apps/web/src/pages/operation/SalesOrdersRegister.tsx` | its local `categoryOf` deleted in favour of the shared one |
+| `apps/web/src/pages/operation/OperationApp.test.tsx` | holds that one header, and the rail's URL parameters surviving the mount |
 | `docs/delivery/MASTER.md` §8 | the 2026-08-20 Delivery Work paragraph **overwritten** (Law 3) |
 
 No migration. No RLS change. No other module's page, register or navigation.
@@ -124,6 +128,29 @@ The Journey-leg path therefore ships **unexercised by live data** and is held by
 tests instead. That is stated rather than hidden: §6 of the Constitution says
 every live row is test data, so a count of zero here is evidence about the code,
 never about the business.
+
+## 7.1 · Found on the production walk — FIXED
+
+🔴 **Two headers on Delivery Work.** `?tab=delivery` was missing from the
+`GlobalTopBar` suppression list in `OperationApp.tsx`, so the page's own 50px
+Destination Header — which embeds `TopBarIcons` — sat beneath a slim bar
+carrying a second `Jump to`, a second bell reading `59`, a second Help and a
+second gear. `Delivery Orders` never showed it because it is a real route and
+was suppressed already, which is why one Delivery page looked right and its
+sibling did not. **This is the identical defect Manual Purchase shipped with in
+August** (`OperationApp.test.tsx` — "one header on Manual Purchase"), and it is
+now held by the same shape of test. It predates this card; the card's acceptance
+line *"exactly one 50px Destination Header"* is what caught it.
+
+🔴 **`Category` read `Other goods` on all 90 rows.** Delivery Work carried its
+own copy of the mini-table's category logic and stopped one step short of
+`lineClass` — the only one of the three sources that can read an AutoCount SKU
+like `H1401F-K`. So this page printed `Other goods` while the Sales Orders
+register, reading the identical line, printed `Mattress`. The box is written
+once precisely so two mini-tables cannot almost agree; the STRING in its first
+column had exactly the same problem. `goodsCategoryOf` now lives in
+`GoodsMiniTable.tsx`, both pages call it, and five tests pin the three sources
+in falling order of authority.
 
 ## 8 · Found in passing — NOT fixed here
 
