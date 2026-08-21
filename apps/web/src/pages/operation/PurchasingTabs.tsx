@@ -52,6 +52,7 @@ import ModuleHeader from "./components/ModuleHeader";
  */
 
 type PurchasingPage =
+  | "purchase-demands"
   | "to-order"
   | "manual-purchase"
   | "purchase-orders"
@@ -69,6 +70,8 @@ type PurchasingPage =
  *  the grouped rail now names the OBJECT each page holds. Only the words moved
  *  — every key, every `?tab=` value and every route is untouched. */
 const PAGE_WORD: Record<PurchasingPage, string> = {
+  /* CARD-2026-08-20 — the Register's word is the RAIL's word, unchanged. */
+  "purchase-demands": "Purchase Demands",
   "to-order": "SO Batch Purchase",
   "manual-purchase": "Manual Purchase Requests",
   "purchase-orders": "Purchase Orders",
@@ -84,7 +87,9 @@ export default function PurchasingTabs({ right }: { right?: ReactNode } = {}) {
   const tabParam = new URLSearchParams(location.search).get("tab");
   const active: PurchasingPage = onProcurement
     ? "purchase-orders"
-    : tabParam === "manual-purchase"
+    : tabParam === "purchase-demands"
+      ? "purchase-demands"
+      : tabParam === "manual-purchase"
       ? "manual-purchase"
       : tabParam === "receiving"
       ? "receiving"

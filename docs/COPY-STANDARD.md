@@ -592,6 +592,45 @@ so the screen cannot respell them.
 | `Check the supplier` | `Check the supplier for {model}` | `Save the supplier` | `Supplier saved` | `Every model has a supplier.` |
 | `Upload handover proof` | `Upload handover proof` | `Upload handover proof` | `Handover proof saved` | `Every handover has its proof.` |
 
+**PURCHASE DEMANDS — the Register's own words** (CARD-2026-08-20-purchase-demands, added on
+execution 2026-08-20). `Purchase Demands` EXPLAINS customer buying demand; it never issues a
+purchase order. Every string below is spelt once in `@carres/shared`'s `PURCHASE_DEMAND_WORDS`
+and `PURCHASE_DEMAND_STATE_WORDS`, so no screen may respell them:
+
+| Where | The word |
+|---|---|
+| Page | `Purchase Demands` |
+| Search | `Search purchase demands…` |
+| Rail heading | `Work to do` |
+| Rail — all | `All demands` |
+| Toolbar door | `Open SO Batch Purchase` |
+| Empty state | `No purchase demands.` |
+| Columns | `Item · Description` · `Variant` · `Category` · `SKU` · `SO No` · `Customer` · `Customer Delivery` · `Supplier` · `Qty Needed` · `Ready Stock` · `On PO` · `To Buy` · `Coverage` |
+
+**The six states, and there is no seventh.** Line 1 is the FACT; line 2 is the FIX, in the
+imperative. The rail carries the short form, because 200px is 200px:
+
+| Fact (line 1) | Rail word | Fix (line 2) |
+|---|---|---|
+| `Ready to buy` | `Ready to buy` | — |
+| `Customer delivery date is missing` | `No customer date` | `Ask customer for a delivery date` |
+| `SKU not found` | `No SKU` | `Add this item to the SKU catalog` |
+| `Supplier not assigned` | `No supplier` | `Check the supplier for {model}` |
+| `Production days are missing` | `No production days` | `Add production days for {supplier} · {category}` |
+| `Covered — no buying needed` | `Covered` | — |
+
+`Check the supplier for {model}` is the Work Engine's own dictionary row above, reused verbatim
+rather than respelt.
+
+**The absence words.** A cell never prints a bare dash where a sentence is owed:
+`No delivery date yet` · `No supplier yet` · `Not counted yet` (the blocker also blocks the
+coverage arithmetic, so nothing is known) · `Nothing covers it yet` (the arithmetic ran and
+found nothing). The last two are DIFFERENT answers and may not be merged.
+
+**Banned on this page:** `Today` · `Tomorrow` · `Needs attention` · `Follow up` · `Pending` ·
+`Waiting` · `Priority` · a generic `Next action` column. A word that tells the operator a row is
+important without telling them what is wrong with it is not a word this Register may use.
+
 **MANUAL PURCHASE — the request's own words** (CARD-2026-08-18-manual-purchase, added on
 execution 2026-08-19; every string below is the card's own ruled text, recorded here so no
 screen respells it):

@@ -42,6 +42,7 @@ import deliveryOrdersRouter from "./routes/operation/delivery-orders";
 import paymentApprovalsRouter from "./routes/operation/payment-approvals";
 import purchaseRouter from "./routes/operation/purchase";
 import toOrderRouter from "./routes/operation/to-order";
+import purchaseDemandsRouter from "./routes/operation/purchase-demands";
 import manualPurchaseRouter from "./routes/operation/manual-purchase";
 import purchasingSettingsRouter from "./routes/operation/purchasing-settings";
 import opsStaffRouter from "./routes/operation/staff";
@@ -206,6 +207,9 @@ api.route("/operation/orders", bulkCompleteRouter);
 api.route("/operation/payments", operationPaymentsRouter);
 api.route("/operation/purchase", purchaseRouter);
 api.route("/operation/purchase/to-order", toOrderRouter);
+// CARD-2026-08-20 — the read-only customer-demand Register. Mounted beside To
+// Order, on the same recomputation; it issues nothing.
+api.route("/operation/purchase/demands", purchaseDemandsRouter);
 // Manual Purchase requests (0359) — the typed lane's header + lines + register.
 api.route("/operation/purchasing/requests", manualPurchaseRouter);
 // P1 (0303) — Purchasing → Settings: the numbers the ordering engine reads.

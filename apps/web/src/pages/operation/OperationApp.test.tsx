@@ -60,6 +60,11 @@ vi.mock("./OperationToOrder", () => ({
 vi.mock("./OperationManualPurchase", () => ({
   default: () => <div data-testid="manual-purchase-stub">manual-purchase</div>,
 }));
+// CARD-2026-08-20-purchase-demands — the read-only demand Register. It
+// self-fetches, so it is stubbed; this suite tests which route mounts it.
+vi.mock("./OperationPurchaseDemands", () => ({
+  default: () => <div data-testid="purchase-demands-stub">purchase-demands</div>,
+}));
 // The right rail self-fetches (tasks/notes) — stub it; this suite tests routing.
 vi.mock("./components/OperationRightRail", () => ({
   default: () => <div data-testid="right-rail-stub">rail</div>,
@@ -207,5 +212,39 @@ describe("OperationApp — one header on Manual Purchase", () => {
   it("the dashboard keeps its top bar — the suppression is per purchasing page", () => {
     renderApp("/operation?tab=dashboard");
     expect(screen.getByTestId("global-topbar-stub")).toBeInTheDocument();
+  });
+});
+
+/**
+ * PURCHASE DEMANDS — the newest BUY destination
+ * (CARD-2026-08-20-purchase-demands).
+ *
+ * The Register draws the Purchasing Destination Header itself, so the slim
+ * global bar must be suppressed exactly as it is for its five siblings — the
+ * same defect Manual Purchase shipped with in August.
+ */
+describe("OperationApp — Purchase Demands", () => {
+  it("?tab=purchase-demands mounts the Register and nothing else", () => {
+    renderApp("/operation?tab=purchase-demands");
+    expect(screen.getByTestId("purchase-demands-stub")).toBeInTheDocument();
+    expect(screen.queryByTestId("to-order-stub")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("dashboard-stub")).not.toBeInTheDocument();
+  });
+
+  it("it suppresses the global top bar like its siblings — one header, not two", () => {
+    renderApp("/operation?tab=purchase-demands");
+    expect(screen.queryByTestId("global-topbar-stub")).not.toBeInTheDocument();
+  });
+
+  it("its own query parameters survive the mount — the rail rides the URL", () => {
+    // A refresh, a shared link and the back button all arrive this way.
+    renderApp("/operation?tab=purchase-demands&state=no_supplier,no_sku");
+    expect(screen.getByTestId("purchase-demands-stub")).toBeInTheDocument();
+  });
+
+  it("SO Batch Purchase is untouched — its route still mounts its own page", () => {
+    renderApp("/operation?tab=purchase");
+    expect(screen.getByTestId("to-order-stub")).toBeInTheDocument();
+    expect(screen.queryByTestId("purchase-demands-stub")).not.toBeInTheDocument();
   });
 });

@@ -16,6 +16,7 @@
 | I am working on | Read |
 |---|---|
 | anything | **§1 · §2 first — they are short and they bind every Purchasing page** |
+| Purchase Demands | **§3.1** |
 | SO Batch Purchase · Manual Purchase (today: To Order) | **§3** |
 | Purchase Orders | **§4** |
 | Receiving | **§5** |
@@ -1066,6 +1067,136 @@ itself, in which case the four buyer columns need a ruled home before any code m
 demand row rather than a PO result — which is a Purchasing business change, not a presentation one.
 
 ---
+
+# §3.1 · Purchase Demands
+
+### MISSION
+Answer ONE question: **what customer goods need buying, what already covers them, and what must be
+fixed before they can be bought?** It is the authoritative demand REGISTER. It inspects and
+explains; it never commits money.
+
+**`SO Batch Purchase` remains the only door that issues a Purchase Order.** This page has no
+`Issue PO`, no draft PO, no price, no FOC, no approval, no `Deliver To` editor and no selection
+that could buy anything. Its one door out is a NAVIGATION door: `Open SO Batch Purchase`.
+
+### WORKFLOW
+```
+customer orders ─┐
+catalog          ├─▶ ONE server recomputation ─┬─▶ SO Batch Purchase   what can I ISSUE today
+ready stock      │   (lib/purchase-demand-read) │
+open POs         │                              └─▶ Purchase Demands   what needs buying, and why not
+purchasing settings ─┘
+```
+
+The buyer opens `Purchase Demands` to see the whole picture, fixes what is blocked (or sends it to
+whoever owns the fix), and crosses to `SO Batch Purchase` to issue.
+
+### WHAT IS ON SCREEN TODAY
+**SHIPPED 2026-08-20 — CARD-2026-08-20-purchase-demands.** Measured on this branch; the deployed
+SHA and the owner walk are recorded at the end of this section.
+
+```
+Destination Header  50px   Purchase Demands              (PurchasingTabs, no prefix, no tabs)
+200px rail                 WORK TO DO — All demands + the six states, each with its count
+Work Toolbar        45px   Search · Open SO Batch Purchase · Export · Columns
+Work Surface               one DataGrid + the fixed 32px status footer
+```
+
+- Route `/operation?tab=purchase-demands`; rail row `purchase-demands` in `BUY`.
+- The rail is PAGE-OWNED filtering, not navigation. It is multi-select and it rides the URL
+  (`?state=no_supplier,no_sku`), so refresh, share and the back button all land on the same
+  listing. It reuses `components/workspace-rail.tsx` — the recipe Purchase Orders and Goods
+  Receipts already wear. **No third rail was written.**
+- The tree is `item/model → variant → one customer's demand`. A single-variant item collapses
+  straight to the customer leaves. A sofa's modules are ONE leaf (the engine's build), so a
+  customer's matched set stays together.
+- Parent columns: `Item · Description` · `Category` · `Qty Needed` · `Ready Stock` · `On PO` ·
+  `To Buy`, each with a footer total. `Work to do` and `Supplier` are in the Columns chooser, off
+  by default. `To Buy` is PRINTED and never editable.
+- One search reaches SO, customer, model, SKU, supplier and PO number.
+- A leaf's SO number opens the Sales Order; a PO number opens Purchase Orders. A READY leaf also
+  carries `Open SO Batch Purchase` with its SO in the URL. A blocked or covered leaf does not
+  pretend it can be bought.
+
+**THE SIX STATES, AND THERE IS NO SEVENTH.** Recomputed on every read from live Sales Order,
+Catalog, Stock, open-PO and Purchasing Settings facts. **Nothing is stored.** Fix the supplier and
+the row moves without anybody clearing a flag.
+
+| State | It means | Owner of the fix |
+|---|---|---|
+| `Ready to buy` | nothing is in the way | — |
+| `Customer delivery date is missing` | the order has no agreed day | Responsible Salesperson (`orders.salesperson_id`) |
+| `SKU not found` | the catalog has never heard of this sold SKU | the month's PO-duty holder (`ops_po_duty`) |
+| `Supplier not assigned` | a real procurable product nobody has mapped | the month's PO-duty holder |
+| `Production days are missing` | this supplier × category has no number in Settings | the authorised Purchasing Settings holder (duty word; no roster fact exists) |
+| `Covered — no buying needed` | an open PO, or an already-drawn unit, covers every unit | — |
+
+Precedence runs in exactly that order and it mirrors the order in which the ENGINE refuses a line.
+`Covered` outranks `Customer delivery date is missing` deliberately: a line with nothing left to
+buy is not blocked by a missing date, and sending somebody to fix it would waste their morning.
+
+Where no person resolves, the DUTY WORD stands — the Work Engine's own law
+(`work-engine.ts` `ownerDuty`), never a hand-picked name.
+
+### API + DATA
+- `GET /api/operation/purchase/demands` — `apps/api/src/routes/operation/purchase-demands.ts`.
+  Read-only. `requireOperation` (operation + principal); every external role is refused.
+  **No write, no RPC, no migration** — asserted by test.
+- `apps/api/src/lib/purchase-demand-read.ts` — **the ONE customer-demand read.** `loadToOrder` and
+  its private helpers moved here from `routes/operation/to-order.ts` **without one line of the
+  arithmetic changing**; SO Batch Purchase now calls it, and its response is byte-identical
+  (`to-order.test.ts` 76/76 unchanged, including the `proceed_date` source guard, which now scans
+  both files).
+- `packages/shared/src/purchase-demands.ts` — the state derivation, the pure grouping/filtering,
+  the footer arithmetic, every visible word and the response schema. One home, so a screen cannot
+  re-derive a state.
+
+**THE ADDITION IS `registerFacts`, AND IT IS WHY THIS PAGE COULD NOT BE BUILT ON THE OLD READ.**
+`loadToOrder` DROPS the lines it cannot buy — that is correct for a workspace that issues (there is
+no document to make) and fatal for a Register that explains (a row that is not there answers
+nothing). The read now records four refusals, at the exact point it already decided, in the same
+pass, from the same values: `no_sku` · `no_supplier` · `no_production_days` · `covered_by_stock`.
+No arithmetic is duplicated and no existing caller reads them.
+
+**A REFUSED LINE'S COVERAGE COLUMNS ARE `null`, NOT `0`.** The fact that blocks the purchase also
+blocks the allocation, so there is no coverage answer. `Not counted yet` and `Nothing covers it
+yet` are DIFFERENT answers and the page keeps them apart. A `0` there would assert something
+nobody measured.
+
+### FROZEN RULES
+1. **This page never issues.** No `Issue PO`, `Send PO`, price, FOC, approval, draft PO, stored
+   batch or auto-reservation of Ready Stock. Register selection is never a prerequisite for
+   anything.
+2. **One demand arithmetic.** Both Purchasing surfaces read
+   `lib/purchase-demand-read.ts`. A second `loadToOrder` anywhere is a defect, and a test asserts
+   neither route declares one.
+3. **No stored status.** The six states are recomputed. Nothing writes a flag, a queue or a
+   remainder.
+4. **Catalog is the only authority on what a sold SKU is.** A SKU absent from the catalog stays
+   visible as `SKU not found`; it is never silently assumed to be a fee, a service or a typo. A SKU
+   the catalog positively classifies as non-procurable (Service, accessory, guarantee) is excluded
+   and says nothing.
+5. **A procurable SKU with no supplier may never disappear.** It carries its line id, model, SKU,
+   quantity, SO, customer and customer date.
+6. **No `Unit ID` column.** Stock has not created or allocated a Unit merely because a customer
+   asked for something.
+7. **No `Deliver To` editor.** Pre-Issue arrangement belongs to SO Batch Purchase; final truth to
+   the PO.
+8. **No `Needs attention`, Priority or generic Next Action column**, and the rail may not say
+   `Today` · `Tomorrow` · `Follow up` · `Pending` · `Waiting`. A word that says a row is important
+   without saying what is wrong with it is not a word this page may use.
+9. **The complete action stays in the shared Work Engine.** The Register shows the governed
+   two-line fact/help treatment and the resolved-owner chip; it holds no action or status store of
+   its own.
+
+### APPROVED EVOLUTION
+- **A selected-demand entrance into SO Batch Purchase** — explicitly Card 2's, and explicitly NOT
+  this card's. Nothing here may invent a stored batch.
+- **The owner chip is a name only where a stored fact already carries one.** Production days have
+  no roster fact at all, so that row always shows the duty word. When Settings grows an authorised
+  holder, this page reads it — it does not invent one.
+- **`Export` exports the parent items**, not the leaves. If a buyer needs the leaf sheet, that is a
+  leaf-level export in the engine, not a second export on this page.
 
 # §4 · Purchase Orders
 

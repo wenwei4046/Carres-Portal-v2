@@ -113,19 +113,33 @@ describe("the approved hierarchy", () => {
 
 /** THE ROUTE TRUTH — the Card's own minimum assertion. A rename moved WORDS. */
 describe("the live destinations keep their exact current addresses", () => {
-  it("six live pages, six unchanged routes", () => {
+  it("seven live pages, and every earlier route is unchanged", () => {
+    // CARD-2026-08-20-purchase-demands added the SEVENTH. It joined at its
+    // governed address and moved nobody: the six below are the same six
+    // strings this test has asserted since the rename.
     expect(
       purchasing
         .filter((item) => !item.soon)
         .map((item) => [item.label, navItemHref(operation, item)]),
     ).toEqual([
       ["Manual Purchase Requests", "/operation?tab=manual-purchase"],
+      ["Purchase Demands", "/operation?tab=purchase-demands"],
       ["SO Batch Purchase", "/operation?tab=purchase"],
       ["Purchase Orders", "/operation/procurement"],
       ["Goods Receipts", "/operation?tab=receiving"],
       ["Supplier Claims", "/operation?tab=claims"],
       ["Report", "/operation?tab=purchasing-report"],
     ]);
+  });
+
+  it("Purchase Demands is LIVE, in BUY, and it is not `Coming soon`", () => {
+    // CARD-2026-08-20-purchase-demands — exactly the two edits the group's own
+    // comment promised: `soon` came off, and the row became a link.
+    const item = purchasing.find((i) => i.key === "purchase-demands");
+    expect(item?.label).toBe("Purchase Demands");
+    expect(item?.soon).toBeUndefined();
+    expect(item?.pageGroup).toBe("purchasing-buy");
+    expect(navItemHref(operation, item!)).toBe("/operation?tab=purchase-demands");
   });
 
   it("the two renamed pages kept their keys — only the word changed", () => {

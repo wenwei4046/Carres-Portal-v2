@@ -299,7 +299,10 @@ export const PORTAL_NAV: PortalNavGroup[] = [
        * its entrances: the `?tab=purchase` door the rail links to, and the
        * `/operation/to-order` path an in-page link still uses. Two entrances,
        * ONE active destination — the rail may never light twice. */
-      { key: "purchase-demands", label: "Purchase Demands", icon: ClipboardList, soon: true, section: "Purchasing", pageGroup: "purchasing-buy" },
+      /* SHIPPED 2026-08-20 (CARD-2026-08-20-purchase-demands) — exactly the two
+         edits the group's own comment promised: `soon` came off, and the row
+         became a link to its governed address `?tab=purchase-demands`. */
+      { key: "purchase-demands", label: "Purchase Demands", icon: ClipboardList, section: "Purchasing", pageGroup: "purchasing-buy" },
       {
         key: "purchase",
         label: "SO Batch Purchase",

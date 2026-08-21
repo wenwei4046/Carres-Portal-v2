@@ -63,6 +63,20 @@ describe("PurchasingTabs — the destination word", () => {
     expect(header.querySelector("svg")).toBeNull();
   });
 
+  it("`Purchase Demands` — the Register's own destination word", () => {
+    // CARD-2026-08-20-purchase-demands. The header geometry is the Sales
+    // Orders one, unchanged: 50px, 24px word, no icon, no `Purchasing ·`
+    // prefix, no tab strip.
+    renderAt("/operation?tab=purchase-demands");
+    const header = screen.getByTestId("purchasing-tabs");
+    expect(screen.getByText("Purchase Demands")).toBeInTheDocument();
+    expect(header.textContent).not.toContain("Purchasing ·");
+    expect(header.querySelector("svg")).toBeNull();
+    // It did NOT fall through to the default page.
+    expect(screen.queryByText("SO Batch Purchase")).not.toBeInTheDocument();
+    expect(document.title).toBe("Purchase Demands · Purchasing — Carres");
+  });
+
   it("the browser tab says the same word", () => {
     renderAt("/operation?tab=receiving");
     expect(document.title).toBe("Goods Receipts · Purchasing — Carres");
