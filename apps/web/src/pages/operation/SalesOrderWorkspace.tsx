@@ -76,6 +76,7 @@ import Button from "@/components/kit/Button";
 import Textarea from "@/components/kit/Textarea";
 import Checkbox from "@/components/kit/Checkbox";
 import DatePicker from "@/components/kit/DatePicker";
+import { getCities, getPostcodes, MY_STATES } from "@/data/malaysia-postcodes";
 import EmptyState from "@/components/kit/EmptyState";
 import Input from "@/components/kit/Input";
 import Loading from "@/components/kit/Loading";
@@ -2008,15 +2009,47 @@ export default function SalesOrderWorkspace() {
           <Input id="so-line2" label="Address line 2" value={draft.customer_address_line2}
             disabled={draft.customer_address_unknown}
             onChange={(e) => setField("customer_address_line2", e.target.value)} />
-          <Input id="so-postcode" label="Postcode" value={draft.customer_address_postcode}
+          {/* THE MALAYSIA CASCADE — state picks city picks postcode, the same
+              three questions in the same order the POS asks them.
+              (`@/data/malaysia-postcodes`, one dataset, no second copy.)
+
+              Before this, all three were free text here while the POS could
+              only ever write a listed value — so the office could produce an
+              address the shop floor was incapable of producing, and a postcode
+              that belongs to no city in its own state.
+
+              STRICT, and that is measured rather than assumed: NO importer
+              writes `customer_address_state` — the only writers are this door
+              and the POS create/update path, and AutoCount rows carry null in
+              all three columns (their address arrives as ONE composed string).
+              So a picker cannot orphan legacy data; there is nothing in the
+              column to preserve. An address the list cannot express still has
+              two homes — the free-text lines above, and `Address not given
+              yet` for the genuinely unknown. */}
+          <Select id="so-state" label="State"
+            value={draft.customer_address_state || undefined}
             disabled={draft.customer_address_unknown}
-            onChange={(e) => setField("customer_address_postcode", e.target.value)} />
-          <Input id="so-city" label="City" value={draft.customer_address_city}
-            disabled={draft.customer_address_unknown}
-            onChange={(e) => setField("customer_address_city", e.target.value)} />
-          <Input id="so-state" label="State" value={draft.customer_address_state}
-            disabled={draft.customer_address_unknown}
-            onChange={(e) => setField("customer_address_state", e.target.value)} />
+            onValueChange={(v) =>
+              setDraft((d) => ({ ...d, ...addressCascadePatch("state", v) }))
+            }
+            options={MY_STATES.map((st) => ({ value: st, label: st }))} />
+          <Select id="so-city" label="City"
+            value={draft.customer_address_city || undefined}
+            disabled={draft.customer_address_unknown || !draft.customer_address_state}
+            hint={!draft.customer_address_state ? "Pick a state first" : undefined}
+            onValueChange={(v) =>
+              setDraft((d) => ({ ...d, ...addressCascadePatch("city", v) }))
+            }
+            options={getCities(draft.customer_address_state || null).map((c) => ({ value: c, label: c }))} />
+          <Select id="so-postcode" label="Postcode"
+            value={draft.customer_address_postcode || undefined}
+            disabled={draft.customer_address_unknown || !draft.customer_address_city}
+            hint={!draft.customer_address_city ? "Pick a city first" : undefined}
+            onValueChange={(v) => setField("customer_address_postcode", v)}
+            options={getPostcodes(
+              draft.customer_address_state || null,
+              draft.customer_address_city || null,
+            ).map((pc) => ({ value: pc, label: pc }))} />
           <Select id="so-building-type" label="Building type"
             value={draft.building_type || undefined}
             onValueChange={(v) => setField("building_type", v)}
@@ -2678,6 +2711,24 @@ export function earliestPromiseISO(
     earliestSellDays,
   );
   return lead > 0 ? minDeliveryDateISO(lead, today) : null;
+}
+
+/**
+ * What an address change does to the fields BELOW it.
+ *
+ * The three parts are a cascade, not three questions: a postcode belongs to a
+ * city and a city belongs to a state. Picking a new state therefore invalidates
+ * both children, and a new city invalidates the postcode — otherwise a draft
+ * can hold `Selangor / Georgetown / 10200`, which no validator downstream would
+ * catch because each field is individually a real value.
+ */
+export function addressCascadePatch(
+  level: "state" | "city",
+  value: string,
+): { customer_address_state?: string; customer_address_city: string; customer_address_postcode: string } {
+  return level === "state"
+    ? { customer_address_state: value, customer_address_city: "", customer_address_postcode: "" }
+    : { customer_address_city: value, customer_address_postcode: "" };
 }
 
 /** What the CATALOG says a SKU is, for the create door's two hints. */
