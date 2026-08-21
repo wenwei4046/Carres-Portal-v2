@@ -2,8 +2,8 @@
 
 **Module:** Delivery · **Sequence:** 02
 **Owner ruling:** Jess, 2026-08-21
-**Status:** IN DELIVERY — closure stamped at the foot of this file once production
-carries the merge SHA
+**Status:** EXECUTED — PR #887 (`d1fc2d2a`) + walk fixes PR #888 (`875c008d`),
+merged, deployed, production-verified
 
 ---
 
@@ -165,5 +165,34 @@ Handed over as its own task.
 
 ---
 
-**CLOSURE.** Stamped when the merge SHA is live on every canonical surface. Not
-before: a SHA proof expires the moment the tip moves.
+**CLOSURE — production-verified 2026-08-21 on `875c008d`.**
+
+Walked authenticated at `erp.carresofficial.com/operation?tab=delivery` as
+`operation@carres.com`, at 1280 · 1440 · 1920. Recorded as what was ASSERTED,
+not as a screenshot claim:
+
+```
+Destination Header        computed height 50px · ONE Jump to · ONE bell
+Local rail                computed width 200px
+Columns                   the eleven, in the approved order, no Owner column
+Rail counts               No confirmed date 88 · Date passed 2
+                          All 90 · NETS 46 · AL 7 · TEOW/TT/EU/SSY/HOUZS 0
+                          No logistics picked 37      (= the pre-build SQL)
+Footer                    "90 delivery scopes"
+Filters combine           AL → 7 rows, all AL, footer "7 of 90",
+                          DATE rail recounted to 7 / 0, URL ?logistics=AL
+Sticky identity           SO / Ref held left:473 through a 1067px scroll;
+                          last column reachable, body never overflows
+Expansion                 2 open → 2 aligned mini-tables, 6 correct headers,
+                          each scoped to its own order
+aria-expanded             false → true
+No second form            0 inputs, selects or buttons inside a disclosure
+Category                  H1401F-K reads `Mattress`  (read `Other goods` on
+                          d1fc2d2a — see §7.1)
+Documents                 DO-170826-5050 `Created` ·
+                          DO-180826-3035 `Out for delivery`
+                          — agrees with the Delivery Orders register
+```
+
+A SHA proof expires when the tip moves: this one is against `875c008d`, and the
+tip was `875c008d` when it was taken.

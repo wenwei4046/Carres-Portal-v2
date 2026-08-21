@@ -335,7 +335,8 @@ Route. **The register shows NO owner, NO avatar and NO action sentence** — a r
 documents; work lives in My Work / Team Work. Rows open the DO object page; document numbers are
 doors (`DO → DO`, `SO → SO`).
 
-**Delivery Work — the manual planning workspace. OWNER RULING 2026-08-21, BUILT
+**Delivery Work — the manual planning workspace. OWNER RULING 2026-08-21,
+BUILT and PRODUCTION-VERIFIED on `875c008d`
 (`CARD-2026-08-21-delivery-02-work-layout`). This OVERWRITES the 2026-08-20 first page.** The
 three-pane action-card screen is deleted, not deprecated beside this: the `Work list / Calendar`
 switch, the KPI/count preamble, the Refresh control, the action-card wall, the permanent detail
