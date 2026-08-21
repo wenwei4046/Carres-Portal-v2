@@ -374,14 +374,30 @@ seven Warehouse objects carry SELECT and nothing else. After 0368 the three numb
 74 rows: **0 NULL buckets** in any of the eight columns, the reconciliation guard passes for real
 and its negative control proves it can fail, and **0 grants of any kind remain to `anon`** on the
 seven objects. Live figures unchanged throughout: on_hand 980 · available 85 · bulk_on_hand 893 ·
-sellable 978 · reserved 2 · incoming 43. 0366 and 0367 were reconciled against their repository
-files by comment-stripped md5 (`3955ccd7f936151d144a959afef4af22` and
-`a98022030312d9071a60b3b2c55d1ada`). After 0370 the cache equals the register exactly
-(**980 = 980**, 0 drifted rows), and healing was proven end to end in a rolled-back transaction:
-the cache was zeroed deliberately, ONE unit touched, and the statement trigger restored all 980
-units for the whole Site.
-Local release gate: shared, API and web suites green, typecheck and build clean, no server secret in
-the web bundle.
+sellable 978 · reserved 2 · incoming 43. After 0370 the cache equals the register exactly (**980 = 980**, 0 drifted
+rows), and healing was proven end to end in a rolled-back transaction against production: the cache
+was zeroed deliberately, ONE unit was touched, and the statement trigger restored all 980 units for
+the whole Site.
+
+**All five applied migrations were reconciled against their repository files** by comment-stripped
+md5 — every one an exact match, so what production runs is what the repository says:
+
+| Migration | md5 (repo == applied) |
+|---|---|
+| 0366 | `33ab7586e227a63366f0ba44d9c7ebc8` |
+| 0367 | `a98022030312d9071a60b3b2c55d1ada` |
+| 0368 | `c13fbeab0f2cb7fa4772bf9b46be3d96` |
+| 0369 | `c9860a6375a0d89ebb0bc6e954170a38` |
+| 0370 | `07357039f1ad66aa1bd11163a1aa43d4` |
+
+**Local release gate:** shared (2474) and API (2293) suites fully green; typecheck, lint, build
+clean; no server secret in the web bundle. The web suite is green on 265 of 266 files. The one
+exception is **pre-existing flakiness this card did not cause and did not fix**:
+`apps/web/src/pages/operation/OperationPurchaseOrders.test.tsx` (last touched by PR #858, untouched
+by this branch) passes 132/132 in isolation but times out under full parallel load — three
+consecutive full runs failed a DIFFERENT set of its tests each time (16, then 2, then 1), with the
+drag-and-drop column-reorder tests taking 68s and 36s before failing. It is flagged for its own
+card rather than papered over here.
 
 ### 12.2 · Still not built
 
