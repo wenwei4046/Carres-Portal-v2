@@ -460,23 +460,36 @@ in §9 and the reports in §11.
 availability arithmetic, one governed door per fact, and no ungoverned write path left on the
 register.
 
-**PRODUCTION-VERIFIED 2026-08-21.** A SHA proof expires when the tip moves, so this names both the
-SHA proved and the tip it was proved against:
+**PRODUCTION-VERIFIED 2026-08-21.** There are TWO questions here and only one of them expires.
+Conflating them is what made the first version of this closure wrong:
+
+```
+is production on the TIP?     moment-bound. Expires the next time ANYONE merges.
+                              Check it while shipping — it is the failed-deploy catch.
+
+is MY code live?              git merge-base --is-ancestor <my-sha> <live-sha>
+                              ANCESTRY, and ancestry is monotonic: once true it
+                              STAYS true however far main moves on.
+```
+
+So the closure rule is: **verify the tip while shipping, close with "verified `X`, tip was `Y`",
+and prove the deliverable by ancestry — do not chase every subsequent merge.** A rule that demands
+re-verification after every later merge has no stopping condition, and the next chat, finding main
+eleven commits ahead, will drop it entirely — at which point it protects nothing.
 
 | | |
 |---|---|
 | Card merged as | `4246ff91` (PR #878) — all seven migrations |
-| First verified at | `4246ff91`, when it was the tip: all five surfaces reported it |
-| Re-verified at | `68dc8f8b` — the tip after #879 and this closure commit landed on top |
+| Verified at | `4246ff91` when it was the tip, and again at `68dc8f8b` — both by reading the five surfaces directly, not the deploy workflow's own poll |
+| Deliverable live | `git merge-base --is-ancestor 4246ff91 <live>` → **true**, and it will stay true |
 
-Both checks read the surfaces directly rather than trusting the deploy workflow's own poll:
-`erp.carresofficial.com` · `pos.carresofficial.com` · `carres-portal.pages.dev` ·
-`carres-pos.pages.dev` · the API Worker's `/health`. Between the two, production briefly reported
-`7e969aba` — Purchasing's SHA — so the sentence "production-verified `4246ff91`" was for a while
-true of a deploy production had already replaced. The Warehouse code was live throughout; the point
-is that **"production-verified at X" is a statement about a moment, not a property of the branch.**
-A later reader of this MASTER should ask *verified when, and has anything landed since* — which is
-why the tip is written down beside the SHA.
+Between the two checks production briefly served `7e969aba` (Purchasing's SHA), so for a window the
+sentence "production-verified `4246ff91`" described a deploy production had already replaced. The
+Warehouse code was live throughout — which is exactly the point the ancestry test makes and the
+tip test cannot.
+
+The five surfaces: `erp.carresofficial.com` · `pos.carresofficial.com` · `carres-portal.pages.dev` ·
+`carres-pos.pages.dev` · the API Worker's `/health`.
 
 Measured on production after the deploy, and again after #879 landed: 136 units · 136 ledger ids ·
 **0 without an identity** · 85 bindable · 893 bulk pieces · 978 sellable · 980 on hand ·
