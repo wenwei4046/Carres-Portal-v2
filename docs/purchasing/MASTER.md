@@ -1198,6 +1198,26 @@ nobody measured.
 - **`Export` exports the parent items**, not the leaves. If a buyer needs the leaf sheet, that is a
   leaf-level export in the engine, not a second export on this page.
 
+**🟡 CARRY-FORWARD — `Ready Stock` counts PIECES, and a Sales Order binds UNITS.**
+Measured in this repository 2026-08-21: `readFreeStock` sums each register record's `qty`
+(`lib/purchase-demand-read.ts` — `Math.max(1, Number(it.qty ?? 1))`), so ONE bulk record holding
+five pieces contributes five to the offer. The Warehouse unit-authority chat reports (their
+measurement, not this card's) that a database constraint forbids a `qty > 1` record from ever
+being reserved, and that production currently holds 893 such pieces against 85 exactly-bindable
+Units — the same *one number answering two questions* shape that card spent three migrations
+removing.
+
+**Nothing was changed here, and that is deliberate.** `Ready Stock` is ADVISORY — this page
+reserves nothing — and the number is `SO Batch Purchase`'s own offer. Correcting it on one surface
+would create exactly the second arithmetic this card exists to prevent, and the correction is a
+Stock business ruling, not a Purchasing presentation choice. The open owner question (does an
+accessory piece carry a Unit identity at all?) is written up with a recommendation in
+`../stock/MASTER.md` §12.1; **that ruling decides this column too**, and when it lands, the fix
+belongs in `readFreeStock` so both Purchasing surfaces move together.
+
+Live exposure today is accessories only, and no accessory reaches this Register: the three
+made-to-order categories are the only ones the engine admits.
+
 # §4 · Purchase Orders
 
 ### MISSION
