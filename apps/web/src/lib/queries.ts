@@ -291,6 +291,7 @@ import {
   type WarehouseReceiptLine,
   type WarehouseReceiptRow,
   type WarehouseSubmitReceiptInput,
+  type StockRegisterUnit,
 } from "@carres/shared";
 import { ApiError, apiFetch } from "./api";
 import { uploadCompartmentPhoto, uploadDeliveryPhoto, uploadModelPhoto } from "./photo-upload";
@@ -5877,6 +5878,48 @@ export interface DeliveryOrdersRegisterPayload {
   attempts: DeliveryOrderAttemptRow[];
   handoverEvents: DeliveryHandoverKindRow[];
 }
+/**
+ * THE STOCK REGISTER — the one current listing of controlled Units
+ * (CARD-2026-08-20-stock-register). Read-only: reservation is the Sales Order's
+ * door and this page has no mutation of its own.
+ */
+export interface StockRegisterPayload {
+  units: StockRegisterUnit[];
+  total: number;
+}
+
+export function useStockRegister() {
+  return useQuery<StockRegisterPayload, ApiError>({
+    queryKey: ["operation", "stock-register"],
+    queryFn: () => apiFetch<StockRegisterPayload>("/api/ops/stock/register"),
+    staleTime: 30_000,
+  });
+}
+
+export interface StockUnitEvent {
+  id: string;
+  event: string;
+  fromValue: string | null;
+  toValue: string | null;
+  note: string | null;
+  eventAt: string;
+}
+
+export interface StockUnitPayload {
+  unit: StockRegisterUnit;
+  events: StockUnitEvent[];
+}
+
+/** One Unit, by its PERMANENT Carres Unit ID — the thing on the label. */
+export function useStockUnit(unitCode: string | undefined) {
+  return useQuery<StockUnitPayload, ApiError>({
+    queryKey: ["operation", "stock-unit", unitCode ?? ""],
+    queryFn: () => apiFetch<StockUnitPayload>(`/api/ops/stock/register/${encodeURIComponent(unitCode as string)}`),
+    enabled: Boolean(unitCode),
+    staleTime: 30_000,
+  });
+}
+
 export function useDeliveryOrdersRegister(opts?: { orderId?: string; enabled?: boolean }) {
   const scope = opts?.orderId ?? "all";
   return useQuery<DeliveryOrdersRegisterPayload, ApiError>({

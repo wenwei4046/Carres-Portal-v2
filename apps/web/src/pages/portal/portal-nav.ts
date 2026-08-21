@@ -379,13 +379,19 @@ export const PORTAL_NAV: PortalNavGroup[] = [
        * their `?tab=` addresses; `Transfers` and `Counts` are blueprint pages
        * printing `Coming soon` until their own PRs. The blueprint keeps
        * Reports and Settings central: NO Report row, NO Settings row here.
-       * The three live rows keep K0's learned order (On hand · Ready stock ·
+       * The three live rows keep K0's learned order (Stock · Ready stock ·
        * In & out) — the rail never reshuffles under an operator; when Ready
-       * stock folds into On hand Views (blueprint item 13.7) its row dies in
+       * stock folds into Stock Views (blueprint item 13.7) its row dies in
        * that card's own PR. Word law (COPY-STANDARD): "Inventory" and
        * "Movements" stay banned UI words; the goods pool is still `Stock` on
        * any page — `Warehouse` is the MODULE heading, not the pool word. */
-      { key: "stock", label: "On hand", icon: Boxes, tab: "stock-onhand", section: "Warehouse" },
+      /* `Stock`, not `On hand` — CARD-2026-08-20-stock-register §1, and
+       * Stock MASTER §2 rejects `On hand` and `Stock Units` as the master-list
+       * name by name. `On hand` described a QUANTITY on a shelf; the page now
+       * lists exact Units and answers which one, where, who has it and whether
+       * it can be used. The `?tab=` address is unchanged, so no bookmark and no
+       * learned rail position moves. */
+      { key: "stock", label: "Stock", icon: Boxes, tab: "stock-onhand", section: "Warehouse" },
       { key: "stock-plan", label: "Ready stock", icon: ClipboardList, section: "Warehouse" },
       { key: "movements", label: "In & out", icon: ArrowLeftRight, section: "Warehouse" },
       { key: "transfers", label: "Transfers", icon: Truck, soon: true, section: "Warehouse" },

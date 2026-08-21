@@ -31,6 +31,7 @@ import {
   stockHealthHeadline,
   computeSlowMovers,
   computePlanAccuracy,
+  type StockRegisterUnit,
   type StockUnitKeyParts,
   type PlanSalesLine,
   type PlanStatus,
@@ -156,6 +157,165 @@ opsStockRouter.get("/inventory", requireOperationOrPrincipal, async (c) => {
     category: categories.get(item.sku) ?? null,
   }));
   return c.json({ items, total: rows.length });
+});
+
+// =====================================================================
+// THE STOCK REGISTER — CARD-2026-08-20-stock-register
+// =====================================================================
+
+/**
+ * GET /register — the one current listing of controlled Units.
+ *
+ * READ-ONLY, AND THAT IS THE DESIGN. Stock exposes no second reservation
+ * editor: choosing, binding, substituting and releasing an exact Unit are the
+ * Sales Order's decisions (Stock MASTER §4, Card §2). This endpoint therefore
+ * has no sibling POST and the page it feeds has no row-level editor.
+ *
+ * It reads `stock_unit_register_v` (0373) — the Unit register plus the last
+ * PHYSICAL event — and nothing else. It does NOT:
+ *   · touch `ops_stock_items` directly (0366 left it with no write policy, and
+ *     a register has no business reading around the governed view anyway);
+ *   · read `stock_balances`, which since 0366 is a non-authoritative cache and
+ *     may never answer whether goods can be offered;
+ *   · re-derive availability. `availability` and `lifecycle_outcome` arrive
+ *     already decided by the one arithmetic, and this route copies them across
+ *     without an opinion (Law D).
+ *
+ * The whole current register is returned in one read and filtered in the
+ * browser, exactly as `/inventory` has been: 136 Units today, and the rail has
+ * to count every section (`Available 85`, `Not in catalog 87`) to draw itself,
+ * which a server-side page of 50 cannot do without a second round trip per
+ * chip. When the register outgrows one read, the counts move to
+ * `stock_sku_availability` and the rows paginate — the shape that changes then
+ * is this endpoint's, not the page's.
+ */
+opsStockRouter.get("/register", requireOperationOrPrincipal, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+
+  const { data, error } = await sb
+    .from("stock_unit_register_v")
+    .select(
+      "id, unit_code, sku, category, warehouse_id, site_name, holder_party_id, " +
+        "holder_name, ownership, supplier, po_no, status, condition, needs_repair, " +
+        "hold_reason, reserved_ref, sold_order_id, qty, date_in, last_verified_at, " +
+        "availability, lifecycle_outcome, last_event_at, last_event",
+    )
+    .order("unit_code", { ascending: true });
+  if (error) throw mapErr(error);
+
+  const units = (data ?? []).map((r) => {
+    const row = r as unknown as Record<string, unknown>;
+    return {
+      id: row.id as string,
+      unitCode: row.unit_code as string,
+      sku: row.sku as string,
+      category: (row.category as string | null) ?? null,
+      warehouseId: (row.warehouse_id as string | null) ?? null,
+      siteName: (row.site_name as string | null) ?? null,
+      holderPartyId: (row.holder_party_id as string | null) ?? null,
+      holderName: (row.holder_name as string | null) ?? null,
+      ownership: row.ownership as string,
+      supplier: (row.supplier as string | null) ?? null,
+      poNo: (row.po_no as string | null) ?? null,
+      status: row.status as string,
+      condition: row.condition as string,
+      needsRepair: Boolean(row.needs_repair),
+      holdReason: (row.hold_reason as string | null) ?? null,
+      reservedRef: (row.reserved_ref as string | null) ?? null,
+      soldOrderId: (row.sold_order_id as string | null) ?? null,
+      qty: (row.qty as number | null) ?? 1,
+      dateIn: (row.date_in as string | null) ?? null,
+      lastVerifiedAt: (row.last_verified_at as string | null) ?? null,
+      availability: row.availability as StockRegisterUnit["availability"],
+      lifecycleOutcome: row.lifecycle_outcome as string,
+      lastEventAt: (row.last_event_at as string | null) ?? null,
+      lastEvent: (row.last_event as string | null) ?? null,
+    } satisfies StockRegisterUnit;
+  });
+
+  return c.json({ units, total: units.length });
+});
+
+/**
+ * GET /register/:unitCode — one Unit, for the Unit object page.
+ *
+ * Looked up by the PERMANENT Carres Unit ID, never by the row's uuid: the ID is
+ * what is printed on the supplier's label and what an operator types, and it is
+ * the thing 0366 promised never changes and is never reused. A Unit whose life
+ * has ended still resolves here — Card §1 keeps ended Units out of the default
+ * LIST, not out of history.
+ *
+ * `events` is the append-only physical lineage, newest first, ordered by `seq`
+ * and never by `event_at` (0372: two events in one statement can share a clock
+ * reading to the microsecond, and a lineage ordered by a tying key is not a
+ * lineage).
+ */
+opsStockRouter.get("/register/:unitCode", requireOperationOrPrincipal, async (c) => {
+  const unitCode = c.req.param("unitCode");
+  const sb = userClient(c.env, c.var.auth.jwt);
+
+  const { data, error } = await sb
+    .from("stock_unit_register_v")
+    .select(
+      "id, unit_code, sku, category, warehouse_id, site_name, holder_party_id, " +
+        "holder_name, ownership, supplier, po_no, status, condition, needs_repair, " +
+        "hold_reason, reserved_ref, sold_order_id, qty, date_in, last_verified_at, " +
+        "availability, lifecycle_outcome, last_event_at, last_event",
+    )
+    .eq("unit_code", unitCode)
+    .maybeSingle();
+  if (error) throw mapErr(error);
+  if (!data) throw new HTTPException(404, { message: "No Unit with that ID" });
+
+  const row = data as unknown as Record<string, unknown>;
+  const unit = {
+    id: row.id as string,
+    unitCode: row.unit_code as string,
+    sku: row.sku as string,
+    category: (row.category as string | null) ?? null,
+    warehouseId: (row.warehouse_id as string | null) ?? null,
+    siteName: (row.site_name as string | null) ?? null,
+    holderPartyId: (row.holder_party_id as string | null) ?? null,
+    holderName: (row.holder_name as string | null) ?? null,
+    ownership: row.ownership as string,
+    supplier: (row.supplier as string | null) ?? null,
+    poNo: (row.po_no as string | null) ?? null,
+    status: row.status as string,
+    condition: row.condition as string,
+    needsRepair: Boolean(row.needs_repair),
+    holdReason: (row.hold_reason as string | null) ?? null,
+    reservedRef: (row.reserved_ref as string | null) ?? null,
+    soldOrderId: (row.sold_order_id as string | null) ?? null,
+    qty: (row.qty as number | null) ?? 1,
+    dateIn: (row.date_in as string | null) ?? null,
+    lastVerifiedAt: (row.last_verified_at as string | null) ?? null,
+    availability: row.availability as StockRegisterUnit["availability"],
+    lifecycleOutcome: row.lifecycle_outcome as string,
+    lastEventAt: (row.last_event_at as string | null) ?? null,
+    lastEvent: (row.last_event as string | null) ?? null,
+  } satisfies StockRegisterUnit;
+
+  const { data: evRows, error: evErr } = await sb
+    .from("stock_unit_events")
+    .select("id, event, from_value, to_value, note, event_at, seq")
+    .eq("unit_id", unit.id)
+    .order("seq", { ascending: false })
+    .limit(200);
+  if (evErr) throw mapErr(evErr);
+
+  const events = (evRows ?? []).map((e) => {
+    const ev = e as unknown as Record<string, unknown>;
+    return {
+      id: ev.id as string,
+      event: ev.event as string,
+      fromValue: (ev.from_value as string | null) ?? null,
+      toValue: (ev.to_value as string | null) ?? null,
+      note: (ev.note as string | null) ?? null,
+      eventAt: ev.event_at as string,
+    };
+  });
+
+  return c.json({ unit, events });
 });
 
 // =====================================================================

@@ -1260,6 +1260,23 @@ counters above the table; the 32px status footer carries the summary.
 **THIS SHAPE IS THE TEMPLATE.** Every Register inherits Rows 1–3 and the three message kinds
 unchanged. Only Row 2's page-owned controls and the columns differ.
 
+**APPLIED — STOCK, 2026-08-21 (`CARD-2026-08-20-stock-register`).** The Warehouse master list is the
+fourth Register on this template, and the first with a LEFT FILTER RAIL beside it.
+
+- **The rail is not a KPI preamble.** §6.7 bans a card strip, a totals band and counters ABOVE the
+  table; the rail sits BESIDE it, and the 32px status footer still carries the summary. Nothing was
+  added above Row 3.
+- **The footer carries TWO numbers**, not one: `85 you can promise · 893 pieces you cannot`. A
+  `qty > 1` record can never be reserved (migration 0366), so a single number would either hide 893
+  real pieces or promise 893 that no Sales Order can name. When a Register's one summary number
+  would answer two different questions, it prints both and names them.
+- **Row 2 is unchanged** — Search · Export · Columns, no page-owned control in Row 1. The superseded
+  On hand page put its search box and an `Import sheet` button in the destination header, which §6.7
+  forbids by name; the replacement does not.
+- **There is no create button.** A Unit is born when a purchase order or consignment order is
+  confirmed — Purchasing's door, never Stock's — so Row 2's create slot is deliberately empty rather
+  than filled with an `Add stock` control the Unit authority removed.
+
 # §7 · Approved Evolution
 
 | What | Why it is not built |
