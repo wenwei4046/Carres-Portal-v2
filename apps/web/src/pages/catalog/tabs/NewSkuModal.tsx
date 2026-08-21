@@ -124,6 +124,9 @@ export default function NewSkuModal({
   const [price, setPrice] = useState("");
   const [cost, setCost] = useState(""); // blank -> null (cost is optional on creation)
   const [description, setDescription] = useState("");
+  /* 0375 — the SUPPLIER'S own item code (their quotation's code for this
+   * piece). Free text, optional; ours is the SKU code above. */
+  const [supplierCode, setSupplierCode] = useState("");
   // new-product fields
   const [category, setCategory] = useState<ProductCategory>("mattress");
   const [name, setName] = useState("");
@@ -481,6 +484,7 @@ export default function NewSkuModal({
         price: isPrincipal ? priceNum : 0,
         cost: isPrincipal ? costNum : null,
         description: description.trim() || null,
+        supplierCode: supplierCode.trim() || null,
       });
       toast.success(`Added ${codePreview || variant.trim()}`);
       onClose();
@@ -1015,6 +1019,17 @@ export default function NewSkuModal({
                   size pool dimensions)
                 </div>
               )}
+            </label>
+
+            <label className="block">
+              <span className="label block mb-1">Supplier item code (optional)</span>
+              <input
+                value={supplierCode}
+                onChange={(e) => setSupplierCode(e.target.value)}
+                placeholder="The supplier's own code for this piece (e.g. off the Hookka quotation)"
+                data-testid="new-sku-supplier-code"
+                className={INPUT_CLS}
+              />
             </label>
           </>
         )}

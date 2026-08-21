@@ -787,6 +787,8 @@ catalogRouter.post("/skus", async (c) => {
       // 0186 — principal-only PWP reward price (companion to cost). null = unset.
       pwp_price: parsed.data.pwpPrice ?? null,
       supplier_id: supplierId,
+      // 0375 — the supplier's own item code. '' → null (a blank is not a code).
+      supplier_code: parsed.data.supplierCode?.trim() || null,
       description,
       pos_active: parsed.data.posActive ?? true,
     })
@@ -813,6 +815,9 @@ catalogRouter.patch("/skus/:id", async (c) => {
   // Loo 2026-07-11 — the CODE is a free, directly-renameable field (AutoCount
   // style). DB unique(sku) turns a collision into a clean 409 via mapPgError.
   if (parsed.data.sku !== undefined) patch.sku = parsed.data.sku;
+  // 0375 — supplier's own item code; '' clears to null (a blank is not a code).
+  if (parsed.data.supplierCode !== undefined)
+    patch.supplier_code = parsed.data.supplierCode?.trim() || null;
   if (parsed.data.variant !== undefined) patch.variant = parsed.data.variant;
   if (parsed.data.variantKind !== undefined) patch.variant_kind = parsed.data.variantKind;
   if (parsed.data.price !== undefined) patch.price = parsed.data.price;

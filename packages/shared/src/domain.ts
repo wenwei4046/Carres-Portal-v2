@@ -104,6 +104,8 @@ export interface ProductSku {
   // instead of parsing a `category:model:variant` prefix from the SKU string
   // (the proto-era convention that's no longer how SKUs are formatted).
   supplierId: string | null;
+  /** 0375 — the SUPPLIER'S own item code (their quotation's code). */
+  supplierCode?: string | null;
   discontinuedAt?: string | null;
   // 0170 — sell-side ON/OFF (Modular toggle, DISTINCT from discontinuedAt) +
   // editable sell-side description.

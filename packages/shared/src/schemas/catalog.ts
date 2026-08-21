@@ -82,6 +82,10 @@ export const productSkuSchema = z.object({
   // SKUs have no supplier). Required for CreatePOModal to route procurable lines
   // to the right supplier group; a null-supplier SKU may not enter a Create-PO line.
   supplierId: z.string().uuid().nullable(),
+  /** 0375 — the SUPPLIER'S own item code for this SKU (the code on their
+   *  quotation). Ours is `sku`; this is theirs. Optional: pre-0375 fixtures
+   *  and Workers don't send it. */
+  supplierCode: z.string().nullable().optional(),
   discontinuedAt: z.string().nullable().optional(),
   // 0170 — sell-side ON/OFF (Modular toggle), DISTINCT from discontinuedAt
   // (cost/PO side). + editable description column.
@@ -1113,6 +1117,9 @@ export const productSkuCreateInput = z
     price: z.number().nonnegative(),
     cost: z.number().nonnegative().nullable().optional(),
     supplierId: z.string().uuid().nullable().optional(),
+    /** 0375 — the SUPPLIER'S own item code (their quotation's code for this
+     *  piece). Free text like `sku`; not money, so not 0175-gated. */
+    supplierCode: z.string().trim().max(80).nullable().optional(),
     description: z.string().trim().max(200).nullable().optional(),
     posActive: z.boolean().optional(),
     // 0186 (PWP Phase 8a) — principal-only per-SKU reward price (the price a
@@ -1139,6 +1146,8 @@ export const productSkuPatchInput = z
     price: z.number().nonnegative().optional(),
     cost: z.number().nonnegative().nullable().optional(),
     supplierId: z.string().uuid().nullable().optional(),
+    /** 0375 — supplier's own item code. '' clears (stored as null). */
+    supplierCode: z.string().trim().max(80).nullable().optional(),
     // 0075 (Loo 2026-05-09) — restore toggle.
     discontinuedAt: z.string().datetime().nullable().optional(),
     // 0170 — Edit-Prices / Modular toggle / inline description edit.
