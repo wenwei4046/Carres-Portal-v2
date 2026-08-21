@@ -63,7 +63,7 @@ import {
 } from "@/lib/queries";
 import CancelSalesOrderDialog from "./CancelSalesOrderDialog";
 import DestinationHeader from "./DestinationHeader";
-import GoodsMiniTable, { categoryWord, type GoodsMiniLine } from "./components/GoodsMiniTable";
+import GoodsMiniTable, { goodsCategoryOf, type GoodsMiniLine } from "./components/GoodsMiniTable";
 import { lineConfigBits } from "../dealer/new-order/special-addons-picker";
 import { isRental, lineName, type MoneyState } from "./sales-order-facts";
 import {
@@ -352,13 +352,6 @@ function ExpandedLines({ row }: { row: RegisterRow }) {
   if (lines.length === 0 && addons.length === 0) {
     return <div className="px-2 py-2 text-body text-base-500">No items on this order</div>;
   }
-  const categoryOf = (line: (typeof lines)[number]) => {
-    const fromAttrs = typeof line.attrs?.category === "string" ? line.attrs.category : "";
-    const fromSku = line.sku.includes(":") ? line.sku.split(":", 1)[0] : "";
-    const classified = lineClass(line.sku);
-    const classifiedLabel = classified === "acc" ? "Accessory" : classified === "unknown" ? "Other goods" : classified;
-    return categoryWord(fromAttrs || fromSku || classifiedLabel);
-  };
   const configOf = (line: (typeof lines)[number]) => {
     const attrs = line.attrs ?? {};
     const facts = lineConfigBits(attrs);
@@ -391,7 +384,7 @@ function ExpandedLines({ row }: { row: RegisterRow }) {
       return {
         key: line.id ?? `${line.sku}-${index}`,
         testId: `expanded-good-${line.sku}`,
-        category: categoryOf(line),
+        category: goodsCategoryOf(line),
         unitIds: fact?.unitIds ?? [],
         unitAbsence: "Not allocated",
         /* A single destination prints its name alone; only a SPLIT earns the

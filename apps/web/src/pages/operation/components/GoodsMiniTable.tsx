@@ -48,6 +48,7 @@
 // register above it owns all three, and wrapping a disclosure in ListPageShell
 // would draw a second page chrome inside one table cell.
 import type { ReactNode } from "react";
+import { lineClass } from "@carres/shared";
 
 /**
  * The owner's re-ruled column order (2026-08-15), and the measured widths.
@@ -145,6 +146,38 @@ export function categoryWord(raw: string): string {
   const clean = raw.replace(/[_-]+/g, " ").trim();
   if (!clean) return "";
   return clean.charAt(0).toUpperCase() + clean.slice(1).toLowerCase();
+}
+
+/**
+ * ⭐ THE `Category` CELL HAS ONE ANSWER — extracted 2026-08-21 (DELIVERY CARD
+ * 02), after Delivery Work shipped a second, worse one.
+ *
+ * The box is written once so two pages cannot drift into two mini-tables that
+ * almost agree; the STRING in its first column has exactly the same problem,
+ * and the second occurrence is the full stop (UI-KIT §6.1). Delivery Work's own
+ * copy dropped the `lineClass` step and printed `Other goods` on every live row
+ * — 90 of them — while the Sales Orders register, reading the identical line,
+ * printed `Mattress`. Found on the production walk.
+ *
+ * THREE SOURCES, IN FALLING ORDER OF AUTHORITY:
+ *   1. what the order line itself RECORDS (`attrs.category`);
+ *   2. the canonical SKU's own head (`mattress:` / `bedframe:` / `sofa:`);
+ *   3. `lineClass` — the shared classifier, which is the only one of the three
+ *      that can read an AutoCount SKU like `H1401F-K`.
+ *
+ * `unknown` prints `Other goods` and `acc` prints `Accessory`: a line nothing
+ * recognises says so, and never borrows a category it did not earn.
+ */
+export function goodsCategoryOf(line: {
+  sku: string;
+  attrs?: Record<string, unknown> | null;
+}): string {
+  const fromAttrs = typeof line.attrs?.category === "string" ? line.attrs.category : "";
+  const fromSku = line.sku.includes(":") ? line.sku.split(":", 1)[0]! : "";
+  const classified = lineClass(line.sku);
+  const classifiedLabel =
+    classified === "acc" ? "Accessory" : classified === "unknown" ? "Other goods" : classified;
+  return categoryWord(fromAttrs || fromSku || classifiedLabel);
 }
 
 export default function GoodsMiniTable({

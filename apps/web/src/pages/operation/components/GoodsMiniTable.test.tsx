@@ -6,7 +6,11 @@
  */
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
-import GoodsMiniTable, { categoryWord, type GoodsMiniLine } from "./GoodsMiniTable";
+import GoodsMiniTable, {
+  categoryWord,
+  goodsCategoryOf,
+  type GoodsMiniLine,
+} from "./GoodsMiniTable";
 
 const goodsLine = (over: Partial<GoodsMiniLine> = {}): GoodsMiniLine => ({
   key: "line-1",
@@ -131,5 +135,37 @@ describe("categoryWord", () => {
   it("returns nothing for nothing rather than inventing a word", () => {
     expect(categoryWord("")).toBe("");
     expect(categoryWord("  ")).toBe("");
+  });
+});
+
+/**
+ * ⭐ THE `Category` CELL HAS ONE ANSWER (DELIVERY CARD 02, 2026-08-21).
+ *
+ * Delivery Work shipped a second copy of this that stopped before `lineClass`,
+ * so an AutoCount SKU printed `Other goods` on all 90 live rows while the Sales
+ * Orders register, reading the identical line, printed `Mattress`. The box owns
+ * the string now; these tests are why a third copy cannot quietly appear.
+ */
+describe("goodsCategoryOf — one answer, three sources in falling authority", () => {
+  it("prefers what the line itself recorded", () => {
+    expect(goodsCategoryOf({ sku: "H1401F-K", attrs: { category: "BEDFRAME" } })).toBe("Bedframe");
+  });
+
+  it("falls back to a canonical SKU's own head", () => {
+    expect(goodsCategoryOf({ sku: "sofa:HK55-3S" })).toBe("Sofa");
+  });
+
+  it("reads an AutoCount SKU through the shared classifier — never `Other goods`", () => {
+    // The exact regression: `H1401F-K` has no attrs and no `:` head.
+    expect(goodsCategoryOf({ sku: "H1401F-K" })).toBe("Mattress");
+    expect(goodsCategoryOf({ sku: "JAGER-SS" })).toBe("Bedframe");
+  });
+
+  it("says `Other goods` only when nothing recognises the line", () => {
+    expect(goodsCategoryOf({ sku: "ZZZ-9999" })).toBe("Other goods");
+  });
+
+  it("names an accessory rather than borrowing a core category", () => {
+    expect(goodsCategoryOf({ sku: "Mattress Protector King" })).toBe("Accessory");
   });
 });
