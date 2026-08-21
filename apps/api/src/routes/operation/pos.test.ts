@@ -1123,7 +1123,7 @@ describe("POST /api/operation/pos/:id/reassign-warehouse", () => {
 //     prior IN-list filter to a single-value .eq()).
 //   - purchase_orders (v2-style coverage filter on legacy fallback): only
 //     open POs gate orders. Received/cancelled don't count.
-//   - order_lines + stock_balances: same as before.
+//   - order_lines + stock_sku_availability (0366): same as before.
 describe("GET /api/operation/pos/awaiting-stock-shortage", () => {
   function mockShortageQueries(opts: {
     // v3-S4.6: thread rows. Each row tagged with operation_stage + po_id so
@@ -1140,7 +1140,15 @@ describe("GET /api/operation/pos/awaiting-stock-shortage", () => {
     // and assert the route narrows the input set BEFORE this fetch. Lines
     // without order_id always pass through (preserves existing tests).
     orderLines?: { sku: string; qty: number; order_id?: string }[];
-    stockBalances?: { sku: string; qty: number; reserved: number }[];
+    stockBalances?: {
+      sku: string;
+      qty: number;
+      reserved: number;
+      /** 0366 — exact Units a Sales Order can BIND. Defaults to qty − reserved. */
+      available?: number;
+      /** 0368 — available + bulk pieces on the floor; what replenishment asks. */
+      sellable?: number;
+    }[];
     pos?: { status: string; so: number | null; so_refs: number[] | null }[];
   }) {
     const fromImpl = vi.fn((table: string) => {
@@ -1218,9 +1226,22 @@ describe("GET /api/operation/pos/awaiting-stock-shortage", () => {
             );
           });
           break;
-        case "stock_balances":
+        case "stock_sku_availability":
+          // 0366 — the shortage feed reads the unit register's ONE availability
+          // authority, not `stock_balances`. Fixtures still describe a site as
+          // {qty, reserved} because that is what the scenarios are about; the
+          // view's `available` is derived here exactly as the register derives
+          // it, so a test that wants a controlled unit sets `available` itself.
           // No filter on this query — the .select() chain itself awaits.
-          chain.select = vi.fn(() => promise(opts.stockBalances ?? []));
+          chain.select = vi.fn(() =>
+            promise(
+              (opts.stockBalances ?? []).map((b) => ({
+                sku: b.sku,
+                // 0368 — this feed decides what to BUY, so it reads `sellable`.
+                sellable: b.sellable ?? b.available ?? b.qty - b.reserved,
+              })),
+            ),
+          );
           break;
         case "purchase_orders":
           // v3-S2.1: route calls `.eq("status", "open")` to grab POs that

@@ -1735,23 +1735,33 @@ orderControlRouter.post("/:id/loan-sofa", async (c) => {
   if (!order) throw new HTTPException(404, { message: "Order not found" });
 
   // Claim the free unit (atomic on status='free' — 409 if someone grabbed it).
-  const now = new Date().toISOString();
-  const { data: claimed, error: claimErr } = await sb
-    .from("ops_stock_items")
-    .update({ status: "reserved", reserved_ref: `LOAN SO-${order.so}`, updated_at: now })
-    .eq("id", itemId)
-    .eq("status", "free")
-    .select("id, sku, condition, po_no")
-    .maybeSingle();
+  // 0366 — through THE binding door, not a raw update. The register carries no
+  // write policy any more, and a loan is still a promise made to one exact
+  // physical sofa: the RPC binds only a free, uncontrolled, single unit and
+  // returns an empty array when someone else got there first.
+  const { data: boundIds, error: claimErr } = await sb.rpc("ops_stock_bind_units", {
+    p_item_ids: [itemId],
+    p_ref: `LOAN SO-${order.so}`,
+    p_note: null,
+  });
   if (claimErr) {
     const m = mapPgError(claimErr);
     return c.json(m.body, m.status);
   }
-  if (!claimed) {
+  if (!Array.isArray(boundIds) || boundIds.length === 0) {
     return c.json(
       { error: "not_free", code: "conflict", message: "That sofa is no longer free" },
       409,
     );
+  }
+  const { data: claimed, error: readErr } = await sb
+    .from("ops_stock_items")
+    .select("id, sku, condition, po_no")
+    .eq("id", itemId)
+    .maybeSingle();
+  if (readErr || !claimed) {
+    const m = mapPgError(readErr ?? new Error("unit vanished after binding"));
+    return c.json(m.body, m.status);
   }
 
   const { data: loan, error: loanErr } = await sb
@@ -1773,10 +1783,10 @@ orderControlRouter.post("/:id/loan-sofa", async (c) => {
     // failed rollback was invisible — and there is no sweeper (three crons,
     // none touches ops_stock_items), so the only thing that frees the unit is
     // a person who has to be told.
-    const { error: rollbackErr } = await sb
-      .from("ops_stock_items")
-      .update({ status: "free", reserved_ref: null, updated_at: new Date().toISOString() })
-      .eq("id", itemId);
+    const { error: rollbackErr } = await sb.rpc("ops_stock_unbind_unit", {
+      p_item_id: itemId,
+      p_ref: `LOAN SO-${order.so}`,
+    });
     const m = mapPgError(loanErr);
     if (rollbackErr) {
       return c.json(

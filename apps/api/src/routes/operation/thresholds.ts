@@ -13,30 +13,15 @@ import type { AppEnv } from "../../types";
  * `low_threshold` + `high_threshold` pair on a single (sku, warehouse_id)
  * `stock_balances` row.
  *
- * Behavior — UPDATE-first, INSERT-on-miss, with 23505 race retry:
- *   1. UPDATE stock_balances SET low_threshold, high_threshold WHERE sku +
- *      warehouse_id match. `.select()` returns the touched rows.
- *   2. If 0 rows matched (the warehouse has never carried this SKU), INSERT
- *      a new row with `qty=0, reserved=0` and the supplied thresholds.
- *   3. T42-C7 — if the INSERT raises 23505 (unique_violation on the
- *      composite PK `(sku, warehouse_id)`), another writer slipped in
- *      between our UPDATE and INSERT. Retry the UPDATE: their INSERT
- *      created the row, our UPDATE now lands on it.
+ * 0366 — Behavior: ONE governed door, `ops_stock_set_thresholds`.
  *
- * Why not `.upsert()` with qty/reserved in payload? supabase-js upsert sends
- * the full payload to the SET clause on conflict — that would clobber an
- * existing row's qty/reserved back to 0. The UPDATE-first / INSERT-on-miss
- * pattern preserves stock counts (only qty/reserved RPCs in 0019/0024/
- * 0034/0045 mutate those columns).
- *
- * Race scenarios after the T42-C7 retry path:
- *   - Two concurrent threshold edits, row exists → both UPDATE; last writer
- *     wins on both threshold columns. Fine.
- *   - Two concurrent threshold edits, row missing → both UPDATE returns 0,
- *     both attempt INSERT. One wins (200). Loser hits 23505, falls back to
- *     UPDATE on the now-existing row, also returns 200. No 500 surfaces.
- *   - Concurrent stock movement RPC → it locks the row FOR UPDATE; our
- *     threshold UPDATE serializes after it on the same key, no clobber.
+ * The old UPDATE-first / INSERT-on-miss / 23505-retry dance existed only
+ * because this route wrote `stock_balances` directly and therefore had to
+ * invent `qty=0, reserved=0` for a brand-new row — and had to be careful never
+ * to clobber counts it did not own. Both problems are gone: the unit register
+ * owns the totals, this table no longer carries a write policy, and the RPC
+ * upserts the two Settings columns in one statement, so the race it was
+ * guarding against cannot arise.
  *
  * `null` is a valid value for either threshold — it clears the alert / the
  * replenishment ceiling. Per migration 0054 a NULL `low_threshold` means "no
@@ -88,59 +73,20 @@ thresholdsRouter.post("/warehouses/:warehouseId/skus/:sku/threshold", async (c) 
 
   const sb = userClient(c.env, auth.jwt);
 
-  // Step 1: UPDATE existing row if present (preserves qty/reserved).
-  const updateRes = await sb
-    .from("stock_balances")
-    .update({
-      low_threshold: parsed.data.low,
-      high_threshold: parsed.data.high,
-    })
-    .eq("sku", sku)
-    .eq("warehouse_id", warehouseId)
-    .select("sku");
-  if (updateRes.error) {
-    const m = mapPgError(updateRes.error);
+  // 0366 — one governed door, one statement. The three-step
+  // UPDATE-then-INSERT-then-retry dance existed because the route wrote the
+  // table directly and had to invent qty/reserved for a new row; the register
+  // owns those now and the direct write policy is gone. The RPC upserts the
+  // Settings columns and touches nothing else.
+  const { error } = await sb.rpc("ops_stock_set_thresholds", {
+    p_sku: sku,
+    p_warehouse_id: warehouseId,
+    p_low: parsed.data.low,
+    p_high: parsed.data.high,
+  });
+  if (error) {
+    const m = mapPgError(error);
     return c.json(m.body, m.status);
-  }
-
-  // Step 2: row didn't exist → INSERT with qty=0, reserved=0.
-  if (!updateRes.data || updateRes.data.length === 0) {
-    const insertRes = await sb.from("stock_balances").insert({
-      sku,
-      warehouse_id: warehouseId,
-      qty: 0,
-      reserved: 0,
-      low_threshold: parsed.data.low,
-      high_threshold: parsed.data.high,
-    });
-    if (insertRes.error) {
-      // T42-C7 — race: another writer INSERTed the row between our Step 1
-      // UPDATE and this INSERT. Postgres raises 23505 (unique_violation) on
-      // the composite PK `(sku, warehouse_id)`. Recover by retrying the
-      // UPDATE — the row now exists. Retry-once is sufficient: a third
-      // writer's INSERT can't race us on UPDATE because the row exists from
-      // here on out. If retry's UPDATE fails for any other reason, we
-      // surface that error (don't loop further).
-      const insertCode = (insertRes.error as { code?: string }).code;
-      if (insertCode === "23505") {
-        const retryRes = await sb
-          .from("stock_balances")
-          .update({
-            low_threshold: parsed.data.low,
-            high_threshold: parsed.data.high,
-          })
-          .eq("sku", sku)
-          .eq("warehouse_id", warehouseId);
-        if (retryRes.error) {
-          const m = mapPgError(retryRes.error);
-          return c.json(m.body, m.status);
-        }
-        // Retry UPDATE succeeded — fall through to the 200 response below.
-      } else {
-        const m = mapPgError(insertRes.error);
-        return c.json(m.body, m.status);
-      }
-    }
   }
 
   return c.json({

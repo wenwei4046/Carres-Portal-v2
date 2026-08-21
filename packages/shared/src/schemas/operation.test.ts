@@ -3,7 +3,6 @@ import {
   assignPartnerInput,
   attachDoInput,
   receivePoWithDoInput,
-  adjustStockInput,
   abandonOrderInput,
   warehousePickInput,
   recheckStockInput,
@@ -126,40 +125,6 @@ describe('receivePoWithDoInput', () => {
   it('rejects extra keys (strict mode)', () => {
     expect(
       receivePoWithDoInput.safeParse({ ...VALID, extraField: 'x' }).success,
-    ).toBe(false);
-  });
-});
-
-describe('adjustStockInput', () => {
-  it('accepts a negative delta with reason (loss/damage)', () => {
-    expect(
-      adjustStockInput.safeParse({
-        sku: 'MAT-Q-FOAM',
-        warehouseId: UUID,
-        delta: -1,
-        reason: 'damaged in transit',
-      }).success,
-    ).toBe(true);
-  });
-  it('rejects when reason is empty', () => {
-    expect(
-      adjustStockInput.safeParse({
-        sku: 'MAT-Q-FOAM',
-        warehouseId: UUID,
-        delta: 5,
-        reason: '',
-      }).success,
-    ).toBe(false);
-  });
-  it('rejects extra keys (strict mode)', () => {
-    expect(
-      adjustStockInput.safeParse({
-        sku: 'MAT-Q-FOAM',
-        warehouseId: UUID,
-        delta: 1,
-        reason: 'fix',
-        extraField: 'x',
-      }).success,
     ).toBe(false);
   });
 });

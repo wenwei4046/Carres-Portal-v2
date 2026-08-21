@@ -225,7 +225,11 @@ describe("GET /api/operation/purchase/today — assembly", () => {
       { sku: "MAT-K", qty: 1, received_qty: 0, purchase_orders: { status: "open" } },
     ];
     const warehouses = [{ id: "wh-klg", name: "Carres Klang" }];
-    const stock = [{ sku: "BF-K", qty: 3, reserved: 0, warehouse_id: "wh-klg" }];
+    // 0368 — free stock comes from the unit register's one availability
+    // authority. Purchasing asks what must be BOUGHT, so it reads `sellable`
+    // (exact Units plus bulk pieces on the floor), not qty − reserved off a
+    // hand-adjustable total.
+    const stock = [{ sku: "BF-K", sellable: 3, warehouse_id: "wh-klg" }];
 
     // Catalog facts are resolved in a SEPARATE product_skus read (no FK
     // order_lines→product_skus, so no embed). Mock it by sku.
@@ -250,7 +254,7 @@ describe("GET /api/operation/purchase/today — assembly", () => {
       product_skus: { data: skuCatalog, error: null },
       purchase_order_lines: { data: poLines, error: null },
       warehouses: { data: warehouses, error: null },
-      stock_balances: { data: stock, error: null },
+      stock_sku_availability: { data: stock, error: null },
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue(sb as any);

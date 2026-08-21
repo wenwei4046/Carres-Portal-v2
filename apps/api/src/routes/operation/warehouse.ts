@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { DB, adjustStockInput, reservedDrilldownQuery } from "@carres/shared";
-import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
+import { DB, reservedDrilldownQuery } from "@carres/shared";
+import { mapPgError } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -9,19 +9,25 @@ import type { AppEnv } from "../../types";
  * /api/operation/warehouse — Phase 4 M4 backend warehouse subsystem.
  *
  * Endpoints implemented:
- *   GET /        — composed query: warehouses + stock_balances aggregated per
- *                  warehouse with low_stock flags. (M4 Task 1)
- *   POST /adjust — wraps operation_adjust_stock RPC for manual stock
- *                  corrections (positive delta = inbound, negative = damage/
- *                  loss). (M4 Task 2)
+ *   GET /        — composed query: warehouses + the UNIT REGISTER's availability
+ *                  (0366's `stock_sku_availability`) per warehouse, with
+ *                  low_stock flags and the Settings thresholds beside them.
+ *
+ * 0366 — POST /adjust is GONE. Stock is counted from the exact Units; there is
+ * no door that moves a total without naming one.
  *
  * Future M4 tasks add: GET /movements (list).
  *
  * Aggregation contract (per spec §18.5):
  *   - low_stock_status badge is row-level (per SKU). Spec §18.5 wording:
  *     "OK (green) / Low (yellow, total ≤1) / Out (red, total = 0)".
- *   - Status uses qty thresholds (NOT qty-vs-reserved). Inline plan comment
- *     "Out=0, Low=1, OK>1" matches §18.5.
+ *   - Status uses qty thresholds (NOT qty-vs-reserved), per spec §18.5. Inline
+ *     plan comment "Out=0, Low=1, OK>1" matches it. 0366 changed only WHERE the
+ *     qty comes from — the unit register, summing each record's `qty` instead
+ *     of counting rows off a hand-adjustable total — never what the badge means.
+ *     Whether a shelf badge should instead ask what can be OFFERED (a unit in
+ *     repair sits in `qty` and can be promised to nobody) is a real question,
+ *     and it belongs to the Stock Register card with the rest of the presentation.
  *   - byWarehouse[wh_id][i].low_stock_status uses that warehouse's qty.
  *   - totalsBySku[sku].low_stock_status_aggregate uses summed qty across
  *     all warehouses (drives the "All warehouses" column badge).
@@ -79,15 +85,19 @@ interface SkuTotals {
 
 operationWarehouseRouter.get("/", async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
-  const [whRes, sbRes] = await Promise.all([
+  const [whRes, sbRes, thrRes] = await Promise.all([
     // P4 (multi-location) — owning_partner_id surfaces own-WH (NULL = Carres own,
     // e.g. Klang; non-NULL = LP-owned, e.g. HOUZS Balakong). The Receiving GRN
     // queue uses it to show only goods coming INTO an own warehouse.
     sb.from("warehouses").select("id, name, address, owning_partner_id").order("name"),
+    // 0366 — the totals come from the UNIT REGISTER through the one
+    // availability authority, never from `stock_balances`, which is now a
+    // non-authoritative cache of the legacy RPCs. The thresholds beside it
+    // are Settings and are read separately and joined below.
     sb
-      .from("stock_balances")
-      // T42-pass3-C1 — include thresholds so the FE can prefill SetThresholdDialog.
-      .select("sku, warehouse_id, qty, reserved, low_threshold, high_threshold"),
+      .from("stock_sku_availability")
+      .select("sku, warehouse_id, on_hand, available, reserved"),
+    sb.from("stock_balances").select("sku, warehouse_id, low_threshold, high_threshold"),
   ]);
   if (whRes.error) {
     const m = mapPgError(whRes.error);
@@ -97,9 +107,31 @@ operationWarehouseRouter.get("/", async (c) => {
     const m = mapPgError(sbRes.error);
     return c.json(m.body, m.status);
   }
+  if (thrRes.error) {
+    const m = mapPgError(thrRes.error);
+    return c.json(m.body, m.status);
+  }
 
   const warehouses = (whRes.data ?? []) as DB.WarehouseRow[];
-  const balances = (sbRes.data ?? []) as DB.StockBalanceRow[];
+  const balances = (sbRes.data ?? []) as Array<{
+    sku: string;
+    warehouse_id: string;
+    on_hand: number;
+    available: number;
+    reserved: number;
+  }>;
+  const thresholds = new Map<string, { low: number | null; high: number | null }>();
+  for (const t of (thrRes.data ?? []) as Array<{
+    sku: string;
+    warehouse_id: string;
+    low_threshold: number | null;
+    high_threshold: number | null;
+  }>) {
+    thresholds.set(`${t.sku}\u0000${t.warehouse_id}`, {
+      low: t.low_threshold ?? null,
+      high: t.high_threshold ?? null,
+    });
+  }
 
   // Initialise byWarehouse with every warehouse (so empty warehouses surface as []).
   const byWarehouse: Record<string, PerWarehouseStockEntry[]> = {};
@@ -109,8 +141,9 @@ operationWarehouseRouter.get("/", async (c) => {
   const totalsAccum: Record<string, { total_qty: number; total_reserved: number }> = {};
 
   for (const b of balances) {
-    const qty = Number(b.qty) || 0;
+    const qty = Number(b.on_hand) || 0;
     const reserved = Number(b.reserved) || 0;
+    const thr = thresholds.get(`${b.sku}\u0000${b.warehouse_id}`);
     // Only push to byWarehouse if the warehouse exists in the warehouses list.
     // Defensive: balance rows for deleted warehouses (cascade should remove them
     // but keep the route resilient) are skipped from BOTH the per-warehouse
@@ -123,8 +156,8 @@ operationWarehouseRouter.get("/", async (c) => {
       reserved,
       low_stock_status: statusFor(qty),
       // T42-pass3-C1 — surface raw thresholds for SetThresholdDialog prefill.
-      low_threshold: b.low_threshold ?? null,
-      high_threshold: b.high_threshold ?? null,
+      low_threshold: thr?.low ?? null,
+      high_threshold: thr?.high ?? null,
     });
 
     const t = (totalsAccum[b.sku] ??= { total_qty: 0, total_reserved: 0 });
@@ -250,26 +283,17 @@ operationWarehouseRouter.get("/reserved-drilldown", async (c) => {
   return c.json({ warehouseId, sku, total, orders });
 });
 
-// ----- POST /adjust — manual stock adjustment -----
-// Wraps operation_adjust_stock RPC (0019). Per spec §17.4 A4 + adjustStockInput
-// schema: signed delta (P0001 negative_stock if delta would dip below 0;
-// P0001 below_reserved if it would dip below stock_balances.reserved). The RPC
-// also writes a stock_movements row (kind='adjust') and an audit_log entry.
-operationWarehouseRouter.post("/adjust", async (c) => {
-  const parsed = await parseJsonBody(c, adjustStockInput);
-  if (!parsed.ok) return c.json(parsed.body, parsed.status);
-  const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb.rpc("operation_adjust_stock", {
-    p_sku: parsed.data.sku,
-    p_warehouse_id: parsed.data.warehouseId,
-    p_delta: parsed.data.delta,
-    p_reason: parsed.data.reason,
-  });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
-  return c.json(data);
-});
+// 0366 — POST /adjust IS GONE, with `operation_adjust_stock` behind it.
+//
+// It moved `stock_balances.qty` by a signed delta and never named a physical
+// Unit: stock appeared and disappeared with nothing behind it, and the totals
+// drifted from the register with nothing to reconcile against. That is the
+// "Add stock / Remove stock" door the Stock MASTER rejects (§2) and the stored
+// total the Unit Authority card forbids from deciding availability (§3).
+//
+// Stock is now COUNTED from the exact Units. What happened to a Unit is
+// recorded through its own governed door and the totals follow. The RPC
+// survives only to raise `unit_authority_only` at a client that has not caught
+// up.
 
 export default operationWarehouseRouter;

@@ -121,9 +121,26 @@ export const RECONCILIATIONS = "reconciliations" as const;
 // ---------------------------------------------------------------------------
 // Stock tables
 // ---------------------------------------------------------------------------
+/** 0366 — a NON-AUTHORITATIVE cache of the legacy RPCs plus the alert
+ *  thresholds beside it. Nothing that decides whether goods can be offered may
+ *  read it; ask STOCK_SKU_AVAILABILITY. */
 export const STOCK_BALANCES   = "stock_balances" as const;
 export const STOCK_MOVEMENTS  = "stock_movements" as const;
+
+// 0366 — THE inventory authority and its two governed read surfaces.
 export const OPS_STOCK_ITEMS  = "ops_stock_items" as const;
+/** The Unit register with its ONE availability answer, lifecycle outcome and
+ *  catalog category. Every derived total drills back to these ids. */
+export const STOCK_UNIT_AVAILABILITY_V = "stock_unit_availability_v" as const;
+/** THE availability authority, per (sku, site). `available` is the only number
+ *  that answers whether goods can be offered — never onHand − reserved. */
+export const STOCK_SKU_AVAILABILITY = "stock_sku_availability" as const;
+/** Append-only physical lineage of one Unit. */
+export const STOCK_UNIT_EVENTS = "stock_unit_events" as const;
+/** Every Carres Unit ID ever minted — what makes "never reused" enforceable. */
+export const STOCK_UNIT_IDS = "stock_unit_ids" as const;
+/** WHO HAS IT: operating-role identities. A Site lives in `warehouses`. */
+export const STOCK_OPERATING_PARTIES = "stock_operating_parties" as const;
 
 // ---------------------------------------------------------------------------
 // Misc / operational tables

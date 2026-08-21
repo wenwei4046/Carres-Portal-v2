@@ -303,19 +303,21 @@ export const officeReceiveInput = z.object({
 export type OfficeReceiveInput = z.infer<typeof officeReceiveInput>;
 
 /**
- * `adjustStockInput` — POST /api/operation/warehouse/adjust.
- * Maps to `operation_adjust_stock(sku, warehouse_id, delta, reason)` RPC.
- * `delta` is signed (positive for ad-hoc inbound, negative for damage/loss);
- * `reason` is required for the audit trail. Server enforces qty >= reserved
- * post-adjust via CHECK constraint (P0001 below_reserved otherwise).
+ * `adjustStockInput` IS GONE — 0366.
+ *
+ * It mapped to `operation_adjust_stock(sku, warehouse_id, delta, reason)`,
+ * which moved a stored total by a signed delta and never named a physical
+ * Unit. That is the "Add stock / Remove stock" door the Stock MASTER rejects
+ * (§2) and the stored total the Card forbids from deciding availability (§3):
+ * inventory appeared and disappeared with no Unit behind it, and
+ * `stock_balances` drifted away from the register with nothing to reconcile
+ * against.
+ *
+ * Stock is now COUNTED from the exact Units. What actually happened to a Unit
+ * is recorded through its own governed door — receipt, hold, takeout,
+ * write-off, site change — and the totals follow. The RPC survives only to
+ * raise `unit_authority_only` at any client that has not caught up.
  */
-export const adjustStockInput = z.object({
-  sku: z.string().min(1),
-  warehouseId: z.string().uuid(),
-  delta: z.number().int(),
-  reason: z.string().min(1),
-}).strict();
-export type AdjustStockInput = z.infer<typeof adjustStockInput>;
 
 /**
  * `abandonOrderInput` — POST /api/operation/orders/:id/abandon.

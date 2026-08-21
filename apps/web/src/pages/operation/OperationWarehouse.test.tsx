@@ -9,14 +9,15 @@ import type {
 } from "@/lib/queries";
 
 /**
- * OperationWarehouse + AdjustStockModal — covers the M5 task 4 plan list
- * (~10 tests).
+ * OperationWarehouse — covers the M5 task 4 plan list.
  *
  * Same vi.mock(@/lib/queries) pattern as operationProcurement.test.tsx — each
- * test sets the mocked hook return states before rendering. The
- * `useAdjustStockMutation` mock resolves to an empty payload so the modal
- * always succeeds; per-test variations (validation, mutation arg shape) are
- * exercised end-to-end through the page.
+ * test sets the mocked hook return states before rendering.
+ *
+ * 0366 — the "+ Adjust" modal and `useAdjustStockMutation` are gone with the
+ * endpoint and the RPC behind them, so the five tests that drove them are gone
+ * too. Stock is counted from the exact Units; there is no door here that moves
+ * a total without naming one.
  */
 
 let warehouseHookState: {
@@ -36,7 +37,6 @@ let drilldownHookState: {
 };
 const refetchSpy = vi.fn();
 const drilldownRefetchSpy = vi.fn();
-const adjustMutateAsync = vi.fn().mockResolvedValue({});
 
 vi.mock("@/lib/queries", async () => {
   const actual =
@@ -46,10 +46,6 @@ vi.mock("@/lib/queries", async () => {
     useOperationWarehouse: () => warehouseHookState,
     useCatalog: () => catalogHookState,
     useReservedDrilldown: () => drilldownHookState,
-    useAdjustStockMutation: () => ({
-      mutateAsync: adjustMutateAsync,
-      isPending: false,
-    }),
   };
 });
 
@@ -210,7 +206,6 @@ function setLoaded(overrides: Partial<WarehouseListResponse> = {}) {
 beforeEach(() => {
   refetchSpy.mockClear();
   drilldownRefetchSpy.mockClear();
-  adjustMutateAsync.mockClear();
   // Default drill-down state — empty result, idle. Tests that need a populated
   // drill-down override this directly via `drilldownHookState = ...`.
   drilldownHookState = {
@@ -392,110 +387,11 @@ describe("OperationWarehouse page", () => {
     expect(refetchSpy).toHaveBeenCalledTimes(1);
   });
 
-  it("9. clicking '+ Adjust' opens AdjustStockModal pre-filled with sku + warehouse + qty", () => {
-    setLoaded();
-    render(wrap(<OperationWarehouse />));
-    expect(screen.queryByText(/Adjust stock/)).not.toBeInTheDocument();
-    fireEvent.click(screen.getByTestId(`warehouse-adjust-${SKU_MATTRESS_KING}`));
-    expect(
-      screen.getByText(`Adjust stock · ${SKU_MATTRESS_KING}`),
-    ).toBeInTheDocument();
-    const ctx = screen.getByTestId("adjust-stock-context");
-    // "Carres Cloud · King" friendly label + "KL Warehouse" + qty 8 / reserved 2
-    expect(ctx.textContent).toContain("Carres Cloud");
-    expect(ctx.textContent).toContain("KL Warehouse");
-    expect(ctx.textContent).toContain("8");
-    expect(ctx.textContent).toContain("2");
-  });
-
-  it("10. AdjustStockModal disables 'Apply' when delta is 0 or empty, and when reason is blank", () => {
-    setLoaded();
-    render(wrap(<OperationWarehouse />));
-    fireEvent.click(screen.getByTestId(`warehouse-adjust-${SKU_MATTRESS_KING}`));
-    const apply = screen.getByRole("button", { name: /Apply adjustment/ });
-    expect(apply).toBeDisabled(); // empty delta + empty reason
-
-    const deltaInput = screen.getByTestId(
-      "adjust-delta-input",
-    ) as HTMLInputElement;
-    const reasonInput = screen.getByTestId(
-      "adjust-reason-input",
-    ) as HTMLTextAreaElement;
-
-    // delta=0 + reason set → still disabled (no-op)
-    fireEvent.change(deltaInput, { target: { value: "0" } });
-    fireEvent.change(reasonInput, { target: { value: "found goods" } });
-    expect(apply).toBeDisabled();
-
-    // delta non-zero + reason blank → still disabled
-    fireEvent.change(deltaInput, { target: { value: "-2" } });
-    fireEvent.change(reasonInput, { target: { value: "" } });
-    expect(apply).toBeDisabled();
-
-    // both valid → enabled
-    fireEvent.change(reasonInput, { target: { value: "damaged in transit" } });
-    expect(apply).not.toBeDisabled();
-  });
-
-  it("11. AdjustStockModal submit calls useAdjustStockMutation with sku/warehouseId/delta/reason", async () => {
-    setLoaded();
-    render(wrap(<OperationWarehouse />));
-    fireEvent.click(screen.getByTestId(`warehouse-adjust-${SKU_MATTRESS_KING}`));
-    const deltaInput = screen.getByTestId(
-      "adjust-delta-input",
-    ) as HTMLInputElement;
-    const reasonInput = screen.getByTestId(
-      "adjust-reason-input",
-    ) as HTMLTextAreaElement;
-    fireEvent.change(deltaInput, { target: { value: "-3" } });
-    fireEvent.change(reasonInput, {
-      target: { value: "forklift dented 3 boxes on receiving" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: /Apply adjustment/ }));
-    await waitFor(() => {
-      expect(adjustMutateAsync).toHaveBeenCalledTimes(1);
-    });
-    expect(adjustMutateAsync.mock.calls[0][0]).toEqual({
-      sku: SKU_MATTRESS_KING,
-      warehouseId: WAREHOUSE_KL.id,
-      delta: -3,
-      reason: "forklift dented 3 boxes on receiving",
-    });
-  });
-
-  it("12. AdjustStockModal pre-empts a delta that would dip below reserved", () => {
-    setLoaded();
-    render(wrap(<OperationWarehouse />));
-    // King: qty 8, reserved 2 → delta -7 would land at qty 1, below reserved 2.
-    fireEvent.click(screen.getByTestId(`warehouse-adjust-${SKU_MATTRESS_KING}`));
-    const deltaInput = screen.getByTestId(
-      "adjust-delta-input",
-    ) as HTMLInputElement;
-    const reasonInput = screen.getByTestId(
-      "adjust-reason-input",
-    ) as HTMLTextAreaElement;
-    fireEvent.change(deltaInput, { target: { value: "-7" } });
-    fireEvent.change(reasonInput, { target: { value: "loss" } });
-    expect(
-      screen.getByTestId("adjust-warning-reserved"),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: /Apply adjustment/ }),
-    ).toBeDisabled();
-  });
-
-  it("13. focus-trap: pressing Esc closes the AdjustStockModal", () => {
-    setLoaded();
-    render(wrap(<OperationWarehouse />));
-    fireEvent.click(screen.getByTestId(`warehouse-adjust-${SKU_MATTRESS_KING}`));
-    expect(
-      screen.getByText(`Adjust stock · ${SKU_MATTRESS_KING}`),
-    ).toBeInTheDocument();
-    fireEvent.keyDown(document, { key: "Escape" });
-    expect(
-      screen.queryByText(`Adjust stock · ${SKU_MATTRESS_KING}`),
-    ).not.toBeInTheDocument();
-  });
+  // 0366 — tests 9–13 covered the "+ Adjust" modal, which is GONE with its
+  // endpoint and its RPC. A total can no longer be nudged by hand: stock is
+  // counted from the exact Units, so what happened to a Unit is recorded
+  // through its own governed door and the totals follow. The button, the
+  // modal and `useAdjustStockMutation` were removed in the same change.
 
   it("14. 'Movement log' button calls setTab('movements')", () => {
     setLoaded();

@@ -68,12 +68,15 @@ export async function runPoDutyCron(env: Bindings): Promise<number> {
     if (openIds.length > 0) {
       const [lines, stock] = await Promise.all([
         sb.from("order_lines").select("order_id, sku, qty").in("order_id", openIds),
-        sb.from("stock_balances").select("sku, qty, reserved"),
+        // 0368 — `sellable` from the unit register's one authority: this cron
+        // chases what must be BOUGHT, so bulk pieces on the floor count.
+        // qty − reserved counted a unit in repair as free.
+        sb.from("stock_sku_availability").select("sku, sellable"),
       ]);
       if (!lines.error && !stock.error) {
         const avail = new Map<string, number>();
         for (const s of stock.data ?? []) {
-          const free = Number(s.qty ?? 0) - Number(s.reserved ?? 0);
+          const free = Number((s as { sellable?: number }).sellable ?? 0);
           avail.set(s.sku as string, (avail.get(s.sku as string) ?? 0) + free);
         }
         const needBySku = new Map<string, number>();

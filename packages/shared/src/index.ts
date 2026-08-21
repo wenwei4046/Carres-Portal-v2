@@ -462,7 +462,6 @@ export {
   receivePoWithDoInput,
   // Slice B (0315) — the Office Receiving Workspace's one write door.
   officeReceiveInput,
-  adjustStockInput,
   abandonOrderInput,
   warehousePickInput,
   recheckStockInput,
@@ -496,7 +495,6 @@ export {
   type AttachDoInput,
   type ReceivePoWithDoInput,
   type OfficeReceiveInput,
-  type AdjustStockInput,
   type AbandonOrderInput,
   type WarehousePickInput,
   type RecheckStockInput,
@@ -611,7 +609,9 @@ export {
   opsStockRefurbishInputSchema,
   opsStockRefurbishCompleteInputSchema,
   opsStockUpdateConditionInputSchema,
-  opsStockCreateInputSchema,
+  opsStockSetSiteInputSchema,
+  opsStockSetHolderInputSchema,
+  opsStockSetOwnershipInputSchema,
   opsStockItemSchema,
   opsStockListResponseSchema,
   opsReorderPointInputSchema,
@@ -657,7 +657,9 @@ export {
   type OpsStockRefurbishInput,
   type OpsStockRefurbishCompleteInput,
   type OpsStockUpdateConditionInput,
-  type OpsStockCreateInput,
+  type OpsStockSetSiteInput,
+  type OpsStockSetHolderInput,
+  type OpsStockSetOwnershipInput,
   type OpsStockItem,
   type OpsStockListResponse,
 } from "./schemas/ops-stock";
@@ -1103,6 +1105,26 @@ export {
   type WarehouseSubmitReceiptInput,
   type WarehouseReceiptReturnInput,
 } from "./schemas/warehouse";
+
+// 0366 · WAREHOUSE UNIT AUTHORITY — the ONE availability arithmetic, and the
+// lifecycle outcome that `ended` must never erase. The SQL half lives in
+// migration 0366 (`public.unit_availability`, `public.unit_lifecycle_outcome`).
+export {
+  UNIT_AVAILABILITY,
+  UNIT_AVAILABILITY_LABEL,
+  UNIT_LIFECYCLE_OUTCOMES,
+  UNIT_LIFECYCLE_OUTCOME_LABEL,
+  UNIT_OWNERSHIPS,
+  UNIT_OWNERSHIP_LABEL,
+  unitAvailability,
+  isUnitAvailable,
+  isUnitBindable,
+  unitLifecycleOutcome,
+  type UnitAvailability,
+  type UnitLifecycleOutcome,
+  type UnitOwnership,
+  type SkuAvailability,
+} from "./unit-availability";
 
 // R4 · Problem stock is quarantined — on hold · returned · written off
 export {

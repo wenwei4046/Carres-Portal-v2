@@ -524,7 +524,8 @@ operationPosRouter.get("/report", requireOperation, async (c) => {
 //   - orders (.eq("operation_stage", "in_production"))
 //   - purchase_orders (.eq("status", "open") for the legacy coverage filter)
 //   - order_lines (.in("order_id", [...]) on the union set)
-//   - stock_balances (no filter — sum across all warehouses per Q2=A)
+//   - stock_sku_availability (0366 — the unit register's one availability
+//     authority; no filter, summed across all warehouses per Q2=A)
 //
 // RLS: the inline role guard above plus the user JWT covers this; no policy
 // changes needed.
@@ -672,8 +673,8 @@ operationPosRouter.get("/awaiting-stock-shortage", requireOperation, async (c) =
     return c.json(empty);
   }
 
-  // Step 2 — fetch order_lines (for those order IDs) AND stock_balances (all
-  // rows) in parallel. Same Promise.all pattern as orders.ts:164/212.
+  // Step 2 — fetch order_lines (for those order IDs) AND the unit register's
+  // availability (all rows) in parallel. Same Promise.all pattern as orders.ts:164/212.
   // 0076 (Loo 2026-05-10): also pull `attrs` so the per-(sku, attrs)
   // aggregation below can preserve color/gap/fabric for CreatePOModal's
   // cascade pre-fill. attrs is jsonb; NULL stays NULL for mattress lines.
@@ -682,7 +683,10 @@ operationPosRouter.get("/awaiting-stock-shortage", requireOperation, async (c) =
   // `bySo` breakdown (Phase 3 per-SO PO auto-split).
   const [linesRes, stockRes] = await Promise.all([
     sb.from("order_lines").select("order_id, sku, qty, attrs").in("order_id", orderIds),
-    sb.from("stock_balances").select("sku, qty, reserved"),
+    // 0366 — the shortage feed decides what we still have to BUY, so it must
+    // read what we can actually offer. `stock_balances` is a non-authoritative
+    // cache now; `stock_sku_availability` counts the exact units.
+    sb.from("stock_sku_availability").select("sku, sellable"),
   ]);
   if (linesRes.error) {
     const m = mapPgError(linesRes.error);
@@ -767,7 +771,12 @@ operationPosRouter.get("/awaiting-stock-shortage", requireOperation, async (c) =
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   for (const r of (stockRes.data ?? []) as any[]) {
     const sku = String(r.sku);
-    const avail = Number(r.qty) - Number(r.reserved);
+    // 0368 — `sellable`, not `available`. This feed decides what to BUY, and a
+    // shelf holding 555 pillows needs no purchase order even though no pillow
+    // carries an identity. (`available` counts only exact Units a Sales Order
+    // can BIND, which is a different question.) Never qty − reserved either:
+    // that counted a unit in repair as sellable.
+    const avail = Number(r.sellable ?? 0);
     availBySku.set(sku, (availBySku.get(sku) ?? 0) + avail);
   }
 
@@ -1301,11 +1310,22 @@ async function autoReserveReceivedToSourceOrder(
   }
   if (idsToReserve.length === 0) return;
 
-  await sb
-    .from("ops_stock_items")
-    .update({ status: "reserved", reserved_ref: soRef, updated_at: new Date().toISOString() })
-    .in("id", idsToReserve)
-    .eq("status", "free"); // guard: skip any that got grabbed concurrently.
+  // 0366 — THE binding door. This was a raw `.update()` straight onto the
+  // register: a second reservation writer beside the governed pool draw, with
+  // no lineage and nothing stopping it from binding a bulk row to one
+  // customer. `ops_stock_bind_units` takes only free, uncontrolled, single
+  // units, records the event, and skips anything grabbed concurrently.
+  const { error: bindErr } = await sb.rpc("ops_stock_bind_units", {
+    p_item_ids: idsToReserve,
+    p_ref: soRef,
+    p_note: null,
+  });
+  if (bindErr) {
+    // Labelling is a consequence of receiving, not the receipt itself: the
+    // goods ARE here. Surfacing this as a failed receive would be a lie, so
+    // it is logged and the units stay free for the operator to bind by hand.
+    console.error("autoReserveReceivedToSourceOrder: bind refused", bindErr);
+  }
 }
 
 // ----- POST /:id/cancel -----

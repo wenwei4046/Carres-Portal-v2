@@ -30,9 +30,15 @@ operationStockRouter.use("*", async (c, next) => {
 operationStockRouter.get("/", async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
 
-  const [warehousesRes, balancesRes, skusRes, poLinesRes] = await Promise.all([
+  const [warehousesRes, balancesRes, thresholdsRes, skusRes, poLinesRes] = await Promise.all([
     sb.from("warehouses").select("id, name").order("name"),
-    sb.from("stock_balances").select("sku, warehouse_id, qty, reserved, low_threshold"),
+    // 0366 — availability comes from the UNIT REGISTER through the one
+    // authority. `stock_balances` supplies only its alert threshold, which is
+    // Settings; it may not answer how much we can offer.
+    sb
+      .from("stock_sku_availability")
+      .select("sku, warehouse_id, on_hand, sellable, reserved"),
+    sb.from("stock_balances").select("sku, low_threshold"),
     sb
       .from("product_skus")
       .select("sku, price, product_models(name, category)")
@@ -47,15 +53,17 @@ operationStockRouter.get("/", async (c) => {
   ]);
   if (warehousesRes.error) throw new HTTPException(500, { message: warehousesRes.error.message });
   if (balancesRes.error) throw new HTTPException(500, { message: balancesRes.error.message });
+  if (thresholdsRes.error) throw new HTTPException(500, { message: thresholdsRes.error.message });
   if (skusRes.error) throw new HTTPException(500, { message: skusRes.error.message });
   if (poLinesRes.error) throw new HTTPException(500, { message: poLinesRes.error.message });
 
   const warehouses = (warehousesRes.data ?? []).map((w) => ({ id: w.id, name: w.name }));
 
-  type Balance = { qty: number; reserved: number };
+  type Balance = { qty: number; reserved: number; sellable: number };
   const balanceMap = new Map<string, Map<string, Balance>>();
   const lowThresholdMap = new Map<string, number>();
-  (balancesRes.data ?? []).forEach((b) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ((balancesRes.data ?? []) as any[]).forEach((b) => {
     if (!b.sku || !b.warehouse_id) return;
     let perSku = balanceMap.get(b.sku);
     if (!perSku) {
@@ -63,10 +71,15 @@ operationStockRouter.get("/", async (c) => {
       balanceMap.set(b.sku, perSku);
     }
     perSku.set(b.warehouse_id, {
-      qty: Number(b.qty ?? 0),
+      qty: Number(b.on_hand ?? 0),
       reserved: Number(b.reserved ?? 0),
+      sellable: Number(b.sellable ?? 0),
     });
-    lowThresholdMap.set(b.sku, Number(b.low_threshold ?? 0));
+  });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ((thresholdsRes.data ?? []) as any[]).forEach((t) => {
+    if (!t.sku) return;
+    lowThresholdMap.set(t.sku, Number(t.low_threshold ?? 0));
   });
 
   const incomingMap = new Map<string, number>();
@@ -84,11 +97,15 @@ operationStockRouter.get("/", async (c) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const model = Array.isArray((s as any).product_models) ? (s as any).product_models[0] : (s as any).product_models;
     const perWh = balanceMap.get(s.sku) ?? new Map<string, Balance>();
-    const totals = Array.from(perWh.values()).reduce(
-      (acc, b) => ({ qty: acc.qty + b.qty, reserved: acc.reserved + b.reserved }),
-      { qty: 0, reserved: 0 },
+    // 0368 — SUMMED from the authority, never derived as qty − reserved (that
+    // counted a unit in repair as sellable). This column is what the operator
+    // can SELL, so it reads `sellable` (exact Units plus bulk pieces on the
+    // floor); `available` alone answers the narrower "which exact Unit can a
+    // Sales Order bind", which is the drawer's question, not this page's.
+    const available = Array.from(perWh.values()).reduce(
+      (acc, b) => acc + b.sellable,
+      0,
     );
-    const available = totals.qty - totals.reserved;
     return {
       sku: s.sku,
       name: model?.name ?? s.sku,
