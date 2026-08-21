@@ -2552,12 +2552,50 @@ function itemRows(
   }));
 }
 
-function categoryWord(line: { sku: string; attrs?: Record<string, unknown> | null }): string {
+/**
+ * The line's CATEGORY WORD — and since 2026-08-21 the CATALOG gets asked.
+ *
+ * D9 (`ERP-ARCHITECTURE.md` §3.1): *"what kind of product is this?"* is the
+ * catalog's answer and nobody else's, and **no screen may re-derive a category
+ * from a SKU string**. This document was doing exactly that: with no `attrs`
+ * and no native prefix — which is every AutoCount-imported line — it fell
+ * straight to a keyword regex over the SKU text. The POS one screen away reads
+ * `product_models.category`, so the same line could print two different words
+ * depending on which surface an operator opened.
+ *
+ * The order of resolution, and why each rung survives:
+ *
+ *   ① `attrs.category`  the DOCUMENT's own snapshot. An order line is a frozen
+ *                       record of what was sold; a category captured at sale
+ *                       time is order truth and outranks anything read live.
+ *   ② `line.category`   THE CATALOG, resolved server-side by `skuCategories`
+ *                       (the one shared reader) and carried on the order-detail
+ *                       payload since PR 867. This rung is the D9 fix.
+ *   ③ the SKU prefix    a NATIVE sku names its own kind before the first colon
+ *                       (`guarantee:`, `service:` …). Kept because it covers
+ *                       words the classifier below has no branch for.
+ *   ④ `lineClass`       the keyword parser, and the ONLY rung that guesses.
+ *                       Kept because 975 live units have no catalog row.
+ *
+ * ⚠️ **Do not "simplify" ④ into `resolvedCategory`.** That helper returns
+ * `CoreCat | "acc"` — it folds `unknown` INTO `acc`, which would silently
+ * retire the ruled word `Other goods` and print `ACCESSORY` over goods nothing
+ * recognised. That is the D9 lie this function exists to stop telling.
+ * `lineClass` is three-valued on purpose.
+ */
+export function categoryWord(line: {
+  sku: string;
+  attrs?: Record<string, unknown> | null;
+  /** The catalog's word. `null` = asked, no catalog row. ABSENT = an older
+   *  Worker that does not send it — both fall through to ③/④. */
+  category?: string | null;
+}): string {
   const fromAttrs = typeof line.attrs?.category === "string" ? line.attrs.category : "";
+  const fromCatalog = typeof line.category === "string" ? line.category.trim() : "";
   const fromSku = line.sku.includes(":") ? line.sku.split(":", 1)[0] : "";
   const classified = lineClass(line.sku);
   const fallback = classified === "acc" ? "Accessory" : classified === "unknown" ? "Other goods" : classified;
-  return (fromAttrs || fromSku || fallback).replace(/[_-]+/g, " ").toUpperCase();
+  return (fromAttrs || fromCatalog || fromSku || fallback).replace(/[_-]+/g, " ").toUpperCase();
 }
 
 function operationalConfig(line: { attrs?: Record<string, unknown> | null }): string[] {
