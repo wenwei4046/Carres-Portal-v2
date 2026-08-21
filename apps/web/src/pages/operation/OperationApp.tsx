@@ -319,6 +319,13 @@ export default function OperationApp() {
           /* CARD-2026-08-20 — the Register draws the Purchasing Destination
              Header itself, so the slim global bar would be a second top row. */
           tab !== "purchase-demands" &&
+          /* CARD-2026-08-21-delivery-02 — the SAME defect Manual Purchase
+             shipped with, caught on the production walk: Delivery Work draws
+             its own 50px Destination Header (which embeds TopBarIcons), so the
+             slim bar put a second Jump to, a second bell reading 59, a second
+             Help and a second gear on one screen. `Delivery Orders` never had
+             it because it is a real route and is suppressed above. */
+          tab !== "delivery" &&
           tab !== "manual-purchase" &&
           tab !== "receiving" &&
           tab !== "claims" &&

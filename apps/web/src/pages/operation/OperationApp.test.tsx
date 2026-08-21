@@ -65,6 +65,12 @@ vi.mock("./OperationManualPurchase", () => ({
 vi.mock("./OperationPurchaseDemands", () => ({
   default: () => <div data-testid="purchase-demands-stub">purchase-demands</div>,
 }));
+// CARD-2026-08-21-delivery-02 — Delivery Work draws its own Destination Header
+// and self-fetches; this suite only asks which route mounts it, and whether the
+// slim global bar stands down when it does.
+vi.mock("./OperationDelivery", () => ({
+  default: () => <div data-testid="delivery-work-stub">delivery-work</div>,
+}));
 // The right rail self-fetches (tasks/notes) — stub it; this suite tests routing.
 vi.mock("./components/OperationRightRail", () => ({
   default: () => <div data-testid="right-rail-stub">rail</div>,
@@ -212,6 +218,31 @@ describe("OperationApp — one header on Manual Purchase", () => {
   it("the dashboard keeps its top bar — the suppression is per purchasing page", () => {
     renderApp("/operation?tab=dashboard");
     expect(screen.getByTestId("global-topbar-stub")).toBeInTheDocument();
+  });
+});
+
+/**
+ * ONE HEADER ON DELIVERY WORK (CARD-2026-08-21-delivery-02, caught on the
+ * production walk 2026-08-21).
+ *
+ * The identical defect Manual Purchase shipped with: `?tab=delivery` was
+ * missing from the GlobalTopBar suppression list, so the page's own 50px
+ * Destination Header — which embeds TopBarIcons — sat under a slim bar carrying
+ * a second Jump to, a second bell reading 59, a second Help and a second gear.
+ * `Delivery Orders` never showed it because it is a real route and was
+ * suppressed already, which is exactly why one route looked right and its
+ * sibling did not.
+ */
+describe("OperationApp — one header on Delivery Work", () => {
+  it("?tab=delivery mounts the page and stands the global top bar down", () => {
+    renderApp("/operation?tab=delivery");
+    expect(screen.getByTestId("delivery-work-stub")).toBeInTheDocument();
+    expect(screen.queryByTestId("global-topbar-stub")).not.toBeInTheDocument();
+  });
+
+  it("its rail choices survive the mount — both filters ride the URL", () => {
+    renderApp("/operation?tab=delivery&date=__no_date&logistics=NETS");
+    expect(screen.getByTestId("delivery-work-stub")).toBeInTheDocument();
   });
 });
 
