@@ -458,7 +458,18 @@ in §9 and the reports in §11.
 
 **BUILT / VERIFIED:** the Unit authority foundation in §12.1 — one permanent identity, one
 availability arithmetic, one governed door per fact, and no ungoverned write path left on the
-register. Production-verified 2026-08-20.
+register. **PRODUCTION-VERIFIED 2026-08-21**: PR #878 merged as `4246ff91`, all seven migrations
+applied, and every canonical surface reports that exact SHA —
+`erp.carresofficial.com` · `pos.carresofficial.com` · `carres-portal.pages.dev` ·
+`carres-pos.pages.dev` · the API Worker's `/health`.
+
+Measured on production after the deploy: 136 units · 136 ledger ids · **0 without an identity** ·
+85 bindable · 893 bulk pieces · 978 sellable · 980 on hand · **0 cache drift** ·
+**0 write policies** and **0 write grants** on any of the seven Warehouse objects ·
+**exactly 1** version of `unit_availability`.
+
+**What a BUILD chat still cannot prove**: the login-gated operator walk. The only visible change on
+the Warehouse page is that `+ Adjust` is gone; nothing else in this card has a screen yet.
 
 **REAL GAP / CONTRADICTION:** none requiring an owner decision.
 
