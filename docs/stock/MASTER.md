@@ -268,7 +268,7 @@ convention. Measured on production before the change, and again after it:
 | Ownership: Carres Owned vs Supplier Consignment | `ownership` column + CHECK; consignment must name its supplier | — |
 | Site, operating party and role are separate | `warehouses` = Site; new `stock_operating_parties` = WHO HAS IT (`carres_warehouse`, `nets_warehouse`, `nets_delivery`, `pj_showroom`); `holder_party_id` on the Unit. NETS is a row, never hard-coded | two doors, neither moves the other |
 | Last verified date | `last_verified_at`, stamped only by `ops_stock_verify_unit` | — |
-| Append-only identity and physical event lineage | `stock_unit_events`, written by a TRIGGER on the register itself so no door can forget it; UPDATE and DELETE both refused | event edit refused |
+| Append-only identity and physical event lineage | `stock_unit_events`, written by a TRIGGER on the register itself so no door can forget it; UPDATE and DELETE both refused; ordered by a monotonic `seq` (0372) | a Unit driven through a governed life in one transaction reads `unit_born -> status_changed -> reservation_changed -> protection_changed -> holder_changed -> verified -> ownership_changed -> condition_changed`, 8 events, 8 distinct sequences, and the sequence itself refused a rewrite |
 | ONE availability arithmetic | `unit_availability(status, needs_repair, hold_reason, condition)` in SQL and `unitAvailability()` in `packages/shared/src/unit-availability.ts`, pinned to each other by tests | six words, both sides |
 | Availability is never a stored number | view `stock_sku_availability` computes from the register on every read — it cannot be stale. A trigger-kept column was rejected: a second copy is still a second copy (Architecture Law D) | — |
 | Every derived total drills to the exact ids | view `stock_unit_availability_v` carries id, availability, lifecycle outcome, catalog category and source status | 74 (sku, site) rows all drill |
@@ -350,7 +350,7 @@ answer beside the availability word — `delivered` · `cancelled_before_receipt
 `returned_to_supplier` · `active` — so Delivered / history can tell them apart without a second
 query or a second arithmetic. Physical disposal is not a fifth word until that fact is recorded.
 
-**Six migrations, because self-review and review kept finding real holes. Every one was found by
+**Seven migrations, because self-review and review kept finding real holes. Every one was found by
 looking again, not by a failing test — which is the point of Law 4. Two of them (0369, 0370) exist
 because a guard described as protecting the numbers could not fire at all, and one (0371) because
 the new authority disagreed with the oldest reader it was meant to replace.**
@@ -367,7 +367,9 @@ the new authority disagreed with the oldest reader it was meant to replace.**
 
 | **0371** | `unit_availability()` gains CONDITION, and the three-argument signature is dropped | **found by review, comparing the new authority against the oldest free-stock reader in the repo.** `readFreeStock` in the To Order engine has excluded damaged goods since 2026-08-04, and said why: R4 releases a quarantined unit back to `free` keeping the condition it was released with, so a damaged unit can be free, sound and unsellable. 0366's arithmetic never asked about condition — so the moment a damaged unit is released, the AUTHORITY would offer a unit every other reader refuses. Live exposure is zero today (0 damaged units; live conditions are `new` and `exhibition`), which is the same reason To Order closed it early. The old signature is DROPPED rather than defaulted: a fourth parameter with a default leaves the wrong call resolvable, which is how this existed in the first place |
 
-**Verification evidence.** All six migrations applied to production; each sanity block passed.
+| **0372** | `stock_unit_events` gains a monotonic `seq`, and `event_at` moves from `now()` to `clock_timestamp()` | **found by review, the first time anyone READ a lineage instead of asserting the trigger fired.** Driving one Unit through a governed life in a single transaction wrote all eight events correctly and returned them as `status_changed -> unit_born -> …` — a Unit that was BORN SECOND. `now()` is the TRANSACTION start time, so every event written in one transaction ties to the microsecond and the order collapses to a uuid tiebreak. Every governed door writes several events per transaction, so this was the normal case, not an edge. MASTER §7 asks In & out for "actual time … event", and §6 asks a correction to preserve the original event and its time; an append-only history whose order cannot be reconstructed answers neither |
+
+**Verification evidence.** All seven migrations applied to production; each sanity block passed.
 Eight negative controls were run against production in a rolled-back transaction after 0366 —
 duplicate id · delete · id reuse after write-off · rename · bulk reservation · hand-written total ·
 the retired adjust door · editing a unit event — and **all eight fired**; the register was unchanged
@@ -382,7 +384,7 @@ rows), and healing was proven end to end in a rolled-back transaction against pr
 was zeroed deliberately, ONE unit was touched, and the statement trigger restored all 980 units for
 the whole Site.
 
-**All six applied migrations were reconciled against their repository files** by comment-stripped
+**All seven applied migrations were reconciled against their repository files** by comment-stripped
 md5 — every one an exact match, so what production runs is what the repository says:
 
 | Migration | md5 (repo == applied) |
@@ -393,6 +395,7 @@ md5 — every one an exact match, so what production runs is what the repository
 | 0369 | `c9860a6375a0d89ebb0bc6e954170a38` |
 | 0370 | `07357039f1ad66aa1bd11163a1aa43d4` |
 | 0371 | `a45dea200a0556fea6bd060ae812b690` |
+| 0372 | `5c3b8be145f1382c553009b42aa550fc` |
 
 **Card §6 coverage, item by item.** Each row says how it is proven, not that it is.
 
