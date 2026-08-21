@@ -430,6 +430,8 @@ describe("NewSkuModal — accessory/service: no variant axis", () => {
       price: 99,
       cost: null,
       description: null,
+      /* 0375 — the supplier's own item code rides the payload; untouched here. */
+      supplierCode: null,
     });
   });
 

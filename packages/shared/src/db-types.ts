@@ -162,6 +162,8 @@ export interface ProductSkuRow {
   // follow-up tightening migration runs (carry-forward
   // phase-4-v3-skus-supplier-id-not-null-tighten).
   supplier_id: string | null;
+  /** 0375 — the SUPPLIER'S own item code (their quotation's code). */
+  supplier_code?: string | null;
   // 0074 — fixed procurement cost per unit. NULL = "not yet set" (Create-PO
   // refuses lines whose SKU has cost=null until operation sets a value via
   // the catalog admin UI).
