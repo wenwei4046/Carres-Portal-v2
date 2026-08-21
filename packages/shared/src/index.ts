@@ -1126,6 +1126,35 @@ export {
   type SkuAvailability,
 } from "./unit-availability";
 
+// CARD-2026-08-20-stock-register · THE STOCK REGISTER — the one current listing
+// of controlled Units. Pure: it READS 0366's availability and never re-derives
+// it. The `Changed` scopes read the append-only physical lineage (0373's
+// `stock_unit_register_v`), never `updated_at`.
+export {
+  ATTENTION_REASONS,
+  ATTENTION_REASON_LABEL,
+  CHANGED_SCOPES,
+  CHANGED_SCOPE_LABEL,
+  EMPTY_RAIL_SELECTION,
+  NO_CATALOG_KEY,
+  NO_CATALOG_LABEL,
+  applyRailSelection,
+  availabilityLabel,
+  categoryKeyOf,
+  changedWithin,
+  hasAttention,
+  isCurrentUnit,
+  isRailFiltered,
+  matchesRegisterQuery,
+  registerSummaryLine,
+  summariseRegister,
+  type AttentionReason,
+  type ChangedScope,
+  type StockRailSelection,
+  type StockRegisterTotals,
+  type StockRegisterUnit,
+} from "./stock-register";
+
 // R4 · Problem stock is quarantined — on hold · returned · written off
 export {
   OPS_STOCK_STATUS_LABEL,

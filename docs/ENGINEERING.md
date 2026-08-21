@@ -224,6 +224,21 @@ the part worth keeping: nine of the sixteen died to one ruling (Jess 2026-07-11,
 into each panel's ⋮), and one file in that same suite had already followed the move a card
 earlier while its siblings did not.
 
+**AND THE SAME TRAP HAS A SECOND DOOR: THE TIMEZONE** (2026-08-21, Stock Register). Two date
+tests passed on the Malaysian laptop that wrote them and failed on CI, which runs UTC. The code was
+correct — `changedWithin` compares an event against **local** midnight, because the operator's
+"today" is the browser's — but the fixtures were written as fixed `+08:00` instants, and a fixed
+instant lands on a different side of a local boundary in a different zone. `Tests 2 failed` on a
+branch whose author had just watched 2,530 pass.
+
+**Build a date fixture FROM the `now` you pass in, in local terms** (`d.setDate(d.getDate() - 1);
+d.setHours(23, 30, 0, 0)`), never as a fixed offset string. Then the test asserts the RULE — "since
+local midnight", "since local Monday" — in whatever zone runs it. Proof is cheap and worth taking:
+`TZ=UTC`, `TZ=Pacific/Kiritimati` (UTC+14) and `TZ=Pacific/Midway` (UTC−11) in a loop, plus the
+negative control under `TZ=UTC` so the rewrite is not merely passing everywhere by testing nothing.
+**This is the path-separator lesson again — green on the machine that reports, red on the machine
+that runs.**
+
 **A green web baseline is the point, not the tidiness.** While it was red, no card could tell
 its own failures from the inherited ones — S2.0 was only able to prove it had broken nothing by
 re-running the same 16 on a detached checkout of `origin/main` and matching the set exactly.

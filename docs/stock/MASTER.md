@@ -426,14 +426,87 @@ consecutive full runs failed a DIFFERENT set of its tests each time (16, then 2,
 drag-and-drop column-reorder tests taking 68s and 36s before failing. It is flagged for its own
 card rather than papered over here.
 
-### 12.2 · Still not built
+### 12.2 · BUILT / VERIFIED — the Stock Register (0373, 2026-08-21)
 
-The superseded three-tab Stock IA, the old wording, the planning-page meaning of Ready stock,
-generic Held stock or Quarantine, and the claim-only issue route are all still on screen and are
-still superseded. Transfers (PR #860), Counts, month-end, the Stock Register, Ready stock as
+`CARD-2026-08-20-stock-register` is built. **`Stock` replaced `On hand`** as the Warehouse master
+list: the rail row, the destination header, the page and `Jump to` all say Stock, and the word
+`On hand` is absent from every operator surface. The `?tab=stock-onhand` address is unchanged, so
+no bookmark and no learned rail position moved.
+
+| What the card required | How it is met | Verified |
+|---|---|---|
+| The destination says **Stock** | `portal-nav.ts` row, `ModuleHeader word="Stock"`, `Jump to` reads the same word | test asserts `On hand` appears nowhere on the surface |
+| One register, not separate stores | the page reads `stock_unit_register_v` and nothing else | test asserts `ops_stock_items` and `stock_balances` are never fetched |
+| Every count derives from Card 1's authority | `availability` and `lifecycle_outcome` arrive already decided; the page copies them | test feeds a row whose `status` contradicts its `availability` and asserts the VIEW wins |
+| Rail sections, cross-section filtering, clear-all, deep-link | rail state lives in the URL; sections AND together; `All stock` clears everything | 13 page tests + 29 pure tests |
+| `Changed` uses PHYSICAL events only | `stock_unit_register_v.last_event_at` (0373), ordered by `seq` per 0372 — never `updated_at` | migration sanity + negative control |
+| Exact Unit search opens the correct Unit Object | `/operation/stock/unit/:unitCode`, looked up by the PERMANENT id | API test asserts the lookup is by `unit_code`, never row uuid |
+| Ended Units out of the default view, still findable | `ended` is filtered out unless the id is typed EXACTLY, or `Delivered / history` is chosen | test asserts a delivered Unit is hidden by default, found by exact id, and NOT found by prefix or product |
+| No dead controls, generic editor or second reservation door | the page is read-only | test asserts no Reserve/Release/Edit/Delete/Add stock/Adjust/Mark done control exists |
+| Current/non-current year formatting | the ONE governed formatter, `fmtDate` | — |
+
+**THE FOOTER PRINTS TWO NUMBERS, AND THAT IS THE POINT.** `85 you can promise · 893 pieces you
+cannot`. §12.1 established that a `qty > 1` record can never be reserved; a Register that printed
+one number would either hide 893 real pillows or promise 893 that no Sales Order can name. The row
+itself repeats the warning inline — *"555 pieces in one record — cannot be promised individually"* —
+which is the one permitted inline second line, and it earns it. This keeps the open owner question
+in §12.1 visible on the screen where it matters instead of buried in a document.
+
+**Date spelling — a deliberate deference.** Card §4 spells time `Tue, 18 Aug · 10:42 AM`; the
+portal's one governed formatter spells it `Tue, 18 Aug 10:42`. `fmt-date.ts` records that three
+page-local formatters were deleted for disagreeing with it, so the Register uses the governed one.
+Changing the spelling is a one-line change in that file for whoever wants it — and it must happen
+THERE, for every page at once, never here.
+
+### 12.3 · The rail is drawn from facts that exist — and five are missing
+
+Card §3 names nine Attention reasons. **Four shipped; five have no fact to read**, and inventing a
+chip that reads a column nobody writes would put a number on screen that means nothing.
+
+| Reason | State | What it waits for |
+|---|---|---|
+| waiting inspection · damaged · in repair · no purchase order | **BUILT** | — |
+| cannot find | not built | a "cannot find" observation — Issues/Counts card (§6) |
+| Unit ID issue | not built | the governed relabel/issue record (§3) |
+| Site differs | not built | a second Site, and Counts (§6). One Site exists today |
+| components missing | not built | a components manifest — Receiving's scan surface (§5) |
+| evidence incomplete | not built | an evidence-completeness fact (§5) |
+
+Two more reasons are measurable but were deliberately NOT shipped as chips because they flag
+**136 of 136 Units**, which is the same as flagging nothing: `last_verified_at IS NULL` (the column
+shipped hours earlier) and `holder_party_id IS NULL` (no door populates it yet). They become useful
+the moment Counts and the handover doors write them. `Who has it` is still shown as a COLUMN, and
+reads **Not recorded** rather than inventing a holder.
+
+`Where` and `Ownership` render only when the data holds more than one value — one Site and no
+consignment Unit exist today, and a filter offering one choice is not a filter
+(`03-page-patterns.md:149`). Each section appears by itself when a second value arrives; no code
+changes.
+
+`Changed` shows **0 in all three scopes**, honestly: `stock_unit_events` holds 0 rows because every
+Unit predates 0366's lineage trigger and nothing has physically moved since. The rail says so in
+words rather than showing three empty filters that look broken.
+
+### 12.4 · Still not built
+
+The superseded planning-page meaning of Ready stock, generic Held stock or Quarantine, and the
+claim-only issue route remain superseded. Transfers (PR #860), Counts, month-end, Ready stock as
 eligible Units, Showroom Sites, the partner mobile surfaces and the reports in §11 remain
-**APPROVED TARGET / NOT BUILT**. `holder_party_id`, `ownership` and `last_verified_at` have their
-doors but no operator screen yet — the Stock Register card owns that presentation.
+**APPROVED TARGET / NOT BUILT**.
+
+**`OperationStockOnHand.tsx` IS DE-ROUTED, NOT DELETED, AND THE REASON IS A DEPENDENCY.** No
+operator can reach it. It is kept because TWO capabilities still live only there:
+`ReorderStockCard` (the K1 reorder points, migration 0286 — the one door where a reorder point and
+lead days are set) and `ImportStockDialog` (the Klg Warehouse sheet import). Deleting the file would
+destroy both without replacing them, and an existing useful capability defaults to KEEP. Their
+homes are **Ready stock** (reorder points) and **Settings/Maintenance** (the sheet import) — a
+relocation this card's scope excluded. **The file dies in the PR that gives those two a home, and
+that is the next Warehouse scope.**
+
+0366's five governed doors that could legitimately live on Unit Detail — `ops_stock_set_site` ·
+`set_holder` · `set_ownership` · `verify_unit` · `set_condition` — are **NOT wired**. Each needs its
+own confirmation copy, permission surface and evidence rule; wiring them half-way would put five
+buttons on screen whose refusals nobody had designed. They are the scope after the relocation.
 
 ## 13 · Resolved contradictions and plan state
 
@@ -453,12 +526,18 @@ measured need, and assumed external cutover.
 upstream/downstream owners.
 
 **APPROVED TARGET / NOT BUILT:** the rest of this Warehouse operating model and its UI — the
-destinations in §2, the journeys in §5, Issues/Counts/correction in §6, the pages in §7, month-end
-in §9 and the reports in §11.
+remaining destinations in §2 (Ready stock as eligible Units, Transfers, Counts), the journeys in §5,
+Issues/Counts/correction in §6, month-end in §9 and the reports in §11.
 
 **BUILT / VERIFIED:** the Unit authority foundation in §12.1 — one permanent identity, one
 availability arithmetic, one governed door per fact, and no ungoverned write path left on the
-register.
+register — and the **Stock Register** in §12.2, which replaced On hand as the Warehouse master list
+and is backed only by that authority.
+
+**NAMED GAPS, NOT SILENT ONES:** the five Attention reasons with no fact behind them (§12.3), the
+two that flag every Unit until Counts and the handover doors write them (§12.3), and the two
+capabilities still stranded on the de-routed On hand page (§12.4). Each names the fact or the card
+it waits for.
 
 **PRODUCTION-VERIFIED 2026-08-21.** There are TWO questions here and only one of them expires.
 Conflating them is what made the first version of this closure wrong:

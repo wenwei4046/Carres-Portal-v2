@@ -1086,10 +1086,27 @@ describe("PortalSidebar — the Warehouse module's pages", () => {
     }
   });
 
-  it("no bare `Stock` row survives — the module is Warehouse", () => {
+  /* UPDATED 2026-08-21 — CARD-2026-08-20-stock-register.
+   *
+   * The ruling this test was written for still stands: the MODULE is called
+   * `Warehouse`, and K0's single merged `Stock` module row is gone for good.
+   * What changed is that `Stock` is now the name of a CHILD PAGE — the Warehouse
+   * master list, replacing `On hand` (ERP-ARCHITECTURE §2.1 and Stock MASTER §2
+   * both spell the tree `Warehouse → Stock · Ready stock · In & out · Transfers
+   * · Counts`).
+   *
+   * The old assertion banned the WORD anywhere in the rail, which was always
+   * wider than the ruling it enforced. It now checks the thing that was actually
+   * ruled: no MODULE row says Stock, and the module row says Warehouse. */
+  it("no bare `Stock` MODULE row survives — the module is Warehouse, Stock is its page", () => {
     renderAt("/operation?tab=stock-onhand");
-    expect(screen.queryByText("Stock")).not.toBeInTheDocument();
     expect(within(module_("warehouse")).getByText("Warehouse")).toBeInTheDocument();
+    // `Stock` exists exactly once, and it is a CHILD.
+    expect(screen.getByTestId("nav-child-stock")).toHaveTextContent("Stock");
+    const moduleRows = Array.from(
+      document.querySelectorAll("[data-testid^='nav-module-']"),
+    ).map((el) => el.textContent?.trim());
+    expect(moduleRows).not.toContain("Stock");
   });
 
   it("the blueprint keeps Reports and Settings central — neither joins the module", () => {
@@ -1099,7 +1116,9 @@ describe("PortalSidebar — the Warehouse module's pages", () => {
         .getByTestId("nav-children-warehouse")
         .querySelectorAll("[data-testid^='nav-child-']"),
     ).map((el) => el.textContent?.replace("Coming soon", "").trim());
-    expect(rows).toEqual(["On hand", "Ready stock", "In & out", "Transfers", "Counts"]);
+    /* `Stock`, not `On hand` — CARD-2026-08-20-stock-register §1. The learned
+     * ORDER is untouched: the rail never reshuffles under an operator. */
+    expect(rows).toEqual(["Stock", "Ready stock", "In & out", "Transfers", "Counts"]);
   });
 });
 

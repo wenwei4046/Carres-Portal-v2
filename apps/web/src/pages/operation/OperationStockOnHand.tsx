@@ -14,6 +14,30 @@ import StockTabs from "./StockTabs";
 import ReorderStockCard from "./components/ReorderStockCard";
 
 /**
+ * ⚠ DE-ROUTED 2026-08-21 — CARD-2026-08-20-stock-register.
+ *
+ * `WarehouseStockRegister` replaced this page at `?tab=stock-onhand`. No
+ * operator can reach this file: the rail says `Stock`, the route is taken, and
+ * the word `On hand` is gone from every operator surface, which is the card's
+ * §6 acceptance line.
+ *
+ * IT IS NOT DELETED, AND THAT IS DELIBERATE. Two capabilities still live ONLY
+ * here and nowhere else in the portal:
+ *
+ *   · `ReorderStockCard`   — the K1 reorder points (migration 0286). The one
+ *                            door where the reorder point and lead days are set.
+ *   · `ImportStockDialog`  — the Klg Warehouse sheet import.
+ *
+ * Deleting the file would destroy both without replacing them, and an existing
+ * useful capability defaults to KEEP (CLAUDE.md §4, Plan/Design Research Law).
+ * Their proper homes are Ready stock (reorder points) and Settings/Maintenance
+ * (the sheet import) — a relocation this card's scope explicitly excludes, and
+ * one that needs its own acceptance boundary rather than being smuggled in.
+ * The gap is recorded in docs/stock/MASTER.md; this file dies in the PR that
+ * gives those two a home.
+ *
+ * Everything below is the superseded surface, unchanged.
+ *
  * OperationStockOnHand — the unified Stock "On Hand" list.
  *
  * On Hand redesign C+ · P1 shell (Jess-locked 2026-07-10, memory

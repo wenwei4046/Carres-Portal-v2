@@ -77,7 +77,8 @@ import OperationOpsReady from "./OperationOpsReady";
 import OperationOpsReserved from "./OperationOpsReserved";
 import OperationOpsRepair from "./OperationOpsRepair";
 import OperationOpsInventory from "./OperationOpsInventory";
-import OperationStockOnHand from "./OperationStockOnHand";
+import WarehouseStockRegister from "./WarehouseStockRegister";
+import WarehouseUnitDetail from "./WarehouseUnitDetail";
 // K2 (0287) — Ready stock, the middle Stock tab K0 reserved.
 import OperationStockPlan from "./OperationStockPlan";
 // Migration 0140 — Service Notes / Issue Tracker.
@@ -372,6 +373,10 @@ export default function OperationApp() {
                 number itself, so `DO-…` anywhere in the portal is a door. */}
             <Route path="delivery-orders" element={<DeliveryOrdersRegister />} />
             <Route path="delivery-orders/:doId" element={<DeliveryOrderPage />} />
+            {/* One exact Unit, addressed by its PERMANENT Carres Unit ID —
+                the thing printed on the supplier label and the thing 0366
+                promised never changes and is never reused. */}
+            <Route path="stock/unit/:unitCode" element={<WarehouseUnitDetail />} />
             {/* STAGE 1 — the workspace route the register's rows open.
                 STAGE 2 — `so/new` is the office birth door ([+ New Sales
                 Order]); static `new` outranks `:orderId`. Declared before
@@ -473,7 +478,9 @@ export default function OperationApp() {
               ))}
             {tab === "op-catalog" && <OperationCatalogPage />}
             {/* Jess redesign step 3 — unified per-unit Stock On Hand list. */}
-            {tab === "stock-onhand" && <OperationStockOnHand />}
+            {/* CARD-2026-08-20-stock-register: the Stock Register replaces the
+                On hand surface. Same `?tab=` address, new page. */}
+            {tab === "stock-onhand" && <WarehouseStockRegister />}
             {/* K2 — Ready stock: the monthly propose → approve plan. */}
             {tab === "stock-plan" && <OperationStockPlan />}
             {tab === "stock" && <OperationStock />}
