@@ -1215,6 +1215,14 @@ accessory piece carry a Unit identity at all?) is written up with a recommendati
 `../stock/MASTER.md` §12.1; **that ruling decides this column too**, and when it lands, the fix
 belongs in `readFreeStock` so both Purchasing surfaces move together.
 
+**The disagreement is bulk REPRESENTATION, not availability.** As of migration 0371 the Warehouse
+unit authority applies exactly this engine's own filter — `status = 'free'` · `needs_repair = false`
+· `condition IN (new, exhibition, old, refurbished)`, i.e. *not damaged*. Before 0371 the two
+diverged on the damaged case and the NEW authority was the wrong one; `readFreeStock`'s own comment
+(*"the day a DAMAGED one is released this page would otherwise offer it to a customer's order"*)
+is what exposed it. So the only open question is whether a `qty > 1` record contributes 1 or N —
+narrower than it looks, and squarely the owner's.
+
 Live exposure today is accessories only, and no accessory reaches this Register: the three
 made-to-order categories are the only ones the engine admits.
 
