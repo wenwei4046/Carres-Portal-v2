@@ -39,10 +39,47 @@ function stripFunctionBodies(sql) {
     );
 }
 
+/**
+ * A COMMENT EXECUTES NOTHING, so the guard must not read one.
+ *
+ * Measured 2026-08-20: migration 0367 was blocked by the sentence "it revoked
+ * INSERT/UPDATE/ DELETE from `authenticated`" in its own header — prose
+ * EXPLAINING a revoke, matched as `delete from`. A guard that fires on the
+ * description of a change rather than the change teaches people to stop writing
+ * descriptions, which is the opposite of what this repository wants.
+ */
+function stripComments(sql) {
+  return sql
+    .replace(/\/\*[\s\S]*?\*\//g, " ")
+    .replace(/--[^\n]*/g, " ");
+}
+
+/**
+ * REVOKING A PRIVILEGE IS NOT USING IT.
+ *
+ * `truncate` was matched as a bare word, so `revoke truncate on t from
+ * authenticated` — which takes the power to empty a table AWAY — was read as
+ * destroying data and blocked. Measured 2026-08-20 on migration 0367, whose
+ * whole purpose is to remove write grants a new table inherits by default; the
+ * TRUNCATE grant matters there precisely because TRUNCATE empties a table
+ * WITHOUT firing the row trigger that refuses a delete.
+ *
+ * The guard now matches TRUNCATE only where it is a statement VERB — at the
+ * start of a statement — so `revoke`/`grant` lists no longer trip it. Its teeth
+ * are unchanged: `truncate t;` still fails, including inside a `do $$ … $$`
+ * block, which IS executed on apply.
+ */
+const DESTRUCTIVE = [
+  /\bdrop\s+(table|schema|column)\b/i,
+  /(^|;)\s*truncate\b/i,
+  /\bdelete\s+from\b/i,
+];
+
 for (const line of changed.filter((entry) => entry.startsWith("A\t"))) {
   const file = line.slice(2);
   const sql = await readFile(file, "utf8");
-  if (/\b(drop\s+(table|schema|column)|truncate|delete\s+from)\b/i.test(stripFunctionBodies(sql))) {
+  const scanned = stripComments(stripFunctionBodies(sql));
+  if (DESTRUCTIVE.some((re) => re.test(scanned))) {
     throw new Error(`${file} contains destructive SQL and requires the governed manual review/apply path.`);
   }
 }
