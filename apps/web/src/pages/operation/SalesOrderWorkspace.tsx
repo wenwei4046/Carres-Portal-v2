@@ -2570,7 +2570,7 @@ function itemRows(
  *                       time is order truth and outranks anything read live.
  *   ② `line.category`   THE CATALOG, resolved server-side by `skuCategories`
  *                       (the one shared reader) and carried on the order-detail
- *                       payload since PR #867. This rung is the D9 fix.
+ *                       payload since PR 867. This rung is the D9 fix.
  *   ③ the SKU prefix    a NATIVE sku names its own kind before the first colon
  *                       (`guarantee:`, `service:` …). Kept because it covers
  *                       words the classifier below has no branch for.
