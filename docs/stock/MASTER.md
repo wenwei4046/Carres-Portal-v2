@@ -458,15 +458,30 @@ in §9 and the reports in §11.
 
 **BUILT / VERIFIED:** the Unit authority foundation in §12.1 — one permanent identity, one
 availability arithmetic, one governed door per fact, and no ungoverned write path left on the
-register. **PRODUCTION-VERIFIED 2026-08-21**: PR #878 merged as `4246ff91`, all seven migrations
-applied, and every canonical surface reports that exact SHA —
-`erp.carresofficial.com` · `pos.carresofficial.com` · `carres-portal.pages.dev` ·
-`carres-pos.pages.dev` · the API Worker's `/health`.
+register.
 
-Measured on production after the deploy: 136 units · 136 ledger ids · **0 without an identity** ·
-85 bindable · 893 bulk pieces · 978 sellable · 980 on hand · **0 cache drift** ·
-**0 write policies** and **0 write grants** on any of the seven Warehouse objects ·
-**exactly 1** version of `unit_availability`.
+**PRODUCTION-VERIFIED 2026-08-21.** A SHA proof expires when the tip moves, so this names both the
+SHA proved and the tip it was proved against:
+
+| | |
+|---|---|
+| Card merged as | `4246ff91` (PR #878) — all seven migrations |
+| First verified at | `4246ff91`, when it was the tip: all five surfaces reported it |
+| Re-verified at | `68dc8f8b` — the tip after #879 and this closure commit landed on top |
+
+Both checks read the surfaces directly rather than trusting the deploy workflow's own poll:
+`erp.carresofficial.com` · `pos.carresofficial.com` · `carres-portal.pages.dev` ·
+`carres-pos.pages.dev` · the API Worker's `/health`. Between the two, production briefly reported
+`7e969aba` — Purchasing's SHA — so the sentence "production-verified `4246ff91`" was for a while
+true of a deploy production had already replaced. The Warehouse code was live throughout; the point
+is that **"production-verified at X" is a statement about a moment, not a property of the branch.**
+A later reader of this MASTER should ask *verified when, and has anything landed since* — which is
+why the tip is written down beside the SHA.
+
+Measured on production after the deploy, and again after #879 landed: 136 units · 136 ledger ids ·
+**0 without an identity** · 85 bindable · 893 bulk pieces · 978 sellable · 980 on hand ·
+**0 cache drift** · **0 write policies** and **0 write grants** on any of the seven Warehouse
+objects · **0 NULL buckets** · **exactly 1** version of `unit_availability`.
 
 **What a BUILD chat still cannot prove**: the login-gated operator walk. The only visible change on
 the Warehouse page is that `+ Adjust` is gone; nothing else in this card has a screen yet.
