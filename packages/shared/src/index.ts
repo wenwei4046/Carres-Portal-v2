@@ -451,6 +451,7 @@ export {
   // Q5 (0318) — the supplier's promised READY date, the third answer body.
   recordReadyDateInput,
   recordSendInput,
+  confirmPoSentInput,
   // PO Revisions (0364) — a sent PO keeps its number and mints a version.
   revisePoInput,
   setMessageTemplateInput,

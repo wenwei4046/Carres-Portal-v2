@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
 import { SignJWT, createLocalJWKSet, exportJWK, generateKeyPair, type JWK, type KeyLike } from "jose";
 import app from "../../index";
@@ -2244,5 +2247,133 @@ describe("POST /api/operation/pos/:id/ready-date", () => {
     );
     const passedJwt = vi.mocked(userClient).mock.calls[0]?.[1];
     expect(passedJwt).toBe(jwt);
+  });
+});
+
+
+/**
+ * CONFIRMED OUTBOUND EVIDENCE (0376; CARD-2026-08-22-purchasing-02 §7.4).
+ *
+ * The whole point of this block: an app that OPENED is not a PDF that ARRIVED.
+ */
+describe("POST /api/operation/pos/:id/confirm-sent", () => {
+  const PO_ID = "PO-2041";
+
+  function mockRpc(result: unknown = { po_id: PO_ID, po_version: 2 }, error: unknown = null) {
+    const rpc = vi.fn().mockResolvedValue({ data: result, error });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    return rpc;
+  }
+
+  async function post(body: unknown, role = "operation") {
+    const jwt = await makeJwt(role);
+    return app.fetch(
+      new Request(`http://t/api/operation/pos/${PO_ID}/confirm-sent`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+      env,
+    );
+  }
+
+  it("records channel, recipient and note through the governed RPC", async () => {
+    const rpc = mockRpc();
+    const res = await post({
+      channel: "whatsapp",
+      recipient: "Hooka Purchasing Group",
+      note: "Sent with the Unit list",
+    });
+    expect(res.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("purchasing_confirm_po_sent", {
+      p_po_id: PO_ID,
+      p_channel: "whatsapp",
+      p_recipient: "Hooka Purchasing Group",
+      p_note: "Sent with the Unit list",
+    });
+  });
+
+  it("NEVER accepts a version from the caller — the server reads it", async () => {
+    const rpc = mockRpc();
+    await post({ channel: "email", recipient: "buy@hooka.my" });
+    const args = rpc.mock.calls[0]![1] as Record<string, unknown>;
+    expect(Object.keys(args).sort()).toEqual(
+      ["p_channel", "p_note", "p_po_id", "p_recipient"].sort(),
+    );
+    expect(JSON.stringify(args)).not.toContain("version");
+  });
+
+  it("refuses a blank recipient — `sent` must say to whom", async () => {
+    const rpc = mockRpc();
+    for (const recipient of ["", "   "]) {
+      const res = await post({ channel: "whatsapp", recipient });
+      expect(res.status, JSON.stringify(recipient)).toBe(422);
+    }
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("refuses a channel nobody governs", async () => {
+    const rpc = mockRpc();
+    const res = await post({ channel: "carrier pigeon", recipient: "Hooka" });
+    expect(res.status).toBe(422);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("refuses an unknown field rather than silently dropping it", async () => {
+    const rpc = mockRpc();
+    const res = await post({ channel: "whatsapp", recipient: "Hooka", poVersion: 1 });
+    expect(res.status).toBe(422);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("a caller who does not hold PO duty is refused by SQL, not by the screen", async () => {
+    mockRpc(null, { code: "P0001", message: "not_po_duty", details: "not_po_duty" });
+    const res = await post({ channel: "whatsapp", recipient: "Hooka" });
+    expect(res.status).toBeGreaterThanOrEqual(400);
+    expect(res.status).toBeLessThan(500);
+  });
+
+  it("a dealer never reaches the door", async () => {
+    const rpc = mockRpc();
+    const res = await post({ channel: "whatsapp", recipient: "Hooka" }, "dealer");
+    expect(res.status).toBe(403);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+});
+
+describe("opening an app records an OPEN, and completes nothing", () => {
+  it("`/sends` still exists and still takes only channel and note", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: {}, error: null });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("http://t/api/operation/pos/PO-2041/sends", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ channel: "whatsapp" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("purchasing_record_send", {
+      p_po_id: "PO-2041",
+      p_channel: "whatsapp",
+      p_note: null,
+    });
+    // It carries NO recipient — an open cannot name who received anything.
+    const args = rpc.mock.calls[0]![1] as Record<string, unknown>;
+    expect(args).not.toHaveProperty("p_recipient");
+  });
+
+  it("the two doors are DIFFERENT functions — an open can never mint evidence", () => {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const src = readFileSync(join(here, "pos.ts"), "utf8");
+    expect(src).toContain("purchasing_record_send");
+    expect(src).toContain("purchasing_confirm_po_sent");
+    // The open door does not touch the evidence function, and vice versa.
+    const openBlock = src.slice(src.indexOf('post("/:id/sends"'), src.indexOf('post("/:id/confirm-sent"'));
+    expect(openBlock).not.toContain("purchasing_confirm_po_sent");
   });
 });

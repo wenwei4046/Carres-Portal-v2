@@ -11,6 +11,7 @@ import {
   recordBalanceDateInput,
   recordReadyDateInput,
   recordTomorrowDeliveryInput,
+  confirmPoSentInput,
   recordSendInput,
   revisePoInput,
   setMessageTemplateInput,
@@ -1605,10 +1606,16 @@ operationPosRouter.post("/:id/ready-date", requireOperation, async (c) => {
 });
 
 // ----- POST /:id/sends -----
-// What LEFT Carres (0312). The channel is the operator's fact; the REVISION is
-// the server's — a send mints one only when the document changed since the
-// last, because re-sending an unchanged PO asks the supplier to replace
-// nothing.
+// AN APP THAT OPENED, NOT A PDF THAT ARRIVED (0376, Card 02 §7.4).
+//
+// This door records that an external channel was OPENED. It once meant "sent",
+// and that was the defect: the operator opens the WhatsApp group, gets
+// interrupted, never pastes the file, and the Portal says the order went out.
+// Since 0376 its rows are `external_open` and they close nothing. The act that
+// completes Issue PO is `POST /:id/confirm-sent` below.
+//
+// It is KEPT rather than deleted: knowing an operator opened the group at
+// 14:02 is real history, and the honest fix was to stop misreading it.
 operationPosRouter.post("/:id/sends", requireOperation, async (c) => {
   const parsed = await parseJsonBody(c, recordSendInput);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
@@ -1616,6 +1623,27 @@ operationPosRouter.post("/:id/sends", requireOperation, async (c) => {
   const { data, error } = await sb.rpc("purchasing_record_send", {
     p_po_id: c.req.param("id"),
     p_channel: parsed.data.channel,
+    p_note: parsed.data.note ?? null,
+  });
+  if (error) return mapSupplierCallError(c, error);
+  return c.json({ ok: true, result: data });
+});
+
+// ----- POST /:id/confirm-sent -----
+// THE ONE ACT THAT CLOSES ISSUE PO (0376; purchasing/MASTER.md §5.6).
+//
+// The operator has actually sent the official PDF and says so. The RPC records
+// channel, recipient, actor, Malaysia time and — read from the purchase order,
+// never accepted from here — the EXACT version that left. Current PO Duty is
+// enforced in SQL, because a door only the UI guards is not guarded.
+operationPosRouter.post("/:id/confirm-sent", requireOperation, async (c) => {
+  const parsed = await parseJsonBody(c, confirmPoSentInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("purchasing_confirm_po_sent", {
+    p_po_id: c.req.param("id"),
+    p_channel: parsed.data.channel,
+    p_recipient: parsed.data.recipient,
     p_note: parsed.data.note ?? null,
   });
   if (error) return mapSupplierCallError(c, error);
