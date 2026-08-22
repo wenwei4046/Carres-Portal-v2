@@ -469,7 +469,7 @@ PARALLEL TRACKS      Sales Order (8)
 REFERENCE ONLY       Purchase Order · Supplier Claim
                        work is the first tab; the rest are Versions / History / Order Route
 ONE SCROLL           Goods Receipt · Purchase Return · Repair Order · Display Request ·
-                       Manual Purchase Request · the governed Consignment documents
+                       Manual Purchase · the governed Consignment documents
 ```
 **The test, and it is mechanical: would a staff member open this tab on an ordinary Tuesday?**
 Yes and it runs beside the others → reason one. No, but they would hunt for it when something
@@ -480,7 +480,8 @@ went wrong → reason two. Neither → it is a section in the scroll, not a tab.
 **the document the other party will actually receive**, redrawn as the left half is typed — which
 is the only way an operator can see what a supplier will read without printing it.
 ```
-SPLITS       PO · Consignment Order · Purchase Return · Repair Order · Supplier Claim
+SPLITS       PO · Consignment Order · Consignment Return · Consignment Sale Notice ·
+               Purchase Return · Repair Order · Supplier Claim
 NEVER        Goods Receipt · Display Request · Manual Purchase
 ```
 Receiving RECORDS what was counted; it composes nothing for anybody. A preview pane there spends
@@ -505,7 +506,7 @@ shipped code, and stated the opposite.)*
 
 ---
 
-# §4.2 · MODULE NAVIGATION — CURRENT GRAMMAR SHIPPED PR #861; PURCHASING TREE APPROVED 2026-08-20
+# §4.2 · MODULE NAVIGATION — CURRENT GRAMMAR SHIPPED PR #861; PURCHASING TREE APPROVED 2026-08-22
 
 ### ONE PORTAL RAIL; A MODULE IS AN EXPANDABLE ROW
 
@@ -515,25 +516,21 @@ module icon + name + chevron row, with its pages hanging from quiet rounded elbo
 never opens a second sidebar, flyout or duplicate tab strip.
 
 Purchasing has enough permanent destinations to require one further level. Its module row toggles
-the entire tree without navigating. `Purchasing Home` and `My Purchasing Work` are direct rows;
-`REQUESTS`, `BUY`, `RECEIVE`, `PROBLEMS` and `CONSIGNMENT` are independent full-row accordion
-headers. More than one group may remain open. The active destination's group opens automatically
-and may not hide the active destination. Purchasing parent/group state is remembered per signed-in
-user.
+the entire tree without navigating. `BUY`, `RECEIVE`, `PROBLEMS` and `SHOWROOM` are independent
+full-row accordion headers. More than one group may remain open. The active destination's group
+opens automatically and may not hide the active destination. Purchasing parent/group state is
+remembered per signed-in user. Purchasing has no Home or module-specific Work destination: its
+Registers and central Work Engine already own those jobs.
 
 ```text
 Purchasing                                               ▾
-│  Purchasing Home
-│  My Purchasing Work
-│
-│  REQUESTS                                              ▸
 │  BUY                                                   ▾
-│  │  Purchase Demands
 │  │  SO Batch Purchase                         ← current
+│  │  Manual Purchase
 │  │  Purchase Orders
 │  RECEIVE                                               ▸
 │  PROBLEMS                                              ▸
-│  CONSIGNMENT                                           ▸
+│  SHOWROOM                                              ▸
 ```
 
 This is navigation only. The 200px `STATUS / WORK TO DO` rail belongs inside an individual Work
@@ -549,9 +546,9 @@ the approved 50% work + 50% live-PDF surface.
 - **The complete map is present from day one.** An approved but unbuilt destination is a `<span>`
   with no href, outside the tab order, `aria-disabled`, and prints `Coming soon` using the existing
   two-line non-control treatment. It has no hover, active bar, count or fake page.
-- **Existing useful destinations remain reachable.** This tree may rename/reposition a real door,
-  but it may not replace a live page with an unbuilt row or delete the existing Purchasing Report
-  before its separate central-report consolidation.
+- **Existing useful capability remains reachable through its approved home.** A previous screen does
+  not earn a permanent door when its job is now a Register facet, central Work item, central Report,
+  in-context Catalog request or authoritative `purchase_demand` read.
 - **ALWAYS EXACTLY ONE VISIBLE ACTIVE INDICATION — APPROVED / LOCKED (the shared module
   active-indication law; Purchasing is not an exception to it).** The rail never says nothing about
   where the operator is standing, and never says it twice. The one indication moves with what is on
@@ -577,10 +574,9 @@ the approved 50% work + 50% live-PDF surface.
   Expanded/collapsed rail width keeps the existing `ops-sidebar-collapsed` law.
 - **A collapsed module icon opens a NAMED destination, never "the first live row".** A module's
   landing page is a capability in its own right and may not be a side effect of the order its rows
-  happen to sit in. Purchasing's 60px icon links to **`SO Batch Purchase`**
-  (`/operation?tab=purchase`) until `Purchasing Home` is built, at which point that page's own
-  approved scope may change the module landing destination. Jump To ordering is unaffected — it
-  lists pages, and a landing choice is not a page.
+  happen to sit in. Purchasing's 60px icon permanently links to **`SO Batch Purchase`**
+  (`/operation?tab=purchase`). Jump To ordering is unaffected — it lists pages, and a landing choice
+  is not a page.
 - **The active row is brought into view** without centring or animation. The brand/collapse area
   stays fixed at the top, the signed-in user stays fixed at the bottom, and only the middle
   destination region scrolls.
@@ -588,8 +584,8 @@ the approved 50% work + 50% live-PDF surface.
 
 *Current shared implementation: `apps/web/src/pages/portal/portal-nav.ts` ·
 `PortalSidebar.tsx` · `operation/PurchasingTabs.tsx` · `operation/StockTabs.tsx` ·
-`operation/components/ModuleHeader.tsx`. Purchasing's nested grouping is an approved target, not
-yet built.*
+`operation/components/ModuleHeader.tsx`. Purchasing's nested grouping is shared production grammar;
+the exact final destination map is the approved target in `docs/purchasing/MASTER.md`.*
 
 # §5 · The right rail
 
@@ -782,7 +778,7 @@ own decision and its own card.**
 **TABS ARE AVOIDED BY DEFAULT — APPROVED / LOCKED.** Separate business jobs, owned records
 or destinations are separate portal-navigation entries and pages; they are never compressed
 into a module tab strip. Purchasing is the explicit reference: `SO Batch Purchase` · `Manual
-Purchase Requests` · `Purchase Orders` · `Goods Receipts` · `Supplier Claims` are individual
+Purchase` · `Purchase Orders` · `Goods Receipts` · `Supplier Claims` are individual
 destinations inside its governed sidebar tree, with no Purchasing tabs and no substitute second
 navigation row.
 

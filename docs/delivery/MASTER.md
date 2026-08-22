@@ -237,6 +237,12 @@ Delivered requires actual time, receiver, delivered goods/quantity and governed 
 Until proof is complete and accepted, show **Delivered — Proof Required**; after acceptance show
 **Delivered — Complete**.
 
+For each exact delivered Unit, Delivery emits one idempotent success fact. If Stock says that Unit
+was `Supplier Consignment`, Purchasing automatically creates the Consignment Sale Notice for that
+supplier × Delivery Visit. Failed/refused goods create no notice; a partial result creates notice
+lines only for the exact Units successfully handed to the customer. Delivery owns the result and
+proof, but cannot issue/correct the supplier document or settle supplier money.
+
 Partially Delivered preserves delivered goods and requires failed quantity, reason, goods location,
 proof and next Work for every remainder. Failed Delivery requires reason, explanation, affected
 goods, actual time where applicable, goods location, reporter, proof and an explicit next action.

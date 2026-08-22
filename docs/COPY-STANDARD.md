@@ -61,7 +61,7 @@ English; complexity is never used to make an instruction sound official.
   preserved; optional Chinese/Bahasa Malaysia help explains but never creates a second truth.
 
 `Send` is banned from Portal action labels, buttons and Current Action copy. It hides the actor,
-channel, object, recipient and required result. Name the real act instead: `Email PO-2041 to Macio`,
+channel, object, recipient and required result. Name the real act instead: `Email PO-2041 to Hooka`,
 `Ask Lim for mattress photos`, `Upload delivery note`, or `Record TCF's reply`. `Open WhatsApp`
 names navigation only; opening the channel never proves that the business action is complete.
 
@@ -105,17 +105,17 @@ Fri 14 Aug
 Further governed examples:
 
 ```text
-PO-2041 Version 1 has not reached Macio
-Email PO-2041 Version 1 to Macio · Ask for delivery confirmation.
+PO-2041 Version 1 has not reached Hooka
+Email PO-2041 Version 1 to Hooka · Ask for delivery confirmation.
 
 Delivery note DO-883 is missing
-Upload Macio DO-883 · Link it to PO-2041.
+Upload Hooka DO-883 · Link it to PO-2041.
 
-Macio has not replied
-Call Macio about PO-2041 · Record item availability.
+Hooka has not replied
+Call Hooka about PO-2041 · Record item availability.
 
 PO-2041 Deliver To has changed
-Email PO-2041 Version 2 to Macio · Ask them to use AL Sungai Buloh.
+Email PO-2041 Version 2 to Hooka · Ask them to use AL Sungai Buloh.
 
 Unit CU-000128 is damaged
 Hold CU-000128 · Add photos for Purchasing.
@@ -457,8 +457,9 @@ and what follows, in furniture words.
 The ban was written to stop a DELIVERY being described as split; that meaning stays banned, and
 so does the word anywhere near a trip. But Carres genuinely holds supplier-owned furniture, the
 supplier calls it consignment, the agreement says consignment, and inventing a Carres-only word
-would leave staff translating in both directions. **`Consignment Order` · `Consignment Receipt`
-· `Consignment Return`** are the ruled document names. On a UNIT the fact is spelt
+would leave staff translating in both directions. **`Consignment Order` · `Consignment Return` ·
+`Consignment Sale Notice`** are the ruled supplier-document names. A consignment arrival uses the
+same **`Goods Receipt`** as a purchase arrival while preserving supplier ownership. On a UNIT the fact is spelt
 **`Supplier Consignment`**, against **`Carres Owned`**. The word never describes a delivery.
 
 ## The dictionary — every visible word, audited (Jess 2026-07-27)
@@ -548,34 +549,31 @@ stay on record.` — a discrepancy keeps both facts and overwrites neither.
 
 **PURCHASING** (docs/purchasing/MASTER.md):
 
-### Purchasing navigation words — owner ruling 2026-08-20
+### Purchasing navigation words — owner ruling 2026-08-22
 
 These are the exact visible words for the Purchasing sidebar tree. They name doors only; they
 do not create a second business status, work queue or source of truth.
 
 | Level | Exact visible words |
 |---|---|
-| Direct pages | `Purchasing Home` · `My Purchasing Work` |
-| Group headings | `REQUESTS` · `BUY` · `RECEIVE` · `PROBLEMS` · `CONSIGNMENT` |
-| REQUESTS pages | `New Supplier Requests` · `New SKU Requests` · `Display Requests` · `Manual Purchase Requests` |
-| BUY pages | `Purchase Demands` · `SO Batch Purchase` · `Purchase Orders` |
+| Group headings | `BUY` · `RECEIVE` · `PROBLEMS` · `SHOWROOM` |
+| BUY pages | `SO Batch Purchase` · `Manual Purchase` · `Purchase Orders` |
 | RECEIVE pages | `Goods Receipts` |
 | PROBLEMS pages | `Supplier Claims` · `Purchase Returns` · `Repair Orders` |
-| CONSIGNMENT pages | `Consignment Overview` · `Consignment Orders` · `Consignment Receipts` · `Consignment Returns` · `Consignment Sale Notices` |
-| Existing report door retained below the tree | `Report` |
+| SHOWROOM pages | `Display Requests` · `Consignment Orders` · `Consignment Returns` · `Consignment Sale Notices` |
 
-`My Purchasing Work` is a filtered view of the shared Work Engine. `Purchase Demands` is the
-authoritative demand register, while `SO Batch Purchase` is the only door that issues Purchase
-Orders. These distinctions belong to the Purchasing MASTER; the labels above are recorded here
-so the screen cannot respell them.
+Purchasing has no Home, module-specific Work, Purchase Demands, New Supplier/New SKU request,
+Consignment Overview, Consignment Receipts, Report or Settings sidebar destination. The capability
+lives in its authority home: Registers, central Work/Reports/Settings, in-context Catalog governance
+or the one Goods Receipts engine. `purchase_demand` remains an authoritative record, not a page.
 
 | Queue tile | Row line | Button | Done message | Empty state |
 |---|---|---|---|---|
 | `Issue PO` | `Issue PO to {supplier}` | `Issue PO` | `PO issued to {supplier}` | `No purchase orders to issue.` |
-| `Confirm ready date` | `Call {supplier} — confirm ready date` | `Record ready date` | `Ready date recorded` | `No supplier to call today. Everything on track.` |
-| `Confirm tomorrow's delivery` | `Call {supplier} — confirm tomorrow's delivery` | `Record answer` | `Answer recorded` | `Nothing arriving tomorrow.` |
-| `Check in` | `Check in from {supplier}` | `Check in` | `Checked in {n} of {m}` | `No goods arriving today. {supplier}'s next delivery is {date}.` |
-| `Confirm balance delivery date` | `Call {supplier} — confirm balance delivery date` | `Record balance date` | `Balance date recorded` | `Nothing short today.` |
+| `Supplier date missing` | `Ask {supplier} for the delivery date` | `Record supplier date` | `Supplier date recorded` | `Every issued order has a supplier date.` |
+| `Supplier date passed` | `Ask {supplier} when the goods will arrive` | `Record supplier answer` | `Supplier answer recorded` | `No supplier date has passed.` |
+| `Goods to receive` | `Receive {document} from {supplier}` | `Start receiving` | `Received {n} of {m}` | `No supplier delivery is ready to receive.` |
+| `Balance date missing` | `Ask {supplier} for the balance delivery date` | `Record balance date` | `Balance date recorded` | `Every part receipt has a balance date.` |
 | `Confirm what happens next` | `Call {supplier} — confirm what happens next` | `Record what happens next` | `Supplier answer recorded` | `No claim is waiting for a supplier answer.` |
 | `Issue consignment order` | `Issue consignment order to {supplier}` | `Issue consignment order` | `Consignment order issued to {supplier}` | `No showroom is waiting for stock.` |
 | `Issue purchase return` | `Issue purchase return to {supplier}` | `Issue purchase return` | `Purchase return issued to {supplier}` | `Nothing is going back.` |
@@ -587,24 +585,21 @@ so the screen cannot respell them.
 | `Approve the purchase` | `Approve {n} {model} for {purpose}` | `Approve` · `Refuse` | `Approved — {n} {model}` | `Nothing waiting for you.` |
 | `Decide what the customer gets` | `Decide what {customer} gets` | `Save what we are doing` | `Recorded` | `No claim is waiting for a decision.` |
 | `Decide what happens to the item` | `Decide what happens to {unit}` | `Save what happened` | `Recorded` | `No item is waiting.` |
-| `Call about a late order` | `Call {salesperson} — {customer}'s goods will be late` | `Record what the customer decided` | `Customer decision recorded` | `No order is late.` |
+| `Late supplier goods` | `Ask {supplier} if the goods can arrive by {weekday, date}` | `Record supplier answer` | `Supplier answer recorded` | `No supplier delivery is late.` |
 | `Check the SKU` | `Check the SKU with {supplier}` | `Publish the SKU` | `SKU published` | `Every request has its product.` |
 | `Check the supplier` | `Check the supplier for {model}` | `Save the supplier` | `Supplier saved` | `Every model has a supplier.` |
 | `Upload handover proof` | `Upload handover proof` | `Upload handover proof` | `Handover proof saved` | `Every handover has its proof.` |
 
-**PURCHASE DEMANDS — the Register's own words** (CARD-2026-08-20-purchase-demands, added on
-execution 2026-08-20). `Purchase Demands` EXPLAINS customer buying demand; it never issues a
-purchase order. Every string below is spelt once in `@carres/shared`'s `PURCHASE_DEMAND_WORDS`
-and `PURCHASE_DEMAND_STATE_WORDS`, so no screen may respell them:
+**PURCHASE DEMAND FACTS — used inside SO Batch Purchase and connected objects.**
+`purchase_demand` explains buying demand and coverage; it never issues a purchase order and has no
+sidebar page. Existing implementation constants do not override these approved placement words.
 
 | Where | The word |
 |---|---|
-| Page | `Purchase Demands` |
-| Search | `Search purchase demands…` |
-| Rail heading | `Work to do` |
-| Rail — all | `All demands` |
-| Toolbar door | `Open SO Batch Purchase` |
-| Empty state | `No purchase demands.` |
+| Page | No page — use `SO Batch Purchase` or the source object |
+| Search | `Search Sales Order, customer, SKU or supplier…` |
+| Rail heading | `BUYING RECORDS` · `WORK TO DO` |
+| Empty state | `Nothing needs buying.` |
 | Columns | `Item · Description` · `Variant` · `Category` · `SKU` · `SO No` · `Customer` · `Customer Delivery` · `Supplier` · `Qty Needed` · `Ready Stock` · `On PO` · `To Buy` · `Coverage` |
 
 **The six states, and there is no seventh.** Line 1 is the FACT; line 2 is the FIX, in the
@@ -627,27 +622,26 @@ rather than respelt.
 coverage arithmetic, so nothing is known) · `Nothing covers it yet` (the arithmetic ran and
 found nothing). The last two are DIFFERENT answers and may not be merged.
 
-**Banned on this page:** `Today` · `Tomorrow` · `Needs attention` · `Follow up` · `Pending` ·
+**Banned on Purchasing surfaces:** `Today` · `Tomorrow` · `Needs attention` · `Follow up` · `Pending` ·
 `Waiting` · `Priority` · a generic `Next action` column. A word that tells the operator a row is
 important without telling them what is wrong with it is not a word this Register may use.
 
-**MANUAL PURCHASE — the request's own words** (CARD-2026-08-18-manual-purchase, added on
-execution 2026-08-19; every string below is the card's own ruled text, recorded here so no
-screen respells it):
+**MANUAL PURCHASE — the internal buy's own words.**
 
 | Where | The word |
 |---|---|
-| The page's create button | `+ New request` |
-| The create workspace title | `New request` |
+| The page's create button | `+ Manual Purchase` |
+| The create workspace title | `New Manual Purchase` |
 | Submit · abandon | `Send for approval` · `Cancel` |
 | The disabled Send NAMES its gap (the Receiving button law; first missing header fact wins, top-to-bottom) | `Send — pick a date` · `Send — say why` |
 | The form's fields | `Need for` · `Needed by` · `Deliver to` · `Raised by` · `Why` · `Items` · `Qty` · `Note` · `Supplier` · `+ Add line` · `Remove` |
 | The already-have block | `WHAT WE ALREADY HAVE` — `free stock` · `already on PO` · `still needed` (the arithmetic is PRINTED, never left to the reader) |
 | The register columns | `Ref` · `Need for` · `What` · `Qty` · `Deliver to` · `Needed by` · `Raised by` · `Status` |
 | The states | `Waiting for approval` · `Waiting for the SKU` · `Ready to order` · `Ordered` · `Arrived` · `Not going ahead` — `Waiting` always names what it waits ON; `Arrived` is a FACT the system observes, never a button |
-| The number series | `REQ-` (never `PR-` — 2990s prints PR for a purchase return) |
+| The purpose choices | `Ready Stock` · `Purchased Display` · `Office` · `Spare Parts` · `Emergency / Urgent Stock` |
+| The number series | `MPR-YYYYMMDD-RRRR` (never `PR-` — that can be mistaken for Purchase Return) |
 | The consolidation OFFER | `Issue as one PO?` — with `Issue as one PO` · `Issue separately` both live on the same screen; an offer that cannot be declined is a gate wearing an offer's clothes |
-| The register's empty state | `No requests yet — press + New request to raise the first one.` (registered 2026-08-19 — the sentence shipped approved; its absence from this table was the defect) |
+| The register's empty state | `No Manual Purchase yet.` |
 
 **PO REVISIONS — the sent document's version** (CARD-2026-08-19-po-revisions, executing
 purchasing/MASTER.md §4's revision rule, Jess 2026-08-18 — *a sent PO is not overwritten, it is
@@ -724,21 +718,15 @@ unknown cost. `Procurement Partner` appears once per governed Issue document, ne
 demand line.
 
 **THIS TABLE IS THE CANONICAL HOME FOR EVERY PURCHASING ACTION, INCLUDING THE ONES THE ORDERS
-LADDER DISPLAYS.** The Orders row and the Purchasing row show the same work, so `Issue PO`
-and `Confirm ready date` are defined **once, here**. The ORDERS table above points
-at this one; it does not respell them.
+LADDER DISPLAYS.** Orders and Purchasing show the same structured action; they never store two
+sentences or two completion facts. `Issue PO` is the governed act. The issue surface may prepare a
+numbered PDF, but the action stays open until that exact version has actually reached the supplier
+and its recipient/channel/actor/time evidence exists.
 
-*(This replaces the rule that `Send PO` and `Confirm ready date` were ONE action each "shared
-by Orders and Purchasing … listed twice". Loo deleted that statement on 2026-07-29: the
-requirement it created — that both flows carry an identical entry — is what made the
-Purchasing split unbuildable without dragging Orders' wording along. **Defining an action
-once and referencing it is stronger than defining it twice and promising the copies match.**)*
-
-> **`Send PO` IS GONE FROM PURCHASING (Loo, 2026-07-29), AND SO ARE `Prepare PO` AND
-> `Draft PO` (Loo, 2026-07-30 — the Purchasing clean restart).** Raising a purchase order is
-> ONE act — **`Issue PO`** creates the formal Purchase Order, and nothing is stored before it.
-> The old done message `PO sent to {supplier}` described a step that no longer exists. The verb `Send`
-> is retired with it and stays banned from reuse — see the verb dictionary.
+`Send PO`, `Prepare PO` and `Draft PO` remain banned action names. In normal sentences, use the full
+object and recipient: `Issue the purchase order to Hooka`. Inside the formal issue surface, the
+completion control may say `Record the PDF sent` because it records evidence rather than creating a
+second business action.
 
 **RETIRED, and it is not in the table above because it is no longer an action**
 (C3, PR #479): the old bare `Confirm` fired when everything was already arranged
@@ -1560,10 +1548,9 @@ surface is how a dictionary splits.
 section.** `docs/purchasing/MASTER.md` owns what the actions DO,
 `docs/purchasing/MASTER.md` owns where the facts sit — neither respells a word.
 
-**This is a PURCHASING exception to two rows in the vocabulary table above, and it is
-deliberate.** A Purchase Order and a customer order are two different subjects; a word banned
-on one is not automatically banned on the other. **`Draft` and `Open` stay banned for a
-CUSTOMER ORDER.**
+**A Purchase Order and a customer order are different subjects, but neither uses a vague visible
+`Open` status.** A numbered PO whose PDF has not been sent shows the concrete fact `The PO PDF has
+not been sent`; it is not called `Draft`, `Prepared` or `Pending`.
 
 **Action ≠ Status. They may never be mixed.** An action is something a person does and it
 LEAVES when its outcome is recorded. A status is what the PO currently is.
@@ -1572,7 +1559,7 @@ LEAVES when its outcome is recorded. A status is what the PO currently is.
 
 | # | Label | Means |
 |---|---|---|
-| 1 | **`Issued`** | a formal PO has been created and issued |
+| 1 | **`Issued`** | the current formal PO PDF was actually sent to the supplier and outbound evidence exists |
 | 2 | **`In Production`** | supplier fulfilment is underway |
 | 3 | **`Receiving`** | physical goods receipt has started |
 | 4 | **`Completed`** | the PO is fully received and no remaining purchasing action exists |
@@ -1581,6 +1568,10 @@ LEAVES when its outcome is recorded. A status is what the PO currently is.
 **`Open` is never a Purchase Order status.** The word for a PO that has been issued is
 `Issued`. (`Open` also reads as "not yet finished", which is a different fact and is what
 `Receiving` says.)
+
+There is no `Acknowledged` state. Once Carres sends the PDF, the order is `Issued`; supplier
+silence changes nothing. Model/fabric unavailable, delay, quantity change and price change are
+later concrete exceptions.
 
 **Supplier Status is a SEPARATE axis** — what the factory and the logistics partner report.
 It is never merged into the five above, and it is not Purchasing's to redefine: two external
@@ -1593,67 +1584,37 @@ roles run their whole lifecycle on it.
 | Demand somebody has consciously reviewed and delayed | region **`Purchasing on Hold`** · row fact **`On hold until {date}`**, carrying **Held by** · **Reason** · **Held time** · **Resume date** | Snoozed · Paused · Excluded · Hidden · Pending |
 | An item whose supplier cannot be worked out | **`Supplier not assigned`** — a FACT, under Missing Configuration. Supporting line: `Assign a supplier before this item can enter the purchasing plan.` | Orphan · Unknown supplier · Invalid SKU · Supplier error |
 
-### The register's Current Action words (Loo, 2026-08-04 — card Q8)
+### The Purchase Orders Register's Work words — owner ruling 2026-08-22
 
-The Purchase Orders register has a `Current Action` column. **It holds exactly ONE state word
-and otherwise says `—`.** Three words that used to sit in it were not actions and are RETIRED.
+The column is **`Work`**, not `Current Action`, `Next Action`, `Status`, `Priority` or a
+one-word instruction. It renders the shared structured Action contract in two lines:
 
-| What the column says | When | Note |
-|---|---|---|
-| **`Check Expected Arrival`** | the factory has never told us which day the goods reach us — **and also when the date they gave has PASSED and nothing came** | **Loo's own word, chosen after seeing the preview.** It is the SHORT spelling of `Confirm Goods Arrival Date`; it matches the column beside it (`Expected Arrival`) so the eye does not change track |
-| **`—`** | the goods are on their way, or already checked in, or the PO is completed or cancelled | **an empty action column is a real answer** (purchasing/MASTER.md), not a gap |
-
-| RETIRED — never put back | Why |
+| Fact (line 1) | Action (line 2, with structured owner avatar) |
 |---|---|
-| ~~`Confirm Arrival`~~ | it REVERSED the full string's tense. `Confirm Goods Arrival Date` asks the factory *which day do the goods reach us* (FUTURE); `Confirm Arrival` reads as *tick that it has arrived* (PAST). **A short form may drop WORDS; it may never drop the TENSE or the OBJECT** |
-| ~~`Contact Supplier`~~ | `Contact` is not one of the verbs — Loo retired it 2026-07-28 and `Call` covers it. It was also a second word for a LATE version of one action, and **a late version of one action is not a second action**: lateness is shown in red, not spelt differently |
-| ~~`Waiting for Goods`~~ | a STATUS wearing an action's column. It keeps its one home — the register's left rail |
-| ~~`Open Receiving`~~ | navigation, not work |
+| `The PO PDF has not been sent` | `Issue the purchase order to {supplier}` |
+| `Supplier date is missing` | `Ask {supplier} for the delivery date` |
+| `The supplier date passed on {weekday, date}` | `Ask {supplier} when the goods will arrive` |
+| `The balance delivery date is missing` | `Ask {supplier} for the balance delivery date` |
+| `Version {n} has not been sent` | `Issue Version {n} to {supplier}` |
+| `Supplier changed the price` | `Ask the commercial approver to check the new price` |
 
-> **⚠️ ONE COLLISION, REPORTED TO LOO AND OVERRULED BY HIM. Do not "fix" it back.**
-> `Check in` already means the receiving act in this same module (the document/act split,
-> Loo 2026-07-28) — so a new hire could read `Check Expected Arrival` as the receiving act.
-> The alternative needing no new verb was `Confirm expected arrival`. **He saw both and chose
-> `Check Expected Arrival`.**
->
-> **RESOLVED 2026-08-05 — he opened the verb table rather than leaving an exception.**
-> The row above first said `Check` "does not widen the verb table … no other module may reach
-> for it", which left the dictionary claiming SIX verbs while a seventh was live on 16 rows —
-> the exact drift this dictionary exists to stop. **`Check` is now the seventh verb**, with
-> its meaning, its completion and its boundary against `Call` and `Check in` written in the
-> verb dictionary above. **Any module may use it, for the meaning defined there and no other.**
+The avatar is metadata, not part of the sentence. The PO and supplier are not repeated where their
+columns already identify them. Completion comes from the named authoritative fact; there is no
+manual `Done` tick.
+### Purchasing report words — central Reports and Register exports
 
-### The Report words (Loo, 2026-08-04 — card Q3)
+Purchasing has no `Report` sidebar page or module tab. Central `Reports` and Register export may
+use the exact measure words `POs`, `Ordered`, `Received`, `Outstanding` and `Total`. They
+may also show Supplier, Category and exact date filters. There is no generic `Status` facet.
 
-Purchasing has a "look at the numbers" layer, and these are the only words on
-it. **Six were ruled; the page may use no seventh.**
+Operations reports contain quantity, Unit, supplier-performance and work facts. Supplier cost,
+invoice, credit, settlement and payment amounts belong to Finance. An export is a snapshot, not a
+second editable truth.
 
-| What | The word | Note |
-|---|---|---|
-| the tab | **`Report`** — **singular** | Loo's own spelling, given verbatim, and it is AutoCount's own menu-bar word, which the team reads daily. **`Reports` and `Reporting` are both wrong; do not "correct" it** |
-| a column: how many purchase orders | **`POs`** | the plural of `PO`, the document's own name |
-| a column: the quantity we asked the factory for | **`Ordered`** | |
-| a column: what physically arrived | **`Received`** | already ruled — the Receiving Workspace's word, reused, not respelt |
-| a column: what is still owed | **`Outstanding`** | already ruled — and **its own rule binds here**: it is PRINTED, never left as `19 − 0` for the reader to subtract |
-| the last row | **`Total`** | |
-
-**No money appears anywhere on this page** (Loo, 2026-08-04): *"i dont show
-costing — due to supplier have own, finance will deal with it. If future need
-to add, just add, not now."* It is structural rather than remembered — the wire
-carries no price field at all, so the page could not print one.
-
-**The rail's headings are `Month` · `Supplier` · `Category`.** The last two are
-the facet-group headings ruled above. **`Month` has no row in this file** — it
-is reused verbatim from the portal's own live screens (HR's commission-run
-column, Finance's month picker) rather than invented, and it is reported here so
-the next chat finds it. **There is deliberately no `Status` facet**: the
-facet-heading rule above bans one by name, and measured 2026-08-04 all 21 live
-purchase orders sit in one state, so the group could narrow nothing.
-
-**Communication is NOT part of the PO lifecycle** (Loo, 2026-07-29). WhatsApp and Email are
-channels that may vary per supplier; they are never a status, never an Operation Status value,
-and they occupy no position in the purchasing information model. The channel words themselves
-are unchanged (`Open WhatsApp` · `Open WhatsApp group`).
+**Outbound channel is evidence, not a lifecycle status.** WhatsApp and Email may vary by supplier.
+`Issued` is complete only when the current PDF version was actually sent and the Portal records
+recipient, channel, actor and time. Opening WhatsApp/email is not proof. Supplier silence does not
+create an `Acknowledged` state.
 
 **The eight terminology slots that stood open from 2026-07-29 are CLOSED by this section.**
 Every word above is ruled. No terminology placeholder is left in Purchasing, and a chat that finds
@@ -2109,11 +2070,9 @@ reason both failures exist, so a caller that formats first is the thing to look 
 
 ## Header rules (see UI-KIT for the shell)
 
-When a page sits under a module tab bar (Purchasing's `To Order / Purchase
-Orders / Receiving / Claims / Settings`), the page does NOT repeat the active tab as
-a breadcrumb or big title. **The tab is the title.** Move the freshness
-stamp (`Today · Wed 22 Jul`) and refresh icon to the right side of the
-tab bar. See `ui/MASTER.md` "Module-tab law".
+Purchasing has no module tab bar. Each destination uses the approved compact Destination Header:
+the current page word once at 24px, no leading page icon and no `Purchasing ·` prefix. Search,
+help and Settings stay in their governed header positions. See `ui/MASTER.md` §4.2.
 
 ---
 
