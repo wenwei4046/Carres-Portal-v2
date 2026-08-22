@@ -4,7 +4,9 @@ import {
   DEMAND_PURPOSE_DEFAULT,
   DEMAND_PURPOSE_VALUES,
   expectedArrivalOf,
+  isOnePoPerOrder,
   isToOrderCategory,
+  monthKeyMYT,
   planFromDocuments,
   readyStockDrawNote,
   READY_STOCK_DRAW_REASON,
@@ -1240,6 +1242,490 @@ toOrderRouter.post("/demand/:id/cancel", requireOperation, async (c) => {
     return c.json(m.body, m.status);
   }
   return c.json(data ?? { ok: true });
+});
+
+
+/**
+ * POST /issue-batch — THE ONE DOOR SO BATCH PURCHASE ISSUES THROUGH
+ * (CARD-2026-08-22-purchasing-02 §7.3; `docs/purchasing/MASTER.md` §5.3).
+ *
+ * The operator ticks lines across many suppliers and many Sales Orders, arranges
+ * where each buy goes, and presses one button. This endpoint turns that into
+ * every purchase order it implies, in ONE transaction: all of them are created
+ * or none is.
+ *
+ * ── NOTHING THE BROWSER SENT IS TRUSTED ─────────────────────────────────────
+ *
+ * The request carries demand IDS and DESTINATIONS, and that is all it is
+ * allowed to carry. Quantity comes from the server's own recomputation, the
+ * supplier comes from the catalog, the arrival date comes from the settings
+ * engine, the grouping is recomputed here, and the numbers are minted by the
+ * RPC. A stale tab can therefore ask for last hour's demand and be told no;
+ * it cannot order it.
+ *
+ * ── WHY THE GROUP KEY HAS FOUR PARTS AND NOT TWO ────────────────────────────
+ *
+ * §4.2 requires one supplier and one `Deliver To` per document. It does not
+ * require the CONVERSE — that everything sharing those two must merge — and two
+ * shipped Carres rules already partition further:
+ *
+ *   · a sofa is ONE PO PER CUSTOMER ORDER (locked 2026-07-27), because a
+ *     matched set is made and delivered together;
+ *   · a proposal is supplier × CATEGORY, so a supplier's mattresses and its
+ *     bedframes are already separate documents today.
+ *
+ * Merging either of those would be a business change this Card does not carry.
+ * So the key is `supplier × destination × category × (sofa ? order : "")`, which
+ * satisfies §4.2 strictly and changes no existing behaviour except the one this
+ * Card asked for: a destination split makes a second document.
+ */
+const soBatchIssueInput = z
+  .object({
+    selections: z
+      .array(
+        z.object({
+          demandId: z.string().min(1),
+          allocations: z
+            .array(
+              z.object({
+                destinationId: z.string().uuid(),
+                qty: z.number().int().positive(),
+              }),
+            )
+            .min(1),
+        }),
+      )
+      .min(1)
+      .max(500),
+    documentDecisions: z
+      .array(
+        z.object({
+          supplierId: z.string().uuid(),
+          destinationId: z.string().uuid(),
+          procurementPartnerId: z.string().uuid().nullable(),
+          lineDecisions: z
+            .array(
+              z.discriminatedUnion("treatment", [
+                z.object({
+                  sku: z.string().min(1),
+                  treatment: z.literal("normal"),
+                  unitCost: z.number().positive(),
+                  costSource: z.enum(["catalog", "hand_entered"]),
+                }),
+                z.object({
+                  sku: z.string().min(1),
+                  treatment: z.literal("free_of_charge"),
+                  reason: z.string().trim().min(1).max(500),
+                }),
+              ]),
+            )
+            .max(500),
+        }),
+      )
+      .max(200)
+      .default([]),
+  })
+  .strict();
+
+type BatchLineDecision = z.infer<
+  typeof soBatchIssueInput
+>["documentDecisions"][number]["lineDecisions"][number];
+
+toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+
+  let raw: unknown;
+  try {
+    raw = await c.req.json();
+  } catch {
+    return c.json({ error: "invalid_json", code: "invalid_param" }, 400);
+  }
+  const parsed = soBatchIssueInput.safeParse(raw);
+  if (!parsed.success) {
+    return c.json({ error: "invalid_body", code: "invalid_param" }, 400);
+  }
+  const { selections, documentDecisions } = parsed.data;
+
+  /* ── 1 · WHO ────────────────────────────────────────────────────────────
+   *
+   * Only Current PO Duty issues (MASTER §5.3). The browser's `mayIssue` is a
+   * convenience; this is the authority, and it is asked BEFORE any work so an
+   * unauthorised request costs one query rather than a recomputation. */
+  const month = monthKeyMYT();
+  const duty = await sb
+    .from("ops_po_duty")
+    .select("user_id")
+    .eq("month", month)
+    .maybeSingle();
+  if (duty.error) {
+    const m = mapPgError(duty.error);
+    return c.json(m.body, m.status);
+  }
+  const dutyRow = duty.data as { user_id?: string } | { user_id?: string }[] | null;
+  const dutyId =
+    (Array.isArray(dutyRow) ? dutyRow[0]?.user_id : dutyRow?.user_id) ?? null;
+  if (!dutyId || dutyId !== c.var.auth.id) {
+    return c.json(
+      {
+        error: "not_po_duty",
+        code: "not_po_duty",
+        message: "Only the current PO duty holder can issue purchase orders.",
+      },
+      403,
+    );
+  }
+
+  /* ── 2 · duplicates, before anything expensive ──────────────────────────── */
+  const seen = new Set<string>();
+  for (const s of selections) {
+    if (seen.has(s.demandId)) {
+      return c.json({ error: "duplicate_demand", code: "duplicate_demand" }, 422);
+    }
+    seen.add(s.demandId);
+  }
+
+  /* ── 3 · RECOMPUTE. The screen is a view; this is the truth. ─────────────── */
+  const res = await loadToOrder(sb);
+  if (!res.ok) return c.json(res.body as Record<string, unknown>, res.status as 400);
+
+  /** demandId → the build it names, and everything the build belongs to. */
+  const index = new Map<
+    string,
+    {
+      proposal: (typeof res.data.proposals)[number];
+      row: ToOrderRow;
+      build: ToOrderBuild;
+    }
+  >();
+  for (const proposal of res.data.proposals) {
+    for (const row of proposal.rows) {
+      if (row.readyStock) continue; // Manual Purchase has its own door.
+      for (const build of row.builds) {
+        index.set(`build::${row.orderId}::${build.key}`, { proposal, row, build });
+      }
+    }
+  }
+
+  /* ── 4 · the destinations, read once ────────────────────────────────────── */
+  const destRes = await sb
+    .from("purchasing_destinations")
+    .select("id, name, is_default, active");
+  if (destRes.error) {
+    const m = mapPgError(destRes.error);
+    return c.json(m.body, m.status);
+  }
+  const destById = new Map(
+    ((destRes.data ?? []) as Record<string, unknown>[]).map((d) => [
+      d.id as string,
+      { id: d.id as string, name: (d.name as string) ?? "", active: d.active !== false },
+    ]),
+  );
+
+  /* ── 5 · every refusal, before a single document is composed ────────────── */
+  type Alloc = { demandId: string; destinationId: string; qty: number };
+  const allocations: Alloc[] = [];
+  for (const s of selections) {
+    const hit = index.get(s.demandId);
+    /* Absent from the recomputation means CHANGED, CANCELLED, COVERED or
+       never real. All four read the same from here, and all four must fail. */
+    if (!hit) {
+      return c.json(
+        { error: "unknown_demand", code: "unknown_demand", demandId: s.demandId },
+        409,
+      );
+    }
+    if (hit.proposal.blocked === "production_days") {
+      return c.json(
+        { error: "production_days_required", code: "production_days_required" },
+        422,
+      );
+    }
+    /* An undated customer order stays visible and unbuyable: the arrival date
+       a supplier is asked to hit is derived from the promise, and there is no
+       promise. */
+    if (hit.row.delivery == null) {
+      return c.json(
+        {
+          error: "blocked_delivery_date",
+          code: "blocked_delivery_date",
+          demandId: s.demandId,
+          message: "Customer delivery date must be confirmed before Issue PO.",
+        },
+        422,
+      );
+    }
+    let total = 0;
+    for (const a of s.allocations) {
+      const dest = destById.get(a.destinationId);
+      if (!dest) {
+        return c.json(
+          { error: "unknown_destination", code: "unknown_destination" },
+          422,
+        );
+      }
+      if (!dest.active) {
+        return c.json(
+          {
+            error: "inactive_destination",
+            code: "inactive_destination",
+            message: `${dest.name} is closed.`,
+          },
+          422,
+        );
+      }
+      total += a.qty;
+      allocations.push({ demandId: s.demandId, destinationId: a.destinationId, qty: a.qty });
+    }
+    /* THE ARRANGEMENT MUST ADD BACK TO THE SERVER'S OWN REMAINDER. The browser
+       checked this too; that check was for the operator, this one is the law. */
+    if (total !== hit.build.qty) {
+      return c.json(
+        {
+          error: "allocation_mismatch",
+          code: "allocation_mismatch",
+          demandId: s.demandId,
+          arranged: total,
+          toBuy: hit.build.qty,
+        },
+        422,
+      );
+    }
+  }
+
+  /* ── 6 · GROUPING, recomputed here (see the header) ─────────────────────── */
+  type Group = {
+    key: string;
+    proposal: (typeof res.data.proposals)[number];
+    destinationId: string;
+    buildKeys: string[];
+  };
+  const groups = new Map<string, Group>();
+  for (const a of allocations) {
+    const hit = index.get(a.demandId)!;
+    const perOrder = isOnePoPerOrder(hit.proposal.category);
+    const key = [
+      hit.proposal.supplierId,
+      a.destinationId,
+      hit.proposal.category,
+      perOrder ? hit.row.orderId : "",
+    ].join("::");
+    let group = groups.get(key);
+    if (!group) {
+      group = { key, proposal: hit.proposal, destinationId: a.destinationId, buildKeys: [] };
+      groups.set(key, group);
+    }
+    if (!group.buildKeys.includes(hit.build.key)) group.buildKeys.push(hit.build.key);
+  }
+
+  const warehouse = res.data.stockWarehouse;
+  if (!warehouse) {
+    return c.json({ error: "no_warehouse", code: "no_warehouse" }, 422);
+  }
+
+  /* Partners, read once, only if some group needs one. */
+  const anyPickup = [...groups.values()].some(
+    (g) => g.proposal.supplierKind === "factory_pickup",
+  );
+  let validPartners = new Set<string>();
+  if (anyPickup) {
+    const partners = await sb.from("delivery_partners").select("id");
+    if (partners.error) {
+      const m = mapPgError(partners.error);
+      return c.json(m.body, m.status);
+    }
+    validPartners = new Set((partners.data ?? []).map((p) => p.id as string));
+  }
+
+  /* A decision is keyed the way the OPERATOR made it — per supplier and
+     destination, which is the document they were looking at. */
+  const decisionsFor = (supplierId: string, destinationId: string) =>
+    documentDecisions.find(
+      (d) => d.supplierId === supplierId && d.destinationId === destinationId,
+    );
+
+  /**
+   * A DECISION FOR A LINE NOBODY IS BUYING IS STALE, NOT NOISE. It means the
+   * operator priced something the recomputation has since moved or covered, and
+   * issuing the rest would send a price they never actually confirmed.
+   *
+   * The check is made against the whole supplier × destination SURFACE the
+   * operator saw, not against one document: the server may split that surface
+   * further (a sofa is one PO per customer order), and the browser cannot know
+   * where those cuts fall. Inside each document, only the decisions whose SKU
+   * is actually on it are applied.
+   */
+  const surfaceSkus = new Map<string, Set<string>>();
+  for (const group of groups.values()) {
+    const key = `${group.proposal.supplierId}::${group.destinationId}`;
+    const plan = planFromDocuments(group.proposal, [
+      { key: group.key, include: true, buildKeys: group.buildKeys },
+    ]);
+    const set = surfaceSkus.get(key) ?? new Set<string>();
+    for (const line of plan[0]?.lines ?? []) set.add(line.sku);
+    surfaceSkus.set(key, set);
+  }
+  for (const d of documentDecisions) {
+    const known = surfaceSkus.get(`${d.supplierId}::${d.destinationId}`);
+    if (!known) continue;
+    if (d.lineDecisions.some((l) => !known.has(l.sku))) {
+      return c.json({ error: "stale_cost_decision", code: "stale_cost_decision" }, 409);
+    }
+  }
+
+  const governedPos: Record<string, unknown>[] = [];
+  const created: { key: string; supplierId: string; destinationId: string }[] = [];
+
+  for (const group of groups.values()) {
+    const docs: IssueDocument[] = [
+      { key: group.key, include: true, buildKeys: group.buildKeys },
+    ];
+    const check = validateIssuePlan(group.proposal, docs);
+    if (!check.ok) {
+      return c.json({ error: check.code, code: check.code, message: check.message }, 422);
+    }
+    const plan = planFromDocuments(group.proposal, docs);
+    if (plan.length !== 1) {
+      return c.json({ error: "nothing_to_issue", code: "nothing_to_issue" }, 409);
+    }
+    const po = plan[0]!;
+
+    const decision = decisionsFor(group.proposal.supplierId, group.destinationId);
+    const partnerId = decision?.procurementPartnerId ?? null;
+    const needsPartner = group.proposal.supplierKind === "factory_pickup";
+    if (needsPartner && (!partnerId || !validPartners.has(partnerId))) {
+      return c.json(
+        {
+          error: "pickup_partner_required",
+          code: "pickup_partner_required",
+          documentKey: group.key,
+        },
+        422,
+      );
+    }
+    if (!needsPartner && partnerId) {
+      return c.json(
+        { error: "pickup_partner_not_allowed", code: "pickup_partner_not_allowed" },
+        422,
+      );
+    }
+
+    const byLine = new Map<string, BatchLineDecision>();
+    for (const d of decision?.lineDecisions ?? []) {
+      if (byLine.has(d.sku)) {
+        return c.json({ error: "duplicate_cost_decision", code: "duplicate_cost_decision" }, 422);
+      }
+      byLine.set(d.sku, d);
+    }
+    const lines: Record<string, unknown>[] = [];
+    for (const line of po.lines) {
+      const d = byLine.get(line.sku);
+      if (d?.treatment === "free_of_charge") {
+        lines.push({
+          sku: line.sku,
+          qty: line.qty,
+          cost: 0,
+          cost_source: "hand_entered",
+          commercial_treatment: "free_of_charge",
+          commercial_reason: d.reason.trim(),
+        });
+        continue;
+      }
+      const liveCost = res.data.catalog.get(line.sku)?.cost ?? null;
+      if (d?.treatment === "normal") {
+        /* A CATALOG PRICE THAT MOVED IS A COMMERCIAL DECISION, NOT A RETRY.
+           Operations may not silently accept it; the document stops and the
+           approver owns it (MASTER §5.6). */
+        if (d.costSource === "catalog" && liveCost !== d.unitCost) {
+          return c.json(
+            { error: "stale_catalog_cost", code: "stale_catalog_cost", sku: line.sku },
+            409,
+          );
+        }
+        lines.push({
+          sku: line.sku,
+          qty: line.qty,
+          cost: d.unitCost,
+          cost_source: d.costSource,
+          commercial_treatment: "normal",
+          commercial_reason: null,
+        });
+        continue;
+      }
+      if (liveCost == null || liveCost <= 0) {
+        return c.json(
+          {
+            error: "cost_required",
+            code: "cost_required",
+            documentKey: group.key,
+            sku: line.sku,
+          },
+          422,
+        );
+      }
+      lines.push({
+        sku: line.sku,
+        qty: line.qty,
+        cost: liveCost,
+        cost_source: "catalog",
+        commercial_treatment: "normal",
+        commercial_reason: null,
+      });
+    }
+
+    governedPos.push({
+      supplier_id: group.proposal.supplierId,
+      warehouse_id: warehouse.id,
+      destination_id: group.destinationId,
+      /* The frozen estimate, from the ONE arithmetic (`expectedArrivalOf`).
+         A PO being born starts its clock today. */
+      eta_date: expectedArrivalOf(res.data.settings, {
+        supplierId: group.proposal.supplierId,
+        category: group.proposal.category,
+        fromIso: todayIso(),
+      }),
+      procurement_partner_id: partnerId,
+      so_refs: po.soRefs,
+      lines,
+    });
+    created.push({
+      key: group.key,
+      supplierId: group.proposal.supplierId,
+      destinationId: group.destinationId,
+    });
+  }
+
+  if (governedPos.length === 0) {
+    return c.json({ error: "nothing_to_issue", code: "nothing_to_issue" }, 409);
+  }
+
+  /* ── 7 · ONE TRANSACTION. A failure on the seventh document rolls back the
+   * first six — including their commercial decisions, destinations and audit
+   * history. There is no partial batch to clean up, because there is no
+   * partial batch. */
+  const { data: batch, error: batchErr } = await sb.rpc("purchasing_issue_pos_batch", {
+    p_pos: governedPos,
+  });
+  if (batchErr) {
+    const m = mapPgError(batchErr);
+    return c.json(m.body, m.status);
+  }
+  const ids = ((batch as { po_ids?: unknown } | null)?.po_ids ?? []) as string[];
+  if (ids.length !== governedPos.length) {
+    return c.json({ error: "po_not_created", code: "po_not_created" }, 500);
+  }
+
+  return c.json({
+    ok: true,
+    /* The official identity, and the two facts the evidence step needs to name
+       the document it is chasing. */
+    pos: ids.map((id, i) => ({
+      id,
+      supplierId: created[i]!.supplierId,
+      supplierName: res.data.supplierNames.get(created[i]!.supplierId) ?? null,
+      destinationId: created[i]!.destinationId,
+      destination: destById.get(created[i]!.destinationId)?.name ?? null,
+    })),
+  });
 });
 
 export default toOrderRouter;

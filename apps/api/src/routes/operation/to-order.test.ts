@@ -50,6 +50,7 @@ const OHANA = "11111111-1111-1111-1111-111111111111";
 const KLANG = "2f181917-f4e1-42b2-9e25-d7ee6785424a";
 const AL = "818b420c-27f9-4707-a516-b91a6e03f343";
 const WAREHOUSE = "00000000-0000-0000-0000-000000000c03";
+const CLOSED_YARD = "9c9c9c9c-0000-4000-8000-00000000000c";
 
 function sofaLine(id: string, sku: string, orderId: string, buildKey: string | null) {
   return {
@@ -137,12 +138,16 @@ const TABLES = (): Tbl => ({
   purchase_order_lines: { data: [], error: null },
   purchasing_destinations: {
     data: [
-      { id: KLANG, name: "Carres Klang", is_default: true },
-      { id: AL, name: "AL Sungai Buloh", is_default: false },
+      { id: KLANG, name: "Carres Klang", is_default: true, active: true },
+      { id: AL, name: "AL Sungai Buloh", is_default: false, active: true },
     ],
     error: null,
   },
   warehouses: { data: [{ id: WAREHOUSE, name: "Carres Klang", kind: "own" }], error: null },
+  /* `u1` is the JWT subject every test signs with, so the caller HOLDS PO duty
+     unless a test deliberately hands it to somebody else. */
+  ops_po_duty: { data: [{ user_id: "u1" }], error: null },
+  app_users: { data: [{ id: "u1", name: "On Duty", email: "od@carres.com" }], error: null },
   purchase_orders: { data: null, error: null },
 });
 
@@ -1888,5 +1893,358 @@ describe("P18 · the proceed date rides the To Order wire", () => {
     ].map((m) => m[1]!);
     expect(selects).toHaveLength(3);
     for (const s of selects) expect(s).toContain("proceed_date");
+  });
+});
+
+
+/**
+ * THE WHOLE-BATCH ISSUE (CARD-2026-08-22-purchasing-02 §7.3).
+ *
+ * One request, every purchase order, one transaction. The server groups by
+ * supplier × Deliver To ITSELF — the browser's grouping is a hint it never
+ * reads — recomputes all demand and coverage first, and creates everything or
+ * nothing.
+ */
+const ISSUE_BATCH = "http://t/api/operation/purchase/to-order/issue-batch";
+
+async function postBatch(body: unknown, role = "operation") {
+  const jwt = await makeJwt(role);
+  return app.fetch(
+    new Request(ISSUE_BATCH, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+    env,
+  );
+}
+
+/** Every buyable demand id the projection would show, with its build quantity. */
+async function readyDemands(sb: ReturnType<typeof makeSb>) {
+  vi.mocked(userClient).mockReturnValue(sb as never);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const body = (await (await get()).json()) as any;
+  const out: { demandId: string; qty: number; orderId: string }[] = [];
+  for (const p of body.proposals) {
+    for (const r of p.rows) {
+      for (const b of r.builds) {
+        out.push({ demandId: `build::${r.orderId}::${b.key}`, qty: b.qty, orderId: r.orderId });
+      }
+    }
+  }
+  return out;
+}
+
+const allTo = (
+  demands: { demandId: string; qty: number }[],
+  destinationId: string,
+) => demands.map((d) => ({ demandId: d.demandId, allocations: [{ destinationId, qty: d.qty }] }));
+
+describe("POST …/to-order/issue-batch — one door, one transaction", () => {
+  it("401 without Authorization", async () => {
+    const res = await app.fetch(new Request(ISSUE_BATCH, { method: "POST" }), env);
+    expect(res.status).toBe(401);
+  });
+
+  it("creates every purchase order through the ONE governed RPC", async () => {
+    const sb = makeSb(TABLES());
+    const demands = await readyDemands(sb);
+    const res = await postBatch({ selections: allTo(demands, KLANG), documentDecisions: [] });
+    expect(res.status).toBe(200);
+    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(1);
+  });
+
+  it("the server groups by supplier × Deliver To — the client's grouping is a hint", async () => {
+    const sb = makeSb(TABLES());
+    const demands = await readyDemands(sb);
+    // Everything to ONE destination.
+    await postBatch({ selections: allTo(demands, KLANG), documentDecisions: [] });
+    const batch = sb.rpcCalls.find((c) => c.fn === "purchasing_issue_pos_batch")!;
+    const pos = batch.args.p_pos as { destination_id: string; supplier_id: string }[];
+    expect(new Set(pos.map((p) => p.destination_id))).toEqual(new Set([KLANG]));
+    expect(new Set(pos.map((p) => p.supplier_id))).toEqual(new Set([OHANA]));
+  });
+
+  it("one supplier split across two destinations becomes TWO documents", async () => {
+    const sb = makeSb(TABLES());
+    const demands = await readyDemands(sb);
+    const first = demands[0]!;
+    const rest = demands.slice(1);
+    const res = await postBatch({
+      selections: [
+        { demandId: first.demandId, allocations: [{ destinationId: AL, qty: first.qty }] },
+        ...allTo(rest, KLANG),
+      ],
+      documentDecisions: [],
+    });
+    expect(res.status).toBe(200);
+    const batch = sb.rpcCalls.find((c) => c.fn === "purchasing_issue_pos_batch")!;
+    const pos = batch.args.p_pos as { destination_id: string }[];
+    expect(new Set(pos.map((p) => p.destination_id))).toEqual(new Set([KLANG, AL]));
+  });
+
+  it("splitting ONE line across two destinations creates two documents from it", async () => {
+    const sb = makeSb(TABLES());
+    const demands = await readyDemands(sb);
+    const multi = demands.find((d) => d.qty >= 2);
+    if (!multi) return; // the sofa fixture is one unit per build; covered elsewhere
+    const res = await postBatch({
+      selections: [
+        {
+          demandId: multi.demandId,
+          allocations: [
+            { destinationId: KLANG, qty: multi.qty - 1 },
+            { destinationId: AL, qty: 1 },
+          ],
+        },
+      ],
+      documentDecisions: [],
+    });
+    expect(res.status).toBe(200);
+  });
+
+  it("every line keeps its source Sales Order on the document", async () => {
+    const sb = makeSb(TABLES());
+    const demands = await readyDemands(sb);
+    await postBatch({ selections: allTo(demands, KLANG), documentDecisions: [] });
+    const batch = sb.rpcCalls.find((c) => c.fn === "purchasing_issue_pos_batch")!;
+    const pos = batch.args.p_pos as { so_refs: number[] }[];
+    const refs = pos.flatMap((p) => p.so_refs).sort();
+    expect(refs).toEqual([1204, 1207]);
+    expect(pos.every((p) => p.so_refs.length > 0)).toBe(true);
+  });
+});
+
+describe("the batch issue refuses before it creates anything", () => {
+  async function expectNoPos(body: unknown, status: number, code?: string) {
+    const sb = makeSb(TABLES());
+    await readyDemands(sb);
+    sb.rpcCalls.length = 0;
+    const res = await postBatch(body);
+    expect(res.status).toBe(status);
+    if (code) expect(((await res.json()) as { code?: string }).code).toBe(code);
+    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
+    return sb;
+  }
+
+  it("a demand the recomputation has never heard of", async () => {
+    await expectNoPos(
+      {
+        selections: [
+          { demandId: "build::ghost::nope", allocations: [{ destinationId: KLANG, qty: 1 }] },
+        ],
+        documentDecisions: [],
+      },
+      409,
+      "unknown_demand",
+    );
+  });
+
+  it("an allocation total that does not equal the server's own remainder", async () => {
+    const sb = makeSb(TABLES());
+    const demands = await readyDemands(sb);
+    sb.rpcCalls.length = 0;
+    const first = demands[0]!;
+    const res = await postBatch({
+      selections: [
+        { demandId: first.demandId, allocations: [{ destinationId: KLANG, qty: first.qty + 5 }] },
+      ],
+      documentDecisions: [],
+    });
+    expect(res.status).toBe(422);
+    expect(((await res.json()) as { code?: string }).code).toBe("allocation_mismatch");
+    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
+  });
+
+  it("a destination that is switched off", async () => {
+    const tables = TABLES();
+    tables.purchasing_destinations = {
+      data: [
+        { id: KLANG, name: "Carres Klang", is_default: true, active: true },
+        { id: CLOSED_YARD, name: "Old Yard", is_default: false, active: false },
+      ],
+      error: null,
+    };
+    const sb = makeSb(tables);
+    const demands = await readyDemands(sb);
+    sb.rpcCalls.length = 0;
+    const first = demands[0]!;
+    const res = await postBatch({
+      selections: [
+        { demandId: first.demandId, allocations: [{ destinationId: CLOSED_YARD, qty: first.qty }] },
+      ],
+      documentDecisions: [],
+    });
+    expect(res.status).toBe(422);
+    expect(((await res.json()) as { code?: string }).code).toBe("inactive_destination");
+    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
+  });
+
+  it("a destination nobody has heard of", async () => {
+    const sb = makeSb(TABLES());
+    const demands = await readyDemands(sb);
+    sb.rpcCalls.length = 0;
+    const res = await postBatch({
+      selections: [
+        {
+          demandId: demands[0]!.demandId,
+          allocations: [
+            { destinationId: "7c7c7c7c-0000-4000-8000-00000000000e", qty: demands[0]!.qty },
+          ],
+        },
+      ],
+      documentDecisions: [],
+    });
+    expect(res.status).toBe(422);
+    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
+  });
+
+  it("a customer order with no delivery date", async () => {
+    const tables = TABLES();
+    (tables.orders.data as Record<string, unknown>[])[0]!.delivery_date = null;
+    (tables.orders.data as Record<string, unknown>[])[0]!.delivery_date_tbd = true;
+    const sb = makeSb(tables);
+    const demands = await readyDemands(sb);
+    sb.rpcCalls.length = 0;
+    const o1 = demands.filter((d) => d.orderId === "o1");
+    if (o1.length === 0) return;
+    const res = await postBatch({ selections: allTo(o1, KLANG), documentDecisions: [] });
+    expect(res.status).toBe(422);
+    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
+  });
+
+  it("an empty selection is refused by the schema, not by the database", async () => {
+    const sb = makeSb(TABLES());
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await postBatch({ selections: [], documentDecisions: [] });
+    expect(res.status).toBe(400);
+    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
+  });
+
+  it("the same demand named twice", async () => {
+    const sb = makeSb(TABLES());
+    const demands = await readyDemands(sb);
+    sb.rpcCalls.length = 0;
+    const first = demands[0]!;
+    const one = { demandId: first.demandId, allocations: [{ destinationId: KLANG, qty: first.qty }] };
+    const res = await postBatch({ selections: [one, one], documentDecisions: [] });
+    expect(res.status).toBe(422);
+    expect(((await res.json()) as { code?: string }).code).toBe("duplicate_demand");
+    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
+  });
+});
+
+describe("only Current PO Duty may issue", () => {
+  it("the duty holder issues", async () => {
+    const sb = makeSb(TABLES());
+    const demands = await readyDemands(sb);
+    const res = await postBatch({ selections: allTo(demands, KLANG), documentDecisions: [] });
+    expect(res.status).toBe(200);
+  });
+
+  it("an Operations login who is NOT on duty is refused, and creates nothing", async () => {
+    const tables = TABLES();
+    tables.ops_po_duty = { data: [{ user_id: "somebody-else" }], error: null };
+    const sb = makeSb(tables);
+    const demands = await readyDemands(sb);
+    sb.rpcCalls.length = 0;
+    const res = await postBatch({ selections: allTo(demands, KLANG), documentDecisions: [] });
+    expect(res.status).toBe(403);
+    expect(((await res.json()) as { code?: string }).code).toBe("not_po_duty");
+    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
+  });
+
+  it("nobody on duty means nobody issues", async () => {
+    const tables = TABLES();
+    tables.ops_po_duty = { data: [], error: null };
+    const sb = makeSb(tables);
+    const demands = await readyDemands(sb);
+    sb.rpcCalls.length = 0;
+    const res = await postBatch({ selections: allTo(demands, KLANG), documentDecisions: [] });
+    expect(res.status).toBe(403);
+    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
+  });
+
+  it("a dealer never reaches the door at all", async () => {
+    const sb = makeSb(TABLES());
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await postBatch({ selections: [], documentDecisions: [] }, "dealer");
+    expect(res.status).toBe(403);
+  });
+});
+
+describe("the commercial laws still hold on the batch door", () => {
+  it("a catalog cost that moved since the operator looked stops that document", async () => {
+    const sb = makeSb(TABLES());
+    const demands = await readyDemands(sb);
+    sb.rpcCalls.length = 0;
+    const res = await postBatch({
+      selections: allTo(demands, KLANG),
+      documentDecisions: [
+        {
+          supplierId: OHANA,
+          destinationId: KLANG,
+          procurementPartnerId: null,
+          lineDecisions: [
+            {
+              sku: "5539-1B(LHF)",
+              treatment: "normal",
+              unitCost: 999999,
+              costSource: "catalog",
+            },
+          ],
+        },
+      ],
+    });
+    expect(res.status).toBe(409);
+    expect(((await res.json()) as { code?: string }).code).toBe("stale_catalog_cost");
+    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
+  });
+
+  it("a priced line that is no longer on the document stops the batch", async () => {
+    const sb = makeSb(TABLES());
+    const demands = await readyDemands(sb);
+    sb.rpcCalls.length = 0;
+    const res = await postBatch({
+      selections: allTo(demands, KLANG),
+      documentDecisions: [
+        {
+          supplierId: OHANA,
+          destinationId: KLANG,
+          procurementPartnerId: null,
+          lineDecisions: [
+            { sku: "GONE-SKU", treatment: "normal", unitCost: 10, costSource: "catalog" },
+          ],
+        },
+      ],
+    });
+    expect(res.status).toBe(409);
+    expect(((await res.json()) as { code?: string }).code).toBe("stale_cost_decision");
+    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
+  });
+
+  it("Free of Charge still carries its reason into the document", async () => {
+    const sb = makeSb(TABLES());
+    const demands = await readyDemands(sb);
+    const res = await postBatch({
+      selections: allTo(demands, KLANG),
+      documentDecisions: [
+        {
+          supplierId: OHANA,
+          destinationId: KLANG,
+          procurementPartnerId: null,
+          lineDecisions: [
+            { sku: "5539-CNR", treatment: "free_of_charge", reason: "Supplier replacement" },
+          ],
+        },
+      ],
+    });
+    expect(res.status).toBe(200);
+    const batch = sb.rpcCalls.find((c) => c.fn === "purchasing_issue_pos_batch")!;
+    const pos = batch.args.p_pos as { lines: Record<string, unknown>[] }[];
+    const foc = pos.flatMap((p) => p.lines).find((l) => l.sku === "5539-CNR")!;
+    expect(foc.commercial_treatment).toBe("free_of_charge");
+    expect(foc.commercial_reason).toBe("Supplier replacement");
+    expect(foc.cost).toBe(0);
   });
 });
