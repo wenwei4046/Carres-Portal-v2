@@ -2,7 +2,7 @@
 
 **Module:** Purchasing · **Sequence:** 01
 **Owner authority:** `docs/purchasing/MASTER.md` — approved / locked 2026-08-22
-**Status:** EXECUTED — built, gated and locally walked 2026-08-22; production proof in §11
+**Status:** EXECUTED · SHIPPED · PRODUCTION-VERIFIED — 2026-08-22, main `ff424f1b`
 **Lane:** BUILD / DELIVERY
 **Base:** local `main` containing Purchasing Blueprint commit `7de0a27a`
 
@@ -491,3 +491,26 @@ page bodies is its own scope and needs its own Card.
 
 ### 11.5 Delivery
 
+| Step | Proof |
+|---|---|
+| PR | [#891](https://github.com/wenwei4046/Carres-Portal-v2/pull/891) |
+| CI `verify` | **pass** — migration law, design/governance guards, type checks, unit + integration tests, production build, and the no-server-secret bundle check |
+| Merge | `ff424f1b` on `main` (`09c26a20` is the implementation commit) |
+| Deploy | `deploy-production.yml` run `32568133486` — **success**: it repeated the authoritative checks on the merged SHA, deployed both Pages projects and the API Worker, then polled every surface to convergence |
+| Production SHA | `https://erp.carresofficial.com/__carres_deploy.json` → `ff424f1b15b4e26fd4aaaaeae4fbbfe9654ad31c`, built `2026-08-22T10:51:38Z` |
+
+### 11.6 Production walk — authenticated, on `ff424f1b`
+
+Walked signed in as `operation@carres.com` on `erp.carresofficial.com`, measured in the live DOM:
+
+| State | Measured live |
+|---|---|
+| `/operation?tab=purchase` | groups `BUY · RECEIVE · PROBLEMS · SHOWROOM` · BUY rows `SO Batch Purchase · Manual Purchase · Purchase Orders` · **0** retired rows · **0** hairlines · **1** lit row (`nav-child-purchase`) · header `SO Batch Purchase` |
+| `/operation?tab=manual-purchase` | BUY `aria-expanded=true`, other three `false` · **1** lit row (`nav-child-manual-purchase`) · parent neutral · destination header **`Manual Purchase`** · tab title `Manual Purchase · Purchasing — Carres` · the string `Manual Purchase Requests` appears **nowhere on the page** |
+| `/operation?tab=receiving` | RECEIVE `aria-expanded=true` and `aria-disabled=true` (forced open, refuses to shut) · row `Goods Receipts` · **1** lit row · parent neutral · header `Goods Receipts` |
+| 60px rail | rail **60px** · **0** group buttons and **0** child rows in the rail · the one Purchasing icon lit with its `bg-kit-blue-9` line · `href="/operation?tab=purchase"` |
+
+The collapsed-rail preference was set for the walk and removed again afterwards; nothing else in the
+signed-in session was changed, and no production data was written.
+
+**CARD COMPLETE.** Every §8 acceptance line is satisfied and no §9 failure condition occurred.
