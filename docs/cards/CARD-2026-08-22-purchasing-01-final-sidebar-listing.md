@@ -2,7 +2,7 @@
 
 **Module:** Purchasing · **Sequence:** 01
 **Owner authority:** `docs/purchasing/MASTER.md` — approved / locked 2026-08-22
-**Status:** QUEUED — owner commissioned 2026-08-22
+**Status:** EXECUTED — built, gated and locally walked 2026-08-22; production proof in §11
 **Lane:** BUILD / DELIVERY
 **Base:** local `main` containing Purchasing Blueprint commit `7de0a27a`
 
@@ -415,3 +415,79 @@ repository's autonomous BUILD/DELIVERY gates through production verification. Do
 choose engineering mechanics. Report only a genuine business-rule conflict or governed production
 approval that cannot be resolved from authority.
 ```
+
+---
+
+## 11 · Execution record — 2026-08-22
+
+**Branch:** `claude/purchasing-01-final-sidebar-listing` · **Base:** local `main` `0f52e23c`
+
+### 11.1 What changed
+
+| File | Change |
+|---|---|
+| `apps/web/src/pages/portal/portal-nav.ts` | eight retired rows DELETED; `Manual Purchase Requests` → `Manual Purchase`, moved into BUY after `SO Batch Purchase`; `display-requests` moved to SHOWROOM; the `dividerAbove` hairline gone with `Report`; the stale five-group / eighteen-destination / Home-landing comments replaced |
+| `apps/web/src/pages/portal/purchasing-sidebar.ts` | four group keys/labels; `PurchasingSidebarStateV1` → `V2`; storage key `:v1:` → `:v2:`; `PURCHASING_LANDING_KEY` kept `"purchase"` and documented as permanent |
+| `apps/web/src/pages/portal/PortalSidebar.tsx` | type/import adaptation to `V2` and three stale comments only — no renderer, geometry or accordion algorithm change |
+| `apps/web/src/pages/operation/PurchasingTabs.tsx` | `manual-purchase` destination word → `Manual Purchase`; every other word, key and route untouched |
+| four test files | the contract above, plus the retired-row and V1/V2 regressions |
+
+Deliberately NOT changed: `OperationPurchaseDemands`, `OperationPurchasingReport` and their
+routes/words (§4 boundary), `apps/api/**`, `packages/shared/**`, `supabase/**`, every page body,
+every 200px page rail, and every other module's navigation.
+
+### 11.2 Gates
+
+| Gate | Result |
+|---|---|
+| focused four files | **143 passed** (`purchasing-sidebar` 22 · `PortalSidebar` 97 · `PurchasingTabs` 6 · `JumpTo` 18) |
+| `pnpm --filter @carres/web test` | **274 files / 3254 tests passed, 0 failed** |
+| `typecheck` | clean |
+| `lint` | `design-standard: no new violations`, guard stage 1 warn-only, exit 0 |
+| `check:v4` | `v4-guard: clean.` |
+| `build` | `✓ built in 9.36s` |
+| `git diff --check` | clean; exactly the eight Card-scope source files + this Card + `docs/evidence/` |
+
+**Task 1 failure proof:** with the new contract written and the old eighteen-row implementation
+still in place, the run was `Test Files 4 failed | 270 passed` · `Tests 33 failed | 3221 passed` —
+the 33 failures were confined to the four Card files, so nothing outside this scope depended on the
+rows being deleted.
+
+### 11.3 Owner walk — local, real rendering
+
+Walked with Playwright at real viewports against the dev server rendering the REAL `PortalSidebar`,
+the REAL stylesheet and the REAL `portal-nav.ts`. The signed-in identity was seeded rather than
+typed (the live rail is behind a password), following the repository's existing
+`src/dev/route-preview.tsx` precedent; the harness entry was transient and is not committed.
+
+| # | Screenshot | Viewport / route | Measured in the rendered DOM |
+|---|---|---|---|
+| 1 | `docs/evidence/purchasing-01-sidebar/1-1440-purchasing-open.png` | 1440×900 · `?tab=purchase` · BUY + SHOWROOM open | rail **232px** · groups `BUY · RECEIVE · PROBLEMS · SHOWROOM` · 7 rows visible · **0** retired rows · **0** hairlines · **1** lit row (`nav-child-purchase`) · parent neutral · **0** destination icons · every `Coming soon` row a `SPAN` with no `href` and `tabindex="-1"` |
+| 2 | `.../2-1130-manual-purchase-active.png` | 1130×900 · `?tab=manual-purchase` | BUY `aria-expanded=true` (forced), other three `false` · rows `SO Batch Purchase · Manual Purchase · Purchase Orders` · **1** lit row (`nav-child-manual-purchase`) · parent + group neutral |
+| 3 | `.../3-1130-goods-receipts-active.png` | 1130×900 · `?tab=receiving` | RECEIVE `aria-expanded=true` (forced), other three `false` · row `Goods Receipts` · **1** lit row (`nav-child-receiving`) |
+| 4 | `.../4-60px-rail-purchasing-active.png` | 60px rail · `?tab=receiving` | rail **60px** · the one Purchasing icon lit · `href="/operation?tab=purchase"` · no group, child or word rendered |
+
+Retired-row sweep ran in all four states over
+`purchasing-home · purchasing-work · new-supplier-requests · new-sku-requests · purchase-demands ·
+consignment-overview · consignment-receipts · purchasing-report` — **absent in every one.**
+
+The harness mounts the rail alone, so the right-hand area of each screenshot is empty canvas: it
+proves the RAIL, not the page beside it. The page bodies are unchanged by this Card and the
+destination header is proved by `PurchasingTabs.test.tsx`.
+
+### 11.4 Self-review against `docs/purchasing/MASTER.md` §4
+
+Every §4 rule holds in the built rail — the four drawers, the multi-open behaviour, the one visible
+active indication in all three modes, the permanent 60px landing, the destination header format, and
+the absence of Home, module Work, Purchase Demands, the two request pages, Consignment Overview and
+Consignment Receipts.
+
+🟡 **One honest gap, carried forward, not fixed here.** §4 says *"There is no Purchase Demands
+page"*, and this Card's §4 boundary deliberately leaves `OperationPurchaseDemands` and
+`OperationPurchasingReport` reachable at their direct URLs with their own header words. The rail and
+Jump To no longer offer them, so no operator is sent there — but the pages still exist, so the
+MASTER sentence is true of the NAVIGATION and not yet of the CODE. Retiring or converging those two
+page bodies is its own scope and needs its own Card.
+
+### 11.5 Delivery
+
