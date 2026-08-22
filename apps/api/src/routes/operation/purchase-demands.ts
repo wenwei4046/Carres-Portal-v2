@@ -3,11 +3,13 @@ import {
   monthKeyMYT,
   purchaseDemandQuantities,
   purchaseDemandStateOf,
+  soBatchAction,
   PURCHASE_DEMAND_OWNER_DUTY,
   type ProductCategory,
   type PurchaseDemandRow,
   type PurchaseDemandState,
-  type PurchaseDemandsResponse,
+  type PurchasingDestination,
+  type SoBatchPurchaseResponse,
 } from "@carres/shared";
 import { requireOperation } from "../../lib/auth-guards";
 import { loadToOrder, type RegisterOrderFact } from "../../lib/purchase-demand-read";
@@ -15,8 +17,8 @@ import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
 /**
- * GET /api/operation/purchase/demands — the PURCHASE DEMANDS Register
- * (CARD-2026-08-20-purchase-demands; `docs/purchasing/MASTER.md` §3.1).
+ * GET /api/operation/purchase/demands — the SO BATCH PURCHASE projection
+ * (CARD-2026-08-22-purchasing-02; `docs/purchasing/MASTER.md` §§5.1, 9.1).
  *
  * One question: *what customer goods need buying, what already covers them, and
  * what must be fixed before they can be bought?*
@@ -57,10 +59,11 @@ function ownerOf(
 
 purchaseDemandsRouter.get("/", requireOperation, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
+  const me = c.var.auth.id;
 
   const res = await loadToOrder(sb);
   if (!res.ok) return c.json(res.body as Record<string, unknown>, res.status as 400);
-  const { proposals, registerFacts, supplierNames, stockWarehouse, today } = res.data;
+  const { proposals, registerFacts, supplierNames, today } = res.data;
 
   /**
    * The two owner facts, read here because they are Register-only.
@@ -80,6 +83,7 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
     ),
   ];
   let poDutyName: string | null = null;
+  let poDutyId: string | null = null;
   const nameById = new Map<string, string>();
   try {
     const month = monthKeyMYT();
@@ -95,7 +99,10 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
       const l = label(u);
       if (l) nameById.set(u.id as string, l);
     }
-    const dutyId = (duty.data as { user_id?: string } | null)?.user_id ?? null;
+    const dutyRow = duty.data as { user_id?: string } | { user_id?: string }[] | null;
+    const dutyId =
+      (Array.isArray(dutyRow) ? dutyRow[0]?.user_id : dutyRow?.user_id) ?? null;
+    poDutyId = dutyId;
     if (dutyId) {
       const holder = await sb
         .from("app_users")
@@ -128,6 +135,9 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
       if (row.readyStock) continue;
       for (const build of row.builds) {
         const q = purchaseDemandQuantities(build, proposal.category);
+        /* THE ENGINE'S OWN ARRIVAL DATE. `stockReady` IS `arriveBy` — the day
+           the goods must be at Carres for this customer promise to hold. */
+        const goodsMustArrive = row.stockReady;
         const state = purchaseDemandStateOf({
           inCatalog: true,
           hasSupplier: true,
@@ -160,6 +170,26 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
           onPo: q.onPo,
           poNumbers: build.coveredByOpenPoPos,
           toBuy: q.toBuy,
+          goodsMustArrive,
+          /* A CARRIED build can be issued, so it carries the reference the
+             issue endpoint recomputes against. A refused line below cannot,
+             and says so by having none. */
+          issueRef: { proposalKey: proposal.key, buildKey: build.key },
+          action: soBatchAction({
+            state,
+            item: build.model,
+            supplier: proposal.supplierName,
+            category: proposal.category,
+            ownerId:
+              state === "no_customer_date" ? (fact.salespersonId ?? null) : poDutyId,
+            ownerName:
+              state === "no_customer_date"
+                ? (nameById.get(fact.salespersonId ?? "") ?? null)
+                : poDutyName,
+            orderId: row.orderId,
+            so: row.so,
+            dueDate: goodsMustArrive,
+          }),
           ...ownerOf(state, nameById.get(fact.salespersonId ?? "") ?? null),
         });
       }
@@ -199,6 +229,25 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
       onPo: covered ? 0 : null,
       poNumbers: [],
       toBuy: covered ? 0 : null,
+      /* The engine refused this line, so there is no build and no plan — and
+         therefore no arrival date and nothing to issue. Inventing either would
+         offer an act that cannot succeed. */
+      goodsMustArrive: null,
+      issueRef: null,
+      action: soBatchAction({
+        state,
+        item: line.modelName ?? line.sku,
+        supplier: line.supplierId ? (supplierNames.get(line.supplierId) ?? null) : null,
+        category: (line.category as ProductCategory | null) ?? null,
+        ownerId: state === "no_customer_date" ? (fact.salespersonId ?? null) : poDutyId,
+        ownerName:
+          state === "no_customer_date"
+            ? (nameById.get(fact.salespersonId ?? "") ?? null)
+            : poDutyName,
+        orderId: line.orderId,
+        so: fact.so,
+        dueDate: null,
+      }),
       ...ownerOf(
         state,
         state === "no_customer_date"
@@ -208,7 +257,43 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
     });
   }
 
-  const body: PurchaseDemandsResponse = { today, rows, stockWarehouse: stockWarehouse?.name ?? null };
+  /* ── 3 · where a buy may be sent ────────────────────────────────────────
+   *
+   * A CLOSED destination is still returned. History reads through this list —
+   * a purchase order sent to a yard that shut last month must still be able to
+   * print where it went — and `active` is what stops it being CHOSEN again.
+   * Filtering it out here would make an old document unreadable. */
+  let destinations: PurchasingDestination[] = [];
+  try {
+    const dest = await sb
+      .from("purchasing_destinations")
+      .select("id, name, is_default, active")
+      .order("name");
+    destinations = ((dest.data ?? []) as Record<string, unknown>[]).map((d) => ({
+      id: d.id as string,
+      name: (d.name as string) ?? "",
+      isDefault: d.is_default === true,
+      active: d.active !== false,
+    }));
+  } catch (e) {
+    console.error("so batch — destinations unavailable", (e as Error).message);
+  }
+  const defaultDestination = destinations.find((d) => d.isDefault && d.active) ?? null;
+
+  const body: SoBatchPurchaseResponse = {
+    today,
+    rows,
+    destinations,
+    /* No default configured means NO default. Picking the first active one
+       would silently make some warehouse the standing answer, and the standing
+       answer is a governed Purchasing setting (MASTER §5.4). */
+    defaultDestinationId: defaultDestination?.id ?? null,
+    currentPoDuty: poDutyId && poDutyName ? { userId: poDutyId, name: poDutyName } : null,
+    /* Convenience only. `mayIssue` decides whether the browser OFFERS the act;
+       the issue endpoint resolves duty again and refuses on its own authority
+       (Card §6 — UI hiding is convenience, API/RPC is authority). */
+    mayIssue: poDutyId != null && poDutyId === me,
+  };
   return c.json(body);
 });
 

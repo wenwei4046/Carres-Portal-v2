@@ -14,7 +14,7 @@ import app from "../../index";
 import { _setJwksForTesting } from "../../middleware/auth";
 
 vi.mock("../../lib/supabase", () => ({ userClient: vi.fn() }));
-import type { PurchaseDemandsResponse } from "@carres/shared";
+import type { SoBatchPurchaseResponse } from "@carres/shared";
 import { userClient } from "../../lib/supabase";
 
 /**
@@ -56,6 +56,9 @@ const OHANA = "22222222-2222-2222-2222-222222222222";
 const WAREHOUSE = "00000000-0000-0000-0000-000000000c03";
 const SALES = "aaaaaaaa-0000-0000-0000-00000000000a";
 const PO_HOLDER = "bbbbbbbb-0000-0000-0000-00000000000b";
+const KLANG_DEST = "dddddddd-0000-4000-8000-00000000000d";
+const BULOH_DEST = "eeeeeeee-0000-4000-8000-00000000000e";
+const CLOSED_DEST = "ffffffff-0000-4000-8000-00000000000f";
 
 function line(
   id: string,
@@ -191,7 +194,14 @@ const TABLES = () => ({
     ],
     error: null,
   },
-  purchasing_destinations: { data: [], error: null },
+  purchasing_destinations: {
+    data: [
+      { id: KLANG_DEST, name: "Carres Klang", is_default: true, active: true },
+      { id: BULOH_DEST, name: "AL Sungai Buloh", is_default: false, active: true },
+      { id: CLOSED_DEST, name: "Old Yard", is_default: false, active: false },
+    ],
+    error: null,
+  },
   purchase_orders: { data: [], error: null },
 });
 
@@ -312,11 +322,11 @@ async function getDemands(
 async function rowsOf(tables?: Record<string, { data: unknown; error: unknown }>) {
   const { res, sb } = await getDemands(tables);
   expect(res.status).toBe(200);
-  const body = (await res.json()) as PurchaseDemandsResponse;
+  const body = (await res.json()) as SoBatchPurchaseResponse;
   return { body, rows: body.rows, sb };
 }
 
-const bySku = (rows: PurchaseDemandsResponse["rows"], sku: string) =>
+const bySku = (rows: SoBatchPurchaseResponse["rows"], sku: string) =>
   rows.find((r) => r.skus.includes(sku));
 
 describe("GET /api/operation/purchase/demands — one read, two projections", () => {
@@ -516,5 +526,169 @@ describe("the guard, and the promise not to write", () => {
     const { sb } = await rowsOf();
     expect(sb.writes).toEqual([]);
     expect(sb.rpcCalls).toEqual([]);
+  });
+});
+
+
+/**
+ * CARD-2026-08-22-purchasing-02 — the SO Batch Purchase projection.
+ *
+ * The Register that EXPLAINS became the Register that also BUYS, so the same
+ * read must now carry the four facts a buy needs and could not previously
+ * state: the arrival date, the engine reference, the structured action and the
+ * destinations a buy may be sent to.
+ */
+describe("the buying facts SO Batch Purchase needs", () => {
+  it("carries the arrival date off the ENGINE — the route subtracts nothing", async () => {
+    const { rows } = await rowsOf();
+    const ready = bySku(rows, "B1201S-K")!;
+    expect(ready.goodsMustArrive).not.toBeNull();
+    // It is EARLIER than the customer promise: production plus buffer is the
+    // whole point of the date, and it is the engine that knows them.
+    expect(ready.goodsMustArrive! < ready.customerDelivery!).toBe(true);
+    const src = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), "purchase-demands.ts"),
+      "utf8",
+    );
+    // No working-day arithmetic may appear in this route.
+    expect(src).not.toMatch(/addWorkingDays|subtractWorkingDays|addDaysIso/);
+  });
+
+  it("a line with no customer date has no arrival date to derive", async () => {
+    const { rows } = await rowsOf();
+    const tbd = rows.find((r) => r.state === "no_customer_date");
+    expect(tbd).toBeDefined();
+    expect(tbd!.goodsMustArrive).toBeNull();
+  });
+
+  it("a ready row carries the engine reference an issue is built from", async () => {
+    const { rows } = await rowsOf();
+    const ready = bySku(rows, "B1201S-K")!;
+    expect(ready.issueRef).not.toBeNull();
+    expect(ready.issueRef!.proposalKey.length).toBeGreaterThan(0);
+    expect(ready.issueRef!.buildKey.length).toBeGreaterThan(0);
+  });
+
+  it("a line the engine REFUSED has no reference, so it can never be issued", async () => {
+    const { rows } = await rowsOf();
+    for (const state of ["no_sku", "no_supplier", "no_production_days"] as const) {
+      const blocked = rows.find((r) => r.state === state);
+      expect(blocked, state).toBeDefined();
+      expect(blocked!.issueRef, state).toBeNull();
+    }
+  });
+
+  it("every unfinished row carries the structured action, with its owner as metadata", async () => {
+    const { rows } = await rowsOf();
+    const ready = bySku(rows, "B1201S-K")!;
+    expect(ready.action).toMatchObject({
+      trigger: "ready_to_buy",
+      ownerRule: "Current PO Duty",
+      completionFact: "Current PO version reached supplier with evidence",
+      sourceObject: { type: "sales_order", id: "o1", number: "SO-1207" },
+    });
+    expect(ready.action!.action).toBe("Issue PO to Nice Future");
+    // The person is metadata, never inside the sentence.
+    expect(ready.action!.action).not.toContain("Yee Jin");
+  });
+
+  it("the salesperson owns the missing customer date, by name", async () => {
+    const { rows } = await rowsOf();
+    const tbd = rows.find((r) => r.state === "no_customer_date")!;
+    expect(tbd.action).toMatchObject({
+      trigger: "no_customer_date",
+      ownerRule: "Responsible Salesperson",
+      ownerName: "Siew Hong",
+      action: "Ask customer for a delivery date",
+      completionFact: "Customer Delivery exists",
+    });
+    expect(tbd.action!.action).not.toContain("Siew Hong");
+  });
+
+  it("a covered row owes nobody anything", async () => {
+    const { rows } = await rowsOf();
+    const covered = rows.find((r) => r.state === "covered");
+    expect(covered).toBeDefined();
+    expect(covered!.action).toBeNull();
+  });
+
+  it("the ready action is DATED by the arrival the goods must make", async () => {
+    const { rows } = await rowsOf();
+    const ready = bySku(rows, "B1201S-K")!;
+    expect(ready.action!.dueDate).toBe(ready.goodsMustArrive);
+  });
+});
+
+describe("the destinations a buy may be sent to", () => {
+  it("returns the active destinations and names the standing default", async () => {
+    const { body } = await rowsOf();
+    expect(body.destinations.map((d) => d.name)).toContain("Carres Klang");
+    expect(body.defaultDestinationId).toBe(KLANG_DEST);
+    const klang = body.destinations.find((d) => d.id === KLANG_DEST)!;
+    expect(klang.isDefault).toBe(true);
+    expect(klang.active).toBe(true);
+  });
+
+  it("a closed destination is RETURNED but marked inactive — history still reads", async () => {
+    const { body } = await rowsOf();
+    const closed = body.destinations.find((d) => d.id === CLOSED_DEST);
+    expect(closed).toBeDefined();
+    expect(closed!.active).toBe(false);
+  });
+
+  it("no default configured means no default is invented", async () => {
+    const tables = TABLES();
+    tables.purchasing_destinations = {
+      data: [{ id: BULOH_DEST, name: "AL Sungai Buloh", is_default: false, active: true }],
+      error: null,
+    };
+    const { body } = await rowsOf(tables);
+    expect(body.defaultDestinationId).toBeNull();
+  });
+});
+
+describe("who may issue", () => {
+  it("names the current PO duty holder", async () => {
+    const { body } = await rowsOf();
+    expect(body.currentPoDuty).toEqual({ userId: PO_HOLDER, name: "Yee Jin" });
+  });
+
+  it("the duty holder may issue", async () => {
+    const tables = TABLES();
+    tables.ops_po_duty = { data: [{ user_id: "u1" }], error: null };
+    tables.app_users = {
+      data: [
+        { id: SALES, name: "Siew Hong", email: "sh@carres.com" },
+        { id: "u1", name: "On Duty", email: "od@carres.com" },
+      ],
+      error: null,
+    };
+    const { body } = await rowsOf(tables);
+    expect(body.mayIssue).toBe(true);
+  });
+
+  it("an operator who is NOT on duty reads the page and may not issue", async () => {
+    const { body } = await rowsOf();
+    // The fixture's duty holder is PO_HOLDER; the caller is `u1`.
+    expect(body.mayIssue).toBe(false);
+  });
+
+  it("nobody on duty means nobody may issue from this read", async () => {
+    const tables = TABLES();
+    tables.ops_po_duty = { data: [], error: null };
+    const { body } = await rowsOf(tables);
+    expect(body.currentPoDuty).toBeNull();
+    expect(body.mayIssue).toBe(false);
+  });
+});
+
+describe("SO demand only — Manual Purchase never leaks in", () => {
+  it("a typed Ready Stock demand is not a customer demand and never appears", async () => {
+    const { rows } = await rowsOf();
+    for (const r of rows) {
+      expect(r.orderId, r.id).not.toBe("");
+      // Every row traces to a real customer order in the fixture.
+      expect(["o1", "o2", "o3", "o4"], r.id).toContain(r.orderId);
+    }
   });
 });
