@@ -60,11 +60,6 @@ vi.mock("./OperationToOrder", () => ({
 vi.mock("./OperationManualPurchase", () => ({
   default: () => <div data-testid="manual-purchase-stub">manual-purchase</div>,
 }));
-// CARD-2026-08-20-purchase-demands — the read-only demand Register. It
-// self-fetches, so it is stubbed; this suite tests which route mounts it.
-vi.mock("./OperationPurchaseDemands", () => ({
-  default: () => <div data-testid="purchase-demands-stub">purchase-demands</div>,
-}));
 // CARD-2026-08-21-delivery-02 — Delivery Work draws its own Destination Header
 // and self-fetches; this suite only asks which route mounts it, and whether the
 // slim global bar stands down when it does.
@@ -254,26 +249,32 @@ describe("OperationApp — one header on Delivery Work", () => {
  * global bar must be suppressed exactly as it is for its five siblings — the
  * same defect Manual Purchase shipped with in August.
  */
-describe("OperationApp — Purchase Demands", () => {
-  it("?tab=purchase-demands mounts the Register and nothing else", () => {
+/**
+ * CARD-2026-08-22-purchasing-02 — the separate Purchase Demands page is RETIRED.
+ * `purchase_demand` is hidden canonical truth, not a destination
+ * (`docs/purchasing/MASTER.md` §4), and its useful capability now lives inside
+ * SO Batch Purchase. The old address REDIRECTS: a bookmark an operator saved
+ * must land somewhere that answers the same question, not on a 404.
+ */
+describe("OperationApp — the retired Purchase Demands address", () => {
+  it("?tab=purchase-demands lands on SO Batch Purchase", () => {
     renderApp("/operation?tab=purchase-demands");
-    expect(screen.getByTestId("purchase-demands-stub")).toBeInTheDocument();
-    expect(screen.queryByTestId("to-order-stub")).not.toBeInTheDocument();
+    expect(screen.getByTestId("to-order-stub")).toBeInTheDocument();
+    expect(screen.queryByTestId("purchase-demands-stub")).not.toBeInTheDocument();
     expect(screen.queryByTestId("dashboard-stub")).not.toBeInTheDocument();
   });
 
-  it("it suppresses the global top bar like its siblings — one header, not two", () => {
-    renderApp("/operation?tab=purchase-demands");
+  it("a saved link with the old rail parameters still lands on the buying page", () => {
+    renderApp("/operation?tab=purchase-demands&state=no_supplier,no_sku");
+    expect(screen.getByTestId("to-order-stub")).toBeInTheDocument();
+  });
+
+  it("SO Batch Purchase suppresses the global bar — one header, not two", () => {
+    renderApp("/operation?tab=purchase");
     expect(screen.queryByTestId("global-topbar-stub")).not.toBeInTheDocument();
   });
 
-  it("its own query parameters survive the mount — the rail rides the URL", () => {
-    // A refresh, a shared link and the back button all arrive this way.
-    renderApp("/operation?tab=purchase-demands&state=no_supplier,no_sku");
-    expect(screen.getByTestId("purchase-demands-stub")).toBeInTheDocument();
-  });
-
-  it("SO Batch Purchase is untouched — its route still mounts its own page", () => {
+  it("SO Batch Purchase mounts its own page at its own address", () => {
     renderApp("/operation?tab=purchase");
     expect(screen.getByTestId("to-order-stub")).toBeInTheDocument();
     expect(screen.queryByTestId("purchase-demands-stub")).not.toBeInTheDocument();

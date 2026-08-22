@@ -546,7 +546,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
                 <button
                   type="button"
                   data-testid="so-batch-issue"
-                  className="inline-flex h-7 shrink-0 items-center rounded-control bg-kit-blue-9 px-3 text-meta font-medium text-white hover:bg-kit-blue-10"
+                  className="inline-flex h-7 shrink-0 items-center rounded-control bg-kit-blue-9 px-3 text-meta font-medium text-white hover:opacity-90"
                   onClick={() => onIssue(selections)}
                 >
                   {W.issuePo}

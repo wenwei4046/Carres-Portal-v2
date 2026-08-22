@@ -44,7 +44,6 @@ import OperationWork from "./OperationWork";
 import OperationRental from "./OperationRental";
 // Purchase / Procurement MRP cockpit — the "what to buy today" guided worklist.
 import OperationToOrder from "./OperationToOrder";
-import OperationPurchaseDemands from "./OperationPurchaseDemands";
 import OperationManualPurchase from "./OperationManualPurchase";
 import OperationWarehouse from "./OperationWarehouse";
 import OperationMovements from "./OperationMovements";
@@ -315,10 +314,10 @@ export default function OperationApp() {
           !isOldOrdersUrl &&
           !isProcurementUrl &&
           !isToOrderUrl &&
+          /* CARD-2026-08-22-purchasing-02 — SO Batch Purchase draws the
+             Purchasing Destination Header itself, so the slim global bar would
+             be a second top row. */
           tab !== "purchase" &&
-          /* CARD-2026-08-20 — the Register draws the Purchasing Destination
-             Header itself, so the slim global bar would be a second top row. */
-          tab !== "purchase-demands" &&
           /* CARD-2026-08-21-delivery-02 — the SAME defect Manual Purchase
              shipped with, caught on the production walk: Delivery Work draws
              its own 50px Destination Header (which embeds TopBarIcons), so the
@@ -461,12 +460,19 @@ export default function OperationApp() {
             {tab === "payments" && <OperationPayments />}
             {/* 0247-0249 — Rental base: agreements + deployed-unit registry */}
             {tab === "rental" && <OperationRental />}
-            {/* Purchasing → To Order — the Planning Workspace, rebuilt from
-                the Golden Template 2026-07-31 (docs/03-page-patterns.md). */}
+            {/* Purchasing → SO Batch Purchase — the buying Register and the
+                guided PO issue journey (CARD-2026-08-22-purchasing-02). */}
             {tab === "purchase" && <OperationToOrder />}
-            {/* The read-only customer-demand Register. It explains; it never
-                issues (CARD-2026-08-20-purchase-demands). */}
-            {tab === "purchase-demands" && <OperationPurchaseDemands />}
+            {/* CARD-2026-08-22-purchasing-02 — `Purchase Demands` was never a
+                destination. `purchase_demand` is hidden canonical truth
+                (`docs/purchasing/MASTER.md` §4), and its useful capability —
+                the six states, the blockers, the coverage arithmetic — now
+                lives inside SO Batch Purchase. The old address REDIRECTS
+                rather than 404s: a bookmark an operator saved must land
+                somewhere that answers the same question. */}
+            {tab === "purchase-demands" && (
+              <Navigate to="/operation?tab=purchase" replace />
+            )}
             {/* Purchasing → Manual Purchase — the typed request lane
                 (CARD-2026-08-18-manual-purchase). */}
             {tab === "manual-purchase" && <OperationManualPurchase />}
