@@ -2,7 +2,8 @@
 
 **Module:** Purchasing · **Sequence:** 02
 **Owner authority:** `docs/purchasing/MASTER.md` §§2, 5–9, 13–15 — approved / locked 2026-08-22
-**Status:** QUEUED — owner commissioned 2026-08-22
+**Status:** BUILT — all eight tasks executed, all gates green, six-view walk captured 2026-08-22.
+Stopped at the merge boundary per §9 Task 8 and §14; migration 0376 is written and validated, NOT applied.
 **Lane:** BUILD / DELIVERY
 **Depends on:** `PURCHASING — CARD 01 · FIX SIDE MENU TO THE FINAL 4-GROUP / 11-PAGE LISTING`
 **Base:** local `main` containing commits `7de0a27a` and `0f52e23c`
@@ -710,3 +711,122 @@ the owner to choose technical execution details already resolved by authority.
 
 Keep this Card updated with test evidence, migration evidence and owner-walk paths. Stop before any
 merge/deploy boundary required by repository governance.
+
+---
+
+## 15 · Execution record — 2026-08-22
+
+**Branch:** `claude/purchasing-02-so-batch-purchase`, cut fresh from `main` `c669ee01`
+(which carries Card 01). Card commit `aecb284c` cherry-picked on as the first commit.
+
+### 15.1 Commits
+
+| Commit | Task | What |
+|---|---|---|
+| `872489d1` | — | the Card onto the branch; the 2026-08-18 Card marked SUPERSEDED |
+| `eada1e01` | 1 | the demand row learns what a buy needs |
+| `baadbe3c` | 2–3 | the Register and the `Deliver To` split |
+| `853f58f7` | 4 | one whole-batch issue door |
+| `039d5526` | 6 | migration 0376 + the confirmed-evidence door |
+| `187426cc` | 5, 7 | the 50/50 journey; the old buying page retires |
+
+### 15.2 Migration
+
+**`0376_an_app_that_opened_is_not_a_pdf_that_arrived.sql`.** The number was re-measured
+immediately before the file was written, against all four sources red line 7 names:
+
+| Source | Highest |
+|---|---|
+| `supabase/migrations` in this branch | 0375 |
+| every branch in the repository | 0375 |
+| both `.codex/worktrees` checkouts | 0364 |
+| the live tracker (`supabase_migrations.schema_migrations`) | 0374 applied |
+
+MAX = 0375, so **0376 was free** and the Card's proposed number stood. `pnpm ci:migrations`
+validates it. **It has NOT been applied** — that is the governed approval path, and §9/§14 stop
+this Card at the merge boundary.
+
+⚠️ Worth the owner knowing: repository migration **0375** is merged but not yet in the live
+tracker. 0376 therefore queues behind it, and 0375 must be applied first.
+
+### 15.3 Gates — all green on the final branch
+
+| Gate | Result |
+|---|---|
+| `pnpm test` | **shared 108 files / 2571 · api 121 / 2369 · web 274 / 3220 — 8,160 tests, 0 failed, 0 stray errors** |
+| `pnpm typecheck` | clean across all three packages |
+| `pnpm lint` | `design-standard: no new violations` |
+| `pnpm --filter @carres/web check:v4` | `v4-guard: clean.` |
+| `pnpm ci:migrations` | 389 filenames validated; nothing applied |
+| `pnpm build` | built, deploy proof stamped |
+| `git diff --check` | clean |
+
+**Tests-first, per task, each proved failing before it was implemented:**
+`so-batch-purchase.test.ts` failed to resolve (module absent) → 31 pass ·
+`purchase-demands.test.ts` 8 failed → 34 pass · API projection 15 failed → 35 pass ·
+`SoBatchRegister.test.tsx` failed to resolve → 36 pass · batch issue 18 failed → 96 pass ·
+`SoBatchIssueWorkspace.test.tsx` failed to resolve → 18 pass.
+
+### 15.4 The six-view owner walk
+
+Playwright at real viewports against the REAL components, the REAL stylesheet and the REAL shared
+contracts, with the payload seeded (the live page is behind a password). The harness followed the
+repository's `src/dev/route-preview.tsx` precedent and was deleted before committing.
+Screenshots: `docs/evidence/purchasing-02-so-batch/`.
+
+| # | View | Measured in the rendered DOM |
+|---|---|---|
+| 1 | `1-1440-register.png` · 1440×900 | header `SO Batch Purchase` · rail headings `BUYING RECORDS` · `WORK TO DO` · six states (`Ready to buy 2`, `Covered 1`, `No customer date 1`, `No SKU` — no count, `No supplier 1`, `No production days`) · the **11 columns in the approved order** · 5 rows · footer `5 buying lines · 19 units needed · 13 units to buy` · **0 banned words** · **`Buy` has no input** |
+| 2 | `2-1130-blocked-row.png` · 1130×900 | fact `Customer delivery date is missing` · act `Ask customer for a delivery date` · owner chip `SH` · **the act does not carry the name** · inspector prints `REQUIRED 2 · FROM STOCK / ON OPEN PO / BUY Not counted yet · SOURCE SO-1321 · B1201S-Q · REQUIRED FOR No delivery date yet · DELIVER TO Carres Klang` · **0 inputs, 0 selects in the inspector** · the row is **not selectable** |
+| 3 | `3-deliver-to-split.png` + `3b-split-applied.png` · 1440×900 | `11 / 11` balanced, no error, apply enabled → cell reads `Carres Klang 10 · AL Sungai Buloh 1` and the bar moves from `Issue 1 PO` to **`Issue 2 POs`** |
+| 4 | `4-5050-review.png` · 1440×900 · `4c-5050-at-1130.png` · 1130×900 | **720 / 720** at 1440 and **565 / 565** at 1130 — each side exactly half · `1 of 2` · `Hooka → Carres Klang`, then `Hooka → AL Sungai Buloh` · **not a dialog** · preview says `This is a preview. Issue PO creates the number.` · **no send, download or confirm control exists before creation** |
+| 5 | `5-not-yet-sent.png` · 1440×900 | `PO-20260822-4041 has not reached Hooka` · the three TOOLS present · `Record the PDF sent` present and **disabled with no recipient** · **0 banned words** |
+| 6 | `6-confirmed-issue.png` · 1440×900 | `PO-20260822-4041 reached Hooka` · `Recorded as sent by WhatsApp` · the form locks after confirmation |
+
+**Four real defects the walk found, all fixed rather than photographed around:**
+
+1. `Not counted yet` — the sentence COPY-STANDARD OWES on a blocked row — truncated to
+   `Not cou…`. `Stock`, `Open PO` and `Required For` widened; other columns trimmed to pay.
+2. The 50/50 measured **375 / 375** inside a flex parent: the workspace never declared its own
+   width. A component that lays out correctly only inside one particular parent is fragile, so
+   both surfaces now declare it.
+3. `Recorded as sent by WhatsApp to` could end in a dangling `to` when no recipient was held.
+4. Three colour steps (`kit-blue-10`, `kit-slate-2`, `kit-slate-7`) the palette does not publish
+   would have rendered as **nothing at all** — caught by `kit-palette.test`.
+
+Two more came from the integration test rather than the walk: the Register trusted `data.rows`
+existed and white-screened on a malformed payload (the orchestrator now parses the response
+against the shared schema — `Nothing needs buying.` is a business answer a broken read may not
+borrow), and the banned-word scan would have passed vacuously forever on the thinned orchestrator.
+
+### 15.5 Judgment calls made under the Card's own authority
+
+- **The group key has four parts, not two.** §4.2 requires one supplier and one `Deliver To` per
+  document; it does not require the converse. Two shipped rules already partition further — a sofa
+  is one PO per customer order (locked 2026-07-27) and a proposal is supplier × category. Merging
+  either would be a business change this Card does not carry, so the key is
+  `supplier × destination × category × (sofa ? order : "")`: strictly inside §4.2, and the only
+  behaviour that changes is the one asked for.
+- **`/issue-batch` is a new door beside the old `/issue`.** The old one still serves ~1,900 lines
+  of guard tests and is the only issuer for nothing else now. Deleting it in the same change would
+  have removed that cover in one step; it is named below as the follow-up.
+- **The rail wording** was resolved from `docs/COPY-STANDARD.md`, which spells all six states, both
+  headings and every fix line. The Card's §3.1 ASCII matches it exactly; MASTER §9.1's longer forms
+  are the FACT line, which is what the row prints.
+
+### 15.6 Owed, and deliberately not done here
+
+- 🔴 **Migration 0376 is not applied.** It needs the governed production approval path, and
+  repository 0375 must be applied before it.
+- 🟡 **`POST …/to-order/issue` is still mounted.** Its only caller is gone. Retiring it, and moving
+  its still-valuable guard tests onto `/issue-batch`, is a small follow-up scope.
+- 🟡 **`documentDecisions` is accepted by the API but the 50/50 does not yet collect
+  transaction cost / Free of Charge / procurement partner.** Every law is enforced server-side —
+  a missing catalog cost returns `cost_required` and a factory-pickup document returns
+  `pickup_partner_required`, so nothing can be issued wrongly — but an operator meeting one of
+  those today is told by an error rather than by a field. The controls are the next scope.
+- 🟡 The right-hand pane after creation points at the PO document endpoint; wiring the rendered
+  `renderPoPdf` blob into the iframe is a small piece left with it.
+
+**STOPPED AT THE MERGE BOUNDARY** per §9 Task 8 and §14. Not pushed, no PR, nothing deployed,
+no migration applied.

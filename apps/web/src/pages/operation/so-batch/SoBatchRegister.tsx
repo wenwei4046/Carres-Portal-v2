@@ -181,7 +181,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
       {
         key: "source",
         label: W.colSourceSo,
-        width: 150,
+        width: 128,
         sortable: true,
         chooserGroup: "Source",
         accessor: (r) => (
@@ -199,7 +199,8 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
       {
         key: "requiredFor",
         label: W.colRequiredFor,
-        width: 132,
+        /* `No delivery date yet` is an owed sentence too — see `stock`. */
+        width: 146,
         sortable: true,
         chooserGroup: "Dates",
         accessor: (r) => (
@@ -217,7 +218,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
       {
         key: "sku",
         label: W.colSku,
-        width: 240,
+        width: 210,
         sortable: true,
         chooserGroup: "Item",
         accessor: (r) => (
@@ -248,7 +249,10 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
       {
         key: "stock",
         label: W.colStock,
-        width: 80,
+        /* Wide enough for `Not counted yet` — the sentence COPY-STANDARD owes
+           when the blocker also blocks the arithmetic. A column that truncates
+           it to `Not cou…` prints neither a number nor an answer. */
+        width: 118,
         align: "right",
         sortable: true,
         chooserGroup: "Quantity",
@@ -259,7 +263,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
       {
         key: "openPo",
         label: W.colOpenPo,
-        width: 96,
+        width: 118,
         align: "right",
         sortable: true,
         chooserGroup: "Quantity",
@@ -291,7 +295,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
       {
         key: "supplier",
         label: W.colSupplier,
-        width: 140,
+        width: 124,
         sortable: true,
         chooserGroup: "Source",
         accessor: (r) =>
@@ -335,7 +339,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
       {
         key: "goodsMustArrive",
         label: W.goodsMustArrive,
-        width: 148,
+        width: 132,
         sortable: true,
         chooserGroup: "Dates",
         accessor: (r) => (
@@ -352,7 +356,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
            AVATAR beside them — never a word inside the sentence. */
         key: "work",
         label: W.colWork,
-        width: 260,
+        width: 230,
         chooserGroup: "Work",
         accessor: (r) => {
           if (!r.action) return null;
@@ -463,7 +467,10 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
   const selectedKeys = useMemo(() => new Set(live.keys()), [live]);
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-kit-canvas" data-testid="so-batch-page">
+    <div
+      className="flex h-full min-h-0 w-full flex-1 flex-col bg-kit-canvas"
+      data-testid="so-batch-page"
+    >
       <PurchasingTabs />
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <aside

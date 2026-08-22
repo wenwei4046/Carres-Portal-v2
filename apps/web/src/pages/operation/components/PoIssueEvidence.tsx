@@ -78,7 +78,12 @@ export default function PoIssueEvidence({
       </h2>
       <p className="mt-0.5 text-meta text-kit-slate-11">
         {confirmed
-          ? `Recorded as sent by ${CHANNEL_WORD[channel]} to ${recipient.trim()}`
+          ? /* The recipient is named only when there is one. A sentence that can
+               end in a dangling `to` is a sentence that tells the reader a fact
+               is missing without saying which. */
+            recipient.trim()
+            ? `Recorded as sent by ${CHANNEL_WORD[channel]} to ${recipient.trim()}`
+            : `Recorded as sent by ${CHANNEL_WORD[channel]}`
           : `Open the ${CHANNEL_WORD[channel]} group and send this PDF`}
       </p>
 

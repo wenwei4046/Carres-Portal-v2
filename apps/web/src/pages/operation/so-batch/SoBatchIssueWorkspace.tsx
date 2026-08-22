@@ -133,7 +133,7 @@ export default function SoBatchIssueWorkspace({
 
   return (
     <div
-      className="flex h-full min-h-0 flex-col bg-kit-canvas"
+      className="flex h-full min-h-0 w-full flex-1 flex-col bg-kit-canvas"
       data-testid="so-batch-issue-workspace"
     >
       <div className="flex h-[50px] shrink-0 items-center justify-between gap-3 border-b border-kit-slate-5 bg-white px-4">
@@ -190,9 +190,9 @@ export default function SoBatchIssueWorkspace({
                 <thead>
                   <tr className="border-b border-kit-slate-5 text-label uppercase text-kit-slate-11">
                     <th className="py-1 text-left">Item</th>
-                    <th className="py-1 text-left">Source</th>
-                    <th className="py-1 text-right">Qty</th>
-                    <th className="py-1 text-left">Goods must arrive</th>
+                    <th className="w-24 py-1 text-left">Source</th>
+                    <th className="w-14 py-1 pr-3 text-right">Qty</th>
+                    <th className="w-40 py-1 text-left">Goods must arrive</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -209,7 +209,7 @@ export default function SoBatchIssueWorkspace({
                       <td className="py-1 font-mono text-meta">
                         {l.so == null ? "" : `SO-${l.so}`}
                       </td>
-                      <td className="py-1 text-right tabular-nums">{l.qty}</td>
+                      <td className="py-1 pr-3 text-right tabular-nums">{l.qty}</td>
                       <td className="py-1 text-meta">
                         {l.goodsMustArrive ? fmtDate(l.goodsMustArrive) : ""}
                       </td>
