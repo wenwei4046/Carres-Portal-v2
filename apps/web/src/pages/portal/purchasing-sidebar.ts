@@ -1,17 +1,17 @@
 import type { PortalNavItem } from "./portal-nav";
 
 /**
- * THE PURCHASING MAP — five named groups inside one module row
- * (CARD-2026-08-20-purchasing-sidebar-groups, owner-approved; the tree is
- * `docs/purchasing/MASTER.md` §1).
+ * THE PURCHASING MAP — four named groups inside one module row
+ * (CARD-2026-08-22-purchasing-01-final-sidebar-listing, owner-approved; the
+ * tree is `docs/purchasing/MASTER.md` §4).
  *
  * The shipped module accordion (CARD-2026-08-19-sidebar-expandable-modules)
  * gave the rail its outer grammar: one expandable module row, its
  * pages hanging off rounded elbows. That grammar holds for five pages and
- * breaks at eighteen — a new hire cannot tell from a flat list which row
- * holds a REQUEST, a buying document, a receipt, a supplier problem or a
- * consignment paper. So the module's pages hang off five NAMED drawers, and
- * the operator opens the one their job lives in.
+ * breaks at eleven — a new hire cannot tell from a flat list which row holds
+ * a buying document, a receipt, a supplier problem or a showroom paper. So
+ * the module's pages hang off four NAMED drawers, and the operator opens the
+ * one their job lives in.
  *
  * ⭐ THIS FILE OWNS GROUPING AND PRESENTATION STATE — NEVER ROUTES.
  * `portal-nav.ts` stays the one page/route source; every helper here consumes
@@ -23,11 +23,10 @@ import type { PortalNavItem } from "./portal-nav";
  */
 
 export type PurchasingPageGroupKey =
-  | "purchasing-requests"
   | "purchasing-buy"
   | "purchasing-receive"
   | "purchasing-problems"
-  | "purchasing-consignment";
+  | "purchasing-showroom";
 
 export interface PurchasingPageGroup {
   key: PurchasingPageGroupKey;
@@ -36,16 +35,20 @@ export interface PurchasingPageGroup {
 }
 
 /**
- * The five drawers, in the approved order — the order a purchase actually
- * travels: someone ASKS, you BUY, the goods are RECEIVED, something goes
- * WRONG, and consignment is the separate book that never mixes with any of it.
+ * The four drawers, in the approved order — the order a purchase actually
+ * travels: you BUY, the goods are RECEIVED, something goes WRONG, and
+ * SHOWROOM is the floor-display book that never mixes with any of it.
+ *
+ * REQUESTS is gone: a blocked buy opens an in-context governed supplier/SKU
+ * request to Catalog and comes straight back to the same buy, so there was
+ * never a destination to name. CONSIGNMENT became SHOWROOM because the drawer
+ * holds bought display goods as well as supplier-owned ones.
  */
 export const PURCHASING_PAGE_GROUPS: ReadonlyArray<PurchasingPageGroup> = [
-  { key: "purchasing-requests", label: "REQUESTS" },
   { key: "purchasing-buy", label: "BUY" },
   { key: "purchasing-receive", label: "RECEIVE" },
   { key: "purchasing-problems", label: "PROBLEMS" },
-  { key: "purchasing-consignment", label: "CONSIGNMENT" },
+  { key: "purchasing-showroom", label: "SHOWROOM" },
 ];
 
 const GROUP_KEYS = new Set<string>(PURCHASING_PAGE_GROUPS.map((g) => g.key));
@@ -55,10 +58,10 @@ const GROUP_KEYS = new Set<string>(PURCHASING_PAGE_GROUPS.map((g) => g.key));
  *
  * The 60px icon rail has one Purchasing control and it must open a page the
  * operator expects. Taking "the first live row" made that page a side effect
- * of row order — grouping the rail moved it from `SO Batch Purchase` to
- * `Manual Purchase Requests` with nobody deciding it. So the destination is
- * named here: `SO Batch Purchase`, the buyer's daily page. When
- * `Purchasing Home` is built, ITS OWN approved scope may change this.
+ * of row order — grouping the rail once moved it from `SO Batch Purchase` to
+ * a request page with nobody deciding it. So the destination is named here:
+ * `SO Batch Purchase`, the buyer's daily page. It is PERMANENT — there is no
+ * Purchasing Home to hand it to (`docs/purchasing/MASTER.md` §4).
  */
 export const PURCHASING_LANDING_KEY = "purchase";
 
@@ -70,10 +73,12 @@ export type PurchasingChildBlock =
 /**
  * The module's children, grouped.
  *
- * Presentation only. A page with no `pageGroup` — `Purchasing Home`,
- * `My Purchasing Work`, the trailing `Report` — stays a direct row at the
- * module's own child indent. A group takes the position of its FIRST member,
- * so the drawers cannot silently reshuffle: the nav array is still the order.
+ * Presentation only. Every Purchasing page hangs in a drawer today; a page
+ * with no `pageGroup` would stay a direct row at the module's own child
+ * indent, and that fallback is kept because losing a page is worse than
+ * drawing it in the wrong place. A group takes the position of its FIRST
+ * member, so the drawers cannot silently reshuffle: the nav array is still
+ * the order.
  */
 export function purchasingChildBlocks(
   pages: ReadonlyArray<PortalNavItem>,
@@ -128,12 +133,12 @@ export function activePurchasingGroup(
  * open. No route, no active key, no count, no business status — a rail
  * preference may never become a second source of business truth.
  */
-export interface PurchasingSidebarStateV1 {
+export interface PurchasingSidebarStateV2 {
   moduleOpen: boolean;
   openGroups: ReadonlyArray<PurchasingPageGroupKey>;
 }
 
-export const EMPTY_PURCHASING_SIDEBAR_STATE: PurchasingSidebarStateV1 = {
+export const EMPTY_PURCHASING_SIDEBAR_STATE: PurchasingSidebarStateV2 = {
   moduleOpen: false,
   openGroups: [],
 };
@@ -145,9 +150,15 @@ export const EMPTY_PURCHASING_SIDEBAR_STATE: PurchasingSidebarStateV1 = {
  * open drawers are not the other's. `session.user.id`, never the email: an
  * email is a business identifier that can change, and it would put a staff
  * address in local storage for no gain.
+ *
+ * ⭐ V2 SINCE 2026-08-22. The allowed group keys changed, so a stored V1
+ * preference names two drawers that no longer exist. The old key is left where
+ * it is rather than migrated or deleted: it is a rail preference, not business
+ * truth, and the honest cost of getting it wrong is one operator re-opening
+ * one drawer once.
  */
 export function purchasingSidebarStorageKey(userId: string): string {
-  return `carres:portal-sidebar:purchasing:v1:${userId}`;
+  return `carres:portal-sidebar:purchasing:v2:${userId}`;
 }
 
 /**
@@ -157,7 +168,7 @@ export function purchasingSidebarStorageKey(userId: string): string {
  */
 export function parsePurchasingSidebarState(
   raw: string | null,
-): PurchasingSidebarStateV1 {
+): PurchasingSidebarStateV2 {
   if (!raw) return EMPTY_PURCHASING_SIDEBAR_STATE;
   let parsed: unknown;
   try {
@@ -184,7 +195,7 @@ export function parsePurchasingSidebarState(
 }
 
 export function serializePurchasingSidebarState(
-  state: PurchasingSidebarStateV1,
+  state: PurchasingSidebarStateV2,
 ): string {
   // Written field by field on purpose — spreading the caller's object is how a
   // route or a count would one day end up in storage.

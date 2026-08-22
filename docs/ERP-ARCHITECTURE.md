@@ -196,16 +196,9 @@ SALES
 
 SUPPLY CHAIN
 ├── Purchasing
-│   ├── Purchasing Home
-│   ├── My Purchasing Work          filtered view of the shared Work Engine
-│   ├── REQUESTS
-│   │   ├── New Supplier Requests
-│   │   ├── New SKU Requests
-│   │   ├── Display Requests
-│   │   └── Manual Purchase Requests
 │   ├── BUY
-│   │   ├── Purchase Demands
 │   │   ├── SO Batch Purchase
+│   │   ├── Manual Purchase
 │   │   └── Purchase Orders
 │   ├── RECEIVE
 │   │   └── Goods Receipts
@@ -213,10 +206,9 @@ SUPPLY CHAIN
 │   │   ├── Supplier Claims
 │   │   ├── Purchase Returns
 │   │   └── Repair Orders
-│   └── CONSIGNMENT
-│       ├── Consignment Overview
+│   └── SHOWROOM
+│       ├── Display Requests
 │       ├── Consignment Orders
-│       ├── Consignment Receipts
 │       ├── Consignment Returns
 │       └── Consignment Sale Notices
 ├── Warehouse
@@ -259,10 +251,9 @@ feeds which — is the module MASTER's, and it changes when the business changes
 
 **A MODULE'S PAGES LIVE IN THE RAIL, AND THE WHOLE MAP IS SHOWN FROM DAY ONE.** The shared
 module row expands in place: one rail, not a second module sidebar or a long tab strip. Purchasing
-adds one nested level because its complete map contains direct Home/Work doors and five recognisable
-operator groups: REQUESTS, BUY, RECEIVE, PROBLEMS and CONSIGNMENT. Each group expands independently;
-the active destination's group remains open. The exact interaction and wire-line grammar live in
-`docs/ui/MASTER.md` §4.2.
+adds one nested level because its complete map has four recognisable operator groups: BUY, RECEIVE,
+PROBLEMS and SHOWROOM. Each group expands independently; the active destination's group remains
+open. The exact interaction and wire-line grammar live in `docs/ui/MASTER.md` §4.2.
 
 **Every approved page is listed before it exists.** The rail is the module's MAP, and a map
 showing four of eleven roads teaches the operators a shape that is about to change under them
@@ -281,11 +272,11 @@ destination region scrolls. The active row is brought into view without centring
 the brand/collapse area and signed-in user remain fixed.
 
 **A DOCUMENT EARNS A DOOR WHEN A HUMAN LOOKS FOR IT BY NAME.** Carres runs three operations staff
-who each do every Purchasing job, so findability may not depend on memory. `My Purchasing Work`
-therefore exposes a Purchasing-filtered view of the one shared Work Engine; it owns no duplicate
-task truth. `Purchase Demands` is the authoritative demand Register but has no Issue authority;
-`SO Batch Purchase` remains the sole Purchase Order creation workspace. Named doors improve
-findability without multiplying action engines or business truth.
+who each do every Purchasing job, so findability may not depend on memory. `My Work` and `Team Work`
+remain the one shared Work Engine; Purchasing does not duplicate them. `purchase_demand` remains the
+authoritative line-level need and coverage remainder, but it has no sidebar destination or Issue
+authority. `SO Batch Purchase` and approved `Manual Purchase` feed the one PO issuance authority.
+Named doors improve findability without multiplying action engines or business truth.
 
 
 ---
@@ -366,6 +357,8 @@ else is a consequence of it.**
 
 **OWNS**
 - The **purchase order** — what we asked a factory for, when we asked, what they promised.
+- The approved `purchase_demand` remainder, whether its source is a Sales Order or Manual Purchase.
+- `Deliver To`, supplier-facing versions and proof that the current PDF was actually sent.
 - The supplier conversation and every promise on it (append-only; a promise is never
   overwritten).
 - The engine numbers: production days, order-by buffer, PO days, supplier work week.
@@ -373,13 +366,15 @@ else is a consequence of it.**
   stored number.
 
 **ACTIONS**
-- Issue a purchase order · call the supplier for a ready date · call about tomorrow's delivery ·
-  call about a balance date · cancel an outstanding demand · set the engine numbers.
+- Issue/revise a purchase order · ask the supplier for an actual date · ask about a dated late
+  delivery or balance · govern supplier claims/returns/repairs · issue consignment orders/returns/
+  sale notices · cancel an outstanding demand · set the engine numbers.
 
 **SUMMARISES** — the customer's promised date and the customer's name (to know what is urgent
 and who is waiting) · free stock (to suggest, never to consume).
 
-**LINKS TO** — the customer order · Receiving (hand over when the van is coming) · Stock.
+**LINKS TO** — the customer order · Receiving · Stock · Delivery required-arrival dates · Service
+Case outcomes · Finance/AP read-only continuation.
 
 > **The rule V1 proved by breaking it (D1): a customer order asking *"has this been bought?"*
 > must ask PURCHASING, through the purchase order.** Never through a column an importer writes.
@@ -389,7 +384,7 @@ and who is waiting) · free stock (to suggest, never to consume).
 ## 3.4 · RECEIVING
 
 **OWNS**
-- The **Receiving Session** — ONE physical delivery, one session.
+- The **Receiving Session / Goods Receipt** — ONE physical delivery, one session, from a PO or CO.
 - The three times (goods received at · submitted at · posted at) and the append-only event
   ledger. **Amend and Void are its acts; history is never edited in place.**
 - **`purchase_order_lines.received_qty` moves only through this module.**
@@ -401,6 +396,9 @@ amend it · void it · return a count for a re-check.
 
 **LINKS TO** — Purchasing (the PO) · Stock (where the units landed) · Supplier Claim (what the
 count opened).
+
+Supplier-consignment receipt preserves supplier ownership and creates no payable. Goods Receipts
+is the one receipt engine; a separate Consignment Receipt page would duplicate the physical act.
 
 > **ONE DOOR. This is the boundary D2 restored**, and it is the sharpest example of Law C in the
 > whole system: a second receive form did not create a second door onto one act — **it created a
@@ -613,10 +611,10 @@ owns its meaning.
 
 ---
 
-# §6 · Decisions still owed — business, not engineering
+# §6 · Cross-module decisions and resolved rulings
 
-**These cannot be settled by reading code, measuring the database, or applying a law already
-ruled. They are the only things this document leaves open.**
+This section records the authority decisions that fix cross-module seams. A row explicitly marked
+resolved is not an Owner Decision and may not be reopened merely because a later build needs detail.
 
 **① Where does STORAGE live? — FROZEN 2026-08-06. See §6.1, and it is the
 reference pattern for every future cross-module ownership question.**
@@ -721,14 +719,16 @@ that already exist. Until that fact exists, a trip table is an unowned record �
 > *Naming note: `ops_order_control.delivery_trips` (0282) is unaffected — it is the
 > append-only history of bookings a later confirmation replaced, not a trip store.*
 
-**③ Does Purchasing own the goods until they are received, or does the customer order?**
-Today a demand belongs to the order and a PO belongs to Purchasing, and the seam between them
-is where D1 lived. **A clean answer removes a whole class of defect.**
+**③ Purchasing / customer-order seam — RESOLVED FROM AUTHORITY 2026-08-22.**
+The customer order owns the reason and promise. Purchasing owns the generated `purchase_demand`
+remainder, supplier commitment and `Deliver To`; Goods Receipts owns the physical receipt; Stock
+then owns Unit custody/location. The Sales Order reads risk and connected documents but cannot mark
+goods ordered or received.
 
-**④ One entrance to Supplier Claim, or two?**
-Adding the Service entrance means the entry rule and the refurbish door move together — that
-was already recorded as the price. **It is approved architecture and not yet a decision to
-build.**
+**④ Supplier Claim entrance — RESOLVED FROM AUTHORITY 2026-08-22.**
+There is one problem intake through Service Case or the authoritative receiving exception. The
+system creates the Purchasing claim workstream when supplier responsibility is in scope.
+`Supplier Claims` is the Purchasing work view, not a second intake.
 
 **⑤ Is Orders V1 migrated, or replaced?**
 This document is the blueprint either way. **Which one it is changes nothing above and

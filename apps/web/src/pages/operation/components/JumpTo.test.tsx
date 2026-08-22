@@ -139,22 +139,35 @@ describe("what typing searches", () => {
   it("matches governed destination NAMES — the pages, never an unbuilt door", () => {
     // The PAGES are the destinations, never the module row. `Purchase Returns`
     // is `Coming soon` and a door the rail refuses to open may not be offered
-    // here — grouping the rail (CARD-2026-08-20) changed no destination and
-    // added no door, because a drawer is presentation and Jump To lists pages.
+    // here — grouping the rail changed no destination and added no door,
+    // because a drawer is presentation and Jump To lists pages.
     //
-    // Starts-with ranks first, then contains in nav order — and in the grouped
-    // nav `Manual Purchase Requests` (REQUESTS) now precedes `SO Batch
-    // Purchase` (BUY). Same three doors, same three routes.
+    // CARD-2026-08-22-purchasing-01: the final rail lists eleven pages, five of
+    // them live. `Purchase Demands` and `Report` LEFT the rail, so Jump To may
+    // not offer them either — a demand is a hidden record, not a destination.
+    //
+    // Starts-with ranks first — `Purchase Orders` — then contains, in NAV
+    // order, which is the BUY drawer's own order: `SO Batch Purchase` then
+    // `Manual Purchase`.
     expect(
       matchDestinations(permittedDestinations("operation"), "purch").map((d) => d.label),
-      // `Purchase Demands` joined on 2026-08-20 — it is a BUILT door now
-      // (CARD-2026-08-20-purchase-demands), so Jump to must reach it.
-    ).toEqual([
+    ).toEqual(["Purchase Orders", "SO Batch Purchase", "Manual Purchase"]);
+  });
+
+  it("every retired Purchasing row is unreachable from Jump To", () => {
+    const all = permittedDestinations("operation").map((d) => d.label);
+    for (const word of [
+      "Purchasing Home",
+      "My Purchasing Work",
+      "New Supplier Requests",
+      "New SKU Requests",
       "Purchase Demands",
-      "Purchase Orders",
+      "Consignment Overview",
+      "Consignment Receipts",
       "Manual Purchase Requests",
-      "SO Batch Purchase",
-    ]);
+    ]) {
+      expect(all, word).not.toContain(word);
+    }
   });
 
   it("a document result prints its number, its type and the identifying party", async () => {

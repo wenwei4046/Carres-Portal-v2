@@ -55,9 +55,16 @@ supplier-consignment display goods, sold display goods awaiting delivery, and go
 change, return or supplier collection.
 
 The ID is created when a PO or Consignment Order is confirmed and supplied to the supplier. The
-supplier adds CARRES UNIT ID to its own label; Carres does not routinely print supplier labels.
-A wrong or unreadable label starts a controlled issue, never a second Unit. Replacement labels keep
-the original ID and full evidence. IDs are never reused.
+locked human format is `U1-000-001`: six system-controlled digits grouped 3 + 3. After
+`U1-999-999`, allocation continues at `U2-000-001`. Allocation is company-wide, never reset,
+manually created or reused. Search/scan may normalise punctuation, but the visible identity never
+changes.
+
+The supplier currently adds `CARRES UNIT ID: U1-000-001` only to its own package label. A supplier
+physical-Unit label, QR, barcode and Carres template are not required now. Carres Operations attaches
+the same text ID to the physical Unit at the showroom. Future supplier labelling or QR/barcode is
+only a carrier for the same Unit ID. A wrong or unreadable label starts a controlled issue, never a
+second Unit. Replacement labels keep the original ID and full evidence.
 
 Every active Unit has Catalog identity, source order, ownership, **Where**, **Who has it**,
 condition, calculated availability, reservation connection, last verified date, evidence and
@@ -88,6 +95,11 @@ page or integration maintains another available quantity.
 | between confirmed handovers | In transit |
 | issue, inspection, repair, missing component or other control | Not available |
 | customer accepted or lifecycle ended | Delivered / history |
+
+Successful customer delivery of an exact `Supplier Consignment` Unit emits the authoritative sold
+event Purchasing uses to create a Consignment Sale Notice. Stock records the ownership/history
+consequence once; it does not issue the notice, create supplier payable or settle money. A failed or
+refused delivery emits no sale event.
 
 Sales Order owns choosing, binding, changing and releasing the exact promised Unit. Stock validates
 eligibility and reflects the result. Warehouse may report a problem but cannot silently release or

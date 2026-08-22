@@ -397,6 +397,11 @@ Related Documents and Order Route only link to the documents. For Singapore, eac
 its own DO/document scope; split or rebooked documents remain separate history rather than
 overwriting one number.
 
+If a successful Delivery Visit contains an exact supplier-consignment Unit, the resulting
+Consignment Sale Notice is created under Purchasing and appears only as a linked Related Document /
+Order Route consequence. Sales Order creation, reservation, deposit and planning never create that
+notice, and Sales cannot issue or correct it.
+
 ## Completion, empty, loading and error truth
 
 There is no fake overall status. Each route states its own truth:
