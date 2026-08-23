@@ -41,7 +41,9 @@ function validDraft(): WizardDraft {
       addressCity: "Bangsar",
       addressPostcode: "59000",
       addressUnknown: false,
-      buildingType: "",
+      /* Required since 2026-08-21 — a "fully filled valid draft" has to carry
+         one now, the same as a state or a postcode. */
+      buildingType: "Condo",
       billing: "",
       billingSame: true,
       billingLine1: "",

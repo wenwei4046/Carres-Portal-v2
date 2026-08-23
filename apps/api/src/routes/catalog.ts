@@ -788,7 +788,18 @@ catalogRouter.post("/skus", async (c) => {
       pwp_price: parsed.data.pwpPrice ?? null,
       supplier_id: supplierId,
       // 0375 — the supplier's own item code. '' → null (a blank is not a code).
-      supplier_code: parsed.data.supplierCode?.trim() || null,
+      //
+      // ⚠️ SPREAD, NOT A FIXED KEY, and the reason is a deploy-order hazard:
+      // this route ships with the WEB deploy, but 0375 is applied BY HAND. In
+      // the window between them the column does not exist, and PostgREST
+      // refuses an INSERT naming an unknown column — which would have taken
+      // out SKU creation entirely, not just the new field. Omitting the key
+      // when nobody typed a code keeps the old path working untouched; a
+      // typed code still fails loudly, which is the honest half of the trade.
+      // The PATCH door is already conditional for the same reason.
+      ...(parsed.data.supplierCode?.trim()
+        ? { supplier_code: parsed.data.supplierCode.trim() }
+        : {}),
       description,
       pos_active: parsed.data.posActive ?? true,
     })
@@ -1171,6 +1182,10 @@ catalogRouter.post("/import-skus", async (c) => {
     if (r.price !== undefined) p.price = r.price;
     if (r.cost !== undefined) p.cost = r.cost;
     if (r.description !== undefined) p.description = r.description;
+    /* 0376 — the supplier's own item code. Same omitted-means-preserve rule:
+       a file with no supplier_code column must not wipe codes keyed in by
+       hand, and only a PRESENT-but-blank cell clears one. */
+    if (r.supplierCode !== undefined) p.supplier_code = r.supplierCode;
     if (r.posActive !== undefined) p.pos_active = r.posActive;
 
     payloadRows.push(p);

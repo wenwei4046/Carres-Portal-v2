@@ -479,6 +479,13 @@ export function step1FirstIssue(
     if (!c.addressState)                    return "Address — State, or tick 'Unknown'";
     if (!c.addressCity)                     return "Address — City, or tick 'Unknown'";
     if (!c.addressPostcode)                 return "Address — Postcode, or tick 'Unknown'";
+    /* 2026-08-21 (Jess) — building type is DELIVERY's fact: stairs, lift
+     * access and van parking all hang off it, and Operations was chasing the
+     * shop for it after the sale. The office door began refusing a create
+     * without it the same day; this is the POS half, and it sits INSIDE the
+     * address branch for the same reason the office one does — an address
+     * nobody has yet cannot be asked what kind of building it is. */
+    if (!c.buildingType)                    return "Address — Building type, or tick 'Unknown'";
   }
   // 2026-07-19 (Loo) — billing keys in with the SAME MY cascade as delivery,
   // so the gate mirrors the delivery rules field-for-field.
