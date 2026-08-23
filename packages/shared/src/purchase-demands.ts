@@ -204,6 +204,22 @@ export interface PurchaseDemandRow {
   issueRef: { proposalKey: string; buildKey: string } | null;
   /** The structured Work contract. `null` when nothing is owed on this line. */
   action: SoBatchPurchaseAction | null;
+  /**
+   * THE CATALOG COST PER SKU, so the 50/50 can ask for the one it does not have
+   * (Card §5.2). `unitCost: null` is the whole point: a SKU Catalog has no price
+   * for cannot be issued until the operator states a Transaction Cost or marks
+   * it Free of Charge with a reason. A `0` here would be a price nobody set.
+   *
+   * It is the CATALOG's number, carried for display and for the unchanged-cost
+   * comparison. The server re-reads it at issue and refuses a stale one.
+   */
+  costs: Array<{ sku: string; unitCost: number | null }>;
+  /**
+   * Whether this supplier's goods are collected from the factory. A
+   * factory-pickup document needs a procurement partner before it can be
+   * issued, and the operator has to be able to choose one on the same screen.
+   */
+  supplierKind: "own_logistics" | "factory_pickup" | null;
   /** WHO fixes the blocker — a real person when a stored fact names one. */
   ownerName: string | null;
   /** The duty word, when no person resolves. */
@@ -631,6 +647,8 @@ export const purchaseDemandRowSchema = z.object({
     .object({ proposalKey: z.string(), buildKey: z.string() })
     .nullable(),
   action: soBatchPurchaseActionSchema.nullable(),
+  costs: z.array(z.object({ sku: z.string(), unitCost: z.number().nullable() })),
+  supplierKind: z.enum(["own_logistics", "factory_pickup"]).nullable(),
   ownerName: z.string().nullable(),
   ownerDuty: z.string().nullable(),
 });
@@ -667,6 +685,8 @@ export const soBatchPurchaseResponseSchema = z.object({
   defaultDestinationId: z.string().nullable(),
   currentPoDuty: z.object({ userId: z.string(), name: z.string() }).nullable(),
   mayIssue: z.boolean(),
+  /** Who may collect from a factory, for the documents that need one. */
+  procurementPartners: z.array(z.object({ id: z.string(), name: z.string() })),
 });
 
 export type SoBatchPurchaseResponse = z.infer<typeof soBatchPurchaseResponseSchema>;

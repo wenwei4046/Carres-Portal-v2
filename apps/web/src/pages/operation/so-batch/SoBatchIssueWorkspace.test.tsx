@@ -52,8 +52,10 @@ function doc(over: Partial<SoBatchDocument> = {}): SoBatchDocument {
         qty: 2,
         goodsMustArrive: "2026-08-19",
         issueRef: { proposalKey: "s-hooka::mattress", buildKey: "b1" },
+        costs: [{ sku: "B1201S-K", unitCost: 100 }],
       },
     ],
+    supplierKind: "own_logistics",
     ...over,
   };
 }
@@ -75,8 +77,10 @@ const SECOND = doc({
       qty: 1,
       goodsMustArrive: "2026-08-25",
       issueRef: { proposalKey: "s-ohana::mattress", buildKey: "b2" },
+      costs: [{ sku: "H1401S-Q", unitCost: 250 }],
     },
   ],
+  supplierKind: "own_logistics",
 });
 
 const onBack = vi.fn();
@@ -87,16 +91,25 @@ function renderWorkspace(documents: SoBatchDocument[] = [doc()]) {
     <SoBatchIssueWorkspace
       documents={documents}
       destinations={[KLANG, BULOH]}
+      procurementPartners={[{ id: "p-nets", name: "NETS" }]}
       onBack={onBack}
       onDone={onDone}
     />,
   );
 }
 
+/* jsdom ships no object-URL implementation; the browser does. Stubbed so the
+   PDF path can be exercised at all — the component's own failure branch is
+   asserted separately below. */
 beforeEach(() => {
   onBack.mockClear();
   onDone.mockClear();
   apiFetch.mockReset();
+  Object.defineProperty(URL, "createObjectURL", {
+    configurable: true,
+    value: vi.fn(() => "blob:so-batch-test"),
+  });
+  Object.defineProperty(URL, "revokeObjectURL", { configurable: true, value: vi.fn() });
 });
 
 describe("50% work + 50% the actual document", () => {
@@ -313,5 +326,251 @@ describe("Issue PO stays open until the PDF actually reaches the supplier", () =
     for (const banned of ["Pending", "Follow up", "Needs attention", "Waiting", "Today"]) {
       expect(text, banned).not.toContain(banned);
     }
+  });
+});
+
+
+/**
+ * THE GOVERNED DOCUMENT DECISIONS (Card §5.2, §7.3).
+ *
+ * The left side is the ONLY editable issue surface, so every commercial fact a
+ * purchase order needs has to be settleable HERE. An operator who meets
+ * `cost_required` or `pickup_partner_required` must be able to fix it without
+ * leaving the journey — an error message is not a control.
+ */
+const noCost = doc({
+  lines: [
+    {
+      demandId: "build::o9::b9", orderId: "o9", so: 1399, item: "Orphan",
+      variant: "King", skus: ["X-NEW-K"], qty: 1, goodsMustArrive: "2026-09-01",
+      issueRef: { proposalKey: "s-hooka::mattress", buildKey: "b9" },
+      costs: [{ sku: "X-NEW-K", unitCost: null }],
+    },
+  ],
+});
+
+const pickup = doc({ supplierKind: "factory_pickup" });
+
+describe("Transaction Cost, or Free of Charge with a reason", () => {
+  it("shows the Catalog price it already has, and does not ask again", () => {
+    renderWorkspace();
+    const cost = screen.getByTestId("so-batch-cost-B1201S-K") as HTMLInputElement;
+    expect(cost.value).toBe("100");
+    expect(screen.getByTestId("so-batch-issue-create")).toBeEnabled();
+  });
+
+  it("a SKU Catalog has no price for BLOCKS the issue until somebody states one", () => {
+    renderWorkspace([noCost]);
+    expect(screen.getByTestId("so-batch-issue-create")).toBeDisabled();
+    expect(screen.getByTestId("so-batch-issue-blocker")).toHaveTextContent(
+      "X-NEW-K needs a transaction cost",
+    );
+  });
+
+  it("typing a cost unblocks it, and rides the request as hand-entered", async () => {
+    apiFetch.mockResolvedValue({ ok: true, pos: [] });
+    renderWorkspace([noCost]);
+    fireEvent.change(screen.getByTestId("so-batch-cost-X-NEW-K"), {
+      target: { value: "480" },
+    });
+    expect(screen.getByTestId("so-batch-issue-create")).toBeEnabled();
+    fireEvent.click(screen.getByTestId("so-batch-issue-create"));
+    await waitFor(() => expect(apiFetch).toHaveBeenCalled());
+    const body = JSON.parse((apiFetch.mock.calls[0]![1] as { body: string }).body);
+    expect(body.documentDecisions[0].lineDecisions).toEqual([
+      { sku: "X-NEW-K", treatment: "normal", unitCost: 480, costSource: "hand_entered" },
+    ]);
+  });
+
+  it("an untouched Catalog price is NOT sent — the server reads its own", async () => {
+    apiFetch.mockResolvedValue({ ok: true, pos: [] });
+    renderWorkspace();
+    fireEvent.click(screen.getByTestId("so-batch-issue-create"));
+    await waitFor(() => expect(apiFetch).toHaveBeenCalled());
+    const body = JSON.parse((apiFetch.mock.calls[0]![1] as { body: string }).body);
+    expect(body.documentDecisions[0]?.lineDecisions ?? []).toEqual([]);
+  });
+
+  it("a CHANGED catalog price is sent as hand-entered, never as `catalog`", async () => {
+    apiFetch.mockResolvedValue({ ok: true, pos: [] });
+    renderWorkspace();
+    fireEvent.change(screen.getByTestId("so-batch-cost-B1201S-K"), {
+      target: { value: "150" },
+    });
+    fireEvent.click(screen.getByTestId("so-batch-issue-create"));
+    await waitFor(() => expect(apiFetch).toHaveBeenCalled());
+    const body = JSON.parse((apiFetch.mock.calls[0]![1] as { body: string }).body);
+    expect(body.documentDecisions[0].lineDecisions[0]).toEqual({
+      sku: "B1201S-K", treatment: "normal", unitCost: 150, costSource: "hand_entered",
+    });
+  });
+
+  it("Free of Charge needs a reason, and says so until it has one", () => {
+    renderWorkspace([noCost]);
+    fireEvent.click(screen.getByTestId("so-batch-foc-X-NEW-K"));
+    expect(screen.getByTestId("so-batch-issue-create")).toBeDisabled();
+    expect(screen.getByTestId("so-batch-issue-blocker")).toHaveTextContent(
+      "X-NEW-K needs a reason",
+    );
+    fireEvent.change(screen.getByTestId("so-batch-foc-reason-X-NEW-K"), {
+      target: { value: "   " },
+    });
+    expect(screen.getByTestId("so-batch-issue-create")).toBeDisabled();
+  });
+
+  it("Free of Charge with a reason rides the request, and asks no price", async () => {
+    apiFetch.mockResolvedValue({ ok: true, pos: [] });
+    renderWorkspace([noCost]);
+    fireEvent.click(screen.getByTestId("so-batch-foc-X-NEW-K"));
+    fireEvent.change(screen.getByTestId("so-batch-foc-reason-X-NEW-K"), {
+      target: { value: "Supplier replacement" },
+    });
+    expect(screen.queryByTestId("so-batch-cost-X-NEW-K")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("so-batch-issue-create"));
+    await waitFor(() => expect(apiFetch).toHaveBeenCalled());
+    const body = JSON.parse((apiFetch.mock.calls[0]![1] as { body: string }).body);
+    expect(body.documentDecisions[0].lineDecisions).toEqual([
+      { sku: "X-NEW-K", treatment: "free_of_charge", reason: "Supplier replacement" },
+    ]);
+  });
+
+  it("a zero or negative cost is not a price", () => {
+    renderWorkspace([noCost]);
+    for (const bad of ["0", "-5"]) {
+      fireEvent.change(screen.getByTestId("so-batch-cost-X-NEW-K"), { target: { value: bad } });
+      expect(screen.getByTestId("so-batch-issue-create"), bad).toBeDisabled();
+    }
+  });
+});
+
+describe("a factory-pickup document needs its procurement partner", () => {
+  it("blocks the issue until one is chosen, and names what is missing", () => {
+    renderWorkspace([pickup]);
+    expect(screen.getByTestId("so-batch-issue-create")).toBeDisabled();
+    expect(screen.getByTestId("so-batch-issue-blocker")).toHaveTextContent(
+      "Hooka → Carres Klang needs a procurement partner",
+    );
+  });
+
+  it("choosing one unblocks it and rides the request", async () => {
+    apiFetch.mockResolvedValue({ ok: true, pos: [] });
+    renderWorkspace([pickup]);
+    fireEvent.change(screen.getByTestId("so-batch-partner"), { target: { value: "p-nets" } });
+    expect(screen.getByTestId("so-batch-issue-create")).toBeEnabled();
+    fireEvent.click(screen.getByTestId("so-batch-issue-create"));
+    await waitFor(() => expect(apiFetch).toHaveBeenCalled());
+    const body = JSON.parse((apiFetch.mock.calls[0]![1] as { body: string }).body);
+    expect(body.documentDecisions[0].procurementPartnerId).toBe("p-nets");
+  });
+
+  it("an own-logistics document is offered no partner control at all", () => {
+    renderWorkspace();
+    expect(screen.queryByTestId("so-batch-partner")).not.toBeInTheDocument();
+  });
+
+  it("its partner is null on the wire — never omitted, never smuggled", async () => {
+    apiFetch.mockResolvedValue({ ok: true, pos: [] });
+    renderWorkspace();
+    fireEvent.click(screen.getByTestId("so-batch-issue-create"));
+    await waitFor(() => expect(apiFetch).toHaveBeenCalled());
+    const body = JSON.parse((apiFetch.mock.calls[0]![1] as { body: string }).body);
+    expect(body.documentDecisions[0].procurementPartnerId).toBeNull();
+  });
+});
+
+describe("a decision is sent for EVERY document, not just the one on screen", () => {
+  it("two documents produce two decisions, each keyed to its own pair", async () => {
+    apiFetch.mockResolvedValue({ ok: true, pos: [] });
+    renderWorkspace([doc(), SECOND]);
+    fireEvent.click(screen.getByTestId("so-batch-issue-create"));
+    await waitFor(() => expect(apiFetch).toHaveBeenCalled());
+    const body = JSON.parse((apiFetch.mock.calls[0]![1] as { body: string }).body);
+    expect(body.documentDecisions).toHaveLength(2);
+    expect(body.documentDecisions.map((d: { supplierId: string }) => d.supplierId)).toEqual([
+      "s-hooka",
+      "s-ohana",
+    ]);
+  });
+
+  it("a blocker on document 2 blocks the batch from document 1's screen", () => {
+    renderWorkspace([doc(), noCost]);
+    expect(screen.getByTestId("so-batch-issue-count")).toHaveTextContent("1 of 2");
+    expect(screen.getByTestId("so-batch-issue-create")).toBeDisabled();
+    // ...and it says which document, so the operator knows where to go.
+    expect(screen.getByTestId("so-batch-issue-blocker")).toHaveTextContent("X-NEW-K");
+  });
+});
+
+
+/**
+ * THE RIGHT-HAND SIDE IS THE ACTUAL DOCUMENT (Card §5.2).
+ *
+ * Not the `/print-data` JSON in an iframe — that would show a payload and call
+ * it a purchase order. The same `renderPoPdf` template Purchase Orders prints
+ * from, so the operator checks the exact bytes the supplier receives.
+ */
+describe("after creation the preview is the real official PDF", () => {
+  const renderMod = () => import("@/lib/pdf/render");
+
+  async function created() {
+    apiFetch.mockImplementation((path: string) =>
+      path.includes("issue-batch")
+        ? Promise.resolve({
+            ok: true,
+            pos: [
+              {
+                id: "PO-20260822-4041", supplierId: "s-hooka", supplierName: "Hooka",
+                destinationId: KLANG.id, destination: "Carres Klang",
+              },
+            ],
+          })
+        : Promise.resolve({ po_number: "PO-20260822-4041", po_id: "PO-20260822-4041", lines: [] }),
+    );
+    renderWorkspace();
+    fireEvent.click(screen.getByTestId("so-batch-issue-create"));
+    await screen.findByTestId("so-batch-evidence-PO-20260822-4041");
+  }
+
+  it("renders the PO template, not the JSON endpoint", async () => {
+    await created();
+    const frame = await screen.findByTestId("so-batch-pdf-PO-20260822-4041");
+    expect(frame.tagName).toBe("IFRAME");
+    const src = frame.getAttribute("src") ?? "";
+    expect(src.startsWith("blob:")).toBe(true);
+    expect(src).not.toContain("print-data");
+    const { renderPoPdf } = await renderMod();
+    expect(renderPoPdf).toHaveBeenCalled();
+  });
+
+  it("asks the document endpoint for the EXACT PO it created", async () => {
+    await created();
+    await screen.findByTestId("so-batch-pdf-PO-20260822-4041");
+    expect(apiFetch).toHaveBeenCalledWith(
+      "/api/operation/pos/PO-20260822-4041/print-data",
+    );
+  });
+
+  it("a render that fails SAYS so — it does not show a blank frame", async () => {
+    apiFetch.mockImplementation((path: string) =>
+      path.includes("issue-batch")
+        ? Promise.resolve({
+            ok: true,
+            pos: [
+              {
+                id: "PO-2099", supplierId: "s-hooka", supplierName: "Hooka",
+                destinationId: KLANG.id, destination: "Carres Klang",
+              },
+            ],
+          })
+        : Promise.reject(new Error("not_found")),
+    );
+    renderWorkspace();
+    fireEvent.click(screen.getByTestId("so-batch-issue-create"));
+    await screen.findByTestId("so-batch-evidence-PO-2099");
+    await waitFor(() =>
+      expect(screen.getByTestId("so-batch-pdf-placeholder-PO-2099")).toHaveTextContent(
+        "not_found",
+      ),
+    );
   });
 });

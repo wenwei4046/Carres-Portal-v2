@@ -261,6 +261,8 @@ export interface SoBatchDocumentLine {
   qty: number;
   goodsMustArrive: string | null;
   issueRef: { proposalKey: string; buildKey: string };
+  /** The catalog cost per SKU behind this line. `null` = Catalog has none. */
+  costs: Array<{ sku: string; unitCost: number | null }>;
 }
 
 export interface SoBatchDocument {
@@ -270,6 +272,8 @@ export interface SoBatchDocument {
   destinationId: string;
   qty: number;
   lines: SoBatchDocumentLine[];
+  /** Factory pickup needs a procurement partner before this can be issued. */
+  supplierKind: "own_logistics" | "factory_pickup" | null;
 }
 
 /**
@@ -301,6 +305,7 @@ export function groupSelectionsIntoDocuments(
           destinationId: a.destinationId,
           qty: 0,
           lines: [],
+          supplierKind: row.supplierKind,
         };
         docs.set(key, doc);
       }
@@ -315,6 +320,7 @@ export function groupSelectionsIntoDocuments(
         qty: a.qty,
         goodsMustArrive: row.goodsMustArrive,
         issueRef: row.issueRef,
+        costs: row.costs,
       });
     }
   }

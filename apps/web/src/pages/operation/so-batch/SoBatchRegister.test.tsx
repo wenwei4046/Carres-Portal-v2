@@ -52,6 +52,8 @@ function row(over: Partial<PurchaseDemandRow> = {}): PurchaseDemandRow {
     goodsMustArrive: "2026-08-19",
     issueRef: { proposalKey: "s-hooka::mattress", buildKey: "b1" },
     action: null,
+    costs: [{ sku: "B1201S-K", unitCost: 100 }],
+    supplierKind: "own_logistics",
     ownerName: null,
     ownerDuty: null,
     ...over,
@@ -110,6 +112,7 @@ function data(over: Partial<SoBatchPurchaseResponse> = {}): SoBatchPurchaseRespo
     defaultDestinationId: KLANG,
     currentPoDuty: { userId: "u1", name: "Yee Jean" },
     mayIssue: true,
+    procurementPartners: [],
     ...over,
   };
 }

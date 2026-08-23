@@ -63,7 +63,7 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
 
   const res = await loadToOrder(sb);
   if (!res.ok) return c.json(res.body as Record<string, unknown>, res.status as 400);
-  const { proposals, registerFacts, supplierNames, today } = res.data;
+  const { proposals, registerFacts, supplierNames, supplierKinds, catalog, today } = res.data;
 
   /**
    * The two owner facts, read here because they are Register-only.
@@ -175,6 +175,15 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
              issue endpoint recomputes against. A refused line below cannot,
              and says so by having none. */
           issueRef: { proposalKey: proposal.key, buildKey: build.key },
+          /* The CATALOG's price per SKU, carried so the 50/50 can ask for the
+             one it does not have. `null` is load-bearing: a SKU with no price
+             cannot be issued until somebody states a cost or marks it Free of
+             Charge, and a `0` here would be a price nobody set. */
+          costs: build.lines.map((l) => ({
+            sku: l.sku,
+            unitCost: catalog.get(l.sku)?.cost ?? null,
+          })),
+          supplierKind: supplierKinds.get(proposal.supplierId) ?? "own_logistics",
           action: soBatchAction({
             state,
             item: build.model,
@@ -234,6 +243,10 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
          offer an act that cannot succeed. */
       goodsMustArrive: null,
       issueRef: null,
+      costs: [{ sku: line.sku, unitCost: catalog.get(line.sku)?.cost ?? null }],
+      supplierKind: line.supplierId
+        ? (supplierKinds.get(line.supplierId) ?? "own_logistics")
+        : null,
       action: soBatchAction({
         state,
         item: line.modelName ?? line.sku,
@@ -280,6 +293,20 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
   }
   const defaultDestination = destinations.find((d) => d.isDefault && d.active) ?? null;
 
+  /* WHO MAY COLLECT FROM A FACTORY. Read here rather than on the issue POST so
+     the operator can choose one while checking the document, instead of being
+     told `pickup_partner_required` after pressing Issue PO. */
+  let procurementPartners: { id: string; name: string }[] = [];
+  try {
+    const partners = await sb.from("delivery_partners").select("id, name").order("name");
+    procurementPartners = ((partners.data ?? []) as Record<string, unknown>[]).map((p) => ({
+      id: p.id as string,
+      name: (p.name as string) ?? "",
+    }));
+  } catch (e) {
+    console.error("so batch — procurement partners unavailable", (e as Error).message);
+  }
+
   const body: SoBatchPurchaseResponse = {
     today,
     rows,
@@ -293,6 +320,7 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
        the issue endpoint resolves duty again and refuses on its own authority
        (Card §6 — UI hiding is convenience, API/RPC is authority). */
     mayIssue: poDutyId != null && poDutyId === me,
+    procurementPartners,
   };
   return c.json(body);
 });

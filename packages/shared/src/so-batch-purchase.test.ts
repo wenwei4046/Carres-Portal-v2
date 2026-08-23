@@ -70,6 +70,8 @@ function row(over: Partial<PurchaseDemandRow> = {}): PurchaseDemandRow {
     goodsMustArrive: "2026-08-19",
     issueRef: { proposalKey: "s-hooka::mattress", buildKey: "b1" },
     action: null,
+    costs: [{ sku: "B1201S-K", unitCost: 100 }],
+    supplierKind: "own_logistics",
     ownerName: null,
     ownerDuty: null,
     ...over,
@@ -340,8 +342,15 @@ describe("documents are grouped by supplier × Deliver To", () => {
       new Map([[r.id, r]]),
     );
     expect(Object.keys(doc!).sort()).toEqual(
-      ["destinationId", "key", "lines", "qty", "supplierId", "supplierName"].sort(),
+      [
+        "destinationId", "key", "lines", "qty", "supplierId", "supplierName",
+        "supplierKind",
+      ].sort(),
     );
+    // Still no price, no number and no arrival date on the GROUPING itself —
+    // the catalog cost rides on the LINE, where the operator prices it.
+    expect(doc).not.toHaveProperty("unitCost");
+    expect(doc).not.toHaveProperty("etaDate");
   });
 });
 

@@ -2,8 +2,9 @@
 
 **Module:** Purchasing · **Sequence:** 02
 **Owner authority:** `docs/purchasing/MASTER.md` §§2, 5–9, 13–15 — approved / locked 2026-08-22
-**Status:** BUILT — all eight tasks executed, all gates green, six-view walk captured 2026-08-22.
-Stopped at the merge boundary per §9 Task 8 and §14; migration 0376 is written and validated, NOT applied.
+**Status:** BUILT — all eight tasks executed, all gates green, six-view walk captured; owner correction of
+2026-08-23 closed in full. Stopped at the merge boundary per §9 Task 8 and §14; migration 0376 is written
+and validated, NOT applied.
 **Lane:** BUILD / DELIVERY
 **Depends on:** `PURCHASING — CARD 01 · FIX SIDE MENU TO THE FINAL 4-GROUP / 11-PAGE LISTING`
 **Base:** local `main` containing commits `7de0a27a` and `0f52e23c`
@@ -814,19 +815,77 @@ borrow), and the banned-word scan would have passed vacuously forever on the thi
   headings and every fix line. The Card's §3.1 ASCII matches it exactly; MASTER §9.1's longer forms
   are the FACT line, which is what the row prints.
 
-### 15.6 Owed, and deliberately not done here
+### 15.6 Owner correction, 2026-08-23 — the three items closed
 
-- 🔴 **Migration 0376 is not applied.** It needs the governed production approval path, and
-  repository 0375 must be applied before it.
-- 🟡 **`POST …/to-order/issue` is still mounted.** Its only caller is gone. Retiring it, and moving
-  its still-valuable guard tests onto `/issue-batch`, is a small follow-up scope.
-- 🟡 **`documentDecisions` is accepted by the API but the 50/50 does not yet collect
-  transaction cost / Free of Charge / procurement partner.** Every law is enforced server-side —
-  a missing catalog cost returns `cost_required` and a factory-pickup document returns
-  `pickup_partner_required`, so nothing can be issued wrongly — but an operator meeting one of
-  those today is told by an error rather than by a field. The controls are the next scope.
-- 🟡 The right-hand pane after creation points at the PO document endpoint; wiring the rendered
-  `renderPoPdf` blob into the iframe is a small piece left with it.
+The three things §15.6 first listed as later scope were mandatory requirements of this Card. They
+are done, and the walk evidence was recaptured against the finished behaviour.
 
-**STOPPED AT THE MERGE BOUNDARY** per §9 Task 8 and §14. Not pushed, no PR, nothing deployed,
-no migration applied.
+**1 · The 50/50 collects and validates the governed decisions.** The left side is the only
+editable issue surface, so everything a purchase order needs is settled there:
+
+- **Transaction Cost** per SKU, seeded from Catalog so the common case needs no typing. An
+  untouched Catalog price is deliberately NOT sent — the server re-reads its own and stamps it;
+  echoing it back would only give the server a number to disagree with. A CHANGED one is sent as
+  `hand_entered`, because the operator changed it and it is theirs now.
+- **Free of Charge** with a required reason. Choosing it removes the price box entirely — a
+  disabled field beside a chosen alternative is a question already answered.
+- **Procurement Partner**, offered only on a factory-pickup document. An own-logistics document
+  that offered it would invite a fact the server refuses (`pickup_partner_not_allowed`).
+- A line with **no Catalog price starts EMPTY**. There is no safe default: `0` is a price nobody
+  set, and guessing one is how a supplier gets asked to deliver for nothing.
+- `documentDecisions` is now composed for **every** document, never `[]`. `Issue PO` is disabled
+  while anything is missing and the surface NAMES the blocker — including a blocker on a document
+  the operator is not looking at, because the request is atomic and a dead button with no
+  explanation is the defect this replaces. Walk view 4 proves exactly that: standing on document 1
+  of 2, the surface reads `Ohana → AL Sungai Buloh needs a procurement partner`.
+
+**2 · The right side renders the real official PO PDF.** `renderPoPdf` — the same template
+Purchase Orders and the print path already use — over the `purchasing_po_document` payload, into a
+blob URL. The JSON endpoint is no longer put in an iframe and called a purchase order. The object
+URL is revoked when it is replaced or the surface closes, and a render that fails SAYS so rather
+than showing a blank frame.
+
+**3 · The old PO issue door is retired.** `POST …/to-order/issue` and its schema are DELETED (427
+lines). Every guard it carried was re-asked of `/issue-batch` before the route went, and two of
+them changed meaning on the way across — recorded as rulings, not regressions:
+
+| The old law | On the batch door |
+|---|---|
+| an unrelated document stays issuable when another needs cost | the batch is **atomic**, so the same input now creates NOTHING (§12) |
+| a client-merged sofa document is refused | the server groups by itself, so the assertion is that it **never merges two customers' sofas** |
+
+Carried across unchanged: sofa modules on their own customer's document · destination on every PO ·
+`cost_required` rather than an invented RM0 · hand-entered cost that never touches Catalog · FOC
+without a reason refused at the boundary · factory pickup needing a valid partner · own-logistics
+refusing one · the client never sending a quantity, SKU or price (now enforced by a **strict**
+schema — a smuggled `lines` is refused, not ignored) · `eta_date` stamping · fail-closed when
+`purchase_demands` is absent.
+
+⚠️ The retirement also nearly dropped a real capability: the old route wrote the PO's **`po_history`
+birth row**, and nothing in the new door did. It is carried across, best-effort exactly as before —
+the purchase orders already exist and failing the issue over a history line would destroy real work
+to protect a note about it.
+
+**The final system has one demand arithmetic (`purchase-demand-read.ts`), one PO issuance authority
+(`/issue-batch` → `purchasing_issue_pos_batch`, asserted as the only caller in the repository), and
+one outbound-evidence authority (`purchasing_confirm_po_sent`).**
+
+### 15.7 Gates after the correction
+
+| Gate | Result |
+|---|---|
+| `pnpm test` | shared 108 / 2571 · api 121 / **2360** · web 274 / **3237** — **8,168 tests, 0 failed** |
+| `pnpm typecheck` · `lint` · `check:v4` · `ci:migrations` · `build` · `git diff --check` | all clean |
+
+Walk views **4, 4b, 5 and 6 recaptured**. View 5/6 show the ACTUAL rendered purchase order — number
+`PO-20260823-4041`, supplier, Deliver To, source `SO-1318`, Unit IDs `UNT-20260823-0011/0012`,
+money-free. Headless Chromium paints no PDF inside an iframe, so the walk harness rasterised the
+same bytes with pdf.js; the product keeps the iframe, which a real browser paints.
+
+### 15.8 Still owed
+
+- 🔴 **Migration 0376 is not applied.** Governed approval path, and repository **0375 must be
+  applied first** — it is merged but not yet in the live tracker.
+- Nothing else. The three items above were the outstanding scope.
+
+**STOPPED BEFORE PUSH AND PR**, as instructed.

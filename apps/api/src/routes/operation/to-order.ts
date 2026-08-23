@@ -11,7 +11,6 @@ import {
   readyStockDrawNote,
   READY_STOCK_DRAW_REASON,
   stockMatchKey,
-  toOrderBuilds,
   railItemLabel,
   type DemandPickItem,
   type ProductCategory,
@@ -62,7 +61,6 @@ import type { AppEnv } from "../../types";
  */
 const toOrderRouter = new Hono<AppEnv>();
 
-
 /** How far back the grid answers "what did we order". Older → Purchase Orders. */
 const ORDERED_WINDOW_DAYS = 14;
 
@@ -105,7 +103,9 @@ async function loadOrderedRows(
     scopeSo == null
       ? allPoRows
       : (allPoRows ?? []).filter((p) =>
-          ((p.so_refs as number[] | null) ?? []).some((so) => Number(so) === scopeSo),
+          ((p.so_refs as number[] | null) ?? []).some(
+            (so) => Number(so) === scopeSo,
+          ),
         );
   if (poErr || !poRows || poRows.length === 0) return [];
 
@@ -116,9 +116,14 @@ async function loadOrderedRows(
   if (catalog.size === 0) {
     const { data: skuRows } = await sb
       .from("product_skus")
-      .select("sku, supplier_id, cost, variant, variant_kind, product_models!inner(category, name)");
+      .select(
+        "sku, supplier_id, cost, variant, variant_kind, product_models!inner(category, name)",
+      );
     for (const row of (skuRows ?? []) as Record<string, unknown>[]) {
-      const pm = row.product_models as { category?: string | null; name?: string | null } | null;
+      const pm = row.product_models as {
+        category?: string | null;
+        name?: string | null;
+      } | null;
       catalog.set(row.sku as string, {
         supplierId: (row.supplier_id as string | null) ?? null,
         cost: row.cost != null ? Number(row.cost) : null,
@@ -145,17 +150,25 @@ async function loadOrderedRows(
     }
   }
 
-  const soRefs = [...new Set(poRows.flatMap((p) => (p.so_refs as number[] | null) ?? []))];
+  const soRefs = [
+    ...new Set(poRows.flatMap((p) => (p.so_refs as number[] | null) ?? [])),
+  ];
   const orderBySo = new Map<number, Record<string, unknown>>();
-  const orderLinesByOrder = new Map<string, { sku: string; qty: number; attrs: unknown }[]>();
+  const orderLinesByOrder = new Map<
+    string,
+    { sku: string; qty: number; attrs: unknown }[]
+  >();
   if (soRefs.length > 0) {
     for (const batch of chunk(soRefs)) {
       const { data, error } = await sb
         .from("orders")
-        .select("id, so, customer_name, delivery_date, delivery_date_tbd, proceed_date")
+        .select(
+          "id, so, customer_name, delivery_date, delivery_date_tbd, proceed_date",
+        )
         .in("so", batch);
       if (error) return [];
-      for (const o of data ?? []) orderBySo.set(Number(o.so), o as Record<string, unknown>);
+      for (const o of data ?? [])
+        orderBySo.set(Number(o.so), o as Record<string, unknown>);
     }
     const orderIds = [...orderBySo.values()].map((o) => o.id as string);
     for (const batch of chunk(orderIds)) {
@@ -166,7 +179,11 @@ async function loadOrderedRows(
       if (error) return [];
       for (const l of data ?? []) {
         const arr = orderLinesByOrder.get(l.order_id as string) ?? [];
-        arr.push({ sku: l.sku as string, qty: Number(l.qty ?? 0), attrs: l.attrs });
+        arr.push({
+          sku: l.sku as string,
+          qty: Number(l.qty ?? 0),
+          attrs: l.attrs,
+        });
         orderLinesByOrder.set(l.order_id as string, arr);
       }
     }
@@ -204,7 +221,8 @@ async function loadOrderedRows(
           placedAt,
           category,
           supplierId: (po.supplier_id as string | null) ?? "",
-          supplierName: supplierNames.get((po.supplier_id as string | null) ?? "") ?? null,
+          supplierName:
+            supplierNames.get((po.supplier_id as string | null) ?? "") ?? null,
           orderId: null,
           customer: null,
           so: null,
@@ -223,7 +241,9 @@ async function loadOrderedRows(
     for (const so of refs) {
       const order = orderBySo.get(Number(so));
       const covered = order
-        ? (orderLinesByOrder.get(order.id as string) ?? []).filter((l) => poSkus.has(l.sku))
+        ? (orderLinesByOrder.get(order.id as string) ?? []).filter((l) =>
+            poSkus.has(l.sku),
+          )
         : [];
       const tbd = Boolean(order?.delivery_date_tbd);
       const base = {
@@ -231,7 +251,8 @@ async function loadOrderedRows(
         placedAt,
         category,
         supplierId: (po.supplier_id as string | null) ?? "",
-        supplierName: supplierNames.get((po.supplier_id as string | null) ?? "") ?? null,
+        supplierName:
+          supplierNames.get((po.supplier_id as string | null) ?? "") ?? null,
         orderId: (order?.id as string | null) ?? null,
         customer: (order?.customer_name as string | null) ?? null,
         so: Number(so),
@@ -242,11 +263,14 @@ async function loadOrderedRows(
         // P18 — the same order fact on the receipt row. Required, not tidy: an
         // order whose every line is bought has no demand rows left, so its group
         // is receipts alone and this is the only place the header could read it.
-        proceedDate: ((order?.proceed_date as string | null) ?? null)?.slice(0, 10) ?? null,
+        proceedDate:
+          ((order?.proceed_date as string | null) ?? null)?.slice(0, 10) ??
+          null,
       };
       if (covered.length === 0) {
         // Nothing matched — still one honest row per PO line.
-        for (const l of poLines) rows.push({ ...base, model: labelOf(l.sku), qty: l.qty });
+        for (const l of poLines)
+          rows.push({ ...base, model: labelOf(l.sku), qty: l.qty });
         continue;
       }
       // One row per BUILD — a sofa's modules collapse to one sofa; every
@@ -263,7 +287,9 @@ async function loadOrderedRows(
           ...base,
           model: labelOf(members[0]!.sku),
           qty:
-            category === "sofa" ? 1 : members.reduce((sum, m) => sum + m.qty, 0),
+            category === "sofa"
+              ? 1
+              : members.reduce((sum, m) => sum + m.qty, 0),
         });
       }
     }
@@ -280,7 +306,8 @@ toOrderRouter.get("/", requireOperation, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
 
   const res = await loadToOrder(sb);
-  if (!res.ok) return c.json(res.body as Record<string, unknown>, res.status as 400);
+  if (!res.ok)
+    return c.json(res.body as Record<string, unknown>, res.status as 400);
 
   const { data: destRows, error: destErr } = await sb
     .from("purchasing_destinations")
@@ -296,7 +323,9 @@ toOrderRouter.get("/", requireOperation, async (c) => {
   // The factory names, read here rather than threaded out of loadToOrder: its
   // no-live-orders early return never reads `suppliers`, and an ordered row's
   // supplier is exactly the one that may have no demand today. 10 rows.
-  const { data: supRows, error: supErr } = await sb.from("suppliers").select("id, name, kind");
+  const { data: supRows, error: supErr } = await sb
+    .from("suppliers")
+    .select("id, name, kind");
   if (supErr) {
     const m = mapPgError(supErr);
     return c.json(m.body, m.status);
@@ -391,14 +420,17 @@ toOrderRouter.get("/", requireOperation, async (c) => {
       .eq("so", scopeSo)
       .maybeSingle();
     let issuable = 0;
-    let blockedProductionDays = res.data.blocked.filter((row) => row.so === scopeSo).length;
+    let blockedProductionDays = res.data.blocked.filter(
+      (row) => row.so === scopeSo,
+    ).length;
     let blockedDeliveryDate = 0;
     let alreadyCovered = 0;
     for (const proposal of proposals) {
       for (const row of proposal.rows) {
         for (const build of row.builds) {
           if (build.fullyOnPo) alreadyCovered += 1;
-          else if (proposal.blocked === "production_days") blockedProductionDays += 1;
+          else if (proposal.blocked === "production_days")
+            blockedProductionDays += 1;
           else if (row.delivery == null) blockedDeliveryDate += 1;
           else issuable += 1;
         }
@@ -442,408 +474,6 @@ toOrderRouter.get("/", requireOperation, async (c) => {
 });
 
 /**
- * The issue contract.
- *
- * The client posts an ARRANGEMENT plus governed transaction-cost/commercial
- * decisions and, for factory-pickup documents, one procurement partner.
- * Quantities and demand lines still come only from server recomputation. A
- * posted SKU must belong to that recomputed document, catalog-seeded prices
- * must still match, and the creation RPC repeats the commercial/partner laws.
- */
-const issueBody = z.object({
-  supplierId: z.string().uuid(),
-  category: z.string().min(1),
-  destinationId: z.string().uuid(),
-  purchaseOrders: z
-    .array(
-      z.object({
-        key: z.string().min(1),
-        include: z.boolean(),
-        buildKeys: z.array(z.string().min(1)),
-        procurementPartnerId: z.string().uuid().optional(),
-        lineDecisions: z
-          .array(
-            z.discriminatedUnion("treatment", [
-              z.object({
-                sku: z.string().min(1),
-                treatment: z.literal("normal"),
-                unitCost: z.number().positive(),
-                costSource: z.enum(["catalog", "hand_entered"]),
-              }),
-              z.object({
-                sku: z.string().min(1),
-                treatment: z.literal("free_of_charge"),
-                reason: z.string().trim().min(1).max(500),
-              }),
-            ]),
-          )
-          .max(500)
-          .optional(),
-      }),
-    )
-    .min(1)
-    .max(200),
-});
-
-toOrderRouter.post("/issue", requireOperation, async (c) => {
-  const sb = userClient(c.env, c.var.auth.jwt);
-
-  let raw: unknown;
-  try {
-    raw = await c.req.json();
-  } catch {
-    return c.json({ error: "invalid_json" }, 400);
-  }
-  const parsed = issueBody.safeParse(raw);
-  if (!parsed.success) {
-    return c.json({ error: "invalid_body", code: "invalid_param" }, 400);
-  }
-  const { supplierId, category, destinationId, purchaseOrders } = parsed.data;
-
-  // Recompute. The operator's screen is a view; what gets issued is built from
-  // the server's own reading, so a stale tab cannot order last hour's demand.
-  const res = await loadToOrder(sb);
-  if (!res.ok) return c.json(res.body as Record<string, unknown>, res.status as 400);
-
-  const proposal = res.data.proposals.find(
-    (p) => p.supplierId === supplierId && p.category === category,
-  );
-  if (!proposal || proposal.rows.length === 0) {
-    return c.json({ error: "nothing_to_issue", code: "nothing_to_issue" }, 409);
-  }
-  if (proposal.blocked === "production_days") {
-    return c.json(
-      { error: "production_days_required", code: "production_days_required" },
-      422,
-    );
-  }
-
-  // THE GATE. Every rule is asked against the proposal the server just built,
-  // never against what the client believes:
-  //   · a build already on a purchase order is not in it, so naming one fails
-  //   · a build belonging to another supplier or category is not in it either
-  //   · the same build twice, an empty document, a merged sofa and a batch past
-  //     the transaction's cap each have their own refusal
-  //   · demand that changed or was cancelled since the page loaded is simply
-  //     absent from the recomputation, and fails as `unknown_build`
-  const docs: IssueDocument[] = purchaseOrders.map((d) => ({
-    key: d.key,
-    include: d.include,
-    buildKeys: d.buildKeys,
-  }));
-
-  // An undated Customer Order remains visible, but cannot enter an Issue
-  // document. Ready Stock is deliberately exempt.
-  const blockedDateBuilds = new Set(
-    proposal.rows
-      .filter((row) => row.delivery == null && !row.readyStock)
-      .flatMap((row) => row.builds.map((build) => build.key)),
-  );
-  if (
-    purchaseOrders.some(
-      (doc) => doc.include && doc.buildKeys.some((key) => blockedDateBuilds.has(key)),
-    )
-  ) {
-    return c.json(
-      {
-        error: "blocked_delivery_date",
-        code: "blocked_delivery_date",
-        message: "Customer delivery date must be confirmed before Issue PO.",
-      },
-      422,
-    );
-  }
-  const check = validateIssuePlan(proposal, docs);
-  if (!check.ok) {
-    return c.json({ error: check.code, code: check.code, message: check.message }, 422);
-  }
-
-  const { data: dest, error: destErr } = await sb
-    .from("purchasing_destinations")
-    .select("id, name")
-    .eq("id", destinationId)
-    .eq("active", true)
-    .maybeSingle();
-  if (destErr) {
-    const m = mapPgError(destErr);
-    return c.json(m.body, m.status);
-  }
-  if (!dest) return c.json({ error: "unknown_destination", code: "invalid_param" }, 422);
-
-  // Carres holds exactly one warehouse; AL and HOUZS are delivery ADDRESSES and
-  // never warehouse records, which is why the destination is its own column.
-  const { data: whRows, error: whErr } = await sb
-    .from("warehouses")
-    .select("id, name, kind")
-    .eq("kind", "own");
-  if (whErr) {
-    const m = mapPgError(whErr);
-    return c.json(m.body, m.status);
-  }
-  const warehouses = whRows ?? [];
-  const warehouse =
-    warehouses.find((w) => /klang|klg/i.test((w.name as string) ?? "")) ?? warehouses[0];
-  if (!warehouse) {
-    return c.json({ error: "no_warehouse", code: "no_warehouse" }, 500);
-  }
-
-  const plan = planFromDocuments(proposal, docs);
-
-  const supplierKind = res.data.supplierKinds.get(supplierId) ?? null;
-  if (!supplierKind) {
-    return c.json({ error: "unresolved_supplier", code: "unresolved_supplier" }, 422);
-  }
-  const needsPartner = supplierKind === "factory_pickup";
-  let validPartners = new Set<string>();
-  if (needsPartner) {
-    const { data: partners, error: partnersErr } = await sb
-      .from("delivery_partners")
-      .select("id");
-    if (partnersErr) {
-      const m = mapPgError(partnersErr);
-      return c.json(m.body, m.status);
-    }
-    validPartners = new Set((partners ?? []).map((p) => p.id as string));
-  }
-
-  // Same frozen ETA arithmetic as before Card 2. It is now passed into the
-  // governed transaction so PO creation, destination and ETA converge or roll
-  // back together; neither the rule nor its inputs changed.
-  const etaDate = expectedArrivalOf(res.data.settings, {
-    supplierId,
-    category,
-    fromIso: todayIso(),
-  });
-
-  const governedPos: Record<string, unknown>[] = [];
-  const activeDocs = purchaseOrders.filter((doc) => doc.include);
-  for (let index = 0; index < plan.length; index += 1) {
-    const po = plan[index];
-    const doc = activeDocs[index];
-    const partnerId = doc?.procurementPartnerId ?? null;
-    if (needsPartner && (!partnerId || !validPartners.has(partnerId))) {
-      return c.json(
-        {
-          error: "pickup_partner_required",
-          code: "pickup_partner_required",
-          documentKey: doc?.key,
-          message: "Select a procurement partner for this factory-pickup PO.",
-        },
-        422,
-      );
-    }
-    if (!needsPartner && partnerId) {
-      return c.json(
-        { error: "pickup_partner_not_allowed", code: "pickup_partner_not_allowed" },
-        422,
-      );
-    }
-
-    type LineDecision = NonNullable<(typeof purchaseOrders)[number]["lineDecisions"]>[number];
-    const decisions = new Map<string, LineDecision>();
-    for (const decision of doc?.lineDecisions ?? []) {
-      if (decisions.has(decision.sku)) {
-        return c.json({ error: "duplicate_cost_decision", code: "duplicate_cost_decision" }, 422);
-      }
-      decisions.set(decision.sku, decision);
-    }
-    const lineSkus = new Set(po.lines.map((line) => line.sku));
-    if ([...decisions.keys()].some((sku) => !lineSkus.has(sku))) {
-      return c.json({ error: "stale_cost_decision", code: "stale_cost_decision" }, 409);
-    }
-
-    const lines: Record<string, unknown>[] = [];
-    for (const line of po.lines) {
-      const decision = decisions.get(line.sku);
-      if (decision?.treatment === "free_of_charge") {
-        lines.push({
-          sku: line.sku,
-          qty: line.qty,
-          cost: 0,
-          cost_source: "hand_entered",
-          commercial_treatment: "free_of_charge",
-          commercial_reason: decision.reason.trim(),
-        });
-        continue;
-      }
-      if (decision?.treatment === "normal") {
-        const liveCost = res.data.catalog.get(line.sku)?.cost ?? null;
-        if (decision.costSource === "catalog" && liveCost !== decision.unitCost) {
-          return c.json(
-            { error: "stale_catalog_cost", code: "stale_catalog_cost", sku: line.sku },
-            409,
-          );
-        }
-        lines.push({
-          sku: line.sku,
-          qty: line.qty,
-          cost: decision.unitCost,
-          cost_source: decision.costSource,
-          commercial_treatment: "normal",
-          commercial_reason: null,
-        });
-        continue;
-      }
-      const liveCost = res.data.catalog.get(line.sku)?.cost ?? null;
-      if (liveCost == null || liveCost <= 0) {
-        return c.json(
-          {
-            error: "cost_required",
-            code: "cost_required",
-            documentKey: doc?.key,
-            sku: line.sku,
-            message: "Transaction cost or Free of Charge is required before Issue PO.",
-          },
-          422,
-        );
-      }
-      lines.push({
-        sku: line.sku,
-        qty: line.qty,
-        cost: liveCost,
-        cost_source: "catalog",
-        commercial_treatment: "normal",
-        commercial_reason: null,
-      });
-    }
-    governedPos.push({
-      supplier_id: po.supplierId,
-      warehouse_id: warehouse.id as string,
-      destination_id: destinationId,
-      eta_date: etaDate,
-      procurement_partner_id: partnerId,
-      so_refs: po.soRefs,
-      lines,
-    });
-  }
-
-  // ONE transaction. A failure on the seventh document rolls back the first
-  // six, including commercial decisions, destination, ETA and audit history.
-  const { data: batch, error: batchErr } = await sb.rpc("purchasing_issue_pos_batch", {
-    p_pos: governedPos,
-  });
-  if (batchErr) {
-    const m = mapPgError(batchErr);
-    return c.json(m.body, m.status);
-  }
-  const ids = ((batch as { po_ids?: unknown } | null)?.po_ids ?? []) as string[];
-  if (ids.length !== plan.length) {
-    return c.json({ error: "po_not_created", code: "po_not_created" }, 500);
-  }
-
-  /**
-   * THE PO'S BIRTH CERTIFICATE (Loo, 2026-08-03).
-   *
-   * A purchase order must be born carrying what the rest of the module reads.
-   * `purchasing_record_tomorrow_delivery` (0306, shipped) refuses to open when
-   * `eta_date` is NULL — so until this stamp existed, a built and deployed
-   * supplier call could never fire on a PO raised here.
-   *
-   *   expected arrival = today
-   *                    + production working days  (on the FACTORY's week)
-   *                    + transit working days     (on the OFFICE week — moving
-   *                                                goods is arranged by us)
-   *
-   * **THE ARITHMETIC ITSELF LIVES IN `expectedArrivalOf` AND NOWHERE ELSE**
-   * (Loo, 2026-08-05). It was written a second time on the register, without
-   * the transit leg, and the register therefore under-warned by exactly the day
-   * it forgot on three live rows. This call and the register's now read the
-   * same function; only `fromIso` differs, because a PO being born starts its
-   * clock today and one already issued starts it at `placed_at`.
-   *
-   * It is stamped ONCE and then frozen: §2 — "a PO already sent is never
-   * re-computed", because its dates were true when it was sent and moving them
-   * would rewrite a promise the supplier already made.
-   *
-   * **AND IT IS OUR ESTIMATE, WHICH THE REGISTER NOW SAYS OUT LOUD.** Stamping
-   * it here is deliberate and stays: 0306 refuses to open the tomorrow call on
-   * a NULL arrival, so removing the stamp would take a shipped supplier call
-   * dark. What was wrong was downstream — the register read *"a date exists"*
-   * as *"the factory promised"*. Provenance now comes from
-   * `po_supplier_promises`, so this stamp can be honest without being silent.
-   *
-   * `expected_ready_date` is deliberately NOT written here. That column is the
-   * factory's PROMISE and R5 grades the factory by it; seeding it with our own
-   * estimate would score a supplier on a number it never gave. Empty is not
-   * missing data — it is the trigger of `Confirm ready date` (§3).
-   *
-   * A supplier with no transit number gets NO arrival rather than a guessed
-   * one (P1's law), and the purchase order is still raised — the goods matter
-   * more than the estimate, and the gap is visible as an empty arrival.
-   */
-  /**
-   * A READY STOCK DEMAND THAT JUST BECAME A PURCHASE ORDER STOPS BEING DEMAND —
-   * BY THE QUANTITY THAT WAS ORDERED, not all of it (0320, Loo 2026-08-04).
-   *
-   * The table carries no status column on purpose (Jess, 2026-08-01): open /
-   * ordered / done are DERIVED. What the issue path owes a demand is the
-   * NUMBER it took; without it the row sits on To Order for ever and gets
-   * ordered twice.
-   *
-   * IT GOES THROUGH THE RPC, and that is 0316's rule applied to this table:
-   * a quantity a client can PATCH is a quantity that moves with no arithmetic
-   * and no guard. `purchasing_demand_record_issue` adds rather than sets (two
-   * documents taking from one demand must add up), takes the row FOR UPDATE
-   * (two operators pressing Issue in the same second queue instead of both
-   * reading the same `issued_qty`), and refuses an over-issue by name — with
-   * the table's own CHECK behind it in case a second door is ever written.
-   *
-   * The map is EXACT rather than by supplier: each document names the builds it
-   * carried, and a build knows its `orderId`, which for a ready stock demand is
-   * `demand:<uuid>`. So a demand is credited to the purchase order that
-   * actually took it, never to "one of today's".
-   */
-  const buildRef = new Map(toOrderBuilds(proposal).map((b) => [b.buildKey, b]));
-  const included = docs.filter((d) => d.include && d.buildKeys.length > 0);
-  for (const [i, d] of included.entries()) {
-    const poId = ids[i];
-    if (!poId) continue;
-    for (const k of d.buildKeys) {
-      const ref = buildRef.get(k);
-      const m = /^demand:(.+)$/.exec(ref?.orderId ?? "");
-      if (!m) continue;
-      const { error: stampErr } = await sb.rpc("purchasing_demand_record_issue", {
-        p_id: m[1]!,
-        p_qty: ref?.qty ?? 0,
-        p_po_id: poId,
-      });
-      if (stampErr) {
-        // The purchase orders exist and the supplier is about to be sent them.
-        // Failing the whole issue now would destroy real work to protect a
-        // number; the demand reappearing is visible and recoverable, and an
-        // over-issue refusal is exactly the double-order this names out loud.
-        console.error("purchase_demands issue record failed", m[1], stampErr.message);
-      }
-    }
-  }
-
-  /**
-   * WHO RAISED IT. Measured 2026-08-01: `operation_create_pos_batch` writes no
-   * audit row of any kind, so a purchase order could not say who issued it or
-   * when. `po_history` has existed since 0001 for exactly this, so nothing new
-   * is invented and no migration is needed.
-   *
-   * Best-effort ON PURPOSE: the purchase orders already exist and the supplier
-   * is about to be sent them. Failing the whole issue because a history line
-   * could not be written would destroy real work to protect a note about it.
-   */
-  await sb.from("po_history").insert(
-    ids.map((id, i) => ({
-      po_id: id,
-      text: `Issued from To Order · ${plan[i]?.lines.length ?? 0} line(s)${
-        etaDate ? ` · expected arrival ${etaDate}` : " · no expected arrival (transit days not set)"
-      }`,
-    })),
-  );
-
-  return c.json({
-    supplier: proposal.supplierName,
-    destination: dest.name as string,
-    pos: ids.map((id, i) => ({ id, customer: plan[i]?.customer ?? proposal.supplierName })),
-  });
-});
-
-/**
  * `Reserve` — ready stock is SUGGESTED; the human decides whether to reserve
  * it (card P10, Loo 2026-08-04; the word is P13's, same day — the goods do not
  * leave, they are LOCKED until delivery, and the order drawer's picker has
@@ -867,7 +497,6 @@ const takeStockBody = z.object({
   orderId: z.string().min(1),
   buildKey: z.string().min(1),
 });
-
 toOrderRouter.post("/take-stock", requireOperation, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
 
@@ -878,11 +507,13 @@ toOrderRouter.post("/take-stock", requireOperation, async (c) => {
     return c.json({ error: "invalid_json" }, 400);
   }
   const parsed = takeStockBody.safeParse(raw);
-  if (!parsed.success) return c.json({ error: "invalid_body", code: "invalid_param" }, 400);
+  if (!parsed.success)
+    return c.json({ error: "invalid_body", code: "invalid_param" }, 400);
   const { orderId, buildKey } = parsed.data;
 
   const res = await loadToOrder(sb);
-  if (!res.ok) return c.json(res.body as Record<string, unknown>, res.status as 400);
+  if (!res.ok)
+    return c.json(res.body as Record<string, unknown>, res.status as 400);
 
   let found: { row: ToOrderRow; build: ToOrderBuild } | null = null;
   for (const p of res.data.proposals) {
@@ -894,7 +525,8 @@ toOrderRouter.post("/take-stock", requireOperation, async (c) => {
   }
   // The row moved, was ordered, or was covered since the page loaded. Absent
   // from the recomputation IS the refusal — there is nothing to take.
-  if (!found) return c.json({ error: "unknown_build", code: "unknown_build" }, 409);
+  if (!found)
+    return c.json({ error: "unknown_build", code: "unknown_build" }, 409);
 
   const { row, build } = found;
   if (build.freeStock <= 0 || build.freeStockItemIds.length === 0) {
@@ -972,7 +604,11 @@ toOrderRouter.post("/take-stock", requireOperation, async (c) => {
         p_po_id: null,
       });
       if (error) {
-        console.error("purchase_demands stock take not recorded", m[1], error.message);
+        console.error(
+          "purchase_demands stock take not recorded",
+          m[1],
+          error.message,
+        );
         return c.json(
           {
             error: "demand_not_recorded",
@@ -1062,7 +698,9 @@ toOrderRouter.get("/demand/pick-items", requireOperation, async (c) => {
     (modelRows ?? []).map((m) => [m.id as string, (m.name as string) ?? ""]),
   );
 
-  const { data: supRows, error: supErr } = await sb.from("suppliers").select("id, name");
+  const { data: supRows, error: supErr } = await sb
+    .from("suppliers")
+    .select("id, name");
   if (supErr) {
     const m = mapPgError(supErr);
     return c.json(m.body, m.status);
@@ -1101,7 +739,10 @@ toOrderRouter.get("/demand/pick-items", requireOperation, async (c) => {
     } catch (e) {
       // Same contract as `readFreeStock`: the picker degrades to zeroes rather
       // than taking the dialog down. A demand can always be typed.
-      console.error("stock counts unavailable — picker shows none", (e as Error).message);
+      console.error(
+        "stock counts unavailable — picker shows none",
+        (e as Error).message,
+      );
     }
   }
 
@@ -1129,7 +770,10 @@ const demandBody = z.object({
   sku: z.string().min(1),
   qty: z.number().int().min(1),
   destinationId: z.string().uuid(),
-  requiredBy: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullish(),
+  requiredBy: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .nullish(),
   remark: z.string().max(500).nullish(),
   /**
    * P15 — the Source. **The enum is the SHARED constant, not a list retyped
@@ -1215,7 +859,9 @@ toOrderRouter.post("/demand/:id/cancel", requireOperation, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
 
   const id = c.req.param("id");
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+  if (
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
+  ) {
     return c.json({ error: "invalid_id", code: "invalid_param" }, 400);
   }
 
@@ -1243,7 +889,6 @@ toOrderRouter.post("/demand/:id/cancel", requireOperation, async (c) => {
   }
   return c.json(data ?? { ok: true });
 });
-
 
 /**
  * POST /issue-batch — THE ONE DOOR SO BATCH PURCHASE ISSUES THROUGH
@@ -1283,44 +928,58 @@ const soBatchIssueInput = z
   .object({
     selections: z
       .array(
-        z.object({
-          demandId: z.string().min(1),
-          allocations: z
-            .array(
-              z.object({
-                destinationId: z.string().uuid(),
-                qty: z.number().int().positive(),
-              }),
-            )
-            .min(1),
-        }),
+        z
+          .object({
+            demandId: z.string().min(1),
+            allocations: z
+              .array(
+                z
+                  .object({
+                    destinationId: z.string().uuid(),
+                    qty: z.number().int().positive(),
+                  })
+                  .strict(),
+              )
+              .min(1),
+          })
+          /* STRICT, and that is the guard. A selection carries a demand id and
+             an arrangement; a `lines`, a `sku`, a `qty` or a `cost` smuggled
+             beside them is REFUSED rather than ignored, because a field the
+             server quietly drops is a field a client believes it sent. */
+          .strict(),
       )
       .min(1)
       .max(500),
     documentDecisions: z
       .array(
-        z.object({
-          supplierId: z.string().uuid(),
-          destinationId: z.string().uuid(),
-          procurementPartnerId: z.string().uuid().nullable(),
-          lineDecisions: z
-            .array(
-              z.discriminatedUnion("treatment", [
-                z.object({
-                  sku: z.string().min(1),
-                  treatment: z.literal("normal"),
-                  unitCost: z.number().positive(),
-                  costSource: z.enum(["catalog", "hand_entered"]),
-                }),
-                z.object({
-                  sku: z.string().min(1),
-                  treatment: z.literal("free_of_charge"),
-                  reason: z.string().trim().min(1).max(500),
-                }),
-              ]),
-            )
-            .max(500),
-        }),
+        z
+          .object({
+            supplierId: z.string().uuid(),
+            destinationId: z.string().uuid(),
+            procurementPartnerId: z.string().uuid().nullable(),
+            lineDecisions: z
+              .array(
+                z.discriminatedUnion("treatment", [
+                  z
+                    .object({
+                      sku: z.string().min(1),
+                      treatment: z.literal("normal"),
+                      unitCost: z.number().positive(),
+                      costSource: z.enum(["catalog", "hand_entered"]),
+                    })
+                    .strict(),
+                  z
+                    .object({
+                      sku: z.string().min(1),
+                      treatment: z.literal("free_of_charge"),
+                      reason: z.string().trim().min(1).max(500),
+                    })
+                    .strict(),
+                ]),
+              )
+              .max(500),
+          })
+          .strict(),
       )
       .max(200)
       .default([]),
@@ -1361,7 +1020,8 @@ toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
     const m = mapPgError(duty.error);
     return c.json(m.body, m.status);
   }
-  const dutyRow = duty.data as { user_id?: string } | { user_id?: string }[] | null;
+  const dutyRow = duty.data as
+    { user_id?: string } | { user_id?: string }[] | null;
   const dutyId =
     (Array.isArray(dutyRow) ? dutyRow[0]?.user_id : dutyRow?.user_id) ?? null;
   if (!dutyId || dutyId !== c.var.auth.id) {
@@ -1379,14 +1039,18 @@ toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
   const seen = new Set<string>();
   for (const s of selections) {
     if (seen.has(s.demandId)) {
-      return c.json({ error: "duplicate_demand", code: "duplicate_demand" }, 422);
+      return c.json(
+        { error: "duplicate_demand", code: "duplicate_demand" },
+        422,
+      );
     }
     seen.add(s.demandId);
   }
 
   /* ── 3 · RECOMPUTE. The screen is a view; this is the truth. ─────────────── */
   const res = await loadToOrder(sb);
-  if (!res.ok) return c.json(res.body as Record<string, unknown>, res.status as 400);
+  if (!res.ok)
+    return c.json(res.body as Record<string, unknown>, res.status as 400);
 
   /** demandId → the build it names, and everything the build belongs to. */
   const index = new Map<
@@ -1401,7 +1065,11 @@ toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
     for (const row of proposal.rows) {
       if (row.readyStock) continue; // Manual Purchase has its own door.
       for (const build of row.builds) {
-        index.set(`build::${row.orderId}::${build.key}`, { proposal, row, build });
+        index.set(`build::${row.orderId}::${build.key}`, {
+          proposal,
+          row,
+          build,
+        });
       }
     }
   }
@@ -1417,7 +1085,11 @@ toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
   const destById = new Map(
     ((destRes.data ?? []) as Record<string, unknown>[]).map((d) => [
       d.id as string,
-      { id: d.id as string, name: (d.name as string) ?? "", active: d.active !== false },
+      {
+        id: d.id as string,
+        name: (d.name as string) ?? "",
+        active: d.active !== false,
+      },
     ]),
   );
 
@@ -1430,7 +1102,11 @@ toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
        never real. All four read the same from here, and all four must fail. */
     if (!hit) {
       return c.json(
-        { error: "unknown_demand", code: "unknown_demand", demandId: s.demandId },
+        {
+          error: "unknown_demand",
+          code: "unknown_demand",
+          demandId: s.demandId,
+        },
         409,
       );
     }
@@ -1474,7 +1150,11 @@ toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
         );
       }
       total += a.qty;
-      allocations.push({ demandId: s.demandId, destinationId: a.destinationId, qty: a.qty });
+      allocations.push({
+        demandId: s.demandId,
+        destinationId: a.destinationId,
+        qty: a.qty,
+      });
     }
     /* THE ARRANGEMENT MUST ADD BACK TO THE SERVER'S OWN REMAINDER. The browser
        checked this too; that check was for the operator, this one is the law. */
@@ -1511,10 +1191,16 @@ toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
     ].join("::");
     let group = groups.get(key);
     if (!group) {
-      group = { key, proposal: hit.proposal, destinationId: a.destinationId, buildKeys: [] };
+      group = {
+        key,
+        proposal: hit.proposal,
+        destinationId: a.destinationId,
+        buildKeys: [],
+      };
       groups.set(key, group);
     }
-    if (!group.buildKeys.includes(hit.build.key)) group.buildKeys.push(hit.build.key);
+    if (!group.buildKeys.includes(hit.build.key))
+      group.buildKeys.push(hit.build.key);
   }
 
   const warehouse = res.data.stockWarehouse;
@@ -1568,12 +1254,16 @@ toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
     const known = surfaceSkus.get(`${d.supplierId}::${d.destinationId}`);
     if (!known) continue;
     if (d.lineDecisions.some((l) => !known.has(l.sku))) {
-      return c.json({ error: "stale_cost_decision", code: "stale_cost_decision" }, 409);
+      return c.json(
+        { error: "stale_cost_decision", code: "stale_cost_decision" },
+        409,
+      );
     }
   }
 
   const governedPos: Record<string, unknown>[] = [];
-  const created: { key: string; supplierId: string; destinationId: string }[] = [];
+  const created: { key: string; supplierId: string; destinationId: string }[] =
+    [];
 
   for (const group of groups.values()) {
     const docs: IssueDocument[] = [
@@ -1581,15 +1271,24 @@ toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
     ];
     const check = validateIssuePlan(group.proposal, docs);
     if (!check.ok) {
-      return c.json({ error: check.code, code: check.code, message: check.message }, 422);
+      return c.json(
+        { error: check.code, code: check.code, message: check.message },
+        422,
+      );
     }
     const plan = planFromDocuments(group.proposal, docs);
     if (plan.length !== 1) {
-      return c.json({ error: "nothing_to_issue", code: "nothing_to_issue" }, 409);
+      return c.json(
+        { error: "nothing_to_issue", code: "nothing_to_issue" },
+        409,
+      );
     }
     const po = plan[0]!;
 
-    const decision = decisionsFor(group.proposal.supplierId, group.destinationId);
+    const decision = decisionsFor(
+      group.proposal.supplierId,
+      group.destinationId,
+    );
     const partnerId = decision?.procurementPartnerId ?? null;
     const needsPartner = group.proposal.supplierKind === "factory_pickup";
     if (needsPartner && (!partnerId || !validPartners.has(partnerId))) {
@@ -1604,7 +1303,10 @@ toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
     }
     if (!needsPartner && partnerId) {
       return c.json(
-        { error: "pickup_partner_not_allowed", code: "pickup_partner_not_allowed" },
+        {
+          error: "pickup_partner_not_allowed",
+          code: "pickup_partner_not_allowed",
+        },
         422,
       );
     }
@@ -1612,7 +1314,10 @@ toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
     const byLine = new Map<string, BatchLineDecision>();
     for (const d of decision?.lineDecisions ?? []) {
       if (byLine.has(d.sku)) {
-        return c.json({ error: "duplicate_cost_decision", code: "duplicate_cost_decision" }, 422);
+        return c.json(
+          { error: "duplicate_cost_decision", code: "duplicate_cost_decision" },
+          422,
+        );
       }
       byLine.set(d.sku, d);
     }
@@ -1637,7 +1342,11 @@ toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
            approver owns it (MASTER §5.6). */
         if (d.costSource === "catalog" && liveCost !== d.unitCost) {
           return c.json(
-            { error: "stale_catalog_cost", code: "stale_catalog_cost", sku: line.sku },
+            {
+              error: "stale_catalog_cost",
+              code: "stale_catalog_cost",
+              sku: line.sku,
+            },
             409,
           );
         }
@@ -1702,17 +1411,45 @@ toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
    * first six — including their commercial decisions, destinations and audit
    * history. There is no partial batch to clean up, because there is no
    * partial batch. */
-  const { data: batch, error: batchErr } = await sb.rpc("purchasing_issue_pos_batch", {
-    p_pos: governedPos,
-  });
+  const { data: batch, error: batchErr } = await sb.rpc(
+    "purchasing_issue_pos_batch",
+    {
+      p_pos: governedPos,
+    },
+  );
   if (batchErr) {
     const m = mapPgError(batchErr);
     return c.json(m.body, m.status);
   }
-  const ids = ((batch as { po_ids?: unknown } | null)?.po_ids ?? []) as string[];
+  const ids = ((batch as { po_ids?: unknown } | null)?.po_ids ??
+    []) as string[];
   if (ids.length !== governedPos.length) {
     return c.json({ error: "po_not_created", code: "po_not_created" }, 500);
   }
+
+  /**
+   * WHO RAISED IT. `purchasing_issue_pos_batch` writes no audit row of any
+   * kind, so without this a purchase order could not say who issued it or when.
+   * `po_history` has existed since 0001 for exactly that, so nothing new is
+   * invented and no migration is needed.
+   *
+   * Best-effort ON PURPOSE, and it moved across from the retired `/issue` door
+   * unchanged: the purchase orders already exist and the supplier is about to
+   * be sent them. Failing the whole issue because a history line could not be
+   * written would destroy real work to protect a note about it.
+   */
+  await sb.from("po_history").insert(
+    ids.map((id, i) => {
+      const po = governedPos[i] as { lines?: unknown[]; eta_date?: string | null };
+      const eta = po?.eta_date;
+      return {
+        po_id: id,
+        text: `Issued from SO Batch Purchase · ${po?.lines?.length ?? 0} line(s)${
+          eta ? ` · expected arrival ${eta}` : " · no expected arrival (transit days not set)"
+        }`,
+      };
+    }),
+  );
 
   return c.json({
     ok: true,

@@ -98,6 +98,7 @@ export default function OperationToOrder() {
     defaultDestinationId: null,
     currentPoDuty: null,
     mayIssue: false,
+    procurementPartners: [],
   };
 
   if (selections && documents.length > 0 && data) {
@@ -105,6 +106,7 @@ export default function OperationToOrder() {
       <SoBatchIssueWorkspace
         documents={documents}
         destinations={data.destinations}
+        procurementPartners={data.procurementPartners}
         onBack={backToBuying}
         onDone={finish}
       />

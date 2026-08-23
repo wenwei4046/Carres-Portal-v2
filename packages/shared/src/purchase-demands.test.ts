@@ -43,6 +43,8 @@ function row(over: Partial<PurchaseDemandRow> = {}): PurchaseDemandRow {
     goodsMustArrive: "2026-08-19",
     issueRef: { proposalKey: "s1::mattress", buildKey: "b1" },
     action: null,
+    costs: [{ sku: "B1201S-K", unitCost: 100 }],
+    supplierKind: "own_logistics",
     ownerName: null,
     ownerDuty: null,
     ...over,
@@ -481,6 +483,7 @@ describe("the SO Batch response carries destinations, duty and permission", () =
       defaultDestinationId: "d1",
       currentPoDuty: { userId: "u1", name: "Yee Jean" },
       mayIssue: true,
+      procurementPartners: [{ id: "p1", name: "NETS" }],
     });
     expect(parsed.destinations[0]!.name).toBe("Carres Klang");
     expect(parsed.mayIssue).toBe(true);
@@ -494,6 +497,7 @@ describe("the SO Batch response carries destinations, duty and permission", () =
       defaultDestinationId: null,
       currentPoDuty: null,
       mayIssue: false,
+      procurementPartners: [],
     });
     expect(parsed.mayIssue).toBe(false);
     expect(parsed.currentPoDuty).toBeNull();

@@ -59,6 +59,8 @@ function payload(over: Partial<SoBatchPurchaseResponse> = {}): SoBatchPurchaseRe
     toBuy: 2,
     goodsMustArrive: "2026-08-19",
     issueRef: { proposalKey: "s-hooka::mattress", buildKey: "b1" },
+    costs: [{ sku: "B1201S-K", unitCost: 100 }],
+    supplierKind: "own_logistics" as const,
     ownerName: null,
     ownerDuty: null,
   };
@@ -84,6 +86,7 @@ function payload(over: Partial<SoBatchPurchaseResponse> = {}): SoBatchPurchaseRe
     defaultDestinationId: KLANG,
     currentPoDuty: { userId: "u1", name: "Yee Jean" },
     mayIssue: true,
+    procurementPartners: [{ id: "p-nets", name: "NETS" }],
     ...over,
   };
 }
