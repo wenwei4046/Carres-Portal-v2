@@ -60,10 +60,12 @@ function isValidSlug(slug: string | undefined): slug is ProcurementTabSlug {
  * let `OrderDetailDrawer` push an order's shortages straight into that modal.
  * Both are gone, and `CreatePOModal` is deleted with them.
  *
- * `purchasing_issue_pos_batch(jsonb)` is now the ONLY authority that may create
- * a Purchase Order, and Batch Purchase is the only door that calls it. This page
- * keeps every one of its EXISTING-document responsibilities — the three channel
- * tabs and everything inside them — and creates nothing.
+ * `purchasing_issue_pos_batch(jsonb)` is the only authority that may create a
+ * Purchase Order, and it is reached only through the governed operator
+ * journeys — SO Batch Purchase and Manual Purchase (corrected 2026-08-23; this
+ * comment used to say Batch Purchase was the single door). This page keeps
+ * every one of its EXISTING-document responsibilities — the three channel tabs
+ * and everything inside them — and creates nothing.
  *
  * The prefill inbox is deliberately NOT replaced with a Batch Purchase deep
  * link: Card 4B forbids substituting another PO creation shortcut.

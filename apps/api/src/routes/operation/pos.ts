@@ -1057,9 +1057,16 @@ operationPosRouter.get("/:id/source-orders", requireOperation, async (c) => {
 // two of the four extra creation authorities the Card 4 audit found still
 // reachable from the browser.
 //
-// `purchasing_issue_pos_batch(jsonb)` is now the ONLY authority that may create
-// a Purchase Order, and Batch Purchase's `POST /api/operation/purchase/to-order/issue`
-// is its only caller.
+// ONE CREATION AUTHORITY, GOVERNED CALLERS.
+// `purchasing_issue_pos_batch(jsonb)` is the only authority that may create a
+// Purchase Order. It is reached through the governed operator journeys — SO
+// Batch Purchase (`POST /api/operation/purchase/to-order/issue-batch`) and
+// Manual Purchase (its own approved issue route) — and through nothing else.
+// One authority with named callers is the law; "one caller" never was.
+//
+// (Corrected 2026-08-23. This comment named `POST …/to-order/issue` as the one
+// caller; that route is RETIRED — CARD-2026-08-22-purchasing-02 deleted it —
+// and Manual Purchase was always a second governed caller of the same RPC.)
 //
 // DELETED rather than left standing as a 403, for the reason the `/receive`
 // retirement below already states in this file: a live route with no caller is

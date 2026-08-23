@@ -7311,8 +7311,9 @@ function ActionsMenu({
                     /operation/procurement carrying a CreatePOModal prefill, and
                     that modal called the legacy ungoverned create RPCs.
                     `purchasing_issue_pos_batch(jsonb)` is the only authority
-                    that may create a Purchase Order, and Batch Purchase is the
-                    only door that calls it. */}
+                    that may create a Purchase Order, and it is reached only
+                    through the governed journeys — SO Batch Purchase and
+                    Manual Purchase (corrected 2026-08-23). */}
                 {pipelineStatus === "ready" && (
                   <MenuItem
                     icon={<Truck className="w-4 h-4" />}

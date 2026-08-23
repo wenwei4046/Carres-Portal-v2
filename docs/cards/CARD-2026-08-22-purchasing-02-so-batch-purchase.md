@@ -808,9 +808,11 @@ borrow), and the banned-word scan would have passed vacuously forever on the thi
   either would be a business change this Card does not carry, so the key is
   `supplier × destination × category × (sofa ? order : "")`: strictly inside §4.2, and the only
   behaviour that changes is the one asked for.
-- **`/issue-batch` is a new door beside the old `/issue`.** The old one still serves ~1,900 lines
-  of guard tests and is the only issuer for nothing else now. Deleting it in the same change would
-  have removed that cover in one step; it is named below as the follow-up.
+- ~~**`/issue-batch` is a new door beside the old `/issue`.**~~ **SUPERSEDED — INITIAL
+  IMPLEMENTATION NOTE ONLY, NOT CURRENT TRUTH.** This described an intermediate state in which both
+  doors were mounted while the old one's guard tests were still the only cover for their laws. It
+  was closed by §15.6 item 3 on 2026-08-23: the guards moved to `/issue-batch` and
+  `POST …/to-order/issue` was DELETED. The Card holds one truth — see §15.6.
 - **The rail wording** was resolved from `docs/COPY-STANDARD.md`, which spells all six states, both
   headings and every fix line. The Card's §3.1 ASCII matches it exactly; MASTER §9.1's longer forms
   are the FACT line, which is what the row prints.
@@ -845,8 +847,9 @@ blob URL. The JSON endpoint is no longer put in an iframe and called a purchase 
 URL is revoked when it is replaced or the surface closes, and a render that fails SAYS so rather
 than showing a blank frame.
 
-**3 · The old PO issue door is retired.** `POST …/to-order/issue` and its schema are DELETED (427
-lines). Every guard it carried was re-asked of `/issue-batch` before the route went, and two of
+**3 · The duplicate SO-buying door is retired.** `POST …/to-order/issue` and its schema are DELETED
+(427 lines). This retires a DUPLICATE ENTRY POINT, not an authority — see the authority model
+below. Every guard it carried was re-asked of `/issue-batch` before the route went, and two of
 them changed meaning on the way across — recorded as rulings, not regressions:
 
 | The old law | On the batch door |
@@ -866,9 +869,25 @@ birth row**, and nothing in the new door did. It is carried across, best-effort 
 the purchase orders already exist and failing the issue over a history line would destroy real work
 to protect a note about it.
 
-**The final system has one demand arithmetic (`purchase-demand-read.ts`), one PO issuance authority
-(`/issue-batch` → `purchasing_issue_pos_batch`, asserted as the only caller in the repository), and
-one outbound-evidence authority (`purchasing_confirm_po_sent`).**
+**THE FINAL AUTHORITY MODEL — corrected 2026-08-23.**
+
+| | |
+|---|---|
+| One demand arithmetic | `apps/api/src/lib/purchase-demand-read.ts` |
+| One **Purchase Order creation authority** | `purchasing_issue_pos_batch` |
+| Its **governed entry points** | SO Batch Purchase → `POST …/to-order/issue-batch`<br>Manual Purchase → its existing governed issue route |
+| One outbound-evidence authority | `purchasing_confirm_po_sent` |
+
+⚠️ **An earlier draft of this section claimed `/issue-batch` was "the only caller in the
+repository". That was wrong.** Manual Purchase has always been a second governed journey onto the
+same creation authority (`routes/operation/manual-purchase.ts`), and this Card never touched it.
+What the Card removed is the DUPLICATE SO-buying door, not a second authority and not Manual
+Purchase's approved way in. **One authority with named governed callers is the law; "one caller"
+never was.** The test that asserted it is rescoped to what it actually proves — SO Batch Purchase
+reaches the authority from exactly one place in its own route — and a companion test now records
+Manual Purchase as the other governed journey, so the misreading cannot come back silently.
+
+`POST …/to-order/issue` remains **RETIRED**: deleted, and asserted 404 by test.
 
 ### 15.7 Gates after the correction
 

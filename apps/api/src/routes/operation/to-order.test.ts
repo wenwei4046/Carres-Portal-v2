@@ -1981,10 +1981,29 @@ describe("there is exactly ONE issuance door left", () => {
     expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
   });
 
-  it("only ONE route in the repository calls the creation RPC", () => {
+  /**
+   * ⭐ ONE AUTHORITY, GOVERNED CALLERS — and the difference matters.
+   *
+   * `purchasing_issue_pos_batch` is the only thing that may create a Purchase
+   * Order. It is NOT reached from only one place: Manual Purchase is a second
+   * governed journey onto the same authority
+   * (`routes/operation/manual-purchase.ts`), and always was. What this Card
+   * removed is the DUPLICATE SO-buying door, not Manual Purchase's.
+   *
+   * So the assertion is scoped honestly: SO Batch Purchase reaches the
+   * authority from exactly one place in its own route.
+   */
+  it("SO Batch Purchase reaches the creation authority from exactly one place", () => {
     const here = dirname(fileURLToPath(import.meta.url));
     const src = readFileSync(join(here, "to-order.ts"), "utf8");
-    // The creation RPC is invoked from exactly one place in the whole route.
     expect(src.match(/rpc\(\s*"purchasing_issue_pos_batch"/g) ?? []).toHaveLength(1);
+  });
+
+  it("Manual Purchase is the OTHER governed journey onto the same authority", () => {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const manual = readFileSync(join(here, "manual-purchase.ts"), "utf8");
+    // It is not a bypass and this Card did not touch it — it is the second
+    // approved way in, and a claim of "one caller" would have been false.
+    expect(manual).toContain("purchasing_issue_pos_batch");
   });
 });

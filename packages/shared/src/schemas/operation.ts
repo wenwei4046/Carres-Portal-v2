@@ -354,8 +354,11 @@ export type AbandonOrderInput = z.infer<typeof abandonOrderInput>;
  * Both routes are retired and the RPCs behind them are revoked from every browser
  * role (migration 0339), so the schemas describe doors that no longer exist.
  *
- * Purchase Order creation has ONE wire contract now — Batch Purchase's issue
- * payload — and ONE authority behind it, `purchasing_issue_pos_batch(jsonb)`. */
+ * Purchase Order creation has ONE authority behind it,
+ * `purchasing_issue_pos_batch(jsonb)`, reached through the governed operator
+ * journeys — SO Batch Purchase and Manual Purchase — each with its own wire
+ * contract. (Corrected 2026-08-23: this said there was one wire contract; there
+ * is one AUTHORITY, and more than one governed way in.) */
 
 /**
  * `warehousePickInput` — POST /api/operation/orders/:id/warehouse.

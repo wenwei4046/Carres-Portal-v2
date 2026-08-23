@@ -6882,11 +6882,18 @@ export function useRecheckStockMutation(
  * browser. Both routes are retired and both RPCs are revoked from every browser
  * role (migration 0339).
  *
- * `purchasing_issue_pos_batch(jsonb)` is now the ONLY authority that may create
- * a Purchase Order. Its one caller is Batch Purchase's
- * `POST /api/operation/purchase/to-order/issue`.
- * There is deliberately no replacement hook: a hook is a door, and this card
- * exists to leave exactly one. */
+ * ONE CREATION AUTHORITY, GOVERNED CALLERS.
+ * `purchasing_issue_pos_batch(jsonb)` is the only authority that may create a
+ * Purchase Order. It is reached through the governed operator journeys — SO
+ * Batch Purchase (`POST /api/operation/purchase/to-order/issue-batch`) and
+ * Manual Purchase (its own approved issue route) — and through nothing else.
+ *
+ * (Corrected 2026-08-23. This comment named `POST …/to-order/issue` as the one
+ * caller; that route is RETIRED — CARD-2026-08-22-purchasing-02 deleted it —
+ * and Manual Purchase was always a second governed caller of the same RPC.)
+ *
+ * There is deliberately no replacement hook: a hook is a door, and the card
+ * that removed the extra authorities exists to leave only governed ones. */
 
 /**
  * Chase-event log (Jess 2026-07-23) — Purchase cockpit's ② Chase button now
