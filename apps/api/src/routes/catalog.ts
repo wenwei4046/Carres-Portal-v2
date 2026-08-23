@@ -788,7 +788,18 @@ catalogRouter.post("/skus", async (c) => {
       pwp_price: parsed.data.pwpPrice ?? null,
       supplier_id: supplierId,
       // 0375 — the supplier's own item code. '' → null (a blank is not a code).
-      supplier_code: parsed.data.supplierCode?.trim() || null,
+      //
+      // ⚠️ SPREAD, NOT A FIXED KEY, and the reason is a deploy-order hazard:
+      // this route ships with the WEB deploy, but 0375 is applied BY HAND. In
+      // the window between them the column does not exist, and PostgREST
+      // refuses an INSERT naming an unknown column — which would have taken
+      // out SKU creation entirely, not just the new field. Omitting the key
+      // when nobody typed a code keeps the old path working untouched; a
+      // typed code still fails loudly, which is the honest half of the trade.
+      // The PATCH door is already conditional for the same reason.
+      ...(parsed.data.supplierCode?.trim()
+        ? { supplier_code: parsed.data.supplierCode.trim() }
+        : {}),
       description,
       pos_active: parsed.data.posActive ?? true,
     })
