@@ -1182,6 +1182,10 @@ catalogRouter.post("/import-skus", async (c) => {
     if (r.price !== undefined) p.price = r.price;
     if (r.cost !== undefined) p.cost = r.cost;
     if (r.description !== undefined) p.description = r.description;
+    /* 0376 — the supplier's own item code. Same omitted-means-preserve rule:
+       a file with no supplier_code column must not wipe codes keyed in by
+       hand, and only a PRESENT-but-blank cell clears one. */
+    if (r.supplierCode !== undefined) p.supplier_code = r.supplierCode;
     if (r.posActive !== undefined) p.pos_active = r.posActive;
 
     payloadRows.push(p);

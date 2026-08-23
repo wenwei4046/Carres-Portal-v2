@@ -114,6 +114,10 @@ export interface SkuImportRow {
   posActive?: boolean;
   /** Raw supplier slug or name; the server resolves it to supplier_id. */
   supplier?: string;
+  /** 0376 — the SUPPLIER'S own item code for this SKU (the code on their
+   *  quotation). Ours is the derived sku. Omitted when the cell was blank, so
+   *  a re-import without the column preserves whatever is stored. */
+  supplierCode?: string;
 }
 
 export type ImportRowResult =
@@ -185,6 +189,11 @@ export function csvRecordToImportRow(rec: Record<string, string>): ImportRowResu
   if (posActive !== undefined) row.posActive = posActive;
   const supplier = get("supplier");
   if (supplier) row.supplier = supplier;
+  /* 0376 — the SUPPLIER'S own item code (their quotation's code for the piece).
+     ABSENT stays absent so the server preserves what is already stored; a
+     PRESENT but blank cell is the only way an import can clear one. */
+  const supplierCode = get("supplier_code");
+  if (supplierCode) row.supplierCode = supplierCode;
 
   return { ok: true, row };
 }
@@ -204,6 +213,7 @@ export const skuImportRowSchema = z
     price: z.number().nonnegative().max(MAX_IMPORT_MONEY).optional(),
     cost: z.number().nonnegative().max(MAX_IMPORT_MONEY).optional(),
     description: z.string().trim().max(200).optional(),
+    supplierCode: z.string().trim().max(80).optional(),
     posActive: z.boolean().optional(),
     supplier: z.string().trim().min(1).max(80).optional(),
   })
