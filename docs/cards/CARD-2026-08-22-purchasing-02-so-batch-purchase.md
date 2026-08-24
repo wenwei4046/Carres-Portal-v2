@@ -1190,15 +1190,37 @@ stays shut.
 | duplicate-number collision gate | clean — `origin/main` tail is `0376`; no other remote branch reaches `0377` |
 | `pnpm lint` (design-standard + v4 guard) | clean |
 | `pnpm typecheck` | clean |
-| `pnpm test` | shared **113/2646** · api **122/2407** · web **277/3287** — **8,340 tests, 0 failed** |
+| `pnpm test` | shared **114/2663** · api **124/2424** · web **278/3318** — **8,405 tests, 0 failed** |
 | `pnpm build` | clean |
+| web bundle secret scan | clean |
+| `git diff --check` | clean |
 | responsive owner walk | 5 widths, measured above |
+
+Re-run in full **after merging `origin/main` at `0eaf5fbc`** (PR #899, which brought `0384` and
+`0385`), so the numbers above are for the combined tree. `so-batch-preview.html` is a dev-only vite
+entry and is **absent from `apps/web/dist`** — verified, not assumed.
 
 ### 17.10 Still owed, and what is NOT done
 
 - 🔴 **Migrations 0377 · 0378 · 0379 · 0380 · 0381 · 0382 · 0383 are NOT applied.** They go through
-  the governed approval path, in that order. Repository `0375` and `0376` are merged but not yet in
-  the live tracker, so the full order is `0375 → 0376 → 0377 → … → 0383`.
+  the governed approval path, in that order.
+
+  **The live tracker, measured 2026-08-24 (not assumed):** applied tail is `0374`, plus
+  `0384_the_import_carries_the_pwp_price` — which was applied AHEAD of `0375`–`0383`. So `0375`,
+  `0376`, `0377`–`0383` and `0385` are all still outstanding, and the apply order this PR needs is:
+
+  ```
+  0375 → 0376 → 0377 → 0378 → 0379 → 0380 → 0381 → 0382 → 0383
+  ```
+
+  None of the seven depends on `0375`, `0376`, `0384` or `0385`; they are numbered below `0384` and
+  can be applied without touching it.
+
+- ✅ **NO SILENT REVERT.** Each replaced function was checked against its LATEST predecessor, not
+  against its first: `purchasing_issue_pos_batch` 0361 → 0380 · `_operation_create_po_inner`
+  0154 → 0382 · `purchasing_po_document` 0378 → 0383 · `purchasing_confirm_po_sent` 0378 → 0379. The
+  only behaviour 0382 drops from 0154 is the behaviour it names: `max(seq) + 1` numbering,
+  `gen_unit_code`, and the own-warehouse-only Unit gate that MASTER §6.2 required removing.
 - 🔴 **Not merged and not deployed.** PR #894 waits on the owner.
 - ⚠️ **A Delivery worktree holds an untracked `0379_delivery_owns_the_arrangement…sql`.** It is not in
   the repository, so there is no collision today — but whichever branch merges second must renumber.
