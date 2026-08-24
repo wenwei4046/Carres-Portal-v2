@@ -77,22 +77,29 @@
  * and the first time they diverged an operator would be told something the
  * server refuses.
  */
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import type { OrderActionTone } from "@carres/shared";
+import type { DeliveryWorkStatusKind, OrderActionTone } from "@carres/shared";
 import { fmtDate } from "@/lib/fmt-date";
 import StatusPill from "@/components/kit/StatusPill";
 import {
   useDeliveryOrdersRegister,
   useDeliveryPartners,
+  useDeliveryArrangements,
   useOperationOrders,
   useOrderLoans,
   useSalesOrderExpansion,
+  type DeliveryArrangementRow,
 } from "@/lib/queries";
 import { DataGrid, type DataGridColumn, type DataGridContextMenuItem } from "@/components/register/DataGrid";
 import ModuleHeader from "./components/ModuleHeader";
 import GoodsMiniTable, { goodsCategoryOf, type GoodsMiniLine } from "./components/GoodsMiniTable";
 import { RailGroup, RailItem } from "./components/workspace-rail";
+import AssignLogisticsDialog from "./components/AssignLogisticsDialog";
+
+/** The two governed action words on this workspace (COPY-STANDARD). */
+const ASSIGN_LOGISTICS = "Assign logistics";
+const EDIT_DELIVERY = "Edit Delivery";
 import { lineName } from "./sales-order-facts";
 import {
   DATE_TO_BE_CONFIRMED_CELL,
@@ -114,12 +121,20 @@ import {
 const STORAGE_KEY = "carres.deliveryWork.register.v1";
 
 /** Owner column ruling 2026-08-18, held here too — one status vocabulary. */
-const STATUS_TONE: Record<string, OrderActionTone> = {
-  created: "neutral",
+/**
+ * The OPERATIONAL ladder's tones (owner ruling 2026-08-24). Two rungs are
+ * deliberately quiet — waiting on a customer or a warehouse is the normal
+ * state of most rows on a planning screen, and painting eighty of them amber
+ * would spend the attention colour on "nothing is wrong yet".
+ */
+const STATUS_TONE: Record<DeliveryWorkStatusKind, OrderActionTone> = {
+  waiting_customer_date: "neutral",
+  confirmed: "info",
+  waiting_warehouse: "neutral",
+  ready_for_handover: "info",
   out_for_delivery: "info",
   delivered: "success",
-  exception: "warning",
-  cancelled: "neutral",
+  failed: "warning",
 };
 
 /** ⭐ AN ABSENCE IS QUIETER THAN A FACT — owner ruling 2026-08-15. */
@@ -245,7 +260,7 @@ function ScopeExpansion({ row }: { row: DeliveryScopeRow }) {
       {openLoans.length > 0 && (
         <div className="px-2" data-testid="delivery-scope-loan">
           <div className="mb-1 text-label font-semibold uppercase tracking-wide text-kit-slate-9">
-            {DW.loanHeading}
+            {DW.itemsToCollect}
           </div>
           <table className="text-left text-body">
             <thead>
@@ -289,6 +304,9 @@ export default function OperationDelivery() {
   const ordersQ = useOperationOrders();
   const partnersQ = useDeliveryPartners();
   const docsQ = useDeliveryOrdersRegister();
+  /* 0379 — Delivery's OWN records. Read alongside the documents so the row can
+     prefer what Delivery wrote over what Sales' door left behind. */
+  const arrangementsQ = useDeliveryArrangements();
   const today = businessToday();
 
   const partners = useMemo(() => partnersQ.data?.partners ?? [], [partnersQ.data]);
@@ -298,6 +316,12 @@ export default function OperationDelivery() {
     return m;
   }, [partners]);
 
+  const arrangementsByScope = useMemo(() => {
+    const m = new Map<string, DeliveryArrangementRow>();
+    for (const a of arrangementsQ.data?.arrangements ?? []) m.set(`${a.order_id}#${a.leg}`, a);
+    return m;
+  }, [arrangementsQ.data]);
+
   const rows = useMemo(
     () =>
       buildDeliveryScopeRows({
@@ -306,8 +330,9 @@ export default function OperationDelivery() {
         attempts: docsQ.data?.attempts ?? [],
         handoverEvents: docsQ.data?.handoverEvents ?? [],
         partnerNameById,
+        arrangements: arrangementsByScope,
       }),
-    [ordersQ.data, docsQ.data, partnerNameById],
+    [ordersQ.data, docsQ.data, partnerNameById, arrangementsByScope],
   );
 
   /* ── The two rails, on the URL ─────────────────────────────────────────── */
@@ -374,9 +399,55 @@ export default function OperationDelivery() {
     [rows, dateSet, logisticsSet, today],
   );
 
+  /** `SO No` is a door to the Sales Order — the ONLY thing that opens it. */
   const openOrder = useCallback(
     (r: DeliveryScopeRow) => navigate(`/operation/orders/so/${r.orderId}`),
     [navigate],
+  );
+
+  /**
+   * ⭐ DOUBLE-CLICK OPENS EDIT DELIVERY, NEVER THE SALES ORDER.
+   *
+   * Owner correction 2026-08-24, caught on production: this page shipped with
+   * `onRowDoubleClick={openOrder}`, which sent a logistics operator mid-plan
+   * into a commercial document they must not edit. A row on this workspace IS
+   * a delivery scope, so opening it opens the delivery.
+   */
+  const openEditDelivery = useCallback(
+    (r: DeliveryScopeRow) =>
+      navigate(`/operation/delivery/edit/${r.orderId}${r.leg != null ? `?leg=${r.leg}` : ""}`),
+    [navigate],
+  );
+
+  /* ── SELECTION ──────────────────────────────────────────────────────────
+     The Sales Orders grammar: ☐ · ▸ · SO / Ref …, and the 45px toolbar is
+     REPLACED in place when anything is ticked (the engine already does that).
+     Selection here scopes a WRITE, which a truth register never does — but
+     this is a workspace, and `Assign logistics` is Delivery's own act. */
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [assigning, setAssigning] = useState<DeliveryScopeRow[] | null>(null);
+
+  const toggleRow = useCallback(
+    (key: string) =>
+      setSelected((prev) => {
+        const next = new Set(prev);
+        if (next.has(key)) next.delete(key);
+        else next.add(key);
+        return next;
+      }),
+    [],
+  );
+  const toggleAll = useCallback(
+    (keys: string[], allSelected: boolean) =>
+      setSelected((prev) => {
+        const next = new Set(prev);
+        for (const k of keys) {
+          if (allSelected) next.delete(k);
+          else next.add(k);
+        }
+        return next;
+      }),
+    [],
   );
 
   const columns = useMemo<DataGridColumn<DeliveryScopeRow>[]>(
@@ -440,6 +511,35 @@ export default function OperationDelivery() {
         filterValue: (r) => r.customer,
       },
       {
+        key: "location",
+        label: "Delivery Location",
+        width: 170,
+        sortable: true,
+        chooserGroup: "Customer",
+        accessor: (r) => (
+          <span className="block truncate" title={r.location}>
+            {r.location}
+          </span>
+        ),
+        searchValue: (r) => r.location,
+        filterValue: (r) => r.location,
+      },
+      {
+        /* Not decoration: a condo with no lift on floor 12 is a different
+           delivery from a landed house, and the planner has to see it before
+           committing a two-man van. */
+        key: "building",
+        label: "Building",
+        width: 120,
+        sortable: true,
+        filterType: "enum",
+        chooserGroup: "Customer",
+        accessor: (r) =>
+          r.building === DW.notGiven ? <Absent>{DW.notGiven}</Absent> : r.building,
+        searchValue: (r) => r.building,
+        filterValue: (r) => r.building,
+      },
+      {
         /* Sales Orders' promise, in Sales Orders' own word. Delivery reads it
            and may never rewrite it (`docs/orders/MASTER.md`). */
         key: "customer_delivery",
@@ -473,46 +573,6 @@ export default function OperationDelivery() {
         sortFn: (a, b) => (a.customerDeliveryIso ?? "").localeCompare(b.customerDeliveryIso ?? ""),
       },
       {
-        key: "location",
-        label: "Delivery Location",
-        width: 170,
-        sortable: true,
-        chooserGroup: "Customer",
-        accessor: (r) => (
-          <span className="block truncate" title={r.location}>
-            {r.location}
-          </span>
-        ),
-        searchValue: (r) => r.location,
-        filterValue: (r) => r.location,
-      },
-      {
-        /* Not decoration: a condo with no lift on floor 12 is a different
-           delivery from a landed house, and the planner has to see it before
-           committing a two-man van. */
-        key: "building",
-        label: "Building",
-        width: 120,
-        sortable: true,
-        filterType: "enum",
-        chooserGroup: "Customer",
-        accessor: (r) =>
-          r.building === DW.notGiven ? <Absent>{DW.notGiven}</Absent> : r.building,
-        searchValue: (r) => r.building,
-        filterValue: (r) => r.building,
-      },
-      {
-        key: "logistics",
-        label: "Logistics Partner",
-        width: 140,
-        sortable: true,
-        filterType: "enum",
-        chooserGroup: "Delivery",
-        accessor: (r) => r.logisticsName ?? <Absent>{DW.noLogistics}</Absent>,
-        searchValue: (r) => r.logisticsName ?? DW.noLogistics,
-        filterValue: (r) => r.logisticsName ?? DW.noLogistics,
-      },
-      {
         /* Delivery's OWN confirmed operational date for this scope — the
            document's when one exists, else the confirmed booking. A carrier's
            provisional date is not confirmed and is not printed here. */
@@ -539,6 +599,17 @@ export default function OperationDelivery() {
         accessor: (r) => r.confirmedTime ?? <Absent>{DW.noTime}</Absent>,
         searchValue: (r) => r.confirmedTime ?? DW.noTime,
         filterValue: (r) => r.confirmedTime ?? DW.noTime,
+      },
+      {
+        key: "logistics",
+        label: "Logistics Partner",
+        width: 140,
+        sortable: true,
+        filterType: "enum",
+        chooserGroup: "Delivery",
+        accessor: (r) => r.logisticsName ?? <Absent>{DW.noLogistics}</Absent>,
+        searchValue: (r) => r.logisticsName ?? DW.noLogistics,
+        filterValue: (r) => r.logisticsName ?? DW.noLogistics,
       },
       {
         key: "goods",
@@ -584,30 +655,29 @@ export default function OperationDelivery() {
       {
         key: "delivery_status",
         label: "Delivery Status",
-        width: 170,
+        width: 180,
         sortable: true,
         filterType: "enum",
-        chooserGroup: "Document",
+        chooserGroup: "Delivery",
         /* The ONE shared arithmetic (`deliveryOrderStatusOf`), rendered in the
            register's own two-line grammar: the pill, then an exception's ONE
            reason in the quieter rank. */
-        accessor: (r) =>
-          r.status ? (
-            <span className="block min-w-0">
-              <StatusPill tone={STATUS_TONE[r.status.kind] ?? "neutral"}>
-                {r.status.label}
-              </StatusPill>
-              {r.status.reasonLabel ? (
-                <span className="block truncate text-label font-normal text-base-600">
-                  {r.status.reasonLabel}
-                </span>
-              ) : null}
-            </span>
-          ) : (
-            <Absent>{DW.noDeliveryOrder}</Absent>
-          ),
-        searchValue: (r) => r.status?.label ?? DW.noDeliveryOrder,
-        filterValue: (r) => r.status?.label ?? DW.noDeliveryOrder,
+        /* ⭐ THE OPERATION'S progress, not the DOCUMENT's (owner ruling
+           2026-08-24). It ALWAYS has an answer — a scope with no document is
+           `Waiting for customer date` or `Delivery confirmed`, never a blank
+           and never `Created`, which is a fact about paper. */
+        accessor: (r) => (
+          <span className="block min-w-0">
+            <StatusPill tone={STATUS_TONE[r.status.kind]}>{r.status.label}</StatusPill>
+            {r.status.reasonLabel ? (
+              <span className="block truncate text-label font-normal text-base-600">
+                {r.status.reasonLabel}
+              </span>
+            ) : null}
+          </span>
+        ),
+        searchValue: (r) => r.status.label,
+        filterValue: (r) => r.status.label,
       },
       {
         /* Off by default. A planner arranging a day phones the customer, and
@@ -644,6 +714,8 @@ export default function OperationDelivery() {
 
   const contextMenu = useCallback(
     (r: DeliveryScopeRow): DataGridContextMenuItem[] => [
+      { label: EDIT_DELIVERY, onClick: () => openEditDelivery(r) },
+      { divider: true },
       { label: `Open SO-${r.so}`, onClick: () => openOrder(r) },
       ...(r.doNumber
         ? [
@@ -655,7 +727,7 @@ export default function OperationDelivery() {
           ]
         : []),
     ],
-    [navigate, openOrder],
+    [navigate, openOrder, openEditDelivery],
   );
 
   const isError = ordersQ.isError || docsQ.isError;
@@ -743,9 +815,40 @@ export default function OperationDelivery() {
               groupBanner={false}
               stickyIdentity
               chooserGroupOrder={["Document", "Customer", "Delivery", "Dates", "Items"]}
-              onRowDoubleClick={openOrder}
+              /* Owner ruling 2026-08-24 — a row on THIS workspace is a delivery
+                 scope, so opening it opens the delivery. */
+              onRowDoubleClick={openEditDelivery}
               contextMenu={contextMenu}
+              expandTitle={DW.showItems}
               expandable={{ renderExpansion: (r) => <ScopeExpansion row={r} /> }}
+              selectable={{
+                selectedKeys: selected,
+                onToggle: toggleRow,
+                onToggleAll: toggleAll,
+              }}
+              selectionSummary={(n) =>
+                n === 1 ? "1 delivery scope selected" : `${n} delivery scopes selected`
+              }
+              selectionActions={[
+                {
+                  /* Delivery's own write, valid for ONE scope or many. */
+                  label: () => ASSIGN_LOGISTICS,
+                  kind: "write",
+                  onClick: (rows) => setAssigning(rows as unknown as DeliveryScopeRow[]),
+                },
+                {
+                  /* ⭐ ONE scope only. Edit Delivery opens a single arrangement,
+                     so offering it beside three ticked rows invites a click
+                     whose only possible answer is a refusal. */
+                  label: () => EDIT_DELIVERY,
+                  kind: "write",
+                  visible: (n) => n === 1,
+                  onClick: (rows) => {
+                    const row = (rows as unknown as DeliveryScopeRow[])[0];
+                    if (row) openEditDelivery(row);
+                  },
+                },
+              ]}
               statusSummary={(filtered) => {
                 const line = scopeFooter(filtered.length, rows.length);
                 return (
@@ -758,6 +861,22 @@ export default function OperationDelivery() {
           )}
         </div>
       </div>
+
+      {assigning && assigning.length > 0 && (
+        <AssignLogisticsDialog
+          scopes={assigning}
+          open
+          onOpenChange={(next) => {
+            if (!next) setAssigning(null);
+          }}
+          onAssigned={() => {
+            /* The picks are spent: leaving them ticked would offer `Assign
+               logistics` again over scopes that just took one. */
+            setSelected(new Set());
+            void ordersQ.refetch();
+          }}
+        />
+      )}
     </div>
   );
 }

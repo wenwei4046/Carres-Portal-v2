@@ -39,6 +39,7 @@ import SettingsWorkspace from "./SettingsWorkspace";
 // build plan. Tab-state driven like Payments / Stock (only orders and
 // procurement are path-driven), so `?tab=delivery` deep-links it.
 import OperationDelivery from "./OperationDelivery";
+import EditDelivery from "./EditDelivery";
 import OperationPayments from "./OperationPayments";
 import OperationWork from "./OperationWork";
 import OperationRental from "./OperationRental";
@@ -165,6 +166,11 @@ export default function OperationApp() {
   // scrolls like a normal page.
   const isDeliveryOrdersRegisterUrl =
     location.pathname === "/operation/delivery-orders";
+  /* EDIT DELIVERY (2026-08-24) draws its own 50px Destination Header, so the
+     slim global bar must stand down — the SAME rule Delivery Work needed and
+     Manual Purchase needed before it. A page that draws a header joins this
+     list in the PR that gives it one. */
+  const isEditDeliveryUrl = location.pathname.startsWith("/operation/delivery/edit");
   /* The one Settings Workspace is its own route, not a module tab — the
      Page Header gear is the ERP's single Settings entry (ui/MASTER.md). */
   const isSettingsUrl = location.pathname.startsWith("/operation/settings");
@@ -313,6 +319,7 @@ export default function OperationApp() {
             two, so the module tab bar is the only chrome). */}
         {!isOrdersUrl &&
           !isDeliveryOrdersUrl &&
+          !isEditDeliveryUrl &&
           !isOldOrdersUrl &&
           !isProcurementUrl &&
           !isToOrderUrl &&
@@ -393,6 +400,13 @@ export default function OperationApp() {
             {/* The one Settings Workspace. Reached only from the Page Header
                 gear's launcher — never a tab, nav item or Work Toolbar action. */}
             <Route path="settings/*" element={<SettingsWorkspace />} />
+            {/* EDIT DELIVERY (owner ruling 2026-08-24) — Delivery's own
+                full-screen surface, and where a Delivery Work row now opens.
+                `?leg=` names the Journey leg; absent means the whole-order
+                scope. It is a REAL route, so the shell suppresses its slim top
+                bar the same way it does for every other page that draws its own
+                Destination Header. */}
+            <Route path="delivery/edit/:orderId" element={<EditDelivery />} />
             <Route path="issues" element={<OperationIssueTracker />} />
             <Route path="issues/reports" element={<IssueRelatedPartyReport />} />
             <Route path="orders/so/new" element={<SalesOrderWorkspace />} />

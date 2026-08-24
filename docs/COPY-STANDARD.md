@@ -427,6 +427,38 @@ employee can be told what is required. Delivery schedule groups and due labels u
 weekday + date, never `Today` or `Tomorrow`. Never show generic `Contact Customer` or `Follow Up`;
 name the purpose, such as `Confirm New Delivery Date` or `Confirm Delivery Address`.
 
+**Delivery Work status words — owner ruling 2026-08-24.** The DOCUMENT and the OPERATION have
+**two separate vocabularies**, and neither may borrow the other's words.
+
+```
+Delivery Orders Register — the DOCUMENT's own life
+  Created · Out for delivery · Delivered · Delivery exception · Cancelled
+
+Delivery Work — the OPERATION's progress
+  Waiting for customer date · Delivery confirmed · Waiting for warehouse ·
+  Ready for handover · Out for delivery · Delivered · Failed Delivery
+```
+
+⛔ **`Created` may never appear on Delivery Work.** It is a true fact about a piece of paper and a
+useless one on a planning screen: two scopes reading `Created` can be a week of real work apart.
+The operational rung that replaces it is `Waiting for warehouse`, which names the owner instead of
+the document. Equally, the operational words may not appear in the Register — a register describes
+documents.
+
+Banned as status words on either surface, because each names a mood rather than a fact:
+`Pending` · `In progress` · `Scheduled` · `Booked` · `Awaiting` · `Unscheduled` · `Not booked`.
+
+**Delivery Work rail and action words — owner ruling 2026-08-24.** The schedule rail's overdue
+bucket is **`Overdue`**, never `Date passed`; its group heading is `DELIVERY SCHEDULE`. The two
+governed actions on the workspace are **`Assign logistics`** (first carrier on a scope) and
+**`Change logistics`** (replacing one, which requires a governed reason and writes history) — never
+`Reassign`, `Set partner` or `Update logistics`. The Delivery-owned editor is **`Edit Delivery`**
+and its save is **`Save Delivery`**; neither may be spelled `Edit delivery order`, because the
+document is not what is being edited. A wrong Sales fact offers the door **`Open Sales Order to
+change`**. The selection bar counts in the page's own unit: `1 delivery scope selected` /
+`3 delivery scopes selected`. The disclosure's hover reads **`Show delivery items`**. The Loan block
+inside an expansion is headed **`Items to collect`**.
+
 ## The delivery group words (T8, locked with Jess 2026-07-27)
 
 What may travel apart, and what may never. There are exactly TWO groups, and a

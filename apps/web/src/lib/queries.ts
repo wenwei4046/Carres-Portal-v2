@@ -292,6 +292,11 @@ import {
   type WarehouseReceiptRow,
   type WarehouseSubmitReceiptInput,
   type StockRegisterUnit,
+  // 0379 — Delivery's own arrangement (owner correction 2026-08-24).
+  type DeliveryArrangementRow,
+  type DeliveryArrangementEventRow,
+  type AssignLogisticsInput,
+  type SaveDeliveryArrangementInput,
 } from "@carres/shared";
 import { ApiError, apiFetch } from "./api";
 import { uploadCompartmentPhoto, uploadDeliveryPhoto, uploadModelPhoto } from "./photo-upload";
@@ -5940,6 +5945,86 @@ export function useStockUnit(unitCode: string | undefined) {
     queryFn: () => apiFetch<StockUnitPayload>(`/api/ops/stock/register/${encodeURIComponent(unitCode as string)}`),
     enabled: Boolean(unitCode),
     staleTime: 30_000,
+  });
+}
+
+/**
+ * DELIVERY'S OWN ARRANGEMENTS (0379) — every scope's carrier, agreed day and
+ * window, in one read. The workspace joins them by `${order_id}#${leg}`.
+ */
+export type { DeliveryArrangementRow, DeliveryArrangementEventRow } from "@carres/shared";
+
+export interface DeliveryArrangementsPayload {
+  arrangements: DeliveryArrangementRow[];
+}
+
+export function useDeliveryArrangements() {
+  return useQuery<DeliveryArrangementsPayload, ApiError>({
+    queryKey: ["operation", "delivery-arrangements"],
+    queryFn: () =>
+      apiFetch<DeliveryArrangementsPayload>("/api/operation/delivery-arrangements"),
+    staleTime: 30_000,
+  });
+}
+
+/** One scope, plus its carrier history and the read-only Sales facts. */
+export interface DeliveryArrangementDetail {
+  order: Record<string, unknown> & {
+    id: string;
+    so: number;
+    customer_name: string | null;
+    customer_phone: string | null;
+    delivery_date: string | null;
+    delivery_date_tbd: boolean | null;
+    do_number: string | null;
+    order_lines: Array<{ id: string; sku: string; qty: number; attrs?: Record<string, unknown> | null }>;
+  };
+  arrangement: DeliveryArrangementRow | null;
+  history: DeliveryArrangementEventRow[];
+}
+
+export function useDeliveryArrangement(orderId: string | undefined, leg = 0) {
+  return useQuery<DeliveryArrangementDetail, ApiError>({
+    queryKey: ["operation", "delivery-arrangement", orderId ?? "", leg],
+    queryFn: () =>
+      apiFetch<DeliveryArrangementDetail>(
+        `/api/operation/delivery-arrangements/${orderId}?leg=${leg}`,
+      ),
+    enabled: Boolean(orderId),
+    staleTime: 10_000,
+  });
+}
+
+/** ASSIGN LOGISTICS — one partner onto one or many scopes, atomically. */
+export function useAssignLogistics() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: AssignLogisticsInput) =>
+      apiFetch<{ assigned: number; partner: string }>(
+        "/api/operation/delivery-arrangements/assign",
+        { method: "POST", body: JSON.stringify(input) },
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["operation", "delivery-arrangements"] });
+      void qc.invalidateQueries({ queryKey: ["operation", "orders"] });
+    },
+  });
+}
+
+/** SAVE DELIVERY — the Edit Delivery form for ONE scope. */
+export function useSaveDeliveryArrangement(orderId: string | undefined, leg = 0) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: SaveDeliveryArrangementInput) =>
+      apiFetch<{ arrangement: DeliveryArrangementRow }>(
+        `/api/operation/delivery-arrangements/${orderId}?leg=${leg}`,
+        { method: "PUT", body: JSON.stringify(input) },
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["operation", "delivery-arrangements"] });
+      void qc.invalidateQueries({ queryKey: ["operation", "delivery-arrangement", orderId ?? ""] });
+      void qc.invalidateQueries({ queryKey: ["operation", "orders"] });
+    },
   });
 }
 

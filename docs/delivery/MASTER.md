@@ -341,9 +341,8 @@ Route. **The register shows NO owner, NO avatar and NO action sentence** — a r
 documents; work lives in My Work / Team Work. Rows open the DO object page; document numbers are
 doors (`DO → DO`, `SO → SO`).
 
-**Delivery Work — the manual planning workspace. OWNER RULING 2026-08-21,
-BUILT and PRODUCTION-VERIFIED on `875c008d`
-(`CARD-2026-08-21-delivery-02-work-layout`). This OVERWRITES the 2026-08-20 first page.** The
+**Delivery Work — the manual planning workspace. OWNER CORRECTION 2026-08-24, which OVERWRITES
+the 2026-08-21 ruling wherever the two disagree (`CARD-2026-08-21-delivery-02-work-layout`).** The
 three-pane action-card screen is deleted, not deprecated beside this: the `Work list / Calendar`
 switch, the KPI/count preamble, the Refresh control, the action-card wall, the permanent detail
 pane and the third working column are gone, and no Delivery surface carries the generic employee
@@ -351,49 +350,131 @@ labels `Due`, `Next Action` or `Priority`. That page answered *who should be nag
 is My Work / Team Work's question; this one answers the logistics question — **everything going out
 on a given day, who is carrying it, and what is still missing.**
 
-It is an operational workspace, not a truth Register, and it **writes nothing**: no `New DO`, no
-`Issue`, no `Release`, no `Approve`. §3's ruling is unchanged — the system issues the document.
+⛔ **SUPERSEDED — *"it writes nothing"*.** The 2026-08-21 text said Delivery Work is read-only. The
+owner overturned that on 2026-08-24 and the sentence is deleted rather than kept beside its
+replacement:
+
+> **DELIVERY WORK OWNS THE DELIVERY ARRANGEMENT.** Who carries a scope, the confirmed operational
+> date and time, the expected arrival, the logistics note, the partner's actual reply proof and the
+> Condo driver/vehicle are **Delivery's writes**, made from this workspace. **Sales Orders remains
+> the owner of the commercial customer promise** — the customer, the address, the building facts and
+> the promised `Customer Delivery` date — and Delivery may never write one of them.
+
+What is unchanged is §3's ruling: **the SYSTEM issues the Delivery Order** when the governed gate
+becomes true. There is no `New DO`, no `Issue`, no `Release` and no `Approve` on this page or in any
+dialog it opens. `Save Delivery` records an arrangement; issuance reads it.
+
+The arrangement is its OWN record (`ops_delivery_arrangements`, migration 0379) keyed by the scope
+`(order_id, leg)` — never `orders.delivery_partner_id`, which is a Sales Order column and could
+hold only one carrier for a two-leg Journey, kept no history, and had two writers.
 
 ```
 one 50px Destination Header  ·  Delivery Work
-200px local rail             ·  DELIVERY DATE + LOGISTICS, page-owned FILTERING
+200px local rail             ·  DELIVERY SCHEDULE + LOGISTICS, page-owned FILTERING
 one expandable DataGrid      ·  the Sales Orders engine, density and toolbar
 ```
 
-**The rail.** `DELIVERY DATE` lists `No confirmed date`, then `Date passed`, then the actual
-weekday + calendar dates ascending — **never Today, never Tomorrow.** `LOGISTICS` lists `All`, then
-the governed partners **NETS · AL · TEOW · TT · EU · SSY · HOUZS in that order and visible at zero**,
-then any other partner while it is genuinely carrying a scope, then `No logistics picked` when
-scopes have none. The two groups COMBINE, each group's counts are computed over the rows the other
-has already narrowed, and counts are **delivery scopes or Journey legs, never whole Sales Orders.**
-Choices ride the URL (`?date=` · `?logistics=`).
+**THE ENTRY RULE (owner ruling 2026-08-24).** A Sales Order does not become delivery work merely by
+existing. A scope enters this workspace only when it has **a delivery location/address · building
+and access facts · goods that require delivering · a valid scope or Journey leg**. An order missing
+its address stays **Sales-owned Work** and must not appear here as a row of `Not given` — measured
+before the correction, 59 of 90 rows carried no location at all, which is two thirds of a logistics
+screen that no logistics operator could act on.
+
+**The rail.** `DELIVERY SCHEDULE` lists `No confirmed date`, then **`Overdue`** (renamed from
+`Date passed`), then the actual weekday + calendar dates ascending — **never Today, never
+Tomorrow** — and it shows the **near-term operating dates even when their count is zero**, because
+a planner has to be able to see that a day is free. The schedule reads **`Confirmed Delivery`**,
+never the customer's promised date. `LOGISTICS` lists `All`, then the governed partners
+**NETS · AL · TEOW · TT · EU · SSY · HOUZS in that order and visible at zero**, then any other
+partner while it is genuinely carrying a scope, then `No logistics picked` when scopes have none.
+The two groups COMBINE, each group's counts are computed over the rows the other has already
+narrowed, and counts are **delivery scopes or Journey legs, never whole Sales Orders.** Choices ride
+the URL (`?date=` · `?logistics=`).
 
 **One parent row = one Delivery scope, or one Journey leg.** A Singapore order's two legs are two
-rows, each with its own Logistics Partner, day and result: leg 1 completing means the goods reached
-the named JB warehouse, which is not the event the Singapore customer is waiting for. A delivered
-order leaves the workspace — that is Delivery Orders and Delivery History.
+rows, each with its own Logistics Partner, day, arrangement and result: leg 1 completing means the
+goods reached the named JB warehouse, which is not the event the Singapore customer is waiting for.
+Singapore Journey legs are **separate assignments**. A delivered order leaves the workspace — that
+is Delivery Orders and Delivery History.
 
-**Default columns, in this order:**
+**Default columns, in this order (owner ruling 2026-08-24, OVERWRITING the 2026-08-21 order):**
 
 ```
-▸ · SO / Ref · Customer · Customer Delivery · Delivery Location · Building · Logistics Partner ·
-Confirmed Delivery · Confirmed Time · Goods · DO No · Delivery Status
+☐ · ▸ · SO / Ref · Customer · Delivery Location · Building · Customer Delivery ·
+Confirmed Delivery · Confirmed Time · Logistics Partner · Goods · DO No · Delivery Status
 ```
 
-`SO / Ref` is the sticky identity column and stays visible through horizontal scroll; SO No opens
-the Sales Order and DO No the Delivery Order. Before the system issues a document the cells read
-`No delivery order yet` and `Not issued yet`. **No Owner column, no avatar, no action sentence.**
-Dates print the actual weekday + date. `Confirmed Delivery` is Delivery's own operational date —
-the document's when one exists, else the confirmed booking; a carrier's provisional date is never
+Date and time stay **separate columns**. `SO / Ref` is the sticky identity column and stays visible
+through horizontal scroll. **No Owner column, no avatar, no action sentence.** Dates print the
+actual weekday + date. `Confirmed Delivery` is Delivery's own operational date — the document's when
+one exists, else the arrangement, else the confirmed booking; a carrier's provisional date is never
 printed as confirmed. `Phone` and `Delivery address` ship in the chooser, off by default.
 
-**▸ has exactly one job:** that scope's goods and physical facts. The shared Goods mini-table
-(`Category · Unit ID · Deliver To · SKU · Qty · Item`), then read-only `Where` · `Who has it` ·
-`Stock ETA`, then the Loan block (`Unit ID · Item · With customer since · Return destination`) and
-only when a loan is genuinely out. **No editable field, no Partner selector, no Save, no second
-Delivery form.** Stock owns Where/Who has it/Stock ETA, Sales Orders owns the customer, address,
-promise and ordered goods, Payment owns the release gate; Delivery Work reads them and creates no
-duplicate truth.
+**THE INTERACTION CONTRACT (owner ruling 2026-08-24).**
+
+```
+Click SO No          →  open the Sales Order
+Click DO No          →  open the Delivery Order
+Click ▸              →  expand and inspect this scope's goods — READ-ONLY
+Double-click a row   →  open Edit Delivery          (never the Sales Order)
+Select one row       →  Assign logistics + Edit Delivery
+Select many rows     →  Assign logistics only
+```
+
+The 45px toolbar is **replaced in place** when rows are selected — never a second toolbar row — and
+reads `1 delivery scope selected` / `3 delivery scopes selected`, `Clear`, then the actions.
+`Edit Delivery` may never redirect to the Sales Order.
+
+**THE DISCLOSURE.** The governed chevron: `▸` collapsed, rotated when expanded, **neutral grey and
+never the danger ink**, in the 32px control gutter, titled `Show delivery items`, carrying a correct
+`aria-expanded`. It is an ENGINE property, so every register wears it.
+
+**`Delivery Status` is the OPERATION's progress, not the document's** (owner ruling 2026-08-24):
+
+```
+Waiting for customer date · Delivery confirmed · Waiting for warehouse ·
+Ready for handover · Out for delivery · Delivered · Failed Delivery
+```
+
+**`Created` may not appear on Delivery Work.** It is a true fact about a piece of paper and a
+useless one on a planning screen — two scopes reading `Created` can be a week of real work apart. It
+stays in the Delivery Orders Register, which is where the document's own life is described. The two
+vocabularies are separate and neither may borrow the other's words.
+
+**ASSIGN LOGISTICS — Delivery's own write.** One or many selected scopes at once. Only partners
+valid for the selected routes/coverage are offered; **Klang Valley defaults to NETS** per §2, as a
+pre-selection and never a lock. **An existing Logistics Partner is never silently replaced:**
+changing one is the governed **`Change logistics`** act and requires a reason from the governed list
+plus an append-only history line, enforced by a database check constraint rather than only by a
+dialog. Singapore Journey legs are assigned separately. The write lands on the arrangement, never on
+the Sales Order.
+
+**EDIT DELIVERY — the Delivery-owned full-screen 50/50 surface.** Left, the form; right, a **live
+preview rendered by the actual governed Delivery Order renderer**, which reads
+`Preview · No delivery order yet` before issuance and the real number after it, and re-renders as
+printable fields change.
+
+```
+LEFT — read-only, from the Sales Order      LEFT — Delivery owns and edits these
+  Customer · Phone                            Logistics Partner
+  Delivery location                           Confirmed Delivery · Confirmed Time
+  Building / floor / lift                     Expected arrival time
+  Customer Delivery                           Logistics note · Actual reply proof
+  Customer preferred time                     Driver / Vehicle — Condo only
+```
+
+A wrong Sales fact is corrected through the door **`Open Sales Order to change`**, never silently
+from Delivery: the save payload has no field for one, so it cannot be written from here even by a
+hand-made request. **`Save Delivery` records the arrangement and does not issue the document.**
+
+**▸ has exactly one job:** that scope's goods and physical facts, read-only. The shared Goods
+mini-table (`Category · Unit ID · Deliver To · SKU · Qty · Item`), then `Where` · `Who has it` ·
+`Stock ETA`, then **`Items to collect`** and only when a Loan exists. **No editable field, no
+Partner selector, no Save, no second Delivery form inside the expansion.** Stock owns Where/Who has
+it/Stock ETA, Sales Orders owns the customer, address, promise and ordered goods, Warehouse owns
+readiness and handover, Payment owns the release gate; Delivery Work creates no duplicate Sales,
+Stock, Warehouse, Purchasing or Payment truth.
 
 **Delivery History defaults:** `Delivery Date · DO No · Customer · Logistics Partner · Result ·
 Failed Delivery Reason · Goods · Proof Status · Recorded By`.
