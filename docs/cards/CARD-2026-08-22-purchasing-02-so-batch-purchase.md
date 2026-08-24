@@ -1223,6 +1223,16 @@ entry and is **absent from `apps/web/dist`** — verified, not assumed.
   None of the seven depends on `0375`, `0376`, `0384` or `0385`; they are numbered below `0384` and
   can be applied without touching it.
 
+- 🔴 **APPLY BEFORE DEPLOY — THIS IS NOT REVERSIBLE ORDER.** Measured against production
+  2026-08-24: every object the new code depends on exists today **except the ones these seven
+  migrations create**. `purchasing_confirm_po_sent`, `purchasing_po_actor`, `ops_po_duty_cover`,
+  `po_cost_approvals`, `po_line_sources`, `formal_document_codes`, `unit_id_series` and
+  `suppliers.address` are all absent. `POST /issue-batch` asks `purchasing_po_actor` as its FIRST
+  act, so **deploying this code before applying the migrations makes SO Batch Purchase unable to
+  issue anything at all**, and `Record the PDF sent` would call a function that does not exist.
+  Manual Purchase would still issue — through the OLD RPC, which ignores the unknown
+  `expected_catalog_cost` and `sources` keys, so it would buy with **no price check and no
+  lineage**. The migrations go first.
 - ✅ **NO SILENT REVERT.** Each replaced function was checked against its LATEST predecessor, not
   against its first: `purchasing_issue_pos_batch` 0361 → 0380 · `_operation_create_po_inner`
   0154 → 0382 · `purchasing_po_document` 0378 → 0383 · `purchasing_confirm_po_sent` 0378 → 0379. The
