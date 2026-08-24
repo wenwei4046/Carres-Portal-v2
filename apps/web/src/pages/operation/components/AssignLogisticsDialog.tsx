@@ -41,6 +41,10 @@ export const AL_WORDS = {
   title: "Assign logistics",
   changeTitle: "Change logistics",
   partner: "Logistics partner",
+  /* Two selects, two placeholders — the partner select borrowed the reason's
+     word on day one (`Pick a reason` over a list of carriers; walk finding
+     2026-08-24). */
+  partnerPlaceholder: "Pick a logistics partner",
   reason: "Why is this changing?",
   reasonPlaceholder: "Pick a reason",
   note: "Note (optional)",
@@ -192,7 +196,7 @@ export default function AssignLogisticsDialog({
               onChange={(e) => setPartnerId(e.target.value || null)}
               data-testid="assign-logistics-partner"
             >
-              <option value="">{AL_WORDS.reasonPlaceholder}</option>
+              <option value="">{AL_WORDS.partnerPlaceholder}</option>
               {candidates.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name}

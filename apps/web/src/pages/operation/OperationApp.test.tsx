@@ -66,6 +66,13 @@ vi.mock("./OperationManualPurchase", () => ({
 vi.mock("./OperationDelivery", () => ({
   default: () => <div data-testid="delivery-work-stub">delivery-work</div>,
 }));
+// Edit Delivery (2026-08-24) self-fetches the arrangement — stubbed; what this
+// suite owns is that the URL actually MOUNTS it, which is precisely what the
+// production walk found broken: the route existed and the `isUrlDriven` gate
+// did not include it, so the main pane rendered nothing.
+vi.mock("./EditDelivery", () => ({
+  default: () => <div data-testid="edit-delivery-stub">edit-delivery</div>,
+}));
 // The right rail self-fetches (tasks/notes) — stub it; this suite tests routing.
 vi.mock("./components/OperationRightRail", () => ({
   default: () => <div data-testid="right-rail-stub">rail</div>,
@@ -254,6 +261,29 @@ describe("OperationApp — Delivery is one page", () => {
     expect(screen.getByTestId("location-probe")).toHaveTextContent(
       "/operation?tab=delivery",
     );
+  });
+});
+
+/**
+ * EDIT DELIVERY IS A ROUTE THAT MOUNTS (walk finding, 2026-08-24). The page
+ * shipped with its Route declared and the `isUrlDriven` gate unaware of it, so
+ * the URL fell through to the `?tab=` branch and drew an empty main pane. A
+ * component test cannot see that — only mounting the APP at the URL can.
+ */
+describe("OperationApp — Edit Delivery mounts at its URL", () => {
+  it("/operation/delivery/edit/:orderId mounts the page", () => {
+    renderApp("/operation/delivery/edit/order-1");
+    expect(screen.getByTestId("edit-delivery-stub")).toBeInTheDocument();
+  });
+
+  it("and the slim global bar stands down — the page draws its own header", () => {
+    renderApp("/operation/delivery/edit/order-1");
+    expect(screen.queryByTestId("global-topbar-stub")).not.toBeInTheDocument();
+  });
+
+  it("a leg keeps its query string", () => {
+    renderApp("/operation/delivery/edit/order-1?leg=2");
+    expect(screen.getByTestId("edit-delivery-stub")).toBeInTheDocument();
   });
 });
 
