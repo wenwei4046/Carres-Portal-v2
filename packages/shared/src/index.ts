@@ -1652,6 +1652,10 @@ export type { ModelDefaultFreeGifts } from "./domain";
 // (`pwpRuleFromRow`) is surfaced top-level here too (mirrors sofaComboFromRow).
 export {
   resolvePwp,
+  // The CROSS-ORDER counterpart: a saved voucher is redeemed on a later order
+  // that need not contain the trigger, so `resolvePwp` cannot judge it. Shared
+  // for the same honest-pricing reason - POS and server must agree.
+  voucherCoversLine,
   parsePwpTargets,
   type PwpRule as PwpRuleEngine,
   type PwpLineInput,

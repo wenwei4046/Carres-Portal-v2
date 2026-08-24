@@ -300,6 +300,10 @@ function buildSbForCreatePwp(opts: {
   /** Override the active pwp_rules the sweep + P8b read (carry_forward toggle /
    *  inactive scenarios). Defaults to the single P8C carry-forward rule. */
   ruleRows?: unknown[];
+  /** 2026-08-24 - override what `pwp_discover_available` returns for a
+   *  cross-order code. `[]` simulates an unknown / already-USED voucher.
+   *  Default: a snapshot mirroring the active rule fixture. */
+  discoverRows?: Array<Record<string, unknown>>;
   fetchedRow?: unknown;
 }) {
   const rpcCalls: Array<{ name: string; args: unknown }> = [];
@@ -386,6 +390,32 @@ function buildSbForCreatePwp(opts: {
       if (name === "pwp_claim_code" || name === "pwp_claim_available_code") {
         if (opts.claimReturnsNull) return { data: null, error: null };
         return { data: { code: String((args as { p_code: string }).p_code) }, error: null };
+      }
+      // 2026-08-24 - the cross-order snapshot door. A crossOrder claim now
+      // validates the line against the reward scope FROZEN on the voucher at
+      // mint, read through the DEFINER discover RPC, because a saved voucher
+      // is redeemed on an order that need not contain the trigger at all.
+      // Mirrors the ACTIVE rule fixture above so the snapshot is truthful.
+      if (name === "pwp_discover_available") {
+        if (opts.discoverRows) return { data: opts.discoverRows, error: null };
+        const first = ruleRows[0] as Record<string, unknown> | undefined;
+        if (!first) return { data: [], error: null };
+        return {
+          data: [
+            {
+              code: String((args as { p_code?: string }).p_code ?? ""),
+              rule_id: first.id,
+              type: first.type,
+              reward_category: first.reward_category,
+              reward_targets: first.reward_targets,
+              source_order_id: null,
+              expires_at: null,
+              phone_matches: true,
+              name_matches: true,
+            },
+          ],
+          error: null,
+        };
       }
       if (name === "pwp_release_codes") return { data: 1, error: null };
       if (name === "pwp_release_available_code") return { data: 1, error: null };

@@ -705,18 +705,40 @@ function MakeFreeRow({
     );
   const offerable = covering.filter((c) => freedQty(c.id) + line.qty <= c.maxFreeQty);
   if (offerable.length === 0) {
-    // Covered, but the order's free allowance is already spent elsewhere —
-    // say so instead of silently dropping the affordance.
-    return covering.some((c) => freedQty(c.id) > 0) ? (
+    // ⭐ THIS BRANCH USED TO SAY NOTHING IN THE COMMONEST CASE, AND THAT WAS THE
+    // REPORTED GWP FRICTION. The old gate spoke only when some OTHER line had
+    // already taken free units (`covering.some(c => freedQty(c.id) > 0)`). But
+    // `max_free_qty` defaults to 1 (0185_free_gifts.sql) and `mergeLine` folds a
+    // second tap of the same product into ONE qty-2 line — so the very first
+    // campaign a principal creates lands on qty 2 / cap 1 / nothing freed yet.
+    // freedQty is 0, the gate is false, and the chip simply disappeared. The
+    // comment above already said "say so instead of silently dropping the
+    // affordance"; the gate on the next line was what stopped it.
+    //
+    // TWO REASONS, TWO FIXES, so they are two different sentences — an error
+    // that does not name its fix is the anti-pattern COPY-STANDARD rule 6 exists
+    // to stop. The allowance is a PER-ORDER total across every claiming line
+    // (free-gift-resolve enforces it that way), not a per-line cap.
+    const spent = covering.find((c) => freedQty(c.id) > 0);
+    // Nothing freed yet → it is THIS line's own qty that overshoots. Report the
+    // most generous campaign, the one closest to being usable.
+    const tightest = covering.reduce((a, b) => (b.maxFreeQty > a.maxFreeQty ? b : a));
+    const message = spent
+      ? `${freedQty(spent.id)} of ${spent.maxFreeQty} free used on another line. Undo it there first.`
+      : // The workaround is real but unguessable: a freed line carries
+        // attrs.free_item, so `sameLine` will not merge a later re-add back into
+        // it — the extra units land as their own paid line.
+        `Only ${tightest.maxFreeQty} free per order. Set this line to ${tightest.maxFreeQty}, then add more.`;
+    return (
       <div className="mt-2">
         <span
           className="t-tiny text-base-400"
           data-testid={`free-limit-reached-${line.localId}`}
         >
-          Free limit reached for this order
+          {message}
         </span>
       </div>
-    ) : null;
+    );
   }
 
   return (
