@@ -12,7 +12,7 @@ or an explicit next action.
 
 Delivery owns Logistics Partner identity/rules and assignment, Delivery Orders, delivery
 arrangements, each actual delivery event and item result, delivery proof, delivery problems,
-goods-location observations, Delivery Work and append-only history.
+goods-location observations, the Delivery workspace and append-only history.
 
 | Truth read or linked by Delivery | Owner |
 |---|---|
@@ -287,31 +287,23 @@ append Root Cause later without rewriting the observation.
 
 ## 8 · Information architecture and templates
 
-**SIDEBAR — owner ruling 2026-08-20; PR #863 is the cross-module authority and supersedes the
-2026-08-16 Sales placement.** **Delivery Order belongs under the expandable Delivery module**, not
-Sales. The 232px PortalSidebar uses one module parent row (icon + name + chevron), opens only one
-module at a time, hangs child pages from rounded elbows and marks the selected child with a 3px
-blue bar plus blue wash. Delivery applies the governed Shell, Register and Object Detail Templates
-and does not invent another UI system.
+**SIDEBAR — owner ruling 2026-08-24.** Delivery is one direct sidebar destination, not an
+expandable parent. It has no separate Delivery Work or Delivery Orders child. Delivery Orders
+remain Delivery-owned formal objects, but operators find them in the one Delivery listing.
+Delivery applies the governed Shell, Register and Object Detail Templates and does not invent
+another UI system.
 
-**DELIVERY NAVIGATION — owner ruling 2026-08-21 (CARD-2026-08-21-delivery-01-sidebar). This
-OVERWRITES the seven-row list of 2026-08-19.** The module carries exactly TWO children, and both
-of them open:
-
-1. **Delivery Work** — actionable operational home · **BUILT** · `/operation?tab=delivery`;
-2. **Delivery Orders** — formal DO truth Register · **BUILT** · `/operation/delivery-orders`.
-
-There is no third row, no hairline and no `Coming soon` label anywhere in this module. The elbow
-trunk ends at **Delivery Orders**.
+**DELIVERY NAVIGATION — owner ruling 2026-08-24.** The sidebar carries exactly one Delivery door:
+**Delivery** · `/operation?tab=delivery`. There is no Delivery parent chevron, child elbow,
+separate Delivery Orders list, hairline or `Coming soon` label.
 
 `Schedule`, `Delivery History`, `Exceptions`, `Partners` and `Report` were rows an operator could
 read, count and want, and every one of them refused the click. Five dead controls in a module with
 two working pages do not teach *not yet*; they teach that the rail cannot be trusted.
 
-**The capabilities are NOT retired.** §7 below still holds Delivery History, Exceptions and
-Partners as approved targets with their column defaults, and Report stays central under Reports
-consolidation. They are simply not NAVIGATION until they are pages. **A row returns to this rail
-in the PR that makes it answer** — never before it.
+**The capabilities are NOT retired.** Delivery History and Exceptions remain inside the DO object
+and filtered Delivery listing. Partners stay in Central Settings and Report stays central under
+Reports consolidation. They do not become duplicate Delivery pages.
 
 Sales contains **Sales Orders** and temporary **Old Orders** only. Central Settings retains the
 governed Delivery settings door.
@@ -319,20 +311,18 @@ governed Delivery settings door.
 There is no separate Delivery dashboard, Fleet, Trips, Regions or Delivery Returns destination.
 KPI cards do not precede the work/Register.
 
-**Delivery Orders Register defaults — owner column ruling 2026-08-18 (OVERWRITES the 2026-08-16
-seven; same table as Sales Orders — one register engine, same typography, search, filters,
-export and chooser):**
+**The unified Delivery listing — owner ruling 2026-08-24:**
 
 ```
-DO No · DO date · SO No · Customer · Customer Delivery · Delivery date · Delivery Location · Status
+SO / Ref · Customer · Customer Delivery · Delivery Location · Building · Logistics Partner ·
+Confirmed Delivery · Confirmed Time · Goods · DO No · Delivery Status
 ```
 
-`DO date` = the day the system issued the document · `Customer Delivery` = the date promised to
-the customer (from the SO) · `Delivery date` = this trip's confirmed date. `Created` and the
-rest stay in the chooser, off by default. `DO No` and `SO No` are mono links — DO No opens the
-document, SO No the source order. Status pills: **Created grey · Out for delivery blue ·
-Delivered green · Delivery exception amber** with its ONE reason as the small second line. One
-row = one trip; a split order shows one row per DO.
+`Customer Delivery` is the Sales Order promise. `Confirmed Delivery` and `Confirmed Time` are
+Delivery's operational arrangement. `DO No` appears in that same row only after system issue;
+before issue it says `No delivery order yet`. DO No opens the formal document and SO / Ref opens
+the source Sales Order. One row = one Delivery scope/Journey leg; a split or multi-leg journey
+shows one row per scope.
 
 Statuses are the document's own: `Created → Out for delivery → Delivered`, plus
 `Delivery exception` carrying its ONE reason, and `Cancelled` for a voided document. There is NO
@@ -341,9 +331,8 @@ Route. **The register shows NO owner, NO avatar and NO action sentence** — a r
 documents; work lives in My Work / Team Work. Rows open the DO object page; document numbers are
 doors (`DO → DO`, `SO → SO`).
 
-**Delivery Work — the manual planning workspace. OWNER RULING 2026-08-21,
-BUILT and PRODUCTION-VERIFIED on `875c008d`
-(`CARD-2026-08-21-delivery-02-work-layout`). This OVERWRITES the 2026-08-20 first page.** The
+**Delivery — the one planning and document workspace. OWNER RULING 2026-08-24.** It replaces the
+separate Delivery Work and Delivery Orders list while preserving the formal DO object. The
 three-pane action-card screen is deleted, not deprecated beside this: the `Work list / Calendar`
 switch, the KPI/count preamble, the Refresh control, the action-card wall, the permanent detail
 pane and the third working column are gone, and no Delivery surface carries the generic employee
@@ -351,16 +340,17 @@ labels `Due`, `Next Action` or `Priority`. That page answered *who should be nag
 is My Work / Team Work's question; this one answers the logistics question — **everything going out
 on a given day, who is carrying it, and what is still missing.**
 
-It is an operational workspace, not a truth Register, and it **writes nothing**: no `New DO`, no
-`Issue`, no `Release`, no `Approve`. §3's ruling is unchanged — the system issues the document.
+It is an operational workspace with formal DO doors in the same listing. Arrangement facts and
+the issued DO remain different objects. There is no `New DO`, `Issue`, `Release` or `Approve` —
+§3's ruling is unchanged and the system issues the document.
 
 ```
-one 50px Destination Header  ·  Delivery Work
+one 50px Destination Header  ·  Delivery
 200px local rail             ·  DELIVERY DATE + LOGISTICS, page-owned FILTERING
 one expandable DataGrid      ·  the Sales Orders engine, density and toolbar
 ```
 
-**The rail.** `DELIVERY DATE` lists `No confirmed date`, then `Date passed`, then the actual
+**The rail.** `DELIVERY DATE` lists `No confirmed date`, then `Overdue`, then the actual
 weekday + calendar dates ascending — **never Today, never Tomorrow.** `LOGISTICS` lists `All`, then
 the governed partners **NETS · AL · TEOW · TT · EU · SSY · HOUZS in that order and visible at zero**,
 then any other partner while it is genuinely carrying a scope, then `No logistics picked` when
@@ -392,7 +382,7 @@ printed as confirmed. `Phone` and `Delivery address` ship in the chooser, off by
 `Stock ETA`, then the Loan block (`Unit ID · Item · With customer since · Return destination`) and
 only when a loan is genuinely out. **No editable field, no Partner selector, no Save, no second
 Delivery form.** Stock owns Where/Who has it/Stock ETA, Sales Orders owns the customer, address,
-promise and ordered goods, Payment owns the release gate; Delivery Work reads them and creates no
+promise and ordered goods, Payment owns the release gate; Delivery reads them and creates no
 duplicate truth.
 
 **Delivery History defaults:** `Delivery Date · DO No · Customer · Logistics Partner · Result ·
@@ -440,7 +430,7 @@ the approved target this page grows into.
 
 ## 10 · Daily operator journey, Work and Quick Rail
 
-Operations starts in Delivery Work and prioritises Failed Delivery action, commitment risk,
+Operations starts in Delivery and prioritises Failed Delivery action, commitment risk,
 Warehouse delay, Logistics reply, missing proof, overdue return and then routine confirmation.
 From issue through arrangement, Warehouse preparation, handover, delivery day, result, proof and
 return, every row states one concrete next action and one owner.

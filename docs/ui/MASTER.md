@@ -508,12 +508,14 @@ shipped code, and stated the opposite.)*
 
 # §4.2 · MODULE NAVIGATION — CURRENT GRAMMAR SHIPPED PR #861; PURCHASING TREE APPROVED 2026-08-22
 
-### ONE PORTAL RAIL; A MODULE IS AN EXPANDABLE ROW
+### ONE PORTAL RAIL; MULTI-PAGE MODULES EXPAND, ONE-PAGE DESTINATIONS DO NOT
 
-PR #861 replaced the short-lived uppercase-heading model with the current shared grammar: one
-module icon + name + chevron row, with its pages hanging from quiet rounded elbows. The existing
-`PortalSidebar` is the only left navigation surface: 232px expanded and 60px collapsed. A module
-never opens a second sidebar, flyout or duplicate tab strip.
+PR #861 replaced the short-lived uppercase-heading model with the current shared grammar: a
+multi-page module uses one icon + name + chevron row, with its pages hanging from quiet rounded
+elbows. A destination with only one page is a direct icon + name row; it does not hide that page
+behind a chevron that reveals the same name again. Delivery follows this direct-row rule from the
+2026-08-24 owner ruling. The existing `PortalSidebar` is the only left navigation surface: 232px
+expanded and 60px collapsed. A module never opens a second sidebar, flyout or duplicate tab strip.
 
 Purchasing has enough permanent destinations to require one further level. Its module row toggles
 the entire tree without navigating. `BUY`, `RECEIVE`, `PROBLEMS` and `SHOWROOM` are independent

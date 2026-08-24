@@ -194,9 +194,9 @@ export default function DeliveryOrderPage() {
         <button
           type="button"
           className="rounded-md border border-base-200 bg-white px-3 py-1.5 text-meta font-medium text-base-700 hover:bg-base-50"
-          onClick={() => navigate("/operation/delivery-orders")}
+          onClick={() => navigate("/operation?tab=delivery")}
         >
-          Back to Delivery Orders
+          Back to Delivery
         </button>
       </div>
     );
@@ -212,8 +212,8 @@ export default function DeliveryOrderPage() {
       <SalesOrderTabs
         identity={d.do_number}
         customer={`SO-${order.so} · ${customer}`}
-        backTo="/operation/delivery-orders"
-        backLabel="Delivery Orders"
+        backTo="/operation?tab=delivery"
+        backLabel="Delivery"
         docTitle={`${d.do_number} — Carres`}
         right={
           <button
