@@ -2,10 +2,11 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   Adapters,
   DB,
-  PWP_RULES,
   SOFA_COMBO_PRICING,
   matchSofaCombo,
   resolvePwp,
+  voucherCoversLine,
+  type PwpDiscoverDto,
   type PwpLineInput,
   type PwpRule as PwpRuleDomain,
   type PwpRuleEngine,
@@ -13,7 +14,7 @@ import {
 } from "@carres/shared";
 
 import type { RecomputableLine } from "./sofa-recompute";
-import { resolveSkuInfo, type SkuInfo } from "./rule-line-input";
+import { readActivePwpRules, resolveSkuInfo, type SkuInfo } from "./rule-line-input";
 
 /**
  * Order-path PWP / Promo claim gate (2990s Products parity Phase 8b, migration
@@ -317,11 +318,11 @@ export async function recomputePwpLines(
   const claimIndexSet = new Set(claims.map((c) => c.index));
 
   // 2. ACTIVE rules (the adapter runs parseRuleTargets). RLS — never service_role.
-  const rulesR = await sb.from(PWP_RULES).select("*").eq("active", true);
-  if (rulesR.error) return { status: "server_error", message: rulesR.error.message };
-  const domainRules: PwpRuleDomain[] = ((rulesR.data ?? []) as DB.PwpRuleRow[]).map((r) =>
-    Adapters.pwpRuleFromRow(r),
-  );
+  //    Read through the ONE ordered door: `resolvePwp` is greedy, so the order
+  //    decides which rule pays for a line and therefore what it costs.
+  const rulesR = await readActivePwpRules(sb);
+  if (!rulesR.ok) return { status: "server_error", message: rulesR.message };
+  const domainRules: PwpRuleDomain[] = rulesR.rules;
   const rulesById = new Map(domainRules.map((r) => [r.id, r] as const));
 
   // 3. Unknown / inactive rule — a claimed ruleId not in the active set rejects.
@@ -393,17 +394,79 @@ export async function recomputePwpLines(
     pwpPriceBySku.set(row.sku, row.pwp_price == null ? null : Number(row.pwp_price));
   }
 
+  // ⭐ CROSS-ORDER SNAPSHOTS — the eligibility a SAVED voucher actually has.
+  //
+  // A carried-forward voucher is redeemed on a LATER order, which need not contain
+  // the trigger at all — that is the entire point of the layer. `resolvePwp` builds
+  // its allowance from THIS cart's trigger lines, so for a reward-only cart it has
+  // nothing to say, returns no grant, and the `!grant` gate below used to 409 with
+  // "not eligible for the claimed offer". It was eligible. The only cart that could
+  // redeem was one that re-bought the trigger — where the same-cart offer already
+  // covers the line and the saved voucher adds nothing.
+  //
+  // What DOES apply is the reward scope frozen onto the code at mint. Read it
+  // through the DEFINER discover door, never a table read: 0188's SELECT policy
+  // admits an AVAILABLE code only when it was minted inside the caller's OWN
+  // dealer, so a voucher earned at another outlet is invisible to a direct
+  // read — and invisibly, so the customer would be told their real voucher does
+  // not exist. `pwp_discover_available` is SECURITY DEFINER for exactly this.
+  //
+  // COST: one subrequest per DISTINCT cross-order code (the RPC takes a single
+  // p_code). One per redeemed voucher, and same-cart claims add none. Revisit if a
+  // bulk-redeem path is ever built — the Cloudflare cap is per invocation.
+  const crossSnapshots = new Map<string, PwpDiscoverDto>();
+  for (const claim of claims) {
+    if (!claim.crossOrder || !claim.code || crossSnapshots.has(claim.code)) continue;
+    const disc = await sb.rpc("pwp_discover_available", { p_code: claim.code });
+    if (disc.error) return { status: "server_error", message: disc.error.message };
+    const row = ((disc.data ?? []) as DB.PwpDiscoverRow[])[0];
+    if (!row) {
+      // Fails CLOSED. Discovery returns nothing for a code that is unknown,
+      // already USED or expired — never price a reward against a voucher we
+      // could not read. The atomic claim would refuse it moments later anyway;
+      // this turns a confusing late failure into a clear one.
+      return {
+        status: "bad_request",
+        code: "pwp_not_eligible",
+        message: "This saved voucher was not found, or it has already been used.",
+      };
+    }
+    crossSnapshots.set(claim.code, Adapters.pwpDiscoverFromRow(row));
+  }
+
   const out = [...stripped];
   const sofaRewardCombosByIndex: Record<number, string[]> = {};
   for (const claim of claims) {
     const grant = grantByIdx.get(claim.index);
-    if (!grant) {
+    const snapshot = claim.crossOrder && claim.code ? crossSnapshots.get(claim.code) ?? null : null;
+    if (!grant && !snapshot) {
       return {
         status: "bad_request",
         code: "pwp_not_eligible",
         message:
           "This line is not eligible for the claimed PWP/promo offer, or the offer allowance is exhausted.",
       };
+    }
+    if (snapshot) {
+      // The voucher must have been minted under the rule being claimed — the same
+      // predicate `pwp_claim_available_code` enforces (`rule_id = p_rule_id`).
+      // Checked here so a mismatch is a clear 409 rather than a silent claim miss.
+      if (snapshot.ruleId !== claim.ruleId) {
+        return {
+          status: "bad_request",
+          code: "pwp_not_eligible",
+          message: "This saved voucher does not belong to the claimed offer.",
+        };
+      }
+      // The reward scope FROZEN at mint, not today's rule — a later rule edit must
+      // never invalidate an outstanding voucher (the P8d design's own words).
+      if (!voucherCoversLine(snapshot, pwpLineInputs[claim.index]!, comboModulesById)) {
+        return {
+          status: "bad_request",
+          code: "pwp_not_eligible",
+          message: "This saved voucher does not apply to this product.",
+        };
+      }
     }
     const rule = rulesById.get(claim.ruleId)!;
     // Wrong-rule binding gate: the line must have been granted BY THE CLAIMED RULE
@@ -416,21 +479,29 @@ export async function recomputePwpLines(
     // force the claimed rule's price (e.g. claim a promo rule whose trigger was
     // never bought while a pwp rule actually granted the line) → reject. This is
     // exactly the per-rule isolation the POS `coveringPwpForLine` enforces.
-    const grantingRule = domainRules[grant.ruleIndex];
-    if (!grantingRule || grantingRule.id !== claim.ruleId) {
-      return {
-        status: "bad_request",
-        code: "pwp_not_eligible",
-        message:
-          "This line is not eligible for the claimed PWP/promo offer, or the offer allowance is exhausted.",
-      };
+    // Same-cart only: a cross-order claim consumed NO allowance from this cart, so
+    // there is no binding to check — its equivalent is the snapshot's ruleId gate
+    // above, already applied.
+    if (grant) {
+      const grantingRule = domainRules[grant.ruleIndex];
+      if (!grantingRule || grantingRule.id !== claim.ruleId) {
+        return {
+          status: "bad_request",
+          code: "pwp_not_eligible",
+          message:
+            "This line is not eligible for the claimed PWP/promo offer, or the offer allowance is exhausted.",
+        };
+      }
     }
 
     // The canonical marker every claimed line is rebuilt with (P8b/P8c/P8d).
     const canonicalMarker = {
       ruleId: rule.id,
       type: rule.type,
-      triggerRef: grant.triggerRef ?? null,
+      // A cross-order redemption has NO trigger in this cart — null is the honest
+      // answer, and the printed SO reads it that way ("redeemed against" is a
+      // same-cart fact; the voucher's own lineage lives on the code).
+      triggerRef: grant?.triggerRef ?? null,
       // P8c carry-through (§3.4): re-emit the bound voucher code + per-submit
       // claimGroup captured from the original line. OMIT a key when empty so a
       // no-voucher (P8b-only) claim rebuilds a marker WITHOUT `code`/`claimGroup`

@@ -592,8 +592,12 @@ const SkuRowView = memo(function SkuRowView({
   function commitPwpPrice(raw: string) {
     const trimmed = raw.trim();
     const val = trimmed === "" ? null : Number(trimmed);
-    if (val !== null && (!Number.isFinite(val) || val < 0)) {
-      toast.error("Enter a non-negative number (blank = not set)");
+    // 0 is NOT a price here — it is the same fact as blank. A 'pwp' reward is a
+    // discount (the server rejects <= 0) and a FREE reward is a 'promo' rule,
+    // which never reads this column at all. Accepting 0 stored a value that no
+    // rule could ever spend and that the till previewed as "RM 0.00".
+    if (val !== null && (!Number.isFinite(val) || val <= 0)) {
+      toast.error("Enter a price above 0, or leave it blank. A free reward is a 'promo' rule, not a PWP price of 0.");
       return;
     }
     if (val === (sku.pwpPrice ?? null)) return;
@@ -749,9 +753,9 @@ const SkuRowView = memo(function SkuRowView({
         {priceEdit ? (
           <input
             type="number"
-            min={0}
+            min={0.01}
             step="0.01"
-            defaultValue={sku.pwpPrice ?? ""}
+            defaultValue={sku.pwpPrice ? String(sku.pwpPrice) : ""}
             placeholder="—"
             onBlur={(e) => commitPwpPrice(e.target.value)}
             onKeyDown={(e) => {
@@ -760,7 +764,11 @@ const SkuRowView = memo(function SkuRowView({
             aria-label={`${sku.sku} PWP price`}
             className={`${INPUT_CLS} text-right t-num text-meta`}
           />
-        ) : sku.pwpPrice == null ? (
+        ) : sku.pwpPrice == null || sku.pwpPrice <= 0 ? (
+          // A stored 0 reads as "not set" for the same reason the Price column
+          // one cell over renders 0 as "price not set" — it is data that predates
+          // the input guard, and showing it as "RM 0.00" claims an offer the
+          // server will refuse.
           <span className="text-meta text-base-400 italic" title="No PWP price — this SKU cannot be a PWP reward">
             —
           </span>

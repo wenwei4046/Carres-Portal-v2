@@ -1,15 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
-  Adapters,
-  DB,
   PWP_CODES,
-  PWP_RULES,
   SOFA_COMBO_PRICING,
   lineMatchesTargets,
   type PwpRule,
   type RuleLineInput,
 } from "@carres/shared";
-import { resolveSkuInfo, type SkuInfo } from "./rule-line-input";
+import { readActivePwpRules, resolveSkuInfo, type SkuInfo } from "./rule-line-input";
 
 /**
  * 0256 — line-EDIT promo parity helpers (Loo 2026-07-25: "edited/added items
@@ -147,12 +144,11 @@ export async function checkPromoEntitlementAfterEdit(
   }
   if (consumedByRule.size === 0) return { status: "ok" };
 
-  // ACTIVE rules only — a deactivated rule's artifacts are settled/dead.
-  const rulesR = await sb.from(PWP_RULES).select("*").eq("active", true);
-  if (rulesR.error) return { status: "server_error", message: rulesR.error.message };
-  const activeRules: PwpRule[] = ((rulesR.data ?? []) as DB.PwpRuleRow[]).map((r) =>
-    Adapters.pwpRuleFromRow(r),
-  );
+  // ACTIVE rules only — a deactivated rule's artifacts are settled/dead. Ordered
+  // door, so the amendment path resolves a cart the same way Confirm did.
+  const rulesR = await readActivePwpRules(sb);
+  if (!rulesR.ok) return { status: "server_error", message: rulesR.message };
+  const activeRules: PwpRule[] = rulesR.rules;
   const activeById = new Map(activeRules.map((r) => [r.id, r] as const));
   const checked = activeRules.filter((r) => consumedByRule.has(r.id));
   if (checked.length === 0) return { status: "ok" };

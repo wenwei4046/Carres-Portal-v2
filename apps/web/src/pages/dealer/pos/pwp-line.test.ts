@@ -116,6 +116,40 @@ describe("coveringPwpForLine", () => {
     expect(coveringPwpForLine(bedLine(), lines, cat)).toEqual([]);
   });
 
+  it("a 'pwp' reward priced at ZERO is not offered either — 0 means NOT SET, not free", () => {
+    // The trap this closes: 0 is a number, so reading it as a price previewed
+    // "RM 0.00" on the chip, let a dealer build the whole order, then lost it to
+    // a 409 at Confirm. The server's test is `p == null || p <= 0`; this one
+    // must match it exactly, or honest-pricing is broken.
+    const cat = catalog({
+      skus: [sku({ sku: "MATT-A", modelId: MATT }), sku({ sku: "BED-A", modelId: BED, pwpPrice: 0 })],
+      pwpRules: [pwpRule],
+    });
+    const lines = [mattLine(), bedLine()];
+    expect(coveringPwpForLine(bedLine(), lines, cat)).toEqual([]);
+  });
+
+  it("NEGATIVE CONTROL: a 'promo' reward is still offered at 0, because promo never reads pwpPrice", () => {
+    // Guards against "fixing" the line above by rejecting 0 everywhere. A promo
+    // reward is free BY THE RULE'S TYPE — its sku's pwpPrice is irrelevant, and
+    // collapsing the two would retire the free-reward feature entirely.
+    const cat = catalog({
+      skus: [sku({ sku: "MATT-A", modelId: MATT }), sku({ sku: "BED-A", modelId: BED, pwpPrice: 0 })],
+      pwpRules: [promoRule],
+    });
+    const lines = [mattLine(), bedLine()];
+    expect(coveringPwpForLine(bedLine(), lines, cat).map((r) => r.id)).toEqual(["rule-promo"]);
+    expect(pwpRewardPrice(bedLine(), cat, promoRule)).toBe(0);
+  });
+
+  it("pwpRewardPrice: 0 reads as null for 'pwp', 0 reads as free for 'promo'", () => {
+    const cat = catalog({
+      skus: [sku({ sku: "MATT-A", modelId: MATT }), sku({ sku: "BED-A", modelId: BED, pwpPrice: 0 })],
+    });
+    expect(pwpRewardPrice(bedLine(), cat, pwpRule)).toBeNull();
+    expect(pwpRewardPrice(bedLine(), cat, promoRule)).toBe(0);
+  });
+
   it("over-allowance: a 2nd reward line beyond the trigger's allowance is not offered", () => {
     const cat = catalog({ pwpRules: [pwpRule] }); // qtyPerTrigger 1, one trigger → allowance 1
     const r1 = bedLine({ localId: "R1" });
