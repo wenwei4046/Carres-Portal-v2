@@ -1,5 +1,5 @@
 -- =============================================================================
--- 0379_delivery_owns_the_arrangement_the_order_owns_the_promise.sql
+-- 0386_delivery_owns_the_arrangement_the_order_owns_the_promise.sql
 -- DELIVERY WORK CORRECTION (owner ruling 2026-08-24) · docs/delivery/MASTER.md §8
 -- =============================================================================
 --
@@ -45,9 +45,13 @@
 -- ── SCHEMA IS WHAT THIS OWNS; DATA IS WHAT IT WALKS PAST (Red line 8) ────────
 -- No row count is asserted anywhere below.
 --
--- Migration number: tracker tail 0374, repository tail 0376, and branch
--- `claude/purchasing-02-so-batch-purchase` claims 0377 + 0378. Taken as MAX + 1
--- per ENGINEERING §5, never from `ls`.
+-- Migration number: 0386, and the file was BORN 0379 — renumbered before merge
+-- when the apply-time reconcile found the purchasing lane had applied its OWN
+-- 0379 (`one_actor_authority_for_every_po_door`) plus 0380–0385 between this
+-- card's numbering snapshot and its apply. Two files, one number is the exact
+-- defect red line 7 names; the tracker row (version 20260824091036) was renamed
+-- to match in the same reconcile, so tracker and repository agree again. Taken
+-- as MAX(tracker 0385 · repo 0376 · every branch 0385) + 1, never from `ls`.
 -- =============================================================================
 
 create table if not exists public.ops_delivery_arrangements (
@@ -82,7 +86,7 @@ create table if not exists public.ops_delivery_arrangements (
 );
 
 comment on table public.ops_delivery_arrangements is
-  '0379 — Delivery''s OWN record of how one delivery scope travels, keyed by '
+  '0386 — Delivery''s OWN record of how one delivery scope travels, keyed by '
   '(order_id, leg). Delivery is its only writer. Sales Orders keeps the '
   'commercial promise (orders.delivery_date, address, goods); this keeps the '
   'operational arrangement. leg=0 is the whole-order trip, leg>=1 a Journey leg.';
@@ -135,7 +139,7 @@ create table if not exists public.ops_delivery_arrangement_events (
 );
 
 comment on table public.ops_delivery_arrangement_events is
-  '0379 — append-only history of an arrangement''s carrier. A ''changed'' row '
+  '0386 — append-only history of an arrangement''s carrier. A ''changed'' row '
   'cannot exist without its governed reason (check constraint), which is how '
   '"never silently replace an existing Logistics Partner" is enforced in the '
   'database rather than only in a dialog.';
