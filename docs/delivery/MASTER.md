@@ -556,3 +556,25 @@ explicitly excluded from current truth rather than deferred blind spots.
 **PLAN MISSION COMPLETE.** The complete Blueprint has been owner-reviewed and no unresolved Owner
 Decision remains. This MASTER persists the approved operating model only. It does not authorise
 Cards, implementation sequencing, migration or build work.
+
+## 16 · Production closure — unified Delivery page
+
+**DEPLOYED 2026-08-24 — PR #896, main SHA
+`52804c005d7bf53bcbe9e1b1dcdd2b47cd684656`.** The first approved Delivery UI correction is live
+in production and has been verified through an authenticated Operations session:
+
+- the Portal sidebar has one direct **Delivery** destination, with no separate Delivery Work or
+  Delivery Orders child;
+- `/operation?tab=delivery` is the one operational listing for delivery planning and issued DO
+  facts;
+- the date rail uses **No confirmed date** and **Overdue**;
+- the listing keeps Customer Delivery separate from Confirmed Delivery and Confirmed Time, shows
+  Logistics Partner and Goods, and adds DO No and Delivery Status to the same row;
+- expanding a row shows its product lines and the shared Stock facts Where, Who has it and Stock
+  ETA without leaving Delivery;
+- clicking an issued DO opens the formal DO object; its back door returns to **Delivery**;
+- the retired `/operation/delivery-orders` list address redirects to the unified Delivery page.
+
+This closure records only the production slice above. It does not claim that the remaining
+Partner arrangement, proxy-recording, proof, exception, Settings, Reports or future Portal/API
+capabilities in this Blueprint are already built.
