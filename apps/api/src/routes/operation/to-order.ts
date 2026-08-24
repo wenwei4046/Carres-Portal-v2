@@ -1,13 +1,15 @@
 import { Hono } from "hono";
+import type { Context } from "hono";
 import { z } from "zod";
 import {
   DEMAND_PURPOSE_DEFAULT,
   DEMAND_PURPOSE_VALUES,
+  composeDocumentLines,
   documentPartitionKey,
   expectedArrivalOf,
   isToOrderCategory,
-  monthKeyMYT,
-  planFromDocuments,
+  PURCHASING_REFUSAL_CODES,
+  purchasingRefusal,
   readyStockDrawNote,
   READY_STOCK_DRAW_REASON,
   stockMatchKey,
@@ -15,6 +17,7 @@ import {
   type DemandPickItem,
   type ProductCategory,
   type IssueDocument,
+  type PoDocumentAllocation,
   type ToOrderBuild,
   type ToOrderOrderedRow,
   type ToOrderRow,
@@ -973,6 +976,11 @@ const soBatchIssueInput = z
                        *  change rather than adopting it silently. */
                       expectedCatalogCost: z.number().nonnegative().nullable().optional(),
                     })
+                    /* A CATALOG LINE MUST ALSO DECLARE WHAT WAS REVIEWED
+                       (0380). That is checked in the handler rather than here:
+                       `discriminatedUnion` takes plain objects only, and a
+                       schema-level refusal would arrive as `invalid_body` when
+                       the operator needs to be told which SKU to look at. */
                     .strict(),
                   z
                     .object({
@@ -992,9 +1000,108 @@ const soBatchIssueInput = z
   })
   .strict();
 
+/**
+ * EVERY REFUSAL LEAVES IN THE APPROVED TWO LINES
+ * (`docs/COPY-STANDARD.md`; Card closure §9).
+ *
+ * `message` is LINE 1 — what is wrong — and `action` is LINE 2 — the act, its
+ * object and what completes it. The words live in `purchasingRefusal` so the
+ * browser, the Purchase Order page and this route cannot spell the same
+ * refusal three ways. `code` still travels for the tests and the log.
+ */
+function refuse(
+  c: Context<AppEnv>,
+  status: 400 | 403 | 409 | 422 | 500,
+  code: string,
+  facts?: Parameters<typeof purchasingRefusal>[1],
+) {
+  const r = purchasingRefusal(code, facts);
+  return c.json(
+    { error: code, code, message: r.wrong, action: r.todo, ...(facts ?? {}) },
+    status,
+  );
+}
+
 type BatchLineDecision = z.infer<
   typeof soBatchIssueInput
 >["documentDecisions"][number]["lineDecisions"][number];
+
+/**
+ * GET /cost-approvals?supplierId=…&skus=a,b,c — WHICH EXCEPTIONS ALREADY HAVE A
+ * MANAGER'S APPROVAL (closure §2; 0380).
+ *
+ * A hand-entered price or a Free of Charge needs an approval record that PO Duty
+ * cannot write for itself. Without this read the operator meets that rule only
+ * as a refusal, after typing everything — and cannot tell "nobody has approved
+ * this yet" from "somebody already did". The surface reads it so it can say
+ * which, in advance.
+ *
+ * It is a READ of approvals that are still OPEN — unused and unexpired. RLS
+ * decides who may see them; this route adds no authority of its own.
+ */
+toOrderRouter.get("/cost-approvals", requireOperation, async (c) => {
+  const supplierId = (c.req.query("supplierId") ?? "").trim();
+  const skus = (c.req.query("skus") ?? "")
+    .split(",")
+    .map((v) => v.trim())
+    .filter((v) => v.length > 0);
+  if (supplierId === "" || skus.length === 0 || skus.length > 500) {
+    return refuse(c, 400, "invalid_param");
+  }
+  const sb = userClient(c.env, c.var.auth.jwt);
+  /* ⭐ NO SKU IN A POSTGREST `.in()` LIST. `sku` is free text and live rows carry
+     a DOUBLE QUOTE (`Leg 4"`); PostgREST wraps a reserved-character value in
+     double quotes, so one inside breaks the filter and the server answers with
+     whatever it could parse. That defect put seven customer requirements on no
+     purchase order on 2026-07-30. This supplier's OPEN approvals are a small
+     slice, so they are read whole and matched here. */
+  const { data, error } = await sb
+    .from("po_cost_approvals")
+    .select("id, sku, treatment, unit_cost, reason, expires_on, approved_at, approved_by")
+    .eq("supplier_id", supplierId)
+    .is("used_by_po", null)
+    .order("approved_at", { ascending: false });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+
+  const today = todayIso();
+  const wanted = new Set(skus);
+  const rows = ((data ?? []) as Record<string, unknown>[]).filter((r) => {
+    if (!wanted.has(r.sku as string)) return false;
+    const expires = r.expires_on as string | null;
+    /* An approval is for a decision, not for ever. */
+    return expires == null || expires >= today;
+  });
+
+  const byId = [
+    ...new Set(
+      rows
+        .map((r) => r.approved_by as string | null)
+        .filter((v): v is string => typeof v === "string" && v.length > 0),
+    ),
+  ];
+  const named = new Map<string, string>();
+  if (byId.length > 0) {
+    const { data: people } = await sb.from("app_users").select("id, name, email").in("id", byId);
+    for (const u of (people ?? []) as Record<string, unknown>[]) {
+      const label = ((u.name as string | null) ?? "").trim() || ((u.email as string | null) ?? "");
+      if (label) named.set(u.id as string, label);
+    }
+  }
+
+  return c.json({
+    approvals: rows.map((r) => ({
+      sku: r.sku as string,
+      treatment: r.treatment as "hand_entered" | "free_of_charge",
+      unitCost: (r.unit_cost as number | null) ?? null,
+      reason: (r.reason as string | null) ?? null,
+      approvedBy: named.get(r.approved_by as string) ?? null,
+      expiresOn: (r.expires_on as string | null) ?? null,
+    })),
+  });
+});
 
 toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
@@ -1013,43 +1120,41 @@ toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
 
   /* ── 1 · WHO ────────────────────────────────────────────────────────────
    *
-   * Only Current PO Duty issues (MASTER §5.3). The browser's `mayIssue` is a
-   * convenience; this is the authority, and it is asked BEFORE any work so an
-   * unauthorised request costs one query rather than a recomputation. */
-  const month = monthKeyMYT();
-  const duty = await sb
-    .from("ops_po_duty")
-    .select("user_id")
-    .eq("month", month)
-    .maybeSingle();
-  if (duty.error) {
-    const m = mapPgError(duty.error);
+   * ⭐ ONE ACTOR AUTHORITY (0379; MASTER §5.3). This route used to read
+   * `ops_po_duty` for itself, which made it the only door that checked — Manual
+   * Purchase and a direct RPC call both walked past it. `purchasing_po_actor()`
+   * is now the single resolver, it knows dated buddy cover, and
+   * `purchasing_issue_pos_batch` asks it again in SQL. This check exists so the
+   * operator gets WORDS instead of a database error, not because it is the
+   * boundary. */
+  const actorRes = await sb.rpc("purchasing_po_actor");
+  if (actorRes.error) {
+    const m = mapPgError(actorRes.error);
     return c.json(m.body, m.status);
   }
-  const dutyRow = duty.data as
-    { user_id?: string } | { user_id?: string }[] | null;
-  const dutyId =
-    (Array.isArray(dutyRow) ? dutyRow[0]?.user_id : dutyRow?.user_id) ?? null;
-  if (!dutyId || dutyId !== c.var.auth.id) {
-    return c.json(
-      {
-        error: "not_po_duty",
-        code: "not_po_duty",
-        message: "Only the current PO duty holder can issue purchase orders.",
-      },
-      403,
-    );
+  const actor = (actorRes.data ?? {}) as {
+    actor_user_id?: string | null;
+    normal_user_id?: string | null;
+    acting_user_id?: string | null;
+  };
+  const actorId = actor.actor_user_id ?? null;
+  if (!actorId) return refuse(c, 403, "no_po_duty_holder");
+  if (actorId !== c.var.auth.id) {
+    let holder: string | null = null;
+    const who = await sb
+      .from("app_users")
+      .select("name, email")
+      .eq("id", actorId)
+      .maybeSingle();
+    const row = who.data as { name?: string | null; email?: string | null } | null;
+    holder = (row?.name ?? "").trim() || (row?.email ?? "").trim() || null;
+    return refuse(c, 403, "not_po_duty", { actor: holder });
   }
 
   /* ── 2 · duplicates, before anything expensive ──────────────────────────── */
   const seen = new Set<string>();
   for (const s of selections) {
-    if (seen.has(s.demandId)) {
-      return c.json(
-        { error: "duplicate_demand", code: "duplicate_demand" },
-        422,
-      );
-    }
+    if (seen.has(s.demandId)) return refuse(c, 422, "duplicate_demand");
     seen.add(s.demandId);
   }
 
@@ -1106,54 +1211,22 @@ toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
     const hit = index.get(s.demandId);
     /* Absent from the recomputation means CHANGED, CANCELLED, COVERED or
        never real. All four read the same from here, and all four must fail. */
-    if (!hit) {
-      return c.json(
-        {
-          error: "unknown_demand",
-          code: "unknown_demand",
-          demandId: s.demandId,
-        },
-        409,
-      );
-    }
+    if (!hit) return refuse(c, 409, "unknown_demand");
     if (hit.proposal.blocked === "production_days") {
-      return c.json(
-        { error: "production_days_required", code: "production_days_required" },
-        422,
-      );
+      return refuse(c, 422, "production_days_required", {
+        supplier: hit.proposal.supplierName ?? null,
+      });
     }
     /* An undated customer order stays visible and unbuyable: the arrival date
        a supplier is asked to hit is derived from the promise, and there is no
        promise. */
-    if (hit.row.delivery == null) {
-      return c.json(
-        {
-          error: "blocked_delivery_date",
-          code: "blocked_delivery_date",
-          demandId: s.demandId,
-          message: "Customer delivery date must be confirmed before Issue PO.",
-        },
-        422,
-      );
-    }
+    if (hit.row.delivery == null) return refuse(c, 422, "blocked_delivery_date");
     let total = 0;
     for (const a of s.allocations) {
       const dest = destById.get(a.destinationId);
-      if (!dest) {
-        return c.json(
-          { error: "unknown_destination", code: "unknown_destination" },
-          422,
-        );
-      }
+      if (!dest) return refuse(c, 422, "unknown_destination");
       if (!dest.active) {
-        return c.json(
-          {
-            error: "inactive_destination",
-            code: "inactive_destination",
-            message: `${dest.name} is closed.`,
-          },
-          422,
-        );
+        return refuse(c, 422, "inactive_destination", { destination: dest.name });
       }
       total += a.qty;
       allocations.push({
@@ -1165,16 +1238,10 @@ toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
     /* THE ARRANGEMENT MUST ADD BACK TO THE SERVER'S OWN REMAINDER. The browser
        checked this too; that check was for the operator, this one is the law. */
     if (total !== hit.build.qty) {
-      return c.json(
-        {
-          error: "allocation_mismatch",
-          code: "allocation_mismatch",
-          demandId: s.demandId,
-          arranged: total,
-          toBuy: hit.build.qty,
-        },
-        422,
-      );
+      return refuse(c, 422, "allocation_mismatch", {
+        arranged: total,
+        toBuy: hit.build.qty,
+      });
     }
   }
 
@@ -1184,6 +1251,8 @@ toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
     proposal: (typeof res.data.proposals)[number];
     destinationId: string;
     buildKeys: string[];
+    /** What this document actually carries — see `composeDocumentLines`. */
+    allocs: PoDocumentAllocation[];
   };
   const groups = new Map<string, Group>();
   for (const a of allocations) {
@@ -1205,17 +1274,25 @@ toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
         proposal: hit.proposal,
         destinationId: a.destinationId,
         buildKeys: [],
+        allocs: [],
       };
       groups.set(key, group);
     }
     if (!group.buildKeys.includes(hit.build.key))
       group.buildKeys.push(hit.build.key);
+    /* ⭐ THE ALLOCATED QUANTITY, not the build's. A build of 11 split 10 + 1
+       across two destinations used to produce two purchase orders of ELEVEN,
+       because each document's lines were read off the whole build. */
+    group.allocs.push({
+      build: hit.build,
+      orderId: hit.row.orderId,
+      so: hit.row.so,
+      qty: a.qty,
+    });
   }
 
   const warehouse = res.data.stockWarehouse;
-  if (!warehouse) {
-    return c.json({ error: "no_warehouse", code: "no_warehouse" }, 422);
-  }
+  if (!warehouse) return refuse(c, 422, "no_warehouse");
 
   /* Partners, read once, only if some group needs one. */
   const anyPickup = [...groups.values()].some(
@@ -1231,8 +1308,6 @@ toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
     validPartners = new Set((partners.data ?? []).map((p) => p.id as string));
   }
 
-  /* A decision is keyed the way the OPERATOR made it — per supplier and
-     destination, which is the document they were looking at. */
   /* ⭐ A DECISION BELONGS TO ONE DOCUMENT (Card closure §4). Keyed by
      supplier + destination it was COARSER than the partition the server
      creates, so a price reviewed on one sofa order could be applied to another
@@ -1241,65 +1316,40 @@ toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
     documentDecisions.find((d) => d.documentKey === key);
 
   /**
-   * A DECISION FOR A LINE NOBODY IS BUYING IS STALE, NOT NOISE. It means the
-   * operator priced something the recomputation has since moved or covered, and
-   * issuing the rest would send a price they never actually confirmed.
+   * THE LINES EVERY DOCUMENT CARRIES, composed once.
    *
-   * The check is made against the whole supplier × destination SURFACE the
-   * operator saw, not against one document: the server may split that surface
-   * further (a sofa is one PO per customer order), and the browser cannot know
-   * where those cuts fall. Inside each document, only the decisions whose SKU
-   * is actually on it are applied.
+   * Composed from the ALLOCATION and carrying the per-unit customer lineage
+   * (0382), so the same walk answers three questions that used to be answered
+   * separately and could disagree: how many units, whose they are, and which
+   * SKUs the operator must have priced.
    */
-  const documentSkus = new Map<string, Set<string>>();
+  const composed = new Map<string, ReturnType<typeof composeDocumentLines>>();
   for (const group of groups.values()) {
-    const plan = planFromDocuments(group.proposal, [
-      { key: group.key, include: true, buildKeys: group.buildKeys },
-    ]);
-    documentSkus.set(group.key, new Set((plan[0]?.lines ?? []).map((l) => l.sku)));
+    const lines = composeDocumentLines(group.allocs);
+    if (!lines.ok) {
+      return refuse(c, 422, lines.code, {
+        supplier: group.proposal.supplierName ?? null,
+      });
+    }
+    composed.set(group.key, lines);
   }
-  /* DUPLICATE · FOREIGN · STALE · MISSING — each refused BY NAME. "Your prices
-     were ignored" is not something an operator can act on, and a document that
-     nobody priced must not be issued on silence. */
+
+  /* DUPLICATE · FOREIGN · STALE — each refused BY NAME. "Your prices were
+     ignored" is not something an operator can act on. */
   const seenDecision = new Set<string>();
   for (const d of documentDecisions) {
-    if (seenDecision.has(d.documentKey)) {
-      return c.json({ error: "duplicate_decision", code: "duplicate_decision" }, 422);
-    }
+    if (seenDecision.has(d.documentKey)) return refuse(c, 422, "duplicate_decision");
     seenDecision.add(d.documentKey);
-    const known = documentSkus.get(d.documentKey);
-    if (!known) {
-      return c.json(
-        { error: "foreign_decision", code: "foreign_decision", documentKey: d.documentKey },
-        409,
-      );
+    const doc = composed.get(d.documentKey);
+    if (!doc?.ok) {
+      return refuse(c, 409, "foreign_decision", { po: null });
     }
+    const known = new Set(doc.lines.map((l) => l.sku));
     const skus = new Set<string>();
     for (const l of d.lineDecisions) {
-      if (skus.has(l.sku)) {
-        return c.json({ error: "duplicate_cost_decision", code: "duplicate_cost_decision" }, 422);
-      }
+      if (skus.has(l.sku)) return refuse(c, 422, "duplicate_cost_decision", { sku: l.sku });
       skus.add(l.sku);
-      if (!known.has(l.sku)) {
-        return c.json({ error: "stale_cost_decision", code: "stale_cost_decision" }, 409);
-      }
-    }
-  }
-  /* MISSING — but only once the operator has priced ANYTHING.
-   *
-   * Sending no decisions at all means "every line stands on the catalog price
-   * it was reviewed at", and the per-line commercial gate proves that for
-   * itself. PARTIAL coverage is the real error: it means the operator priced
-   * the document in front of them and never saw the others the server split
-   * out, which is exactly the drift the shared partition exists to stop. */
-  if (documentDecisions.length > 0) {
-    for (const group of groups.values()) {
-      if (!decisionsFor(group.key)) {
-        return c.json(
-          { error: "missing_decision", code: "missing_decision", documentKey: group.key },
-          422,
-        );
-      }
+      if (!known.has(l.sku)) return refuse(c, 409, "stale_cost_decision", { sku: l.sku });
     }
   }
 
@@ -1312,58 +1362,59 @@ toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
       { key: group.key, include: true, buildKeys: group.buildKeys },
     ];
     const check = validateIssuePlan(group.proposal, docs);
-    if (!check.ok) {
-      return c.json(
-        { error: check.code, code: check.code, message: check.message },
-        422,
-      );
-    }
-    const plan = planFromDocuments(group.proposal, docs);
-    if (plan.length !== 1) {
-      return c.json(
-        { error: "nothing_to_issue", code: "nothing_to_issue" },
-        409,
-      );
-    }
-    const po = plan[0]!;
+    if (!check.ok) return refuse(c, 422, check.code ?? "nothing_to_issue");
+    const composedDoc = composed.get(group.key)!;
+    if (!composedDoc.ok) return refuse(c, 409, "nothing_to_issue");
+    const soRefs = [
+      ...new Set(
+        group.allocs.map((a) => a.so).filter((v): v is number => v != null),
+      ),
+    ];
 
     const decision = decisionsFor(group.key);
     const partnerId = decision?.procurementPartnerId ?? null;
     const needsPartner = group.proposal.supplierKind === "factory_pickup";
     if (needsPartner && (!partnerId || !validPartners.has(partnerId))) {
-      return c.json(
-        {
-          error: "pickup_partner_required",
-          code: "pickup_partner_required",
-          documentKey: group.key,
-        },
-        422,
-      );
+      return refuse(c, 422, "pickup_partner_required", {
+        supplier: group.proposal.supplierName ?? null,
+      });
     }
     if (!needsPartner && partnerId) {
-      return c.json(
-        {
-          error: "pickup_partner_not_allowed",
-          code: "pickup_partner_not_allowed",
-        },
-        422,
-      );
+      return refuse(c, 422, "pickup_partner_not_allowed", {
+        supplier: group.proposal.supplierName ?? null,
+      });
     }
 
     const byLine = new Map<string, BatchLineDecision>();
     for (const d of decision?.lineDecisions ?? []) {
-      if (byLine.has(d.sku)) {
-        return c.json(
-          { error: "duplicate_cost_decision", code: "duplicate_cost_decision" },
-          422,
-        );
-      }
+      if (byLine.has(d.sku)) return refuse(c, 422, "duplicate_cost_decision", { sku: d.sku });
       byLine.set(d.sku, d);
     }
     const lines: Record<string, unknown>[] = [];
-    for (const line of po.lines) {
+    for (const line of composedDoc.lines) {
       const d = byLine.get(line.sku);
-      if (d?.treatment === "free_of_charge") {
+      /**
+       * ⭐ NO DECISION IS NOT A CATALOG PRICE (0380; closure §3).
+       *
+       * The server used to fill an unpriced line from Catalog and send it back
+       * as `cost_source: catalog`, so the database compared its own live value
+       * against itself and agreed every time — a supplier price that moved
+       * between review and Issue was adopted with nobody's approval. There is
+       * no such fallback now: a line nobody checked is a line nobody may buy.
+       */
+      if (!d) {
+        return refuse(c, 422, "cost_review_required", {
+          sku: line.sku,
+          supplier: group.proposal.supplierName ?? null,
+        });
+      }
+      const sources = line.sources.map((src) => ({
+        order_id: src.orderId,
+        so: src.so,
+        order_line_id: src.orderLineId,
+        qty: src.qty,
+      }));
+      if (d.treatment === "free_of_charge") {
         lines.push({
           sku: line.sku,
           qty: line.qty,
@@ -1371,52 +1422,54 @@ toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
           cost_source: "hand_entered",
           commercial_treatment: "free_of_charge",
           commercial_reason: d.reason.trim(),
+          /* An exception carries no catalog expectation; 0380 asks the
+             approval table instead. */
+          expected_catalog_cost: null,
+          sources,
         });
         continue;
       }
       const liveCost = res.data.catalog.get(line.sku)?.cost ?? null;
-      if (d?.treatment === "normal") {
+      if (d.costSource === "catalog") {
         /* A CATALOG PRICE THAT MOVED IS A COMMERCIAL DECISION, NOT A RETRY.
-           Operations may not silently accept it; the document stops and the
-           approver owns it (MASTER §5.6). */
-        if (d.costSource === "catalog" && liveCost !== d.unitCost) {
-          return c.json(
-            {
-              error: "stale_catalog_cost",
-              code: "stale_catalog_cost",
-              sku: line.sku,
-            },
-            409,
-          );
+           Refused here for the words, and again in SQL for the authority
+           (`purchasing_check_line_commercials`). */
+        const facts = { sku: line.sku, supplier: group.proposal.supplierName ?? null };
+        /* CATALOG HAS NO PRICE is a configuration hole, not a price that moved,
+           and the two need different acts. */
+        if (liveCost == null || liveCost <= 0) return refuse(c, 422, "cost_required", facts);
+        /* Nothing declared means nothing reviewed. */
+        if (d.expectedCatalogCost == null) {
+          return refuse(c, 422, "expected_cost_required", facts);
+        }
+        if (liveCost !== d.expectedCatalogCost || liveCost !== d.unitCost) {
+          return refuse(c, 409, "supplier_price_changed", facts);
         }
         lines.push({
           sku: line.sku,
           qty: line.qty,
-          cost: d.unitCost,
-          cost_source: d.costSource,
+          /* THE STORED NUMBER IS THE SERVER'S OWN READ. The declaration only
+             makes the comparison possible. */
+          cost: liveCost,
+          cost_source: "catalog",
           commercial_treatment: "normal",
           commercial_reason: null,
+          expected_catalog_cost: d.expectedCatalogCost,
+          sources,
         });
         continue;
       }
-      if (liveCost == null || liveCost <= 0) {
-        return c.json(
-          {
-            error: "cost_required",
-            code: "cost_required",
-            documentKey: group.key,
-            sku: line.sku,
-          },
-          422,
-        );
-      }
+      /* A hand-entered price is an EXCEPTION. It travels as one, and 0380
+         refuses it without a manager's approval on file. */
       lines.push({
         sku: line.sku,
         qty: line.qty,
-        cost: liveCost,
-        cost_source: "catalog",
+        cost: d.unitCost,
+        cost_source: "hand_entered",
         commercial_treatment: "normal",
         commercial_reason: null,
+        expected_catalog_cost: null,
+        sources,
       });
     }
 
@@ -1432,7 +1485,7 @@ toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
         fromIso: todayIso(),
       }),
       procurement_partner_id: partnerId,
-      so_refs: po.soRefs,
+      so_refs: soRefs,
       lines,
     });
     created.push({
@@ -1442,9 +1495,7 @@ toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
     });
   }
 
-  if (governedPos.length === 0) {
-    return c.json({ error: "nothing_to_issue", code: "nothing_to_issue" }, 409);
-  }
+  if (governedPos.length === 0) return refuse(c, 409, "nothing_to_issue");
 
   /* ── 7 · ONE TRANSACTION. A failure on the seventh document rolls back the
    * first six — including their commercial decisions, destinations and audit
@@ -1457,14 +1508,29 @@ toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
     },
   );
   if (batchErr) {
+    /* ⭐ THE DATABASE'S OWN REFUSAL, IN THE OPERATOR'S WORDS. Every rule the
+       RPC keeps (0379 duty · 0380 price and approval · 0382 lineage) raises
+       with a machine-readable `detail`, and every one of those codes has words
+       in `purchasingRefusal`. Without this the operator met a Postgres
+       sentence, which is exactly the "Something went wrong" the copy standard
+       forbids. */
+    const detail = String((batchErr as { details?: string }).details ?? "").trim();
+    const known = (PURCHASING_REFUSAL_CODES as readonly string[]).includes(detail);
+    if (known) {
+      const status =
+        detail === "not_po_duty"
+          ? 403
+          : detail === "supplier_price_changed"
+            ? 409
+            : 422;
+      return refuse(c, status, detail);
+    }
     const m = mapPgError(batchErr);
     return c.json(m.body, m.status);
   }
   const ids = ((batch as { po_ids?: unknown } | null)?.po_ids ??
     []) as string[];
-  if (ids.length !== governedPos.length) {
-    return c.json({ error: "po_not_created", code: "po_not_created" }, 500);
-  }
+  if (ids.length !== governedPos.length) return refuse(c, 500, "po_not_created");
 
   /**
    * WHO RAISED IT. `purchasing_issue_pos_batch` writes no audit row of any
@@ -1490,17 +1556,52 @@ toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
     }),
   );
 
+  /* ⭐ THE DOORS THE EVIDENCE STEP WILL NEED (closure §7).
+   *
+   * The operator now has to actually send each PDF, and the ONE communication
+   * area asks the supplier's own group link and email. Reading them here — once,
+   * for the suppliers just issued to — is what lets that surface offer the real
+   * door instead of a generic `web.whatsapp.com` that opens nobody's chat.
+   *
+   * Best-effort: a supplier with nothing on file gets a named gap, and the
+   * purchase orders exist either way. */
+  const supplierIds = [...new Set(created.map((x) => x.supplierId))];
+  const doorsBySupplier = new Map<
+    string,
+    { whatsappGroupUrl: string | null; contactEmail: string | null; contact: string | null }
+  >();
+  if (supplierIds.length > 0) {
+    const { data: sups } = await sb
+      .from("suppliers")
+      .select("id, whatsapp_group_url, contact_email, contact")
+      .in("id", supplierIds);
+    for (const r of (sups ?? []) as Record<string, unknown>[]) {
+      doorsBySupplier.set(r.id as string, {
+        whatsappGroupUrl: (r.whatsapp_group_url as string | null) ?? null,
+        contactEmail: (r.contact_email as string | null) ?? null,
+        contact: (r.contact as string | null) ?? null,
+      });
+    }
+  }
+
   return c.json({
     ok: true,
-    /* The official identity, and the two facts the evidence step needs to name
-       the document it is chasing. */
-    pos: ids.map((id, i) => ({
-      id,
-      supplierId: created[i]!.supplierId,
-      supplierName: res.data.supplierNames.get(created[i]!.supplierId) ?? null,
-      destinationId: created[i]!.destinationId,
-      destination: destById.get(created[i]!.destinationId)?.name ?? null,
-    })),
+    /* The official identity, and the facts the evidence step needs to name and
+       reach the document it is chasing. */
+    pos: ids.map((id, i) => {
+      const supplierId = created[i]!.supplierId;
+      const doors = doorsBySupplier.get(supplierId);
+      return {
+        id,
+        supplierId,
+        supplierName: res.data.supplierNames.get(supplierId) ?? null,
+        destinationId: created[i]!.destinationId,
+        destination: destById.get(created[i]!.destinationId)?.name ?? null,
+        whatsappGroupUrl: doors?.whatsappGroupUrl ?? null,
+        contactEmail: doors?.contactEmail ?? null,
+        contact: doors?.contact ?? null,
+      };
+    }),
   });
 });
 

@@ -482,11 +482,16 @@ describe("the SO Batch response carries destinations, duty and permission", () =
       ],
       defaultDestinationId: "d1",
       currentPoDuty: { userId: "u1", name: "Yee Jean" },
+      /* 0379 — the dated buddy cover who may act TODAY. A separate fact from
+         the holder: the duty stays where management put it, and the audit must
+         still say who actually pressed Issue PO. */
+      actingPoDuty: { userId: "u2", name: "Shasha" },
       mayIssue: true,
       procurementPartners: [{ id: "p1", name: "NETS" }],
     });
     expect(parsed.destinations[0]!.name).toBe("Carres Klang");
     expect(parsed.mayIssue).toBe(true);
+    expect(parsed.actingPoDuty).toEqual({ userId: "u2", name: "Shasha" });
   });
 
   it("a reader who is not on duty is told so honestly", () => {
@@ -496,10 +501,12 @@ describe("the SO Batch response carries destinations, duty and permission", () =
       destinations: [],
       defaultDestinationId: null,
       currentPoDuty: null,
+      actingPoDuty: null,
       mayIssue: false,
       procurementPartners: [],
     });
     expect(parsed.mayIssue).toBe(false);
     expect(parsed.currentPoDuty).toBeNull();
+    expect(parsed.actingPoDuty).toBeNull();
   });
 });

@@ -7,6 +7,7 @@ import {
   splitAllocation,
   validateAllocations,
   documentPartitionKey,
+  composeDocumentLines,
   groupSelectionsIntoDocuments,
   soBatchSelectionSummary,
   isSelectableForBuying,
@@ -422,5 +423,119 @@ describe("the selection bar counts lines, units and documents", () => {
       new Map([[a.id, a]]),
     );
     expect(summary.text).toBe("1 selected · 1 unit · Issue 1 PO");
+  });
+});
+
+// ─── The lines one document carries, and their lineage ───────────────────────
+
+describe("composeDocumentLines", () => {
+  const single = (
+    key: string,
+    sku: string,
+    qty: number,
+    cost: number | null = 100,
+  ) => ({
+    key,
+    qty,
+    lines: [{ lineId: `${key}-l1`, sku, qty, cost }],
+  });
+
+  it("scales a split allocation instead of repeating the whole build", () => {
+    /* ⭐ THE REGRESSION. A build of 11 split 10 + 1 used to produce TWO
+       purchase orders of 11 — 22 units bought for an 11-unit demand. */
+    const build = single("b1", "B1201S-K", 11);
+    const klang = composeDocumentLines([
+      { build, orderId: "o1", so: 1318, qty: 10 },
+    ]);
+    const buloh = composeDocumentLines([
+      { build, orderId: "o1", so: 1318, qty: 1 },
+    ]);
+    expect(klang.ok && klang.lines[0]!.qty).toBe(10);
+    expect(buloh.ok && buloh.lines[0]!.qty).toBe(1);
+    const total =
+      (klang.ok ? klang.lines[0]!.qty : 0) + (buloh.ok ? buloh.lines[0]!.qty : 0);
+    expect(total).toBe(11);
+  });
+
+  it("adds one SKU from several customer orders into one line with three sources", () => {
+    const res = composeDocumentLines([
+      { build: single("b1", "M-KING", 2), orderId: "o1", so: 1318, qty: 2 },
+      { build: single("b2", "M-KING", 1), orderId: "o2", so: 1321, qty: 1 },
+      { build: single("b3", "M-KING", 3), orderId: "o3", so: null, qty: 3 },
+    ]);
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.lines).toHaveLength(1);
+    const line = res.lines[0]!;
+    expect(line.qty).toBe(6);
+    expect(line.sources.map((s) => [s.so, s.qty])).toEqual([
+      [1318, 2],
+      [1321, 1],
+      [null, 3],
+    ]);
+    /* THE PARTS MUST ADD UP TO THE LINE — the rule 0382 refuses in SQL. */
+    expect(line.sources.reduce((s, x) => s + x.qty, 0)).toBe(line.qty);
+  });
+
+  it("keeps every source's own order line, so SQL can validate the lineage", () => {
+    const res = composeDocumentLines([
+      { build: single("b1", "M-KING", 2), orderId: "o1", so: 1318, qty: 2 },
+    ]);
+    expect(res.ok && res.lines[0]!.sources[0]).toEqual({
+      orderId: "o1",
+      so: 1318,
+      orderLineId: "b1-l1",
+      qty: 2,
+    });
+  });
+
+  it("carries a whole matched set, and every module keeps its own quantity", () => {
+    const sofa = {
+      key: "sofa1",
+      qty: 1,
+      lines: [
+        { lineId: "l1", sku: "5539-1B", qty: 1, cost: 500 },
+        { lineId: "l2", sku: "5539-CNR", qty: 2, cost: 300 },
+      ],
+    };
+    const res = composeDocumentLines([
+      { build: sofa, orderId: "o1", so: 1318, qty: 1 },
+    ]);
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.lines.map((l) => [l.sku, l.qty])).toEqual([
+      ["5539-1B", 1],
+      ["5539-CNR", 2],
+    ]);
+  });
+
+  it("refuses to cut a matched set across two places", () => {
+    const sofa = {
+      key: "sofa1",
+      qty: 2,
+      lines: [
+        { lineId: "l1", sku: "5539-1B", qty: 2, cost: 500 },
+        { lineId: "l2", sku: "5539-CNR", qty: 2, cost: 300 },
+      ],
+    };
+    expect(
+      composeDocumentLines([{ build: sofa, orderId: "o1", so: 1318, qty: 1 }]),
+    ).toEqual({ ok: false, code: "partial_split_not_allowed" });
+  });
+
+  it("says nothing_to_issue rather than composing an empty document", () => {
+    expect(composeDocumentLines([])).toEqual({ ok: false, code: "nothing_to_issue" });
+    expect(
+      composeDocumentLines([
+        { build: single("b1", "M-KING", 2), orderId: "o1", so: 1, qty: 0 },
+      ]),
+    ).toEqual({ ok: false, code: "nothing_to_issue" });
+  });
+
+  it("keeps the catalog cost the engine read, and never invents one", () => {
+    const res = composeDocumentLines([
+      { build: single("b1", "M-KING", 1, null), orderId: "o1", so: 1, qty: 1 },
+    ]);
+    expect(res.ok && res.lines[0]!.cost).toBeNull();
   });
 });

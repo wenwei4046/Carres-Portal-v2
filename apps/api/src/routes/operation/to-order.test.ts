@@ -279,6 +279,31 @@ function makeSb(tables: Record<string, { data: unknown; error: unknown }>) {
 
   const rpc = vi.fn(async (fn: string, args: Record<string, unknown>) => {
     rpcCalls.push({ fn, args });
+    /* 0379 · THE ONE ACTOR RESOLVER, answered from the same two tables the SQL
+       reads, so a test still says who holds the duty by setting `ops_po_duty`
+       and says who covers by setting `ops_po_duty_cover`. */
+    if (fn === "purchasing_po_actor") {
+      const dutyData = tables.ops_po_duty?.data as
+        | { user_id?: string }[]
+        | { user_id?: string }
+        | null;
+      const normal =
+        (Array.isArray(dutyData) ? dutyData[0]?.user_id : dutyData?.user_id) ?? null;
+      const coverData = tables.ops_po_duty_cover?.data as
+        | { acting_user_id?: string }[]
+        | null;
+      const acting = (Array.isArray(coverData) ? coverData[0]?.acting_user_id : null) ?? null;
+      return {
+        data: {
+          normal_user_id: normal,
+          acting_user_id: acting,
+          actor_user_id: acting ?? normal,
+          is_cover: acting != null,
+          month: "2026-08",
+        },
+        error: null,
+      };
+    }
     if (fn === "purchasing_issue_pos_batch") {
       const pos = (args.p_pos as unknown[]) ?? [];
       const ids = pos.map(() => `PO-${(poSeq += 1)}`);
@@ -581,7 +606,7 @@ describe("a requirement the catalog cannot answer for", () => {
     const demands = await readyDemands(sb);
     const res = await postBatch({
       selections: allTo(demands, KLANG),
-      documentDecisions: [],
+      documentDecisions: pricedAll(demands, KLANG),
     });
     expect(res.status).toBe(200);
   });
@@ -762,7 +787,7 @@ describe("a purchase order is born with its expected arrival", () => {
     vi.mocked(userClient).mockReturnValue(sb as never);
     await postBatch({
       selections: allTo(await readyDemands(sb), KLANG),
-      documentDecisions: [],
+      documentDecisions: pricedAll(await readyDemands(sb), KLANG),
     });
 
     const pos = sb.rpcCalls.find((c) => c.fn === "purchasing_issue_pos_batch")!.args.p_pos as {
@@ -796,7 +821,7 @@ describe("a purchase order is born with its expected arrival", () => {
     vi.mocked(userClient).mockReturnValue(sb as never);
     await postBatch({
       selections: allTo(await readyDemands(sb), KLANG),
-      documentDecisions: [],
+      documentDecisions: pricedAll(await readyDemands(sb), KLANG),
     });
     // R5 grades a factory by `expected_ready_date`. Seeding it with OUR
     // estimate would score a supplier on a number it never gave, and nothing
@@ -816,7 +841,7 @@ describe("a purchase order is born with its expected arrival", () => {
     vi.mocked(userClient).mockReturnValue(sb as never);
     const res = await postBatch({
       selections: allTo(await readyDemands(sb), KLANG),
-      documentDecisions: [],
+      documentDecisions: pricedAll(await readyDemands(sb), KLANG),
     });
 
     // The goods matter more than the estimate: the PO is still raised.
@@ -833,7 +858,7 @@ describe("a purchase order is born with its expected arrival", () => {
     vi.mocked(userClient).mockReturnValue(sb as never);
     await postBatch({
       selections: allTo(await readyDemands(sb), KLANG),
-      documentDecisions: [],
+      documentDecisions: pricedAll(await readyDemands(sb), KLANG),
     });
 
     // Measured 2026-08-01: `purchasing_issue_pos_batch` writes no audit row of
@@ -887,7 +912,7 @@ describe("purchase_demands absent — fail closed, not down", () => {
 
     const res = await postBatch({
       selections: allTo(await readyDemands(sb), KLANG),
-      documentDecisions: [],
+      documentDecisions: pricedAll(await readyDemands(sb), KLANG),
     });
     expect(res.status).toBe(200);
   });
@@ -1376,11 +1401,18 @@ async function readyDemands(sb: ReturnType<typeof makeSb>) {
   vi.mocked(userClient).mockReturnValue(sb as never);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const body = (await (await get()).json()) as any;
-  const out: { demandId: string; qty: number; orderId: string }[] = [];
+  const out: { demandId: string; qty: number; orderId: string; skus: string[] }[] = [];
   for (const p of body.proposals) {
     for (const r of p.rows) {
       for (const b of r.builds) {
-        out.push({ demandId: `build::${r.orderId}::${b.key}`, qty: b.qty, orderId: r.orderId });
+        out.push({
+          demandId: `build::${r.orderId}::${b.key}`,
+          qty: b.qty,
+          orderId: r.orderId,
+          /* The SKUs this build puts on a document — so a test can price
+             exactly what each side of a split actually carries. */
+          skus: String(b.codes ?? "").split(" · ").filter(Boolean),
+        });
       }
     }
   }
@@ -1405,21 +1437,120 @@ function sofaDocKey(orderId: string, destinationId = KLANG) {
     orderId,
   });
 }
+/**
+ * ⭐ EVERY LINE IS PRICED, ALWAYS (0380; closure §3).
+ *
+ * There is no "send nothing and let the server read Catalog" path any more:
+ * that was the check that compared the live value against itself. The browser
+ * declares the price it REVIEWED for every SKU, and so does every test.
+ */
+const CATALOG_COST: Record<string, number> = {
+  "5539-1B(LHF)": 100,
+  "5539-CNR": 100,
+  "5539-2A(RHF)": 100,
+  "5539-1A(LHF)": 120,
+};
+/** Which SKUs each customer order's sofa document carries. */
+const SKUS_BY_ORDER: Record<string, string[]> = {
+  o1: ["5539-1B(LHF)", "5539-CNR", "5539-2A(RHF)", "5539-1A(LHF)"],
+  o2: ["5539-1A(LHF)"],
+};
+type WireDecision = { sku: string } & Record<string, unknown>;
+const catalogLines = (orderId: string): WireDecision[] =>
+  (SKUS_BY_ORDER[orderId] ?? []).map((sku) => ({
+    sku,
+    treatment: "normal",
+    unitCost: CATALOG_COST[sku]!,
+    costSource: "catalog",
+    expectedCatalogCost: CATALOG_COST[sku]!,
+  }));
+
 function decisionsForAll(
   demands: { orderId: string }[],
   destinationId: string,
-  priced: { orderId: string; lineDecisions: unknown[]; procurementPartnerId?: string | null } | null = null,
+  priced: {
+    orderId: string;
+    lineDecisions: unknown[];
+    procurementPartnerId?: string | null;
+  } | null = null,
 ) {
   const orders = [...new Set(demands.map((d) => d.orderId))];
-  return orders.map((orderId) => ({
-    documentKey: sofaDocKey(orderId, destinationId),
-    supplierId: OHANA,
-    destinationId,
-    procurementPartnerId:
-      priced?.procurementPartnerId !== undefined ? priced.procurementPartnerId : null,
-    lineDecisions: priced && priced.orderId === orderId ? priced.lineDecisions : [],
-  }));
+  return orders.map((orderId) => {
+    /* A test that prices ONE sku replaces that one and leaves the rest at the
+       catalog price it reviewed — the same thing the operator does. */
+    const byS = new Map<string, WireDecision>(catalogLines(orderId).map((l) => [l.sku, l]));
+    if (priced && priced.orderId === orderId) {
+      for (const l of priced.lineDecisions as WireDecision[]) byS.set(l.sku, l);
+    }
+    return {
+      documentKey: sofaDocKey(orderId, destinationId),
+      supplierId: OHANA,
+      destinationId,
+      procurementPartnerId:
+        priced?.procurementPartnerId !== undefined ? priced.procurementPartnerId : null,
+      lineDecisions: [...byS.values()],
+    };
+  });
 }
+
+/** The catalog decision for an explicit SKU list — used where a split makes
+ *  each document carry a different part of the set. */
+const catalogLinesFor = (skus: readonly string[]): WireDecision[] =>
+  skus.map((sku) => ({
+    sku,
+    treatment: "normal",
+    unitCost: CATALOG_COST[sku]!,
+    costSource: "catalog",
+    expectedCatalogCost: CATALOG_COST[sku]!,
+  }));
+
+const pricedDoc = (
+  orderId: string,
+  destinationId: string,
+  skus: readonly string[],
+) => ({
+  documentKey: sofaDocKey(orderId, destinationId),
+  supplierId: OHANA,
+  destinationId,
+  procurementPartnerId: null,
+  lineDecisions: catalogLinesFor(skus),
+});
+
+/**
+ * PRICE WHAT EACH DOCUMENT ACTUALLY CARRIES, derived from the arrangement.
+ *
+ * The browser can do exactly this because the partition key is shared: it knows
+ * where the server's cuts fall, so it can price each document rather than
+ * guessing at the whole supplier surface.
+ */
+const priceSplit = (
+  selections: readonly {
+    demandId: string;
+    allocations: readonly { destinationId: string; qty: number }[];
+  }[],
+  demands: readonly { demandId: string; orderId: string; skus: string[] }[],
+) => {
+  const byId = new Map(demands.map((d) => [d.demandId, d]));
+  const docs = new Map<string, { orderId: string; destinationId: string; skus: Set<string> }>();
+  for (const sel of selections) {
+    const d = byId.get(sel.demandId);
+    if (!d) continue;
+    for (const a of sel.allocations) {
+      const key = sofaDocKey(d.orderId, a.destinationId);
+      let hit = docs.get(key);
+      if (!hit) {
+        hit = { orderId: d.orderId, destinationId: a.destinationId, skus: new Set() };
+        docs.set(key, hit);
+      }
+      for (const sku of d.skus) hit.skus.add(sku);
+    }
+  }
+  return [...docs.values()].map((v) => pricedDoc(v.orderId, v.destinationId, [...v.skus]));
+};
+
+/** Everything at the catalog price, for the ordinary happy path. */
+const pricedAll = (demands: { orderId: string }[], destinationId: string) =>
+  decisionsForAll(demands, destinationId);
 
 const allTo = (
   demands: { demandId: string; qty: number }[],
@@ -1435,7 +1566,7 @@ describe("POST …/to-order/issue-batch — one door, one transaction", () => {
   it("creates every purchase order through the ONE governed RPC", async () => {
     const sb = makeSb(TABLES());
     const demands = await readyDemands(sb);
-    const res = await postBatch({ selections: allTo(demands, KLANG), documentDecisions: [] });
+    const res = await postBatch({ selections: allTo(demands, KLANG), documentDecisions: pricedAll(demands, KLANG) });
     expect(res.status).toBe(200);
     expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(1);
   });
@@ -1444,7 +1575,7 @@ describe("POST …/to-order/issue-batch — one door, one transaction", () => {
     const sb = makeSb(TABLES());
     const demands = await readyDemands(sb);
     // Everything to ONE destination.
-    await postBatch({ selections: allTo(demands, KLANG), documentDecisions: [] });
+    await postBatch({ selections: allTo(demands, KLANG), documentDecisions: pricedAll(demands, KLANG) });
     const batch = sb.rpcCalls.find((c) => c.fn === "purchasing_issue_pos_batch")!;
     const pos = batch.args.p_pos as { destination_id: string; supplier_id: string }[];
     expect(new Set(pos.map((p) => p.destination_id))).toEqual(new Set([KLANG]));
@@ -1456,12 +1587,15 @@ describe("POST …/to-order/issue-batch — one door, one transaction", () => {
     const demands = await readyDemands(sb);
     const first = demands[0]!;
     const rest = demands.slice(1);
+    const selections = [
+      { demandId: first.demandId, allocations: [{ destinationId: AL, qty: first.qty }] },
+      ...allTo(rest, KLANG),
+    ];
+    /* Each document is priced for the part of the set IT carries — the
+       partition is shared, so the browser knows where the cut fell. */
     const res = await postBatch({
-      selections: [
-        { demandId: first.demandId, allocations: [{ destinationId: AL, qty: first.qty }] },
-        ...allTo(rest, KLANG),
-      ],
-      documentDecisions: [],
+      selections,
+      documentDecisions: priceSplit(selections, demands),
     });
     expect(res.status).toBe(200);
     const batch = sb.rpcCalls.find((c) => c.fn === "purchasing_issue_pos_batch")!;
@@ -1484,7 +1618,7 @@ describe("POST …/to-order/issue-batch — one door, one transaction", () => {
           ],
         },
       ],
-      documentDecisions: [],
+      documentDecisions: pricedAll(demands, KLANG),
     });
     expect(res.status).toBe(200);
   });
@@ -1492,7 +1626,7 @@ describe("POST …/to-order/issue-batch — one door, one transaction", () => {
   it("every line keeps its source Sales Order on the document", async () => {
     const sb = makeSb(TABLES());
     const demands = await readyDemands(sb);
-    await postBatch({ selections: allTo(demands, KLANG), documentDecisions: [] });
+    await postBatch({ selections: allTo(demands, KLANG), documentDecisions: pricedAll(demands, KLANG) });
     const batch = sb.rpcCalls.find((c) => c.fn === "purchasing_issue_pos_batch")!;
     const pos = batch.args.p_pos as { so_refs: number[] }[];
     const refs = pos.flatMap((p) => p.so_refs).sort();
@@ -1535,7 +1669,7 @@ describe("the batch issue refuses before it creates anything", () => {
       selections: [
         { demandId: first.demandId, allocations: [{ destinationId: KLANG, qty: first.qty + 5 }] },
       ],
-      documentDecisions: [],
+      documentDecisions: pricedAll(demands, KLANG),
     });
     expect(res.status).toBe(422);
     expect(((await res.json()) as { code?: string }).code).toBe("allocation_mismatch");
@@ -1559,7 +1693,7 @@ describe("the batch issue refuses before it creates anything", () => {
       selections: [
         { demandId: first.demandId, allocations: [{ destinationId: CLOSED_YARD, qty: first.qty }] },
       ],
-      documentDecisions: [],
+      documentDecisions: pricedAll(demands, KLANG),
     });
     expect(res.status).toBe(422);
     expect(((await res.json()) as { code?: string }).code).toBe("inactive_destination");
@@ -1579,7 +1713,7 @@ describe("the batch issue refuses before it creates anything", () => {
           ],
         },
       ],
-      documentDecisions: [],
+      documentDecisions: pricedAll(demands, KLANG),
     });
     expect(res.status).toBe(422);
     expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
@@ -1594,7 +1728,7 @@ describe("the batch issue refuses before it creates anything", () => {
     sb.rpcCalls.length = 0;
     const o1 = demands.filter((d) => d.orderId === "o1");
     if (o1.length === 0) return;
-    const res = await postBatch({ selections: allTo(o1, KLANG), documentDecisions: [] });
+    const res = await postBatch({ selections: allTo(o1, KLANG), documentDecisions: pricedAll(demands, KLANG) });
     expect(res.status).toBe(422);
     expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
   });
@@ -1624,7 +1758,7 @@ describe("only Current PO Duty may issue", () => {
   it("the duty holder issues", async () => {
     const sb = makeSb(TABLES());
     const demands = await readyDemands(sb);
-    const res = await postBatch({ selections: allTo(demands, KLANG), documentDecisions: [] });
+    const res = await postBatch({ selections: allTo(demands, KLANG), documentDecisions: pricedAll(demands, KLANG) });
     expect(res.status).toBe(200);
   });
 
@@ -1634,7 +1768,7 @@ describe("only Current PO Duty may issue", () => {
     const sb = makeSb(tables);
     const demands = await readyDemands(sb);
     sb.rpcCalls.length = 0;
-    const res = await postBatch({ selections: allTo(demands, KLANG), documentDecisions: [] });
+    const res = await postBatch({ selections: allTo(demands, KLANG), documentDecisions: pricedAll(demands, KLANG) });
     expect(res.status).toBe(403);
     expect(((await res.json()) as { code?: string }).code).toBe("not_po_duty");
     expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
@@ -1646,7 +1780,7 @@ describe("only Current PO Duty may issue", () => {
     const sb = makeSb(tables);
     const demands = await readyDemands(sb);
     sb.rpcCalls.length = 0;
-    const res = await postBatch({ selections: allTo(demands, KLANG), documentDecisions: [] });
+    const res = await postBatch({ selections: allTo(demands, KLANG), documentDecisions: pricedAll(demands, KLANG) });
     expect(res.status).toBe(403);
     expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
   });
@@ -1672,11 +1806,15 @@ describe("the commercial laws still hold on the batch door", () => {
               treatment: "normal",
               unitCost: 999999,
               costSource: "catalog",
+              /* ⭐ WHAT THE OPERATOR REVIEWED. Catalog says 100 now, so the
+                 price moved between the review and Issue PO — and 0380 refuses
+                 it instead of adopting it silently. */
+              expectedCatalogCost: 999999,
             },
           ] }),
     });
     expect(res.status).toBe(409);
-    expect(((await res.json()) as { code?: string }).code).toBe("stale_catalog_cost");
+    expect(((await res.json()) as { code?: string }).code).toBe("supplier_price_changed");
     expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
   });
 
@@ -1749,7 +1887,7 @@ describe("the retired door's laws, re-asked of the batch door", () => {
 
   it("puts every module of a customer's sofas on that customer's document", async () => {
     const { sb, demands } = await ready();
-    await postBatch({ selections: allTo(demands, KLANG), documentDecisions: [] });
+    await postBatch({ selections: allTo(demands, KLANG), documentDecisions: pricedAll(demands, KLANG) });
     const pos = batchArgs(sb) as unknown as {
       so_refs: number[];
       lines: { sku: string }[];
@@ -1766,7 +1904,7 @@ describe("the retired door's laws, re-asked of the batch door", () => {
 
   it("the server never merges two customers' sofas onto one document", async () => {
     const { sb, demands } = await ready();
-    await postBatch({ selections: allTo(demands, KLANG), documentDecisions: [] });
+    await postBatch({ selections: allTo(demands, KLANG), documentDecisions: pricedAll(demands, KLANG) });
     const pos = batchArgs(sb) as unknown as { so_refs: number[] }[];
     // A sofa is one PO per customer order (locked 2026-07-27).
     for (const po of pos) expect(po.so_refs).toHaveLength(1);
@@ -1775,7 +1913,7 @@ describe("the retired door's laws, re-asked of the batch door", () => {
 
   it("writes the chosen destination onto EVERY purchase order it created", async () => {
     const { sb, demands } = await ready();
-    await postBatch({ selections: allTo(demands, AL), documentDecisions: [] });
+    await postBatch({ selections: allTo(demands, AL), documentDecisions: pricedAll(demands, AL) });
     for (const po of batchArgs(sb)) expect(po.destination_id).toBe(AL);
   });
 
@@ -1785,7 +1923,7 @@ describe("the retired door's laws, re-asked of the batch door", () => {
       if (r.sku === "5539-CNR") r.cost = null;
     });
     const { sb, demands } = await ready(tables);
-    const res = await postBatch({ selections: allTo(demands, KLANG), documentDecisions: [] });
+    const res = await postBatch({ selections: allTo(demands, KLANG), documentDecisions: pricedAll(demands, KLANG) });
     expect(res.status).toBe(422);
     const body = (await res.json()) as { code?: string; sku?: string };
     expect(body.code).toBe("cost_required");
@@ -1801,7 +1939,7 @@ describe("the retired door's laws, re-asked of the batch door", () => {
       if (r.sku === "5539-CNR") r.cost = null;
     });
     const { sb, demands } = await ready(tables);
-    await postBatch({ selections: allTo(demands, KLANG), documentDecisions: [] });
+    await postBatch({ selections: allTo(demands, KLANG), documentDecisions: pricedAll(demands, KLANG) });
     expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
   });
 
@@ -1837,7 +1975,7 @@ describe("the retired door's laws, re-asked of the batch door", () => {
     const tables = TABLES();
     (tables.suppliers.data as Record<string, unknown>[])[0]!.kind = "factory_pickup";
     const { sb, demands } = await ready(tables);
-    const res = await postBatch({ selections: allTo(demands, KLANG), documentDecisions: [] });
+    const res = await postBatch({ selections: allTo(demands, KLANG), documentDecisions: pricedAll(demands, KLANG) });
     expect(res.status).toBe(422);
     expect(((await res.json()) as { code?: string }).code).toBe("pickup_partner_required");
     expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
@@ -1888,7 +2026,7 @@ describe("the retired door's laws, re-asked of the batch door", () => {
           lines: [{ sku: "5539-CNR", qty: 99, cost: 1 }],
         },
       ],
-      documentDecisions: [],
+      documentDecisions: pricedAll(demands, KLANG),
     });
     expect(res.status).toBe(400);
     expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
@@ -1896,7 +2034,7 @@ describe("the retired door's laws, re-asked of the batch door", () => {
 
   it("the quantities that reach the RPC are the SERVER's, never the request's", async () => {
     const { sb, demands } = await ready();
-    await postBatch({ selections: allTo(demands, KLANG), documentDecisions: [] });
+    await postBatch({ selections: allTo(demands, KLANG), documentDecisions: pricedAll(demands, KLANG) });
     const lines = (batchArgs(sb) as unknown as { lines: { qty: number }[] }[]).flatMap(
       (p) => p.lines,
     );
@@ -1984,5 +2122,574 @@ describe("there is exactly ONE issuance door left", () => {
     // It is not a bypass and this Card did not touch it — it is the second
     // approved way in, and a claim of "one caller" would have been false.
     expect(manual).toContain("purchasing_issue_pos_batch");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CARD 02 CLOSURE — the five authorities, at the door that uses them
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * ONE ACTOR AUTHORITY (closure §1; 0379).
+ *
+ * The route used to read `ops_po_duty` for itself. It now asks the ONE resolver
+ * `purchasing_po_actor`, which knows dated buddy cover — and the creation RPC
+ * asks it again, so a direct call cannot walk past it either.
+ */
+describe("closure §1 · one governed PO actor authority", () => {
+  it("asks the ONE resolver, never the duty table, for who may act", async () => {
+    const sb = makeSb(TABLES());
+    const demands = await readyDemands(sb);
+    sb.rpcCalls.length = 0;
+    sb.tableCalls.length = 0;
+    await postBatch({
+      selections: allTo(demands, KLANG),
+      documentDecisions: pricedAll(demands, KLANG),
+    });
+    expect(sb.rpcCalls.some((c) => c.fn === "purchasing_po_actor")).toBe(true);
+    expect(sb.tableCalls).not.toContain("ops_po_duty");
+  });
+
+  it("lets the authorised cover issue while the holder is away", async () => {
+    const tables = TABLES();
+    /* The month's holder is somebody else; today's dated cover is the caller. */
+    tables.ops_po_duty = { data: [{ user_id: "u9" }], error: null };
+    tables.ops_po_duty_cover = {
+      data: [{ normal_user_id: "u9", acting_user_id: "u1" }],
+      error: null,
+    };
+    const sb = makeSb(tables);
+    const demands = await readyDemands(sb);
+    sb.rpcCalls.length = 0;
+    const res = await postBatch({
+      selections: allTo(demands, KLANG),
+      documentDecisions: pricedAll(demands, KLANG),
+    });
+    expect(res.status).toBe(200);
+    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(1);
+  });
+
+  it("refuses an Operations login who is neither the holder nor the cover", async () => {
+    const tables = TABLES();
+    tables.ops_po_duty = { data: [{ user_id: "u9" }], error: null };
+    tables.app_users = {
+      data: [{ id: "u9", name: "Li Ching", email: "lc@carres.com" }],
+      error: null,
+    };
+    const sb = makeSb(tables);
+    const demands = await readyDemands(sb);
+    sb.rpcCalls.length = 0;
+    const res = await postBatch({
+      selections: allTo(demands, KLANG),
+      documentDecisions: pricedAll(demands, KLANG),
+    });
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { code?: string; message?: string; action?: string };
+    expect(body.code).toBe("not_po_duty");
+    /* ⭐ THE TWO LINES (closure §9): the fact, then the act, naming the person. */
+    expect(body.message).toBe("You do not hold PO duty today.");
+    expect(body.action).toBe("Ask Li Ching to issue this purchase order.");
+    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
+  });
+
+  it("says so plainly when the month has no PO duty holder at all", async () => {
+    const tables = TABLES();
+    tables.ops_po_duty = { data: [], error: null };
+    const sb = makeSb(tables);
+    const demands = await readyDemands(sb);
+    sb.rpcCalls.length = 0;
+    const res = await postBatch({
+      selections: allTo(demands, KLANG),
+      documentDecisions: pricedAll(demands, KLANG),
+    });
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { code?: string; action?: string };
+    expect(body.code).toBe("no_po_duty_holder");
+    expect(body.action).toBe("Ask management to set this month's PO duty holder.");
+    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
+  });
+
+  it("turns the DATABASE's own duty refusal into the same two lines", async () => {
+    /* The route's check is for words; the RPC's is the authority. When SQL
+       refuses, the operator must still read a sentence and not a stack. */
+    const sb = makeSb(TABLES());
+    const demands = await readyDemands(sb);
+    const realRpc = sb.rpc.getMockImplementation()!;
+    sb.rpc.mockImplementation(async (fn: string, args: Record<string, unknown>) => {
+      if (fn === "purchasing_issue_pos_batch") {
+        return {
+          data: null,
+          error: { message: "only Current PO Duty…", details: "not_po_duty", code: "42501" },
+        } as never;
+      }
+      return realRpc(fn, args);
+    });
+    const res = await postBatch({
+      selections: allTo(demands, KLANG),
+      documentDecisions: pricedAll(demands, KLANG),
+    });
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { code?: string; message?: string; action?: string };
+    expect(body.code).toBe("not_po_duty");
+    expect(body.message).toBe("You do not hold PO duty today.");
+    expect(body.action?.length).toBeGreaterThan(0);
+  });
+
+  it("turns a commercial-approval refusal from SQL into the same two lines", async () => {
+    const sb = makeSb(TABLES());
+    const demands = await readyDemands(sb);
+    const realRpc = sb.rpc.getMockImplementation()!;
+    sb.rpc.mockImplementation(async (fn: string, args: Record<string, unknown>) => {
+      if (fn === "purchasing_issue_pos_batch") {
+        return {
+          data: null,
+          error: {
+            message: "this price has no commercial approval",
+            details: "commercial_approval_required",
+            code: "P0001",
+          },
+        } as never;
+      }
+      return realRpc(fn, args);
+    });
+    const res = await postBatch({
+      selections: allTo(demands, KLANG),
+      documentDecisions: pricedAll(demands, KLANG),
+    });
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code?: string; action?: string };
+    expect(body.code).toBe("commercial_approval_required");
+    expect(body.action).toMatch(/Ask a manager to approve/);
+  });
+});
+
+/**
+ * COMMERCIAL AUTHORITY (closure §2; 0380).
+ *
+ * The defect was silent: the API re-read Catalog, sent the value back as
+ * `cost_source: catalog`, and the RPC compared the live value with itself. Every
+ * line now declares the price the OPERATOR REVIEWED, and there is no fallback
+ * for a line nobody checked.
+ */
+describe("closure §2 · commercial authority", () => {
+  it("sends the reviewed catalog cost to the RPC, so SQL has something to compare", async () => {
+    const sb = makeSb(TABLES());
+    const demands = await readyDemands(sb);
+    sb.rpcCalls.length = 0;
+    const res = await postBatch({
+      selections: allTo(demands, KLANG),
+      documentDecisions: pricedAll(demands, KLANG),
+    });
+    expect(res.status).toBe(200);
+    const pos = sb.rpcCalls.find((c) => c.fn === "purchasing_issue_pos_batch")!.args
+      .p_pos as { lines: Record<string, unknown>[] }[];
+    const lines = pos.flatMap((p) => p.lines);
+    expect(lines.length).toBeGreaterThan(0);
+    for (const l of lines) {
+      expect(l.cost_source).toBe("catalog");
+      /* ⭐ THE DECLARATION. Without it 0380 refuses the line outright. */
+      expect(l.expected_catalog_cost).toBe(l.cost);
+      expect(l.expected_catalog_cost).not.toBeNull();
+    }
+  });
+
+  it("refuses a line nobody priced instead of filling it from Catalog", async () => {
+    const sb = makeSb(TABLES());
+    const demands = await readyDemands(sb);
+    sb.rpcCalls.length = 0;
+    /* One document arrives with an EMPTY decision list — exactly what the old
+       "send nothing and let the server read Catalog" path produced. */
+    const res = await postBatch({
+      selections: allTo(demands, KLANG),
+      documentDecisions: [
+        { ...pricedDoc("o1", KLANG, []), lineDecisions: [] },
+        pricedDoc("o2", KLANG, ["5539-1A(LHF)"]),
+      ],
+    });
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code?: string; sku?: string; action?: string };
+    expect(body.code).toBe("cost_review_required");
+    expect(body.action).toMatch(/Check the cost of/);
+    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
+  });
+
+  it("sends a hand-entered price as an EXCEPTION, with no catalog expectation", async () => {
+    const sb = makeSb(TABLES());
+    const demands = await readyDemands(sb);
+    sb.rpcCalls.length = 0;
+    const res = await postBatch({
+      selections: allTo(demands, KLANG),
+      documentDecisions: decisionsForAll(demands, KLANG, {
+        orderId: "o1",
+        procurementPartnerId: null,
+        lineDecisions: [
+          {
+            sku: "5539-CNR",
+            treatment: "normal",
+            unitCost: 250,
+            costSource: "hand_entered",
+            expectedCatalogCost: 100,
+          },
+        ],
+      }),
+    });
+    expect(res.status).toBe(200);
+    const pos = sb.rpcCalls.find((c) => c.fn === "purchasing_issue_pos_batch")!.args
+      .p_pos as { lines: Record<string, unknown>[] }[];
+    const hand = pos.flatMap((p) => p.lines).find((l) => l.sku === "5539-CNR")!;
+    expect(hand.cost).toBe(250);
+    expect(hand.cost_source).toBe("hand_entered");
+    /* ⭐ AN EXCEPTION'S AUTHORITY IS AN APPROVAL RECORD, not a catalog price.
+       0380 goes to `po_cost_approvals`; there is nothing here to compare. */
+    expect(hand.expected_catalog_cost).toBeNull();
+  });
+
+  it("sends Free of Charge as an exception too — reason kept, expectation absent", async () => {
+    const sb = makeSb(TABLES());
+    const demands = await readyDemands(sb);
+    sb.rpcCalls.length = 0;
+    const res = await postBatch({
+      selections: allTo(demands, KLANG),
+      documentDecisions: decisionsForAll(demands, KLANG, {
+        orderId: "o1",
+        procurementPartnerId: null,
+        lineDecisions: [
+          { sku: "5539-CNR", treatment: "free_of_charge", reason: "Replacement for a claim" },
+        ],
+      }),
+    });
+    expect(res.status).toBe(200);
+    const pos = sb.rpcCalls.find((c) => c.fn === "purchasing_issue_pos_batch")!.args
+      .p_pos as { lines: Record<string, unknown>[] }[];
+    const foc = pos.flatMap((p) => p.lines).find((l) => l.sku === "5539-CNR")!;
+    expect(foc).toMatchObject({
+      cost: 0,
+      cost_source: "hand_entered",
+      commercial_treatment: "free_of_charge",
+      commercial_reason: "Replacement for a claim",
+      expected_catalog_cost: null,
+    });
+  });
+
+  it("stores the SERVER's price, not the number the browser declared", async () => {
+    const sb = makeSb(TABLES());
+    const demands = await readyDemands(sb);
+    sb.rpcCalls.length = 0;
+    await postBatch({
+      selections: allTo(demands, KLANG),
+      documentDecisions: pricedAll(demands, KLANG),
+    });
+    const pos = sb.rpcCalls.find((c) => c.fn === "purchasing_issue_pos_batch")!.args
+      .p_pos as { lines: Record<string, unknown>[] }[];
+    const cnr = pos.flatMap((p) => p.lines).find((l) => l.sku === "5539-CNR")!;
+    /* The fixture's catalog cost. The declaration only made the comparison
+       possible; the stored number is the server's own read. */
+    expect(cnr.cost).toBe(100);
+  });
+});
+
+/**
+ * SOURCE LINEAGE (closure §4; 0382).
+ *
+ * `so_refs` sat on the DOCUMENT, so a bulk purchase order printed a blank
+ * `SO NO`. Every line now carries which customer order each unit is for.
+ */
+describe("closure §4 · source lineage on every line", () => {
+  it("gives every line its customer order, SO number and order line", async () => {
+    const sb = makeSb(TABLES());
+    const demands = await readyDemands(sb);
+    sb.rpcCalls.length = 0;
+    const res = await postBatch({
+      selections: allTo(demands, KLANG),
+      documentDecisions: pricedAll(demands, KLANG),
+    });
+    expect(res.status).toBe(200);
+    const pos = sb.rpcCalls.find((c) => c.fn === "purchasing_issue_pos_batch")!.args
+      .p_pos as { lines: { sku: string; qty: number; sources: Record<string, unknown>[] }[] }[];
+    const lines = pos.flatMap((p) => p.lines);
+    expect(lines.length).toBeGreaterThan(0);
+    for (const l of lines) {
+      expect(Array.isArray(l.sources)).toBe(true);
+      expect(l.sources.length).toBeGreaterThan(0);
+      /* THE PARTS ADD UP TO THE LINE — the rule 0382 refuses in SQL. */
+      expect(l.sources.reduce((s, x) => s + Number(x.qty), 0)).toBe(l.qty);
+      for (const src of l.sources) {
+        expect(typeof src.order_id).toBe("string");
+        expect(typeof src.order_line_id).toBe("string");
+        expect(src.so === null || typeof src.so === "number").toBe(true);
+      }
+    }
+  });
+
+  it("names the real order line, so SQL can validate the lineage it is given", async () => {
+    const sb = makeSb(TABLES());
+    const demands = await readyDemands(sb);
+    sb.rpcCalls.length = 0;
+    await postBatch({
+      selections: allTo(demands, KLANG),
+      documentDecisions: pricedAll(demands, KLANG),
+    });
+    const pos = sb.rpcCalls.find((c) => c.fn === "purchasing_issue_pos_batch")!.args
+      .p_pos as { lines: { sku: string; sources: { order_id: string; order_line_id: string; so: number | null }[] }[] }[];
+    const cnr = pos.flatMap((p) => p.lines).find((l) => l.sku === "5539-CNR")!;
+    /* `p2` is the fixture's own order line for 5539-CNR on order o1 (SO-1207). */
+    expect(cnr.sources).toEqual([{ order_id: "o1", so: 1207, order_line_id: "p2", qty: 1 }]);
+  });
+
+  it("keeps the document's so_refs derived from the same lineage", async () => {
+    const sb = makeSb(TABLES());
+    const demands = await readyDemands(sb);
+    sb.rpcCalls.length = 0;
+    await postBatch({
+      selections: allTo(demands, KLANG),
+      documentDecisions: pricedAll(demands, KLANG),
+    });
+    const pos = sb.rpcCalls.find((c) => c.fn === "purchasing_issue_pos_batch")!.args
+      .p_pos as { so_refs: number[]; lines: { sources: { so: number | null }[] }[] }[];
+    for (const po of pos) {
+      const fromLines = new Set(
+        po.lines.flatMap((l) => l.sources.map((s) => s.so)).filter((v) => v != null),
+      );
+      expect(new Set(po.so_refs)).toEqual(fromLines);
+    }
+  });
+});
+
+/**
+ * ⭐ THE SPLIT THAT USED TO DOUBLE THE ORDER (closure §3 · §4).
+ *
+ * Measured 2026-08-24: the endpoint grouped allocations into documents and then
+ * asked `planFromDocuments` for each group's lines — a function that answers
+ * *what does this BUILD contain*. A demand of 3 split 2 + 1 across two
+ * destinations therefore produced two purchase orders of THREE: six units
+ * bought for a three-unit demand.
+ *
+ * The sofa fixture cannot show it (a sofa build is one unit and one place), so
+ * this fixture buys mattresses, which consolidate across customer orders.
+ */
+function MATTRESS_TABLES(): Tbl {
+  const t = TABLES();
+  t.purchasing_production_days = {
+    data: [{ supplier_id: OHANA, category: "mattress", working_days: 7 }],
+    error: null,
+  };
+  t.orders = {
+    data: [
+      {
+        id: "m1", so: 1400, customer_name: "MEI", status: "proceed_order",
+        delivery_date: "2026-09-30", delivery_date_tbd: false,
+        placed_at: "2026-07-01", created_at: "2026-07-01",
+      },
+    ],
+    error: null,
+  };
+  t.order_lines = {
+    data: [
+      {
+        id: "ml1", order_id: "m1", sku: "MAT-KING", qty: 3, attrs: null,
+        excluded_from_plan: false, exclude_from_plan_until: null,
+      },
+    ],
+    error: null,
+  };
+  t.product_skus = {
+    data: [
+      {
+        sku: "MAT-KING", supplier_id: OHANA, cost: 800, variant: "King",
+        product_models: { category: "mattress", name: "Dreamland" },
+      },
+    ],
+    error: null,
+  };
+  return t;
+}
+
+const matDocKey = (destinationId: string) =>
+  documentPartitionKey({
+    supplierId: OHANA,
+    destinationId,
+    category: "mattress",
+    /* A mattress consolidates across customer orders, so the order is not part
+       of its key — `documentPartitionKey` drops it. */
+    orderId: "m1",
+  });
+
+const matDoc = (destinationId: string) => ({
+  documentKey: matDocKey(destinationId),
+  supplierId: OHANA,
+  destinationId,
+  procurementPartnerId: null,
+  lineDecisions: [
+    {
+      sku: "MAT-KING",
+      treatment: "normal",
+      unitCost: 800,
+      costSource: "catalog",
+      expectedCatalogCost: 800,
+    },
+  ],
+});
+
+describe("closure §3 · a Deliver To split buys the demand ONCE", () => {
+  it("splits 3 into 2 + 1 and buys three units, not six", async () => {
+    const sb = makeSb(MATTRESS_TABLES());
+    const demands = await readyDemands(sb);
+    const only = demands.find((d) => d.qty === 3);
+    expect(only, "the mattress fixture must offer one build of 3").toBeTruthy();
+    sb.rpcCalls.length = 0;
+    const res = await postBatch({
+      selections: [
+        {
+          demandId: only!.demandId,
+          allocations: [
+            { destinationId: KLANG, qty: 2 },
+            { destinationId: AL, qty: 1 },
+          ],
+        },
+      ],
+      documentDecisions: [matDoc(KLANG), matDoc(AL)],
+    });
+    expect(res.status).toBe(200);
+    const pos = sb.rpcCalls.find((c) => c.fn === "purchasing_issue_pos_batch")!.args
+      .p_pos as {
+      destination_id: string;
+      lines: { sku: string; qty: number; sources: { qty: number }[] }[];
+    }[];
+    expect(pos).toHaveLength(2);
+    const byDest = new Map(pos.map((p) => [p.destination_id, p]));
+    expect(byDest.get(KLANG)!.lines[0]!.qty).toBe(2);
+    expect(byDest.get(AL)!.lines[0]!.qty).toBe(1);
+    /* ⭐ THE WHOLE POINT: three units bought for a three-unit demand. */
+    const bought = pos.flatMap((p) => p.lines).reduce((s, l) => s + l.qty, 0);
+    expect(bought).toBe(3);
+    /* And the lineage was cut with it, not copied. */
+    for (const p of pos) {
+      for (const l of p.lines) {
+        expect(l.sources.reduce((s, x) => s + x.qty, 0)).toBe(l.qty);
+      }
+    }
+  });
+
+  it("still refuses a split that does not add back to the server's own Buy", async () => {
+    const sb = makeSb(MATTRESS_TABLES());
+    const demands = await readyDemands(sb);
+    const only = demands.find((d) => d.qty === 3)!;
+    sb.rpcCalls.length = 0;
+    const res = await postBatch({
+      selections: [
+        {
+          demandId: only.demandId,
+          allocations: [
+            { destinationId: KLANG, qty: 2 },
+            { destinationId: AL, qty: 3 },
+          ],
+        },
+      ],
+      documentDecisions: [matDoc(KLANG), matDoc(AL)],
+    });
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code?: string; message?: string };
+    expect(body.code).toBe("allocation_mismatch");
+    expect(body.message).toBe("You arranged 5 units and must buy 3.");
+    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
+  });
+});
+
+/**
+ * ⭐ WHICH EXCEPTIONS A MANAGER HAS ALREADY APPROVED (closure §2).
+ *
+ * Without this read, "ask a manager to approve the price" arrives only as a
+ * refusal, after the operator has typed eleven prices — and they cannot tell
+ * "nobody has approved this yet" from "somebody already did".
+ */
+describe("GET …/to-order/cost-approvals", () => {
+  const TODAY = new Date().toISOString().slice(0, 10);
+  const YESTERDAY = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+  const SUP = "bbbbbbbb-0000-0000-0000-000000000001";
+
+  async function ask(query: string, tables?: Tbl) {
+    const t = tables ?? TABLES();
+    const sb = makeSb(t);
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`${READ}/cost-approvals${query}`, {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    return { res, sb };
+  }
+
+  it("401 without Authorization", async () => {
+    const res = await app.fetch(new Request(`${READ}/cost-approvals`), env);
+    expect(res.status).toBe(401);
+  });
+
+  it("asks for a supplier and at least one SKU, in words", async () => {
+    const { res } = await ask("");
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { code?: string; action?: string };
+    expect(body.code).toBe("invalid_param");
+    expect(body.action?.length).toBeGreaterThan(0);
+  });
+
+  it("returns the open approvals with the approver's name", async () => {
+    const t = TABLES();
+    (t as unknown as Tbl).po_cost_approvals = {
+      data: [
+        {
+          id: "a1", sku: "5539-CNR", treatment: "hand_entered", unit_cost: 250,
+          reason: "Agreed with the factory", expires_on: null,
+          approved_at: "2026-08-24T01:00:00Z", approved_by: "u1",
+        },
+      ],
+      error: null,
+    };
+    const { res } = await ask(`?supplierId=${SUP}&skus=5539-CNR`, t);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { approvals: Record<string, unknown>[] };
+    expect(body.approvals).toEqual([
+      {
+        sku: "5539-CNR",
+        treatment: "hand_entered",
+        unitCost: 250,
+        reason: "Agreed with the factory",
+        approvedBy: "On Duty",
+        expiresOn: null,
+      },
+    ]);
+  });
+
+  it("drops an EXPIRED approval — it is for a decision, not for ever", async () => {
+    const t = TABLES();
+    (t as unknown as Tbl).po_cost_approvals = {
+      data: [
+        {
+          id: "a1", sku: "5539-CNR", treatment: "free_of_charge", unit_cost: null,
+          reason: "Claim replacement", expires_on: YESTERDAY,
+          approved_at: "2026-08-01T01:00:00Z", approved_by: "u1",
+        },
+        {
+          id: "a2", sku: "5539-2A(RHF)", treatment: "free_of_charge", unit_cost: null,
+          reason: "Claim replacement", expires_on: TODAY,
+          approved_at: "2026-08-01T01:00:00Z", approved_by: "u1",
+        },
+      ],
+      error: null,
+    };
+    const { res } = await ask(`?supplierId=${SUP}&skus=5539-CNR,5539-2A(RHF)`, t);
+    const body = (await res.json()) as { approvals: { sku: string }[] };
+    /* Today's expiry still counts; yesterday's does not. */
+    expect(body.approvals.map((a) => a.sku)).toEqual(["5539-2A(RHF)"]);
+  });
+
+  it("writes nothing at all", async () => {
+    const t = TABLES();
+    (t as unknown as Tbl).po_cost_approvals = { data: [], error: null };
+    const { sb } = await ask(`?supplierId=${SUP}&skus=5539-CNR`, t);
+    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
+    expect(sb.inserts).toEqual([]);
+    expect(sb.updates).toEqual([]);
   });
 });

@@ -156,6 +156,10 @@ function makeSb(rpc: ReturnType<typeof vi.fn>) {
   } as unknown as ReturnType<typeof userClient>;
 }
 
+/** ⭐ THE PRICES THE OPERATOR REVIEWED (0380). Every issue declares them now;
+ *  there is no "let the server read Catalog" path left. */
+const REVIEWED = { "5539-2NA": 850, "5539-CNR": 400 };
+
 async function issue(body: unknown, rpc: ReturnType<typeof vi.fn>) {
   vi.mocked(userClient).mockReturnValue(makeSb(rpc));
   const jwt = await makeJwt("operation");
@@ -173,7 +177,7 @@ async function issue(body: unknown, rpc: ReturnType<typeof vi.fn>) {
 describe("POST /purchasing/requests/issue — the reason rides to the authority", () => {
   it("together: one document per supplier×category wall, carrying purpose and demand links", async () => {
     const rpc = vi.fn().mockResolvedValue({ data: { po_ids: ["PO-9001"] }, error: null });
-    const res = await issue({ requestIds: [REQ_A, REQ_B], together: true }, rpc);
+    const res = await issue({ requestIds: [REQ_A, REQ_B], together: true, expectedCosts: REVIEWED }, rpc);
     expect(res.status).toBe(200);
 
     expect(rpc).toHaveBeenCalledWith("purchasing_issue_pos_batch", expect.anything());
@@ -194,7 +198,7 @@ describe("POST /purchasing/requests/issue — the reason rides to the authority"
 
   it("declined: one document per request — the offer is an offer, not a gate", async () => {
     const rpc = vi.fn().mockResolvedValue({ data: { po_ids: ["PO-9001", "PO-9002"] }, error: null });
-    const res = await issue({ requestIds: [REQ_A, REQ_B], together: false }, rpc);
+    const res = await issue({ requestIds: [REQ_A, REQ_B], together: false, expectedCosts: REVIEWED }, rpc);
     expect(res.status).toBe(200);
     const pos = rpc.mock.calls[0][1].p_pos as Array<Record<string, unknown>>;
     expect(pos).toHaveLength(2);
@@ -208,11 +212,140 @@ describe("POST /purchasing/requests/issue — the reason rides to the authority"
     // REQ_A undecided this time.
     REQUESTS[0].approved_at = null;
     try {
-      const res = await issue({ requestIds: [REQ_A], together: false }, rpc);
+      const res = await issue({ requestIds: [REQ_A], together: false, expectedCosts: REVIEWED }, rpc);
       expect(res.status).toBe(409);
       expect(rpc).not.toHaveBeenCalled();
     } finally {
       REQUESTS[0].approved_at = "2026-08-19T03:00:00Z";
     }
+  });
+});
+
+/**
+ * ⭐ THE SAME COMMERCIAL AND ACTOR LAW ON THE MANUAL LANE
+ * (closure §1 · §2; 0379 · 0380).
+ *
+ * This lane called the creation authority with NO duty check at all, and it
+ * re-read the Catalog price itself and sent it back as `cost_source: catalog` —
+ * so the database compared its own live value against itself.
+ */
+describe("closure §2 · the manual lane declares the price it reviewed", () => {
+  it("sends the reviewed cost beside the server's own read", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: { po_ids: ["PO-9001"] }, error: null });
+    const res = await issue(
+      { requestIds: [REQ_A, REQ_B], together: true, expectedCosts: REVIEWED },
+      rpc,
+    );
+    expect(res.status).toBe(200);
+    const pos = rpc.mock.calls[0][1].p_pos as Array<Record<string, unknown>>;
+    const lines = pos[0].lines as Array<Record<string, unknown>>;
+    for (const l of lines) {
+      /* The stored number is the server's; the declaration is what makes the
+         comparison possible. Here they agree, which is the ordinary case. */
+      expect(l.expected_catalog_cost).toBe(l.cost);
+    }
+  });
+
+  it("refuses a SKU whose price was never reviewed", async () => {
+    const rpc = vi.fn();
+    const res = await issue(
+      { requestIds: [REQ_A, REQ_B], together: true, expectedCosts: { "5539-2NA": 850 } },
+      rpc,
+    );
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code?: string; message?: string; action?: string };
+    expect(body.code).toBe("expected_cost_required");
+    expect(body.message).toBe("5539-CNR has no checked transaction cost.");
+    expect(body.action?.length).toBeGreaterThan(0);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("refuses a price that moved between the review and Issue", async () => {
+    const rpc = vi.fn();
+    const res = await issue(
+      {
+        requestIds: [REQ_A, REQ_B],
+        together: true,
+        /* Catalog says 400 now; the operator looked at 380. */
+        expectedCosts: { "5539-2NA": 850, "5539-CNR": 380 },
+      },
+      rpc,
+    );
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as { code?: string; action?: string };
+    expect(body.code).toBe("supplier_price_changed");
+    expect(body.action).toBe("Go back to buying and check the new price before you issue.");
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("turns the database's duty refusal into the approved two lines", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: null,
+      error: { message: "only Current PO Duty…", details: "not_po_duty", code: "42501" },
+    });
+    const res = await issue(
+      { requestIds: [REQ_A, REQ_B], together: true, expectedCosts: REVIEWED },
+      rpc,
+    );
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { code?: string; message?: string; action?: string };
+    expect(body.code).toBe("not_po_duty");
+    expect(body.message).toBe("You do not hold PO duty today.");
+    expect(body.action?.length).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * ⭐ THE PRICES THE OPERATOR IS ABOUT TO COMMIT TO (closure §2).
+ *
+ * `Issue as one PO` pulls in sibling requests whose lines are not on screen, so
+ * the surface could not otherwise SHOW — or honestly declare — the price it was
+ * buying at.
+ */
+describe("GET /purchasing/requests/issue-costs", () => {
+  async function ask(query: string, rpc = vi.fn()) {
+    vi.mocked(userClient).mockReturnValue(makeSb(rpc));
+    const jwt = await makeJwt("operation");
+    return app.fetch(
+      new Request(
+        `https://api.test/api/operation/purchasing/requests/issue-costs${query}`,
+        { headers: { Authorization: `Bearer ${jwt}` } },
+      ),
+      env as never,
+      { waitUntil() {}, passThroughException() {} } as never,
+    );
+  }
+
+  it("401 without Authorization", async () => {
+    const res = await app.fetch(
+      new Request("https://api.test/api/operation/purchasing/requests/issue-costs"),
+      env as never,
+      { waitUntil() {}, passThroughException() {} } as never,
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it("asks for at least one request, in words", async () => {
+    const res = await ask("");
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { code?: string; action?: string };
+    expect(body.code).toBe("invalid_param");
+    expect(body.action?.length).toBeGreaterThan(0);
+  });
+
+  it("returns the catalog cost of every SKU still to buy", async () => {
+    const res = await ask(`?requestIds=${REQ_A},${REQ_B}`);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { costs: { sku: string; unitCost: number | null }[] };
+    expect(body.costs).toEqual([
+      { sku: "5539-2NA", unitCost: 850 },
+      { sku: "5539-CNR", unitCost: 400 },
+    ]);
+  });
+
+  it("writes nothing — it is a read, which is why /issue compares again", async () => {
+    const rpc = vi.fn();
+    await ask(`?requestIds=${REQ_A}`, rpc);
+    expect(rpc).not.toHaveBeenCalled();
   });
 });

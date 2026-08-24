@@ -5,6 +5,7 @@
 // around a surface whose whole point is document + work, side by side.
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  purchasingRefusal,
   SO_BATCH_PURCHASE_WORDS as W,
   type PurchasingDestination,
   type SoBatchDocument,
@@ -13,7 +14,11 @@ import { apiFetch } from "@/lib/api";
 import { fmtDate } from "@/lib/fmt-date";
 import { renderPoPdf } from "@/lib/pdf/render";
 import type { PoTemplateData } from "@/lib/pdf/types";
-import PoIssueEvidence, { type IssuedPo } from "../components/PoIssueEvidence";
+import PoIssueEvidence, {
+  doorsForIssuedPo,
+  type IssuedPo,
+  type PoSendEvidence,
+} from "../components/PoIssueEvidence";
 
 /**
  * REVIEW PURCHASE ORDERS — the guided issue journey
@@ -70,7 +75,13 @@ type WireLineDecision =
       sku: string;
       treatment: "normal";
       unitCost: number;
-      costSource: "hand_entered";
+      /**
+       * `catalog` = the operator accepted the Catalog price they were shown.
+       * `hand_entered` = they changed it, which is a commercial EXCEPTION and
+       * needs a manager's approval on file (0380).
+       */
+      costSource: "catalog" | "hand_entered";
+      /** The Catalog price this line was REVIEWED against. */
       expectedCatalogCost: number | null;
     }
   | { sku: string; treatment: "free_of_charge"; reason: string };
@@ -100,9 +111,11 @@ export default function SoBatchIssueWorkspace({
   const [at, setAt] = useState(0);
   const [mode, setMode] = useState<Mode>("review");
   const [creating, setCreating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<{ wrong: string; todo: string } | null>(null);
   const [pos, setPos] = useState<IssuedPo[]>([]);
-  const [confirmed, setConfirmed] = useState<Set<string>>(new Set());
+  /** Which documents THIS visit has confirmed — the journey's own progress, not
+   *  the evidence. The evidence is read from the server (closure §8). */
+  const [, setConfirmed] = useState<Set<string>>(new Set());
 
   /* ── THE COMMERCIAL DECISIONS ─────────────────────────────────────────────
    *
@@ -157,6 +170,85 @@ export default function SoBatchIssueWorkspace({
   const current = documents[Math.min(at, Math.max(documents.length - 1, 0))];
 
   /**
+   * WHICH EXCEPTIONS A MANAGER HAS ALREADY APPROVED (closure §2; 0380).
+   *
+   * A changed price or a Free of Charge needs an approval record PO Duty cannot
+   * write for itself. Without this read the operator meets that rule only as a
+   * refusal, after typing everything, and cannot tell "nobody has approved this
+   * yet" from "somebody already did".
+   *
+   * Keyed `supplierId::sku` because an approval is for one supplier's price.
+   */
+  const [approvals, setApprovals] = useState<
+    Record<string, { treatment: string; unitCost: number | null; approvedBy: string | null }>
+  >({});
+  useEffect(() => {
+    const bySupplier = new Map<string, Set<string>>();
+    for (const doc of documents) {
+      const set = bySupplier.get(doc.supplierId) ?? new Set<string>();
+      for (const { sku } of documentSkus(doc)) set.add(sku);
+      bySupplier.set(doc.supplierId, set);
+    }
+    let dead = false;
+    void (async () => {
+      const found: Record<
+        string,
+        { treatment: string; unitCost: number | null; approvedBy: string | null }
+      > = {};
+      for (const [supplierId, skus] of bySupplier) {
+        if (skus.size === 0) continue;
+        try {
+          const res = await apiFetch<{
+            approvals: {
+              sku: string;
+              treatment: string;
+              unitCost: number | null;
+              approvedBy: string | null;
+            }[];
+          }>(
+            `/api/operation/purchase/to-order/cost-approvals?supplierId=${encodeURIComponent(
+              supplierId,
+            )}&skus=${encodeURIComponent([...skus].join(","))}`,
+          );
+          for (const a of res.approvals ?? []) {
+            found[`${supplierId}::${a.sku}`] = {
+              treatment: a.treatment,
+              unitCost: a.unitCost,
+              approvedBy: a.approvedBy,
+            };
+          }
+        } catch {
+          /* An approval that cannot be READ is not an approval that exists.
+             The server refuses the issue either way; this only costs the
+             advance warning. */
+        }
+      }
+      if (!dead) setApprovals(found);
+    })();
+    return () => {
+      dead = true;
+    };
+  }, [documents]);
+
+  /**
+   * IS THIS EXCEPTION APPROVED? A changed price must match the approved amount;
+   * a Free of Charge only needs a Free of Charge approval.
+   */
+  const approvalFor = useCallback(
+    (doc: SoBatchDocument, sku: string, d: LineDecision, catalogCost: number | null) => {
+      const hit = approvals[`${doc.supplierId}::${sku}`];
+      if (!hit) return null;
+      if (d.treatment === "free_of_charge") {
+        return hit.treatment === "free_of_charge" ? hit : null;
+      }
+      const n = Number(d.cost);
+      if (catalogCost != null && n === catalogCost) return null; // not an exception
+      return hit.treatment === "hand_entered" && hit.unitCost === n ? hit : null;
+    },
+    [approvals],
+  );
+
+  /**
    * WHAT IS STOPPING THE WHOLE BATCH, named.
    *
    * It is computed across EVERY document, not the one on screen: the request is
@@ -165,37 +257,54 @@ export default function SoBatchIssueWorkspace({
    * first blocker wins — a list of five would be read as five problems when
    * fixing them is one pass.
    */
-  const blocker = useMemo<string | null>(() => {
+  const blocker = useMemo<{ wrong: string; todo: string } | null>(() => {
     for (const doc of documents) {
+      const supplier = doc.supplierName ?? null;
       if (doc.supplierKind === "factory_pickup" && !partners[doc.key]) {
-        return `${doc.supplierName ?? "Supplier"} → ${destinationName(
-          doc.destinationId,
-        )} needs a procurement partner`;
+        return purchasingRefusal("pickup_partner_required", { supplier });
       }
-      for (const { sku } of documentSkus(doc)) {
+      for (const { sku, catalogCost } of documentSkus(doc)) {
         const d = decisions[`${doc.key}::${sku}`];
-        if (!d) return `${sku} needs a transaction cost`;
+        if (!d) return purchasingRefusal("cost_review_required", { sku, supplier });
         if (d.treatment === "free_of_charge") {
-          if (d.reason.trim() === "") return `${sku} needs a reason for Free of Charge`;
+          if (d.reason.trim() === "") {
+            return purchasingRefusal("free_of_charge_reason_required", { sku, supplier });
+          }
+          /* ⭐ AND SOMEBODY ELSE MUST HAVE APPROVED IT (0380). Operations
+             executes the buy; it does not decide what Carres agrees to pay. */
+          if (!approvalFor(doc, sku, d, catalogCost)) {
+            return purchasingRefusal("commercial_approval_required", { sku, supplier });
+          }
           continue;
         }
         const n = Number(d.cost);
         if (d.cost.trim() === "" || !Number.isFinite(n) || n <= 0) {
-          return `${sku} needs a transaction cost`;
+          return purchasingRefusal("cost_required", { sku, supplier });
+        }
+        const changed = catalogCost == null || n !== catalogCost;
+        if (changed && !approvalFor(doc, sku, d, catalogCost)) {
+          return purchasingRefusal("commercial_approval_required", { sku, supplier });
         }
       }
     }
     return null;
-  }, [documents, decisions, partners, destinationName]);
+  }, [documents, decisions, partners, approvalFor]);
 
   /**
    * The decisions, on the wire.
    *
-   * An UNTOUCHED Catalog price is deliberately omitted: the server re-reads its
-   * own catalog and stamps it. Sending it back as `costSource: "catalog"` would
-   * only give the server a number to disagree with — which is exactly what
-   * `stale_catalog_cost` is for, and there is no reason to invite it when
-   * nobody edited anything.
+   * ⭐ EVERY LINE IS DECLARED, INCLUDING AN UNTOUCHED CATALOG PRICE
+   * (Card closure §2; 0380).
+   *
+   * An untouched price used to be OMITTED, on the reasoning that the server
+   * would re-read its own catalog and stamp it. That was the defect: the server
+   * then compared the live value against itself and agreed every time, so a
+   * supplier price that moved between the review and `Issue PO` was adopted with
+   * nobody's approval and nobody's knowledge.
+   *
+   * What the operator SAW now travels with the line. The number that is STORED
+   * is still the server's own read — the declaration is only what makes the
+   * comparison possible at all.
    */
   const documentDecisions = useMemo(
     () =>
@@ -216,14 +325,25 @@ export default function SoBatchIssueWorkspace({
             return [{ sku, treatment: "free_of_charge" as const, reason: d.reason.trim() }];
           }
           const n = Number(d.cost);
-          if (catalogCost != null && n === catalogCost) return [];
+          if (!Number.isFinite(n) || n <= 0) return [];
+          /* UNCHANGED — the operator accepted the price they were shown. */
+          if (catalogCost != null && n === catalogCost) {
+            return [
+              {
+                sku,
+                treatment: "normal" as const,
+                costSource: "catalog" as const,
+                unitCost: n,
+                expectedCatalogCost: catalogCost,
+              },
+            ];
+          }
+          /* CHANGED — theirs now, and an exception a manager must approve. */
           return [
             {
               sku,
               treatment: "normal" as const,
               unitCost: n,
-              /* Hand-entered even when it started as the catalog price: the
-                 operator changed it, so it is theirs now. */
               costSource: "hand_entered" as const,
               /* The catalog price this was reviewed against, so the server can
                  tell "the operator agreed a different price" from "the supplier
@@ -272,15 +392,49 @@ export default function SoBatchIssueWorkspace({
     } catch (e) {
       /* The request is atomic, so a failure created NOTHING. The operator stays
          exactly where they were, with the selection intact, and can fix the
-         line the server named. */
-      setError(e instanceof Error ? e.message : "Issue PO failed");
+         line the server named — in the approved two lines (closure §9), never
+         as a code or a raw database sentence. */
+      const body = (e as { body?: { message?: string; action?: string; code?: string; sku?: string } })
+        .body;
+      const fallback = purchasingRefusal(body?.code, { sku: body?.sku ?? null });
+      setError({
+        wrong: body?.message ?? fallback.wrong,
+        todo: body?.action ?? fallback.todo,
+      });
     } finally {
       setCreating(false);
     }
   }
 
+  /**
+   * ⭐ THE PERSISTED EVIDENCE, READ BACK (closure §8).
+   *
+   * This surface used to hand the evidence panel a row it had MADE UP after a
+   * successful confirmation — right version, invented channel, no recipient, no
+   * actor, no time from the server. It read as evidence and was a memory. A
+   * reload showed nothing at all.
+   *
+   * `po_sends` is now read for the document on screen and re-read after each
+   * confirmation, so what the operator sees is what a second operator, a
+   * reload and the audit trail see.
+   */
+  const [evidence, setEvidence] = useState<Record<string, PoSendEvidence[]>>({});
+  const loadEvidence = useCallback(async (poId: string) => {
+    try {
+      const res = await apiFetch<{ sends: PoSendEvidence[] }>(
+        `/api/operation/pos/${encodeURIComponent(poId)}/sends`,
+      );
+      setEvidence((prev) => ({ ...prev, [poId]: res.sends ?? [] }));
+    } catch {
+      /* Unreadable history is not history that says something else. The panel
+         shows none, the act stays open, and SQL refuses a second confirmation
+         of the same version anyway. */
+    }
+  }, []);
+
   const onConfirmed = useCallback(
     (poId: string) => {
+      void loadEvidence(poId);
       setConfirmed((prev) => {
         const next = new Set(prev).add(poId);
         if (next.size >= pos.length && pos.length > 0) onDone();
@@ -292,30 +446,19 @@ export default function SoBatchIssueWorkspace({
         return next;
       });
     },
-    [pos, onDone],
+    [pos, onDone, loadEvidence],
   );
 
   const total = mode === "evidence" ? pos.length : documents.length;
   const idx = Math.min(at, Math.max(total - 1, 0));
   const currentPo = mode === "evidence" ? pos[idx] : undefined;
 
-  /* A document this session has just confirmed. The Register refetches on the
-     way out, so the authoritative history arrives with it; this is only what
-     keeps the surface honest between the confirmation and that refetch. */
-  const confirmedEvidence = useCallback(
-    (v: number) => [
-      {
-        channel: "whatsapp",
-        sent_at: new Date().toISOString(),
-        kind: "confirmed_sent" as const,
-        recipient: null,
-        po_version: v,
-      },
-    ],
-    [],
-  );
-
   const currentPoId = currentPo?.id ?? null;
+  /* The document on screen brings its own history with it. */
+  useEffect(() => {
+    if (!currentPoId) return;
+    void loadEvidence(currentPoId);
+  }, [currentPoId, loadEvidence]);
   useEffect(() => {
     if (!currentPoId) return;
     let dead = false;
@@ -348,14 +491,21 @@ export default function SoBatchIssueWorkspace({
       className="flex h-full min-h-0 w-full flex-1 flex-col bg-kit-canvas"
       data-testid="so-batch-issue-workspace"
     >
+      {/* The 50px destination header keeps its height at every width. Walked at
+          375px on 2026-08-24: the title WRAPPED and its second line was cut off
+          by the fixed row. A long name now truncates — the row is the law, and a
+          clipped word is worse than a shortened one. */}
       <div className="flex h-[50px] shrink-0 items-center justify-between gap-3 border-b border-kit-slate-5 bg-white px-4">
-        <span className="flex items-baseline gap-3">
-          <span className="text-page font-semibold">{W.reviewTitle}</span>
-          <span className="text-meta text-kit-slate-11" data-testid="so-batch-issue-count">
+        <span className="flex min-w-0 items-baseline gap-3">
+          <span className="truncate text-page font-semibold">{W.reviewTitle}</span>
+          <span
+            className="shrink-0 whitespace-nowrap text-meta text-kit-slate-11"
+            data-testid="so-batch-issue-count"
+          >
             {idx + 1} of {total}
           </span>
         </span>
-        <span className="flex items-center gap-2">
+        <span className="flex shrink-0 items-center gap-2">
           {total > 1 ? (
             <>
               <button
@@ -381,13 +531,31 @@ export default function SoBatchIssueWorkspace({
         </span>
       </div>
 
+      {/* ⭐ 50 / 50 AT 1130px AND WIDER; STACKED BELOW IT (closure §10).
+          The split was unconditional, so on a narrower window each half got
+          under 565px and the PDF page became unreadable while the decision
+          controls clipped. Below the breakpoint the work comes FIRST and the
+          document follows it, because the operator's next act is on the left
+          and a page they cannot read is not worth the top half.
+
+          Stacked it is a flex COLUMN, not a one-column grid: walked at 1129px,
+          a grid compressed the work row and clipped every control in it. A flex
+          column with `shrink-0` panes is as tall as its content and scrolls. */}
       <div
-        className="grid min-h-0 flex-1 grid-cols-2 overflow-hidden"
+        className="flex min-h-0 flex-1 flex-col overflow-y-auto min-[1130px]:grid min-[1130px]:grid-cols-2 min-[1130px]:overflow-hidden"
         data-testid="so-batch-issue-split"
       >
         {/* ── 50% · the only editable side ──────────────────────────────── */}
         <div
-          className="flex min-h-0 flex-col overflow-y-auto border-r border-kit-slate-5 bg-white p-4"
+          /* ⭐ `shrink-0` UNTIL THE BREAKPOINT, and that is not cosmetic.
+             Walked at 1129px on 2026-08-24: a two-row GRID compressed this pane
+             to 208px and CLIPPED it — the Transaction Cost block, the blocker
+             and both buttons were cut off with no scrollbar, because the row
+             reported that it fitted. Stacked, the surface is a flex COLUMN and
+             this pane is as tall as its content; the split scrolls. Side by side
+             it is a grid item and `min-h-0` again, so the pane scrolls inside a
+             fixed split. */
+          className="flex shrink-0 flex-col border-b border-kit-slate-5 bg-white p-4 min-[1130px]:min-h-0 min-[1130px]:shrink min-[1130px]:overflow-y-auto min-[1130px]:border-b-0 min-[1130px]:border-r"
           data-testid="so-batch-issue-work"
         >
           {mode === "review" && current ? (
@@ -443,6 +611,20 @@ export default function SoBatchIssueWorkspace({
                   const key = `${current.key}::${sku}`;
                   const d = decisions[key] ?? { treatment: "normal" as const, cost: "" };
                   const foc = d.treatment === "free_of_charge";
+                  /* ⭐ IS THIS AN EXCEPTION, AND HAS A MANAGER APPROVED IT?
+                     (0380). Answered here, before Issue PO, because "ask a
+                     manager" is work somebody has to start — meeting it only as
+                     a refusal after typing eleven prices is the same rule
+                     delivered too late. */
+                  const changed =
+                    !foc &&
+                    d.treatment === "normal" &&
+                    d.cost.trim() !== "" &&
+                    (catalogCost == null || Number(d.cost) !== catalogCost);
+                  const isException = foc || changed;
+                  const approved = isException
+                    ? approvalFor(current, sku, d, catalogCost)
+                    : null;
                   return (
                     <div key={sku} className="flex flex-col gap-1">
                       <div className="flex items-center justify-between gap-3">
@@ -494,6 +676,31 @@ export default function SoBatchIssueWorkspace({
                           }
                         />
                       ) : null}
+                      {isException ? (
+                        approved ? (
+                          <span
+                            className="text-meta text-kit-green-11"
+                            data-testid={`so-batch-approved-${sku}`}
+                          >
+                            {approved.approvedBy
+                              ? `${approved.approvedBy} approved this price.`
+                              : "A manager approved this price."}
+                          </span>
+                        ) : (
+                          <span
+                            className="flex flex-col"
+                            data-testid={`so-batch-needs-approval-${sku}`}
+                          >
+                            <span className="text-meta text-kit-slate-12">
+                              This is not the Catalog price.
+                            </span>
+                            <span className="text-meta text-kit-slate-11">
+                              Ask a manager to approve this price for{" "}
+                              {current.supplierName ?? "this supplier"}.
+                            </span>
+                          </span>
+                        )
+                      ) : null}
                     </div>
                   );
                 })}
@@ -525,18 +732,23 @@ export default function SoBatchIssueWorkspace({
                 ) : null}
               </div>
 
+              {/* ⭐ FAIL CLOSED, AND SAY WHAT TO DO (closure §9). LINE 1 is the
+                  fact, LINE 2 the act — never `Needs attention`, never a code,
+                  and never a Postgres sentence. */}
               {blocker ? (
-                <p
-                  className="mt-3 text-meta text-kit-slate-11"
+                <span
+                  className="mt-3 flex flex-col"
                   data-testid="so-batch-issue-blocker"
                 >
-                  {blocker}
-                </p>
+                  <span className="text-meta text-kit-slate-12">{blocker.wrong}</span>
+                  <span className="text-meta text-kit-slate-11">{blocker.todo}</span>
+                </span>
               ) : null}
               {error ? (
-                <p className="mt-3 text-meta text-kit-red-11" data-testid="so-batch-issue-error">
-                  {error}
-                </p>
+                <span className="mt-3 flex flex-col" data-testid="so-batch-issue-error">
+                  <span className="text-meta text-kit-red-11">{error.wrong}</span>
+                  <span className="text-meta text-kit-slate-11">{error.todo}</span>
+                </span>
               ) : null}
               <div className="mt-auto flex items-center justify-between gap-3 pt-4">
                 <button
@@ -566,7 +778,17 @@ export default function SoBatchIssueWorkspace({
               <PoIssueEvidence
                 po={currentPo}
                 version={pdfVersion}
-                evidence={confirmed.has(currentPo.id) ? confirmedEvidence(pdfVersion) : []}
+                /* PERSISTED rows, never this tab's memory (closure §8). */
+                evidence={evidence[currentPo.id] ?? []}
+                /* The supplier's real group and address, from the issue
+                   response — the ONE communication area asks for them. */
+                doors={doorsForIssuedPo(currentPo)}
+                onOpened={() => {
+                  /* An OPEN is history. SO Batch Purchase does not write it:
+                     `purchasing_record_send` belongs to the Purchase Order
+                     object, and a second writer of the same row is a second
+                     truth about the same document. */
+                }}
                 onConfirmed={() => onConfirmed(currentPo.id)}
               />
             ) : (
@@ -579,7 +801,9 @@ export default function SoBatchIssueWorkspace({
 
         {/* ── 50% · the document itself ─────────────────────────────────── */}
         <div
-          className="flex min-h-0 flex-col overflow-y-auto bg-kit-canvas p-4"
+          /* Stacked, the document keeps a readable height rather than
+             collapsing to the height of an iframe nobody can read. */
+          className="flex min-h-[70vh] shrink-0 flex-col bg-kit-canvas p-4 min-[1130px]:min-h-0 min-[1130px]:shrink min-[1130px]:overflow-y-auto"
           data-testid="so-batch-issue-preview"
         >
           {mode === "review" ? (

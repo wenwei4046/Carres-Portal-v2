@@ -284,6 +284,30 @@ function makeSb(tables: Record<string, { data: unknown; error: unknown }>) {
   });
   const rpc = vi.fn(async (fn: string) => {
     rpcCalls.push(fn);
+    /* 0379 · the ONE actor resolver, answered from the same two tables SQL
+       reads, so a test still says who holds the duty with `ops_po_duty` and who
+       covers it with `ops_po_duty_cover`. */
+    if (fn === "purchasing_po_actor") {
+      const dutyData = tables.ops_po_duty?.data as
+        | { user_id?: string }[]
+        | { user_id?: string }
+        | null;
+      const normal =
+        (Array.isArray(dutyData) ? dutyData[0]?.user_id : dutyData?.user_id) ?? null;
+      const coverData = tables.ops_po_duty_cover?.data as
+        | { acting_user_id?: string }[]
+        | null;
+      const acting = (Array.isArray(coverData) ? coverData[0]?.acting_user_id : null) ?? null;
+      return {
+        data: {
+          normal_user_id: normal,
+          acting_user_id: acting,
+          actor_user_id: acting ?? normal,
+          is_cover: acting != null,
+        },
+        error: null,
+      };
+    }
     return { data: null, error: null };
   });
   return { from, rpc, writes, filters, rpcCalls };
@@ -525,7 +549,10 @@ describe("the guard, and the promise not to write", () => {
   it("reads the Register without a single write", async () => {
     const { sb } = await rowsOf();
     expect(sb.writes).toEqual([]);
-    expect(sb.rpcCalls).toEqual([]);
+    /* `purchasing_po_actor` is `stable` and writes nothing — it is a READ that
+       happens to be a function, because the duty and cover answer is one rule
+       and not two table joins repeated on four surfaces (0379). */
+    expect(sb.rpcCalls).toEqual(["purchasing_po_actor"]);
   });
 });
 
@@ -690,5 +717,54 @@ describe("SO demand only — Manual Purchase never leaks in", () => {
       // Every row traces to a real customer order in the fixture.
       expect(["o1", "o2", "o3", "o4"], r.id).toContain(r.orderId);
     }
+  });
+});
+
+/**
+ * ⭐ THE REGISTER ASKS THE SAME ACTOR RESOLVER AS THE DOOR
+ * (closure §1; 0379).
+ *
+ * A covering operator used to be shown a page with no `Issue PO` on it while
+ * the door would have let them through — the Register read `ops_po_duty` and
+ * knew nothing about cover.
+ */
+describe("closure §1 · the Register offers the act to whoever may act today", () => {
+  it("offers Issue PO to the authorised cover, and names the holder it covers", async () => {
+    const t = TABLES() as unknown as Record<string, { data: unknown; error: unknown }>;
+    t.ops_po_duty = { data: [{ user_id: PO_HOLDER }], error: null };
+    t.ops_po_duty_cover = {
+      data: [{ normal_user_id: PO_HOLDER, acting_user_id: "u1" }],
+      error: null,
+    };
+    t.app_users = {
+      data: [
+        ...((t.app_users?.data as { id: string; name: string; email: string }[]) ?? []),
+        { id: "u1", name: "Shasha", email: "ss@carres.com" },
+      ],
+      error: null,
+    };
+    const { body } = await rowsOf(t);
+    expect(body.mayIssue).toBe(true);
+    /* BOTH people, separately. Team Work groups by the holder; the audit says
+       who acted. Collapsing them would lose one for good. */
+    expect(body.currentPoDuty?.userId).toBe(PO_HOLDER);
+    expect(body.actingPoDuty).toEqual({ userId: "u1", name: "Shasha" });
+  });
+
+  it("does not offer it to an Operations login who is neither", async () => {
+    const t = TABLES() as unknown as Tbl;
+    t.ops_po_duty = { data: [{ user_id: PO_HOLDER }], error: null };
+    const { body } = await rowsOf(t);
+    expect(body.mayIssue).toBe(false);
+    expect(body.actingPoDuty).toBeNull();
+  });
+
+  it("offers it to nobody when the month has no holder and no cover", async () => {
+    const t = TABLES() as unknown as Tbl;
+    t.ops_po_duty = { data: [], error: null };
+    const { body } = await rowsOf(t);
+    expect(body.mayIssue).toBe(false);
+    expect(body.currentPoDuty).toBeNull();
+    expect(body.actingPoDuty).toBeNull();
   });
 });

@@ -111,6 +111,9 @@ function data(over: Partial<SoBatchPurchaseResponse> = {}): SoBatchPurchaseRespo
     ],
     defaultDestinationId: KLANG,
     currentPoDuty: { userId: "u1", name: "Yee Jean" },
+    /* 0379 — a dated buddy cover, when one is open. Nobody is covering by
+       default; the tests that care set it. */
+    actingPoDuty: null,
     mayIssue: true,
     procurementPartners: [],
     ...over,

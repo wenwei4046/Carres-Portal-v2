@@ -1,6 +1,9 @@
 import { useMemo, useState } from "react";
+import { purchasingRefusal } from "@carres/shared";
 import { apiFetch } from "@/lib/api";
 import { fmtDate } from "@/lib/fmt-date";
+import { renderPoPdf } from "@/lib/pdf/render";
+import type { PoTemplateData } from "@/lib/pdf/types";
 
 /**
  * WHAT ACTUALLY REACHED THE SUPPLIER
@@ -34,6 +37,15 @@ import { fmtDate } from "@/lib/fmt-date";
  * from it — a `confirmed_sent` row FOR THE CURRENT VERSION — so a page reload,
  * a second operator and a revision all agree. Local state is only what the
  * operator is typing right now.
+ *
+ * ── AND IT IS THE ONE COMMUNICATION AREA (closure §7) ───────────────────────
+ *
+ * The Purchase Order page used to carry its own `Copy message`, `Open WhatsApp
+ * group` and `Open email` beside this component, so one document had two sets of
+ * send controls and two accounts of what had happened to it. The supplier's real
+ * doors — the saved group link, the email address, the drafted message — are
+ * PASSED IN and rendered here, once. A surface with no doors on file says so
+ * instead of offering a button that opens nothing.
  */
 export interface IssuedPo {
   id: string;
@@ -41,6 +53,38 @@ export interface IssuedPo {
   supplierName: string | null;
   destinationId: string;
   destination: string | null;
+  /** The supplier's own doors, as `issue-batch` returns them (closure §7). */
+  whatsappGroupUrl?: string | null;
+  contactEmail?: string | null;
+  contact?: string | null;
+}
+
+/**
+ * THE SUPPLIER'S DOORS, RESOLVED FROM WHAT IS ON FILE.
+ *
+ * `docs/COPY-STANDARD.md` (Loo, 2026-07-28) gives the WhatsApp control two
+ * labels, not one: `Open WhatsApp group` for a saved group link and
+ * `Open WhatsApp` for a `wa.me/` chat with one named party. The word follows the
+ * BEHAVIOUR — a label naming a door the click does not open is worse than a
+ * vague one, because the operator learns to stop reading it.
+ */
+export function doorsForIssuedPo(po: IssuedPo, message?: string | null): PoOutboundDoors {
+  const group = po.whatsappGroupUrl ?? null;
+  const digits = (po.contact ?? "").replace(/\D/g, "");
+  return {
+    whatsapp: group
+      ? { url: group, isGroup: true }
+      : digits
+        ? { url: `https://wa.me/${digits}`, isGroup: false }
+        : null,
+    mailto: po.contactEmail
+      ? `mailto:${encodeURIComponent(po.contactEmail)}?subject=${encodeURIComponent(
+          `${po.id} — Carres Purchase Order`,
+        )}`
+      : null,
+    message: message ?? null,
+    supplierName: po.supplierName,
+  };
 }
 
 export type SendChannel = "whatsapp" | "email" | "print";
@@ -54,6 +98,15 @@ export interface PoSendEvidence {
   recipient?: string | null;
   po_version?: number | null;
   sent_by?: string | null;
+  /**
+   * ⭐ WHO (0379; closure §8). Three separate facts: who actually pressed it,
+   * who holds PO duty for the month, and the authorised cover when one acted.
+   * `Team Work` groups by the holder; the audit must name the actor. A UUID is
+   * not an actor, so the API resolves the names.
+   */
+  sent_by_name?: string | null;
+  duty_name?: string | null;
+  acting_name?: string | null;
 }
 
 const CHANNEL_WORD: Record<string, string> = {
@@ -79,10 +132,27 @@ export function confirmedSendFor(
   );
 }
 
+/**
+ * The supplier's real doors out of the Portal. They are facts about the
+ * supplier, so they are resolved by whoever knows the supplier and handed here
+ * — this component owns the LAW, not the address book.
+ */
+export interface PoOutboundDoors {
+  /** The saved group link, or a `wa.me/` chat with one named party. */
+  whatsapp?: { url: string; isGroup: boolean } | null;
+  /** A `mailto:` with the subject and body already filled. */
+  mailto?: string | null;
+  /** The drafted supplier message, when the caller has one to copy. */
+  message?: string | null;
+  supplierName?: string | null;
+}
+
 export default function PoIssueEvidence({
   po,
   version,
   evidence = [],
+  doors,
+  onOpened,
   onConfirmed,
 }: {
   po: IssuedPo;
@@ -90,6 +160,10 @@ export default function PoIssueEvidence({
   version: number;
   /** Persisted `po_sends` history for this PO, newest first. */
   evidence?: readonly PoSendEvidence[];
+  /** The supplier's own doors; absent means none are on file. */
+  doors?: PoOutboundDoors;
+  /** An external app was OPENED. It records history and completes nothing. */
+  onOpened?: (channel: "whatsapp" | "email") => void;
   onConfirmed: () => void;
 }) {
   const [channel, setChannel] = useState<SendChannel>("whatsapp");
@@ -97,6 +171,8 @@ export default function PoIssueEvidence({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [action, setAction] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [downloading, setDownloading] = useState(false);
 
   const supplier = po.supplierName ?? "the supplier";
   const confirmed = useMemo(
@@ -110,6 +186,58 @@ export default function PoIssueEvidence({
     [evidence, confirmed],
   );
   const ready = recipient.trim().length > 0 && !saving && !confirmed;
+  const wa = doors?.whatsapp ?? null;
+
+  async function copyMessage() {
+    if (!doors?.message) return;
+    try {
+      await navigator.clipboard.writeText(doors.message);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    } catch {
+      /* The clipboard refused. The draft is still selectable where it is
+         written, so nothing is lost and nothing is claimed. */
+    }
+  }
+
+  /**
+   * RENDER THE DOCUMENT AND HAND IT OVER.
+   *
+   * `renderPoPdf` is the same template the printed paper uses, over the same
+   * money-free payload, so the file the operator forwards is byte-for-byte the
+   * one the supplier is meant to receive. It still records NOTHING: taking a
+   * copy of a document is not sending it.
+   */
+  async function downloadPdf() {
+    if (downloading) return;
+    setDownloading(true);
+    setError(null);
+    setAction(null);
+    let url: string | null = null;
+    try {
+      const data = await apiFetch<PoTemplateData>(
+        `/api/operation/pos/${encodeURIComponent(po.id)}/print-data`,
+      );
+      const blob = await renderPoPdf(data);
+      url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${po.id}.pdf`;
+      a.rel = "noopener";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } catch (e) {
+      const body = (e as { body?: { message?: string; action?: string; code?: string } }).body;
+      const fallback = purchasingRefusal(body?.code, { po: po.id, supplier: po.supplierName });
+      setError(body?.message ?? fallback.wrong);
+      setAction(body?.action ?? fallback.todo);
+    } finally {
+      /* An un-revoked object URL holds the whole PDF for the tab's life. */
+      if (url) setTimeout(() => URL.revokeObjectURL(url!), 30_000);
+      setDownloading(false);
+    }
+  }
 
   async function confirm() {
     if (!ready) return;
@@ -123,9 +251,17 @@ export default function PoIssueEvidence({
       });
       onConfirmed();
     } catch (e) {
-      const body = (e as { body?: { message?: string; action?: string } }).body;
-      setError(body?.message ?? (e instanceof Error ? e.message : "Could not record the send"));
-      setAction(body?.action ?? null);
+      /* ⭐ THE TWO LINES, WHEREVER THEY COME FROM (closure §9). The API sends
+         them; a refusal that arrives with only a code is turned into the same
+         words here rather than shown as a code. */
+      const body = (e as { body?: { message?: string; action?: string; code?: string } }).body;
+      const fallback = purchasingRefusal(body?.code, {
+        po: po.id,
+        supplier: po.supplierName,
+        version,
+      });
+      setError(body?.message ?? fallback.wrong);
+      setAction(body?.action ?? fallback.todo);
     } finally {
       setSaving(false);
     }
@@ -140,39 +276,81 @@ export default function PoIssueEvidence({
       </h2>
       <p className="mt-0.5 text-meta text-kit-slate-11">
         {confirmed
-          ? `Recorded as sent by ${CHANNEL_WORD[confirmed.channel] ?? confirmed.channel}${
+          ? `${CHANNEL_WORD[confirmed.channel] ?? confirmed.channel}${
               confirmed.recipient ? ` to ${confirmed.recipient}` : ""
+            }${confirmed.sent_by_name ? ` by ${confirmed.sent_by_name}` : ""}${
+              confirmed.acting_name && confirmed.acting_name !== confirmed.sent_by_name
+                ? ` (covering ${confirmed.duty_name ?? "PO duty"})`
+                : ""
             } · ${fmtDate(confirmed.sent_at, { time: true })}`
           : `Open the ${CHANNEL_WORD[channel]} group and send this PDF`}
       </p>
 
-      {/* THE TOOLS. They open things. They record nothing. */}
-      <div className="mt-3 flex flex-wrap gap-2">
+      {/* ── THE ONE COMMUNICATION AREA (closure §7) ─────────────────────
+          Every door out of the Portal for this document lives here. They OPEN
+          things; they record nothing and they complete nothing. */}
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        {wa ? (
+          <a
+            data-testid="po-open-whatsapp"
+            className="inline-flex h-7 items-center rounded-control border border-kit-slate-6 px-2.5 text-meta font-medium"
+            href={wa.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => onOpened?.("whatsapp")}
+          >
+            {wa.isGroup ? "Open WhatsApp group" : "Open WhatsApp"}
+          </a>
+        ) : (
+          /* A button that opens nothing teaches the operator to stop reading
+             the labels. The gap is named instead. */
+          <span className="text-meta text-kit-slate-11" data-testid="po-no-whatsapp">
+            No WhatsApp on file for {supplier}
+          </span>
+        )}
+        {doors?.mailto ? (
+          <a
+            data-testid="po-open-email"
+            className="inline-flex h-7 items-center rounded-control border border-kit-slate-6 px-2.5 text-meta font-medium"
+            href={doors.mailto}
+            onClick={() => onOpened?.("email")}
+          >
+            Open email
+          </a>
+        ) : (
+          <span className="text-meta text-kit-slate-11" data-testid="po-no-email">
+            No email on file for {supplier}
+          </span>
+        )}
+        {doors?.message ? (
+          <button
+            type="button"
+            data-testid="po-copy-message"
+            className="h-7 rounded-control border border-kit-slate-6 px-2.5 text-meta"
+            onClick={() => void copyMessage()}
+          >
+            Copy message
+          </button>
+        ) : null}
+        {/* ⭐ A REAL PDF, NOT THE PAYLOAD BEHIND IT (closure §6). This link used
+            to point at `/print-data`, so `Download PDF` handed the operator —
+            and any supplier they forwarded it to — a JSON response. The same
+            template the paper uses is rendered here and the file that lands is
+            the document. */}
         <button
           type="button"
-          data-testid="so-batch-evidence-whatsapp"
-          className="h-7 rounded-control border border-kit-slate-6 px-2.5 text-meta"
-          onClick={() => window.open("https://web.whatsapp.com", "_blank", "noopener")}
-        >
-          Open WhatsApp group
-        </button>
-        <button
-          type="button"
-          data-testid="so-batch-evidence-email"
-          className="h-7 rounded-control border border-kit-slate-6 px-2.5 text-meta"
-          onClick={() => window.open("mailto:", "_blank", "noopener")}
-        >
-          Open email
-        </button>
-        <a
           data-testid="so-batch-evidence-download"
-          className="inline-flex h-7 items-center rounded-control border border-kit-slate-6 px-2.5 text-meta"
-          href={`/api/operation/pos/${encodeURIComponent(po.id)}/print-data`}
-          target="_blank"
-          rel="noreferrer"
+          className="h-7 rounded-control border border-kit-slate-6 px-2.5 text-meta disabled:opacity-40"
+          disabled={downloading}
+          onClick={() => void downloadPdf()}
         >
-          Download PDF
-        </a>
+          {downloading ? "Opening PDF…" : "Download PDF"}
+        </button>
+        {copied ? (
+          <span className="text-meta font-medium text-kit-green-11" data-testid="po-copied">
+            Copied
+          </span>
+        ) : null}
       </div>
 
       {/* THE ACT. */}
@@ -232,11 +410,17 @@ export default function PoIssueEvidence({
           </span>
           {history.map((e, i) => (
             <span key={`${e.sent_at}-${i}`} className="text-meta text-kit-slate-11">
+              {/* ⭐ A CONFIRMED SEND OF AN EARLIER VERSION STAYS HISTORY.
+                  It names its own version, so an old send can never be read as
+                  proof that the current document reached the supplier — which
+                  is the whole point of a revision (0378; closure §8). */}
               {e.kind === "confirmed_sent"
                 ? `Version ${e.po_version ?? "?"} sent to ${e.recipient ?? "supplier"} by ${
                     CHANNEL_WORD[e.channel] ?? e.channel
-                  }`
-                : `${CHANNEL_WORD[e.channel] ?? e.channel} opened`}
+                  }${e.sent_by_name ? ` · ${e.sent_by_name}` : ""}`
+                : `${CHANNEL_WORD[e.channel] ?? e.channel} opened${
+                    e.sent_by_name ? ` · ${e.sent_by_name}` : ""
+                  }`}
               {" · "}
               {fmtDate(e.sent_at, { time: true })}
             </span>

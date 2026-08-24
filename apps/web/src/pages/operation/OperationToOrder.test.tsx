@@ -90,6 +90,8 @@ function payload(over: Partial<SoBatchPurchaseResponse> = {}): SoBatchPurchaseRe
     destinations: [{ id: KLANG, name: "Carres Klang", isDefault: true, active: true }],
     defaultDestinationId: KLANG,
     currentPoDuty: { userId: "u1", name: "Yee Jean" },
+    /* 0379 — nobody is covering by default. */
+    actingPoDuty: null,
     mayIssue: true,
     procurementPartners: [{ id: "p-nets", name: "NETS" }],
     ...over,

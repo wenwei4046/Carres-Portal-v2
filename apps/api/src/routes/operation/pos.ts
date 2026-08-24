@@ -355,17 +355,53 @@ operationPosRouter.get("/", requireOperation, async (c) => {
          detail page has to be able to tell them apart. `kind`, `recipient` and
          `po_version` ride with the row so the evidence surface reads persisted
          truth rather than whatever it happens to remember. */
-      .select("po_id, channel, note, sent_at, kind, recipient, po_version, sent_by, po_revisions(rev_no)")
+      /* 0379 — and WHO. `sent_by` is the person who pressed it, `duty_user_id`
+         the month's holder and `acting_user_id` the authorised cover when one
+         acted. Three facts, because `Team Work` groups by the holder while the
+         audit trail must name the actor. */
+      .select(
+        "po_id, channel, note, sent_at, kind, recipient, po_version, sent_by, duty_user_id, acting_user_id, po_revisions(rev_no)",
+      )
       .in("po_id", poIds)
       .order("sent_at", { ascending: false });
     if (sendErr) {
       const m = mapPgError(sendErr);
       return c.json(m.body, m.status);
     }
+    /* A UUID IS NOT AN ACTOR. The evidence has to be readable by a human
+       checking later who sent what, so the names are resolved here rather than
+       printed as an id (closure §8). */
+    const actorIds = [
+      ...new Set(
+        (sendRows ?? [])
+          .flatMap((r) => {
+            const row = r as Record<string, unknown>;
+            return [row.sent_by, row.duty_user_id, row.acting_user_id];
+          })
+          .filter((v): v is string => typeof v === "string" && v.length > 0),
+      ),
+    ];
+    const actorName = new Map<string, string>();
+    if (actorIds.length > 0) {
+      const { data: people } = await sb
+        .from("app_users")
+        .select("id, name, email")
+        .in("id", actorIds);
+      for (const u of (people ?? []) as Record<string, unknown>[]) {
+        const label =
+          ((u.name as string | null) ?? "").trim() || ((u.email as string | null) ?? "");
+        if (label) actorName.set(u.id as string, label);
+      }
+    }
     for (const r of sendRows ?? []) {
       const row = r as Record<string, unknown>;
       const arr = sendsByPo.get(row.po_id as string) ?? [];
-      arr.push(row);
+      arr.push({
+        ...row,
+        sent_by_name: actorName.get(row.sent_by as string) ?? null,
+        duty_name: actorName.get(row.duty_user_id as string) ?? null,
+        acting_name: actorName.get(row.acting_user_id as string) ?? null,
+      });
       sendsByPo.set(row.po_id as string, arr);
     }
   }
@@ -938,10 +974,17 @@ operationPosRouter.get("/:id/units", requireOperation, async (c) => {
   return c.json({ units: data ?? [] });
 });
 
-// The route adds two facts the document layer needs and the RPC does not
-// carry: `so_refs` (the Sales Order column — per-line attribution does not
-// exist in the schema, so the template prints the SO only when the PO covers
-// exactly one) and `issued_by` (null until the portal records an issuer).
+// ⭐ THE ROUTE ADDS NOTHING (0383; Card closure §7).
+//
+// It used to add two facts and both were wrong. `so_refs` was re-read here
+// because per-line attribution did not exist in the schema — 0382 gave it one,
+// so the document now carries which customer order each unit is for and the
+// `SO NO` column is fed from that instead of printing blank on every bulk PO.
+// `issued_by` was hard-coded `null`, which erased the issuer the creation helper
+// had already written to `audit_log`.
+//
+// `purchasing_po_document` is the document authority. A route that overwrites
+// its answer is a second truth about the same paper.
 // 2026-05-12 (Loo): browser renders @react-pdf locally (Workers WASM ban —
 // see render.ts note in apps/web/src/lib/pdf/).
 operationPosRouter.get("/:id/print-data", requireOperation, async (c) => {
@@ -975,24 +1018,7 @@ operationPosRouter.get("/:id/print-data", requireOperation, async (c) => {
     return c.json(m.body, m.status);
   }
 
-  const { data: po, error: e2 } = await sb
-    .from("purchase_orders")
-    .select("so, so_refs")
-    .eq("id", poId)
-    .maybeSingle();
-  if (e2) {
-    const m = mapPgError(e2);
-    return c.json(m.body, m.status);
-  }
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const poRow: any = po ?? {};
-  const soRefs: number[] = Array.isArray(poRow.so_refs)
-    ? poRow.so_refs
-    : poRow.so != null
-      ? [Number(poRow.so)]
-      : [];
-
-  return c.json({ ...(doc as Record<string, unknown>), so_refs: soRefs, issued_by: null });
+  return c.json(doc as Record<string, unknown>);
 });
 
 // ----- GET /:id/source-orders -----
@@ -1616,6 +1642,65 @@ operationPosRouter.post("/:id/ready-date", requireOperation, async (c) => {
   });
   if (error) return mapSupplierCallError(c, error);
   return c.json({ ok: true, result: data });
+});
+
+// ----- GET /:id/sends -----
+// THE OUTBOUND EVIDENCE FOR ONE PURCHASE ORDER (closure §8; 0377 · 0378 · 0379).
+//
+// SO Batch Purchase issues a purchase order and then has to chase it. It has no
+// register behind it, so without this read the evidence surface could only show
+// what the current tab happened to remember — and a reload, a second operator or
+// a revision would each tell a different story about the same paper.
+//
+// Every row carries what makes it evidence: the kind (an OPEN completes
+// nothing), the exact version, the recipient, the channel, the time, and WHO —
+// the actor, the month's duty holder and the authorised cover when one acted.
+operationPosRouter.get("/:id/sends", requireOperation, async (c) => {
+  const poId = c.req.param("id");
+  const sb = userClient(c.env, c.var.auth.jwt);
+
+  const { data: rows, error } = await sb
+    .from("po_sends")
+    .select(
+      "channel, note, sent_at, kind, recipient, po_version, sent_by, duty_user_id, acting_user_id",
+    )
+    .eq("po_id", poId)
+    .order("sent_at", { ascending: false });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+
+  const ids = [
+    ...new Set(
+      (rows ?? [])
+        .flatMap((r) => {
+          const row = r as Record<string, unknown>;
+          return [row.sent_by, row.duty_user_id, row.acting_user_id];
+        })
+        .filter((v): v is string => typeof v === "string" && v.length > 0),
+    ),
+  ];
+  const named = new Map<string, string>();
+  if (ids.length > 0) {
+    const { data: people } = await sb.from("app_users").select("id, name, email").in("id", ids);
+    for (const u of (people ?? []) as Record<string, unknown>[]) {
+      const label = ((u.name as string | null) ?? "").trim() || ((u.email as string | null) ?? "");
+      if (label) named.set(u.id as string, label);
+    }
+  }
+
+  return c.json({
+    sends: (rows ?? []).map((r) => {
+      const row = r as Record<string, unknown>;
+      return {
+        ...row,
+        sent_by_name: named.get(row.sent_by as string) ?? null,
+        duty_name: named.get(row.duty_user_id as string) ?? null,
+        acting_name: named.get(row.acting_user_id as string) ?? null,
+      };
+    }),
+  });
 });
 
 // ----- POST /:id/sends -----

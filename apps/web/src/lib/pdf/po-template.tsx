@@ -168,8 +168,25 @@ export function PoTemplate(data: PoTemplateData) {
      `docs/COPY-STANDARD.md` — and this is paper that leaves the building.) */
   const versionLabel = `Version ${version ?? 1}`;
 
-  // Per-line SO attribution exists only when the PO covers ONE sales order.
-  const soLabel = so_refs && so_refs.length === 1 ? `SO-${so_refs[0]}` : "";
+  /**
+   * ⭐ PER-LINE SO ATTRIBUTION, FROM THE LINE'S OWN LINEAGE (0382).
+   *
+   * This used to print only when the whole purchase order covered exactly ONE
+   * sales order, because the schema kept `so_refs` on the DOCUMENT and nothing
+   * per line. Every bulk purchase order therefore printed a blank `SO NO`
+   * column — the one column that tells the factory whose goods these are.
+   *
+   * A line serving three customers prints all three, with the quantity beside
+   * each, because ten mattresses on one line are not interchangeable once they
+   * are promised to three people. The document-level fallback stays for the
+   * purchase orders raised before 0382, which have no lineage to read.
+   */
+  const soCell = (line: PoTemplateData["lines"][number]): string => {
+    const src = (line.sources ?? []).filter((s) => s.so != null);
+    if (src.length === 1) return `SO-${src[0]!.so}`;
+    if (src.length > 1) return src.map((s) => `SO-${s.so} × ${s.qty}`).join("\n");
+    return so_refs && so_refs.length === 1 ? `SO-${so_refs[0]}` : "";
+  };
   // Bulk PO (several sales orders) closes with a TOTAL row; a one-customer
   // PO does not (one set per page makes a total meaningless).
   const isBulk = (so_refs?.length ?? 0) > 1;
@@ -295,7 +312,7 @@ export function PoTemplate(data: PoTemplateData) {
           return (
             <View key={`${line.sku}-${idx}`} wrap={false} style={[styles.row, styles.rowHair]}>
               <Text style={styles.cellNo}>{idx + 1}</Text>
-              <Text style={styles.cellSo}>{soLabel}</Text>
+              <Text style={styles.cellSo}>{soCell(line)}</Text>
               <Text style={styles.cellUnit}>
                 {line.unit_codes && line.unit_codes.length > 0 ? line.unit_codes.join("\n") : "—"}
               </Text>

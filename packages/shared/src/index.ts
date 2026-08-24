@@ -2090,6 +2090,7 @@ export {
   splitAllocation,
   validateAllocations,
   documentPartitionKey,
+  composeDocumentLines,
   groupSelectionsIntoDocuments,
   soBatchSelectionSummary,
   destinationAllocationSchema,
@@ -2101,9 +2102,21 @@ export {
   type SoBatchSelection,
   type SoBatchDocument,
   type SoBatchDocumentLine,
+  type PoDocumentAllocation,
+  type PoDocumentLine,
+  type PoDocumentLines,
+  type PoLineSource,
   type SoBatchSelectionSummary,
   type AllocationCheck,
 } from "./so-batch-purchase";
+export {
+  PURCHASING_REFUSAL_CODES,
+  purchasingRefusal,
+  purchasingRefusalLine,
+  type PurchasingRefusal,
+  type PurchasingRefusalCode,
+  type PurchasingRefusalFacts,
+} from "./purchasing-refusals";
 export {
   IMPORT_ACCESSORY_KINDS,
   IMPORT_LEAD_DAYS_DEFAULT,

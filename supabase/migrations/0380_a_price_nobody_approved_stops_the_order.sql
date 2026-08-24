@@ -272,15 +272,6 @@ begin
       using errcode = '42501', detail = 'not_po_duty';
   end if;
 
-  -- ⭐ 0379 · THE ACTOR GATE. Previously this function trusted any Operations
-  -- login, so a direct RPC call bypassed the duty check that lived in one API
-  -- route. Now every caller — SO Batch Purchase, Manual Purchase, curl —
-  -- meets the same authority.
-  if not public.purchasing_actor_may_issue(auth.uid()) then
-    raise exception 'only Current PO Duty or its authorised cover may issue purchase orders'
-      using errcode = '42501', detail = 'not_po_duty';
-  end if;
-
   if p_pos is null or jsonb_typeof(p_pos) <> 'array' then
     raise exception 'p_pos must be a JSON array'
       using errcode = '22023', detail = 'invalid_batch_size';

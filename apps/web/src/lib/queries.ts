@@ -4262,6 +4262,9 @@ export function useIssuePurchaseRequests() {
       requestIds: string[];
       together: boolean;
       partners?: Record<string, string> | null;
+      /** ⭐ The Catalog price the operator REVIEWED, per SKU (0380). Without it
+       *  the server has only its own live value to compare against itself. */
+      expectedCosts: Record<string, number>;
     }) =>
       apiFetch<{ poIds: string[]; documents: number }>(
         "/api/operation/purchasing/requests/issue",

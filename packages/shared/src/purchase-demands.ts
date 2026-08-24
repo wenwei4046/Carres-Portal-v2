@@ -667,9 +667,9 @@ export type PurchaseDemandsResponse = z.infer<typeof purchaseDemandsResponseSche
  *
  * The rows plus the four facts the buying journey needs and the Register alone
  * never did: where goods may be sent, which of those is the standing default,
- * who currently holds PO Duty, and whether THIS reader may issue. `mayIssue` is
- * a convenience — the API refuses an unauthorised issue whatever the browser
- * believes (Card §6).
+ * who currently holds PO Duty, who is covering it today, and whether THIS reader
+ * may issue. `mayIssue` is a convenience — the API and the creation RPC both
+ * refuse an unauthorised issue whatever the browser believes (Card §6; 0379).
  */
 export const soBatchPurchaseResponseSchema = z.object({
   today: z.string(),
@@ -683,7 +683,14 @@ export const soBatchPurchaseResponseSchema = z.object({
     }),
   ),
   defaultDestinationId: z.string().nullable(),
+  /** The month's normal holder. `Team Work` groups by this person. */
   currentPoDuty: z.object({ userId: z.string(), name: z.string() }).nullable(),
+  /**
+   * ⭐ 0379 — the dated buddy cover who may act TODAY, when one is set. It is a
+   * separate fact from the holder on purpose: the duty stays where management
+   * put it, and the audit must still say who actually pressed Issue PO.
+   */
+  actingPoDuty: z.object({ userId: z.string(), name: z.string() }).nullable(),
   mayIssue: z.boolean(),
   /** Who may collect from a factory, for the documents that need one. */
   procurementPartners: z.array(z.object({ id: z.string(), name: z.string() })),

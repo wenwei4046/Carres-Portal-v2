@@ -411,3 +411,105 @@ export const soBatchSelectionSchema = z.object({
   demandId: z.string().min(1),
   allocations: z.array(destinationAllocationSchema).min(1),
 });
+
+// ─── The lines one document actually carries ─────────────────────────────────
+
+/** One customer order's claim on a purchase-order line (0382). */
+export interface PoLineSource {
+  orderId: string;
+  /** The customer-facing number. `null` on an order that has none yet. */
+  so: number | null;
+  /** `order_lines.id` — validated against its order in SQL, never trusted. */
+  orderLineId: string;
+  qty: number;
+}
+
+/** One line of one purchase order, with the lineage behind every unit. */
+export interface PoDocumentLine {
+  sku: string;
+  qty: number;
+  /** The catalog cost the engine read for this SKU. `null` = Catalog has none. */
+  cost: number | null;
+  /** Which customer order each unit is for. Sums to `qty`, always. */
+  sources: PoLineSource[];
+}
+
+/** What the caller allocated to ONE document, per demand. */
+export interface PoDocumentAllocation {
+  /** The build behind this demand — the thing being made. */
+  build: {
+    key: string;
+    /** Units the server says are still to buy on this build. */
+    qty: number;
+    lines: readonly { lineId: string; sku: string; qty: number; cost: number | null }[];
+  };
+  orderId: string;
+  so: number | null;
+  /** Units of that build going to THIS document's destination. */
+  qty: number;
+}
+
+export type PoDocumentLines =
+  | { ok: true; lines: PoDocumentLine[] }
+  | { ok: false; code: "nothing_to_issue" | "partial_split_not_allowed" };
+
+/**
+ * COMPOSE ONE DOCUMENT'S LINES FROM WHAT WAS ALLOCATED TO IT — not from the
+ * whole build (Card closure §4 · §5; 0382).
+ *
+ * ── THE DEFECT THIS REPLACES ────────────────────────────────────────────────
+ *
+ * Measured 2026-08-24: the issue endpoint grouped allocations into documents
+ * and then asked `planFromDocuments` for each group's lines. That function
+ * answers *what does this BUILD contain*, so a build of 11 split 10 + 1 across
+ * two destinations produced **two purchase orders of 11** — 22 units bought for
+ * an 11-unit demand. The split the Card promised was the one thing that broke
+ * it.
+ *
+ * Lines are therefore composed from the ALLOCATION. And because the aggregate
+ * loses which customer each unit belongs to, the lineage is composed with it in
+ * the same pass — one walk, so a line and its sources cannot disagree.
+ *
+ * ── AND A SET IS NOT SPLIT ──────────────────────────────────────────────────
+ *
+ * A build of several order lines is a matched set: a sofa's modules are made
+ * and delivered together (locked 2026-07-27). Its `qty` is 1, so a partial
+ * allocation cannot arise from the arrangement rules — but a hand-made request
+ * could ask for one, and there is no honest way to cut two modules in half.
+ * It is refused by name rather than guessed at.
+ */
+export function composeDocumentLines(
+  allocations: readonly PoDocumentAllocation[],
+): PoDocumentLines {
+  const bySku = new Map<string, PoDocumentLine>();
+  for (const a of allocations) {
+    if (a.qty <= 0) continue;
+    const buildLines = a.build.lines;
+    if (buildLines.length === 0) continue;
+    /* A SET GOES WHOLE OR NOT AT ALL. */
+    if (buildLines.length > 1 && a.qty !== a.build.qty) {
+      return { ok: false, code: "partial_split_not_allowed" };
+    }
+    for (const l of buildLines) {
+      /* One line: the allocation IS the quantity. A set: the line's own,
+         because the whole set is on this document. */
+      const qty = buildLines.length === 1 ? a.qty : l.qty;
+      if (qty <= 0) continue;
+      let hit = bySku.get(l.sku);
+      if (!hit) {
+        hit = { sku: l.sku, qty: 0, cost: l.cost, sources: [] };
+        bySku.set(l.sku, hit);
+      }
+      hit.qty += qty;
+      hit.sources.push({
+        orderId: a.orderId,
+        so: a.so,
+        orderLineId: l.lineId,
+        qty,
+      });
+    }
+  }
+  const lines = [...bySku.values()];
+  if (lines.length === 0) return { ok: false, code: "nothing_to_issue" };
+  return { ok: true, lines };
+}

@@ -75,3 +75,40 @@ describe("po-template obeys docs/pdf/PO-PDF-STANDARD.md", () => {
     expect(SRC).toMatch(/wrap=\{false\}/);
   });
 });
+
+/**
+ * ⭐ THE DOCUMENT CARRIES THE FACTS IT CLAIMS
+ * (0382 · 0383; CARD-2026-08-22-purchasing-02 closure §6 · §7).
+ *
+ * `SO NO` and `Item ID` were columns with nothing behind them: the schema kept
+ * `so_refs` on the DOCUMENT, so every bulk purchase order printed a blank
+ * customer column, and the route hard-coded the issuer to `null`.
+ */
+describe("po-template prints the lineage and the issuer it is given", () => {
+  it("reads SO NO from the LINE's own sources, not only the document", () => {
+    /* The old rule — print the SO only when the whole PO covers exactly one —
+       is now the fallback for purchase orders raised before 0382. */
+    expect(SRC).toContain("const soCell =");
+    expect(SRC).toMatch(/line\.sources/);
+    expect(SRC).toMatch(/soCell\(line\)/);
+    /* A line serving several customers prints each with its quantity: ten
+       mattresses are not interchangeable once three people are promised them. */
+    expect(SRC).toMatch(/SO-\$\{s\.so\} × \$\{s\.qty\}/);
+    /* And the document-level fallback survives for the older documents. */
+    expect(SRC).toMatch(/so_refs && so_refs\.length === 1/);
+  });
+
+  it("still fills Item ID from the units the issue actually minted", () => {
+    expect(SRC).toMatch(/line\.unit_codes/);
+    /* An em dash, not an empty cell — a blank column reads as a defect. */
+    expect(SRC).toMatch(/unit_codes\.join\("\\n"\) : "—"/);
+  });
+
+  it("names the issuer when the document authority carries one", () => {
+    expect(SRC).toMatch(/issued_by \? ` · Issued by \$\{issued_by\}`/);
+  });
+
+  it("prints the supplier's own address, because a formal document names both parties", () => {
+    expect(SRC).toMatch(/supplier\.address \?/);
+  });
+});

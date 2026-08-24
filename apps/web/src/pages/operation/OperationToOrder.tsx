@@ -97,6 +97,7 @@ export default function OperationToOrder() {
     destinations: [],
     defaultDestinationId: null,
     currentPoDuty: null,
+    actingPoDuty: null,
     mayIssue: false,
     procurementPartners: [],
   };

@@ -46,12 +46,31 @@ const sentV1: PoSendEvidence = {
 };
 
 const onConfirmed = vi.fn();
-const renderIt = (version: number, evidence: PoSendEvidence[] = []) =>
+const onOpened = vi.fn();
+/**
+ * ⭐ THE SUPPLIER'S REAL DOORS ARE PASSED IN (closure §7). This component is the
+ * ONE communication area now, so the WhatsApp group, the email address and the
+ * drafted message come from whoever knows the supplier. A surface with none on
+ * file names the gap instead of offering a button that opens nothing.
+ */
+const DOORS = {
+  whatsapp: { url: "https://chat.whatsapp.com/hooka", isGroup: true },
+  mailto: "mailto:buy@hooka.my",
+  message: "Hi Hooka, please build PO-20260823-4041.",
+  supplierName: "Hooka",
+};
+const renderIt = (
+  version: number,
+  evidence: PoSendEvidence[] = [],
+  doors: typeof DOORS | undefined = DOORS,
+) =>
   render(
     <PoIssueEvidence
       po={PO}
       version={version}
       evidence={evidence}
+      doors={doors}
+      onOpened={onOpened}
       onConfirmed={onConfirmed}
     />,
   );
@@ -117,7 +136,7 @@ describe("persisted evidence survives a reload", () => {
     renderIt(1, [sentV1]);
     const panel = screen.getByTestId(`so-batch-evidence-${PO.id}`);
     expect(panel).toHaveTextContent("reached Hooka");
-    expect(panel).toHaveTextContent("Recorded as sent by WhatsApp to Hooka Purchasing Group");
+    expect(panel).toHaveTextContent("WhatsApp to Hooka Purchasing Group");
     expect(screen.queryByTestId("so-batch-evidence-confirm")).not.toBeInTheDocument();
   });
 
@@ -169,13 +188,16 @@ describe("the confirmation declares the version it is looking at", () => {
     expect(onConfirmed).not.toHaveBeenCalled();
   });
 
-  it("the tools still record nothing", () => {
+  it("the tools still complete nothing — they open, and the act stays open", () => {
     renderIt(1);
-    const open = vi.spyOn(window, "open").mockReturnValue(null);
-    fireEvent.click(screen.getByTestId("so-batch-evidence-whatsapp"));
-    fireEvent.click(screen.getByTestId("so-batch-evidence-email"));
+    fireEvent.click(screen.getByTestId("po-open-whatsapp"));
+    fireEvent.click(screen.getByTestId("po-open-email"));
+    /* An OPEN is history (`external_open`) and the caller records it. It does
+       not confirm anything and it never calls `confirm-sent`. */
+    expect(onOpened.mock.calls.map((c) => c[0])).toEqual(["whatsapp", "email"]);
     expect(apiFetch).not.toHaveBeenCalled();
-    open.mockRestore();
+    expect(onConfirmed).not.toHaveBeenCalled();
+    expect(screen.getByTestId("so-batch-evidence-confirm")).toBeInTheDocument();
   });
 });
 

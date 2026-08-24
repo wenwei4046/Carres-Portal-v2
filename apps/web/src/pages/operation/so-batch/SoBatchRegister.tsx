@@ -561,10 +561,19 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
               ) : (
                 /* NOT a disabled button. A control the operator cannot use
                    should say WHO can, not grey itself out and stay silent. */
-                <span className="shrink-0 truncate text-meta text-kit-slate-11">
-                  {data.currentPoDuty
-                    ? `${data.currentPoDuty.name} holds PO duty`
-                    : "Nobody holds PO duty"}
+                /* ⭐ AND IT NAMES WHOEVER MAY ACT TODAY (0379; closure §1).
+                   A dated buddy cover is the person to ask, not the holder they
+                   are covering — a chip that named the absent holder sent the
+                   operator to somebody who is on leave. */
+                <span
+                  className="shrink-0 truncate text-meta text-kit-slate-11"
+                  data-testid="so-batch-duty-chip"
+                >
+                  {data.actingPoDuty
+                    ? `${data.actingPoDuty.name} is covering PO duty`
+                    : data.currentPoDuty
+                      ? `${data.currentPoDuty.name} holds PO duty`
+                      : "Nobody holds PO duty"}
                 </span>
               )}
             </div>

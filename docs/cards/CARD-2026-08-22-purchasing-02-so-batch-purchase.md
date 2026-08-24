@@ -2,9 +2,10 @@
 
 **Module:** Purchasing · **Sequence:** 02
 **Owner authority:** `docs/purchasing/MASTER.md` §§2, 5–9, 13–15 — approved / locked 2026-08-22
-**Status:** BUILT — all eight tasks executed, all gates green, six-view walk captured; owner correction of
-2026-08-23 closed in full. Stopped at the merge boundary per §9 Task 8 and §14; migration 0377 is written
-and validated, NOT applied.
+**Status:** BUILT — all eight tasks executed, the owner corrections of 2026-08-23 and 2026-08-24
+closed, and the seven-authority closure pass of 2026-08-24 (§17) complete. All gates green.
+Stopped at the merge boundary per §9 Task 8 and §14: **migrations 0377–0383 are written, validated
+and NOT applied.** Merge, migration order and deployment await the owner's decision.
 **Lane:** BUILD / DELIVERY
 **Depends on:** `PURCHASING — CARD 01 · FIX SIDE MENU TO THE FINAL 4-GROUP / 11-PAGE LISTING`
 **Base:** local `main` containing commits `7de0a27a` and `0f52e23c`
@@ -1030,3 +1031,180 @@ Merge and deployment wait for that decision and the owner's approval.
 number. Two branches open at once will collide again, and the next one may not be caught by hand.
 A duplicate-number check belongs in that gate; it is a change to shared CI tooling and is outside
 this Card's file map.
+
+---
+
+## 17 · Closure pass, 2026-08-24 — the seven authorities the Card had not closed
+
+**RESOLVED FROM AUTHORITY.** Existing Card scope (§4.2, §5.2, §5.3, §6, §7.3, §7.4, §9 Tasks 4–6)
+plus `docs/purchasing/MASTER.md` §§5.3, 5.6, 6.1, 6.2, 8.2, 8.3, 9.1. No new Card, no new owner
+decision.
+
+Everything below was MEASURED against this branch and against live production before it was written.
+Each item names the defect first, because a fix whose defect is not written down is a fix the next
+hand will undo.
+
+### 17.1 One governed PO actor authority · migration 0379
+
+`purchasing_issue_pos_batch` gated on `is_operation()` **and nothing else**. Any Operations login
+could create purchase orders by calling the RPC directly, and Manual Purchase called it through its
+own route with **no duty check at all** — the duty lived in the one API route SO Batch Purchase
+happened to use.
+
+- `purchasing_po_actor()` is the ONE resolver. It knows the month's holder and the dated buddy cover,
+  and returns **both people separately**: Team Work groups by the normal holder, the audit must name
+  who acted. Collapsing them would lose one permanently.
+- `purchasing_actor_may_issue()` is asked by the **creation authority itself** and by the evidence
+  door. A principal who is neither holder nor cover is refused — audit access is not issuance
+  authority.
+- `ops_po_duty_cover` is a dated, management-set record with **no write policy**; before it, "the
+  holder is on leave" had no answer except handing over the month.
+- The API asks the same resolver so the operator reads WORDS, not a database error; the Register asks
+  it too, so a covering operator is OFFERED the act instead of being shown a page with no button on
+  a door that would have let them through. `mayIssue` now answers about the ACTOR.
+
+### 17.2 Commercial authority · migration 0380
+
+Three holes, one shape — PO Duty deciding commercial truth it does not own. **The worst was
+silent:** an untouched catalog cost was re-read by the API and sent back as `cost_source: catalog`,
+so the RPC compared the live value **against itself** and always agreed. A supplier price that moved
+between review and Issue was adopted with nobody's approval and nobody's knowledge.
+
+- The reviewed price travels as `expected_catalog_cost` on every line, and the server compares. A
+  mismatch creates **zero** purchase orders — not this one, not the other nineteen.
+- **There is no "send nothing and let the server read Catalog" path left.** A line nobody checked is
+  refused (`cost_review_required`). The web declares what it SHOWED, including an untouched price;
+  the stored number is still the server's own read.
+- A hand-entered price or a Free of Charge is an EXCEPTION and needs an open `po_cost_approvals`
+  record. `purchasing_approve_po_cost` admits only `principal`/`finance` and refuses a manager who is
+  also today's actor. **An approval is spent when used.**
+- The 50/50 surface reads the open approvals and says, in advance, `This is not the Catalog price. /
+  Ask a manager to approve this price for {supplier}.` — or names the approver when one exists.
+  Meeting that rule only as a refusal, after eleven prices were typed, is the rule delivered too late.
+- Manual Purchase declares the same way: a new `GET /issue-costs` read shows the price of every SKU
+  the issue will commit to (including the sibling requests `Issue as one PO` pulls in), and the
+  request carries those exact numbers. A SKU with no catalog price is NAMED, never declared as RM0.
+
+### 17.3 One exact document partition, and the split that used to double the order
+
+The browser grouped by `supplier × destination`; the server grouped by
+`supplier × destination × category × sofa-order`. The operator could review ONE document, press
+`Issue PO` and be handed THREE — and a decision keyed the browser's way could attach a price to a
+document that was never created, or to the wrong customer's sofa.
+
+- `documentPartitionKey` is the one contract, computed from the same facts on both sides. The server
+  still recomputes it from its own recomputation: agreement, not trust.
+- Duplicate, foreign, stale and partial-coverage decisions are each refused BY NAME.
+- 🔴 **AND THE SPLIT BOUGHT THE DEMAND TWICE.** Each group asked `planFromDocuments` for its lines —
+  a function that answers *what does this BUILD contain* — so a build of 11 split 10 + 1 across two
+  destinations produced **two purchase orders of 11**: 22 units for an 11-unit demand. The one thing
+  §4.1 promised was the one thing that broke it. `composeDocumentLines` now composes each document
+  from its ALLOCATION, and refuses to cut a matched set (a sofa is made and delivered together,
+  locked 2026-07-27).
+
+### 17.4 Source lineage · migration 0382
+
+"Every line retains source SO/line attribution" (§4.2) was true of the REQUEST and of nothing after
+it. `so_refs` sat on the DOCUMENT, so a bulk purchase order aggregating one SKU across three
+customers had nothing to print in `SO NO` — and printed blank. A supplier delivering ten mattresses
+could not tell Carres whose they were, and neither could Carres.
+
+`po_line_sources` stores order, SO number, order line and quantity per line, **validated** rather
+than trusted (a browser that could name a source could put one customer's goods on another's order)
+and the parts must add up to the line. The document authority returns it and the PDF prints it, with
+the quantity beside each SO when a line serves several.
+
+### 17.5 The locked identities · migration 0381
+
+MASTER locked `PREFIX-YYYYMMDD-RRRR` and `U1-000-001`; production minted `PO-2054` and
+`id-fke850823`. `max(seq) + 1` tells any supplier holding two of our purchase orders how much Carres
+bought in between.
+
+- `allocate_formal_document_code` draws `RRRR` at random, unique on `(date, code)` **across
+  prefixes** so a PO and a GRN cannot share a tail. A lost race draws again; a genuinely exhausted
+  day fails loudly. Rows are never deleted, so a cancelled number stays taken.
+- `unit_id_series` is one locked row — a table, not a sequence, because a sequence cannot roll
+  `U1-999-999` into `U2-000-001`. Units are minted for **every** governed destination, since §6.2
+  requires the supplier to write the Unit ID on a showroom or external delivery's package too.
+- **Existing identities are permanent. Nothing is renumbered or recoded.**
+
+### 17.6 The official PDF, and one communication area · migration 0383
+
+The template had columns for `SO NO` and `Item ID` and a footer naming the issuer; the document
+authority returned none of them, and the route hard-coded `issued_by: null` **over** the issuer the
+creation helper had already written to `audit_log`. The supplier's own address was hard-coded null
+because `suppliers` had no address column at all.
+
+- `purchasing_po_document` now carries version, the supplier's address, the real issuer, the Units
+  the issue minted and the per-line source breakdown. **The route adds nothing** — a route that
+  overwrites the document authority is a second truth about the same paper.
+- The Purchase Order page's own `Copy message` · `Open WhatsApp group` · `Open email` are GONE: one
+  document had two sets of send controls beside each other. `PoIssueEvidence` is the one
+  communication area, and the supplier's real doors are passed into it.
+- 🔴 **`Download PDF` linked to `/print-data`** — it handed the operator, and any supplier they
+  forwarded it to, a JSON response. It now renders the same template the paper uses.
+- SO Batch Purchase READS the persisted `po_sends` for the document on screen instead of showing a
+  row it had invented after a confirmation (right version, made-up channel, no recipient, no actor,
+  no server time). A reload used to show nothing at all.
+
+### 17.7 Fail closed, and guide the operator
+
+`purchasingRefusal` is the one place the words live: **LINE 1 the fact, LINE 2 the act, its object
+and what completes it.** Forty-eight codes answer by name, every one is walked by a test that bans
+`Needs attention` · `Next action` · `Something went wrong` · `Pending` · `Waiting` · `Follow up`, and
+holds every line to fourteen words. The API sends both lines, the browser renders both, and a refusal
+raised in SQL is translated rather than shown raw. Nothing is created when a refusal fires.
+
+### 17.8 The responsive walk — 1130px and below
+
+Walked in a real browser against `so-batch-preview.html`, a dev-only vite entry rendering the REAL
+component with seeded documents. The live surface is behind a login AND behind `Issue PO`; a walk
+that reached the right-hand PDF would have created real purchase orders and committed Carres to a
+supplier.
+
+| Width | Measured |
+|---|---|
+| 1440 × 880 | `720px` + `720px`; document 2 offers its procurement partner; three sofa module costs each editable |
+| **1130** × 860 | `grid-template-columns: 565px 565px`; no sideways scroll; `Issue PO` visible and shut with its two-line blocker |
+| **1129** × 860 | stacked, work first (`50→426`), document below (`426→1028`), split scrolls, nothing clipped |
+| 768 × 900 | stacked; both buttons inside the pane, no overlap, no sideways scroll |
+| 375 × 812 | stacked; every control reachable; header title truncates |
+
+Two defects the green suite had not caught, both found by the walk and both fixed:
+
+- 🔴 **1129px CLIPPED THE DECISION PANE.** A one-column grid compressed it to 208px and cut off the
+  Transaction Cost block, the blocker and both buttons **with no scrollbar** — the row reported that
+  it fitted. Stacked, the surface is a flex COLUMN with `shrink-0` panes.
+- 🟡 **375px clipped the surface title**, which wrapped into a fixed 50px header. It truncates now;
+  the row keeps its height.
+
+And walked in the browser: changing a price shows
+`This is not the Catalog price. / Ask a manager to approve this price for Ohana.` and `Issue PO`
+stays shut.
+
+### 17.9 Gates
+
+| Gate | Result |
+|---|---|
+| `node scripts/check-migrations.mjs` | 396 filenames validated, 0 changes, **no migration applied** |
+| duplicate-number collision gate | clean — `origin/main` tail is `0376`; no other remote branch reaches `0377` |
+| `pnpm lint` (design-standard + v4 guard) | clean |
+| `pnpm typecheck` | clean |
+| `pnpm test` | shared **113/2646** · api **122/2407** · web **277/3287** — **8,340 tests, 0 failed** |
+| `pnpm build` | clean |
+| responsive owner walk | 5 widths, measured above |
+
+### 17.10 Still owed, and what is NOT done
+
+- 🔴 **Migrations 0377 · 0378 · 0379 · 0380 · 0381 · 0382 · 0383 are NOT applied.** They go through
+  the governed approval path, in that order. Repository `0375` and `0376` are merged but not yet in
+  the live tracker, so the full order is `0375 → 0376 → 0377 → … → 0383`.
+- 🔴 **Not merged and not deployed.** PR #894 waits on the owner.
+- ⚠️ **A Delivery worktree holds an untracked `0379_delivery_owns_the_arrangement…sql`.** It is not in
+  the repository, so there is no collision today — but whichever branch merges second must renumber.
+  The gate now catches it; the other chat must be told.
+- 🟡 **The owner's own authenticated walk is still owed** for the business journey: this chat can
+  prove the layout and every rule by test, but it cannot press `Issue PO` on live data, because that
+  would create real purchase orders.
+- 🟡 **`purchasing_record_send` is untouched.** Its rows stay `external_open`: knowing an operator
+  opened the group at 14:02 is real history, and the honest fix was to stop misreading it.

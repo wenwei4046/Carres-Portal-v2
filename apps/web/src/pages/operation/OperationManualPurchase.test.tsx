@@ -153,6 +153,13 @@ const PICK = {
 
 function respond(url: string): unknown {
   if (url.includes("/purchasing/requests/detail/")) return DETAIL;
+  /* ⭐ THE PRICES THIS ISSUE WILL COMMIT TO (0380; Card 02 closure §2). The
+     surface reads them, shows them and declares them, because the API compares
+     the DECLARED price against Catalog — it no longer compares its own live
+     value with itself. */
+  if (url.includes("/purchasing/requests/issue-costs")) {
+    return { costs: [{ sku: "5539-2NA", unitCost: 850 }] };
+  }
   if (url.includes("/purchasing/requests/already-have")) {
     return { sku: "5539-2NA", alreadyOnPo: 1, firstPo: { id: "PO-2041", eta: "2026-08-22" } };
   }
@@ -593,6 +600,9 @@ describe("issue and the observed arrival (slice 3)", () => {
     );
     apiFetch.mockImplementation((url: string) => {
       if (url.includes("/purchasing/requests/detail/")) return Promise.resolve(DETAIL);
+      if (url.includes("/purchasing/requests/issue-costs")) {
+        return Promise.resolve({ costs: [{ sku: "5539-2NA", unitCost: 850 }] });
+      }
       if (url.includes("/purchasing/requests/already-have")) {
         return Promise.resolve({ sku: "x", alreadyOnPo: 0, firstPo: null });
       }
@@ -676,5 +686,128 @@ describe("the rail corrections (2026-08-19)", () => {
     // The register column's first child is the grid surface itself — no
     // dedicated button row precedes it.
     expect(grid.firstElementChild?.contains(btn)).toBe(true);
+  });
+});
+
+/**
+ * ⭐ CLOSURE §2 — THE MANUAL LANE DECLARES THE PRICE IT REVIEWED (0380).
+ *
+ * This lane buys at the Catalog price, and the API used to read that price
+ * itself and send it back to the creation authority as `cost_source: catalog` —
+ * so the database compared its own live value against itself and agreed every
+ * time. A price nobody was shown is a price nobody reviewed, so the surface
+ * shows them and the request carries them.
+ */
+describe("closure §2 · the issue declares the transaction cost it showed", () => {
+  it("shows the cost of every SKU it is about to buy", async () => {
+    DETAIL = {
+      request: REGISTER.requests[1],
+      lines: REGISTER.lines.filter((l) => l.request_id === REQ2),
+      destinations: REGISTER.destinations,
+      suppliers: [{ id: "s2", name: "Office Co", kind: "own_logistics" }],
+      users: REGISTER.users,
+      canApprove: false,
+    };
+    await loaded();
+    fireEvent.click(screen.getByText("REQ-0002", { selector: "button" }));
+    const costs = await screen.findByTestId("mp-issue-costs");
+    expect(costs).toHaveTextContent("Transaction cost");
+    expect(screen.getByTestId("mp-issue-cost-5539-2NA")).toHaveTextContent("RM 850");
+  });
+
+  it("sends those exact numbers with the issue request", async () => {
+    DETAIL = {
+      request: REGISTER.requests[1],
+      lines: REGISTER.lines.filter((l) => l.request_id === REQ2),
+      destinations: REGISTER.destinations,
+      suppliers: [{ id: "s2", name: "Office Co", kind: "own_logistics" }],
+      users: REGISTER.users,
+      canApprove: false,
+    };
+    await loaded();
+    fireEvent.click(screen.getByText("REQ-0002", { selector: "button" }));
+    await screen.findByTestId("mp-issue-costs");
+    fireEvent.click(screen.getByTestId("mp-issue-po"));
+    await waitFor(() => {
+      const post = apiFetch.mock.calls.find((c) =>
+        String(c[0]).endsWith("/purchasing/requests/issue"),
+      );
+      expect(post).toBeTruthy();
+      const sent = JSON.parse(String((post![1] as RequestInit).body));
+      expect(sent.expectedCosts).toEqual({ "5539-2NA": 850 });
+    });
+  });
+
+  it("names a SKU Catalog has no price for, and never declares it as zero", async () => {
+    DETAIL = {
+      request: REGISTER.requests[1],
+      lines: REGISTER.lines.filter((l) => l.request_id === REQ2),
+      destinations: REGISTER.destinations,
+      suppliers: [{ id: "s2", name: "Office Co", kind: "own_logistics" }],
+      users: REGISTER.users,
+      canApprove: false,
+    };
+    apiFetch.mockImplementation((url: string) => {
+      if (url.includes("/purchasing/requests/issue-costs")) {
+        return Promise.resolve({
+          costs: [
+            { sku: "5539-2NA", unitCost: 850 },
+            { sku: "X-NEW-K", unitCost: null },
+          ],
+        });
+      }
+      return Promise.resolve(respond(url));
+    });
+    await loaded();
+    fireEvent.click(screen.getByText("REQ-0002", { selector: "button" }));
+    const row = await screen.findByTestId("mp-issue-cost-X-NEW-K");
+    /* The two lines: the fact, then the act. */
+    expect(row).toHaveTextContent("Catalog has no price.");
+    expect(row).toHaveTextContent("Ask Catalog to set the cost of X-NEW-K.");
+    fireEvent.click(screen.getByTestId("mp-issue-po"));
+    await waitFor(() => {
+      const post = apiFetch.mock.calls.find((c) =>
+        String(c[0]).endsWith("/purchasing/requests/issue"),
+      );
+      expect(post).toBeTruthy();
+      const sent = JSON.parse(String((post![1] as RequestInit).body));
+      /* A hole is NOT declared as RM0 — the server refuses the line by name. */
+      expect(sent.expectedCosts).toEqual({ "5539-2NA": 850 });
+    });
+  });
+
+  it("reports a refusal in the approved two lines", async () => {
+    DETAIL = {
+      request: REGISTER.requests[1],
+      lines: REGISTER.lines.filter((l) => l.request_id === REQ2),
+      destinations: REGISTER.destinations,
+      suppliers: [{ id: "s2", name: "Office Co", kind: "own_logistics" }],
+      users: REGISTER.users,
+      canApprove: false,
+    };
+    apiFetch.mockImplementation((url: string, init?: RequestInit) => {
+      if (init?.method === "POST" && url.endsWith("/purchasing/requests/issue")) {
+        return Promise.reject(
+          Object.assign(new Error("refused"), {
+            body: {
+              code: "not_po_duty",
+              message: "You do not hold PO duty today.",
+              action: "Ask Shasha to issue this purchase order.",
+            },
+          }),
+        );
+      }
+      if (url.includes("/purchasing/requests/issue-costs")) {
+        return Promise.resolve({ costs: [{ sku: "5539-2NA", unitCost: 850 }] });
+      }
+      return Promise.resolve(respond(url));
+    });
+    await loaded();
+    fireEvent.click(screen.getByText("REQ-0002", { selector: "button" }));
+    await screen.findByTestId("mp-issue-costs");
+    fireEvent.click(screen.getByTestId("mp-issue-po"));
+    const err = await screen.findByTestId("mp-issue-error");
+    expect(err).toHaveTextContent("You do not hold PO duty today.");
+    expect(err).toHaveTextContent("Ask Shasha to issue this purchase order.");
   });
 });
