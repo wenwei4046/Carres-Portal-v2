@@ -484,7 +484,7 @@ operationOrdersRouter.get("/:id", requireOperation, async (c) => {
     // by identity (update-in-place keeps attrs + source_po).
     sb.from("order_lines").select("id, sku, qty, unit_price, attrs, source_po").eq("order_id", id),
     sb.from("order_addons").select("addon_key, qty, unit_price").eq("order_id", id),
-    sb.from("order_history").select("text, by_role, occurred_at").eq("order_id", id).order("occurred_at", { ascending: true }),
+    sb.from("order_history").select("text, by_role, by_user_id, occurred_at").eq("order_id", id).order("occurred_at", { ascending: true }),
     sb
       .from("order_supplier_threads")
       .select(
@@ -682,6 +682,55 @@ operationOrdersRouter.get("/:id", requireOperation, async (c) => {
     category: categoryBySku.get(u.sku) ?? null,
   }));
 
+  // ⭐ HISTORY SAYS WHICH PERSON, NOT JUST WHICH ROLE (2026-08-24).
+  //
+  // `order_history.by_user_id` has been written by every RPC since 0003, and
+  // this route selected only `text, by_role, occurred_at` - so the ledger could
+  // say "Salesperson changed the delivery date" but never WHICH salesperson.
+  // MASTER.md:146 calls History "the append-only event ledger"; a ledger that
+  // cannot name its actor is an audit trail with the audit removed.
+  //
+  // TWO SOURCES, BECAUSE ONE CANNOT SEE EVERYONE. 0235 lets an operation JWT
+  // read app_users rows whose role IS 'operation' - deliberately, so staff can
+  // see colleagues without reading every dealer account. But the actor on a
+  // sales order is very often a SALESPERSON, whose app_users row is role
+  // 'dealer' and therefore invisible here. `salespersons` carries `user_id` and
+  // is readable by any internal role (0002 `salespersons_scoped_read`), so it
+  // answers exactly the half app_users cannot. Reading only app_users would
+  // have silently dropped the name in the commonest case - which is the whole
+  // defect, moved rather than fixed.
+  //
+  // FAILS OPEN, ALWAYS. An unresolved id (a cron, a trigger, a deleted account,
+  // an RLS miss) yields `actor: null` and the UI says `Unknown user`. It never
+  // invents an actor, and it never drops the event.
+  const historyRows = (historyRes.data ?? []) as Array<{
+    text: string;
+    by_role: string | null;
+    by_user_id: string | null;
+    occurred_at: string;
+  }>;
+  const actorIds = [...new Set(historyRows.map((h) => h.by_user_id).filter((v): v is string => !!v))];
+  const actorById = new Map<string, string>();
+  if (actorIds.length > 0) {
+    const [staffRes, sellerRes] = await Promise.all([
+      sb.from("app_users").select("id, name").in("id", actorIds),
+      sb.from("salespersons").select("user_id, name").in("user_id", actorIds),
+    ]);
+    // A read error is not fatal - the ledger still renders, unnamed.
+    for (const r of (staffRes.data ?? []) as Array<{ id: string; name: string | null }>) {
+      if (r.name) actorById.set(r.id, r.name);
+    }
+    // app_users wins where both answer: it is the account, the salesperson row
+    // is the sales-side profile of the same person.
+    for (const r of (sellerRes.data ?? []) as Array<{ user_id: string | null; name: string | null }>) {
+      if (r.user_id && r.name && !actorById.has(r.user_id)) actorById.set(r.user_id, r.name);
+    }
+  }
+  const historyWithActor = historyRows.map((h) => ({
+    ...h,
+    actor: h.by_user_id ? (actorById.get(h.by_user_id) ?? null) : null,
+  }));
+
   return c.json({
     order,
     lines: linesWithCategory,
@@ -691,7 +740,7 @@ operationOrdersRouter.get("/:id", requireOperation, async (c) => {
     stockBalances,
     freeUnits: freeUnitsWithCategory,
     pos: posWithLines,
-    history: historyRes.data ?? [],
+    history: historyWithActor,
     threads: threadsRes.data ?? [],
     /* An absent overlay row is UNKNOWN, not "no photo": the Route says
        `No delivery photo yet` only on an explicit empty ledger. */

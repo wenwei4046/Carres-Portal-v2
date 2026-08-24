@@ -569,19 +569,88 @@ function draftFromSnapshot(snap: SalesOrderSnapshot): Draft {
 function Block({
   title,
   note,
+  subtitle,
+  summary,
+  forceOpen,
   children,
 }: {
   title: string;
   note?: string;
+  /** ⭐ WHAT THIS BLOCK IS FOR, in the operator's words (2026-08-24).
+   *
+   *  Jess's objective is that someone who does not know ERP can work this page
+   *  without asking what a section means. The block TITLES are locked words
+   *  (COPY-STANDARD "Use exactly", and MASTER.md's SALES ORDER OBJECT PAGE V2
+   *  names them in its block order), so the answer is not to rename them — it
+   *  is to EXPLAIN them. A subtitle teaches; a new noun would only move the
+   *  confusion somewhere else. */
+  subtitle?: string;
+  /** One line standing in for the whole block while collapsed. Passing this is
+   *  what makes a block collapsible at all — a block with no honest one-line
+   *  summary must stay open, because a chevron hiding an unknown is worse than
+   *  a card the reader can simply see. */
+  summary?: string;
+  /** ⭐ NEVER HIDE AN UNSAVED CHANGE. The dark save bar says `⚠ {n} changes`;
+   *  if one of those changes sat inside a collapsed block the operator would be
+   *  told something changed with no way to find it. A dirty block force-opens
+   *  and cannot be closed until it is saved or discarded. */
+  forceOpen?: boolean;
   children: React.ReactNode;
 }) {
+  const collapsible = Boolean(summary);
+  const [open, setOpen] = useState(false);
+  const isOpen = !collapsible || open || Boolean(forceOpen);
+  const headingId = `block-h-${title.replace(/\s+/g, "-").toLowerCase()}`;
+  const bodyId = `block-b-${title.replace(/\s+/g, "-").toLowerCase()}`;
+
   return (
     <section className="rounded-card border border-kit-slate-5 bg-white px-4 py-3" data-block={title}>
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-l-2 border-base-300 pl-2">
-        <h2 className="text-label font-semibold tracking-wide text-base-700 uppercase">{title}</h2>
+        <h2 id={headingId} className="text-label font-semibold tracking-wide text-base-700 uppercase">
+          {title}
+        </h2>
         {note && <span className="text-label font-normal text-base-600">{note}</span>}
       </div>
-      <div className="mt-3">{children}</div>
+      {subtitle && (
+        <p className="mt-1 pl-2 text-label font-normal text-base-500" data-testid={`block-subtitle-${title}`}>
+          {subtitle}
+        </p>
+      )}
+      {collapsible && !isOpen ? (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          aria-expanded={false}
+          aria-controls={bodyId}
+          className="mt-2 flex w-full items-center gap-2 rounded-control px-2 py-1.5 text-left text-body text-base-600 hover:bg-hovertint"
+          data-testid={`block-expand-${title}`}
+        >
+          <span className="text-base-400">▸</span>
+          <span className="min-w-0 flex-1 truncate">{summary}</span>
+        </button>
+      ) : (
+        <>
+          {collapsible && (
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              /* A dirty block cannot be closed — the change must stay findable. */
+              disabled={Boolean(forceOpen)}
+              aria-expanded
+              aria-controls={bodyId}
+              className="mt-2 flex items-center gap-2 rounded-control px-2 py-1 text-left text-meta text-base-500 hover:bg-hovertint disabled:cursor-not-allowed disabled:opacity-50"
+              data-testid={`block-collapse-${title}`}
+              title={forceOpen ? "This section has unsaved changes" : undefined}
+            >
+              <span className="text-base-400">▾</span>
+              <span>{forceOpen ? "Unsaved changes here" : "Hide"}</span>
+            </button>
+          )}
+          <div id={bodyId} className="mt-3">
+            {children}
+          </div>
+        </>
+      )}
     </section>
   );
 }
@@ -1889,7 +1958,10 @@ export default function SalesOrderWorkspace() {
       </Block>
 
       {/* ② ORDER INFO */}
-      <Block title="Order info">
+      <Block
+        title="Order info"
+        subtitle="The dates this order runs on. Proceed date is when production may start."
+      >
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <Fact label="Ordered" value={isNew ? "Today" : fmtDate(order?.placed_at ?? null)} />
           {mode === "create" ? (
@@ -1972,9 +2044,23 @@ export default function SalesOrderWorkspace() {
         )}
       </Block>
 
-      {/* ③ AMEND DELIVERY DATE */}
+      {/* ③ AMEND DELIVERY DATE
+          Collapsed unless an amendment is actually live. The block order is
+          LOCKED (MASTER.md, SALES ORDER OBJECT PAGE V2) and does not move —
+          what changes is only how much of it is open at once, which no ruling
+          governs. A pending amendment is real news, so it stays expanded. */}
       {!isNew && mode === "object" && orderId && (
-        <Block title="Amend delivery date" note="creates a Revision · needs approval">
+        <Block
+          title="Amend delivery date"
+          note="creates a Revision · needs approval"
+          subtitle="Move the date the customer was promised. Needs approval before it counts."
+          summary={
+            liveAmendment
+              ? "Amendment pending approval"
+              : "Delivery date unchanged — open to request a new one"
+          }
+          forceOpen={Boolean(liveAmendment)}
+        >
           <SalesOrderAmendDeliveryDate
             orderId={orderId}
             currentDeliveryDate={order?.delivery_date ?? null}
@@ -1988,6 +2074,13 @@ export default function SalesOrderWorkspace() {
         <Block
           title="Emergency contact"
           note="Used only if we cannot reach the customer on delivery day"
+          summary={
+            draft.emergency_name.trim() || draft.emergency_phone.trim()
+              ? `${draft.emergency_name.trim() || "No name"} · ${draft.emergency_phone.trim() || "no phone"}`
+              : "No emergency contact recorded"
+          }
+          /* Never hide a change the save bar is counting. */
+          forceOpen={changedFields.some((k) => k.startsWith("emergency_"))}
         >
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3" data-pos-field="emergency">
             <Input id="so-emergency-name" label="Name" value={draft.emergency_name}
@@ -2149,7 +2242,17 @@ export default function SalesOrderWorkspace() {
       </Block>
 
       {/* ⑦ SALES OWNERSHIP */}
-      <Block title="Sales ownership">
+      {/* The TITLE is locked — COPY-STANDARD:1395 rules this exact wording and
+          MASTER.md's block order names `SALES OWNERSHIP`. The audit's proposed
+          rename to "Sales assignment" is not available, and COPY-STANDARD's own
+          "Do NOT use" column already rejected the same shape ("Request
+          ownership change"). So the confusion is answered the only way that is
+          both legal and better: the locked word stays, and a subtitle says what
+          it means. */}
+      <Block
+        title="Sales ownership"
+        subtitle="Who sold it — the dealer, the showroom and the salesperson credited."
+      >
         {mode === "create" ? (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <Select id="so-dealer" label="Dealer"
@@ -2369,7 +2472,15 @@ export default function SalesOrderWorkspace() {
       )}
 
       {/* This is the Sales Order's document index. It reads every owning
-          module and never creates, edits or closes another module's record. */}
+          module and never creates, edits or closes another module's record.
+
+          NOT COLLAPSED, deliberately. The obvious candidate — seven rows of
+          links most reads never open — is the one card whose completeness is
+          MECHANICALLY PINNED: `SalesOrderWorkspace.ui-contract.test.ts` asserts
+          "a complete read-only Related Documents index" by matching this exact
+          source line. Collapsing it broke that test, which is the enforcement
+          of a locked ruling doing its job. Reopening it needs an owner ruling,
+          not a build decision. */}
       {!isNew && mode !== "oldrev" && (
         <Block title="Related Documents">
           <div data-testid="sales-order-related-documents">
