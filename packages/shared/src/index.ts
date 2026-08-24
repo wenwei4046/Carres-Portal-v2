@@ -2089,7 +2089,7 @@ export {
   setDestination,
   splitAllocation,
   validateAllocations,
-  documentGroupKey,
+  documentPartitionKey,
   groupSelectionsIntoDocuments,
   soBatchSelectionSummary,
   destinationAllocationSchema,

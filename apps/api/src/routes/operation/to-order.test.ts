@@ -10,6 +10,7 @@ import {
   type JWK,
   type KeyLike,
 } from "jose";
+import { documentPartitionKey } from "@carres/shared";
 import app from "../../index";
 import { _setJwksForTesting } from "../../middleware/auth";
 
@@ -1386,6 +1387,40 @@ async function readyDemands(sb: ReturnType<typeof makeSb>) {
   return out;
 }
 
+
+/**
+ * ⭐ A DECISION NAMES ITS DOCUMENT (Card closure §4).
+ *
+ * The fixture is Ohana × sofa, and a sofa is ONE PO PER CUSTOMER ORDER — so
+ * `o1` and `o2` are two documents and a decision must say which. This builds
+ * the set the browser would send: the priced document, plus an entry for every
+ * other document so the coverage is complete (partial coverage is refused,
+ * because it means the operator never saw the split the server made).
+ */
+function sofaDocKey(orderId: string, destinationId = KLANG) {
+  return documentPartitionKey({
+    supplierId: OHANA,
+    destinationId,
+    category: "sofa",
+    orderId,
+  });
+}
+function decisionsForAll(
+  demands: { orderId: string }[],
+  destinationId: string,
+  priced: { orderId: string; lineDecisions: unknown[]; procurementPartnerId?: string | null } | null = null,
+) {
+  const orders = [...new Set(demands.map((d) => d.orderId))];
+  return orders.map((orderId) => ({
+    documentKey: sofaDocKey(orderId, destinationId),
+    supplierId: OHANA,
+    destinationId,
+    procurementPartnerId:
+      priced?.procurementPartnerId !== undefined ? priced.procurementPartnerId : null,
+    lineDecisions: priced && priced.orderId === orderId ? priced.lineDecisions : [],
+  }));
+}
+
 const allTo = (
   demands: { demandId: string; qty: number }[],
   destinationId: string,
@@ -1631,21 +1666,14 @@ describe("the commercial laws still hold on the batch door", () => {
     sb.rpcCalls.length = 0;
     const res = await postBatch({
       selections: allTo(demands, KLANG),
-      documentDecisions: [
-        {
-          supplierId: OHANA,
-          destinationId: KLANG,
-          procurementPartnerId: null,
-          lineDecisions: [
+      documentDecisions: decisionsForAll(demands, KLANG, { orderId: "o1", procurementPartnerId: null, lineDecisions: [
             {
               sku: "5539-1B(LHF)",
               treatment: "normal",
               unitCost: 999999,
               costSource: "catalog",
             },
-          ],
-        },
-      ],
+          ] }),
     });
     expect(res.status).toBe(409);
     expect(((await res.json()) as { code?: string }).code).toBe("stale_catalog_cost");
@@ -1658,16 +1686,9 @@ describe("the commercial laws still hold on the batch door", () => {
     sb.rpcCalls.length = 0;
     const res = await postBatch({
       selections: allTo(demands, KLANG),
-      documentDecisions: [
-        {
-          supplierId: OHANA,
-          destinationId: KLANG,
-          procurementPartnerId: null,
-          lineDecisions: [
+      documentDecisions: decisionsForAll(demands, KLANG, { orderId: "o1", procurementPartnerId: null, lineDecisions: [
             { sku: "GONE-SKU", treatment: "normal", unitCost: 10, costSource: "catalog" },
-          ],
-        },
-      ],
+          ] }),
     });
     expect(res.status).toBe(409);
     expect(((await res.json()) as { code?: string }).code).toBe("stale_cost_decision");
@@ -1679,16 +1700,9 @@ describe("the commercial laws still hold on the batch door", () => {
     const demands = await readyDemands(sb);
     const res = await postBatch({
       selections: allTo(demands, KLANG),
-      documentDecisions: [
-        {
-          supplierId: OHANA,
-          destinationId: KLANG,
-          procurementPartnerId: null,
-          lineDecisions: [
+      documentDecisions: decisionsForAll(demands, KLANG, { orderId: "o1", procurementPartnerId: null, lineDecisions: [
             { sku: "5539-CNR", treatment: "free_of_charge", reason: "Supplier replacement" },
-          ],
-        },
-      ],
+          ] }),
     });
     expect(res.status).toBe(200);
     const batch = sb.rpcCalls.find((c) => c.fn === "purchasing_issue_pos_batch")!;
@@ -1795,16 +1809,9 @@ describe("the retired door's laws, re-asked of the batch door", () => {
     const { sb, demands } = await ready();
     const res = await postBatch({
       selections: allTo(demands, KLANG),
-      documentDecisions: [
-        {
-          supplierId: OHANA,
-          destinationId: KLANG,
-          procurementPartnerId: null,
-          lineDecisions: [
+      documentDecisions: decisionsForAll(demands, KLANG, { orderId: "o1", procurementPartnerId: null, lineDecisions: [
             { sku: "5539-CNR", treatment: "normal", unitCost: 1234, costSource: "hand_entered" },
-          ],
-        },
-      ],
+          ] }),
     });
     expect(res.status).toBe(200);
     const line = (batchArgs(sb) as unknown as { lines: Record<string, unknown>[] }[])
@@ -1820,14 +1827,7 @@ describe("the retired door's laws, re-asked of the batch door", () => {
     const { sb, demands } = await ready();
     const res = await postBatch({
       selections: allTo(demands, KLANG),
-      documentDecisions: [
-        {
-          supplierId: OHANA,
-          destinationId: KLANG,
-          procurementPartnerId: null,
-          lineDecisions: [{ sku: "5539-CNR", treatment: "free_of_charge", reason: "   " }],
-        },
-      ],
+      documentDecisions: decisionsForAll(demands, KLANG, { orderId: "o1", procurementPartnerId: null, lineDecisions: [{ sku: "5539-CNR", treatment: "free_of_charge", reason: "   " }] }),
     });
     expect(res.status).toBe(400);
     expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
@@ -1845,14 +1845,7 @@ describe("the retired door's laws, re-asked of the batch door", () => {
     const { sb: sb2, demands: d2 } = await ready(tables);
     const ok = await postBatch({
       selections: allTo(d2, KLANG),
-      documentDecisions: [
-        {
-          supplierId: OHANA,
-          destinationId: KLANG,
-          procurementPartnerId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
-          lineDecisions: [],
-        },
-      ],
+      documentDecisions: decisionsForAll(demands, KLANG, { orderId: "o1", procurementPartnerId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", lineDecisions: [] }),
     });
     expect(ok.status).toBe(200);
     for (const po of batchArgs(sb2)) {
@@ -1866,14 +1859,7 @@ describe("the retired door's laws, re-asked of the batch door", () => {
     const { sb, demands } = await ready(tables);
     const res = await postBatch({
       selections: allTo(demands, KLANG),
-      documentDecisions: [
-        {
-          supplierId: OHANA,
-          destinationId: KLANG,
-          procurementPartnerId: "5d5d5d5d-0000-4000-8000-00000000000d",
-          lineDecisions: [],
-        },
-      ],
+      documentDecisions: decisionsForAll(demands, KLANG, { orderId: "o1", procurementPartnerId: "5d5d5d5d-0000-4000-8000-00000000000d", lineDecisions: [] }),
     });
     expect(res.status).toBe(422);
     expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
@@ -1883,14 +1869,7 @@ describe("the retired door's laws, re-asked of the batch door", () => {
     const { sb, demands } = await ready();
     const res = await postBatch({
       selections: allTo(demands, KLANG),
-      documentDecisions: [
-        {
-          supplierId: OHANA,
-          destinationId: KLANG,
-          procurementPartnerId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
-          lineDecisions: [],
-        },
-      ],
+      documentDecisions: decisionsForAll(demands, KLANG, { orderId: "o1", procurementPartnerId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", lineDecisions: [] }),
     });
     expect(res.status).toBe(422);
     expect(((await res.json()) as { code?: string }).code).toBe("pickup_partner_not_allowed");

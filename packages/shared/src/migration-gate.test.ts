@@ -4,13 +4,21 @@ import { mkdtempSync, writeFileSync, mkdirSync, rmSync, readFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-// @ts-expect-error — repository tooling, deliberately plain .mjs
-import {
-  findCollisions,
-  staleBaselineEntries,
-  collisionMessage,
-  groupByNumber,
-} from "../../../scripts/migration-collisions.mjs";
+/* Repository tooling, deliberately plain `.mjs` with no declaration file — it
+   is run by CI with node, not compiled. Typed at the boundary here. */
+// @ts-expect-error -- untyped .mjs tooling module
+import * as collisions from "../../../scripts/migration-collisions.mjs";
+
+const { findCollisions, staleBaselineEntries, collisionMessage, groupByNumber } =
+  collisions as {
+    findCollisions: (
+      files: string[],
+      baseline?: Set<string>,
+    ) => Array<{ number: string; files: string[] }>;
+    staleBaselineEntries: (files: string[], baseline?: Set<string>) => string[];
+    collisionMessage: (c: Array<{ number: string; files: string[] }>) => string;
+    groupByNumber: (files: string[]) => Map<string, string[]>;
+  };
 
 /**
  * THE MIGRATION NUMBER IS THE APPLY ORDER (red line 7).

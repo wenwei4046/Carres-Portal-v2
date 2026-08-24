@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { isOnePoPerOrder } from "./to-order";
+import type { ProductCategory } from "./db-types";
 import type { PurchaseDemandRow, PurchaseDemandState } from "./purchase-demands";
 
 /**
@@ -240,15 +242,45 @@ export function validateAllocations(
 // ─── Documents ───────────────────────────────────────────────────────────────
 
 /**
- * ONE PO HAS ONE SUPPLIER AND ONE `Deliver To` (Card §4.2). The key says so and
- * nothing else — no category, no date, no order. Two Sales Orders on the same
- * supplier going to the same place belong on one document; the same supplier
- * going to two places cannot.
+ * ⭐ THE ONE DOCUMENT PARTITION — used by the browser AND the server.
  *
- * This key is a HINT. The server recomputes it, and the server's answer wins.
+ * Four parts, and every one of them is load-bearing:
+ *
+ *   supplier      one PO has one supplier
+ *   destination   one PO has one `Deliver To` (Card §4.2)
+ *   category      a proposal is supplier × category, so a supplier's
+ *                 mattresses and its bedframes are already separate documents
+ *   source order  a SOFA is ONE PO PER CUSTOMER ORDER (locked 2026-07-27) —
+ *                 a matched set is made and delivered together
+ *
+ * ── WHY THIS FUNCTION EXISTS AT ALL ─────────────────────────────────────────
+ *
+ * Measured 2026-08-24: the browser grouped by supplier × destination and the
+ * server grouped by all four. So the operator could review ONE document, press
+ * Issue, and be handed THREE — and `documentDecisions`, keyed the browser's
+ * way, could attach a price to a document that was never created.
+ *
+ * A shared function is the only fix that stays fixed. Both sides now compute
+ * the same key from the same facts, so `Issue N POs`, `1 of N`,
+ * `documentDecisions`, the server's grouping and `pos.length` cannot drift
+ * apart. The server still recomputes it from its own recomputation — this is
+ * agreement, not trust.
  */
-export function documentGroupKey(supplierId: string, destinationId: string): string {
-  return `${supplierId}::${destinationId}`;
+export function documentPartitionKey(f: {
+  supplierId: string;
+  destinationId: string;
+  category: ProductCategory | null;
+  orderId: string;
+}): string {
+  /* A sofa is one PO per customer order; everything else consolidates across
+     orders inside its category. */
+  const perOrder = f.category != null && isOnePoPerOrder(f.category);
+  return [
+    f.supplierId,
+    f.destinationId,
+    f.category ?? "uncatalogued",
+    perOrder ? f.orderId : "",
+  ].join("::");
 }
 
 export interface SoBatchDocumentLine {
@@ -266,10 +298,15 @@ export interface SoBatchDocumentLine {
 }
 
 export interface SoBatchDocument {
+  /** The four-part partition key (`documentPartitionKey`). */
   key: string;
   supplierId: string;
   supplierName: string | null;
   destinationId: string;
+  /** Part of the partition, and what the server groups on. */
+  category: ProductCategory | null;
+  /** Set only when this category is one-PO-per-customer-order (sofa). */
+  orderId: string | null;
   qty: number;
   lines: SoBatchDocumentLine[];
   /** Factory pickup needs a procurement partner before this can be issued. */
@@ -295,7 +332,12 @@ export function groupSelectionsIntoDocuments(
     }
     for (const a of selection.allocations) {
       if (a.qty <= 0) continue;
-      const key = documentGroupKey(row.supplierId, a.destinationId);
+      const key = documentPartitionKey({
+        supplierId: row.supplierId,
+        destinationId: a.destinationId,
+        category: row.category,
+        orderId: row.orderId,
+      });
       let doc = docs.get(key);
       if (!doc) {
         doc = {
@@ -303,6 +345,9 @@ export function groupSelectionsIntoDocuments(
           supplierId: row.supplierId,
           supplierName: row.supplier,
           destinationId: a.destinationId,
+          category: row.category,
+          orderId:
+            row.category != null && isOnePoPerOrder(row.category) ? row.orderId : null,
           qty: 0,
           lines: [],
           supplierKind: row.supplierKind,

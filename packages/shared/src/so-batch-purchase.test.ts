@@ -6,7 +6,7 @@ import {
   setDestination,
   splitAllocation,
   validateAllocations,
-  documentGroupKey,
+  documentPartitionKey,
   groupSelectionsIntoDocuments,
   soBatchSelectionSummary,
   isSelectableForBuying,
@@ -283,11 +283,46 @@ describe("validateAllocations — the arrangement must add back to the server's 
 });
 
 describe("documents are grouped by supplier × Deliver To", () => {
-  it("the key is supplier and destination, and nothing else", () => {
-    expect(documentGroupKey("s-hooka", KLANG.id)).toBe(`s-hooka::${KLANG.id}`);
-    expect(documentGroupKey("s-hooka", KLANG.id)).not.toBe(
-      documentGroupKey("s-hooka", SG_BULOH.id),
-    );
+  it("the key is supplier × destination × category × sofa-order, and nothing else", () => {
+    const k = (over: Partial<Parameters<typeof documentPartitionKey>[0]> = {}) =>
+      documentPartitionKey({
+        supplierId: "s-hooka",
+        destinationId: KLANG.id,
+        category: "mattress",
+        orderId: "o1",
+        ...over,
+      });
+    expect(k()).toBe(`s-hooka::${KLANG.id}::mattress::`);
+    // Each part moves the key.
+    expect(k({ destinationId: SG_BULOH.id })).not.toBe(k());
+    expect(k({ supplierId: "s-ohana" })).not.toBe(k());
+    expect(k({ category: "bedframe" })).not.toBe(k());
+    // ...except the order, which only matters where a sofa says it does.
+    expect(k({ orderId: "o2" })).toBe(k());
+  });
+
+  it("⭐ a SOFA is one document per customer order — the locked 2026-07-27 rule", () => {
+    const sofa = (orderId: string) =>
+      documentPartitionKey({
+        supplierId: "s-ohana", destinationId: KLANG.id, category: "sofa", orderId,
+      });
+    expect(sofa("o1")).not.toBe(sofa("o2"));
+    expect(sofa("o1")).toBe(`s-ohana::${KLANG.id}::sofa::o1`);
+  });
+
+  it("a non-sofa category consolidates across customer orders", () => {
+    const mattress = (orderId: string) =>
+      documentPartitionKey({
+        supplierId: "s-hooka", destinationId: KLANG.id, category: "mattress", orderId,
+      });
+    expect(mattress("o1")).toBe(mattress("o2"));
+  });
+
+  it("an uncatalogued line gets its own partition rather than joining one", () => {
+    const key = documentPartitionKey({
+      supplierId: "s-hooka", destinationId: KLANG.id, category: null, orderId: "o1",
+    });
+    expect(key).toContain("uncatalogued");
   });
 
   it("one supplier split across two destinations becomes TWO documents", () => {
@@ -344,7 +379,7 @@ describe("documents are grouped by supplier × Deliver To", () => {
     expect(Object.keys(doc!).sort()).toEqual(
       [
         "destinationId", "key", "lines", "qty", "supplierId", "supplierName",
-        "supplierKind",
+        "supplierKind", "category", "orderId",
       ].sort(),
     );
     // Still no price, no number and no arrival date on the GROUPING itself —

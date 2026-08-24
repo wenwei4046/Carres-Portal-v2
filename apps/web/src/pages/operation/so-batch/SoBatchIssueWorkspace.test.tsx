@@ -55,6 +55,8 @@ function doc(over: Partial<SoBatchDocument> = {}): SoBatchDocument {
         costs: [{ sku: "B1201S-K", unitCost: 100 }],
       },
     ],
+    category: "mattress",
+    orderId: null,
     supplierKind: "own_logistics",
     ...over,
   };
@@ -80,6 +82,8 @@ const SECOND = doc({
       costs: [{ sku: "H1401S-Q", unitCost: 250 }],
     },
   ],
+  category: "mattress",
+  orderId: null,
   supplierKind: "own_logistics",
 });
 
@@ -387,8 +391,13 @@ describe("Transaction Cost, or Free of Charge with a reason", () => {
     await waitFor(() => expect(apiFetch).toHaveBeenCalled());
     const body = JSON.parse((apiFetch.mock.calls[0]![1] as { body: string }).body);
     expect(body.documentDecisions[0].lineDecisions).toEqual([
-      { sku: "X-NEW-K", treatment: "normal", unitCost: 480, costSource: "hand_entered" },
+      {
+        sku: "X-NEW-K", treatment: "normal", unitCost: 480,
+        costSource: "hand_entered", expectedCatalogCost: null,
+      },
     ]);
+    // ...and the decision names the exact document it belongs to.
+    expect(body.documentDecisions[0].documentKey).toBe(noCost.key);
   });
 
   it("an untouched Catalog price is NOT sent — the server reads its own", async () => {
@@ -410,7 +419,11 @@ describe("Transaction Cost, or Free of Charge with a reason", () => {
     await waitFor(() => expect(apiFetch).toHaveBeenCalled());
     const body = JSON.parse((apiFetch.mock.calls[0]![1] as { body: string }).body);
     expect(body.documentDecisions[0].lineDecisions[0]).toEqual({
-      sku: "B1201S-K", treatment: "normal", unitCost: 150, costSource: "hand_entered",
+      sku: "B1201S-K", treatment: "normal", unitCost: 150,
+      costSource: "hand_entered",
+      /* The price it was reviewed against — so the server can tell an agreed
+         difference from a supplier moving the price after the operator looked. */
+      expectedCatalogCost: 100,
     });
   });
 

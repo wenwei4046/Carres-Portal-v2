@@ -3,8 +3,8 @@ import { z } from "zod";
 import {
   DEMAND_PURPOSE_DEFAULT,
   DEMAND_PURPOSE_VALUES,
+  documentPartitionKey,
   expectedArrivalOf,
-  isOnePoPerOrder,
   isToOrderCategory,
   monthKeyMYT,
   planFromDocuments,
@@ -954,6 +954,8 @@ const soBatchIssueInput = z
       .array(
         z
           .object({
+            /** The exact partition key the operator reviewed (closure §4). */
+            documentKey: z.string().min(1),
             supplierId: z.string().uuid(),
             destinationId: z.string().uuid(),
             procurementPartnerId: z.string().uuid().nullable(),
@@ -966,6 +968,10 @@ const soBatchIssueInput = z
                       treatment: z.literal("normal"),
                       unitCost: z.number().positive(),
                       costSource: z.enum(["catalog", "hand_entered"]),
+                      /** The catalog price the operator REVIEWED (0380): the
+                       *  server compares it with the live one and refuses a
+                       *  change rather than adopting it silently. */
+                      expectedCatalogCost: z.number().nonnegative().nullable().optional(),
                     })
                     .strict(),
                   z
@@ -1182,13 +1188,16 @@ toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
   const groups = new Map<string, Group>();
   for (const a of allocations) {
     const hit = index.get(a.demandId)!;
-    const perOrder = isOnePoPerOrder(hit.proposal.category);
-    const key = [
-      hit.proposal.supplierId,
-      a.destinationId,
-      hit.proposal.category,
-      perOrder ? hit.row.orderId : "",
-    ].join("::");
+    /* ⭐ THE SHARED PARTITION (Card closure §4). The browser computes this same
+       key from the same facts, so `Issue N POs`, `1 of N`, the decisions, this
+       grouping and `pos.length` cannot drift apart. Still RECOMPUTED here from
+       the server's own recomputation — agreement, not trust. */
+    const key = documentPartitionKey({
+      supplierId: hit.proposal.supplierId,
+      destinationId: a.destinationId,
+      category: hit.proposal.category,
+      orderId: hit.row.orderId,
+    });
     let group = groups.get(key);
     if (!group) {
       group = {
@@ -1224,10 +1233,12 @@ toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
 
   /* A decision is keyed the way the OPERATOR made it — per supplier and
      destination, which is the document they were looking at. */
-  const decisionsFor = (supplierId: string, destinationId: string) =>
-    documentDecisions.find(
-      (d) => d.supplierId === supplierId && d.destinationId === destinationId,
-    );
+  /* ⭐ A DECISION BELONGS TO ONE DOCUMENT (Card closure §4). Keyed by
+     supplier + destination it was COARSER than the partition the server
+     creates, so a price reviewed on one sofa order could be applied to another
+     customer's document. It now names the exact key the operator reviewed. */
+  const decisionsFor = (key: string) =>
+    documentDecisions.find((d) => d.documentKey === key);
 
   /**
    * A DECISION FOR A LINE NOBODY IS BUYING IS STALE, NOT NOISE. It means the
@@ -1240,24 +1251,55 @@ toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
    * where those cuts fall. Inside each document, only the decisions whose SKU
    * is actually on it are applied.
    */
-  const surfaceSkus = new Map<string, Set<string>>();
+  const documentSkus = new Map<string, Set<string>>();
   for (const group of groups.values()) {
-    const key = `${group.proposal.supplierId}::${group.destinationId}`;
     const plan = planFromDocuments(group.proposal, [
       { key: group.key, include: true, buildKeys: group.buildKeys },
     ]);
-    const set = surfaceSkus.get(key) ?? new Set<string>();
-    for (const line of plan[0]?.lines ?? []) set.add(line.sku);
-    surfaceSkus.set(key, set);
+    documentSkus.set(group.key, new Set((plan[0]?.lines ?? []).map((l) => l.sku)));
   }
+  /* DUPLICATE · FOREIGN · STALE · MISSING — each refused BY NAME. "Your prices
+     were ignored" is not something an operator can act on, and a document that
+     nobody priced must not be issued on silence. */
+  const seenDecision = new Set<string>();
   for (const d of documentDecisions) {
-    const known = surfaceSkus.get(`${d.supplierId}::${d.destinationId}`);
-    if (!known) continue;
-    if (d.lineDecisions.some((l) => !known.has(l.sku))) {
+    if (seenDecision.has(d.documentKey)) {
+      return c.json({ error: "duplicate_decision", code: "duplicate_decision" }, 422);
+    }
+    seenDecision.add(d.documentKey);
+    const known = documentSkus.get(d.documentKey);
+    if (!known) {
       return c.json(
-        { error: "stale_cost_decision", code: "stale_cost_decision" },
+        { error: "foreign_decision", code: "foreign_decision", documentKey: d.documentKey },
         409,
       );
+    }
+    const skus = new Set<string>();
+    for (const l of d.lineDecisions) {
+      if (skus.has(l.sku)) {
+        return c.json({ error: "duplicate_cost_decision", code: "duplicate_cost_decision" }, 422);
+      }
+      skus.add(l.sku);
+      if (!known.has(l.sku)) {
+        return c.json({ error: "stale_cost_decision", code: "stale_cost_decision" }, 409);
+      }
+    }
+  }
+  /* MISSING — but only once the operator has priced ANYTHING.
+   *
+   * Sending no decisions at all means "every line stands on the catalog price
+   * it was reviewed at", and the per-line commercial gate proves that for
+   * itself. PARTIAL coverage is the real error: it means the operator priced
+   * the document in front of them and never saw the others the server split
+   * out, which is exactly the drift the shared partition exists to stop. */
+  if (documentDecisions.length > 0) {
+    for (const group of groups.values()) {
+      if (!decisionsFor(group.key)) {
+        return c.json(
+          { error: "missing_decision", code: "missing_decision", documentKey: group.key },
+          422,
+        );
+      }
     }
   }
 
@@ -1285,10 +1327,7 @@ toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
     }
     const po = plan[0]!;
 
-    const decision = decisionsFor(
-      group.proposal.supplierId,
-      group.destinationId,
-    );
+    const decision = decisionsFor(group.key);
     const partnerId = decision?.procurementPartnerId ?? null;
     const needsPartner = group.proposal.supplierKind === "factory_pickup";
     if (needsPartner && (!partnerId || !validPartners.has(partnerId))) {

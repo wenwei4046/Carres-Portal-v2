@@ -66,7 +66,13 @@ type LineDecision = { treatment: "normal"; cost: string } | {
 
 /** One priced line, exactly as `soBatchIssueInput` expects it on the wire. */
 type WireLineDecision =
-  | { sku: string; treatment: "normal"; unitCost: number; costSource: "hand_entered" }
+  | {
+      sku: string;
+      treatment: "normal";
+      unitCost: number;
+      costSource: "hand_entered";
+      expectedCatalogCost: number | null;
+    }
   | { sku: string; treatment: "free_of_charge"; reason: string };
 
 /** Every distinct SKU on a document, with the Catalog price behind it. */
@@ -194,6 +200,11 @@ export default function SoBatchIssueWorkspace({
   const documentDecisions = useMemo(
     () =>
       documents.map((doc) => ({
+        /* ⭐ THE EXACT DOCUMENT (Card closure §4). Both sides compute this key
+           from the same facts, so a decision cannot attach to a document the
+           server never creates — and the server refuses one that does not
+           name a partition it built. */
+        documentKey: doc.key,
         supplierId: doc.supplierId,
         destinationId: doc.destinationId,
         procurementPartnerId:
@@ -214,6 +225,10 @@ export default function SoBatchIssueWorkspace({
               /* Hand-entered even when it started as the catalog price: the
                  operator changed it, so it is theirs now. */
               costSource: "hand_entered" as const,
+              /* The catalog price this was reviewed against, so the server can
+                 tell "the operator agreed a different price" from "the supplier
+                 moved the price after they looked" (0380). */
+              expectedCatalogCost: catalogCost,
             },
           ];
         }),
