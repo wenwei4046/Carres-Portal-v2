@@ -1155,6 +1155,13 @@ and what completes it.** Forty-eight codes answer by name, every one is walked b
 holds every line to fourteen words. The API sends both lines, the browser renders both, and a refusal
 raised in SQL is translated rather than shown raw. Nothing is created when a refusal fires.
 
+The words are LAW, so they are written down where words are law: `docs/COPY-STANDARD.md` gains
+**"Why a purchase order was refused — CANONICAL HOME"**, carrying the thirteen load-bearing pairs
+verbatim and the rules that bind every line. `docs/pdf/PO-PDF-STANDARD.md` is overwritten where it
+was out of date: the **P5 per-line-SO gap is CLOSED** (it said "schema carries no per-line SO yet"),
+and `Issued by` plus the supplier's full address now have fields behind columns that had been law
+since 2026-08-09 and printed nothing.
+
 ### 17.8 The responsive walk — 1130px and below
 
 Walked in a real browser against `so-batch-preview.html`, a dev-only vite entry rendering the REAL

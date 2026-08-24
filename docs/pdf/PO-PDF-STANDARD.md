@@ -64,8 +64,18 @@ not theirs. 100% legible on a cheap B/W laser, a fax, a WhatsApp photo.
     scannable id per physical unit. The column the 2026-08-01 law reserved is
     now LIVE: the supplier labels each unit by id; the warehouse scans on
     receive. Prints `—` until codes arrive. **Never the SKU.**
-  - Per-line `SO No` prints only when the PO covers exactly ONE sales order
-    (schema carries no per-line SO yet — the P5 allocation gap, still open).
+  - **Per-line `SO No` comes from the LINE's own lineage** (`po_line_sources`,
+    0382). One aggregated SKU serving three customers prints all three with the
+    quantity beside each — `SO-1318 × 2` — because ten mattresses stop being
+    interchangeable the moment three people are promised them. A line serving one
+    order prints `SO-1318` alone.
+
+    The P5 allocation gap is **CLOSED**. Until 0382 the schema kept `so_refs` on
+    the DOCUMENT and nothing per line, so this column printed only when the whole
+    PO covered exactly one sales order — every bulk purchase order printed it
+    BLANK, and a supplier delivering ten mattresses could not tell Carres whose
+    they were. Purchase orders raised before 0382 have no lineage to read and
+    keep the old document-level fallback.
   - CR/TCF import refs never appear. No database words on paper. No UOM
     column. An item never splits across pages.
   - A BULK PO (several SOs) closes with the family `TOTAL` row (qty only);
@@ -87,6 +97,15 @@ target for the sofa PO's paging (implement with the long-order pass, matching
 the DO's per-set pages).
 
 ## 4 · Footer & audit
+
+**`Issued by {name}` is the real issuer** — `audit_log`'s own actor for the
+creation, read by `purchasing_po_document` (0383). The route hard-coded it to
+`null` until then, so the footer named nobody on every purchase order Carres has
+ever sent. **The supplier's FULL address is read too** (`suppliers.address`,
+added by 0383): the column has been law since 2026-08-09 and had no field behind
+it, so it printed nothing. An address nobody has filled still prints nothing —
+the gap is visible rather than fatal, because a purchase order has to be able to
+leave.
 
 Family footer with the PO's audit cell: left `{PO no} · Issued by {name}` ·
 centre `Computer-generated document · No signature required.` · right page
@@ -113,3 +132,4 @@ PO. The paper therefore carries `PO No` **and** `Version` (§2).
 | 2026-08-09 | FINAL (owner: ok): supplier full address; content-driven section-2 widths; detail rows PO No · Issued · Deliver by. | Loo |
 | 2026-08-24 | `Version` prints on the paper, including Version 1 — identity block, PO DETAILS row and continuation header (0378). The confirmation records the version the operator rendered; a stale one is refused. The `never revises` line in §5 is marked superseded by 0364. | CARD-2026-08-22-purchasing-02 |
 | 2026-08-09 | FAMILY REWRITE: chrome deferred to SO-PDF-STANDARD (§2.1/§8.5); logo-stamp header, 35mm label gutter, caps header dates and the zero-fill table DELETED per the Master Overwrite Law; `Sales Order` column → `SO No`; `TOTAL QUANTITY` → family `TOTAL` row; Item ID column goes LIVE with 0153 unit codes; `Delivery by` bold in PO DETAILS; footer keeps the Issued-by audit. Business rules (no money, consolidation, one destination, sofa drawing) unchanged. | Loo |
+| 2026-08-24 | **P5 CLOSED**: per-line `SO No` reads `po_line_sources` (0382), so a bulk PO prints its per-customer breakdown instead of a blank column. `Issued by` is the real `audit_log` actor and the supplier's FULL address is read from `suppliers.address` (0383) — both were hard-coded `null` before. Item ID is fed by the `U1-000-001` allocator (0381). No visual or business rule changed. | CARD-2026-08-22-purchasing-02 |
