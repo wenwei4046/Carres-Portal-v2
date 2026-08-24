@@ -1186,6 +1186,12 @@ catalogRouter.post("/import-skus", async (c) => {
        a file with no supplier_code column must not wipe codes keyed in by
        hand, and only a PRESENT-but-blank cell clears one. */
     if (r.supplierCode !== undefined) p.supplier_code = r.supplierCode;
+    /* 0186 pwp_price via the import (2026-08-24). Same omitted-means-preserve
+       rule. DEPLOY-ORDER SAFE unlike 0375's column: this is a KEY IN A JSONB
+       PAYLOAD, and catalog_import_skus reads only the keys it knows — until
+       the migration teaching it pwp_price is applied, the key is simply
+       ignored (rows import, prices don't land), never an error. */
+    if (r.pwpPrice !== undefined) p.pwp_price = r.pwpPrice;
     if (r.posActive !== undefined) p.pos_active = r.posActive;
 
     payloadRows.push(p);

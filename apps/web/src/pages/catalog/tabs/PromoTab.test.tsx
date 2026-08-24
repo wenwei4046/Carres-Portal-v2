@@ -71,7 +71,11 @@ function makeCatalog(overrides?: Partial<CatalogResponse>): CatalogResponse {
     ],
     skus: [
       sku({ sku: "MATT-A", modelId: MATTRESS_MODEL, price: 1200 }),
-      sku({ sku: "PILLOW", modelId: ACCESSORY_MODEL, price: 100, description: "Memory Pillow" }),
+      // pwpPrice is REQUIRED for the PWP-rule tests below to be able to save at
+      // all: the form now refuses a 'pwp' rule none of whose reward SKUs carries
+      // a price, because that rule can never fire. Before this line the fixture
+      // built exactly that born-dead rule and asserted it saved.
+      sku({ sku: "PILLOW", modelId: ACCESSORY_MODEL, price: 100, description: "Memory Pillow", pwpPrice: 60 }),
     ],
     sofaFabrics: [],
     addons: [],
@@ -534,6 +538,132 @@ describe("PromoTab — PWP / promo rules", () => {
     render(wrap(<PromoTab catalog={makeCatalog()} isPrincipal={true} />));
     fireEvent.click(screen.getByTestId("pwp-add"));
     fireEvent.change(screen.getByTestId("pwp-qty"), { target: { value: "0" } });
+    expect(screen.getByTestId("pwp-save")).toBeDisabled();
+  });
+
+  // ---- the targets belong to the category that is leaving -------------------
+  // Two pickers are on screen (trigger, reward), so every rtp-* query is
+  // getAllByTestId + index: [0] = trigger, [1] = reward.
+
+  it("changing the TRIGGER category clears the trigger targets it orphans", () => {
+    render(wrap(<PromoTab catalog={makeCatalog()} isPrincipal={true} />));
+    fireEvent.click(screen.getByTestId("pwp-add"));
+
+    // trigger defaults to 'mattress' — pick the mattress model
+    fireEvent.change(screen.getAllByTestId("rtp-add-model")[0], {
+      target: { value: MATTRESS_MODEL },
+    });
+    expect(screen.getByTestId(`rtp-model-${MATTRESS_MODEL}`)).toBeInTheDocument();
+
+    // now move the category out from under it
+    fireEvent.change(screen.getByTestId("pwp-trigger-category"), {
+      target: { value: "bedframe" },
+    });
+
+    // the mattress must be gone — a rule reading "category bedframe AND model
+    // in [a mattress]" matches nothing, and the Save guard counts targets
+    // rather than checking they belong, so it would never have caught it.
+    expect(screen.queryByTestId(`rtp-model-${MATTRESS_MODEL}`)).not.toBeInTheDocument();
+  });
+
+  it("changing the REWARD category clears the reward targets it orphans", () => {
+    render(wrap(<PromoTab catalog={makeCatalog()} isPrincipal={true} />));
+    fireEvent.click(screen.getByTestId("pwp-add"));
+
+    // reward defaults to 'accessory' — pick the accessory model
+    fireEvent.change(screen.getAllByTestId("rtp-add-model")[1], {
+      target: { value: ACCESSORY_MODEL },
+    });
+    expect(screen.getByTestId(`rtp-model-${ACCESSORY_MODEL}`)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByTestId("pwp-reward-category"), {
+      target: { value: "mattress" },
+    });
+    expect(screen.queryByTestId(`rtp-model-${ACCESSORY_MODEL}`)).not.toBeInTheDocument();
+  });
+
+  it("changing the trigger category leaves the REWARD targets alone", () => {
+    // The two sides are independent; clearing both on one change would be a
+    // different bug wearing the same fix.
+    render(wrap(<PromoTab catalog={makeCatalog()} isPrincipal={true} />));
+    fireEvent.click(screen.getByTestId("pwp-add"));
+    fireEvent.change(screen.getAllByTestId("rtp-add-model")[1], {
+      target: { value: ACCESSORY_MODEL },
+    });
+    fireEvent.change(screen.getByTestId("pwp-trigger-category"), {
+      target: { value: "bedframe" },
+    });
+    expect(screen.getByTestId(`rtp-model-${ACCESSORY_MODEL}`)).toBeInTheDocument();
+  });
+
+  // ---- the born-dead rule ---------------------------------------------------
+
+  it("a 'pwp' rule whose rewards are ALL unpriced cannot be saved, and says why", () => {
+    // The rule would be invisible at the till AND its trigger would still mint
+    // voucher codes that print on the customer's receipt. Refusing at authoring
+    // is the only place a human can still act on it.
+    const cat = makeCatalog({
+      skus: [
+        sku({ sku: "MATT-A", modelId: MATTRESS_MODEL, price: 1200 }),
+        sku({ sku: "PILLOW", modelId: ACCESSORY_MODEL, price: 100, pwpPrice: null }),
+      ],
+    });
+    render(wrap(<PromoTab catalog={cat} isPrincipal={true} />));
+    fireEvent.click(screen.getByTestId("pwp-add"));
+
+    expect(screen.getByTestId("pwp-save")).toBeDisabled();
+    expect(screen.getByTestId("pwp-reward-price-coverage")).toHaveTextContent(
+      /None of the 1 reward SKUs has a PWP price/i,
+    );
+  });
+
+  it("NEGATIVE CONTROL: the same unpriced catalog saves fine as a PROMO", async () => {
+    // A promo reward is free BY THE RULE'S TYPE — the server returns 0 without
+    // ever reading pwp_price. Routing promo through the price guard would refuse
+    // every free-gift rule in the system.
+    const cat = makeCatalog({
+      skus: [
+        sku({ sku: "MATT-A", modelId: MATTRESS_MODEL, price: 1200 }),
+        sku({ sku: "PILLOW", modelId: ACCESSORY_MODEL, price: 100, pwpPrice: null }),
+      ],
+    });
+    render(wrap(<PromoTab catalog={cat} isPrincipal={true} />));
+    fireEvent.click(screen.getByTestId("pwp-add"));
+    fireEvent.click(screen.getByTestId("pwp-kind-promo"));
+
+    expect(screen.queryByTestId("pwp-reward-price-coverage")).not.toBeInTheDocument();
+    expect(screen.getByTestId("pwp-save")).not.toBeDisabled();
+    fireEvent.click(screen.getByTestId("pwp-save"));
+    await waitFor(() => expect(mockCreatePwp).toHaveBeenCalledOnce());
+    expect(mockCreatePwp.mock.calls[0][0].type).toBe("promo");
+  });
+
+  it("partial reward coverage is allowed, and reports the count", () => {
+    const cat = makeCatalog({
+      skus: [
+        sku({ sku: "MATT-A", modelId: MATTRESS_MODEL, price: 1200 }),
+        sku({ sku: "PILLOW", modelId: ACCESSORY_MODEL, price: 100, pwpPrice: 60 }),
+        sku({ sku: "THROW", modelId: ACCESSORY_MODEL, price: 80, pwpPrice: null }),
+      ],
+    });
+    render(wrap(<PromoTab catalog={cat} isPrincipal={true} />));
+    fireEvent.click(screen.getByTestId("pwp-add"));
+
+    expect(screen.getByTestId("pwp-save")).not.toBeDisabled();
+    expect(screen.getByTestId("pwp-reward-price-coverage")).toHaveTextContent(
+      /1 of 2 reward SKUs have a PWP price/i,
+    );
+  });
+
+  it("a reward price of 0 counts as unpriced — the till would refuse it", () => {
+    const cat = makeCatalog({
+      skus: [
+        sku({ sku: "MATT-A", modelId: MATTRESS_MODEL, price: 1200 }),
+        sku({ sku: "PILLOW", modelId: ACCESSORY_MODEL, price: 100, pwpPrice: 0 }),
+      ],
+    });
+    render(wrap(<PromoTab catalog={cat} isPrincipal={true} />));
+    fireEvent.click(screen.getByTestId("pwp-add"));
     expect(screen.getByTestId("pwp-save")).toBeDisabled();
   });
 

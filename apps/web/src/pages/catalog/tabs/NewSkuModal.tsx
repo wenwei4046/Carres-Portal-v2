@@ -20,6 +20,7 @@ import { ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import {
   useCreateCatalogModel,
+  useOperationSuppliers,
   useCreateCatalogSku,
   useCreateGuaranteeProduct,
   useGenerateSkus,
@@ -127,6 +128,13 @@ export default function NewSkuModal({
   /* 0375 — the SUPPLIER'S own item code (their quotation's code for this
    * piece). Free text, optional; ours is the SKU code above. */
   const [supplierCode, setSupplierCode] = useState("");
+  /* 2026-08-24 - WHO supplies this piece. Empty = Auto: the route resolves
+   * the supplier from `suppliers.cat_covered[]` exactly as it always has,
+   * so an untouched form is byte-identical to before this picker existed.
+   * Picking one writes supplier_id explicitly - the identity is the FK;
+   * the NAME is only ever derived from it (Law A/D), never typed here. */
+  const [supplierId, setSupplierId] = useState("");
+  const suppliersQ = useOperationSuppliers();
   // new-product fields
   const [category, setCategory] = useState<ProductCategory>("mattress");
   const [name, setName] = useState("");
@@ -484,6 +492,7 @@ export default function NewSkuModal({
         price: isPrincipal ? priceNum : 0,
         cost: isPrincipal ? costNum : null,
         description: description.trim() || null,
+        supplierId: supplierId || null,
         supplierCode: supplierCode.trim() || null,
       });
       toast.success(`Added ${codePreview || variant.trim()}`);
@@ -1019,6 +1028,25 @@ export default function NewSkuModal({
                   size pool dimensions)
                 </div>
               )}
+            </label>
+
+            <label className="block">
+              <span className="label block mb-1">Supplier</span>
+              <select
+                value={supplierId}
+                onChange={(e) => setSupplierId(e.target.value)}
+                data-testid="new-sku-supplier"
+                className={INPUT_CLS}
+              >
+                {/* Auto keeps the route's category-based resolution - the
+                    behaviour every SKU before this picker was created under. */}
+                <option value="">Auto (by category)</option>
+                {(suppliersQ.data?.suppliers ?? []).map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
             </label>
 
             <label className="block">

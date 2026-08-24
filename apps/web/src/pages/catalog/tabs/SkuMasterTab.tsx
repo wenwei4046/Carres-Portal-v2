@@ -9,7 +9,7 @@ import type {
 import { activeSofaSizes, categoryHasSizeAxis, PRODUCT_CATEGORIES } from "@carres/shared";
 import { ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { useDeleteCatalogSku, usePatchCatalogModel, usePatchCatalogSku } from "@/lib/queries";
+import { useDeleteCatalogSku, useOperationSuppliers, usePatchCatalogModel, usePatchCatalogSku } from "@/lib/queries";
 import { INPUT_CLS } from "@/pages/operation/components/Modal";
 import { CategoryChip, CATEGORY_LABEL, CATEGORY_LABEL_SHORT, CodeChip } from "../components/atoms";
 import { skuMargin } from "../margin";
@@ -81,6 +81,11 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
   const [category, setCategory] = useState<CatFilter>("all");
   const [modelFilter, setModelFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
+  /* 2026-08-24 - filter by WHO supplies it. "all" | "none" (no supplier on
+   * the SKU) | a suppliers.id. Names come from the roster and are matched by
+   * the FK, never by text - the same identity rule the Suppliers tab lives by. */
+  const [supplierFilter, setSupplierFilter] = useState<string>("all");
+  const suppliersQ = useOperationSuppliers();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [newOpen, setNewOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
@@ -151,6 +156,13 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
     return allRows
       .filter((r) => (category === "all" ? true : r.category === category))
       .filter((r) => (modelFilter === "all" ? true : r.sku.modelId === modelFilter))
+      .filter((r) =>
+        supplierFilter === "all"
+          ? true
+          : supplierFilter === "none"
+            ? r.sku.supplierId == null
+            : r.sku.supplierId === supplierFilter,
+      )
       .filter((r) => {
         if (!q) return true;
         return (
@@ -161,7 +173,7 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
         );
       })
       .sort((a, b) => a.sku.sku.localeCompare(b.sku.sku));
-  }, [allRows, category, modelFilter, search]);
+  }, [allRows, category, modelFilter, search, supplierFilter]);
 
   const visible = filtered.slice(0, VISIBLE_CAP);
   const overflow = filtered.length - visible.length;
@@ -246,6 +258,23 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
           ))}
         </div>
         <div className="flex items-center gap-2">
+          <select
+            value={supplierFilter}
+            onChange={(e) => setSupplierFilter(e.target.value)}
+            aria-label="Filter by supplier"
+            data-testid="sku-supplier-filter"
+            className={`${INPUT_CLS} w-44`}
+          >
+            <option value="all">All suppliers</option>
+            {/* "No supplier" is a real bucket, not an error state: service and
+                accessory SKUs legitimately carry none (0171). */}
+            <option value="none">No supplier</option>
+            {(suppliersQ.data?.suppliers ?? []).map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
           <input
             type="search"
             value={search}
@@ -592,8 +621,12 @@ const SkuRowView = memo(function SkuRowView({
   function commitPwpPrice(raw: string) {
     const trimmed = raw.trim();
     const val = trimmed === "" ? null : Number(trimmed);
-    if (val !== null && (!Number.isFinite(val) || val < 0)) {
-      toast.error("Enter a non-negative number (blank = not set)");
+    // 0 is NOT a price here — it is the same fact as blank. A 'pwp' reward is a
+    // discount (the server rejects <= 0) and a FREE reward is a 'promo' rule,
+    // which never reads this column at all. Accepting 0 stored a value that no
+    // rule could ever spend and that the till previewed as "RM 0.00".
+    if (val !== null && (!Number.isFinite(val) || val <= 0)) {
+      toast.error("Enter a price above 0, or leave it blank. A free reward is a 'promo' rule, not a PWP price of 0.");
       return;
     }
     if (val === (sku.pwpPrice ?? null)) return;
@@ -749,9 +782,9 @@ const SkuRowView = memo(function SkuRowView({
         {priceEdit ? (
           <input
             type="number"
-            min={0}
+            min={0.01}
             step="0.01"
-            defaultValue={sku.pwpPrice ?? ""}
+            defaultValue={sku.pwpPrice ? String(sku.pwpPrice) : ""}
             placeholder="—"
             onBlur={(e) => commitPwpPrice(e.target.value)}
             onKeyDown={(e) => {
@@ -760,7 +793,11 @@ const SkuRowView = memo(function SkuRowView({
             aria-label={`${sku.sku} PWP price`}
             className={`${INPUT_CLS} text-right t-num text-meta`}
           />
-        ) : sku.pwpPrice == null ? (
+        ) : sku.pwpPrice == null || sku.pwpPrice <= 0 ? (
+          // A stored 0 reads as "not set" for the same reason the Price column
+          // one cell over renders 0 as "price not set" — it is data that predates
+          // the input guard, and showing it as "RM 0.00" claims an offer the
+          // server will refuse.
           <span className="text-meta text-base-400 italic" title="No PWP price — this SKU cannot be a PWP reward">
             —
           </span>

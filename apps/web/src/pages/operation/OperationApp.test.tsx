@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 
 /**
  * Regression test for the Phase 4.5 Chunk 2 procurement nested routing.
@@ -99,12 +99,18 @@ vi.mock("./OperationImport", () => ({
 
 import OperationApp from "./OperationApp";
 
+function LocationProbe() {
+  const location = useLocation();
+  return <output data-testid="location-probe">{location.pathname}{location.search}</output>;
+}
+
 function renderApp(initialPath: string) {
   return render(
     <MemoryRouter initialEntries={[initialPath]}>
       <Routes>
         <Route path="/operation/*" element={<OperationApp />} />
       </Routes>
+      <LocationProbe />
     </MemoryRouter>,
   );
 }
@@ -238,6 +244,16 @@ describe("OperationApp — one header on Delivery Work", () => {
   it("its rail choices survive the mount — both filters ride the URL", () => {
     renderApp("/operation?tab=delivery&date=__no_date&logistics=NETS");
     expect(screen.getByTestId("delivery-work-stub")).toBeInTheDocument();
+  });
+});
+
+describe("OperationApp — Delivery is one page", () => {
+  it("the old Delivery Orders list address returns to the unified Delivery page", async () => {
+    renderApp("/operation/delivery-orders");
+    expect(await screen.findByTestId("delivery-work-stub")).toBeInTheDocument();
+    expect(screen.getByTestId("location-probe")).toHaveTextContent(
+      "/operation?tab=delivery",
+    );
   });
 });
 

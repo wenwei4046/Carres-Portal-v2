@@ -31,7 +31,6 @@ import OperationDashboard from "./OperationDashboard";
 // named in the cutover card — revert + redeploy the previous Pages build.
 import OperationOrdersControl from "./OperationOrdersControl";
 import SalesOrdersRegister from "./SalesOrdersRegister";
-import DeliveryOrdersRegister from "./DeliveryOrdersRegister";
 import DeliveryOrderPage from "./DeliveryOrderPage";
 import SalesOrderWorkspace from "./SalesOrderWorkspace";
 import SettingsWorkspace from "./SettingsWorkspace";
@@ -378,7 +377,10 @@ export default function OperationApp() {
             {/* The Delivery Orders register + the DO object page (blueprint
                 card 2026-08-16). `:doId` accepts the row id or the document
                 number itself, so `DO-…` anywhere in the portal is a door. */}
-            <Route path="delivery-orders" element={<DeliveryOrdersRegister />} />
+            <Route
+              path="delivery-orders"
+              element={<Navigate to="/operation?tab=delivery" replace />}
+            />
             <Route path="delivery-orders/:doId" element={<DeliveryOrderPage />} />
             {/* One exact Unit, addressed by its PERMANENT Carres Unit ID —
                 the thing printed on the supplier label and the thing 0366

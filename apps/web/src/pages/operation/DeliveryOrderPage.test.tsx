@@ -131,6 +131,14 @@ beforeEach(() => {
 });
 
 describe("DeliveryOrderPage", () => {
+  it("returns to the one Delivery workspace", () => {
+    mount(payload());
+    expect(screen.getByRole("link", { name: /Delivery$/ })).toHaveAttribute(
+      "href",
+      "/operation?tab=delivery",
+    );
+  });
+
   it("renders every ruled block, read-only — no input, no save, no void", () => {
     const { container } = { container: undefined } as { container?: unknown };
     void container;

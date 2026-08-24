@@ -35,6 +35,12 @@ const mockGenerateSkusMutateAsync = vi.fn();
 const mockCreateGuaranteeMutateAsync = vi.fn();
 
 vi.mock("@/lib/queries", () => ({
+  /* 2026-08-24 - the supplier picker/filter/column reads the roster through
+   * this hook; one named supplier is enough to pin the render path. */
+  useOperationSuppliers: () => ({
+    data: { suppliers: [{ id: "00000000-0000-4000-8000-0000000000s1".replace("s","a"), name: "Hookka" }] },
+    isLoading: false,
+  }),
   useCreateCatalogModel: () => ({
     mutate: vi.fn(),
     mutateAsync: mockCreateModelMutateAsync,
@@ -430,6 +436,9 @@ describe("NewSkuModal — accessory/service: no variant axis", () => {
       price: 99,
       cost: null,
       description: null,
+      /* 2026-08-24 — the picker default is Auto: supplierId null keeps the
+         route's category-based resolution, byte-identical to pre-picker. */
+      supplierId: null,
       /* 0375 — the supplier's own item code rides the payload; untouched here. */
       supplierCode: null,
     });
