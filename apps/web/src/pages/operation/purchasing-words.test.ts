@@ -265,8 +265,24 @@ describe("Communication Truthfulness · the PO workspace claims only what it saw
     expect(visibleSource(PO)).toMatch(/· Snapshot \{/);
   });
 
+  /**
+   * ⭐ THE DOORS MOVED INTO THE ONE COMMUNICATION AREA
+   * (CARD-2026-08-22-purchasing-02 closure §7, 2026-08-24).
+   *
+   * They used to be rendered TWICE for one document — once by this page's own
+   * Communication band and once by the governed evidence surface below it — so
+   * one purchase order had two sets of send controls and two accounts of what
+   * had happened to it. The labels are unchanged and the law is unchanged; what
+   * changed is that exactly one component draws them.
+   */
+  const EVIDENCE = "pages/operation/components/PoIssueEvidence.tsx";
+
   it("labels every door by what the click opens", () => {
-    const src = visibleSource(PO);
+    /* The channel `<option>`s are stripped first. `WhatsApp` inside the
+       Channel select is the NAME OF A RECORDED CHANNEL — the fact the operator
+       is declaring about a send that already happened — not a door label. The
+       ban is on a control that names no door. */
+    const src = visibleSource(EVIDENCE).replace(/<option[\s\S]*?<\/option>/g, " ");
     // COPY-STANDARD's WhatsApp table, verbatim — plus `Open email`, which Jess
     // ruled on 2026-08-03 into the same shape: the button says which
     // application opens, never what we hope happens afterwards.
@@ -280,6 +296,28 @@ describe("Communication Truthfulness · the PO workspace claims only what it saw
     );
     expect(src, "`WhatsApp` alone names no door").not.toMatch(/>\s*WhatsApp\s*</);
     expect(src, "`Email` alone reads as an outcome").not.toMatch(/>\s*Email\s*</);
+  });
+
+  it("draws each door ONCE — the Purchase Order page renders none of them itself", () => {
+    const src = visibleSource(PO);
+    for (const label of ["Copy message", "Open WhatsApp group", "Open email"]) {
+      expect(src, `${label} must be drawn only by the evidence surface`).not.toMatch(
+        new RegExp(`>\\s*${label}\\s*<`),
+      );
+    }
+    // It still supplies the supplier's real doors, because it knows the supplier.
+    expect(src).toMatch(/doors=\{\{ whatsapp: wa, mailto, message: text/);
+  });
+
+  it("hands over a PDF, never the payload behind it", () => {
+    const src = visibleSource(EVIDENCE);
+    // `Download PDF` used to be an anchor at `/print-data`, so it handed the
+    // operator — and any supplier they forwarded it to — a JSON response.
+    expect(src).toMatch(/"Download PDF"/);
+    expect(src).toMatch(/renderPoPdf\(data\)/);
+    expect(src, "no href may point at the JSON endpoint").not.toMatch(
+      /href=\{`\/api\/operation\/pos\/[^`]*print-data/,
+    );
   });
 });
 

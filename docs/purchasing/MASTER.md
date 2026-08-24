@@ -229,6 +229,16 @@ Only Current PO Duty may complete PO issuance. Manager approval governs exceptio
 authority; it does not replace Current PO Duty as operator. Manager does not manually assign every
 row. Duty, roster and buddy-cover resolve the action owner automatically.
 
+**HOW IT IS ENFORCED — BUILT, migrations 0379 / 0380, PR #894.** `purchasing_po_actor()` is the ONE
+resolver. It reads the month's `ops_po_duty` holder and the dated `ops_po_duty_cover` window, and
+returns both people separately: the normal holder, because Team Work groups by them, and the acting
+cover, because the audit trail must say who pressed it. `purchasing_actor_may_issue()` is the gate,
+and it is asked by the CREATION AUTHORITY itself — `purchasing_issue_pos_batch` — and by the evidence
+door `purchasing_confirm_po_sent`. So SO Batch Purchase, Manual Purchase and a direct RPC call all
+meet the same authority; a door only its caller guards is not guarded. A principal who holds neither
+role is refused: audit access is not issuance authority. Cover has no write policy — it is set
+through a governed door, never by a browser.
+
 ### 5.4 Deliver To
 
 Default is `Carres Klang`.
@@ -262,6 +272,26 @@ the supplier is silent. There is no `Acknowledged` status.
 Supplier out-of-stock, delayed model/fabric, changed quantity or changed price is a later exception.
 A supplier price change stops the issue/change and routes to the commercial approver; Operations
 does not decide it.
+
+**HOW IT IS ENFORCED — BUILT, migrations 0378 / 0379 / 0380, PR #894.**
+
+- **THE VERSION IS DECLARED, NOT READ BACK.** The confirmation states the version it RENDERED;
+  SQL locks the purchase order, compares, and refuses `stale_po_version` writing nothing. Reading
+  the current version at confirmation time recorded a revision as sent that the supplier never
+  received.
+- **THE PRICE IS DECLARED TOO.** Every line carries `expected_catalog_cost` — the price the operator
+  reviewed — and `purchasing_check_line_commercials` compares it with Catalog. A mismatch is
+  `supplier_price_changed` and creates ZERO purchase orders, because the batch is atomic and a
+  half-priced batch is worse than a refusal. The API used to re-read Catalog and hand the value back
+  as `cost_source: catalog`, so the check compared the live value against itself and always agreed.
+- **AN EXCEPTION NEEDS SOMEBODY ELSE'S APPROVAL.** A hand-entered cost and a Free of Charge each
+  require an open, unexpired `po_cost_approvals` record. `purchasing_approve_po_cost` admits only
+  `principal` or `finance`, and refuses a manager who is also today's PO actor: one person cannot be
+  both sides of an exception. An approval is SPENT when used.
+- **EVIDENCE CARRIES WHO.** `po_sends` stores the actor, the month's duty holder and the authorised
+  cover, with channel, recipient, Malaysia time and the exact version. An `external_open` is
+  communication history and completes nothing; a `confirmed_sent` for an EARLIER version stays
+  history and never completes the current one.
 
 ### 5.7 PO states and balances
 
@@ -301,6 +331,14 @@ PREFIX-YYYYMMDD-RRRR
   matching tail digits.
 - A revision keeps the original number: `PO-20260820-4827 · Version 2`.
 
+**HOW IT IS ENFORCED — BUILT, migration 0381, PR #894.** `allocate_formal_document_code(prefix)`
+DRAWS `RRRR` at random from the day's unused codes and is unique on `(date, code)` ACROSS prefixes,
+so one day has one `4827` whatever document holds it. A losing race gets a unique violation and draws
+again; no lock is held and no number is skipped. Rows are never deleted, so a cancelled number stays
+taken. Production minted `PO-2054` from `max(seq) + 1` until then — a number that told any supplier
+holding two of our purchase orders how much Carres bought in between. **Existing identities are
+permanent and are NOT renumbered.**
+
 | Prefix | Document |
 |---|---|
 | `MPR` | Manual Purchase |
@@ -331,6 +369,16 @@ U1-000-001
 - A repair keeps the same Unit ID. A physical replacement gets a new Unit ID.
 - Non-separable set pieces may use `U1-000-001-A/B`; independently saleable pieces get separate
   Unit IDs as defined by Catalog.
+
+**HOW IT IS ENFORCED — BUILT, migrations 0381 / 0382, PR #894.** `unit_id_series` is ONE row, locked
+`FOR UPDATE` while allocating, so two receipts cannot mint one Unit ID; it is a table rather than a
+sequence because a sequence cannot roll `U1-999-999` into `U2-000-001` and cannot be read back
+without consuming. `allocate_unit_id()` is the only door and the table is revoked from
+`authenticated`. `normalise_unit_id()` makes `U1-000-001`, `U1-000001` and `U1000001` the same Unit
+for search and scan. Units are minted for EVERY governed destination, not only Carres-owned
+warehouses, because §6.2 requires the supplier to write the Unit ID on a showroom or external
+delivery's package too. The series is seeded ABOVE anything already in the locked format:
+**existing units are never recoded.**
 
 Unit IDs are allocated when the PO/CO is confirmed for issue so the supplier-facing document can
 list every expected Unit. Current supplier capability requires one simple extra line on its own
@@ -465,6 +513,19 @@ summary. Action ownership uses structured avatar metadata.
 - Use `Order Route`, never `RelationMap`, `RelationshipMap` or `Relation Map`.
 - A formal outside-readable document uses 50% edit/check + 50% live PDF preview only during
   issue/edit/revision. It returns to full-width view after completion.
+- **THE 50/50 BINDS FROM 1130px** (measured: two 565px halves is the narrowest a readable A4 preview
+  and a full decision column both fit). Narrower, the surface STACKS — decision work first, the
+  document below it keeping a readable height — and the surface scrolls. Nothing is compressed:
+  walked at 1129px on 2026-08-24, a one-column grid squeezed the decision pane to 208px and clipped
+  the cost block, the blocker and both buttons with no scrollbar, because the row reported that it
+  fitted.
+- **ONE COMMUNICATION AREA PER DOCUMENT.** The doors out of the Portal (`Copy message`,
+  `Open WhatsApp group` / `Open WhatsApp`, `Open email`, `Download PDF`) and the act
+  (`Record the PDF sent`) are drawn by ONE component on every surface that chases a document. Two
+  sets of send controls on one object is two accounts of what happened to it.
+- **`Download PDF` HANDS OVER A PDF.** Never a link to the JSON payload behind it: a page that
+  shows an API response as if it were a document teaches the operator that the document is
+  unreliable.
 - Internal Manual Purchase and Display Request objects have no empty PDF preview.
 
 ### 8.3 Two-line fact/action copy
@@ -514,6 +575,20 @@ duplicate demand editor.
 **Exceptions:** cancelled/changed SO, stock becomes available, supplier missing, supplier date too
 late, price changed, split destination.
 **Connections:** Sales Orders, Stock, Delivery calendar, Catalog, PO.
+
+**THE DOCUMENT PARTITION — ONE CONTRACT, BOTH SIDES.** A purchase order is one
+`Supplier × Deliver To × Category × (one-PO-per-order category ? Source Order : —)`. The browser and
+the server compute that key from the same facts (`documentPartitionKey`), so `Issue N POs`, `1 of N`,
+the commercial decisions, the server's grouping and the number of purchase orders created cannot
+drift apart; the server still recomputes it from its own recomputation, which is agreement rather
+than trust. A commercial decision names the exact document it belongs to, and a duplicate, foreign,
+stale or partial-coverage decision is refused BY NAME. A `Deliver To` split therefore buys the
+demand ONCE: lines are composed from the ALLOCATION, not from the whole build.
+
+**EVERY PO LINE CARRIES ITS SOURCE.** `po_line_sources` records which customer order, SO number and
+order line each unit is for, validated in SQL rather than trusted, and the parts must add up to the
+line. The supplier-facing document prints that breakdown, so a bulk purchase order no longer shows a
+blank `SO NO`.
 
 ### 9.2 Manual Purchase
 

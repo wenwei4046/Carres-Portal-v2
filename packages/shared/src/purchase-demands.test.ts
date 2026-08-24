@@ -13,6 +13,8 @@ import {
   purchaseDemandStateCounts,
   purchaseDemandStateOf,
   purchaseDemandsResponseSchema,
+  soBatchAction,
+  soBatchPurchaseResponseSchema,
   type PurchaseDemandRow,
   type PurchaseDemandState,
 } from "./purchase-demands";
@@ -38,6 +40,11 @@ function row(over: Partial<PurchaseDemandRow> = {}): PurchaseDemandRow {
     onPo: 0,
     poNumbers: [],
     toBuy: 2,
+    goodsMustArrive: "2026-08-19",
+    issueRef: { proposalKey: "s1::mattress", buildKey: "b1" },
+    action: null,
+    costs: [{ sku: "B1201S-K", unitCost: 100 }],
+    supplierKind: "own_logistics",
     ownerName: null,
     ownerDuty: null,
     ...over,
@@ -321,5 +328,185 @@ describe("the wire", () => {
         rows: [{ ...row(), state: "needs_attention" }],
       }).success,
     ).toBe(false);
+  });
+});
+
+
+/**
+ * CARD-2026-08-22-purchasing-02 — the three facts SO Batch Purchase needs that
+ * the Register alone never did: the date the goods must physically arrive, the
+ * engine reference an issue is built from, and the structured Work action.
+ */
+describe("the buying facts the row now carries", () => {
+  it("carries the arrival date the SERVER derived — the browser subtracts nothing", () => {
+    const r = row({ goodsMustArrive: "2026-08-19", customerDelivery: "2026-08-28" });
+    expect(r.goodsMustArrive).toBe("2026-08-19");
+    // It is a carried fact, not a function of the customer date.
+    expect(row({ customerDelivery: null, goodsMustArrive: null }).goodsMustArrive).toBeNull();
+  });
+
+  it("carries the engine reference a purchase order is actually built from", () => {
+    expect(row().issueRef).toEqual({ proposalKey: "s1::mattress", buildKey: "b1" });
+    // A refused line has no build, so it has no reference — and cannot be issued.
+    expect(row({ state: "no_supplier", issueRef: null }).issueRef).toBeNull();
+  });
+
+  it("the action is STRUCTURED — trigger, owner rule, act, completion fact and source", () => {
+    const action = soBatchAction({
+      state: "no_customer_date",
+      item: "Booqit",
+      supplier: "Hooka",
+      category: "mattress",
+      ownerId: "u1",
+      ownerName: "Shasha",
+      orderId: "o1",
+      so: 1318,
+      dueDate: "2026-08-19",
+    });
+    expect(action).not.toBeNull();
+    expect(action!.trigger).toBe("no_customer_date");
+    expect(action!.ownerRule).toBe("Responsible Salesperson");
+    expect(action!.ownerName).toBe("Shasha");
+    expect(action!.action).toBe("Ask customer for a delivery date");
+    expect(action!.completionFact).toBe("Customer Delivery exists");
+    expect(action!.sourceObject).toEqual({ type: "sales_order", id: "o1", number: "SO-1318" });
+    expect(action!.dueDate).toBe("2026-08-19");
+  });
+
+  it("every trigger names its owner rule and its completion fact", () => {
+    const expected: Record<string, [string, string]> = {
+      ready_to_buy: ["Current PO Duty", "Current PO version reached supplier with evidence"],
+      no_customer_date: ["Responsible Salesperson", "Customer Delivery exists"],
+      no_sku: ["Catalog/Master Data through Current PO Duty", "Approved SKU exists"],
+      no_supplier: ["Current PO Duty", "Approved supplier relationship exists"],
+      no_production_days: [
+        "Purchasing Settings authority",
+        "Governed supplier/category days exist",
+      ],
+    };
+    for (const [trigger, [rule, fact]] of Object.entries(expected)) {
+      const a = soBatchAction({
+        state: trigger as PurchaseDemandState,
+        item: "Booqit",
+        supplier: "Hooka",
+        category: "mattress",
+        ownerId: null,
+        ownerName: null,
+        orderId: "o1",
+        so: 1318,
+        dueDate: null,
+      });
+      expect(a, trigger).not.toBeNull();
+      expect(a!.ownerRule, trigger).toBe(rule);
+      expect(a!.completionFact, trigger).toBe(fact);
+    }
+  });
+
+  it("a covered line has no action — nothing is owed on it", () => {
+    expect(
+      soBatchAction({
+        state: "covered",
+        item: "Booqit",
+        supplier: "Hooka",
+        category: "mattress",
+        ownerId: null,
+        ownerName: null,
+        orderId: "o1",
+        so: 1318,
+        dueDate: null,
+      }),
+    ).toBeNull();
+  });
+
+  it("the owner is METADATA — the sentence never carries the person's name", () => {
+    const a = soBatchAction({
+      state: "no_supplier",
+      item: "Booqit",
+      supplier: null,
+      category: "mattress",
+      ownerId: "u9",
+      ownerName: "Yee Jean",
+      orderId: "o1",
+      so: 1318,
+      dueDate: null,
+    })!;
+    expect(a.action).not.toContain("Yee Jean");
+    expect(a.ownerName).toBe("Yee Jean");
+    expect(a.ownerId).toBe("u9");
+  });
+
+  it("the ready line's act names the supplier and the document it owes", () => {
+    const a = soBatchAction({
+      state: "ready_to_buy",
+      item: "Booqit",
+      supplier: "Hooka",
+      category: "mattress",
+      ownerId: null,
+      ownerName: null,
+      orderId: "o1",
+      so: 1318,
+      dueDate: "2026-08-19",
+    })!;
+    expect(a.action).toBe("Issue PO to Hooka");
+    expect(a.ownerDuty).toBe("PO duty");
+  });
+
+  it("no action sentence uses a banned generic word", () => {
+    for (const state of PURCHASE_DEMAND_STATES) {
+      const a = soBatchAction({
+        state,
+        item: "Booqit",
+        supplier: "Hooka",
+        category: "mattress",
+        ownerId: null,
+        ownerName: null,
+        orderId: "o1",
+        so: 1318,
+        dueDate: null,
+      });
+      if (!a) continue;
+      for (const banned of ["Follow up", "Needs attention", "Pending", "Waiting", "Today", "Priority"]) {
+        expect(a.action, `${state} / ${banned}`).not.toContain(banned);
+      }
+    }
+  });
+});
+
+describe("the SO Batch response carries destinations, duty and permission", () => {
+  it("parses a whole payload", () => {
+    const parsed = soBatchPurchaseResponseSchema.parse({
+      today: "2026-08-22",
+      rows: [],
+      destinations: [
+        { id: "d1", name: "Carres Klang", isDefault: true, active: true },
+      ],
+      defaultDestinationId: "d1",
+      currentPoDuty: { userId: "u1", name: "Yee Jean" },
+      /* 0379 — the dated buddy cover who may act TODAY. A separate fact from
+         the holder: the duty stays where management put it, and the audit must
+         still say who actually pressed Issue PO. */
+      actingPoDuty: { userId: "u2", name: "Shasha" },
+      mayIssue: true,
+      procurementPartners: [{ id: "p1", name: "NETS" }],
+    });
+    expect(parsed.destinations[0]!.name).toBe("Carres Klang");
+    expect(parsed.mayIssue).toBe(true);
+    expect(parsed.actingPoDuty).toEqual({ userId: "u2", name: "Shasha" });
+  });
+
+  it("a reader who is not on duty is told so honestly", () => {
+    const parsed = soBatchPurchaseResponseSchema.parse({
+      today: "2026-08-22",
+      rows: [],
+      destinations: [],
+      defaultDestinationId: null,
+      currentPoDuty: null,
+      actingPoDuty: null,
+      mayIssue: false,
+      procurementPartners: [],
+    });
+    expect(parsed.mayIssue).toBe(false);
+    expect(parsed.currentPoDuty).toBeNull();
+    expect(parsed.actingPoDuty).toBeNull();
   });
 });

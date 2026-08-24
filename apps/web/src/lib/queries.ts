@@ -3361,11 +3361,20 @@ export interface operationPoListRow {
    *  MORE THAN ONE expected arrival (promise-ledger history, 0306), so the
    *  listing marks it `(revised)`. OPTIONAL — older Worker degrades to false. */
   eta_revised?: boolean;
-  /** What LEFT Carres for this supplier (0312), newest first. */
+  /** What LEFT Carres for this supplier (0312), newest first — and since 0377,
+   *  WHAT KIND of leaving it was. `external_open` is communication history and
+   *  completes nothing; `confirmed_sent` is the operator's statement that the
+   *  PDF actually reached the supplier, with the exact version it was.
+   *  The three newer fields are OPTIONAL so a browser on this build against an
+   *  older Worker degrades instead of crashing. */
   sends?: {
     channel: string;
     note: string | null;
     sent_at: string;
+    kind?: "external_open" | "confirmed_sent" | null;
+    recipient?: string | null;
+    po_version?: number | null;
+    sent_by?: string | null;
     po_revisions: { rev_no: number } | null;
   }[];
   /** The supplier-date field's own history (0306 ledger, newest first) —
@@ -4260,6 +4269,9 @@ export function useIssuePurchaseRequests() {
       requestIds: string[];
       together: boolean;
       partners?: Record<string, string> | null;
+      /** ⭐ The Catalog price the operator REVIEWED, per SKU (0380). Without it
+       *  the server has only its own live value to compare against itself. */
+      expectedCosts: Record<string, number>;
     }) =>
       apiFetch<{ poIds: string[]; documents: number }>(
         "/api/operation/purchasing/requests/issue",
@@ -6889,11 +6901,18 @@ export function useRecheckStockMutation(
  * browser. Both routes are retired and both RPCs are revoked from every browser
  * role (migration 0339).
  *
- * `purchasing_issue_pos_batch(jsonb)` is now the ONLY authority that may create
- * a Purchase Order. Its one caller is Batch Purchase's
- * `POST /api/operation/purchase/to-order/issue`.
- * There is deliberately no replacement hook: a hook is a door, and this card
- * exists to leave exactly one. */
+ * ONE CREATION AUTHORITY, GOVERNED CALLERS.
+ * `purchasing_issue_pos_batch(jsonb)` is the only authority that may create a
+ * Purchase Order. It is reached through the governed operator journeys — SO
+ * Batch Purchase (`POST /api/operation/purchase/to-order/issue-batch`) and
+ * Manual Purchase (its own approved issue route) — and through nothing else.
+ *
+ * (Corrected 2026-08-23. This comment named `POST …/to-order/issue` as the one
+ * caller; that route is RETIRED — CARD-2026-08-22-purchasing-02 deleted it —
+ * and Manual Purchase was always a second governed caller of the same RPC.)
+ *
+ * There is deliberately no replacement hook: a hook is a door, and the card
+ * that removed the extra authorities exists to leave only governed ones. */
 
 /**
  * Chase-event log (Jess 2026-07-23) — Purchase cockpit's ② Chase button now

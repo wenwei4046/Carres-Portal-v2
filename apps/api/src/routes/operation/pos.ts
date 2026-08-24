@@ -11,6 +11,7 @@ import {
   recordBalanceDateInput,
   recordReadyDateInput,
   recordTomorrowDeliveryInput,
+  confirmPoSentInput,
   recordSendInput,
   revisePoInput,
   setMessageTemplateInput,
@@ -342,23 +343,65 @@ operationPosRouter.get("/", requireOperation, async (c) => {
     return c.json(m.body, m.status);
   }
 
-  // What we have SENT (0312) — the Activity timeline reads it, and the
-  // supplier's own version number comes with it.
+  // What LEFT Carres (0312), and since 0377 WHAT KIND of leaving it was: an
+  // `external_open` is communication history and completes nothing; a
+  // `confirmed_sent` carries recipient, actor, time and the exact version the
+  // supplier received.
   const sendsByPo = new Map<string, Record<string, unknown>[]>();
   if (poIds.length > 0) {
     const { data: sendRows, error: sendErr } = await sb
       .from("po_sends")
-      .select("po_id, channel, note, sent_at, po_revisions(rev_no)")
+      /* 0377/0378 — an OPEN and a CONFIRMED SEND are different facts, and the
+         detail page has to be able to tell them apart. `kind`, `recipient` and
+         `po_version` ride with the row so the evidence surface reads persisted
+         truth rather than whatever it happens to remember. */
+      /* 0379 — and WHO. `sent_by` is the person who pressed it, `duty_user_id`
+         the month's holder and `acting_user_id` the authorised cover when one
+         acted. Three facts, because `Team Work` groups by the holder while the
+         audit trail must name the actor. */
+      .select(
+        "po_id, channel, note, sent_at, kind, recipient, po_version, sent_by, duty_user_id, acting_user_id, po_revisions(rev_no)",
+      )
       .in("po_id", poIds)
       .order("sent_at", { ascending: false });
     if (sendErr) {
       const m = mapPgError(sendErr);
       return c.json(m.body, m.status);
     }
+    /* A UUID IS NOT AN ACTOR. The evidence has to be readable by a human
+       checking later who sent what, so the names are resolved here rather than
+       printed as an id (closure §8). */
+    const actorIds = [
+      ...new Set(
+        (sendRows ?? [])
+          .flatMap((r) => {
+            const row = r as Record<string, unknown>;
+            return [row.sent_by, row.duty_user_id, row.acting_user_id];
+          })
+          .filter((v): v is string => typeof v === "string" && v.length > 0),
+      ),
+    ];
+    const actorName = new Map<string, string>();
+    if (actorIds.length > 0) {
+      const { data: people } = await sb
+        .from("app_users")
+        .select("id, name, email")
+        .in("id", actorIds);
+      for (const u of (people ?? []) as Record<string, unknown>[]) {
+        const label =
+          ((u.name as string | null) ?? "").trim() || ((u.email as string | null) ?? "");
+        if (label) actorName.set(u.id as string, label);
+      }
+    }
     for (const r of sendRows ?? []) {
       const row = r as Record<string, unknown>;
       const arr = sendsByPo.get(row.po_id as string) ?? [];
-      arr.push(row);
+      arr.push({
+        ...row,
+        sent_by_name: actorName.get(row.sent_by as string) ?? null,
+        duty_name: actorName.get(row.duty_user_id as string) ?? null,
+        acting_name: actorName.get(row.acting_user_id as string) ?? null,
+      });
       sendsByPo.set(row.po_id as string, arr);
     }
   }
@@ -931,10 +974,17 @@ operationPosRouter.get("/:id/units", requireOperation, async (c) => {
   return c.json({ units: data ?? [] });
 });
 
-// The route adds two facts the document layer needs and the RPC does not
-// carry: `so_refs` (the Sales Order column — per-line attribution does not
-// exist in the schema, so the template prints the SO only when the PO covers
-// exactly one) and `issued_by` (null until the portal records an issuer).
+// ⭐ THE ROUTE ADDS NOTHING (0383; Card closure §7).
+//
+// It used to add two facts and both were wrong. `so_refs` was re-read here
+// because per-line attribution did not exist in the schema — 0382 gave it one,
+// so the document now carries which customer order each unit is for and the
+// `SO NO` column is fed from that instead of printing blank on every bulk PO.
+// `issued_by` was hard-coded `null`, which erased the issuer the creation helper
+// had already written to `audit_log`.
+//
+// `purchasing_po_document` is the document authority. A route that overwrites
+// its answer is a second truth about the same paper.
 // 2026-05-12 (Loo): browser renders @react-pdf locally (Workers WASM ban —
 // see render.ts note in apps/web/src/lib/pdf/).
 operationPosRouter.get("/:id/print-data", requireOperation, async (c) => {
@@ -968,24 +1018,7 @@ operationPosRouter.get("/:id/print-data", requireOperation, async (c) => {
     return c.json(m.body, m.status);
   }
 
-  const { data: po, error: e2 } = await sb
-    .from("purchase_orders")
-    .select("so, so_refs")
-    .eq("id", poId)
-    .maybeSingle();
-  if (e2) {
-    const m = mapPgError(e2);
-    return c.json(m.body, m.status);
-  }
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const poRow: any = po ?? {};
-  const soRefs: number[] = Array.isArray(poRow.so_refs)
-    ? poRow.so_refs
-    : poRow.so != null
-      ? [Number(poRow.so)]
-      : [];
-
-  return c.json({ ...(doc as Record<string, unknown>), so_refs: soRefs, issued_by: null });
+  return c.json(doc as Record<string, unknown>);
 });
 
 // ----- GET /:id/source-orders -----
@@ -1056,9 +1089,16 @@ operationPosRouter.get("/:id/source-orders", requireOperation, async (c) => {
 // two of the four extra creation authorities the Card 4 audit found still
 // reachable from the browser.
 //
-// `purchasing_issue_pos_batch(jsonb)` is now the ONLY authority that may create
-// a Purchase Order, and Batch Purchase's `POST /api/operation/purchase/to-order/issue`
-// is its only caller.
+// ONE CREATION AUTHORITY, GOVERNED CALLERS.
+// `purchasing_issue_pos_batch(jsonb)` is the only authority that may create a
+// Purchase Order. It is reached through the governed operator journeys — SO
+// Batch Purchase (`POST /api/operation/purchase/to-order/issue-batch`) and
+// Manual Purchase (its own approved issue route) — and through nothing else.
+// One authority with named callers is the law; "one caller" never was.
+//
+// (Corrected 2026-08-23. This comment named `POST …/to-order/issue` as the one
+// caller; that route is RETIRED — CARD-2026-08-22-purchasing-02 deleted it —
+// and Manual Purchase was always a second governed caller of the same RPC.)
 //
 // DELETED rather than left standing as a 403, for the reason the `/receive`
 // retirement below already states in this file: a live route with no caller is
@@ -1604,11 +1644,76 @@ operationPosRouter.post("/:id/ready-date", requireOperation, async (c) => {
   return c.json({ ok: true, result: data });
 });
 
+// ----- GET /:id/sends -----
+// THE OUTBOUND EVIDENCE FOR ONE PURCHASE ORDER (closure §8; 0377 · 0378 · 0379).
+//
+// SO Batch Purchase issues a purchase order and then has to chase it. It has no
+// register behind it, so without this read the evidence surface could only show
+// what the current tab happened to remember — and a reload, a second operator or
+// a revision would each tell a different story about the same paper.
+//
+// Every row carries what makes it evidence: the kind (an OPEN completes
+// nothing), the exact version, the recipient, the channel, the time, and WHO —
+// the actor, the month's duty holder and the authorised cover when one acted.
+operationPosRouter.get("/:id/sends", requireOperation, async (c) => {
+  const poId = c.req.param("id");
+  const sb = userClient(c.env, c.var.auth.jwt);
+
+  const { data: rows, error } = await sb
+    .from("po_sends")
+    .select(
+      "channel, note, sent_at, kind, recipient, po_version, sent_by, duty_user_id, acting_user_id",
+    )
+    .eq("po_id", poId)
+    .order("sent_at", { ascending: false });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+
+  const ids = [
+    ...new Set(
+      (rows ?? [])
+        .flatMap((r) => {
+          const row = r as Record<string, unknown>;
+          return [row.sent_by, row.duty_user_id, row.acting_user_id];
+        })
+        .filter((v): v is string => typeof v === "string" && v.length > 0),
+    ),
+  ];
+  const named = new Map<string, string>();
+  if (ids.length > 0) {
+    const { data: people } = await sb.from("app_users").select("id, name, email").in("id", ids);
+    for (const u of (people ?? []) as Record<string, unknown>[]) {
+      const label = ((u.name as string | null) ?? "").trim() || ((u.email as string | null) ?? "");
+      if (label) named.set(u.id as string, label);
+    }
+  }
+
+  return c.json({
+    sends: (rows ?? []).map((r) => {
+      const row = r as Record<string, unknown>;
+      return {
+        ...row,
+        sent_by_name: named.get(row.sent_by as string) ?? null,
+        duty_name: named.get(row.duty_user_id as string) ?? null,
+        acting_name: named.get(row.acting_user_id as string) ?? null,
+      };
+    }),
+  });
+});
+
 // ----- POST /:id/sends -----
-// What LEFT Carres (0312). The channel is the operator's fact; the REVISION is
-// the server's — a send mints one only when the document changed since the
-// last, because re-sending an unchanged PO asks the supplier to replace
-// nothing.
+// AN APP THAT OPENED, NOT A PDF THAT ARRIVED (0377, Card 02 §7.4).
+//
+// This door records that an external channel was OPENED. It once meant "sent",
+// and that was the defect: the operator opens the WhatsApp group, gets
+// interrupted, never pastes the file, and the Portal says the order went out.
+// Since 0377 its rows are `external_open` and they close nothing. The act that
+// completes Issue PO is `POST /:id/confirm-sent` below.
+//
+// It is KEPT rather than deleted: knowing an operator opened the group at
+// 14:02 is real history, and the honest fix was to stop misreading it.
 operationPosRouter.post("/:id/sends", requireOperation, async (c) => {
   const parsed = await parseJsonBody(c, recordSendInput);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
@@ -1619,6 +1724,48 @@ operationPosRouter.post("/:id/sends", requireOperation, async (c) => {
     p_note: parsed.data.note ?? null,
   });
   if (error) return mapSupplierCallError(c, error);
+  return c.json({ ok: true, result: data });
+});
+
+// ----- POST /:id/confirm-sent -----
+// THE ONE ACT THAT CLOSES ISSUE PO (0377; purchasing/MASTER.md §5.6).
+//
+// The operator has actually sent the official PDF and says so. The RPC records
+// channel, recipient, actor, Malaysia time and — read from the purchase order,
+// never accepted from here — the EXACT version that left. Current PO Duty is
+// enforced in SQL, because a door only the UI guards is not guarded.
+operationPosRouter.post("/:id/confirm-sent", requireOperation, async (c) => {
+  const parsed = await parseJsonBody(c, confirmPoSentInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("purchasing_confirm_po_sent", {
+    p_po_id: c.req.param("id"),
+    /* 0378 — the version the operator RENDERED, declared. SQL locks the row and
+       compares it against the version that exists; a mismatch writes nothing.
+       The stored version is still SQL's own read. */
+    p_expected_version: parsed.data.poVersion,
+    p_channel: parsed.data.channel,
+    p_recipient: parsed.data.recipient,
+    p_note: parsed.data.note ?? null,
+  });
+  if (error) {
+    /* THE ONE ERROR THE OPERATOR CAN ACT ON, in the approved two-line form
+       (`docs/purchasing/MASTER.md` §8.3): the FACT, then the FIX. Everything
+       else falls through to the shared supplier-call mapping. */
+    const details = String((error as { details?: string }).details ?? "");
+    if (details === "stale_po_version" || /stale_po_version/.test(error.message ?? "")) {
+      return c.json(
+        {
+          error: "rule_violation",
+          code: "stale_po_version",
+          message: "Purchase order changed",
+          action: "Open the latest PDF and send it again.",
+        },
+        409,
+      );
+    }
+    return mapSupplierCallError(c, error);
+  }
   return c.json({ ok: true, result: data });
 });
 

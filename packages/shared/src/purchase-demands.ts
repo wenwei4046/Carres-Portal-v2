@@ -186,10 +186,146 @@ export interface PurchaseDemandRow {
   onPo: number | null;
   poNumbers: string[];
   toBuy: number | null;
+  /**
+   * CARD-2026-08-22-purchasing-02 — the date the goods must physically reach
+   * Carres, CARRIED off the server's own arrival engine (`ToOrderRow.stockReady`
+   * → `arriveBy`). The browser never subtracts a working day: the office week,
+   * the holidays, the supplier's production days and the arrival buffer are all
+   * server facts, and a second subtraction here would be a second answer.
+   *
+   * `null` when the customer order has no date to plan backwards from.
+   */
+  goodsMustArrive: IsoDate | null;
+  /**
+   * The engine reference an issue is actually built from. `null` on any line
+   * the engine refused — which is precisely why such a line cannot be issued:
+   * there is no build to turn into a purchase order.
+   */
+  issueRef: { proposalKey: string; buildKey: string } | null;
+  /** The structured Work contract. `null` when nothing is owed on this line. */
+  action: SoBatchPurchaseAction | null;
+  /**
+   * THE CATALOG COST PER SKU, so the 50/50 can ask for the one it does not have
+   * (Card §5.2). `unitCost: null` is the whole point: a SKU Catalog has no price
+   * for cannot be issued until the operator states a Transaction Cost or marks
+   * it Free of Charge with a reason. A `0` here would be a price nobody set.
+   *
+   * It is the CATALOG's number, carried for display and for the unchanged-cost
+   * comparison. The server re-reads it at issue and refuses a stale one.
+   */
+  costs: Array<{ sku: string; unitCost: number | null }>;
+  /**
+   * Whether this supplier's goods are collected from the factory. A
+   * factory-pickup document needs a procurement partner before it can be
+   * issued, and the operator has to be able to choose one on the same screen.
+   */
+  supplierKind: "own_logistics" | "factory_pickup" | null;
   /** WHO fixes the blocker — a real person when a stored fact names one. */
   ownerName: string | null;
   /** The duty word, when no person resolves. */
   ownerDuty: string | null;
+}
+
+// ─── The action ──────────────────────────────────────────────────────────────
+
+/**
+ * THE WORK CONTRACT, STRUCTURED (`docs/purchasing/MASTER.md` §8.4).
+ *
+ * Eight fields, because a sentence is not a contract: the same row must be able
+ * to tell My Work who owes it, Team Work whose pile it sits in, and the
+ * operator what act closes it — without any of the three parsing prose. The
+ * owner is METADATA and never appears inside `action`: an avatar renders the
+ * person, and a name baked into the sentence cannot be re-rendered when the
+ * roster changes or cover moves the work.
+ */
+export interface SoBatchPurchaseAction {
+  trigger: Exclude<PurchaseDemandState, "covered">;
+  /** The RULE that finds the owner — never the person, who may be absent. */
+  ownerRule: string;
+  ownerId: string | null;
+  ownerName: string | null;
+  /** The duty word, when the rule resolves to a duty rather than a person. */
+  ownerDuty: string | null;
+  /** The imperative act, in primary-school English. Carries no owner name. */
+  action: string;
+  /** The FACT that closes it — observed, never ticked. */
+  completionFact: string;
+  dueDate: IsoDate | null;
+  sourceObject: { type: "sales_order"; id: string; number: string };
+  cover: { normalOwnerId: string | null; actingOwnerId: string | null } | null;
+}
+
+/** The owner RULE per trigger (`docs/purchasing/MASTER.md` §§5.3, 9.1). */
+const ACTION_OWNER_RULE: Record<Exclude<PurchaseDemandState, "covered">, string> = {
+  ready_to_buy: "Current PO Duty",
+  no_customer_date: "Responsible Salesperson",
+  no_sku: "Catalog/Master Data through Current PO Duty",
+  no_supplier: "Current PO Duty",
+  no_production_days: "Purchasing Settings authority",
+};
+
+/**
+ * The FACT that completes it. Every one of these is something the system can
+ * OBSERVE — a date exists, a relationship exists, a document reached a
+ * supplier. None of them is a person saying they are done.
+ */
+const ACTION_COMPLETION_FACT: Record<Exclude<PurchaseDemandState, "covered">, string> = {
+  ready_to_buy: "Current PO version reached supplier with evidence",
+  no_customer_date: "Customer Delivery exists",
+  no_sku: "Approved SKU exists",
+  no_supplier: "Approved supplier relationship exists",
+  no_production_days: "Governed supplier/category days exist",
+};
+
+/**
+ * Compose one row's action.
+ *
+ * The four blocker sentences are `purchaseDemandHelpLine`'s, reused rather than
+ * respelt — two spellings of one instruction is how a Register and a Work
+ * queue start telling an operator different things. `ready_to_buy` gets its own
+ * sentence because it is not a blocker being fixed; it is the buy itself.
+ */
+export function soBatchAction(f: {
+  state: PurchaseDemandState;
+  item: string;
+  supplier: string | null;
+  category: ProductCategory | null;
+  ownerId: string | null;
+  ownerName: string | null;
+  orderId: string;
+  so: number | null;
+  dueDate: IsoDate | null;
+  cover?: { normalOwnerId: string | null; actingOwnerId: string | null } | null;
+}): SoBatchPurchaseAction | null {
+  if (f.state === "covered") return null;
+  const trigger = f.state;
+  const act =
+    trigger === "ready_to_buy"
+      ? `Issue PO to ${f.supplier ?? "the supplier"}`
+      : purchaseDemandHelpLine({
+          state: trigger,
+          item: f.item,
+          supplier: f.supplier,
+          category: f.category,
+        });
+  if (!act) return null;
+  const duty = PURCHASE_DEMAND_OWNER_DUTY[trigger] ?? (trigger === "ready_to_buy" ? "PO duty" : null);
+  return {
+    trigger,
+    ownerRule: ACTION_OWNER_RULE[trigger],
+    ownerId: f.ownerId,
+    ownerName: f.ownerName,
+    ownerDuty: f.ownerName ? null : duty,
+    action: act,
+    completionFact: ACTION_COMPLETION_FACT[trigger],
+    dueDate: f.dueDate,
+    sourceObject: {
+      type: "sales_order",
+      id: f.orderId,
+      number: f.so == null ? "" : `SO-${f.so}`,
+    },
+    cover: f.cover ?? null,
+  };
 }
 
 // ─── The derivation ──────────────────────────────────────────────────────────
@@ -453,6 +589,34 @@ export const purchaseDemandStateSchema = z.enum([
   "covered",
 ]);
 
+export const soBatchPurchaseActionSchema = z.object({
+  trigger: z.enum([
+    "ready_to_buy",
+    "no_customer_date",
+    "no_sku",
+    "no_supplier",
+    "no_production_days",
+  ]),
+  ownerRule: z.string(),
+  ownerId: z.string().nullable(),
+  ownerName: z.string().nullable(),
+  ownerDuty: z.string().nullable(),
+  action: z.string(),
+  completionFact: z.string(),
+  dueDate: z.string().nullable(),
+  sourceObject: z.object({
+    type: z.literal("sales_order"),
+    id: z.string(),
+    number: z.string(),
+  }),
+  cover: z
+    .object({
+      normalOwnerId: z.string().nullable(),
+      actingOwnerId: z.string().nullable(),
+    })
+    .nullable(),
+});
+
 export const purchaseDemandRowSchema = z.object({
   id: z.string(),
   state: purchaseDemandStateSchema,
@@ -478,6 +642,13 @@ export const purchaseDemandRowSchema = z.object({
   onPo: z.number().nullable(),
   poNumbers: z.array(z.string()),
   toBuy: z.number().nullable(),
+  goodsMustArrive: z.string().nullable(),
+  issueRef: z
+    .object({ proposalKey: z.string(), buildKey: z.string() })
+    .nullable(),
+  action: soBatchPurchaseActionSchema.nullable(),
+  costs: z.array(z.object({ sku: z.string(), unitCost: z.number().nullable() })),
+  supplierKind: z.enum(["own_logistics", "factory_pickup"]).nullable(),
   ownerName: z.string().nullable(),
   ownerDuty: z.string().nullable(),
 });
@@ -490,3 +661,39 @@ export const purchaseDemandsResponseSchema = z.object({
 });
 
 export type PurchaseDemandsResponse = z.infer<typeof purchaseDemandsResponseSchema>;
+
+/**
+ * THE SO BATCH PURCHASE READ (Card §7.1).
+ *
+ * The rows plus the four facts the buying journey needs and the Register alone
+ * never did: where goods may be sent, which of those is the standing default,
+ * who currently holds PO Duty, who is covering it today, and whether THIS reader
+ * may issue. `mayIssue` is a convenience — the API and the creation RPC both
+ * refuse an unauthorised issue whatever the browser believes (Card §6; 0379).
+ */
+export const soBatchPurchaseResponseSchema = z.object({
+  today: z.string(),
+  rows: z.array(purchaseDemandRowSchema),
+  destinations: z.array(
+    z.object({
+      id: z.string(),
+      name: z.string(),
+      isDefault: z.boolean(),
+      active: z.boolean(),
+    }),
+  ),
+  defaultDestinationId: z.string().nullable(),
+  /** The month's normal holder. `Team Work` groups by this person. */
+  currentPoDuty: z.object({ userId: z.string(), name: z.string() }).nullable(),
+  /**
+   * ⭐ 0379 — the dated buddy cover who may act TODAY, when one is set. It is a
+   * separate fact from the holder on purpose: the duty stays where management
+   * put it, and the audit must still say who actually pressed Issue PO.
+   */
+  actingPoDuty: z.object({ userId: z.string(), name: z.string() }).nullable(),
+  mayIssue: z.boolean(),
+  /** Who may collect from a factory, for the documents that need one. */
+  procurementPartners: z.array(z.object({ id: z.string(), name: z.string() })),
+});
+
+export type SoBatchPurchaseResponse = z.infer<typeof soBatchPurchaseResponseSchema>;

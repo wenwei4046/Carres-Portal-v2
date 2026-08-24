@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
 import { SignJWT, createLocalJWKSet, exportJWK, generateKeyPair, type JWK, type KeyLike } from "jose";
 import app from "../../index";
@@ -2244,5 +2247,198 @@ describe("POST /api/operation/pos/:id/ready-date", () => {
     );
     const passedJwt = vi.mocked(userClient).mock.calls[0]?.[1];
     expect(passedJwt).toBe(jwt);
+  });
+});
+
+
+/**
+ * CONFIRMED OUTBOUND EVIDENCE (0377; CARD-2026-08-22-purchasing-02 §7.4).
+ *
+ * The whole point of this block: an app that OPENED is not a PDF that ARRIVED.
+ */
+describe("POST /api/operation/pos/:id/confirm-sent", () => {
+  const PO_ID = "PO-2041";
+
+  function mockRpc(result: unknown = { po_id: PO_ID, po_version: 2 }, error: unknown = null) {
+    const rpc = vi.fn().mockResolvedValue({ data: result, error });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    return rpc;
+  }
+
+  async function post(body: unknown, role = "operation") {
+    const jwt = await makeJwt(role);
+    return app.fetch(
+      new Request(`http://t/api/operation/pos/${PO_ID}/confirm-sent`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+      env,
+    );
+  }
+
+  it("records channel, recipient, version and note through the governed RPC", async () => {
+    const rpc = mockRpc();
+    const res = await post({
+      channel: "whatsapp",
+      recipient: "Hooka Purchasing Group",
+      poVersion: 2,
+      note: "Sent with the Unit list",
+    });
+    expect(res.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("purchasing_confirm_po_sent", {
+      p_po_id: PO_ID,
+      p_expected_version: 2,
+      p_channel: "whatsapp",
+      p_recipient: "Hooka Purchasing Group",
+      p_note: "Sent with the Unit list",
+    });
+  });
+
+  /**
+   * ⭐ 0378 — the caller DECLARES the version it rendered.
+   *
+   * 0377 had SQL read the newest version instead, reasoning that a caller able
+   * to name one could lie. That was backwards: send Version 1, let another
+   * session revise to Version 2, confirm — and Carres recorded Version 2 as
+   * shared while the supplier held Version 1. Declaring is not trusting; SQL
+   * locks, compares, refuses, and still stores only its own read.
+   */
+  it("a confirmation with NO version is refused", async () => {
+    const rpc = mockRpc();
+    const res = await post({ channel: "email", recipient: "buy@hooka.my" });
+    expect(res.status).toBe(422);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("a version that is not a positive whole number is refused", async () => {
+    const rpc = mockRpc();
+    for (const bad of [0, -1, 1.5, "2", null]) {
+      const res = await post({ channel: "email", recipient: "buy@hooka.my", poVersion: bad });
+      expect(res.status, JSON.stringify(bad)).toBe(422);
+    }
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("the declared version reaches SQL as the EXPECTED version, not as the stored one", async () => {
+    const rpc = mockRpc();
+    await post({ channel: "email", recipient: "buy@hooka.my", poVersion: 1 });
+    const args = rpc.mock.calls[0]![1] as Record<string, unknown>;
+    expect(args.p_expected_version).toBe(1);
+    // There is no argument that could SET the stored version.
+    expect(Object.keys(args)).not.toContain("p_version");
+    expect(Object.keys(args)).not.toContain("p_po_version");
+  });
+
+  it("viewing Version 1 while the database holds Version 2 is refused, in two lines", async () => {
+    mockRpc(null, {
+      code: "P0001",
+      message: "stale_po_version: saw 1, current is 2",
+      details: "stale_po_version",
+    });
+    const res = await post({ channel: "whatsapp", recipient: "Hooka", poVersion: 1 });
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as { code?: string; message?: string; action?: string };
+    expect(body.code).toBe("stale_po_version");
+    // The approved fact/fix pair (`docs/purchasing/MASTER.md` §8.3).
+    expect(body.message).toBe("Purchase order changed");
+    expect(body.action).toBe("Open the latest PDF and send it again.");
+  });
+
+  it("a stale confirmation writes NOTHING — the refusal is the whole outcome", async () => {
+    const rpc = mockRpc(null, {
+      code: "P0001",
+      message: "stale_po_version",
+      details: "stale_po_version",
+    });
+    await post({ channel: "whatsapp", recipient: "Hooka", poVersion: 1 });
+    // One call, and it raised. No second call could have written a row.
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(rpc.mock.calls[0]![0]).toBe("purchasing_confirm_po_sent");
+  });
+
+  it("declaring the version that IS current records it", async () => {
+    const rpc = mockRpc({ po_id: PO_ID, po_version: 2 });
+    const res = await post({ channel: "whatsapp", recipient: "Hooka", poVersion: 2 });
+    expect(res.status).toBe(200);
+    expect((rpc.mock.calls[0]![1] as Record<string, unknown>).p_expected_version).toBe(2);
+    const body = (await res.json()) as { result?: { po_version?: number } };
+    expect(body.result?.po_version).toBe(2);
+  });
+
+  it("refuses a blank recipient — `sent` must say to whom", async () => {
+    const rpc = mockRpc();
+    for (const recipient of ["", "   "]) {
+      const res = await post({ channel: "whatsapp", recipient, poVersion: 1 });
+      expect(res.status, JSON.stringify(recipient)).toBe(422);
+    }
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("refuses a channel nobody governs", async () => {
+    const rpc = mockRpc();
+    const res = await post({ channel: "carrier pigeon", recipient: "Hooka", poVersion: 1 });
+    expect(res.status).toBe(422);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("refuses an unknown field rather than silently dropping it", async () => {
+    const rpc = mockRpc();
+    const res = await post({
+      channel: "whatsapp", recipient: "Hooka", poVersion: 1, sentAt: "2026-08-24",
+    });
+    expect(res.status).toBe(422);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("a caller who does not hold PO duty is refused by SQL, not by the screen", async () => {
+    mockRpc(null, { code: "P0001", message: "not_po_duty", details: "not_po_duty" });
+    const res = await post({ channel: "whatsapp", recipient: "Hooka", poVersion: 1 });
+    expect(res.status).toBeGreaterThanOrEqual(400);
+    expect(res.status).toBeLessThan(500);
+  });
+
+  it("a dealer never reaches the door", async () => {
+    const rpc = mockRpc();
+    const res = await post({ channel: "whatsapp", recipient: "Hooka", poVersion: 1 }, "dealer");
+    expect(res.status).toBe(403);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+});
+
+describe("opening an app records an OPEN, and completes nothing", () => {
+  it("`/sends` still exists and still takes only channel and note", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: {}, error: null });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("http://t/api/operation/pos/PO-2041/sends", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ channel: "whatsapp" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("purchasing_record_send", {
+      p_po_id: "PO-2041",
+      p_channel: "whatsapp",
+      p_note: null,
+    });
+    // It carries NO recipient — an open cannot name who received anything.
+    const args = rpc.mock.calls[0]![1] as Record<string, unknown>;
+    expect(args).not.toHaveProperty("p_recipient");
+  });
+
+  it("the two doors are DIFFERENT functions — an open can never mint evidence", () => {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const src = readFileSync(join(here, "pos.ts"), "utf8");
+    expect(src).toContain("purchasing_record_send");
+    expect(src).toContain("purchasing_confirm_po_sent");
+    // The open door does not touch the evidence function, and vice versa.
+    const openBlock = src.slice(src.indexOf('post("/:id/sends"'), src.indexOf('post("/:id/confirm-sent"'));
+    expect(openBlock).not.toContain("purchasing_confirm_po_sent");
   });
 });

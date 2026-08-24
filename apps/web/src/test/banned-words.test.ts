@@ -45,11 +45,25 @@ describe("no banned word reaches the screen (C12 · portal-wide)", () => {
     );
   });
 
-  describe("To Order", () => {
-    itSaysNoBannedWord(join(PAGES, "operation", "OperationToOrder.tsx"), {
-      minStrings: 80,
-      expectString: "Open Purchase Order",
-    });
+  /**
+   * SO BATCH PURCHASE (CARD-2026-08-22-purchasing-02). `OperationToOrder.tsx`
+   * is a thin orchestrator now — it owns data and mode and spells almost no
+   * words — so the scan follows the WORDS to the two files that hold them. A
+   * floor left on the orchestrator would pass vacuously forever.
+   */
+  describe("SO Batch Purchase", () => {
+    itSaysNoBannedWord(
+      join(PAGES, "operation", "so-batch", "SoBatchRegister.tsx"),
+      { minStrings: 40, expectString: "Not counted yet" },
+    );
+    itSaysNoBannedWord(
+      join(PAGES, "operation", "so-batch", "SoBatchIssueWorkspace.tsx"),
+      { minStrings: 20, expectString: "Goods must arrive" },
+    );
+    itSaysNoBannedWord(
+      join(PAGES, "operation", "components", "PoIssueEvidence.tsx"),
+      { minStrings: 20, expectString: "Record the PDF sent" },
+    );
   });
 
   /**
