@@ -1833,13 +1833,13 @@ Fixed phrasings — reuse, never invent a variant:
 
 ## The Delivery Order DOCUMENT words (blueprint card, owner ruling 2026-08-16)
 
-The Delivery Orders Register (SALES sidebar) and the DO object page speak these words and no
-others. The status set is the document's own lifecycle — registered here and in
+The Delivery listing and the DO object page speak these words and no others. The status set is
+the document's own lifecycle — registered here and in
 `STATUS-STANDARD.md`; the ONE arithmetic is `deliveryOrderStatusOf` in `packages/shared`.
 
 | Meaning | Use exactly | Do NOT use |
 |---|---|---|
-| The sidebar door / register | **Delivery Orders** | DOs · Deliveries · Dispatch |
+| The sidebar door / one workspace | **Delivery** | Delivery Work · Delivery Orders · DOs · Dispatch |
 | A fresh document, no run yet | **Created** | New · Open · Pending |
 | Goods received by logistics, not yet resulted (derived from the §4 chain's `Received by logistics` fact, 0363 — never from the calendar) | **Out for delivery** | In transit · Dispatched · On the way |
 | The trip completed | **Delivered** | Done · Complete · Closed |
@@ -1856,25 +1856,23 @@ library itself (`delivery-reasons.ts`), never as a second list. **No Release, Ap
 button exists anywhere on this surface**: the SYSTEM issues the document
 (`../orders/MASTER.md` §8).
 
-## The Delivery module words (T11, locked with Jess 2026-07-27)
+## The Delivery module words (owner ruling 2026-08-24)
 
-The standalone Delivery page adds **no new vocabulary**. Its queue names, its
-action pills and its calendar lines are the words already ruled above, taken
-from the same shared constants the Orders list reads — a module that spelt a
-queue differently would be rule 8's failure with its own menu item. Only these
-four strings are the page's own:
+There is one sidebar word and one page title: **Delivery**. `Delivery Work` and `Delivery Orders`
+are not separate destinations. A formal DO remains a Delivery Order and its number remains a door
+inside the one Delivery listing.
 
 | Concept | Canonical word | Do NOT use |
 |---|---|---|
-| The two views of the module | **Queues · Calendar** | List · Board · Schedule · Planner |
-| How much work is on the board | **{n} to do · {n} late** | Total · Outstanding · Open items |
-| Nothing in the picked queue | **Nothing to do here.** + the sentence saying when an order joins | No results · Empty · All clear |
-| Leaving the module to act | **Open order** | View · Details · Go to order · Edit |
+| Sidebar and page title | **Delivery** | Delivery Work · Delivery Orders · Deliveries |
+| No confirmed operational date | **No confirmed date** | Unscheduled · Pending · No ETA |
+| Confirmed date is behind today with no result | **Overdue** | Date passed · Late delivery |
+| No formal DO exists yet | **No delivery order yet** | Not issued · Create DO · Issue DO |
+| Open the formal document | the actual **DO number** | View DO · Details |
 
-**The module states facts and hands over.** Every write — booking a date,
-recording a reason, uploading a delivery photo — happens in the order drawer,
-which is where the gates live. So the page carries exactly ONE button, and its
-word says where it takes you.
+The same row carries the arrangement facts, scoped goods, DO number and Delivery Status. This
+does not merge their authority: Delivery arrangement remains editable operational truth and the
+issued DO remains a formal historical document.
 
 **The delivery-rule word law (T9, Jess 2026-07-27):** every one of these lines
 WARNS and none of them blocks, so every one of them must name the logistics company and

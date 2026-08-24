@@ -8,7 +8,7 @@
  *     partner, its own day and its own status.
  *  2. `Confirmed Delivery` has ONE arithmetic — the document first, then the
  *     confirmed booking, and a carrier's provisional date is never confirmed.
- *  3. The DELIVERY DATE rail orders itself `No confirmed date` → `Date passed`
+ *  3. The DELIVERY DATE rail orders itself `No confirmed date` → `Overdue`
  *     → real ascending days, and prints no relative day word.
  *  4. The LOGISTICS rail keeps the seven governed partners visible at zero and
  *     admits an ungoverned one only while it is carrying something.
@@ -213,7 +213,7 @@ describe("the DELIVERY DATE rail", () => {
     }),
   ]);
 
-  it("buckets a scope by its confirmed date, and a past date is `Date passed`", () => {
+  it("buckets a scope by its confirmed date, and a past date is `Overdue`", () => {
     expect(dateBucketOf(rows.find((r) => r.so === 1301)!, TODAY)).toBe(NO_DATE_KEY);
     expect(dateBucketOf(rows.find((r) => r.so === 1302)!, TODAY)).toBe(DATE_PASSED_KEY);
     expect(dateBucketOf(rows.find((r) => r.so === 1303)!, TODAY)).toBe("2026-08-25");
