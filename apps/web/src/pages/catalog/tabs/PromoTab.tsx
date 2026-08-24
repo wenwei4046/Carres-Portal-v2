@@ -174,6 +174,46 @@ function accessorySkus(catalog: CatalogResponse): ProductSkuDto[] {
   return catalog.skus.filter((s) => catByModel.get(s.modelId) === "accessory");
 }
 
+/**
+ * ⭐ CAN THIS RULE'S REWARD EVER BE PRICED? — the born-dead guard.
+ *
+ * A 'pwp' reward's price is NOT on the rule. It lives per-SKU on
+ * `product_skus.pwp_price`, edited on a DIFFERENT tab (SKU Master), and nothing
+ * connected the two — so a principal could author a complete, Active rule whose
+ * reward SKUs carried no price at all. That rule is invisible at the till (the
+ * offer is skipped when there is no price) AND the voucher layer still mints
+ * codes off its trigger and prints them on the customer's receipt: a voucher for
+ * a discount that cannot exist.
+ *
+ * Returns how many reward SKUs the rule could land on and how many carry a
+ * usable price. `total === 0` means the TARGETING matches nothing.
+ *
+ * TWO KINDS ARE DELIBERATELY EXEMPT — never route them here:
+ *   · a 'promo' rule — always free; the server returns 0 without ever reading
+ *     pwp_price, so an unpriced reward is correct, not broken
+ *   · a SOFA reward  — priced from the combo PWP map, not from this column
+ */
+export function rewardPriceCoverage(
+  catalog: CatalogResponse,
+  rewardCategory: ProductCategory,
+  targets: RuleTarget[],
+): { total: number; priced: number } {
+  const catByModel = new Map(catalog.models.map((m) => [m.id, m.category]));
+  const targeted = new Set(targets.map((t) => t.modelId));
+  // Empty targeting means the WHOLE category — not "nothing". Same reading the
+  // engine uses, and the same one the help text under the picker states.
+  const candidates = catalog.skus.filter(
+    (s) =>
+      catByModel.get(s.modelId) === rewardCategory &&
+      (targeted.size === 0 || targeted.has(s.modelId)),
+  );
+  return {
+    total: candidates.length,
+    // The server's own test, character for character: `p == null || p <= 0`.
+    priced: candidates.filter((s) => typeof s.pwpPrice === "number" && s.pwpPrice > 0).length,
+  };
+}
+
 /** Friendly name for a gift accessory SKU: the accessory's MODEL name — the
  *  PRODUCT NAME (an accessory is one model = one product, e.g. "Memory Foam
  *  Pillow"; Loo 2026-07-11: show the product name, NOT the description) →
@@ -1302,8 +1342,23 @@ function PwpRuleForm({
   // explicit model or combo selection (empty ≠ every sofa build).
   const sofaTriggerInvalid = triggerCategory === "sofa" && finalTrigger.length === 0;
   const sofaRewardInvalid = rewardCategory === "sofa" && finalReward.length === 0;
+  // A 'promo' is always free and a sofa reward is priced from the combo map, so
+  // neither reads pwp_price and neither can be born dead this way.
+  const rewardPriceApplies = type === "pwp" && rewardCategory !== "sofa";
+  const coverage = rewardPriceApplies
+    ? rewardPriceCoverage(catalog, rewardCategory, finalReward)
+    : null;
+  // Refuse only the ARITHMETIC impossibility — not a preference. Zero priced
+  // rewards means no cart can ever be granted this rule. Partial coverage
+  // (3 of 12) is legitimate and only earns the count shown under the picker.
+  const rewardUnpriced = coverage !== null && coverage.priced === 0;
   const valid =
-    Number.isInteger(qtyNum) && qtyNum >= 1 && daysValid && !sofaTriggerInvalid && !sofaRewardInvalid;
+    Number.isInteger(qtyNum) &&
+    qtyNum >= 1 &&
+    daysValid &&
+    !sofaTriggerInvalid &&
+    !sofaRewardInvalid &&
+    !rewardUnpriced;
 
   async function submit() {
     if (!valid) return;
@@ -1422,7 +1477,16 @@ function PwpRuleForm({
           Category
           <select
             value={triggerCategory}
-            onChange={(e) => setTriggerCategory(e.target.value as ProductCategory)}
+            onChange={(e) => {
+              // ⭐ THE TARGETS BELONG TO THE CATEGORY THAT IS LEAVING. The engine
+              // needs category AND target to BOTH hold, so keeping mattress models
+              // under a sofa category produces a rule that can never match — and
+              // the Save guard below never catches it, because it counts how many
+              // targets were picked, never whether they belong. Clearing is the
+              // only honest option: no mattress model maps onto a sofa one.
+              setTriggerCategory(e.target.value as ProductCategory);
+              setTriggerTargets([]);
+            }}
             className={`${INPUT_CLS} w-40`}
             data-testid="pwp-trigger-category"
           >
@@ -1453,7 +1517,12 @@ function PwpRuleForm({
           Category
           <select
             value={rewardCategory}
-            onChange={(e) => setRewardCategory(e.target.value as ProductCategory)}
+            onChange={(e) => {
+              // Same reason as the trigger side above — the picked models belong
+              // to the outgoing category and cannot follow it.
+              setRewardCategory(e.target.value as ProductCategory);
+              setRewardTargets([]);
+            }}
             className={`${INPUT_CLS} w-40`}
             data-testid="pwp-reward-category"
           >
@@ -1473,10 +1542,25 @@ function PwpRuleForm({
         <p className={`text-meta ${sofaRewardInvalid ? "text-danger" : "text-base-400"}`}>
           {rewardCategory === "sofa"
             ? "Pick at least one reward combo for a sofa reward."
-            : `The reward is sold at each reward SKU's PWP price (set in SKU Master)${
-                type === "promo" ? " — for a Promo, a PWP price of RM 0 redeems the reward free" : ""
-              }. None added = any ${rewardCategory}.`}
+            : type === "promo"
+              ? `A Promo gives the reward free — it never reads a PWP price. None added = any ${rewardCategory}.`
+              : `The reward is sold at each reward SKU's PWP price (set in SKU Master). None added = any ${rewardCategory}.`}
         </p>
+        {/* The born-dead guard, stated where the author can act on it. Without a
+            priced reward the rule matches nothing at the till, so Save is
+            refused rather than saving a rule that only LOOKS complete. */}
+        {coverage !== null && (
+          <p
+            className={`text-meta ${rewardUnpriced ? "text-danger" : "text-base-400"}`}
+            data-testid="pwp-reward-price-coverage"
+          >
+            {coverage.total === 0
+              ? "No reward SKU matches this targeting — nothing can be granted."
+              : rewardUnpriced
+                ? `None of the ${coverage.total} reward SKUs has a PWP price. Set one in SKU Master, or make this a Promo if the reward is free.`
+                : `${coverage.priced} of ${coverage.total} reward SKUs have a PWP price. The rest cannot be granted.`}
+          </p>
+        )}
       </div>
 
       <div className="flex items-center justify-end gap-2">

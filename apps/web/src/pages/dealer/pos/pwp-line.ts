@@ -176,7 +176,17 @@ export function pwpRewardPrice(
   if (rule.type === "promo") return 0;
   const skuRow = catalog.skus.find((s) => s.sku === line.sku) ?? null;
   const p = skuRow?.pwpPrice;
-  return typeof p === "number" ? p : null;
+  // ⭐ A STORED 0 IS "NOT SET", NEVER "FREE" — and this line is the client half
+  // of a rule the server already states: `p == null || p <= 0` is rejected at
+  // Confirm (`pwp-recompute.ts`, "2990s parity: pwp_price = 0 means not set for
+  // a 'pwp' rule"). Only a 'promo' rule redeems free, and it returns above
+  // without ever reading pwpPrice — so 0 has no meaning here at all.
+  //
+  // Reading it as a price previewed "RM 0.00" on the chip, let the dealer build
+  // the entire order on it, and lost the lot to a 409 at Confirm naming SKU
+  // Master, a screen a dealer cannot open. Honest-pricing means this function
+  // and the server answer identically or the chip must not appear.
+  return typeof p === "number" && p > 0 ? p : null;
 }
 
 /** Reconstruct the pure `SofaBuild` a build line carries (null = not a build /
