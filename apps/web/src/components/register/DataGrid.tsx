@@ -237,6 +237,8 @@ export type DataGridProps<T> = {
     renderExpansion: (row: T) => ReactNode;
     /** Optional: derive a stable row id for expansion state. Defaults to rowKey. */
     rowExpansionKey?: (row: T) => string;
+    /** Per-row test id for the disclosure chevron. */
+    testId?: (row: T) => string;
   };
   /**
    * First-class multi-select (Commander 2026-06-19). Prepends a synthetic
@@ -250,7 +252,21 @@ export type DataGridProps<T> = {
     /** Toggle all visible rows. `keys` = the keys currently shown; `allSelected`
         = whether they are all already selected (so the parent clears vs selects). */
     onToggleAll: (keys: string[], allSelected: boolean) => void;
+    /**
+     * Which rows may be selected at all (SO Batch Purchase, 2026-08-22).
+     *
+     * Some registers list rows that CANNOT take the bulk act — a buying line
+     * whose supplier is unresolved has no purchase order to make. Offering the
+     * tick there offers an act that fails, and a page-local overlay could not
+     * fix the header checkbox or row-click, which both live in here. Omitted =
+     * every row is selectable, exactly as before.
+     */
+    isSelectable?: (row: never) => boolean;
+    /** Per-row test id for the checkbox. */
+    testId?: (row: never) => string;
   };
+  /** Per-row test id for the whole `<tr>`. */
+  rowTestId?: (row: T) => string;
   /**
    * STAGE 1 engine extension (Law 13, with `chooserGroup`): the order the
    * grouped Columns chooser lists its sections in. Groups not named here
@@ -379,6 +395,7 @@ function DataGridInner<T>({
   onRowClick,
   rowStyle,
   onSelectionChange,
+  rowTestId,
   onFilteredRowsChange,
   onSearchChange,
   appearance = "default",
@@ -1350,7 +1367,7 @@ function DataGridInner<T>({
     return (
       <Fragment key={`f-${key}-${idx}`}>
         <tr
-          data-testid={isReference ? "grid-parent-row" : undefined}
+          data-testid={rowTestId?.(row) ?? (isReference ? "grid-parent-row" : undefined)}
           className={`${styles.tr} ${selectedKey === key ? styles.trSelected : ""}`}
           style={{
             ...rowStyle?.(row),
@@ -1364,7 +1381,9 @@ function DataGridInner<T>({
           onClick={() => {
             setSelectedKey(key);
             if (onRowClick) onRowClick(row);
-            else if (selectable) selectable.onToggle(key);
+            else if (selectable && (selectable.isSelectable?.(row as never) ?? true)) {
+              selectable.onToggle(key);
+            }
           }}
           onDoubleClick={() => onRowDoubleClick?.(row)}
           onContextMenu={(e) => {
@@ -1389,7 +1408,9 @@ function DataGridInner<T>({
                   <input
                     type="checkbox"
                     aria-label="Select row"
+                    data-testid={selectable.testId?.(row as never)}
                     checked={selectable.selectedKeys.has(key)}
+                    disabled={!(selectable.isSelectable?.(row as never) ?? true)}
                     onChange={() => selectable.onToggle(key)}
                   />
                 </td>
@@ -1405,6 +1426,7 @@ function DataGridInner<T>({
                   <button
                     type="button"
                     aria-label={isExpanded ? "Collapse row" : "Expand row"}
+                    data-testid={expandable.testId?.(row)}
                     /* The disclosure has to ANNOUNCE its state, not only its
                        label: a screen reader lands on the chevron and must be
                        told whether the goods below it are already open. One
@@ -1809,7 +1831,12 @@ function DataGridInner<T>({
                 const isSorted = layout.sort?.key === col.key;
                 const arrow = isSorted ? (layout.sort!.dir === "asc" ? "A" : "V") : "";
                 if (col.key === "__select__" && selectable) {
-                  const keys = sortedRows.map(rowKey);
+                  /* Select-all means "every row that CAN be selected". A header
+                     box that stays indeterminate forever because three rows can
+                     never be ticked is a control that lies about its own state. */
+                  const keys = sortedRows
+                    .filter((r) => selectable.isSelectable?.(r as never) ?? true)
+                    .map(rowKey);
                   const allSel = keys.length > 0 && keys.every((k) => selectable.selectedKeys.has(k));
                   const someSel = !allSel && keys.some((k) => selectable.selectedKeys.has(k));
                   return (

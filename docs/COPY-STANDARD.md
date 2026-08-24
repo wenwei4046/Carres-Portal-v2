@@ -1601,6 +1601,46 @@ one-word instruction. It renders the shared structured Action contract in two li
 The avatar is metadata, not part of the sentence. The PO and supplier are not repeated where their
 columns already identify them. Completion comes from the named authoritative fact; there is no
 manual `Done` tick.
+### Why a purchase order was refused — CANONICAL HOME (CARD-2026-08-22-purchasing-02, 2026-08-24)
+
+Every refusal on the Purchasing buying journey uses the portal two-line shape — LINE 1 the FACT,
+LINE 2 the ACT with its object, who is asked and what completes it — and there is exactly ONE place
+the words live: `packages/shared/src/purchasing-refusals.ts`. The API sends both lines, both surfaces
+render both, and a refusal raised in SQL is translated into them rather than shown raw. Written three
+times the same refusal becomes three sentences, and the operator learns that the message is
+unreliable rather than that the document is blocked.
+
+The load-bearing ones, verbatim:
+
+| Refused because | Line 1 · the fact | Line 2 · the act |
+|---|---|---|
+| The caller is not today's PO actor | `You do not hold PO duty today.` | `Ask {name} to issue this purchase order.` |
+| No duty holder is set for the month | `Nobody holds PO duty this month.` | `Ask management to set this month's PO duty holder.` |
+| Catalog's price moved since the review | `{sku} costs a different price now.` | `Go back to buying and check the new price before you issue.` |
+| Nobody checked the price of a line | `{sku} has no checked transaction cost.` | `Check the cost of {sku} on this page, then issue again.` |
+| An exception has no manager's approval | `Nobody approved this price for {sku}.` | `Ask a manager to approve the price of {sku} for {supplier}.` |
+| Catalog holds no price at all | `{sku} has no transaction cost.` | `Type the agreed cost of {sku}, or mark it Free of Charge.` |
+| Free of Charge with no reason | `{sku} is Free of Charge with no reason.` | `Type why {sku} is free, then ask a manager to approve it.` |
+| A manager would approve their own exception | `You cannot approve a price you will use yourself.` | `Ask another manager to approve this price.` |
+| The Deliver To split does not add up | `You arranged {n} units and must buy {m}.` | `Change the Deliver To split so the units add up, then issue again.` |
+| A matched set was split across two places | `A sofa set cannot go to two places.` | `Send the whole set to one place, then issue again.` |
+| The document on screen is out of date | `The purchase orders on screen are out of date.` | `Go back to buying, then open Review Purchase Orders again.` |
+| The purchase order changed after rendering | `{po} changed after you opened it.` | `Open the new PDF, send it, then record it as sent.` |
+| The day's number pool is exhausted | `Today has no purchase order number left.` | `Tell IT today. Issue this purchase order tomorrow.` |
+
+Rules that bind every line, and are proved by test rather than reviewed:
+
+- **Banned outright**, here as everywhere: `Needs attention` · `Next action` · `Something went
+  wrong` · `Pending` · `Waiting` · `Priority` · a bare `Follow up` · `Invalid` · `Failed to`.
+- **Fourteen words maximum per line**, and each line ends as a sentence.
+- A refusal **names the SKU, supplier, document or destination** it is about whenever the server
+  knows it; where it does not, a plain noun stands in — never an empty gap.
+- An unrecognised code still names an act: `The Portal refused this purchase order.` /
+  `Nothing was created. Tell IT the message on screen.` A message with no act is the defect the
+  file exists to remove.
+- **Nothing is created when a refusal fires.** The batch is atomic, so the operator stays where they
+  were with the selection intact.
+
 ### Purchasing report words — central Reports and Register exports
 
 Purchasing has no `Report` sidebar page or module tab. Central `Reports` and Register export may

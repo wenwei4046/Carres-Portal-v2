@@ -6,6 +6,7 @@ import {
   MANUAL_PURCHASE_WORDS as MW,
   TO_ORDER_WORDS as W,
   manualPurchaseStatusOf,
+  purchasingRefusal,
   stillNeededOf,
   type DemandPickItem,
   type DemandPurpose,
@@ -1014,6 +1015,32 @@ function RequestDetail({
   const issue = useIssuePurchaseRequests();
   const partnersQ = useDeliveryPartners();
 
+  /**
+   * ⭐ THE TRANSACTION COSTS THIS ISSUE WILL COMMIT TO (0380; Card 02 closure §2).
+   *
+   * This lane buys at the Catalog price, and the API used to read that price
+   * itself and hand it straight back to the creation authority as
+   * `cost_source: catalog` — so the database compared its own live value against
+   * itself and agreed every time. A supplier price that moved was adopted with
+   * nobody's approval and nobody's knowledge.
+   *
+   * The prices are therefore READ and SHOWN before `Issue PO`, and the same
+   * numbers are declared with the request. `Issue as one PO` can pull in sibling
+   * requests whose lines are not on this screen, so the read covers them too —
+   * otherwise the operator would be declaring a price they never saw.
+   */
+  const issueIds = useMemo(() => [id, ...readySiblingIds], [id, readySiblingIds]);
+  const costsQ = useQuery({
+    queryKey: ["operation", "purchasing", "requests", "issue-costs", issueIds],
+    queryFn: () =>
+      apiFetch<{ costs: { sku: string; unitCost: number | null }[] }>(
+        `/api/operation/purchasing/requests/issue-costs?requestIds=${encodeURIComponent(
+          issueIds.join(","),
+        )}`,
+      ),
+    staleTime: 15_000,
+  });
+
   /** The approver's per-line numbers — seeded from `still needed` once the
    *  stock facts land; the human may override before approving. */
   const [cuts, setCuts] = useState<Record<string, string>>({});
@@ -1070,15 +1097,32 @@ function RequestDetail({
         partners[sp.id] = partnerId;
       }
     }
+    /* THE PRICES SHOWN ON THIS SCREEN, declared. A SKU with no Catalog price is
+       a configuration hole; it is not declared as zero, and the server refuses
+       the line by name. */
+    const expectedCosts: Record<string, number> = {};
+    for (const c of costsQ.data?.costs ?? []) {
+      if (c.unitCost != null) expectedCosts[c.sku] = c.unitCost;
+    }
+    if (Object.keys(expectedCosts).length === 0) {
+      setIssueError("The transaction costs are still loading. Wait, then issue again.");
+      return;
+    }
     try {
       await issue.mutateAsync({
         requestIds: together ? [id, ...readySiblingIds] : [id],
         together,
         partners: Object.keys(partners).length > 0 ? partners : null,
+        expectedCosts,
       });
       onBack();
     } catch (e) {
-      setIssueError(e instanceof Error ? e.message : "The PO was not issued");
+      /* THE APPROVED TWO LINES (closure §9): the fact, then the act. */
+      const body = (e as { body?: { message?: string; action?: string; code?: string } }).body;
+      const fallback = purchasingRefusal(body?.code);
+      setIssueError(
+        `${body?.message ?? fallback.wrong} ${body?.action ?? fallback.todo}`.trim(),
+      );
     }
   }
 
@@ -1289,6 +1333,39 @@ function RequestDetail({
               </div>
             ) : null;
           })()}
+          {/* ⭐ THE PRICES THIS ISSUE COMMITS TO (0380; closure §2).
+              Shown before the button, because the request DECLARES them and a
+              number nobody was shown is not a number anybody reviewed. `Issue as
+              one PO` widens the set to the sibling requests, so this list does
+              too. A SKU Catalog has no price for is named, not defaulted. */}
+          {(costsQ.data?.costs ?? []).length > 0 ? (
+            <div className="flex flex-col gap-0.5" data-testid="mp-issue-costs">
+              <span className="text-label uppercase tracking-wide text-base-500">
+                Transaction cost
+              </span>
+              {(costsQ.data?.costs ?? []).map((c) => (
+                <span
+                  key={c.sku}
+                  className="flex items-center justify-between gap-3 text-meta"
+                  data-testid={`mp-issue-cost-${c.sku}`}
+                >
+                  <span className="min-w-0 truncate font-mono">{c.sku}</span>
+                  {c.unitCost == null ? (
+                    <span className="flex shrink-0 flex-col text-right">
+                      <span className="text-base-900">Catalog has no price.</span>
+                      <span className="text-base-500">
+                        Ask Catalog to set the cost of {c.sku}.
+                      </span>
+                    </span>
+                  ) : (
+                    <span className="shrink-0 tabular-nums text-base-900">
+                      RM {Number(c.unitCost).toLocaleString()}
+                    </span>
+                  )}
+                </span>
+              ))}
+            </div>
+          ) : null}
           <div className="flex items-center gap-3">
             {readySiblingIds.length > 0 ? (
               <>

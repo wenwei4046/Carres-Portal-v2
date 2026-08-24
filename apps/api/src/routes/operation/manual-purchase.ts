@@ -1,6 +1,12 @@
 import { Hono, type Context } from "hono";
 import { z } from "zod";
-import { DEMAND_PURPOSE_VALUES, expectedArrivalOf, isOpsManager } from "@carres/shared";
+import {
+  DEMAND_PURPOSE_VALUES,
+  expectedArrivalOf,
+  isOpsManager,
+  PURCHASING_REFUSAL_CODES,
+  purchasingRefusal,
+} from "@carres/shared";
 import { requireOperation } from "../../lib/auth-guards";
 import { myDuties } from "../../lib/duties";
 import { loadPurchasingSettings } from "../../lib/purchasing-settings";
@@ -33,6 +39,26 @@ import type { AppEnv } from "../../types";
  * `/api/operation/purchase/to-order/demand/pick-items`.
  */
 const manualPurchaseRouter = new Hono<AppEnv>();
+
+/**
+ * EVERY REFUSAL LEAVES IN THE APPROVED TWO LINES (closure §9).
+ *
+ * Manual Purchase and SO Batch Purchase reach the same creation authority, so
+ * they must refuse in the same words — `purchasingRefusal` is the one place
+ * those words live.
+ */
+function refuse(
+  c: Context<AppEnv>,
+  status: 400 | 403 | 409 | 422 | 500,
+  code: string,
+  facts?: Parameters<typeof purchasingRefusal>[1],
+) {
+  const r = purchasingRefusal(code, facts);
+  return c.json(
+    { error: code, code, message: r.wrong, action: r.todo, ...(facts ?? {}) },
+    status,
+  );
+}
 
 /** The approver is the Settings manager — the card names them one and the
  *  same gate (`ops_manager` duty or principal). `canApprove` decides what
@@ -335,6 +361,20 @@ const issueBody = z.object({
   /** supplierId → delivery partner, required only for factory-pickup
    *  suppliers; the RPC re-validates. */
   partners: z.record(z.string().uuid(), z.string().uuid()).nullish(),
+  /**
+   * ⭐ THE TRANSACTION COST THE OPERATOR REVIEWED, per SKU (0380; closure §2).
+   *
+   * This lane issues at the Catalog price, and the API used to read that price
+   * itself and hand it back to the RPC as `cost_source: catalog` — so the
+   * database compared its own live value against itself and agreed every time.
+   * A supplier price that moved between the review and Issue was adopted with
+   * nobody's approval.
+   *
+   * The browser now declares what it SHOWED. The stored number is still the
+   * server's own read; the declaration is only what makes the comparison
+   * possible at all.
+   */
+  expectedCosts: z.record(z.string().min(1), z.number().nonnegative()),
 });
 
 /**
@@ -363,7 +403,7 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
   if (!parsed.success) {
     return c.json({ error: "invalid_body", code: "invalid_param" }, 400);
   }
-  const { requestIds, together, partners } = parsed.data;
+  const { requestIds, together, partners, expectedCosts } = parsed.data;
 
   const { data: requests, error: reqErr } = await sb
     .from("purchase_requests")
@@ -471,7 +511,18 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
     if (cat.cost == null || cat.cost <= 0) {
       // The manual lane issues at catalog cost; a SKU without one is a
       // configuration hole the catalog must fix — surfaced by name.
-      return c.json({ error: "cost_required", code: "cost_required", sku: l.sku }, 422);
+      return refuse(c, 422, "cost_required", { sku: l.sku as string });
+    }
+    /* ⭐ THE REVIEWED PRICE MUST STILL BE TRUE (0380; closure §2). Nothing
+       declared means nothing reviewed, and a declaration that no longer matches
+       Catalog means the supplier moved the price after the operator looked.
+       Neither is Operations' decision to wave through. */
+    const reviewed = expectedCosts[l.sku as string];
+    if (reviewed == null) {
+      return refuse(c, 422, "expected_cost_required", { sku: l.sku as string });
+    }
+    if (reviewed !== cat.cost) {
+      return refuse(c, 409, "supplier_price_changed", { sku: l.sku as string });
     }
     const req = reqById.get(l.request_id as string)!;
     const wall = `${cat.supplierId}|${cat.category}|${req.destination_id}|${req.purpose}`;
@@ -513,10 +564,14 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
       lines: lines.map((l) => ({
         sku: l.sku,
         qty: l.issueQty,
+        /* THE SERVER'S OWN READ is what is stored. */
         cost: catalog.get(l.sku as string)!.cost,
         cost_source: "catalog",
         commercial_treatment: "normal",
         commercial_reason: null,
+        /* …and the reviewed price travels beside it, so 0380 has two numbers to
+           compare instead of one number compared with itself. */
+        expected_catalog_cost: expectedCosts[l.sku as string] ?? null,
         demand_id: l.id,
       })),
     });
@@ -526,11 +581,89 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
     p_pos: governedPos,
   });
   if (batchErr) {
+    /* ⭐ THE SAME DOOR, THE SAME WORDS (0379/0380; closure §1 · §9). This lane
+       used to call the creation authority with NO duty check at all, and any
+       Postgres message it raised reached the operator raw. Both are closed: the
+       gate is in SQL, and its refusal arrives as the approved two lines. */
+    const detail = String((batchErr as { details?: string }).details ?? "").trim();
+    if ((PURCHASING_REFUSAL_CODES as readonly string[]).includes(detail)) {
+      const status =
+        detail === "not_po_duty" ? 403 : detail === "supplier_price_changed" ? 409 : 422;
+      return refuse(c, status, detail);
+    }
     const m = mapPgError(batchErr);
     return c.json(m.body, m.status);
   }
   const poIds = ((batch as { po_ids?: unknown } | null)?.po_ids ?? []) as string[];
   return c.json({ poIds, documents: governedPos.length });
+});
+
+/**
+ * GET /issue-costs?requestIds=a,b,c — THE PRICES THE OPERATOR IS ABOUT TO
+ * COMMIT TO (closure §2).
+ *
+ * `Issue as one PO` can pull in sibling requests whose lines are not on screen,
+ * so the surface could not otherwise show — or declare — the price it was
+ * buying at. This read answers exactly the SKUs those requests still have to
+ * buy, and the browser sends the same numbers back to `/issue`.
+ *
+ * It is a READ. It creates nothing and reserves nothing, and a price it returns
+ * is only a fact about right now — which is precisely why `/issue` compares it
+ * again.
+ */
+manualPurchaseRouter.get("/issue-costs", requireOperation, async (c) => {
+  const raw = (c.req.query("requestIds") ?? "").trim();
+  const requestIds = raw
+    .split(",")
+    .map((v) => v.trim())
+    .filter((v) => v.length > 0);
+  if (requestIds.length === 0 || requestIds.length > 20) {
+    return refuse(c, 400, "invalid_param");
+  }
+  const sb = userClient(c.env, c.var.auth.jwt);
+
+  const { data: lines, error } = await sb
+    .from("purchase_demands")
+    .select("id, sku, qty, approved_qty, issued_qty, cancelled_at")
+    .in("request_id", requestIds);
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  /* The same arithmetic `/issue` uses — the approver's number less what already
+     went out. A line with nothing left to buy has no price to review. */
+  const skus = [
+    ...new Set(
+      (lines ?? [])
+        .filter((l) => l.cancelled_at === null)
+        .filter(
+          (l) => Math.max(0, Number(l.approved_qty ?? l.qty) - Number(l.issued_qty ?? 0)) > 0,
+        )
+        .map((l) => l.sku as string),
+    ),
+  ];
+  if (skus.length === 0) return c.json({ costs: [] });
+
+  /* ⭐ NO SKU IN A POSTGREST `.in()` LIST. `sku` is free text and live rows carry
+     a DOUBLE QUOTE (`Leg 4"`), which breaks the filter and makes the server
+     answer with whatever it could parse. The catalog is a couple of hundred
+     rows, so it is read whole and matched here — the same rule To Order keeps. */
+  const { data: catRows, error: catErr } = await sb.from("product_skus").select("sku, cost");
+  if (catErr) {
+    const m = mapPgError(catErr);
+    return c.json(m.body, m.status);
+  }
+  const wanted = new Set(skus);
+  const costBySku = new Map(
+    (catRows ?? [])
+      .filter((r) => wanted.has(r.sku as string))
+      .map((r) => [r.sku as string, (r.cost as number | null) ?? null]),
+  );
+  return c.json({
+    costs: skus
+      .map((sku) => ({ sku, unitCost: costBySku.get(sku) ?? null }))
+      .sort((a, b) => a.sku.localeCompare(b.sku)),
+  });
 });
 
 manualPurchaseRouter.get("/already-have", requireOperation, async (c) => {
