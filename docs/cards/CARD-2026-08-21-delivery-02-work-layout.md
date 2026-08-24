@@ -1,9 +1,55 @@
 # DELIVERY — CARD 02 · FIX DELIVERY WORK LAYOUT
 
 **Module:** Delivery · **Sequence:** 02
-**Owner ruling:** Jess, 2026-08-21
-**Status:** EXECUTED — PR #887 (`d1fc2d2a`) + walk fixes PR #888 (`875c008d`),
-merged, deployed, production-verified
+**Owner ruling:** Jess, 2026-08-21 · **CORRECTED by Jess, 2026-08-24**
+**Status:** CARD 02 executed (PR #887 `d1fc2d2a` + #888 `875c008d`).
+**CARD 02-A — the correction — IN PROGRESS.**
+
+---
+
+## 0 · THE 2026-08-24 CORRECTION — what the first build got wrong
+
+The owner checked production and `origin/main` and found the layout right and the
+**behaviour wrong**. This section OVERWRITES anything below it that disagrees;
+the superseded text is kept only where it still describes what shipped, and every
+superseded ruling is struck rather than left standing beside its replacement.
+
+| 🔴 | What was wrong | The correction |
+|---|---|---|
+| 1 | `onRowDoubleClick={openOrder}` → double-click opened the **Sales Order**, throwing a logistics operator into a commercial document mid-plan | Double-click opens **Edit Delivery** |
+| 2 | No selection, no bulk act — the workspace could plan nothing | ☐ column, in-place selection toolbar, `Assign logistics` + `Edit Delivery` |
+| 3 | The claim *"Delivery Work writes nothing"* | **Delivery Work owns the Delivery arrangement.** Sales keeps the commercial promise |
+| 4 | Carrier lived on `orders.delivery_partner_id` — a Sales column, one carrier for a two-leg Journey, no history, two writers | `ops_delivery_arrangements` keyed `(order_id, leg)`, migration **0379** |
+| 5 | The disclosure was a 12px **red** triangle — danger ink spent on "there is more here" | Neutral grey chevron, 32px gutter, `Show delivery items`, correct `aria-expanded` |
+| 6 | `Delivery Status` printed the DOCUMENT's `Created` | Seven **operational** rungs; `Created` stays in the Register |
+| 7 | Rail said `Date passed`; only days already holding work appeared | **`Overdue`**; the near-term operating window shows even at zero |
+| 8 | Every incomplete Sales Order was dumped in — **59 of 90 rows had no location at all** | The **entry rule**: location + building facts + goods, else it stays Sales work |
+| 9 | Column order put the dates before the place facts | The owner's corrected order, date and time separate |
+
+### 0.1 · The interaction contract (LAW)
+
+```
+Click SO No          →  open the Sales Order
+Click DO No          →  open the Delivery Order
+Click ▸              →  expand and inspect this scope's goods — READ-ONLY
+Double-click a row   →  open Edit Delivery          (NEVER the Sales Order)
+Select one row       →  Assign logistics + Edit Delivery
+Select many rows     →  Assign logistics only
+```
+
+### 0.2 · What the correction deliberately did NOT change
+
+§3's ruling stands: **the SYSTEM issues the Delivery Order.** There is no `Issue`,
+no `Release`, no `Approve` and no `New DO` on the workspace, in the Assign dialog
+or on Edit Delivery. `Save Delivery` records an arrangement; issuance reads it.
+
+### 0.3 · One judgment call, stated rather than hidden
+
+The owner's toolbar sketch lists `Clear`, `Assign logistics` and `Edit Delivery`.
+`Export Excel (N)` is the register ENGINE's own selection output and was KEPT: it
+is read-only, it is on every other register's selection bar, and removing it would
+make Delivery Work the one place an operator cannot export what they just picked.
+🟡 **Say so and it goes** — it is one prop (`hideSelectionExport`).
 
 ---
 
