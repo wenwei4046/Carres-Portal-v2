@@ -33,6 +33,11 @@
 
 import {
   deliveryOrderStatusOf,
+  deliveryWorkStatusOf,
+  lineKind,
+  DELIVERY_WORK_STATUS_LABEL,
+  type DeliveryArrangementRow,
+  type DeliveryWorkStatus,
   type DeliveryHandoverKind,
   type DeliveryOrderStatus,
   type DeliveryStop,
@@ -64,25 +69,29 @@ export const DW = {
   empty: "No delivery scopes",
   loadFailed: "Delivery could not be loaded",
   tryAgain: "Try again",
-  railDate: "DELIVERY DATE",
+  railDate: "DELIVERY SCHEDULE",
   railLogistics: "LOGISTICS",
   railAll: "All",
   /** A scope Delivery has not yet fixed an operational date for. */
   noConfirmedDate: "No confirmed date",
-  /** A confirmed date that is already behind us and has produced no result. */
-  datePassed: "Overdue",
+  /**
+   * A confirmed date that is already behind us and has produced no result.
+   * Renamed from `Date passed` by owner ruling 2026-08-24: `Overdue` is the
+   * word the operator uses for it, and the rail is a work queue rather than a
+   * description of the calendar. (Both 2026-08-24 lanes made this rename
+   * independently; the KEY follows the word here.)
+   */
+  overdue: "Overdue",
   /** No Logistics Partner on the scope yet — a fact, never `Unassigned`. */
   noLogistics: "No logistics picked",
   /**
-   * ⭐ ONE SENTENCE, USED IN BOTH CELLS, AND THAT IS DELIBERATE.
+   * `DO No`'s absence, and ONLY `DO No`'s.
    *
-   * The card rules this exact string for `DO No`. `Delivery Status` reuses it
-   * rather than minting a second one, because Constitution §2 forbids a word
-   * the dictionary has not approved and because the two columns are genuinely
-   * answering the same fact when no document exists: `DO No` asks *which
-   * document*, `Delivery Status` asks *what state* — and until the system
-   * issues one, both answers are "there is not a document yet". A dedicated
-   * status word is an owner call, not this card's to invent.
+   * It used to double as the `Delivery Status` cell too. The owner overturned
+   * that on 2026-08-24: a status column must say where the WORK is, and "there
+   * is no document" says where the paperwork is. `Delivery Status` now runs
+   * the seven-rung operational ladder (`deliveryWorkStatusOf`) and this string
+   * went back to answering one question.
    */
   noDeliveryOrder: "No delivery order yet",
   noCustomerDate: "No delivery date",
@@ -93,6 +102,15 @@ export const DW = {
    *  new absence for Jess to confirm, never as pre-approved vocabulary. */
   noTime: "No time agreed",
   noGoods: "No items on this order",
+  /** Why an order is NOT delivery work yet — Sales owns each of these. */
+  blockerNoLocation: "No delivery address",
+  blockerNoBuilding: "No building or access facts",
+  blockerNoGoods: "No goods to deliver",
+  notYetHere: "Not delivery work yet",
+  /** The disclosure's hover — what OPENS, never the mechanic. */
+  showItems: "Show delivery items",
+  /** The expansion's Loan block heading (owner wording 2026-08-24). */
+  itemsToCollect: "Items to collect",
   /** The expansion's read-only physical facts (Stock and Warehouse own them). */
   where: "Where",
   whoHasIt: "Who has it",
@@ -126,7 +144,7 @@ export const GOVERNED_LOGISTICS = [
 export const NO_LOGISTICS_KEY = "__none";
 /** The two dateless rail buckets. Every other key is a real ISO date. */
 export const NO_DATE_KEY = "__no_date";
-export const DATE_PASSED_KEY = "__passed";
+export const OVERDUE_KEY = "__overdue";
 
 /** One parent row: a delivery scope, or one leg of a Delivery Journey. */
 export interface DeliveryScopeRow {
@@ -154,8 +172,15 @@ export interface DeliveryScopeRow {
   confirmedTime: string | null;
   goods: string;
   doNumber: string | null;
-  /** The document's derived status; null when no document exists yet. */
-  status: DeliveryOrderStatus | null;
+  /**
+   * ⭐ THE OPERATION'S progress, never the DOCUMENT's (owner ruling
+   * 2026-08-24). `Created` belongs to the Delivery Orders register; this
+   * column answers *where is the work*, and it always has an answer — even
+   * before any document exists.
+   */
+  status: DeliveryWorkStatus;
+  /** True once Delivery has recorded its own arrangement for this scope. */
+  hasArrangement: boolean;
   /** The order behind the row — for the expansion's own reads. */
   o: operationOrderListRow;
 }
@@ -170,23 +195,35 @@ export interface DeliveryScopeRow {
  * them onto the governed document statuses is what keeps ONE status vocabulary
  * across Delivery Work, the Delivery Orders register and the DO object.
  *
- * `handed_off` reads `Delivered` on purpose: leg 1 completing means the goods
- * were accepted at the named JB warehouse (`docs/orders/MASTER.md` — Singapore
- * Sales Order), which is that leg's delivery. It is never the Singapore
- * customer's, and it never claims to be, because the customer's leg is its own
- * row with its own status.
+ * A leg speaks the SAME seven operational words as a whole-order scope (owner
+ * ruling 2026-08-24) — one vocabulary across the workspace, so two rows of one
+ * order cannot be read on two different scales.
  */
-export function legStatusOf(stop: Pick<DeliveryStop, "status">): DeliveryOrderStatus {
+export function legWorkStatusOf(
+  stop: Pick<DeliveryStop, "status">,
+  confirmedIso: string | null,
+): DeliveryWorkStatus {
+  const say = (kind: DeliveryWorkStatus["kind"]): DeliveryWorkStatus => ({
+    kind,
+    label: DELIVERY_WORK_STATUS_LABEL[kind],
+    reasonLabel: null,
+  });
   switch (stop.status) {
     case "delivered":
     case "handed_off":
-      return { kind: "delivered", label: "Delivered", reasonLabel: null };
+      /* `handed_off` reads Delivered on purpose: leg 1 completing means the
+         goods were accepted at the named JB warehouse, which IS that leg's
+         delivery. It never claims the Singapore customer received them —
+         their leg is its own row with its own status. */
+      return say("delivered");
     case "picked_up":
-      return { kind: "out_for_delivery", label: "Out for delivery", reasonLabel: null };
+      return say("out_for_delivery");
     case "issue":
-      return { kind: "exception", label: "Delivery exception", reasonLabel: null };
+      return say("failed");
     default:
-      return { kind: "created", label: DW.noDeliveryOrder, reasonLabel: null };
+      /* A leg nobody has moved yet is exactly the two rungs the whole-order
+         scope uses: a day agreed, or not. */
+      return say(confirmedIso ? "confirmed" : "waiting_customer_date");
   }
 }
 
@@ -227,9 +264,17 @@ export function logisticsOf(
 export function confirmedDeliveryOf(
   o: operationOrderListRow,
   doc: DeliveryOrderRow | null,
+  arrangement?: DeliveryArrangementRow | null,
 ): { iso: string | null; time: string | null } {
   if (doc?.delivery_date) {
     return { iso: doc.delivery_date.slice(0, 10), time: doc.time_slot ?? null };
+  }
+  /* Delivery's own arrangement outranks the booking overlay: it is the record
+     Delivery wrote deliberately, where the overlay is a field Sales' door also
+     touches. The DOCUMENT still outranks both — it is the snapshot the
+     warehouse and the partner are actually working to. */
+  if (arrangement?.confirmed_date) {
+    return { iso: arrangement.confirmed_date.slice(0, 10), time: arrangement.confirmed_time ?? null };
   }
   const booking = orderBookingDay(o);
   if (booking.kind === "confirmed" && booking.date) {
@@ -254,6 +299,82 @@ function journeyLegsOf(o: operationOrderListRow): DeliveryStop[] | null {
 }
 
 /**
+ * ⭐ THE ENTRY RULE — owner ruling 2026-08-24, and it is the correction that
+ * makes this page usable.
+ *
+ * > "Do not dump every incomplete Sales Order into Delivery Work. Missing
+ * >  address/location remains Sales-owned Work and must not appear here as rows
+ * >  filled with `Not given`."
+ *
+ * The first build admitted every open order. Measured on production the day it
+ * shipped: 90 rows, 59 of them with no delivery location at all — so two thirds
+ * of the workspace was a column of `Not given` that no logistics operator could
+ * act on, and the one thing they DID need (an address to give a carrier) was
+ * missing by definition. Those orders are not delivery work; they are SALES
+ * work, and they belong in the Sales Order's own queue until somebody asks the
+ * customer where the goods go.
+ *
+ * FOUR facts, and a scope needs all four:
+ *
+ * ```
+ * a place to deliver to      an address or a locality — a carrier cannot be
+ *                            given `Not given`
+ * building/access facts      the crew has to know what they are walking into
+ * goods that need delivering at least one line that is not a pure service
+ * a real scope               the order is still travelling (below)
+ * ```
+ *
+ * A scope failing the rule is not hidden work: `deliveryEntryBlockers` names
+ * exactly what is missing, and the page can say so rather than dropping rows
+ * into silence.
+ */
+export interface DeliveryEntryFacts {
+  hasLocation: boolean;
+  hasBuilding: boolean;
+  hasGoods: boolean;
+  isTravelling: boolean;
+}
+
+export function deliveryEntryFactsOf(o: operationOrderListRow): DeliveryEntryFacts {
+  const line1 = o.customer_address_line1?.trim() ?? "";
+  const city = o.customer_address_city?.trim() ?? "";
+  const state = o.customer_address_state?.trim() ?? "";
+  const freeText = o.customer_address?.trim() ?? "";
+  /* A locality OR a written address. `conciseLocality` prints the first two;
+     an AutoCount order often carries only the third, and refusing it would
+     throw away real delivery work over a data-entry shape. */
+  const hasLocation = Boolean(city || state || line1 || freeText);
+
+  /* `building_type` is the Sales Portal's own field. Floor/lift answer the same
+     question for an order that predates it — what is the crew walking into. */
+  const hasBuilding =
+    Boolean(o.building_type?.trim()) || o.delivery_floor != null || o.delivery_has_lift != null;
+
+  /* A SERVICE delivers nothing. An order that is only `DELIVERY` or a warranty
+     visit has no goods to put on a truck, and a truck is what this page plans. */
+  const hasGoods = (o.order_lines ?? []).some(
+    (l) => Number(l.qty || 0) > 0 && lineKind(l.sku) !== "service",
+  );
+
+  return { hasLocation, hasBuilding, hasGoods, isTravelling: isOpenDeliveryScope(o) };
+}
+
+/** What this order still needs before it is delivery work — in the operator's words. */
+export function deliveryEntryBlockers(o: operationOrderListRow): string[] {
+  const f = deliveryEntryFactsOf(o);
+  const out: string[] = [];
+  if (!f.hasLocation) out.push(DW.blockerNoLocation);
+  if (!f.hasBuilding) out.push(DW.blockerNoBuilding);
+  if (!f.hasGoods) out.push(DW.blockerNoGoods);
+  return out;
+}
+
+export function entersDeliveryWork(o: operationOrderListRow): boolean {
+  const f = deliveryEntryFactsOf(o);
+  return f.isTravelling && f.hasLocation && f.hasBuilding && f.hasGoods;
+}
+
+/**
  * A scope belongs on the planning workspace while the goods still have to
  * travel. A delivered order is HISTORY — the Delivery Orders register and
  * Delivery History hold it — and leaving it here would make every count on the
@@ -269,6 +390,8 @@ export interface ScopeInputs {
   attempts: DeliveryOrderAttemptRow[];
   handoverEvents: DeliveryHandoverKindRow[];
   partnerNameById: Map<string, string>;
+  /** Delivery's OWN records (0379), keyed `${orderId}#${leg}`. */
+  arrangements?: Map<string, DeliveryArrangementRow>;
 }
 
 /**
@@ -285,6 +408,7 @@ export function buildDeliveryScopeRows({
   attempts,
   handoverEvents,
   partnerNameById,
+  arrangements,
 }: ScopeInputs): DeliveryScopeRow[] {
   const attemptsByDo = new Map<string, DeliveryOrderAttemptRow[]>();
   for (const a of attempts) {
@@ -301,21 +425,36 @@ export function buildDeliveryScopeRows({
   const docByNumber = new Map<string, DeliveryOrderRow>();
   for (const d of deliveryOrders) docByNumber.set(d.do_number, d);
 
-  const statusOf = (doc: DeliveryOrderRow): DeliveryOrderStatus =>
+  /** The facts a document carries — fed to BOTH ladders, never re-derived. */
+  const factsOf = (doc: DeliveryOrderRow | null) => ({
+    attempts: doc
+      ? (attemptsByDo.get(doc.do_number) ?? []).map((a) => ({
+          result: a.result,
+          reasonKey: a.reason_key,
+          recordedAt: a.recorded_at,
+        }))
+      : [],
+    handoverEvents: doc
+      ? (handoverByDoId.get(doc.id) ?? []).map((kind) => ({ kind }))
+      : [],
+  });
+
+  /* The DOCUMENT ladder is still run — it is what decides whether a voided
+     document should take its scope off the workspace entirely. What it no
+     longer does is print on the screen. */
+  const docStatusOf = (doc: DeliveryOrderRow): DeliveryOrderStatus =>
     deliveryOrderStatusOf({
       voidedAt: doc.voided_at,
       voidReason: doc.void_reason,
-      attempts: (attemptsByDo.get(doc.do_number) ?? []).map((a) => ({
-        result: a.result,
-        reasonKey: a.reason_key,
-        recordedAt: a.recorded_at,
-      })),
-      handoverEvents: (handoverByDoId.get(doc.id) ?? []).map((kind) => ({ kind })),
+      ...factsOf(doc),
     });
 
   const rows: DeliveryScopeRow[] = [];
   for (const o of orders) {
-    if (!isOpenDeliveryScope(o)) continue;
+    /* THE ENTRY RULE (owner ruling 2026-08-24) — a Sales Order missing its
+       address is Sales work, not delivery work, and must not arrive here as a
+       row of `Not given`. */
+    if (!entersDeliveryWork(o)) continue;
 
     /* The ACTIVE document is the one `orders.do_number` mirrors — the DO model's
        own definition. A superseded or failed document keeps its history in the
@@ -336,19 +475,34 @@ export function buildDeliveryScopeRows({
 
     const legs = journeyLegsOf(o);
     if (!legs) {
-      const confirmed = confirmedDeliveryOf(o, doc);
-      const partner = logisticsOf(o, partnerNameById);
+      /* ⭐ DELIVERY'S OWN RECORD WINS (0379). The arrangement is what Delivery
+         wrote; the order's column is what Sales' door left behind. Reading the
+         arrangement FIRST is what makes `Assign logistics` visible on this
+         screen the moment it is saved, and the fallback is what stops anything
+         disappearing on the day the table shipped empty. */
+      const arrangement = arrangements?.get(`${o.id}#0`) ?? null;
+      const fallbackPartner = logisticsOf(o, partnerNameById);
+      const confirmed = confirmedDeliveryOf(o, doc, arrangement);
+      const facts = factsOf(doc);
       rows.push({
         ...base,
         key: o.id,
         leg: null,
         legRoute: null,
-        logisticsId: partner.id,
-        logisticsName: partner.name,
+        logisticsId: arrangement?.partner_id ?? fallbackPartner.id,
+        logisticsName: arrangement?.partner_name ?? fallbackPartner.name,
         confirmedIso: confirmed.iso,
         confirmedTime: confirmed.time,
         doNumber: doc?.do_number ?? null,
-        status: doc ? statusOf(doc) : null,
+        hasArrangement: Boolean(arrangement),
+        status: deliveryWorkStatusOf({
+          confirmedDate: confirmed.iso,
+          /* A VOIDED document is not a live one: its scope is waiting to be
+             re-planned, and calling that `Waiting for warehouse` would point at
+             a warehouse holding nothing. */
+          hasDeliveryOrder: Boolean(doc) && docStatusOf(doc!).kind !== "cancelled",
+          ...facts,
+        }),
       });
       continue;
     }
@@ -358,17 +512,24 @@ export function buildDeliveryScopeRows({
        DO link, and printing the order's number on both legs would say one
        document authorised two different handovers. */
     for (const stop of legs) {
+      /* Each leg has its OWN arrangement — two carriers, two dates, two rows.
+         That is the whole reason the arrangement is keyed by (order, leg). */
+      const arrangement = arrangements?.get(`${o.id}#${stop.leg}`) ?? null;
+      const confirmedIso =
+        arrangement?.confirmed_date ??
+        (stop.scheduled_at ? stop.scheduled_at.slice(0, 10) : null);
       rows.push({
         ...base,
         key: `${o.id}#leg${stop.leg}`,
         leg: stop.leg,
         legRoute: legRouteOf(stop),
-        logisticsId: stop.partner_id ?? null,
-        logisticsName: stop.partner_name ?? null,
-        confirmedIso: stop.scheduled_at ? stop.scheduled_at.slice(0, 10) : null,
-        confirmedTime: null,
+        logisticsId: arrangement?.partner_id ?? stop.partner_id ?? null,
+        logisticsName: arrangement?.partner_name ?? stop.partner_name ?? null,
+        confirmedIso,
+        confirmedTime: arrangement?.confirmed_time ?? null,
         doNumber: null,
-        status: legStatusOf(stop),
+        hasArrangement: Boolean(arrangement),
+        status: legWorkStatusOf(stop, confirmedIso),
       });
     }
   }
@@ -378,7 +539,7 @@ export function buildDeliveryScopeRows({
 /** Which rail bucket a scope's confirmed date falls in. */
 export function dateBucketOf(row: DeliveryScopeRow, todayIso: string): string {
   if (!row.confirmedIso) return NO_DATE_KEY;
-  return row.confirmedIso < todayIso ? DATE_PASSED_KEY : row.confirmedIso;
+  return row.confirmedIso < todayIso ? OVERDUE_KEY : row.confirmedIso;
 }
 
 export interface RailItem {
@@ -398,6 +559,32 @@ export interface RailItem {
  * this file decides the ORDER and the COUNTS, `fmt-date.ts` decides the
  * spelling, and neither borrows the other's job.
  */
+/**
+ * How many days ahead the rail always shows, work or no work. Owner ruling
+ * 2026-08-24: *"Show the near-term operating dates even when count is zero."*
+ *
+ * A planning rail that lists only the days that already hold something can
+ * never be used to PLAN — the operator cannot see that Thursday is empty,
+ * because Thursday is not on it. Seven days is the horizon the team books
+ * within (production/booking lead times, `docs/purchasing/MASTER.md`), and it
+ * is a constant here rather than a setting because nobody has asked to tune it.
+ */
+export const NEAR_TERM_DAYS = 7;
+
+/** The next `NEAR_TERM_DAYS` calendar dates from `todayIso`, inclusive. */
+export function nearTermDates(todayIso: string, days = NEAR_TERM_DAYS): string[] {
+  const out: string[] = [];
+  const [y, m, d] = todayIso.slice(0, 10).split("-").map(Number);
+  for (let i = 0; i < days; i += 1) {
+    /* UTC arithmetic on a bare date: adding a day must never be a timezone
+       question, and `Date.UTC` is the one place in this file that touches a
+       clock-shaped API without asking what time it is. */
+    const t = new Date(Date.UTC(y ?? 1970, (m ?? 1) - 1, (d ?? 1) + i));
+    out.push(t.toISOString().slice(0, 10));
+  }
+  return out;
+}
+
 export function buildDateRail(
   rows: DeliveryScopeRow[],
   todayIso: string,
@@ -416,14 +603,17 @@ export function buildDateRail(
   const days = [
     ...new Set([
       ...counts.keys(),
-      ...[...picked].filter((k) => k !== NO_DATE_KEY && k !== DATE_PASSED_KEY),
+      /* The near-term operating window is ALWAYS on the rail — an empty
+         Thursday is a fact a planner needs, not a row to hide. */
+      ...nearTermDates(todayIso),
+      ...[...picked].filter((k) => k !== NO_DATE_KEY && k !== OVERDUE_KEY),
     ]),
   ]
-    .filter((k) => k !== NO_DATE_KEY && k !== DATE_PASSED_KEY)
+    .filter((k) => k !== NO_DATE_KEY && k !== OVERDUE_KEY)
     .sort();
   return [
     { key: NO_DATE_KEY, label: DW.noConfirmedDate, count: counts.get(NO_DATE_KEY) ?? 0 },
-    { key: DATE_PASSED_KEY, label: DW.datePassed, count: counts.get(DATE_PASSED_KEY) ?? 0 },
+    { key: OVERDUE_KEY, label: DW.overdue, count: counts.get(OVERDUE_KEY) ?? 0 },
     ...days.map((iso) => ({ key: iso, label: fmt(iso), count: counts.get(iso) ?? 0 })),
   ];
 }

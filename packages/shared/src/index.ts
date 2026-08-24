@@ -1936,6 +1936,36 @@ export {
   type DeliveryOrderAttemptFact,
   type DeliveryHandoverKind,
 } from "./delivery-order-status";
+// DELIVERY WORK's own status ladder — the OPERATION's progress, deliberately a
+// different vocabulary from the document's (owner correction 2026-08-24).
+// `Created` belongs to the Register and may never appear on the workspace.
+export {
+  deliveryWorkStatusOf,
+  DELIVERY_WORK_STATUS_LABEL,
+  type DeliveryWorkStatus,
+  type DeliveryWorkStatusKind,
+  type DeliveryWorkStatusInput,
+} from "./delivery-work-status";
+// THE DELIVERY ARRANGEMENT (0379) — Delivery's own record of how a scope
+// travels, keyed by (order_id, leg). Overwrites the "Delivery Work writes
+// nothing" claim; Sales keeps the commercial promise, Delivery the arrangement.
+export {
+  deliveryScopeLegSchema,
+  deliveryScopeRefSchema,
+  assignLogisticsInputSchema,
+  saveDeliveryArrangementInputSchema,
+  isLogisticsChange,
+  changeLogisticsReasonLabel,
+  CHANGE_LOGISTICS_REASONS,
+  CHANGE_LOGISTICS_REASON_KEYS,
+  DEFAULT_KV_LOGISTICS,
+  type DeliveryScopeRef,
+  type AssignLogisticsInput,
+  type SaveDeliveryArrangementInput,
+  type DeliveryArrangementRow,
+  type DeliveryArrangementEventRow,
+  type ChangeLogisticsReasonKey,
+} from "./schemas/delivery-arrangement";
 // The §4 handover chain door inputs (0363) — one schema for Worker and web.
 export {
   DELIVERY_HANDOVER_KINDS,

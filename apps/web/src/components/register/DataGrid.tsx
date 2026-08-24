@@ -184,7 +184,29 @@ export type DataGridProps<T> = {
   toolbarStart?: ReactNode;
   /** Outputs valid ONLY for the exact selection — MASTER.md:588. The label
    *  receives the count so the button prints the truthful number. */
-  selectionActions?: Array<{ label: (n: number) => string; onClick: (rows: never[]) => void }>;
+  selectionActions?: Array<{
+    label: (n: number) => string;
+    onClick: (rows: never[]) => void;
+    /**
+     * Which selection sizes this action is valid for. Owner ruling 2026-08-24:
+     * `Edit Delivery` opens ONE scope, so it must not offer itself for three —
+     * an action that cannot mean anything for the current selection should not
+     * be there to be clicked. Absent = always shown (every existing caller).
+     */
+    visible?: (n: number) => boolean;
+    /** `output` keeps the printer glyph; `write` is a governed action. */
+    kind?: "output" | "write";
+  }>;
+  /**
+   * The selection bar's own count sentence. The engine's default says
+   * `N selected`, which is true and says nothing about WHAT. A page that knows
+   * its unit passes it — `1 delivery scope selected` (owner ruling 2026-08-24).
+   */
+  selectionSummary?: (n: number) => string;
+  /** Hover/title on the disclosure chevron — what OPENS, not the mechanic. */
+  expandTitle?: string;
+  /** Hide the built-in Excel pill on the selection bar. */
+  hideSelectionExport?: boolean;
   toolbarEnd?: ReactNode;
   /** Fixed informational footer. Receives the filtered result and, when
       present, the selected rows that remain in that result. */
@@ -403,6 +425,9 @@ function DataGridInner<T>({
   toolbarStart,
   toolbarEnd,
   selectionActions,
+  selectionSummary,
+  expandTitle,
+  hideSelectionExport,
   statusSummary,
   outputActions,
   focusSearchNonce,
@@ -1433,6 +1458,12 @@ function DataGridInner<T>({
                        attribute in the ENGINE gives every register the same
                        answer — a page-local disclosure could not (Law 13). */
                     aria-expanded={isExpanded}
+                    /* ⭐ THE HOVER SAYS WHAT OPENS (owner correction
+                       2026-08-24). A disclosure whose only label is "Expand
+                       row" tells the operator the mechanic and not the
+                       content. Pages that carry something other than goods
+                       pass their own word. */
+                    title={expandTitle ?? "Show items"}
                     onClick={(e) => {
                       e.stopPropagation();
                       toggleExpand(expandKey);
@@ -1442,8 +1473,19 @@ function DataGridInner<T>({
                       border: 0,
                       padding: 0,
                       cursor: "pointer",
-                      color: "var(--c-burnt)",
-                      fontSize: 12,
+                      /* ⭐ A DISCLOSURE IS CHROME, NOT AN ALARM — owner
+                         correction 2026-08-24 on a production screenshot.
+                         This was `var(--c-burnt)`: a 12px RED triangle in the
+                         leftmost gutter of every row, which is the portal's
+                         danger ink spent on a control that means "there is
+                         more here". Red down a whole column reads as ninety
+                         problems. Neutral grey is what a chevron is for, and
+                         fixing it in the ENGINE fixes every register at once
+                         rather than teaching one page a private colour.
+                         `--fg-muted` is the module's own base-500 alias — a
+                         token the sheet already speaks, not a new literal. */
+                      color: "var(--fg-muted)",
+                      fontSize: 14,
                       lineHeight: 1,
                       display: "inline-block",
                       transform: isExpanded ? "rotate(90deg)" : "rotate(0deg)",
@@ -1748,7 +1790,14 @@ function DataGridInner<T>({
       </div>
       ) : (
         <div className={`${styles.toolbar} ${styles.selectionBar}`} data-testid="selection-bar">
-          <span className={styles.selectionCount}>{selectedVisibleRows.length} selected</span>
+          <span className={styles.selectionCount}>
+            {/* The page names its own unit when it has one: `3 delivery scopes
+                selected` beats `3 selected`, which is true and says nothing
+                about what three of. */}
+            {selectionSummary
+              ? selectionSummary(selectedVisibleRows.length)
+              : `${selectedVisibleRows.length} selected`}
+          </span>
           <button
             type="button"
             className={styles.tbarBtn}
@@ -1756,27 +1805,40 @@ function DataGridInner<T>({
           >
             Clear
           </button>
-          <button
-            type="button"
-            className={styles.toolbarPill}
-            onClick={() => {
-              void exportRows(selectedVisibleRows);
-            }}
-          >
-            <Download size={14} strokeWidth={1.75} aria-hidden />
-            <span>Export Excel ({selectedVisibleRows.length})</span>
-          </button>
-          {(selectionActions ?? []).map((a) => (
+          {!hideSelectionExport && (
             <button
-              key={a.label(0)}
               type="button"
               className={styles.toolbarPill}
-              onClick={() => a.onClick(selectedVisibleRows as never[])}
+              onClick={() => {
+                void exportRows(selectedVisibleRows);
+              }}
             >
-              <Printer size={14} strokeWidth={1.75} aria-hidden />
-              <span>{a.label(selectedVisibleRows.length)}</span>
+              <Download size={14} strokeWidth={1.75} aria-hidden />
+              <span>Export Excel ({selectedVisibleRows.length})</span>
             </button>
-          ))}
+          )}
+          {(selectionActions ?? [])
+            /* ⭐ AN ACTION THAT CANNOT MEAN ANYTHING FOR THIS SELECTION IS NOT
+               OFFERED (owner ruling 2026-08-24). `Edit Delivery` opens one
+               scope; showing it beside three ticked rows invites a click whose
+               only possible answer is a refusal. */
+            .filter((a) => (a.visible ? a.visible(selectedVisibleRows.length) : true))
+            .map((a) => (
+              <button
+                key={a.label(0)}
+                type="button"
+                className={styles.toolbarPill}
+                data-testid={`selection-action-${a.label(1).toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
+                onClick={() => a.onClick(selectedVisibleRows as never[])}
+              >
+                {/* A printer on `Assign logistics` would be a lie about what
+                    the button does. Only an OUTPUT keeps the printer glyph. */}
+                {a.kind === "write" ? null : (
+                  <Printer size={14} strokeWidth={1.75} aria-hidden />
+                )}
+                <span>{a.label(selectedVisibleRows.length)}</span>
+              </button>
+            ))}
         </div>
       )}
 
