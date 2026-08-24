@@ -34,6 +34,7 @@ import {
   ListTodo,
   CircleAlert,
   Library,
+  SlidersHorizontal,
   type LucideIcon,
 } from "lucide-react";
 import type { Role } from "@carres/shared/domain";
@@ -535,6 +536,18 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       // The principal trace-only Orders page is gone (Loo 2026-07-16) — Admin
       // "Orders" jumps straight to the Operations order control grid.
       { key: "orders", label: "Sales Orders", icon: ClipboardList, path: "/operation/orders" },
+      // YH, 2026-08-24 — the lead-time floor (earliest a store may sell) is a
+      // principal-level decision, but its only editor lived under Operations
+      // Settings. `role === "principal"` already grants edit there (checkDuty
+      // short-circuits on role, never a duty — 0260), so this needs no new
+      // page, no new API: same pattern as "Sales Orders" above, a path-driven
+      // jump straight into the operations-owned surface it actually edits.
+      {
+        key: "purchasing-settings",
+        label: "Purchasing settings",
+        icon: SlidersHorizontal,
+        path: "/operation/settings/purchasing",
+      },
       // Loo 2026-07-19 — two separate doors: "Dealers" = external resellers,
       // "Showrooms" = the stores Carres owns. Same page, filtered by
       // `dealers.channel`.

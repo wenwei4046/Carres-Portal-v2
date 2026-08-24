@@ -1432,26 +1432,46 @@ catalogRouter.post("/models/:id/generate-skus", async (c) => {
   }
 
   // Supplier resolution (size categories need one; service/accessory don't).
+  // An explicit caller supplierId wins outright - two suppliers can both cover
+  // one category, and without an override a keyer has no way to say a batch is
+  // Hookka's rather than whichever supplier's cat_covered[] happened to sort
+  // first. Absent (the default) keeps today's auto-resolve byte-identical.
   let supplierId: string | null = null;
   if (!SUPPLIERLESS_CATEGORIES.has(modelRow.category)) {
-    const { data: supRow, error: supErr } = await sb
-      .from("suppliers")
-      .select("id")
-      .contains("cat_covered", [modelRow.category])
-      .limit(1)
-      .maybeSingle();
-    if (supErr) { const m = mapPgError(supErr); return c.json(m.body, m.status); }
-    if (!supRow) {
-      return c.json(
-        {
-          error: "rule_violation",
-          code: "no_supplier_for_category",
-          message: `No supplier currently covers ${modelRow.category}. Configure one before generating ${modelRow.category} SKUs.`,
-        },
-        422,
-      );
+    if (parsed.data.supplierId) {
+      const { data: chosen, error: chosenErr } = await sb
+        .from("suppliers")
+        .select("id")
+        .eq("id", parsed.data.supplierId)
+        .maybeSingle();
+      if (chosenErr) { const m = mapPgError(chosenErr); return c.json(m.body, m.status); }
+      if (!chosen) {
+        return c.json(
+          { error: "not_found", code: "not_found", message: "supplierId does not exist" },
+          404,
+        );
+      }
+      supplierId = chosen.id as string;
+    } else {
+      const { data: supRow, error: supErr } = await sb
+        .from("suppliers")
+        .select("id")
+        .contains("cat_covered", [modelRow.category])
+        .limit(1)
+        .maybeSingle();
+      if (supErr) { const m = mapPgError(supErr); return c.json(m.body, m.status); }
+      if (!supRow) {
+        return c.json(
+          {
+            error: "rule_violation",
+            code: "no_supplier_for_category",
+            message: `No supplier currently covers ${modelRow.category}. Configure one before generating ${modelRow.category} SKUs.`,
+          },
+          422,
+        );
+      }
+      supplierId = supRow.id as string;
     }
-    supplierId = supRow.id as string;
   }
 
   // Mattress/bedframe sizes resolve through the canonical table so the SKU
@@ -2145,6 +2165,7 @@ catalogRouter.put("/models/:modelId/compartments/:compartmentId", async (c) => {
     modelId,
     compartmentId,
     priceOverride: parsed.data.priceOverride ?? null,
+    supplierId: parsed.data.supplierId,
   });
   if (!synced.ok) return c.json(synced.body, synced.status);
 

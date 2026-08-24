@@ -52,7 +52,17 @@ const notFound = (what: string): CompartmentSkuResult => ({
  */
 export async function syncCompartmentSku(
   sb: SupabaseClient,
-  args: { modelId: string; compartmentId: string; priceOverride: number | null },
+  args: {
+    modelId: string;
+    compartmentId: string;
+    priceOverride: number | null;
+    /* 2026-08-24 - override the auto-resolved supplier on a model's FIRST
+     * compartment. Once one supplier'd sku exists on the model, step 4's own
+     * inherit-from-siblings branch already wins over any fallback, so this
+     * only matters the one time it is genuinely ambiguous. Absent keeps the
+     * existing inherit-then-category-cover fallback byte-identical. */
+    supplierId?: string | null;
+  },
 ): Promise<CompartmentSkuResult> {
   // 1. The model gives the sku prefix (model_key), the category (supplier +
   //    mutex soundness derive from it) and the name (description prefix).
@@ -97,7 +107,20 @@ export async function syncCompartmentSku(
       .limit(1)
       .maybeSingle();
     if (ownErr) return { ok: false, ...mapPgError(ownErr) };
+    // A sibling SKU's own supplier still wins over a caller override - the
+    // model already has a real answer, and one compartment cannot silently
+    // fork it onto a second supplier.
     supplierId = (own?.supplier_id as string | null | undefined) ?? null;
+    if (!supplierId && args.supplierId) {
+      const { data: chosen, error: chosenErr } = await sb
+        .from("suppliers")
+        .select("id")
+        .eq("id", args.supplierId)
+        .maybeSingle();
+      if (chosenErr) return { ok: false, ...mapPgError(chosenErr) };
+      if (!chosen) return notFound("supplierId");
+      supplierId = chosen.id as string;
+    }
     if (!supplierId) {
       const { data: cover, error: covErr } = await sb
         .from("suppliers")

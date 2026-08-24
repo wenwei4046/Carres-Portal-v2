@@ -9122,16 +9122,21 @@ export function useOfferModelCompartments() {
     mutationFn: async ({
       modelId,
       compartmentIds,
+      supplierId,
     }: {
       modelId: string;
       compartmentIds: string[];
+      /* 2026-08-24 - override for the model's FIRST supplier'd sku. Harmless
+       * to send on every call: syncCompartmentSku's own inherit-from-siblings
+       * step wins the moment one compartment in the batch has written it. */
+      supplierId?: string;
     }) => {
       const failed: { compartmentId: string; message: string }[] = [];
       for (const compartmentId of compartmentIds) {
         try {
           await apiFetch<{ modelSofaCompartment: ModelSofaCompartmentDto }>(
             `/api/catalog/models/${modelId}/compartments/${compartmentId}`,
-            catalogJson("PUT", {}),
+            catalogJson("PUT", supplierId ? { supplierId } : {}),
           );
         } catch (e) {
           failed.push({

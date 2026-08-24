@@ -455,6 +455,11 @@ export const modelSofaCompartmentInput = z
   .object({
     priceOverride: z.number().nonnegative().nullable().optional(),
     sortOrder: z.number().int().optional(),
+    /* 2026-08-24 - override the sync's auto-resolved supplier for a model's
+     * FIRST compartment (once one exists, every later compartment already
+     * inherits it — see syncCompartmentSku). Absent keeps today's inherit-
+     * then-category-cover fallback byte-identical. */
+    supplierId: z.string().uuid().optional(),
   })
   .strict();
 export type ModelSofaCompartmentInput = z.infer<typeof modelSofaCompartmentInput>;
@@ -1228,6 +1233,12 @@ export const generateSkusInput = z
   .object({
     variants: z.array(z.string().trim().min(1).max(60)).max(100).optional(),
     price: z.number().nonnegative().optional(),
+    /* 2026-08-24 - override the batch's auto-resolved supplier. Absent (the
+     * default) keeps today's behaviour byte-identical: the first supplier
+     * whose cat_covered[] names this model's category. Two suppliers can
+     * both cover mattress; without this a keyer has no way to say a brand-new
+     * batch is Hookka's, not whichever supplier happened to sort first. */
+    supplierId: z.string().uuid().optional(),
   })
   .strict();
 export type GenerateSkusInput = z.infer<typeof generateSkusInput>;
