@@ -3354,11 +3354,20 @@ export interface operationPoListRow {
    *  MORE THAN ONE expected arrival (promise-ledger history, 0306), so the
    *  listing marks it `(revised)`. OPTIONAL — older Worker degrades to false. */
   eta_revised?: boolean;
-  /** What LEFT Carres for this supplier (0312), newest first. */
+  /** What LEFT Carres for this supplier (0312), newest first — and since 0376,
+   *  WHAT KIND of leaving it was. `external_open` is communication history and
+   *  completes nothing; `confirmed_sent` is the operator's statement that the
+   *  PDF actually reached the supplier, with the exact version it was.
+   *  The three newer fields are OPTIONAL so a browser on this build against an
+   *  older Worker degrades instead of crashing. */
   sends?: {
     channel: string;
     note: string | null;
     sent_at: string;
+    kind?: "external_open" | "confirmed_sent" | null;
+    recipient?: string | null;
+    po_version?: number | null;
+    sent_by?: string | null;
     po_revisions: { rev_no: number } | null;
   }[];
   /** The supplier-date field's own history (0306 ledger, newest first) —

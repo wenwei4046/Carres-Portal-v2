@@ -133,6 +133,11 @@ export default function SoBatchIssueWorkspace({
    */
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [pdfError, setPdfError] = useState<string | null>(null);
+  /* ⭐ THE VERSION THAT WAS ACTUALLY RENDERED, off the official document data
+     (0377). The confirmation declares this number, so what Carres records is by
+     construction what the operator looked at. Reading it from anywhere else —
+     a list row, a second fetch — would reintroduce the race. */
+  const [pdfVersion, setPdfVersion] = useState<number | null>(null);
 
   const setDecision = useCallback((key: string, next: LineDecision) => {
     setDecisions((prev) => ({ ...prev, [key]: next }));
@@ -279,6 +284,22 @@ export default function SoBatchIssueWorkspace({
   const idx = Math.min(at, Math.max(total - 1, 0));
   const currentPo = mode === "evidence" ? pos[idx] : undefined;
 
+  /* A document this session has just confirmed. The Register refetches on the
+     way out, so the authoritative history arrives with it; this is only what
+     keeps the surface honest between the confirmation and that refetch. */
+  const confirmedEvidence = useCallback(
+    (v: number) => [
+      {
+        channel: "whatsapp",
+        sent_at: new Date().toISOString(),
+        kind: "confirmed_sent" as const,
+        recipient: null,
+        po_version: v,
+      },
+    ],
+    [],
+  );
+
   const currentPoId = currentPo?.id ?? null;
   useEffect(() => {
     if (!currentPoId) return;
@@ -292,6 +313,7 @@ export default function SoBatchIssueWorkspace({
         );
         const blob = await renderPoPdf(data);
         if (dead) return;
+        setPdfVersion(data.version ?? 1);
         url = URL.createObjectURL(blob);
         setPdfUrl(url);
       } catch (e) {
@@ -302,6 +324,7 @@ export default function SoBatchIssueWorkspace({
       dead = true;
       if (url) URL.revokeObjectURL(url);
       setPdfUrl(null);
+      setPdfVersion(null);
     };
   }, [currentPoId]);
 
@@ -521,11 +544,21 @@ export default function SoBatchIssueWorkspace({
               </div>
             </>
           ) : currentPo ? (
-            <PoIssueEvidence
-              po={currentPo}
-              confirmed={confirmed.has(currentPo.id)}
-              onConfirmed={() => onConfirmed(currentPo.id)}
-            />
+            /* The form appears only once the official document has rendered:
+               until then there is no version to declare, and a confirmation
+               without one is the defect 0377 closes. */
+            pdfVersion != null ? (
+              <PoIssueEvidence
+                po={currentPo}
+                version={pdfVersion}
+                evidence={confirmed.has(currentPo.id) ? confirmedEvidence(pdfVersion) : []}
+                onConfirmed={() => onConfirmed(currentPo.id)}
+              />
+            ) : (
+              <p className="text-meta text-kit-slate-11" data-testid="so-batch-evidence-waiting">
+                {pdfError ?? `Opening ${currentPo.id}…`}
+              </p>
+            )
           ) : null}
         </div>
 

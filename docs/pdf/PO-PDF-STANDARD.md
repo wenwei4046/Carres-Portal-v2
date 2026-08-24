@@ -32,7 +32,17 @@ not theirs. 100% legible on a cheap B/W laser, a fax, a WhatsApp photo.
 
 - **Money is ABSENT, structurally.** The payload (0307) carries no RM figure;
   the template cannot print one. The source-scan test enforces it.
-- **PO DETAILS**: `PO No · Deliver by (bold value — the supplier's 3-second
+- **THE DOCUMENT PRINTS ITS VERSION, INCLUDING VERSION 1** (0377, 2026-08-24).
+  It appears in the identity block under `PURCHASE ORDER`, as a `Version` row in
+  PO DETAILS, and on every continuation header beside the number. A supplier
+  holding two papers with one number and no version cannot tell which one to
+  build from. **This does NOT change `docs/COPY-STANDARD.md`'s panel rule** —
+  `Version 1 prints nothing` governs the internal REVISIONS PANEL, where an
+  unrevised PO is just the PO; this is paper that leaves the building, and it
+  must be self-identifying. The version the PDF prints is the version the
+  confirmation records: `purchasing_po_document` returns it, the template prints
+  it, and `purchasing_confirm_po_sent` refuses a mismatch.
+- **PO DETAILS**: `PO No · Version · Deliver by (bold value — the supplier's 3-second
   fact; imperative, the reader IS the supplier — lineage: "Required
   Delivery" rejected 2026-08-01, "Supplier Delivery By" frozen, "Supplier"
   dropped on paper 2026-08-09) · Issued`. **No SO No row** — a bulk PO can
@@ -85,8 +95,13 @@ numbers. No signature boxes anywhere — the portal's audit trail is the record.
 ## 5 · Numbering
 
 `PO-2044` prints the database id; renumbering to `PREFIX-DDMMYY-NNNN` is a
-clean-start job. An amended document number would carry a `-B` suffix; the PO
-itself never revises (a sent PO is never edited; more items = a new PO).
+clean-start job.
+
+**~~the PO itself never revises~~ — SUPERSEDED (Jess, 2026-08-18; 0364).** A
+sent PO is not overwritten, it is REVISED: the NUMBER is kept and a version is
+minted, because cancel-and-reissue puts two numbers for one job in a factory's
+hands and a factory reads two numbers as two jobs. Adding items is still a NEW
+PO. The paper therefore carries `PO No` **and** `Version` (§2).
 
 ## Change Log
 
@@ -96,4 +111,5 @@ itself never revises (a sent PO is never edited; more items = a new PO).
 | 2026-08-09 | PO DETAILS: SO No row removed (the table owns it); `Delivery by` → `Deliver by`. | Loo |
 | 2026-08-09 | Section 2 = three columns (SUPPLIER · DELIVER TO · PO DETAILS) — deliver-to returns to section 2. | Loo |
 | 2026-08-09 | FINAL (owner: ok): supplier full address; content-driven section-2 widths; detail rows PO No · Issued · Deliver by. | Loo |
+| 2026-08-24 | `Version` prints on the paper, including Version 1 — identity block, PO DETAILS row and continuation header (0377). The confirmation records the version the operator rendered; a stale one is refused. The `never revises` line in §5 is marked superseded by 0364. | CARD-2026-08-22-purchasing-02 |
 | 2026-08-09 | FAMILY REWRITE: chrome deferred to SO-PDF-STANDARD (§2.1/§8.5); logo-stamp header, 35mm label gutter, caps header dates and the zero-fill table DELETED per the Master Overwrite Law; `Sales Order` column → `SO No`; `TOTAL QUANTITY` → family `TOTAL` row; Item ID column goes LIVE with 0153 unit codes; `Delivery by` bold in PO DETAILS; footer keeps the Issued-by audit. Business rules (no money, consolidation, one destination, sofa drawing) unchanged. | Loo |

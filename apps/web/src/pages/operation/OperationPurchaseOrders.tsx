@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import {
   comparePoRisk,
@@ -77,6 +78,8 @@ import {
   type SupplierRow,
 } from "@/lib/queries";
 import CorrectionWorkList from "./CorrectionWorkList";
+/* ONE evidence component, shared with SO Batch Purchase (Card §9 Task 6). */
+import PoIssueEvidence from "./components/PoIssueEvidence";
 
 /**
  * OperationPurchaseOrders — the Supplier Execution Workspace
@@ -3392,6 +3395,7 @@ function ActivityDesk({
   const [saved, setSaved] = useState(false);
   const send = useRecordSend(po.id);
   const saveTemplate = useSetMessageTemplate();
+  const qc = useQueryClient();
 
   const supplierName = supplier?.name ?? "supplier";
   const items = po.purchase_order_lines
@@ -3472,6 +3476,21 @@ function ActivityDesk({
   }
 
   const sends = po.sends ?? [];
+  /* ⭐ THE SAME GOVERNED EVIDENCE JOURNEY AS SO BATCH PURCHASE
+     (Card §5.3 / §9 Task 6 — "reuse the same evidence component and law on the
+     Purchase Order detail page"). One component, so the two surfaces cannot
+     drift into telling an operator different things about the same document.
+     It reads PERSISTED `po_sends`, so a reload, a second operator and a
+     revision all agree, and it declares the CURRENT version — after a revise,
+     the previous version's evidence stays as history and the new version is
+     unsent. */
+  const issuedPo = {
+    id: po.id,
+    supplierId: po.supplier_id ?? "",
+    supplierName: supplier?.name ?? null,
+    destinationId: po.destination_id ?? "",
+    destination: null,
+  };
 
   return (
     <section className="mt-4 pt-3 border-t border-kit-slate-5" data-testid="po-activity">
@@ -3517,13 +3536,24 @@ function ActivityDesk({
             message leave, so no button here may say `Send`.
 
             This REPLACES the 2026-08-02 note that said "opening WhatsApp IS
-            the send". There is still no "I've sent" button, and the reason is
-            unchanged and good — a record somebody must remember to make
-            afterwards is a record that will be wrong. What changed is the
-            claim: opening a door is not the same act as a message arriving.
+            the send".
 
-            Copy still records NOTHING (guarded by a test): copying is taking
-            the words somewhere else, not communicating them. */}
+            ⭐ AND IT SUPERSEDES ITS OWN SUCCESSOR (0376/0377,
+            CARD-2026-08-22-purchasing-02). That note went on to say there was
+            deliberately no "I've sent" action, because a record somebody must
+            remember to make afterwards is a record that will be wrong. The
+            first half was right and the conclusion was not: without such an
+            act, a purchase order the supplier never received reads as sent,
+            which is the same wrong record with nobody's name on it. There IS
+            now a confirmation — `PoIssueEvidence` below, the same governed
+            component SO Batch Purchase uses — and it is not a tick-box: it
+            asks WHO received it and WHICH VERSION, and refuses a version the
+            operator did not actually see.
+
+            These buttons are unchanged and still record only an
+            `external_open`. Copy still records NOTHING (guarded by a test):
+            copying is taking the words somewhere else, not communicating
+            them. */}
         <button
           type="button"
           onClick={() => void copyMessage()}
@@ -3563,6 +3593,15 @@ function ActivityDesk({
         {send.isPending && (
           <span className="text-label text-kit-slate-9">Recording…</span>
         )}
+      </div>
+
+      <div className="mt-3" data-testid="po-issue-evidence">
+        <PoIssueEvidence
+          po={issuedPo}
+          version={po.version ?? 1}
+          evidence={sends}
+          onConfirmed={() => void qc.invalidateQueries({ queryKey: ["operation", "pos"] })}
+        />
       </div>
 
       {draftOpen && (

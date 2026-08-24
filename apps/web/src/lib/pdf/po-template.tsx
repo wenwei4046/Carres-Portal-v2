@@ -161,7 +161,12 @@ function isChaise(code: string): boolean {
 }
 
 export function PoTemplate(data: PoTemplateData) {
-  const { po_number, issue_date, supplier, destination, delivery_instructions, eta_date, so_refs, issued_by, lines } = data;
+  const { po_number, version, issue_date, supplier, destination, delivery_instructions, eta_date, so_refs, issued_by, lines } = data;
+  /* 0377 — the document's own identity. A supplier holding two papers with one
+     number and no version cannot tell which to build from, so Version 1 prints
+     too. (`Version 1 prints nothing` is the internal REVISIONS PANEL's rule —
+     `docs/COPY-STANDARD.md` — and this is paper that leaves the building.) */
+  const versionLabel = `Version ${version ?? 1}`;
 
   // Per-line SO attribution exists only when the PO covers ONE sales order.
   const soLabel = so_refs && so_refs.length === 1 ? `SO-${so_refs[0]}` : "";
@@ -176,6 +181,7 @@ export function PoTemplate(data: PoTemplateData) {
   // frozen term's paper form: the reader IS the supplier, imperative.
   const detailRows: Array<[string, string | null, boolean?]> = [
     ["PO No", po_number],
+    ["Version", versionLabel.replace("Version ", "")],
     ["Issued", niceDate(issue_date)],
     ["Deliver by", niceDate(eta_date), true],
   ];
@@ -206,6 +212,9 @@ export function PoTemplate(data: PoTemplateData) {
                   <View style={styles.docBlock}>
                     <Text style={styles.docNumber}>{po_number}</Text>
                     <Text style={styles.docTitle}>PURCHASE ORDER</Text>
+                    {/* The identity a supplier reads at a glance, on the same
+                        line the number lives on. */}
+                    <Text style={styles.docTitle}>{versionLabel}</Text>
                   </View>
                 </View>
                 <View style={styles.headerRule} />
@@ -216,7 +225,9 @@ export function PoTemplate(data: PoTemplateData) {
                   <Text style={styles.legalLine}>
                     {CARRES_COMPANY.legalName} · SSM {CARRES_COMPANY.regNo}
                   </Text>
-                  <Text style={{ fontSize: 9, fontWeight: 700 }}>PURCHASE ORDER · {po_number}</Text>
+                  <Text style={{ fontSize: 9, fontWeight: 700 }}>
+                    PURCHASE ORDER · {po_number} · {versionLabel}
+                  </Text>
                 </View>
                 <View style={styles.headerRule} />
               </View>

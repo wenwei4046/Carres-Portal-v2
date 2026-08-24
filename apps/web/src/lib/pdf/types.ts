@@ -153,6 +153,15 @@ export type PoTemplateData = {
   // supplier-facing PO carries no RM figure (docs/pdf/PO-PDF-STANDARD.md §2).
   po_number: string;
   po_id: string;
+  /**
+   * 0377 — which version of this document the factory is being handed. It
+   * PRINTS, including Version 1: a supplier holding two papers with one number
+   * and no version cannot tell which one to build from, and "an unrevised PO is
+   * just the PO" is a rule for the internal panel, not for paper that leaves
+   * the building. The confirmation hands this same number back, so what Carres
+   * records is by construction what the operator rendered.
+   */
+  version: number;
   issue_date: string;
   supplier: { name: string; address: string | null; contact: string | null };
   destination: { name: string; address: string };

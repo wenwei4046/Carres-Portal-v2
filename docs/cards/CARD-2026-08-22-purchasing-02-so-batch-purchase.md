@@ -907,4 +907,100 @@ same bytes with pdf.js; the product keeps the iframe, which a real browser paint
   applied first** — it is merged but not yet in the live tracker.
 - Nothing else. The three items above were the outstanding scope.
 
-**STOPPED BEFORE PUSH AND PR**, as instructed.
+**PR:** https://github.com/wenwei4046/Carres-Portal-v2/pull/894 — open, CI green, **not merged**.
+
+---
+
+## 16 · Release-blocker correction, 2026-08-24 — confirm what you actually SAW
+
+**RESOLVED FROM AUTHORITY.** Existing Card scope (§5.3, §7.4, §9 Task 6), not a new Card.
+
+### 16.1 The race 0376 left open
+
+0376 read the CURRENT version off the purchase order and recorded that, on the reasoning that a
+caller able to name a version could lie about it. **The logic was backwards, and it built the defect
+it meant to stop:**
+
+```
+1 · the operator opens PO-2041 and sends Version 1 to the supplier
+2 · another session revises it to Version 2
+3 · the operator presses `Record the PDF sent`
+4 · the RPC reads version = 2 and records Version 2 as sent
+```
+
+The supplier holds Version 1. Carres believes Version 2 is shared, so the work to send the new
+document never appears and the factory builds from a paper nobody chased. A silent wrong answer,
+produced by a guard.
+
+**DECLARING IS NOT TRUSTING.** The caller states the version it RENDERED; SQL locks the row,
+compares, refuses on a mismatch, and still stores only its own read. A caller that names a version
+it never saw is refused rather than believed.
+
+### 16.2 What changed
+
+**Migration `0377_confirm_what_you_actually_saw.sql`** — number re-measured immediately before
+writing against all four sources: repo `0376` · every branch `0376` · both worktrees `0364` ·
+live tracker `0374`. MAX = `0376`, so **`0377` was free**. **0376 is NOT edited** — it is committed,
+therefore immutable (red line 6); this file supersedes its function and leaves its table alone.
+
+- `purchasing_po_document` now returns `version`, so the official document carries its own identity.
+- The unsafe four-argument `purchasing_confirm_po_sent` is **DROPPED**, not left beside its
+  replacement — a door with the old defect still open is one curl away from being used.
+- The governed signature takes `p_expected_version`, locks the PO `FOR UPDATE`, compares, and raises
+  `stale_po_version` writing **no `po_sends` and no `po_history` row**. A half-recorded confirmation
+  is worse than none: it puts a date against a document the supplier never received.
+
+**The official PDF prints its version, including Version 1** — identity block, a `Version` row in
+PO DETAILS, and every continuation header. A supplier holding two papers with one number and no
+version cannot tell which to build from. `docs/pdf/PO-PDF-STANDARD.md` is updated (it is law), and
+`docs/COPY-STANDARD.md`'s `Version 1 prints nothing` is **untouched** — that governs the internal
+revisions panel, where an unrevised PO is just the PO; this is paper that leaves the building.
+
+**`PoIssueEvidence` is now on Purchase Order detail too**, the same component SO Batch Purchase
+uses, reading **persisted `po_sends`** rather than local state. `external_open` is communication
+history and completes nothing; `confirmed_sent` shows channel, recipient, time and exact version;
+only evidence **for the current version** completes Issue PO, so after a revision the previous
+version stays as history and the new version is unsent. The obsolete comment claiming there is
+deliberately no "I've sent" action is replaced — its first half was right (a record somebody must
+remember to make will be wrong) and its conclusion was not: without the act, a purchase order the
+supplier never received reads as sent, which is the same wrong record with nobody's name on it.
+
+A document that never rendered offers **no confirmation at all** — no version seen, nothing safe to
+declare.
+
+### 16.3 The ten required regressions
+
+| # | Proved by |
+|---|---|
+| 1 · missing `poVersion` refused | `pos.test.ts` — 422, RPC never called |
+| 2 · viewed V1 + database V2 → stale error | `pos.test.ts` — 409 `stale_po_version` |
+| 3 · stale writes zero rows | `pos.test.ts` — one call, and it raised; SQL writes nothing before the check |
+| 4 · matching V2 records V2 | `pos.test.ts` — `p_expected_version: 2`, result `po_version: 2` |
+| 5 · the PDF visibly contains its version | `po-template.test.ts` — identity block, PO DETAILS row, continuation header |
+| 6 · SO Batch sends the RENDERED version | `SoBatchIssueWorkspace.test.tsx` + `OperationToOrder.test.tsx` — document reports V3, body carries `poVersion: 3` |
+| 7 · PO detail uses the same component | `PoIssueEvidence.test.tsx` — both files mount it; neither spells its own `confirm-sent` |
+| 8 · persisted evidence survives reload | `PoIssueEvidence.test.tsx` — fresh mount, no interaction, reads server rows |
+| 9 · V1 evidence does not complete V2 | `PoIssueEvidence.test.tsx` — V2 reads unsent, V1 stays as history |
+| 10 · `external_open` never completes | `PoIssueEvidence.test.tsx` + `pos.test.ts` |
+
+### 16.4 Gates after the correction
+
+| Gate | Result |
+|---|---|
+| `pnpm test` | shared 108/2571 · api 121/**2366** · web **275**/**3255** — **8,192 tests, 0 failed** |
+| `typecheck` · `lint` · `check:v4` · `ci:migrations` · `build` · `diff --check` | all clean |
+
+Walk views **4, 4b, 5 and 6 recaptured with the version visible**. View 5 is the honest hard case:
+Version 1 was sent, the PO was then revised, and the surface reads
+`PO-20260823-4041 · Version 2 has not reached Hooka` with
+`Version 1 sent to Hooka Purchasing Group by WhatsApp` kept below as history. The rendered PDF
+beside it prints `Version 2`.
+
+### 16.5 Migration order — unchanged stop boundary
+
+```
+0375  (merged, unapplied)  →  0376  (this PR)  →  0377  (this correction)
+```
+
+🔴 **None of the three is applied.** They go through the governed approval path, in that order.
+Merge and deployment wait for that decision and the owner's approval.

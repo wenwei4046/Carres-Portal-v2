@@ -19,6 +19,11 @@ vi.mock("@/lib/api", async () => {
   return { ...actual, apiFetch: (...a: unknown[]) => apiFetch(...a) };
 });
 vi.mock("./components/GlobalTopBar", () => ({ TopBarIcons: () => null }));
+/* The 50/50 renders the REAL PO template; @react-pdf is exercised in its own
+   suite, and jsdom ships no object-URL implementation. */
+vi.mock("@/lib/pdf/render", () => ({
+  renderPoPdf: vi.fn(async () => new Blob(["%PDF-1.4"], { type: "application/pdf" })),
+}));
 
 import OperationToOrder from "./OperationToOrder";
 
@@ -106,6 +111,11 @@ beforeEach(() => {
   navigate.mockClear();
   apiFetch.mockReset();
   localStorage.clear();
+  Object.defineProperty(URL, "createObjectURL", {
+    configurable: true,
+    value: vi.fn(() => "blob:so-batch-test"),
+  });
+  Object.defineProperty(URL, "revokeObjectURL", { configurable: true, value: vi.fn() });
 });
 
 describe("the page reads the ONE projection and draws the Register", () => {
@@ -164,22 +174,26 @@ describe("the whole journey — tick, arrange, issue, prove it arrived", () => {
       "Issue PO creates the number",
     );
 
-    apiFetch.mockResolvedValue({
-      ok: true,
-      pos: [
-        {
-          id: "PO-2041",
-          supplierId: "s-hooka",
-          supplierName: "Hooka",
-          destinationId: KLANG,
-          destination: "Carres Klang",
-        },
-      ],
-    });
+    apiFetch.mockImplementation((path: string) =>
+      path.includes("issue-batch")
+        ? Promise.resolve({
+            ok: true,
+            pos: [
+              {
+                id: "PO-2041",
+                supplierId: "s-hooka",
+                supplierName: "Hooka",
+                destinationId: KLANG,
+                destination: "Carres Klang",
+              },
+            ],
+          })
+        : Promise.resolve({ po_number: "PO-2041", po_id: "PO-2041", version: 1, lines: [] }),
+    );
     fireEvent.click(screen.getByTestId("so-batch-issue-create"));
     await screen.findByTestId("so-batch-evidence-PO-2041");
     expect(screen.getByTestId("so-batch-evidence-PO-2041")).toHaveTextContent(
-      "PO-2041 has not reached Hooka",
+      "PO-2041 · Version 1 has not reached Hooka",
     );
 
     /* The confirm answers `ok`, and the REFETCH that follows answers a real
@@ -187,7 +201,9 @@ describe("the whole journey — tick, arrange, issue, prove it arrived", () => {
     apiFetch.mockImplementation((path: string) =>
       path.includes("confirm-sent")
         ? Promise.resolve({ ok: true })
-        : Promise.resolve(payload({ rows: [] })),
+        : path.includes("print-data")
+          ? Promise.resolve({ po_number: "PO-2041", po_id: "PO-2041", version: 1, lines: [] })
+          : Promise.resolve(payload({ rows: [] })),
     );
     fireEvent.change(screen.getByTestId("so-batch-evidence-recipient"), {
       target: { value: "Hooka Purchasing Group" },
@@ -198,6 +214,46 @@ describe("the whole journey — tick, arrange, issue, prove it arrived", () => {
     await waitFor(() =>
       expect(screen.getByText("Nothing needs buying.")).toBeInTheDocument(),
     );
+  });
+
+  it("the confirmation declares the version the RENDERED document reported", async () => {
+    apiFetch.mockImplementation((path: string) =>
+      path.includes("issue-batch")
+        ? Promise.resolve({
+            ok: true,
+            pos: [
+              {
+                id: "PO-2041", supplierId: "s-hooka", supplierName: "Hooka",
+                destinationId: KLANG, destination: "Carres Klang",
+              },
+            ],
+          })
+        : path.includes("print-data")
+          ? /* A REVISED purchase order — Version 3 is what the operator sees. */
+            Promise.resolve({ po_number: "PO-2041", po_id: "PO-2041", version: 3, lines: [] })
+          : Promise.resolve(payload()),
+    );
+    renderPage();
+    await screen.findByTestId("so-batch-row-build::o1::b1");
+    fireEvent.click(screen.getByTestId("so-batch-select-build::o1::b1"));
+    fireEvent.click(screen.getByTestId("so-batch-issue"));
+    await screen.findByTestId("so-batch-issue-workspace");
+    fireEvent.click(screen.getByTestId("so-batch-issue-create"));
+    await screen.findByTestId("so-batch-evidence-PO-2041");
+    expect(screen.getByTestId("so-batch-evidence-PO-2041")).toHaveTextContent("Version 3");
+
+    apiFetch.mockClear();
+    fireEvent.change(screen.getByTestId("so-batch-evidence-recipient"), {
+      target: { value: "Hooka Purchasing Group" },
+    });
+    fireEvent.click(screen.getByTestId("so-batch-evidence-confirm"));
+    await waitFor(() =>
+      expect(
+        apiFetch.mock.calls.some((c) => String(c[0]).includes("confirm-sent")),
+      ).toBe(true),
+    );
+    const call = apiFetch.mock.calls.find((c) => String(c[0]).includes("confirm-sent"))!;
+    expect(JSON.parse((call[1] as { body: string }).body).poVersion).toBe(3);
   });
 
   it("Back to buying keeps the selection and creates nothing", async () => {

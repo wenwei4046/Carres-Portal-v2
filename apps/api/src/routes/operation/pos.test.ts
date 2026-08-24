@@ -2278,36 +2278,99 @@ describe("POST /api/operation/pos/:id/confirm-sent", () => {
     );
   }
 
-  it("records channel, recipient and note through the governed RPC", async () => {
+  it("records channel, recipient, version and note through the governed RPC", async () => {
     const rpc = mockRpc();
     const res = await post({
       channel: "whatsapp",
       recipient: "Hooka Purchasing Group",
+      poVersion: 2,
       note: "Sent with the Unit list",
     });
     expect(res.status).toBe(200);
     expect(rpc).toHaveBeenCalledWith("purchasing_confirm_po_sent", {
       p_po_id: PO_ID,
+      p_expected_version: 2,
       p_channel: "whatsapp",
       p_recipient: "Hooka Purchasing Group",
       p_note: "Sent with the Unit list",
     });
   });
 
-  it("NEVER accepts a version from the caller — the server reads it", async () => {
+  /**
+   * ⭐ 0377 — the caller DECLARES the version it rendered.
+   *
+   * 0376 had SQL read the newest version instead, reasoning that a caller able
+   * to name one could lie. That was backwards: send Version 1, let another
+   * session revise to Version 2, confirm — and Carres recorded Version 2 as
+   * shared while the supplier held Version 1. Declaring is not trusting; SQL
+   * locks, compares, refuses, and still stores only its own read.
+   */
+  it("a confirmation with NO version is refused", async () => {
     const rpc = mockRpc();
-    await post({ channel: "email", recipient: "buy@hooka.my" });
+    const res = await post({ channel: "email", recipient: "buy@hooka.my" });
+    expect(res.status).toBe(422);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("a version that is not a positive whole number is refused", async () => {
+    const rpc = mockRpc();
+    for (const bad of [0, -1, 1.5, "2", null]) {
+      const res = await post({ channel: "email", recipient: "buy@hooka.my", poVersion: bad });
+      expect(res.status, JSON.stringify(bad)).toBe(422);
+    }
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("the declared version reaches SQL as the EXPECTED version, not as the stored one", async () => {
+    const rpc = mockRpc();
+    await post({ channel: "email", recipient: "buy@hooka.my", poVersion: 1 });
     const args = rpc.mock.calls[0]![1] as Record<string, unknown>;
-    expect(Object.keys(args).sort()).toEqual(
-      ["p_channel", "p_note", "p_po_id", "p_recipient"].sort(),
-    );
-    expect(JSON.stringify(args)).not.toContain("version");
+    expect(args.p_expected_version).toBe(1);
+    // There is no argument that could SET the stored version.
+    expect(Object.keys(args)).not.toContain("p_version");
+    expect(Object.keys(args)).not.toContain("p_po_version");
+  });
+
+  it("viewing Version 1 while the database holds Version 2 is refused, in two lines", async () => {
+    mockRpc(null, {
+      code: "P0001",
+      message: "stale_po_version: saw 1, current is 2",
+      details: "stale_po_version",
+    });
+    const res = await post({ channel: "whatsapp", recipient: "Hooka", poVersion: 1 });
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as { code?: string; message?: string; action?: string };
+    expect(body.code).toBe("stale_po_version");
+    // The approved fact/fix pair (`docs/purchasing/MASTER.md` §8.3).
+    expect(body.message).toBe("Purchase order changed");
+    expect(body.action).toBe("Open the latest PDF and send it again.");
+  });
+
+  it("a stale confirmation writes NOTHING — the refusal is the whole outcome", async () => {
+    const rpc = mockRpc(null, {
+      code: "P0001",
+      message: "stale_po_version",
+      details: "stale_po_version",
+    });
+    await post({ channel: "whatsapp", recipient: "Hooka", poVersion: 1 });
+    // One call, and it raised. No second call could have written a row.
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(rpc.mock.calls[0]![0]).toBe("purchasing_confirm_po_sent");
+  });
+
+  it("declaring the version that IS current records it", async () => {
+    const rpc = mockRpc({ po_id: PO_ID, po_version: 2 });
+    const res = await post({ channel: "whatsapp", recipient: "Hooka", poVersion: 2 });
+    expect(res.status).toBe(200);
+    expect((rpc.mock.calls[0]![1] as Record<string, unknown>).p_expected_version).toBe(2);
+    const body = (await res.json()) as { result?: { po_version?: number } };
+    expect(body.result?.po_version).toBe(2);
   });
 
   it("refuses a blank recipient — `sent` must say to whom", async () => {
     const rpc = mockRpc();
     for (const recipient of ["", "   "]) {
-      const res = await post({ channel: "whatsapp", recipient });
+      const res = await post({ channel: "whatsapp", recipient, poVersion: 1 });
       expect(res.status, JSON.stringify(recipient)).toBe(422);
     }
     expect(rpc).not.toHaveBeenCalled();
@@ -2315,28 +2378,30 @@ describe("POST /api/operation/pos/:id/confirm-sent", () => {
 
   it("refuses a channel nobody governs", async () => {
     const rpc = mockRpc();
-    const res = await post({ channel: "carrier pigeon", recipient: "Hooka" });
+    const res = await post({ channel: "carrier pigeon", recipient: "Hooka", poVersion: 1 });
     expect(res.status).toBe(422);
     expect(rpc).not.toHaveBeenCalled();
   });
 
   it("refuses an unknown field rather than silently dropping it", async () => {
     const rpc = mockRpc();
-    const res = await post({ channel: "whatsapp", recipient: "Hooka", poVersion: 1 });
+    const res = await post({
+      channel: "whatsapp", recipient: "Hooka", poVersion: 1, sentAt: "2026-08-24",
+    });
     expect(res.status).toBe(422);
     expect(rpc).not.toHaveBeenCalled();
   });
 
   it("a caller who does not hold PO duty is refused by SQL, not by the screen", async () => {
     mockRpc(null, { code: "P0001", message: "not_po_duty", details: "not_po_duty" });
-    const res = await post({ channel: "whatsapp", recipient: "Hooka" });
+    const res = await post({ channel: "whatsapp", recipient: "Hooka", poVersion: 1 });
     expect(res.status).toBeGreaterThanOrEqual(400);
     expect(res.status).toBeLessThan(500);
   });
 
   it("a dealer never reaches the door", async () => {
     const rpc = mockRpc();
-    const res = await post({ channel: "whatsapp", recipient: "Hooka" }, "dealer");
+    const res = await post({ channel: "whatsapp", recipient: "Hooka", poVersion: 1 }, "dealer");
     expect(res.status).toBe(403);
     expect(rpc).not.toHaveBeenCalled();
   });

@@ -118,6 +118,21 @@ export type RecordSendInput = z.infer<typeof recordSendInput>;
 export const confirmPoSentInput = z.object({
   channel: z.enum(["whatsapp", "email", "print"]),
   recipient: z.string().trim().min(1).max(200),
+  /**
+   * ⭐ THE VERSION THE OPERATOR ACTUALLY RENDERED (0377).
+   *
+   * 0376 left this out and had SQL read the newest version instead, reasoning
+   * that a caller able to name a version could lie about it. That was
+   * backwards, and it built the defect it meant to stop: send Version 1, let
+   * another session revise to Version 2, confirm — and Carres records Version 2
+   * as shared while the supplier holds Version 1.
+   *
+   * DECLARING IS NOT TRUSTING. The caller says which document it saw; SQL locks
+   * the row, compares, refuses `stale_po_version` on a mismatch, and still
+   * stores only its own read. A caller that names a version it never rendered
+   * is refused, not believed.
+   */
+  poVersion: z.number().int().positive(),
   note: z.string().trim().max(300).optional(),
 }).strict();
 export type ConfirmPoSentInput = z.infer<typeof confirmPoSentInput>;

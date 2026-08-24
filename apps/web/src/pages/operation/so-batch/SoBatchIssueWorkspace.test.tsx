@@ -243,28 +243,32 @@ describe("Issue PO creates every document in one request", () => {
 
 describe("Issue PO stays open until the PDF actually reaches the supplier", () => {
   async function reachEvidence() {
-    apiFetch.mockResolvedValue({
-      ok: true,
-      pos: [
-        {
-          id: "PO-2041",
-          supplierId: "s-hooka",
-          supplierName: "Hooka",
-          destinationId: KLANG.id,
-          destination: "Carres Klang",
-        },
-      ],
-    });
+    apiFetch.mockImplementation((path: string) =>
+      path.includes("issue-batch")
+        ? Promise.resolve({
+            ok: true,
+            pos: [
+              {
+                id: "PO-2041", supplierId: "s-hooka", supplierName: "Hooka",
+                destinationId: KLANG.id, destination: "Carres Klang",
+              },
+            ],
+          })
+        : /* The official document reports Version 2 — the operator is looking
+             at a REVISED purchase order, and that is what must be recorded. */
+          Promise.resolve({ po_number: "PO-2041", po_id: "PO-2041", version: 2, lines: [] }),
+    );
     renderWorkspace();
     fireEvent.click(screen.getByTestId("so-batch-issue-create"));
     await screen.findByTestId("so-batch-evidence-PO-2041");
     apiFetch.mockReset();
+    apiFetch.mockResolvedValue({ ok: true });
   }
 
-  it("says what has not happened yet, in the document's own words", async () => {
+  it("says what has not happened yet, naming the exact version", async () => {
     await reachEvidence();
     expect(screen.getByTestId("so-batch-evidence-PO-2041")).toHaveTextContent(
-      "PO-2041 has not reached Hooka",
+      "PO-2041 · Version 2 has not reached Hooka",
     );
   });
 
@@ -306,8 +310,13 @@ describe("Issue PO stays open until the PDF actually reaches the supplier", () =
     expect(path).toBe("/api/operation/pos/PO-2041/confirm-sent");
     expect(path).not.toContain("/sends");
     const body = JSON.parse((init as { body: string }).body);
-    expect(body).toEqual({ channel: "whatsapp", recipient: "Hooka Purchasing Group" });
-    expect(body).not.toHaveProperty("poVersion");
+    /* ⭐ THE VERSION RIDES, and it is the one the RENDERED document reported —
+       not a list row, not a second fetch (0377). */
+    expect(body).toEqual({
+      channel: "whatsapp",
+      recipient: "Hooka Purchasing Group",
+      poVersion: 2,
+    });
   });
 
   it("when every document is confirmed, the journey is finished", async () => {
@@ -524,7 +533,10 @@ describe("after creation the preview is the real official PDF", () => {
               },
             ],
           })
-        : Promise.resolve({ po_number: "PO-20260822-4041", po_id: "PO-20260822-4041", lines: [] }),
+        : Promise.resolve({
+            po_number: "PO-20260822-4041", po_id: "PO-20260822-4041",
+            version: 1, lines: [],
+          }),
     );
     renderWorkspace();
     fireEvent.click(screen.getByTestId("so-batch-issue-create"));
@@ -550,7 +562,7 @@ describe("after creation the preview is the real official PDF", () => {
     );
   });
 
-  it("a render that fails SAYS so — it does not show a blank frame", async () => {
+  it("a render that fails SAYS so, and offers NOTHING to confirm", async () => {
     apiFetch.mockImplementation((path: string) =>
       path.includes("issue-batch")
         ? Promise.resolve({
@@ -566,11 +578,15 @@ describe("after creation the preview is the real official PDF", () => {
     );
     renderWorkspace();
     fireEvent.click(screen.getByTestId("so-batch-issue-create"));
-    await screen.findByTestId("so-batch-evidence-PO-2099");
     await waitFor(() =>
       expect(screen.getByTestId("so-batch-pdf-placeholder-PO-2099")).toHaveTextContent(
         "not_found",
       ),
     );
+    /* ⭐ NO VERSION MEANS NOTHING SAFE TO CONFIRM (0377). The document never
+       rendered, so the operator cannot have seen a version, so the form that
+       would declare one is not offered at all. */
+    expect(screen.queryByTestId("so-batch-evidence-confirm")).not.toBeInTheDocument();
+    expect(screen.getByTestId("so-batch-evidence-waiting")).toHaveTextContent("not_found");
   });
 });

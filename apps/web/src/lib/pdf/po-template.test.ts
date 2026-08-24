@@ -27,9 +27,35 @@ describe("po-template obeys docs/pdf/PO-PDF-STANDARD.md", () => {
     expect(CODE).not.toMatch(/fabric_surcharge/);
   });
 
+  /**
+   * ⭐ 0377 — THE DOCUMENT PRINTS ITS OWN VERSION, INCLUDING VERSION 1.
+   *
+   * A supplier holding two papers with one number and no version cannot tell
+   * which to build from. (`Version 1 prints nothing` is the internal REVISIONS
+   * PANEL's rule — `docs/COPY-STANDARD.md` — and this is paper that leaves the
+   * building; the panel rule is untouched.)
+   */
+  it("prints its version, and takes it from the document payload", () => {
+    expect(SRC).toContain("versionLabel");
+    expect(SRC).toMatch(/Version \$\{version \?\? 1\}/);
+    // It comes off the official payload, not from a prop somebody could pass.
+    expect(SRC).toMatch(/const \{ po_number, version,/);
+    // It appears on the first-page identity block AND the continuation header.
+    expect(SRC).toMatch(/docTitle[^\n]*>\{versionLabel\}/);
+    expect(SRC).toContain("{versionLabel}");
+    // And as its own PO DETAILS row.
+    expect(SRC).toMatch(/\["Version",/);
+  });
+
+  it("never invents a version — a payload without one reads Version 1", () => {
+    // `version ?? 1` and nothing else; no counting, no lookup, no default prop.
+    expect(CODE).not.toMatch(/version\s*\+\+|version\s*\+\s*1/);
+  });
+
   it("carries the Law's fixed strings", () => {
     for (const s of [
       "Deliver by",
+      "Version",
       "PURCHASE ORDER",
       "Computer-generated document · No signature required.",
       "SO No",

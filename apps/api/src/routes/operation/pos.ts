@@ -343,13 +343,19 @@ operationPosRouter.get("/", requireOperation, async (c) => {
     return c.json(m.body, m.status);
   }
 
-  // What we have SENT (0312) — the Activity timeline reads it, and the
-  // supplier's own version number comes with it.
+  // What LEFT Carres (0312), and since 0376 WHAT KIND of leaving it was: an
+  // `external_open` is communication history and completes nothing; a
+  // `confirmed_sent` carries recipient, actor, time and the exact version the
+  // supplier received.
   const sendsByPo = new Map<string, Record<string, unknown>[]>();
   if (poIds.length > 0) {
     const { data: sendRows, error: sendErr } = await sb
       .from("po_sends")
-      .select("po_id, channel, note, sent_at, po_revisions(rev_no)")
+      /* 0376/0377 — an OPEN and a CONFIRMED SEND are different facts, and the
+         detail page has to be able to tell them apart. `kind`, `recipient` and
+         `po_version` ride with the row so the evidence surface reads persisted
+         truth rather than whatever it happens to remember. */
+      .select("po_id, channel, note, sent_at, kind, recipient, po_version, sent_by, po_revisions(rev_no)")
       .in("po_id", poIds)
       .order("sent_at", { ascending: false });
     if (sendErr) {
@@ -1649,11 +1655,32 @@ operationPosRouter.post("/:id/confirm-sent", requireOperation, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
   const { data, error } = await sb.rpc("purchasing_confirm_po_sent", {
     p_po_id: c.req.param("id"),
+    /* 0377 — the version the operator RENDERED, declared. SQL locks the row and
+       compares it against the version that exists; a mismatch writes nothing.
+       The stored version is still SQL's own read. */
+    p_expected_version: parsed.data.poVersion,
     p_channel: parsed.data.channel,
     p_recipient: parsed.data.recipient,
     p_note: parsed.data.note ?? null,
   });
-  if (error) return mapSupplierCallError(c, error);
+  if (error) {
+    /* THE ONE ERROR THE OPERATOR CAN ACT ON, in the approved two-line form
+       (`docs/purchasing/MASTER.md` §8.3): the FACT, then the FIX. Everything
+       else falls through to the shared supplier-call mapping. */
+    const details = String((error as { details?: string }).details ?? "");
+    if (details === "stale_po_version" || /stale_po_version/.test(error.message ?? "")) {
+      return c.json(
+        {
+          error: "rule_violation",
+          code: "stale_po_version",
+          message: "Purchase order changed",
+          action: "Open the latest PDF and send it again.",
+        },
+        409,
+      );
+    }
+    return mapSupplierCallError(c, error);
+  }
   return c.json({ ok: true, result: data });
 });
 
