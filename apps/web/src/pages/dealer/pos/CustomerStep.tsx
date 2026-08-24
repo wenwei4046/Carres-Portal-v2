@@ -677,10 +677,15 @@ export default function CustomerStep({
                       }}
                       onChange={(patch) => setC(patch)}
                     />
-                    {/* Building type (Loo 2026-07-19) — delivery-access info for
-                        operation; optional, rides entry_data.fields. */}
+                    {/* Building type (Loo 2026-07-19) — delivery-access info
+                        for operation; rides entry_data.fields.
+                        REQUIRED since 2026-08-21 (Jess): stairs, lift access
+                        and van parking hang off it, and Operations was chasing
+                        the shop for it after the sale. `step1FirstIssue` names
+                        it as the missing field, exactly like the address parts
+                        above; it is asked only when an address exists. */}
                     <label className="block mt-3.5">
-                      <span className="label block mb-1.5">Building type</span>
+                      <span className="label block mb-1.5">Building type *</span>
                       <select
                         value={c.buildingType}
                         onChange={(e) => setC({ buildingType: e.target.value })}

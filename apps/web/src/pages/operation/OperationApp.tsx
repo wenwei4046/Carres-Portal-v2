@@ -65,6 +65,7 @@ import { CATALOG_TAB_PARAM } from "@/pages/catalog/catalog-tabs";
 import OperationStock from "./OperationStock";
 import OperationAllOrders from "./OperationAllOrders";
 import OperationSuppliers from "./OperationSuppliers";
+import OperationSupplierItems from "./OperationSupplierItems";
 // 2026-05-20 — Phase A · AutoCount integration tabs.
 import OperationImport from "./OperationImport";
 import OperationInbox from "./OperationInbox";
@@ -499,6 +500,11 @@ export default function OperationApp() {
             {tab === "stock" && <OperationStock />}
             {tab === "all-orders" && <OperationAllOrders />}
             {tab === "suppliers" && <OperationSuppliers />}
+            {/* 0375 — the supplier's own item code, joined to ours. A separate
+                DESTINATION rather than a tab inside the roster: the roster is
+                about parties, this is about items, and the sidebar already
+                gives a module more than one page. */}
+            {tab === "supplier-items" && <OperationSupplierItems />}
             {/* 2026-05-20 — Phase A · AutoCount integration */}
             {tab === "ops-import" && <OperationImport />}
             {tab === "ops-inbox" && <OperationInbox />}

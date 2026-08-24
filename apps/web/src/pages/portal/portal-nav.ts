@@ -80,6 +80,7 @@ export type PortalSection =
   | "Warehouse"
   | "Finance"
   | "Customer Care"
+  | "Suppliers"
   | "Master Data"
   | "Admin";
 
@@ -92,6 +93,7 @@ export const SECTION_ORDER: ReadonlyArray<PortalSection> = [
   "Warehouse",
   "Finance",
   "Customer Care",
+  "Suppliers",
   "Master Data",
   "Admin",
 ];
@@ -124,6 +126,10 @@ export const PORTAL_MODULES: ReadonlyArray<PortalModule> = [
   { section: "Delivery", label: "Delivery", icon: Route },
   { section: "Warehouse", label: "Warehouse", icon: Boxes },
   { section: "Customer Care", label: "Customer Care", icon: LifeBuoy },
+  /* Suppliers left Master Data on 2026-08-21 (YH's placement ruling): it is a
+     PARTY the business deals with, not a reference list — the same kind of
+     thing Customer Care is. The page itself did not move; only its door. */
+  { section: "Suppliers", label: "Suppliers", icon: Truck },
   { section: "Master Data", label: "Master Data", icon: Library },
 ];
 
@@ -406,7 +412,10 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       // money there is buying cost, isolated from POS selling). The selling
       // Product & Maintenance lives in the Admin area below.
       { key: "op-catalog", label: "Catalog", icon: Calculator, section: "Master Data" },
-      { key: "suppliers", label: "Suppliers", icon: Truck, section: "Master Data" },
+      /* The roster stays exactly the page it was; `?tab=suppliers` is
+         unchanged, so every bookmark and deep link still lands. */
+      { key: "suppliers", label: "Suppliers", icon: Truck, section: "Suppliers" },
+      { key: "supplier-items", label: "Supplier items", icon: Boxes, section: "Suppliers" },
       {
         key: "service-notes",
         label: "Service Cases",

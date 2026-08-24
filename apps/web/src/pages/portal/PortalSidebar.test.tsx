@@ -72,7 +72,13 @@ describe("PortalSidebar — role visibility", () => {
   it("operation sees Operations only — no Finance / Admin", () => {
     renderAt("/operation");
     expect(module_("purchasing")).toBeInTheDocument();
-    expect(module_("master-data")).toBeInTheDocument();
+    /* 2026-08-21 — Suppliers left Master Data for its own module, so Master
+       Data holds ONE page (Catalog) and renders as a PLAIN row: a module is an
+       expandable parent, and there is nothing to expand into. The rule is
+       `pages.length > 1` in buildNavBlocks; this asserts the row is present,
+       not what shape it takes. */
+    expect(child("op-catalog")).toBeInTheDocument();
+    expect(module_("suppliers")).toBeInTheDocument();
     // The selling catalog is principal-only, by area.
     expect(screen.queryByText("Product & Maintenance")).not.toBeInTheDocument();
     expect(screen.queryByText("AR · Receivables")).not.toBeInTheDocument();
@@ -94,7 +100,13 @@ describe("PortalSidebar — role visibility", () => {
     expect(screen.getByText("Operations")).toBeInTheDocument();
     expect(screen.getAllByText("Finance").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("Admin")).toBeInTheDocument();
-    expect(module_("master-data")).toBeInTheDocument();
+    /* 2026-08-21 — Suppliers left Master Data for its own module, so Master
+       Data holds ONE page (Catalog) and renders as a PLAIN row: a module is an
+       expandable parent, and there is nothing to expand into. The rule is
+       `pages.length > 1` in buildNavBlocks; this asserts the row is present,
+       not what shape it takes. */
+    expect(child("op-catalog")).toBeInTheDocument();
+    expect(module_("suppliers")).toBeInTheDocument();
     // Inactive areas are collapsed → their items are hidden until clicked.
     expect(screen.queryByText("AR · Receivables")).not.toBeInTheDocument();
     expect(screen.queryByText("Accounts")).not.toBeInTheDocument();
@@ -123,7 +135,10 @@ describe("a module is an expandable PARENT ROW, never a heading", () => {
       ["delivery", "Delivery"],
       ["warehouse", "Warehouse"],
       ["customer-care", "Customer Care"],
-      ["master-data", "Master Data"],
+      /* Master Data dropped off this list on 2026-08-21: with Suppliers gone
+         it carries one page, and a one-page section is a plain row by design.
+         Suppliers takes its place — two pages, so a real module. */
+      ["suppliers", "Suppliers"],
     ] as const) {
       const row = module_(slug);
       expect(row.tagName).toBe("BUTTON");
