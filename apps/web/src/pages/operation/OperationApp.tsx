@@ -31,7 +31,6 @@ import OperationDashboard from "./OperationDashboard";
 // named in the cutover card — revert + redeploy the previous Pages build.
 import OperationOrdersControl from "./OperationOrdersControl";
 import SalesOrdersRegister from "./SalesOrdersRegister";
-import DeliveryOrdersRegister from "./DeliveryOrdersRegister";
 import DeliveryOrderPage from "./DeliveryOrderPage";
 import SalesOrderWorkspace from "./SalesOrderWorkspace";
 import SettingsWorkspace from "./SettingsWorkspace";
