@@ -159,11 +159,19 @@ export function categoryWord(raw: string): string {
  * — 90 of them — while the Sales Orders register, reading the identical line,
  * printed `Mattress`. Found on the production walk.
  *
- * THREE SOURCES, IN FALLING ORDER OF AUTHORITY:
+ * FOUR SOURCES, IN FALLING ORDER OF AUTHORITY — the SAME ladder the SO detail
+ * document reads (`categoryWord` in SalesOrderWorkspace), because a line that
+ * says `Mattress` on the document and `Other goods` in a register footer is a
+ * tally the operator trusts and cannot reproduce (found by Jess, 2026-08-24 —
+ * `Other goods 44`):
  *   1. what the order line itself RECORDS (`attrs.category`);
- *   2. the canonical SKU's own head (`mattress:` / `bedframe:` / `sofa:`);
- *   3. `lineClass` — the shared classifier, which is the only one of the three
- *      that can read an AutoCount SKU like `H1401F-K`.
+ *   2. the CATALOG's word (`line.category`, resolved server-side through
+ *      `skuCategories` — the one category reader, Law D). ABSENT = an older
+ *      Worker that does not send it; NULL = asked, no catalog row — both fall
+ *      through;
+ *   3. the canonical SKU's own head (`mattress:` / `bedframe:` / `sofa:`);
+ *   4. `lineClass` — the shared classifier, the only rung that can read an
+ *      AutoCount SKU like `H1401F-K`.
  *
  * `unknown` prints `Other goods` and `acc` prints `Accessory`: a line nothing
  * recognises says so, and never borrows a category it did not earn.
@@ -171,13 +179,15 @@ export function categoryWord(raw: string): string {
 export function goodsCategoryOf(line: {
   sku: string;
   attrs?: Record<string, unknown> | null;
+  category?: string | null;
 }): string {
   const fromAttrs = typeof line.attrs?.category === "string" ? line.attrs.category : "";
+  const fromCatalog = typeof line.category === "string" ? line.category.trim() : "";
   const fromSku = line.sku.includes(":") ? line.sku.split(":", 1)[0]! : "";
   const classified = lineClass(line.sku);
   const classifiedLabel =
     classified === "acc" ? "Accessory" : classified === "unknown" ? "Other goods" : classified;
-  return categoryWord(fromAttrs || fromSku || classifiedLabel);
+  return categoryWord(fromAttrs || fromCatalog || fromSku || classifiedLabel);
 }
 
 export default function GoodsMiniTable({

@@ -478,6 +478,108 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
   });
 
   /**
+   * THE FOOTER READS THE SAME LADDER AS THE DOCUMENT (2026-08-24).
+   *
+   * Jess: "Other goods 44 - the number doesn't tally." The arithmetic was
+   * never wrong; the CLASSIFIER was. The footer read the SKU text alone
+   * while the SO detail reads recorded `attrs.category`, then the catalog,
+   * then the SKU - so a product the document named MATTRESS counted here as
+   * `Other goods`, and the number could not be reproduced from the orders
+   * the operator can open.
+   */
+  it("counts an AutoCount line by its CATALOG category, not the unreadable SKU text", () => {
+    listHookState.data = {
+      orders: [
+        order({
+          order_lines: [
+            // Free-text AutoCount SKU no parser can read - but the catalog
+            // knows it, and the server now sends that word.
+            { sku: "1013Jager/Fab3-King/PC151-01", qty: 2, unit_price: 3200, category: "mattress" },
+          ],
+        }),
+      ],
+    };
+    mount();
+    const footer = screen.getByTestId("grid-footer");
+    expect(footer).toHaveTextContent("Mattress 2");
+    expect(footer).not.toHaveTextContent("Other goods");
+  });
+
+  it("prefers what the ORDER recorded over what the catalog says today", () => {
+    // `attrs.category` is what this order agreed to. A later catalog
+    // re-classification must never rewrite a committed line.
+    listHookState.data = {
+      orders: [
+        order({
+          order_lines: [
+            {
+              sku: "FREE-TEXT-THING",
+              qty: 1,
+              unit_price: 500,
+              attrs: { category: "sofa" },
+              category: "mattress",
+            },
+          ],
+        }),
+      ],
+    };
+    mount();
+    expect(screen.getByTestId("grid-footer")).toHaveTextContent("Sofa 1");
+  });
+
+  it("a catalog ACCESSORY whose type is recognised prints the TYPE, not the bare word", () => {
+    listHookState.data = {
+      orders: [
+        order({
+          order_lines: [
+            { sku: "SOME-PILLOW-CODE", qty: 4, unit_price: 89, category: "accessory" },
+          ],
+        }),
+      ],
+    };
+    mount();
+    expect(screen.getByTestId("grid-footer")).toHaveTextContent("Pillow 4");
+  });
+
+  it("a catalog ACCESSORY whose type nothing recognises prints `Accessory`, NOT `Other goods`", () => {
+    // The catalog positively says accessory. Calling it `Other goods` would
+    // report a classification failure over a line that IS classified.
+    listHookState.data = {
+      orders: [
+        order({
+          order_lines: [{ sku: "XZ-9931", qty: 3, unit_price: 40, category: "accessory" }],
+        }),
+      ],
+    };
+    mount();
+    const footer = screen.getByTestId("grid-footer");
+    expect(footer).toHaveTextContent("Accessory 3");
+    expect(footer).not.toHaveTextContent("Other goods");
+  });
+
+  it("NEGATIVE CONTROL: a line nothing recognises is STILL `Other goods` - the word keeps its meaning", () => {
+    // The fix must not launder unclassified goods into a category. This
+    // number is a real data-quality signal and has to survive.
+    listHookState.data = {
+      orders: [
+        order({ order_lines: [{ sku: "Leg 4\"", qty: 5, unit_price: 20, category: null }] }),
+      ],
+    };
+    mount();
+    expect(screen.getByTestId("grid-footer")).toHaveTextContent("Other goods 5");
+  });
+
+  it("an OLDER Worker that sends no category behaves exactly as before", () => {
+    // Absent (not null) - the field simply is not on the wire. The parser
+    // rungs still answer, so this build is safe against a lagging Worker.
+    listHookState.data = {
+      orders: [order({ order_lines: [{ sku: "B1201S-K", qty: 1, unit_price: 2499 }] })],
+    };
+    mount();
+    expect(screen.getByTestId("grid-footer")).toHaveTextContent("Mattress 1");
+  });
+
+  /**
    * ⭐ AN ABSENCE IS QUIETER THAN A FACT — owner ruling 2026-08-15.
    * The words are unchanged; only their weight moves, so search, filter, sort
    * and Export still read the same string.

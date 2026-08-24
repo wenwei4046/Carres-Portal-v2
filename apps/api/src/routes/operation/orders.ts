@@ -335,9 +335,27 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
         (o.order_lines ?? []).map((l) => l.sku),
       ),
     );
+    // 2026-08-24 (OTHER GOODS TALLY) - the register footer classified a line
+    // from its SKU TEXT ALONE while the SO detail read the catalog first, so
+    // the same product counted as `Mattress` on the document and `Other goods`
+    // in the footer - a tally the operator trusts and cannot reproduce. Stamp
+    // the catalog category onto every list line the same way the DETAIL route
+    // has since PR 885, through the same one owner: `skuCategories` is the ONE
+    // category reader (Law D - the detail route's own comment explicitly
+    // REJECTED folding this into `resolveSkuLabels`, and one batched
+    // subrequest per page is the documented price of one owner). Fails OPEN:
+    // an outage returns an empty map, category reads null, and the browser
+    // falls back to the SKU parser exactly as it did before this line existed.
+    const categoryBySku = await skuCategories(
+      sb,
+      orders.flatMap((o: { order_lines?: { sku?: string | null }[] | null }) =>
+        (o.order_lines ?? []).map((l) => l.sku).filter((s): s is string => !!s),
+      ),
+    );
     for (const o of orders as { order_lines?: ({ sku?: string | null } & Record<string, unknown>)[] | null }[]) {
       for (const l of o.order_lines ?? []) {
         (l as Record<string, unknown>).label = l.sku ? (labelBySku[l.sku] ?? null) : null;
+        (l as Record<string, unknown>).category = l.sku ? (categoryBySku.get(l.sku) ?? null) : null;
       }
     }
   } catch (e_label) {
