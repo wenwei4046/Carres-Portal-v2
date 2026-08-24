@@ -17,6 +17,12 @@ vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 const mockPatchMutate = vi.fn();
 vi.mock("@/lib/queries", () => ({
+  /* 2026-08-24 - the supplier picker/filter/column reads the roster through
+   * this hook; one named supplier is enough to pin the render path. */
+  useOperationSuppliers: () => ({
+    data: { suppliers: [{ id: "00000000-0000-4000-8000-0000000000s1".replace("s","a"), name: "Hookka" }] },
+    isLoading: false,
+  }),
   usePatchCatalogSku: () => ({ mutate: mockPatchMutate, isPending: false }),
 }));
 
@@ -137,5 +143,93 @@ describe("OperationSkuCostTab — costing view", () => {
     fireEvent.change(screen.getByTestId("opcost-sku-search"), { target: { value: "cloud" } });
     expect(screen.getByTestId("opcost-row-CLOUD-KING")).toBeInTheDocument();
     expect(screen.queryByTestId("opcost-row-LUNA-3S")).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * SUPPLIER EDITING ON THE COST TAB (2026-08-24) — the buyer keys a quotation
+ * here, so the two supplier facts are editable here: WHO supplies it
+ * (supplier_id via the roster picker — never a typed name, Law A/D) and THEIR
+ * code for it (supplier_code). Neither is money, so neither is 0175-locked —
+ * operation writes both, the same standing 0226 gave it over cost.
+ */
+describe("supplier editing (2026-08-24)", () => {
+  const HOOKKA_ID = "00000000-0000-4000-8000-0000000000a1";
+
+  it("view mode shows name · their-code; absent shows the muted dash", () => {
+    render(
+      <OperationSkuCostTab
+        catalog={makeCatalog([
+          { ...SKU_COST_SET, supplierId: HOOKKA_ID, supplierCode: "HK-KING" },
+        ])}
+      />,
+    );
+    const cell = screen.getByTestId("opcost-supplier-CLOUD-KING");
+    expect(cell.textContent).toContain("Hookka");
+    expect(cell.textContent).toContain("HK-KING");
+  });
+
+  it("edit mode: picking a supplier commits { supplierId } — the FK, never a name", () => {
+    render(<OperationSkuCostTab catalog={makeCatalog([SKU_COST_SET])} />);
+    fireEvent.click(screen.getByTestId("opcost-edit-costs"));
+    fireEvent.change(screen.getByTestId("opcost-supplier-pick-CLOUD-KING"), {
+      target: { value: HOOKKA_ID },
+    });
+    expect(mockPatchMutate).toHaveBeenCalledTimes(1);
+    expect(mockPatchMutate.mock.calls[0][0]).toEqual({
+      id: "s1",
+      patch: { supplierId: HOOKKA_ID },
+    });
+  });
+
+  it("edit mode: 'No supplier' commits { supplierId: null } — a real bucket (0171)", () => {
+    render(
+      <OperationSkuCostTab catalog={makeCatalog([{ ...SKU_COST_SET, supplierId: HOOKKA_ID }])} />,
+    );
+    fireEvent.click(screen.getByTestId("opcost-edit-costs"));
+    fireEvent.change(screen.getByTestId("opcost-supplier-pick-CLOUD-KING"), {
+      target: { value: "" },
+    });
+    expect(mockPatchMutate.mock.calls[0][0]).toEqual({
+      id: "s1",
+      patch: { supplierId: null },
+    });
+  });
+
+  it("edit mode: typing their code commits { supplierCode } on blur; blank clears to null", () => {
+    render(
+      <OperationSkuCostTab
+        catalog={makeCatalog([{ ...SKU_COST_SET, supplierCode: "OLD-1" }])}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("opcost-edit-costs"));
+    const input = screen.getByTestId("opcost-supplier-code-CLOUD-KING");
+    fireEvent.change(input, { target: { value: "HK-KING" } });
+    fireEvent.blur(input);
+    expect(mockPatchMutate.mock.calls[0][0]).toEqual({
+      id: "s1",
+      patch: { supplierCode: "HK-KING" },
+    });
+    fireEvent.change(input, { target: { value: "   " } });
+    fireEvent.blur(input);
+    expect(mockPatchMutate.mock.calls[1][0]).toEqual({
+      id: "s1",
+      patch: { supplierCode: null },
+    });
+  });
+
+  it("NEGATIVE CONTROL: unchanged values commit nothing", () => {
+    render(
+      <OperationSkuCostTab
+        catalog={makeCatalog([{ ...SKU_COST_SET, supplierId: HOOKKA_ID, supplierCode: "HK-KING" }])}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("opcost-edit-costs"));
+    fireEvent.change(screen.getByTestId("opcost-supplier-pick-CLOUD-KING"), {
+      target: { value: HOOKKA_ID },
+    });
+    const input = screen.getByTestId("opcost-supplier-code-CLOUD-KING");
+    fireEvent.blur(input);
+    expect(mockPatchMutate).not.toHaveBeenCalled();
   });
 });

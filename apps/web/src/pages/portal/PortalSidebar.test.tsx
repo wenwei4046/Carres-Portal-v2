@@ -132,7 +132,6 @@ describe("a module is an expandable PARENT ROW, never a heading", () => {
     for (const [slug, name] of [
       ["sales", "Sales"],
       ["purchasing", "Purchasing"],
-      ["delivery", "Delivery"],
       ["warehouse", "Warehouse"],
       ["customer-care", "Customer Care"],
       /* Master Data dropped off this list on 2026-08-21: with Suppliers gone
@@ -252,15 +251,11 @@ describe("the accordion", () => {
  * the exact defect the drawing exists to avoid.
  */
 describe("the elbow connectors", () => {
-  /* DELIVERY IS THE FLAT MODULE NOW — TWO pages since
-   * CARD-2026-08-21-delivery-01-sidebar. Purchasing grew a nested level under
-   * CARD-2026-08-20, so the one-level contract is proved on the module that
-   * still has one level. Two children is the SHORTEST run that can still prove
-   * the drawing: one elbow that carries the trunk on, one that ends it.
-   * Purchasing's own nesting is proved in its own describe below. */
+  /* Sales stays a two-page module, so it proves the one-level elbow grammar.
+   * Delivery is now one direct page and correctly carries no elbow. */
   it("every child row carries its own elbow", () => {
-    renderAt("/operation?tab=delivery");
-    const group = screen.getByTestId("nav-children-delivery");
+    renderAt("/operation/orders");
+    const group = screen.getByTestId("nav-children-sales");
     const rows = group.querySelectorAll("[data-testid^='nav-child-']");
     const elbows = group.querySelectorAll("[data-testid^='nav-elbow-']");
     expect(rows.length).toBe(2);
@@ -268,8 +263,8 @@ describe("the elbow connectors", () => {
   });
 
   it("every elbow turns at its own row's middle", () => {
-    renderAt("/operation?tab=delivery");
-    const group = screen.getByTestId("nav-children-delivery");
+    renderAt("/operation/orders");
+    const group = screen.getByTestId("nav-children-sales");
     for (const el of group.querySelectorAll<HTMLElement>("[data-testid^='nav-elbow-']")) {
       // Capped at the row's centre; the number is only what it reaches UP by.
       expect(el.style.height).toMatch(/^calc\(50% \+ \d+px\)$/);
@@ -281,17 +276,17 @@ describe("the elbow connectors", () => {
    * past the group. Every child but the last carries the trunk on to the next
    * one; the last carries none, so the drawing simply stops there. */
   it("the trunk stops at the last child — it carries on from every other", () => {
-    renderAt("/operation?tab=delivery");
-    const group = screen.getByTestId("nav-children-delivery");
+    renderAt("/operation/orders");
+    const group = screen.getByTestId("nav-children-sales");
     const rows = group.querySelectorAll("[data-testid^='nav-child-']");
     const trunks = group.querySelectorAll("[data-testid^='nav-trunk-']");
     expect(rows.length).toBe(2);
     expect(trunks.length).toBe(rows.length - 1);
-    // `Delivery Orders` is last, and nothing hangs below it.
-    expect(screen.getByTestId("nav-elbow-delivery-orders")).toBeInTheDocument();
-    expect(screen.queryByTestId("nav-trunk-delivery-orders")).not.toBeInTheDocument();
+    // `Old Orders` is last, and nothing hangs below it.
+    expect(screen.getByTestId("nav-elbow-old-orders")).toBeInTheDocument();
+    expect(screen.queryByTestId("nav-trunk-old-orders")).not.toBeInTheDocument();
     // ...and the row above it DOES carry the line on.
-    expect(screen.getByTestId("nav-trunk-delivery")).toBeInTheDocument();
+    expect(screen.getByTestId("nav-trunk-orders")).toBeInTheDocument();
   });
 
   it("a selected child still shows the elbow it hangs from", () => {
@@ -301,8 +296,8 @@ describe("the elbow connectors", () => {
   });
 
   it("the trunk hangs from the module ICON's centre, and the elbow turns into the row", () => {
-    renderAt("/operation?tab=delivery");
-    const elbow = screen.getByTestId("nav-elbow-delivery-orders");
+    renderAt("/operation/orders");
+    const elbow = screen.getByTestId("nav-elbow-old-orders");
     // px-3.5 (14) + half a 16px icon = 22; the 1px line is centred on it.
     expect(elbow.style.left).toBe("21.5px");
     expect(elbow.style.width).toBe("11px");
@@ -310,9 +305,9 @@ describe("the elbow connectors", () => {
   });
 
   it("a child is decoration-free for a screen reader — the elbow is aria-hidden", () => {
-    renderAt("/operation?tab=delivery");
+    renderAt("/operation/orders");
     expect(
-      screen.getByTestId("nav-elbow-delivery-orders").getAttribute("aria-hidden"),
+      screen.getByTestId("nav-elbow-old-orders").getAttribute("aria-hidden"),
     ).toBe("true");
   });
 });
@@ -1137,52 +1132,22 @@ describe("PortalSidebar — Purchasing remembers its drawers", () => {
  * (`docs/delivery/MASTER.md` §7 still holds them as approved targets); they are
  * simply not NAVIGATION until they are pages.
  */
-describe("PortalSidebar — the Delivery module's pages", () => {
-  it("lists exactly two pages, in order", () => {
-    renderAt("/operation?tab=delivery");
-    const rows = Array.from(
-      screen
-        .getByTestId("nav-children-delivery")
-        .querySelectorAll("[data-testid^='nav-child-']"),
-    ).map((el) => el.textContent?.trim());
-    expect(rows).toEqual(["Delivery Work", "Delivery Orders"]);
-  });
-
-  it("keeps Delivery Orders under Delivery", () => {
-    renderAt("/operation/delivery-orders");
-    const group = screen.getByTestId("nav-children-delivery");
-    expect(group.contains(child("delivery-orders"))).toBe(true);
-    expect(child("delivery-orders").className).toContain("bg-kit-blue-3");
-  });
-
-  it("`Delivery Work` is the existing page — same key, same route", () => {
+describe("PortalSidebar — Delivery is one page", () => {
+  it("shows one plain Delivery door instead of a parent with two children", () => {
     renderAt("/operation?tab=delivery");
     const row = child("delivery");
     expect(row.tagName).toBe("A");
     expect(row).toHaveAttribute("href", "/operation?tab=delivery");
     expect(row.className).toContain("bg-kit-blue-3");
+    expect(row).toHaveTextContent("Delivery");
+    expect(screen.queryByTestId("nav-module-delivery")).toBeNull();
+    expect(screen.queryByTestId("nav-child-delivery-orders")).toBeNull();
   });
 
-  it("`Delivery Orders` keeps its own path, and lights only itself", () => {
-    renderAt("/operation/delivery-orders");
-    expect(child("delivery-orders")).toHaveAttribute(
-      "href",
-      "/operation/delivery-orders",
-    );
-    // Standing on the Register, `Delivery Work` is NOT lit.
-    expect(child("delivery").className).not.toContain("bg-kit-blue-3");
-  });
-
-  it("standing on Delivery Work does not light the Register", () => {
-    renderAt("/operation?tab=delivery");
-    expect(child("delivery-orders").className).not.toContain("bg-kit-blue-3");
-  });
-
-  /* THE RETIRED ROWS ARE GONE FROM THE DOM, not hidden. A `Coming soon` label
-   * anywhere in this module is the exact defect the card removed. */
-  it("no retired child and no `Coming soon` survives in Delivery", () => {
+  it("does not show retired Delivery destinations", () => {
     renderAt("/operation?tab=delivery");
     for (const key of [
+      "delivery-orders",
       "delivery-schedule",
       "delivery-history",
       "delivery-exceptions",
@@ -1191,17 +1156,6 @@ describe("PortalSidebar — the Delivery module's pages", () => {
     ]) {
       expect(screen.queryByTestId(`nav-child-${key}`)).toBeNull();
     }
-    const group = screen.getByTestId("nav-children-delivery");
-    expect(group.textContent).not.toContain("Coming soon");
-    for (const word of ["Schedule", "Delivery History", "Exceptions", "Partners"]) {
-      expect(within(group).queryByText(word)).toBeNull();
-    }
-  });
-
-  it("the module still opens on its own named destination, not a dead row", () => {
-    renderAt("/operation");
-    fireEvent.click(module_("delivery"));
-    expect(child("delivery").className).toContain("bg-kit-blue-3");
   });
 });
 

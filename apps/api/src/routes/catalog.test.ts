@@ -1704,6 +1704,72 @@ describe("POST /api/catalog/models/:id/generate-skus (idempotent skip)", () => {
     expect(rows[0]?.variant).toBe("King");
   });
 
+  // 2026-08-24 — an explicit supplierId overrides the category-cover
+  // auto-resolve. Two suppliers can both cover mattress; without this a
+  // keyer had no way to say a batch is Hookka's rather than whichever
+  // supplier's cat_covered[] happened to sort first.
+  it("an explicit supplierId is accepted (the schema no longer .strict()-rejects it)", async () => {
+    const records: { table: string; op: "insert" | "update"; body: unknown }[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      scriptedSb({
+        reads: {
+          product_models: {
+            category: "mattress",
+            model_key: "carres-classic",
+            allowed_options: { sizes: ["Queen"] },
+          },
+          suppliers: { id: "00000000-0000-0000-0000-00000000ff01" },
+          product_skus__list: [],
+        },
+        inserted: [{ id: "00000000-0000-0000-0000-00000000bb33" }],
+        records,
+      }),
+    );
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/models/${MODEL_ID_LIVE}/generate-skus`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ supplierId: "00000000-0000-0000-0000-00000000ff01" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { generated: number };
+    expect(body.generated).toBe(1);
+  });
+
+  it("an explicit supplierId that resolves to no row is 404, distinct from the 422 no-supplier-for-category path", async () => {
+    const records: { table: string; op: "insert" | "update"; body: unknown }[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      scriptedSb({
+        reads: {
+          product_models: {
+            category: "mattress",
+            model_key: "carres-classic",
+            allowed_options: { sizes: ["Queen"] },
+          },
+          // No supplier row at all — the override path's own lookup fails.
+          suppliers: null,
+          product_skus__list: [],
+        },
+        records,
+      }),
+    );
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/models/${MODEL_ID_LIVE}/generate-skus`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ supplierId: "00000000-0000-0000-0000-00000000dead" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as { code: string };
+    expect(body.code).toBe("not_found");
+  });
+
   it("expands raw bed-size codes to full-name variants (K→King, SS→Super Single)", async () => {
     const records: { table: string; op: "insert" | "update"; body: unknown }[] = [];
     vi.mocked(userClient).mockReturnValue(
@@ -2824,7 +2890,7 @@ describe("0178 — sofa compartments (pool + per-model offered)", () => {
           product_models: [{ id: MODEL_ID_LIVE, model_key: "OHANA", category: "sofa", name: "Ohana" }],
           sofa_compartments: [COMP_ROW],
           product_skus: [], // model has no existing sku → no own supplier
-          suppliers: [{ id: "sup-covers-sofa" }],
+          suppliers: [{ id: "00000000-0000-0000-0000-00000000ffa2" }],
         },
         writeReturn: { model_id: MODEL_ID_LIVE, compartment_id: COMP_ID, price_override: null, sort_order: 0 },
       }),
@@ -2844,7 +2910,99 @@ describe("0178 — sofa compartments (pool + per-model offered)", () => {
     // fixture carries 250) is deliberately IGNORED (Loo 2026-07-20): prices
     // live in SKU Master only — legacy pool prices must never leak onto a
     // fresh model's SKUs.
-    expect(skuUpsert?.payload).toMatchObject({ supplier_id: "sup-covers-sofa", price: 0, pos_active: true });
+    expect(skuUpsert?.payload).toMatchObject({ supplier_id: "00000000-0000-0000-0000-00000000ffa2", price: 0, pos_active: true });
+  });
+
+  // 2026-08-24 — the ONE ambiguous case: a model's first compartment, no
+  // sibling sku's supplier to inherit yet. An explicit supplierId must win
+  // over the category-cover guess, or a keyer has no way to say a brand-new
+  // sofa's compartments are Hookka's rather than whichever supplier's
+  // cat_covered[] happened to sort first.
+  it("PUT — no model-own supplier, caller passes supplierId → the OVERRIDE wins, not the category cover", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({
+        recorded,
+        reads: {
+          product_models: [{ id: MODEL_ID_LIVE, model_key: "BOOQIT", category: "sofa", name: "Booqit" }],
+          sofa_compartments: [COMP_ROW],
+          product_skus: [], // no existing sku → no own supplier to inherit
+          // The category-cover fallback WOULD pick this one — proving the
+          // override actually short-circuits it, not merely ignored.
+          suppliers: [{ id: "00000000-0000-0000-0000-00000000ffa2" }, { id: "00000000-0000-0000-0000-00000000ffa1" }],
+        },
+        writeReturn: { model_id: MODEL_ID_LIVE, compartment_id: COMP_ID, price_override: null, sort_order: 0 },
+      }),
+    );
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/models/${MODEL_ID_LIVE}/compartments/${COMP_ID}`, {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ priceOverride: null, supplierId: "00000000-0000-0000-0000-00000000ffa1" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const skuUpsert = recorded.find((r) => r.op === "upsert" && r.table === "product_skus");
+    expect(skuUpsert?.payload).toMatchObject({ supplier_id: "00000000-0000-0000-0000-00000000ffa1" });
+  });
+
+  it("PUT — a supplierId that resolves to no row is 404, not a silent fall-through to Auto", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({
+        recorded,
+        reads: {
+          product_models: [{ id: MODEL_ID_LIVE, model_key: "BOOQIT", category: "sofa", name: "Booqit" }],
+          sofa_compartments: [COMP_ROW],
+          product_skus: [],
+          suppliers: [{ id: "00000000-0000-0000-0000-00000000ffa2" }], // real supplier exists — just not this id
+        },
+        writeReturn: { model_id: MODEL_ID_LIVE, compartment_id: COMP_ID, price_override: null, sort_order: 0 },
+      }),
+    );
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/models/${MODEL_ID_LIVE}/compartments/${COMP_ID}`, {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ priceOverride: null, supplierId: "00000000-0000-0000-0000-00000000ffa9" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as { code: string };
+    expect(body.code).toBe("not_found");
+  });
+
+  it("PUT — a model-own supplier still wins over an override (never fork one model onto two suppliers)", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({
+        recorded,
+        reads: {
+          product_models: [{ id: MODEL_ID_LIVE, model_key: "OHANA", category: "sofa", name: "Ohana" }],
+          sofa_compartments: [COMP_ROW],
+          // The model already has a real supplier'd sku.
+          product_skus: [{ model_id: MODEL_ID_LIVE, supplier_id: "sup-ohana" }],
+          suppliers: [{ id: "00000000-0000-0000-0000-00000000ffa3" }],
+        },
+        writeReturn: { model_id: MODEL_ID_LIVE, compartment_id: COMP_ID, price_override: null, sort_order: 0 },
+      }),
+    );
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/models/${MODEL_ID_LIVE}/compartments/${COMP_ID}`, {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ priceOverride: null, supplierId: "00000000-0000-0000-0000-00000000ffa3" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const skuUpsert = recorded.find((r) => r.op === "upsert" && r.table === "product_skus");
+    expect(skuUpsert?.payload).toMatchObject({ supplier_id: "sup-ohana" });
   });
 
   it("PUT — re-offer of a LIVE row preserves price AND pos_active (no clobber of a manual OFF)", async () => {

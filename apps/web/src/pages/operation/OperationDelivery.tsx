@@ -1,5 +1,5 @@
 /**
- * DELIVERY WORK — the manual Delivery planning workspace.
+ * DELIVERY — the one planning and document workspace.
  * `CARD-2026-08-21-delivery-02-work-layout` · `docs/delivery/MASTER.md` §8.
  *
  * ─────────────────────────────────────────────────────────────────────────────
@@ -26,11 +26,11 @@
  *
  * ```
  * ┌──────────────────────────────────────────────────────────────────────────┐
- * │ Delivery Work                                        🔔 ❓ ⚙  (50px)      │
+ * │ Delivery                                             🔔 ❓ ⚙  (50px)      │
  * ├──────────── 200px ──────────────┬────────────────────────────────────────┤
  * │ DELIVERY DATE                   │ Search              Filters  Columns   │
  * │   No confirmed date        88   ├────────────────────────────────────────┤
- * │   Date passed               1   │ ▸ SO-1322 · customer · dates …         │
+ * │   Overdue                  1   │ ▸ SO-1322 · customer · dates …         │
  * │   Fri, 21 Aug               2   │   └ Category · Unit ID · Deliver To …  │
  * │ LOGISTICS                       │                                        │
  * │   All · NETS · AL · TEOW …      ├────────────────────────────────────────┤

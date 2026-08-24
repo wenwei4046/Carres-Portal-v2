@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { Adapters, DB, PWP_RULES, type PwpRule } from "@carres/shared";
 
 /**
  * Shared sku → { model_id, category, variant } resolution for the order-path
@@ -67,4 +68,49 @@ export async function resolveSkuInfo(
     });
   }
   return { ok: true, skuInfo };
+}
+
+/** Active rules, or the read error, fail-closed like `resolveSkuInfo`. */
+export type ReadActivePwpRulesResult =
+  | { ok: true; rules: PwpRule[] }
+  | { ok: false; message: string };
+
+/**
+ * ⭐ THE ONE READ OF THE ACTIVE PWP RULE SET — AND THE ONE ORDER.
+ *
+ * `resolvePwp` is GREEDY: it walks rules in the order it is handed them and
+ * binds each reward line to the FIRST rule with spare allowance. The order is
+ * therefore not a display preference — it decides which rule pays for a line,
+ * and with overlapping rules it decides the PRICE.
+ *
+ * Four readers fed that resolver and NONE of them ordered the read:
+ * `pwp-recompute` (the price at Confirm), `pwp-codes` (which vouchers get
+ * minted), `pwp-carry-forward` (which survive as saved vouchers) and
+ * `replace-lines-helpers` (the amendment path). A bare PostgREST select has no
+ * guaranteed order, so the four could each bind the same cart differently, and
+ * the same cart could resolve differently twice in a row.
+ *
+ * That is Law D — a derived fact has ONE arithmetic — broken four ways. This is
+ * the single door: `created_at` for the real precedence ("the rule that existed
+ * first wins"), then `id` to break a tie, because two rules created in one
+ * transaction share a timestamp and `created_at` alone is not a total order.
+ *
+ * ⚠️ NOTE: this makes the answer STABLE, not authored. Which rule *should* win
+ * when two overlap is an owner's ruling and there is no priority column to hold
+ * it (0186). Until there is, first-created wins — knowably, every time.
+ */
+export async function readActivePwpRules(
+  sb: SupabaseClient,
+): Promise<ReadActivePwpRulesResult> {
+  const { data, error } = await sb
+    .from(PWP_RULES)
+    .select("*")
+    .eq("active", true)
+    .order("created_at", { ascending: true })
+    .order("id", { ascending: true });
+  if (error) return { ok: false, message: error.message };
+  return {
+    ok: true,
+    rules: ((data ?? []) as DB.PwpRuleRow[]).map((row) => Adapters.pwpRuleFromRow(row)),
+  };
 }

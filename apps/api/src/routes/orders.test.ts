@@ -208,13 +208,22 @@ function buildSbForCreate(opts: {
   const rpcCalls: Array<{ name: string; payload: unknown }> = [];
   const eqs: Array<[string, unknown]> = [];
   let currentTable: string | null = null;
+  // 2026-08-24: the active-rule read is `.eq().order().order()` through the ONE
+  // ordered door (readActivePwpRules), so `order` has to CHAIN. This chain has
+  // no `then`, so the hop object carries its own - and it still resolves EMPTY,
+  // which is the point: this builder is the UNCONFIGURED-rule path, and an
+  // empty rule set is what makes a claim reject as pwp_unknown_rule.
+  const orderChain: Record<string, unknown> = {
+    order: () => orderChain,
+    then: (resolve: (v: unknown) => unknown) => resolve({ data: [], error: null }),
+  };
   const chain = {
     eq(col: string, val: unknown) {
       eqs.push([col, val]);
       return chain;
     },
     in: async () => ({ data: opts.productSkuCategoryRows ?? [], error: null }),
-    order: async () => ({ data: [], error: null }),
+    order: () => orderChain,
     maybeSingle: async () => {
       // P1 — the earliest-sell floor is a setting, not a constant.
       if (currentTable === "purchasing_settings") {
@@ -291,6 +300,10 @@ function buildSbForCreatePwp(opts: {
   /** Override the active pwp_rules the sweep + P8b read (carry_forward toggle /
    *  inactive scenarios). Defaults to the single P8C carry-forward rule. */
   ruleRows?: unknown[];
+  /** 2026-08-24 - override what `pwp_discover_available` returns for a
+   *  cross-order code. `[]` simulates an unknown / already-USED voucher.
+   *  Default: a snapshot mirroring the active rule fixture. */
+  discoverRows?: Array<Record<string, unknown>>;
   fetchedRow?: unknown;
 }) {
   const rpcCalls: Array<{ name: string; args: unknown }> = [];
@@ -347,7 +360,13 @@ function buildSbForCreatePwp(opts: {
         return chain;
       },
       maybeSingle: async () => ({ data: opts.fetchedRow ?? null, error: null }),
-      order: async () => ({ data: [], error: null }),
+      // 2026-08-24: `order` was TERMINAL here, resolving an empty list. The
+      // active-rule read now goes through the ONE ordered door
+      // (readActivePwpRules) as .eq().order().order(), so a terminal stub
+      // handed every PWP test an EMPTY rule set and 11 of them 500'd.
+      // Chainable instead: the chain is awaitable via `then` -> rowsFor,
+      // which still yields [] for every dormant table.
+      order: () => chain,
       then: (resolve: (v: unknown) => unknown) => resolve({ data: rowsFor(table), error: null }),
     };
     return chain;
@@ -371,6 +390,32 @@ function buildSbForCreatePwp(opts: {
       if (name === "pwp_claim_code" || name === "pwp_claim_available_code") {
         if (opts.claimReturnsNull) return { data: null, error: null };
         return { data: { code: String((args as { p_code: string }).p_code) }, error: null };
+      }
+      // 2026-08-24 - the cross-order snapshot door. A crossOrder claim now
+      // validates the line against the reward scope FROZEN on the voucher at
+      // mint, read through the DEFINER discover RPC, because a saved voucher
+      // is redeemed on an order that need not contain the trigger at all.
+      // Mirrors the ACTIVE rule fixture above so the snapshot is truthful.
+      if (name === "pwp_discover_available") {
+        if (opts.discoverRows) return { data: opts.discoverRows, error: null };
+        const first = ruleRows[0] as Record<string, unknown> | undefined;
+        if (!first) return { data: [], error: null };
+        return {
+          data: [
+            {
+              code: String((args as { p_code?: string }).p_code ?? ""),
+              rule_id: first.id,
+              type: first.type,
+              reward_category: first.reward_category,
+              reward_targets: first.reward_targets,
+              source_order_id: null,
+              expires_at: null,
+              phone_matches: true,
+              name_matches: true,
+            },
+          ],
+          error: null,
+        };
       }
       if (name === "pwp_release_codes") return { data: 1, error: null };
       if (name === "pwp_release_available_code") return { data: 1, error: null };

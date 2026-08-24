@@ -34,6 +34,7 @@ import {
   ListTodo,
   CircleAlert,
   Library,
+  SlidersHorizontal,
   type LucideIcon,
 } from "lucide-react";
 import type { Role } from "@carres/shared/domain";
@@ -123,7 +124,6 @@ export interface PortalModule {
 export const PORTAL_MODULES: ReadonlyArray<PortalModule> = [
   { section: "Sales", label: "Sales", icon: ClipboardList },
   { section: "Purchasing", label: "Purchasing", icon: ShoppingBag },
-  { section: "Delivery", label: "Delivery", icon: Route },
   { section: "Warehouse", label: "Warehouse", icon: Boxes },
   { section: "Customer Care", label: "Customer Care", icon: LifeBuoy },
   /* Suppliers left Master Data on 2026-08-21 (YH's placement ruling): it is a
@@ -353,31 +353,15 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       // this door shows the delivery work and hands over to the same drawer the
       // Orders list opens.
       /* THE DELIVERY MODULE'S PAGES — TWO, and both of them open
-       * (CARD-2026-08-21-delivery-01-sidebar, owner ruling 2026-08-21). This
-       * OVERWRITES the seven-row list of 2026-08-19: `Schedule`,
-       * `Delivery History`, `Exceptions`, `Partners` and `Report` were five
-       * rows an operator could read, count and want, and every one of them
-       * refused the click. A door that is drawn and cannot be opened teaches
-       * the rail is unreliable, and it taught that lesson five times in a
-       * module that has exactly two working pages.
-       *
-       * The capabilities are NOT retired — `docs/delivery/MASTER.md` §7 still
-       * holds Delivery History, Exceptions and Partners as approved targets,
-       * and Report stays central. They are simply not NAVIGATION until they
-       * are pages. A row returns here in the PR that makes it answer.
-       *
-       * `Delivery Work` IS the existing Delivery page — same key, same
-       * `?tab=delivery` route; `Delivery Orders` keeps its own path. No
-       * hairline and no Report row survive: nothing is left to divide from.
-       * NO Settings row: the header gear is the one Settings entry
-       * (Jess, 2026-08-19). */
-      { key: "delivery", label: "Delivery Work", icon: Route, section: "Delivery" },
+       * Owner ruling 2026-08-24: arrangement and formal DO truth share one
+       * Delivery listing. A one-page destination is a direct row, not a
+       * chevron that reveals one child of the same name. The historical DO
+       * object path remains a valid deep link and lights this same row. */
       {
-        key: "delivery-orders",
-        label: "Delivery Orders",
-        icon: PackageCheck,
-        path: "/operation/delivery-orders",
-        section: "Delivery",
+        key: "delivery",
+        label: "Delivery",
+        icon: Route,
+        activeFor: ["tab:delivery", "path:/operation/delivery-orders"],
       },
       /* WAREHOUSE IS A HEADING, NOT A PARENT ROW (Warehouse Blueprint item 13,
        * owner-approved; applied 2026-08-19 under the Jess 2026-08-19 SALES
@@ -552,6 +536,18 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       // The principal trace-only Orders page is gone (Loo 2026-07-16) — Admin
       // "Orders" jumps straight to the Operations order control grid.
       { key: "orders", label: "Sales Orders", icon: ClipboardList, path: "/operation/orders" },
+      // YH, 2026-08-24 — the lead-time floor (earliest a store may sell) is a
+      // principal-level decision, but its only editor lived under Operations
+      // Settings. `role === "principal"` already grants edit there (checkDuty
+      // short-circuits on role, never a duty — 0260), so this needs no new
+      // page, no new API: same pattern as "Sales Orders" above, a path-driven
+      // jump straight into the operations-owned surface it actually edits.
+      {
+        key: "purchasing-settings",
+        label: "Purchasing settings",
+        icon: SlidersHorizontal,
+        path: "/operation/settings/purchasing",
+      },
       // Loo 2026-07-19 — two separate doors: "Dealers" = external resellers,
       // "Showrooms" = the stores Carres owns. Same page, filtered by
       // `dealers.channel`.

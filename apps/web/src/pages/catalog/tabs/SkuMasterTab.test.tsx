@@ -57,6 +57,12 @@ vi.mock("@/lib/sku-csv", async (orig) => {
 });
 
 vi.mock("@/lib/queries", () => ({
+  /* 2026-08-24 - the supplier picker/filter/column reads the roster through
+   * this hook; one named supplier is enough to pin the render path. */
+  useOperationSuppliers: () => ({
+    data: { suppliers: [{ id: "00000000-0000-4000-8000-0000000000s1".replace("s","a"), name: "Hookka" }] },
+    isLoading: false,
+  }),
   usePatchCatalogSku: () => ({
     mutate: mockPatchMutate,
     mutateAsync: mockPatchMutateAsync,

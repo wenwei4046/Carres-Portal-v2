@@ -188,13 +188,13 @@ describe("the old three-pane page is gone", () => {
 });
 
 describe("the shape", () => {
-  it("draws one 50px Destination Header saying only Delivery Work", () => {
+  it("draws one 50px Destination Header saying only Delivery", () => {
     wrap(<OperationDelivery />);
     const header = screen.getByTestId("delivery-work-destination-header");
     expect(header.className).toContain("h-[50px]");
     expect(
       within(header).getByTestId("delivery-work-destination-header-module-word").textContent,
-    ).toBe("Delivery Work");
+    ).toBe("Delivery");
   });
 
   it("draws the 200px local rail and one listing beside it", () => {
@@ -749,7 +749,7 @@ describe("empty, loading and error all speak inside the listing", () => {
     ordersState.error = new Error("boom");
     wrap(<OperationDelivery />);
     const listing = screen.getByTestId("delivery-work-listing");
-    expect(within(listing).getByText("Delivery Work could not be loaded")).toBeTruthy();
+    expect(within(listing).getByText("Delivery could not be loaded")).toBeTruthy();
     fireEvent.click(within(listing).getByRole("button", { name: "Try again" }));
     expect(ordersState.refetch).toHaveBeenCalled();
     // The rail survives the failure — it is the page, not the result.

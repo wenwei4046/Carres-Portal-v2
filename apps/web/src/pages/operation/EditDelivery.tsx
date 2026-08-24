@@ -80,7 +80,7 @@ import { DATE_TO_BE_CONFIRMED_CELL } from "./sales-order-guidance";
 export const ED = {
   page: "Edit Delivery",
   docTitle: "Edit Delivery — Carres",
-  back: "Delivery Work",
+  back: "Delivery",
   save: "Save Delivery",
   saving: "Saving…",
   saved: "Delivery arrangement saved",

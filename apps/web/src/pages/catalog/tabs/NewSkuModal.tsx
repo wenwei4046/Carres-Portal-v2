@@ -20,6 +20,7 @@ import { ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import {
   useCreateCatalogModel,
+  useOperationSuppliers,
   useCreateCatalogSku,
   useCreateGuaranteeProduct,
   useGenerateSkus,
@@ -127,6 +128,13 @@ export default function NewSkuModal({
   /* 0375 — the SUPPLIER'S own item code (their quotation's code for this
    * piece). Free text, optional; ours is the SKU code above. */
   const [supplierCode, setSupplierCode] = useState("");
+  /* 2026-08-24 - WHO supplies this piece. Empty = Auto: the route resolves
+   * the supplier from `suppliers.cat_covered[]` exactly as it always has,
+   * so an untouched form is byte-identical to before this picker existed.
+   * Picking one writes supplier_id explicitly - the identity is the FK;
+   * the NAME is only ever derived from it (Law A/D), never typed here. */
+  const [supplierId, setSupplierId] = useState("");
+  const suppliersQ = useOperationSuppliers();
   // new-product fields
   const [category, setCategory] = useState<ProductCategory>("mattress");
   const [name, setName] = useState("");
@@ -150,6 +158,56 @@ export default function NewSkuModal({
       ),
     [models],
   );
+  // ⭐ TWO MODELS CAN SHARE A NAME (2026-08-24) — the schema's real identity is
+  // `(category, model_key)`, not name. Two suppliers each pitching a "Booqit"
+  // land as two separate models the moment either one's model_key differs
+  // (the import's own escape hatch; the auto-derived key alone WOULD collide).
+  // The "Add to existing model" list read `{Category} {Name}` only, so two
+  // same-named rows were LITERALLY IDENTICAL TEXT — a keyer had no way to tell
+  // Hookka's Booqit from anyone else's, and could add a SKU to the wrong one.
+  // Disambiguate ONLY where a real collision exists in this category, using a
+  // fact already loaded (model_key) rather than inventing a supplier concept
+  // a model doesn't have — supplier lives on the SKU, not here.
+  const duplicateNameKeys = useMemo(() => {
+    const seen = new Map<string, number>();
+    for (const m of models) {
+      const k = `${m.category} ${m.name.trim().toLowerCase()}`;
+      seen.set(k, (seen.get(k) ?? 0) + 1);
+    }
+    return new Set([...seen].filter(([, n]) => n > 1).map(([k]) => k));
+  }, [models]);
+  // ⭐ ONE PICKER, THREE FLOWS (2026-08-24). The classic single-SKU flow always
+  // had this control; the bulk paths (sizeFlow, compFlow) did not, so a batch
+  // of mattress sizes or sofa compartments always guessed its supplier via the
+  // route's category-cover fallback with no way to override it. Same state
+  // (`supplierId`), same control, rendered wherever a flow needs it — the value
+  // means the same thing everywhere: empty = Auto (today's resolve), a pick =
+  // an explicit override sent to whichever endpoint this flow calls.
+  const supplierPickerField = (
+    <label className="block">
+      <span className="label block mb-1">Supplier</span>
+      <select
+        value={supplierId}
+        onChange={(e) => setSupplierId(e.target.value)}
+        data-testid="new-sku-supplier"
+        className={INPUT_CLS}
+      >
+        {/* Auto keeps the route's category-based resolution - the behaviour
+            every SKU before this picker was created under. */}
+        <option value="">Auto (by category)</option>
+        {(suppliersQ.data?.suppliers ?? []).map((s) => (
+          <option key={s.id} value={s.id}>
+            {s.name}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+
+  const modelOptionLabel = (m: ProductModelDto): string => {
+    const dupe = duplicateNameKeys.has(`${m.category} ${m.name.trim().toLowerCase()}`);
+    return `${CATEGORY_LABEL[m.category]} ${m.name}${dupe ? ` (${m.modelKey})` : ""}`;
+  };
   const existingModel = sortedModels.find((m) => m.id === modelId);
   // The category the option chips key off — the picked category (new) or the
   // picked model's (existing): "Add to existing model" surfaces the SAME chips
@@ -402,6 +460,7 @@ export default function NewSkuModal({
         const { failed } = await offerCompartments.mutateAsync({
           modelId: sofaModelId,
           compartmentIds: ids,
+          supplierId: supplierId || undefined,
         });
         if (failed.length > 0) {
           // Keep the modal open with ONLY the failed compartments selected —
@@ -448,7 +507,11 @@ export default function NewSkuModal({
         const r = await generateSkus.mutateAsync({
           modelId: sizeModelId,
           // Non-principal generates UNPRICED (price omitted → server defaults 0).
-          input: { variants: sizes, price: isPrincipal && priceNum > 0 ? priceNum : undefined },
+          input: {
+            variants: sizes,
+            price: isPrincipal && priceNum > 0 ? priceNum : undefined,
+            supplierId: supplierId || undefined,
+          },
         });
         toast.success(
           mode === "existing"
@@ -484,6 +547,7 @@ export default function NewSkuModal({
         price: isPrincipal ? priceNum : 0,
         cost: isPrincipal ? costNum : null,
         description: description.trim() || null,
+        supplierId: supplierId || null,
         supplierCode: supplierCode.trim() || null,
       });
       toast.success(`Added ${codePreview || variant.trim()}`);
@@ -704,7 +768,7 @@ export default function NewSkuModal({
               <option value="">Select a model...</option>
               {sortedModels.map((m) => (
                 <option key={m.id} value={m.id}>
-                  {CATEGORY_LABEL[m.category]} {m.name}
+                  {modelOptionLabel(m)}
                 </option>
               ))}
             </select>
@@ -803,6 +867,7 @@ export default function NewSkuModal({
             )}
           </div>
         )}
+        {compFlow && supplierPickerField}
         {sizeSection && (
           <div className="block" data-testid="new-sku-sizes">
             <div className="flex items-center justify-between mb-1">
@@ -921,6 +986,7 @@ export default function NewSkuModal({
               </div>
             </div>
           ))}
+        {sizeFlow && supplierPickerField}
 
         {/* Classic single-SKU fields — hidden on the compartment path (codes,
             descriptions + prices all derive per compartment there) AND on the
@@ -1020,6 +1086,8 @@ export default function NewSkuModal({
                 </div>
               )}
             </label>
+
+            {supplierPickerField}
 
             <label className="block">
               <span className="label block mb-1">Supplier item code (optional)</span>

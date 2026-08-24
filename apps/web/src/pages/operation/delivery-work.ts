@@ -63,11 +63,11 @@ import { itemsSummary } from "./sales-order-facts";
  * fact (*no confirmed date*), never the mood (*pending*).
  */
 export const DW = {
-  page: "Delivery Work",
-  docTitle: "Delivery Work — Carres",
+  page: "Delivery",
+  docTitle: "Delivery — Carres",
   search: "Search delivery scopes…",
   empty: "No delivery scopes",
-  loadFailed: "Delivery Work could not be loaded",
+  loadFailed: "Delivery could not be loaded",
   tryAgain: "Try again",
   railDate: "DELIVERY SCHEDULE",
   railLogistics: "LOGISTICS",
@@ -78,7 +78,8 @@ export const DW = {
    * A confirmed date that is already behind us and has produced no result.
    * Renamed from `Date passed` by owner ruling 2026-08-24: `Overdue` is the
    * word the operator uses for it, and the rail is a work queue rather than a
-   * description of the calendar.
+   * description of the calendar. (Both 2026-08-24 lanes made this rename
+   * independently; the KEY follows the word here.)
    */
   overdue: "Overdue",
   /** No Logistics Partner on the scope yet — a fact, never `Unassigned`. */
@@ -551,7 +552,7 @@ export interface RailItem {
  * THE DELIVERY DATE RAIL — two named facts, then the real calendar.
  *
  * `No confirmed date` first because it is the largest pile of work on a manual
- * planning screen, `Date passed` second because it is the loudest, then one row
+ * planning screen, `Overdue` second because it is the loudest, then one row
  * per actual day, ascending. **Never `Today`, never `Tomorrow`** (owner ruling
  * 2026-08-15): the operator reads the weekday off the date itself, so the date
  * has to say which day it is. The caller supplies the printed date string —

@@ -2920,6 +2920,13 @@ export interface operationOrderListRow {
   building_type?: string | null;
   delivery_floor?: number | null;
   delivery_has_lift?: boolean | null;
+  /** 2026-08-24 POS PARITY - the till asks for these at creation (0200
+   *  demographics + 0104 stair carry); the register now lists them so the
+   *  office can read back what the customer was asked. */
+  customer_race?: string | null;
+  customer_gender?: string | null;
+  customer_birthday?: string | null;
+  delivery_stair_items?: number | null;
   channel?: string | null;
   invoice_no?: string | null;
   invoiced_at?: string | null;
@@ -9200,16 +9207,21 @@ export function useOfferModelCompartments() {
     mutationFn: async ({
       modelId,
       compartmentIds,
+      supplierId,
     }: {
       modelId: string;
       compartmentIds: string[];
+      /* 2026-08-24 - override for the model's FIRST supplier'd sku. Harmless
+       * to send on every call: syncCompartmentSku's own inherit-from-siblings
+       * step wins the moment one compartment in the batch has written it. */
+      supplierId?: string;
     }) => {
       const failed: { compartmentId: string; message: string }[] = [];
       for (const compartmentId of compartmentIds) {
         try {
           await apiFetch<{ modelSofaCompartment: ModelSofaCompartmentDto }>(
             `/api/catalog/models/${modelId}/compartments/${compartmentId}`,
-            catalogJson("PUT", {}),
+            catalogJson("PUT", supplierId ? { supplierId } : {}),
           );
         } catch (e) {
           failed.push({

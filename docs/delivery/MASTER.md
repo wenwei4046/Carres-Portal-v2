@@ -12,7 +12,7 @@ or an explicit next action.
 
 Delivery owns Logistics Partner identity/rules and assignment, Delivery Orders, delivery
 arrangements, each actual delivery event and item result, delivery proof, delivery problems,
-goods-location observations, Delivery Work and append-only history.
+goods-location observations, the Delivery workspace and append-only history.
 
 | Truth read or linked by Delivery | Owner |
 |---|---|
@@ -287,31 +287,23 @@ append Root Cause later without rewriting the observation.
 
 ## 8 · Information architecture and templates
 
-**SIDEBAR — owner ruling 2026-08-20; PR #863 is the cross-module authority and supersedes the
-2026-08-16 Sales placement.** **Delivery Order belongs under the expandable Delivery module**, not
-Sales. The 232px PortalSidebar uses one module parent row (icon + name + chevron), opens only one
-module at a time, hangs child pages from rounded elbows and marks the selected child with a 3px
-blue bar plus blue wash. Delivery applies the governed Shell, Register and Object Detail Templates
-and does not invent another UI system.
+**SIDEBAR — owner ruling 2026-08-24.** Delivery is one direct sidebar destination, not an
+expandable parent. It has no separate Delivery Work or Delivery Orders child. Delivery Orders
+remain Delivery-owned formal objects, but operators find them in the one Delivery listing.
+Delivery applies the governed Shell, Register and Object Detail Templates and does not invent
+another UI system.
 
-**DELIVERY NAVIGATION — owner ruling 2026-08-21 (CARD-2026-08-21-delivery-01-sidebar). This
-OVERWRITES the seven-row list of 2026-08-19.** The module carries exactly TWO children, and both
-of them open:
-
-1. **Delivery Work** — actionable operational home · **BUILT** · `/operation?tab=delivery`;
-2. **Delivery Orders** — formal DO truth Register · **BUILT** · `/operation/delivery-orders`.
-
-There is no third row, no hairline and no `Coming soon` label anywhere in this module. The elbow
-trunk ends at **Delivery Orders**.
+**DELIVERY NAVIGATION — owner ruling 2026-08-24.** The sidebar carries exactly one Delivery door:
+**Delivery** · `/operation?tab=delivery`. There is no Delivery parent chevron, child elbow,
+separate Delivery Orders list, hairline or `Coming soon` label.
 
 `Schedule`, `Delivery History`, `Exceptions`, `Partners` and `Report` were rows an operator could
 read, count and want, and every one of them refused the click. Five dead controls in a module with
 two working pages do not teach *not yet*; they teach that the rail cannot be trusted.
 
-**The capabilities are NOT retired.** §7 below still holds Delivery History, Exceptions and
-Partners as approved targets with their column defaults, and Report stays central under Reports
-consolidation. They are simply not NAVIGATION until they are pages. **A row returns to this rail
-in the PR that makes it answer** — never before it.
+**The capabilities are NOT retired.** Delivery History and Exceptions remain inside the DO object
+and filtered Delivery listing. Partners stay in Central Settings and Report stays central under
+Reports consolidation. They do not become duplicate Delivery pages.
 
 Sales contains **Sales Orders** and temporary **Old Orders** only. Central Settings retains the
 governed Delivery settings door.
@@ -319,20 +311,18 @@ governed Delivery settings door.
 There is no separate Delivery dashboard, Fleet, Trips, Regions or Delivery Returns destination.
 KPI cards do not precede the work/Register.
 
-**Delivery Orders Register defaults — owner column ruling 2026-08-18 (OVERWRITES the 2026-08-16
-seven; same table as Sales Orders — one register engine, same typography, search, filters,
-export and chooser):**
+**The unified Delivery listing — owner ruling 2026-08-24:**
 
 ```
-DO No · DO date · SO No · Customer · Customer Delivery · Delivery date · Delivery Location · Status
+SO / Ref · Customer · Customer Delivery · Delivery Location · Building · Logistics Partner ·
+Confirmed Delivery · Confirmed Time · Goods · DO No · Delivery Status
 ```
 
-`DO date` = the day the system issued the document · `Customer Delivery` = the date promised to
-the customer (from the SO) · `Delivery date` = this trip's confirmed date. `Created` and the
-rest stay in the chooser, off by default. `DO No` and `SO No` are mono links — DO No opens the
-document, SO No the source order. Status pills: **Created grey · Out for delivery blue ·
-Delivered green · Delivery exception amber** with its ONE reason as the small second line. One
-row = one trip; a split order shows one row per DO.
+`Customer Delivery` is the Sales Order promise. `Confirmed Delivery` and `Confirmed Time` are
+Delivery's operational arrangement. `DO No` appears in that same row only after system issue;
+before issue it says `No delivery order yet`. DO No opens the formal document and SO / Ref opens
+the source Sales Order. One row = one Delivery scope/Journey leg; a split or multi-leg journey
+shows one row per scope.
 
 Statuses are the document's own: `Created → Out for delivery → Delivered`, plus
 `Delivery exception` carrying its ONE reason, and `Cancelled` for a voided document. There is NO
@@ -341,8 +331,11 @@ Route. **The register shows NO owner, NO avatar and NO action sentence** — a r
 documents; work lives in My Work / Team Work. Rows open the DO object page; document numbers are
 doors (`DO → DO`, `SO → SO`).
 
-**Delivery Work — the manual planning workspace. OWNER CORRECTION 2026-08-24, which OVERWRITES
-the 2026-08-21 ruling wherever the two disagree (`CARD-2026-08-21-delivery-02-work-layout`).** The
+**Delivery — the one planning and document workspace. TWO OWNER RULINGS OF 2026-08-24, merged
+here as one truth:** the UNITING ruling (it replaces the separate Delivery Work and Delivery Orders
+lists while preserving the formal DO object) and the BEHAVIOUR CORRECTION
+(`CARD-2026-08-21-delivery-02-work-layout` §0), which overwrites the 2026-08-21 ruling wherever
+the two disagree. The
 three-pane action-card screen is deleted, not deprecated beside this: the `Work list / Calendar`
 switch, the KPI/count preamble, the Refresh control, the action-card wall, the permanent detail
 pane and the third working column are gone, and no Delivery surface carries the generic employee
@@ -350,26 +343,27 @@ labels `Due`, `Next Action` or `Priority`. That page answered *who should be nag
 is My Work / Team Work's question; this one answers the logistics question — **everything going out
 on a given day, who is carrying it, and what is still missing.**
 
-⛔ **SUPERSEDED — *"it writes nothing"*.** The 2026-08-21 text said Delivery Work is read-only. The
+⛔ **SUPERSEDED — *"it writes nothing"*.** The 2026-08-21 text said the workspace is read-only. The
 owner overturned that on 2026-08-24 and the sentence is deleted rather than kept beside its
 replacement:
 
-> **DELIVERY WORK OWNS THE DELIVERY ARRANGEMENT.** Who carries a scope, the confirmed operational
+> **THE DELIVERY WORKSPACE OWNS THE DELIVERY ARRANGEMENT.** Who carries a scope, the confirmed operational
 > date and time, the expected arrival, the logistics note, the partner's actual reply proof and the
 > Condo driver/vehicle are **Delivery's writes**, made from this workspace. **Sales Orders remains
 > the owner of the commercial customer promise** — the customer, the address, the building facts and
 > the promised `Customer Delivery` date — and Delivery may never write one of them.
 
-What is unchanged is §3's ruling: **the SYSTEM issues the Delivery Order** when the governed gate
-becomes true. There is no `New DO`, no `Issue`, no `Release` and no `Approve` on this page or in any
+It is an operational workspace with formal DO doors in the same listing; arrangement facts and the
+issued DO remain different objects. What is unchanged is §3's ruling: **the SYSTEM issues the
+Delivery Order** when the governed gate becomes true. There is no `New DO`, no `Issue`, no `Release` and no `Approve` on this page or in any
 dialog it opens. `Save Delivery` records an arrangement; issuance reads it.
 
-The arrangement is its OWN record (`ops_delivery_arrangements`, migration 0379) keyed by the scope
+The arrangement is its OWN record (`ops_delivery_arrangements`, migration 0386) keyed by the scope
 `(order_id, leg)` — never `orders.delivery_partner_id`, which is a Sales Order column and could
 hold only one carrier for a two-leg Journey, kept no history, and had two writers.
 
 ```
-one 50px Destination Header  ·  Delivery Work
+one 50px Destination Header  ·  Delivery
 200px local rail             ·  DELIVERY SCHEDULE + LOGISTICS, page-owned FILTERING
 one expandable DataGrid      ·  the Sales Orders engine, density and toolbar
 ```
@@ -437,7 +431,7 @@ Waiting for customer date · Delivery confirmed · Waiting for warehouse ·
 Ready for handover · Out for delivery · Delivered · Failed Delivery
 ```
 
-**`Created` may not appear on Delivery Work.** It is a true fact about a piece of paper and a
+**`Created` may not appear on the Delivery workspace.** It is a true fact about a piece of paper and a
 useless one on a planning screen — two scopes reading `Created` can be a week of real work apart. It
 stays in the Delivery Orders Register, which is where the document's own life is described. The two
 vocabularies are separate and neither may borrow the other's words.
@@ -473,7 +467,7 @@ mini-table (`Category · Unit ID · Deliver To · SKU · Qty · Item`), then `Wh
 `Stock ETA`, then **`Items to collect`** and only when a Loan exists. **No editable field, no
 Partner selector, no Save, no second Delivery form inside the expansion.** Stock owns Where/Who has
 it/Stock ETA, Sales Orders owns the customer, address, promise and ordered goods, Warehouse owns
-readiness and handover, Payment owns the release gate; Delivery Work creates no duplicate Sales,
+readiness and handover, Payment owns the release gate; the Delivery workspace creates no duplicate Sales,
 Stock, Warehouse, Purchasing or Payment truth.
 
 **Delivery History defaults:** `Delivery Date · DO No · Customer · Logistics Partner · Result ·
@@ -521,7 +515,7 @@ the approved target this page grows into.
 
 ## 10 · Daily operator journey, Work and Quick Rail
 
-Operations starts in Delivery Work and prioritises Failed Delivery action, commitment risk,
+Operations starts in Delivery and prioritises Failed Delivery action, commitment risk,
 Warehouse delay, Logistics reply, missing proof, overdue return and then routine confirmation.
 From issue through arrangement, Warehouse preparation, handover, delivery day, result, proof and
 return, every row states one concrete next action and one owner.
@@ -647,3 +641,25 @@ explicitly excluded from current truth rather than deferred blind spots.
 **PLAN MISSION COMPLETE.** The complete Blueprint has been owner-reviewed and no unresolved Owner
 Decision remains. This MASTER persists the approved operating model only. It does not authorise
 Cards, implementation sequencing, migration or build work.
+
+## 16 · Production closure — unified Delivery page
+
+**DEPLOYED 2026-08-24 — PR #896, main SHA
+`52804c005d7bf53bcbe9e1b1dcdd2b47cd684656`.** The first approved Delivery UI correction is live
+in production and has been verified through an authenticated Operations session:
+
+- the Portal sidebar has one direct **Delivery** destination, with no separate Delivery Work or
+  Delivery Orders child;
+- `/operation?tab=delivery` is the one operational listing for delivery planning and issued DO
+  facts;
+- the date rail uses **No confirmed date** and **Overdue**;
+- the listing keeps Customer Delivery separate from Confirmed Delivery and Confirmed Time, shows
+  Logistics Partner and Goods, and adds DO No and Delivery Status to the same row;
+- expanding a row shows its product lines and the shared Stock facts Where, Who has it and Stock
+  ETA without leaving Delivery;
+- clicking an issued DO opens the formal DO object; its back door returns to **Delivery**;
+- the retired `/operation/delivery-orders` list address redirects to the unified Delivery page.
+
+This closure records only the production slice above. It does not claim that the remaining
+Partner arrangement, proxy-recording, proof, exception, Settings, Reports or future Portal/API
+capabilities in this Blueprint are already built.

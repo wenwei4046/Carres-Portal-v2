@@ -4,7 +4,6 @@ import {
   Adapters,
   DB,
   PWP_CODES,
-  PWP_RULES,
   SOFA_COMBO_PRICING,
   lineMatchesTargets,
   pwpReserveInputSchema,
@@ -15,7 +14,7 @@ import {
   type RuleTarget,
 } from "@carres/shared";
 import { userClient } from "../lib/supabase";
-import { resolveSkuInfo, type SkuInfo } from "../lib/rule-line-input";
+import { readActivePwpRules, resolveSkuInfo, type SkuInfo } from "../lib/rule-line-input";
 import type { AppEnv } from "../types";
 
 /**
@@ -112,10 +111,11 @@ pwpCodesRouter.post("/reserve", async (c) => {
     builtCompartments: (builtCompartments ?? []).map((m) => m.trim()).filter(Boolean),
   };
 
-  // 2. ACTIVE pwp_rules (RLS). The adapter parses RuleTargets.
-  const rulesR = await sb.from(PWP_RULES).select("*").eq("active", true);
-  if (rulesR.error) throw new HTTPException(500, { message: rulesR.error.message });
-  const rules: PwpRule[] = ((rulesR.data ?? []) as DB.PwpRuleRow[]).map((r) => Adapters.pwpRuleFromRow(r));
+  // 2. ACTIVE pwp_rules (RLS), through the ordered door — minting must match the
+  //    rule the recompute will later bind, or the voucher names the wrong rule.
+  const rulesR = await readActivePwpRules(sb);
+  if (!rulesR.ok) throw new HTTPException(500, { message: rulesR.message });
+  const rules: PwpRule[] = rulesR.rules;
 
   // 3. Select rules whose TRIGGER scope matches this line: category match AND the
   //    RuleTarget matcher covers it. (combo-scope triggers are not minted from a

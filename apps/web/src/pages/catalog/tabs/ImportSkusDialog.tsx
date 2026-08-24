@@ -16,7 +16,8 @@ import { CATEGORY_LABEL } from "../components/atoms";
  * csvRecordToImportRow; the server re-validates + upserts (blank = preserve).
  *
  * Columns (case-insensitive): model, [model_key], category, variant,
- * [variant_kind], [price], [cost], [description], [pos_active], [supplier].
+ * [variant_kind], [price], [cost], [pwp_price], [supplier], [supplier_code],
+ * [description], [pos_active].
  */
 
 type Stage = "pick" | "preview" | "result";
@@ -26,10 +27,15 @@ interface Skipped {
   reason: string;
 }
 
+// 2026-08-24 — the template and the hint below are the ONLY place a keyer
+// learns which columns the import understands, and they had quietly fallen
+// behind the importer itself: supplier_code (0376) and pwp_price (0384) were
+// importable while this list still ended at supplier. A capability the hint
+// does not name may as well not exist.
 const TEMPLATE =
-  "model,model_key,category,variant,variant_kind,price,cost,description,pos_active,supplier\n" +
-  "Booqit,booqit,sofa,1-SEATER,size,1899,,Compact 1 seater,yes,\n" +
-  "2990 AKKA-FIRM MATT,,mattress,K,size,2990,,King mattress,yes,nice-future\n";
+  "model,model_key,category,variant,variant_kind,price,cost,pwp_price,supplier_code,description,pos_active,supplier\n" +
+  "Booqit,booqit,sofa,1-SEATER,size,1899,,,HK-1S,Compact 1 seater,yes,hookka\n" +
+  "2990 AKKA-FIRM MATT,,mattress,K,size,2990,,,,King mattress,yes,nice-future\n";
 
 export default function ImportSkusDialog({ onClose }: { onClose: () => void }) {
   const isPrincipal = useAuth((s) => s.role) === "principal";
@@ -93,12 +99,18 @@ export default function ImportSkusDialog({ onClose }: { onClose: () => void }) {
             <span className="font-mono text-meta">model</span>,{" "}
             <span className="font-mono text-meta">category</span>,{" "}
             <span className="font-mono text-meta">variant</span>. Optional:{" "}
-            <span className="font-mono text-meta">model_key, variant_kind, price, cost, description, pos_active, supplier</span>.
+            <span className="font-mono text-meta">
+              model_key, variant_kind, price, cost, pwp_price, supplier, supplier_code,
+              description, pos_active
+            </span>
+            . <span className="font-mono text-meta">supplier</span> names the party;{" "}
+            <span className="font-mono text-meta">supplier_code</span> is that party's own code
+            for the piece.
           </p>
           <p className="text-meta text-base-500">
             Rows sharing a model become one product; each row is one SKU under it. A blank cell never
             overwrites existing data, so you can export → edit → re-import safely.
-            {!isPrincipal && " Price / cost columns are Master-Admin only."}
+            {!isPrincipal && " Price / cost / pwp_price columns are Master-Admin only."}
           </p>
           <div className="flex items-center gap-2">
             <button
@@ -151,7 +163,7 @@ export default function ImportSkusDialog({ onClose }: { onClose: () => void }) {
             <div className="rounded-[4px] border border-amber-300 bg-amber-50 px-3 py-2" data-testid="import-pricing-blocked">
               <div className="text-body font-semibold text-amber-800">This file sets prices</div>
               <div className="text-meta text-amber-700 mt-0.5">
-                Only the principal (Master Admin) can import price / cost. Remove those columns, or ask
+                Only the principal (Master Admin) can import price / cost / pwp_price. Remove those columns, or ask
                 the principal to run this import.
               </div>
             </div>
