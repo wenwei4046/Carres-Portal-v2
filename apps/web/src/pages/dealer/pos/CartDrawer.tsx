@@ -31,6 +31,8 @@ import {
 import {
   coveringPwpForLine,
   isLinePwp,
+  rewardCapableRules,
+  voucherOfferForLine,
   linePwpCode,
   linePwpCrossOrder,
   linePwpRuleId,
@@ -831,7 +833,22 @@ function PwpRow({
   }
 
   const covering = coveringPwpForLine(line, lines, catalog);
-  if (covering.length === 0) return null;
+  // ⭐ AN EMPTY `covering` MUST NOT HIDE THE SAVED-VOUCHER SURFACE.
+  //
+  // `coveringPwpForLine` answers "is this line grantable right now, from a
+  // trigger already in THIS cart" — the right gate for the same-cart chips
+  // below, and the wrong one for a carried-forward voucher, which exists to be
+  // spent on a LATER order that need not contain the trigger at all. Gating the
+  // whole row on it meant a cart holding only the reward could not even show the
+  // box to type a saved voucher number into, so the entire P8d layer was
+  // reachable only by carts that did not need it.
+  //
+  // The honest test for showing the voucher surface is "could this product ever
+  // be a reward" — the rules' REWARD scope, with no trigger and no allowance in
+  // it. Empty means no voucher could ever apply here, so a normal cart stays
+  // exactly as quiet as it is today.
+  const rewardCapable = rewardCapableRules(line, catalog);
+  if (covering.length === 0 && rewardCapable.length === 0) return null;
 
   // 0187 — P8c is Auto-Fill ONLY: a covering rule is offerable only when a
   // RESERVED code minted under it is free to bind (not already on another reward
@@ -847,9 +864,11 @@ function PwpRow({
     return hit?.code ?? null;
   }
 
-  const coveringIds = new Set(covering.map((r) => r.id));
   return (
     <div className="flex flex-col gap-1.5 mt-2">
+      {/* The same-cart chips exist only when a trigger in THIS cart grants the
+          line. A reward-only cart skips straight to the voucher row below. */}
+      {covering.length > 0 && (
       <div className="flex flex-wrap items-center gap-1.5">
         <span className="t-tiny text-base-400">Use PWP:</span>
         {covering.map((rule) => {
@@ -882,6 +901,7 @@ function PwpRow({
           );
         })}
       </div>
+      )}
 
       {/* 0188 — the CROSS-ORDER (carry-forward) voucher affordance. Phone-gated:
           a cross-order voucher is bound to the customer's phone; the server
@@ -891,8 +911,6 @@ function PwpRow({
       {hasVoucherLayer && claimGroup && (
         <PwpCrossOrderRow
           line={line}
-          covering={coveringIds}
-          coveringRules={covering}
           catalog={catalog}
           onSet={onSet}
           claimGroup={claimGroup}
@@ -923,8 +941,6 @@ function PwpRow({
  */
 function PwpCrossOrderRow({
   line,
-  covering,
-  coveringRules,
   catalog,
   onSet,
   claimGroup,
@@ -934,8 +950,6 @@ function PwpCrossOrderRow({
   onApplyVoucherCode,
 }: {
   line: DraftLine;
-  covering: Set<string>;
-  coveringRules: PwpRuleDto[];
   catalog: CatalogResponse;
   onSet: (localId: string, next: DraftLine) => void;
   claimGroup: string;
@@ -963,23 +977,38 @@ function PwpCrossOrderRow({
     );
   }
 
-  /** The rule (covering this line) backing voucher `v`, with the previewed price. */
-  function ruleForVoucher(v: PwpDiscoverDto): { rule: PwpRuleDto; price: number } | null {
-    if (!v.ruleId || !covering.has(v.ruleId)) return null;
-    const rule = coveringRules.find((r) => r.id === v.ruleId);
+  /**
+   * The rule backing voucher `v`, with the previewed price — or null.
+   *
+   * ⭐ THIS USED TO REQUIRE `covering.has(v.ruleId)`, i.e. the voucher's rule had
+   * to be granting this line FROM A TRIGGER IN THIS CART. That is the second
+   * gate that made carry-forward unreachable: even with the row rendered, every
+   * saved voucher was filtered out of the suggestions and a typed code was
+   * rejected with "This voucher doesn't apply to this product" — when it did.
+   *
+   * A voucher is judged by the reward scope FROZEN on it at mint, which is what
+   * `voucherOfferForLine` checks, and it is the SAME function the server runs.
+   */
+  function offerForVoucher(v: PwpDiscoverDto): { rule: PwpRuleDto; price: number } | null {
+    if (!v.ruleId) return null;
+    // The server still requires the claimed rule to be ACTIVE (pwp_unknown_rule),
+    // so a voucher we cannot back with a live rule is not offerable here either —
+    // better a hidden offer than one that 409s at Confirm.
+    const rule = (catalog.pwpRules ?? []).find((r) => r.id === v.ruleId && r.active);
     if (!rule) return null;
-    return { rule, price: pwpRewardPrice(line, catalog, rule) ?? 0 };
+    const offer = voucherOfferForLine(v, line, catalog);
+    return offer ? { rule, price: offer.price } : null;
   }
 
   // Auto-suggest: identity-matched (phone AND name — the 2990s name+phone
   // binding, 0204) AVAILABLE vouchers whose rule covers this line + not already
   // bound to another reward line in this cart.
   const suggestions = availableVouchers.filter(
-    (v) => v.phoneMatches && v.nameMatches && !consumedCodes.has(v.code) && ruleForVoucher(v) !== null,
+    (v) => v.phoneMatches && v.nameMatches && !consumedCodes.has(v.code) && offerForVoucher(v) !== null,
   );
 
   function bind(v: PwpDiscoverDto) {
-    const hit = ruleForVoucher(v);
+    const hit = offerForVoucher(v);
     if (!hit) return;
     onSet(line.localId, markLinePwpWithAvailableCode(line, hit.rule, hit.price, v.code, claimGroup));
   }
@@ -1003,7 +1032,7 @@ function PwpCrossOrderRow({
         setManualError("This voucher belongs to a different customer.");
         return;
       }
-      if (ruleForVoucher(v) === null) {
+      if (offerForVoucher(v) === null) {
         setManualError("This voucher doesn't apply to this product.");
         return;
       }
@@ -1022,7 +1051,7 @@ function PwpCrossOrderRow({
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="t-tiny text-base-400">Saved:</span>
           {suggestions.map((v) => {
-            const hit = ruleForVoucher(v)!;
+            const hit = offerForVoucher(v)!;
             const tag = hit.rule.type === "promo" ? "FREE" : rm(hit.price);
             return (
               <button
