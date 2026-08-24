@@ -164,3 +164,57 @@ describe("a blank never carries two meanings", () => {
     expect(moneyText(unpriced.balance)).toBe("No price yet");
   });
 });
+
+/**
+ * POS PARITY COLUMNS (2026-08-24) — race · gender · birthday · stair carry.
+ *
+ * The till asks for all four at SO creation (0200 demographics, 0104 stair
+ * carry) and the DETAIL route always served them — but the register's list
+ * never carried them, so a fact the customer was asked for could not be read
+ * back on the one screen the office browses. Added as ordinary optional
+ * columns: OFF by default (no `on:`), in the chooser like every other, so the
+ * owner-ruled default view is untouched.
+ */
+describe("POS parity columns — the register can show what the till asked", () => {
+  const byKey = (k: string) => REGISTER_FIELDS.find((f) => f.key === k)!;
+
+  it("all four exist, in their honest groups, hidden by default", () => {
+    for (const k of ["race", "gender", "birthday"]) {
+      expect(byKey(k)).toBeTruthy();
+      expect(byKey(k).group).toBe("Customer");
+      expect(byKey(k).on).toBeUndefined(); // default OFF — the ruled view holds
+    }
+    // Stair carry is a DELIVERY fact — it sits with Floor and Lift, where the
+    // operator planning the trip looks, not under Customer.
+    expect(byKey("stair_items").group).toBe("Delivery");
+    expect(byKey("stair_items").on).toBeUndefined();
+  });
+
+  it("values render; absence renders the dictionary word, never a blank", () => {
+    const r = buildRegisterRow(
+      order({
+        customer_race: "Chinese",
+        customer_gender: "F",
+        customer_birthday: "1990-04-12",
+        delivery_stair_items: 3,
+      }),
+    );
+    expect(byKey("race").text(r)).toBe("Chinese");
+    expect(byKey("gender").text(r)).toBe("F");
+    expect(byKey("birthday").text(r)).toBe("1990-04-12");
+    expect(byKey("stair_items").text(r)).toBe("3");
+
+    const bare = buildRegisterRow(order({}));
+    expect(byKey("race").text(bare)).toBe(NOT_GIVEN);
+    expect(byKey("gender").text(bare)).toBe(NOT_GIVEN);
+    expect(byKey("birthday").text(bare)).toBe(NOT_GIVEN);
+    expect(byKey("stair_items").text(bare)).toBe(NOT_GIVEN);
+  });
+
+  it("ZERO stair items is a recorded fact, not an absence", () => {
+    // `0` means "asked, and the answer was none" — rendering it as NOT_GIVEN
+    // would erase a real answer. Only null/undefined is absence.
+    const r = buildRegisterRow(order({ delivery_stair_items: 0 }));
+    expect(byKey("stair_items").text(r)).toBe("0");
+  });
+});
