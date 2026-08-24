@@ -289,6 +289,25 @@ export const REGISTER_FIELDS: readonly RegisterField[] = [
   { key: "billing", label: "Billing address", width: "220px", group: "Customer",
     text: (r) => r.o.customer_billing || NOT_GIVEN },
 
+  /* ⭐ PARITY WITH WHAT THE TILL ACTUALLY ASKS (2026-08-24).
+     A salesperson fills these at SO creation and the register route already
+     SELECTS them — they simply had no column, so a fact the customer was asked
+     for could not be read back by the office that has to act on it. Added as
+     ordinary optional columns: off by default, in the chooser like every other,
+     so the owner-ruled default view is untouched. */
+  { key: "race", label: "Race", width: "110px", group: "Customer",
+    text: (r) => r.o.customer_race || NOT_GIVEN },
+  { key: "gender", label: "Gender", width: "100px", group: "Customer",
+    text: (r) => r.o.customer_gender || NOT_GIVEN },
+  { key: "birthday", label: "Birthday", width: "120px", group: "Customer",
+    text: (r) => r.o.customer_birthday || NOT_GIVEN },
+  /* Stair carry is a DELIVERY fact, not a customer one — it sits with Floor and
+     Lift, which is where the operator planning the trip looks. */
+  { key: "stair_items", label: "Stair carry items", width: "140px", align: "right", numeric: true,
+    group: "Delivery",
+    text: (r) =>
+      r.o.delivery_stair_items == null ? NOT_GIVEN : String(r.o.delivery_stair_items) },
+
   /* ── SOURCE — who sold it, through which door ───────────────────────────── */
   { key: "salesperson", label: "Salesperson", width: "167px", group: "Sales ownership",
     text: (r) => r.o.salespersons?.name || NOT_RECORDED },
