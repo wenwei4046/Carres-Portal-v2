@@ -8,7 +8,7 @@ import type {
 } from "@carres/shared";
 import { PRODUCT_CATEGORIES } from "@carres/shared";
 import { ApiError } from "@/lib/api";
-import { usePatchCatalogSku } from "@/lib/queries";
+import { useOperationSuppliers, usePatchCatalogSku } from "@/lib/queries";
 import { INPUT_CLS } from "@/pages/operation/components/Modal";
 import { CategoryChip, CATEGORY_LABEL, CodeChip } from "../components/atoms";
 
@@ -25,9 +25,12 @@ import { CategoryChip, CATEGORY_LABEL, CodeChip } from "../components/atoms";
  */
 
 const VISIBLE_CAP = 300;
-// 7 tracks: code · desc · product · category · size · cost · edit
+// 8 tracks: code · desc · product · category · size · supplier · cost · edit
+// 2026-08-24 - SUPPLIER added beside cost: the buyer recording a cost is
+// looking at a quotation, and the quotation has a name on it. The name is
+// DERIVED from supplier_id through the roster (Law A/D) - never stored here.
 const GRID_COLS =
-  "170px minmax(180px,1.4fr) minmax(120px,1fr) 110px 110px 130px 60px";
+  "170px minmax(180px,1.4fr) minmax(120px,1fr) 110px 110px minmax(120px,1fr) 130px 60px";
 
 type CatFilter = ProductCategory | "all";
 
@@ -50,6 +53,14 @@ export default function OperationSkuCostTab({ catalog }: { catalog: CatalogRespo
   const [modelFilter, setModelFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
   const [editMode, setEditMode] = useState(false);
+  /* The roster is already cached by the order drawer / Suppliers tab; this
+   * adds no server work of its own. Map once, look up per row. */
+  const suppliersQ = useOperationSuppliers();
+  const supplierNameById = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const s of suppliersQ.data?.suppliers ?? []) m.set(s.id, s.name);
+    return m;
+  }, [suppliersQ.data?.suppliers]);
 
   const modelById = useMemo(() => {
     const m = new Map<string, ProductModelDto>();
@@ -183,6 +194,7 @@ export default function OperationSkuCostTab({ catalog }: { catalog: CatalogRespo
           <div className="label">Product</div>
           <div className="label">Category</div>
           <div className="label">Size</div>
+          <div className="label">Supplier</div>
           <div className="label text-right">Cost</div>
           <div className="label" />
         </div>
@@ -194,7 +206,12 @@ export default function OperationSkuCostTab({ catalog }: { catalog: CatalogRespo
         )}
 
         {visible.map((r) => (
-          <CostRowView key={r.sku.id} row={r} editMode={editMode} />
+          <CostRowView
+            key={r.sku.id}
+            row={r}
+            editMode={editMode}
+            supplierName={r.sku.supplierId ? supplierNameById.get(r.sku.supplierId) ?? null : null}
+          />
         ))}
       </div>
     </div>
@@ -204,9 +221,13 @@ export default function OperationSkuCostTab({ catalog }: { catalog: CatalogRespo
 const CostRowView = memo(function CostRowView({
   row,
   editMode,
+  supplierName,
 }: {
   row: FlatRow;
   editMode: boolean;
+  /** Resolved through the roster by supplier_id; null = the SKU names no
+   *  supplier (legitimate for service/accessory, 0171). */
+  supplierName: string | null;
 }) {
   const { sku, category, productName } = row;
   const patch = usePatchCatalogSku();
@@ -248,6 +269,13 @@ const CostRowView = memo(function CostRowView({
       </div>
       <div className="text-meta text-base-600">{category ? CATEGORY_LABEL[category] : "—"}</div>
       <div className="text-body text-base-700">{sku.variant || "—"}</div>
+      <div
+        className="text-meta text-base-600 truncate"
+        title={supplierName ?? ""}
+        data-testid={`opcost-supplier-${sku.sku}`}
+      >
+        {supplierName || <span className="text-base-400">—</span>}
+      </div>
       <div className="text-right" data-testid={`opcost-cost-${sku.sku}`}>
         {editMode ? (
           <input

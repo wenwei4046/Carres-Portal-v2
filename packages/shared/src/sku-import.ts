@@ -118,6 +118,12 @@ export interface SkuImportRow {
    *  quotation). Ours is the derived sku. Omitted when the cell was blank, so
    *  a re-import without the column preserves whatever is stored. */
   supplierCode?: string;
+  /** 0186 pwp_price via the import (2026-08-24) — the per-SKU PWP reward
+   *  price. Present only when the cell had a value; blank/absent = omitted =
+   *  preserve, the same rule as `price`. ⚠ principal-locked by the extended
+   *  0175 trigger: a non-principal import carrying this column fails PER ROW
+   *  on the lock — correct, not a bug (the importer is INVOKER on purpose). */
+  pwpPrice?: number;
 }
 
 export type ImportRowResult =
@@ -174,6 +180,18 @@ export function csvRecordToImportRow(rec: Record<string, string>): ImportRowResu
   if (costP.value !== null && costP.value > MAX_IMPORT_MONEY) {
     return { ok: false, reason: `cost ${costP.value} exceeds the maximum (${MAX_IMPORT_MONEY})` };
   }
+  const pwpP = parseMoney(get("pwp_price"));
+  if (pwpP.error) return { ok: false, reason: `pwp_price "${get("pwp_price")}" is not a number` };
+  if (pwpP.value !== null && pwpP.value > MAX_IMPORT_MONEY) {
+    return { ok: false, reason: `pwp_price ${pwpP.value} exceeds the maximum (${MAX_IMPORT_MONEY})` };
+  }
+  // 0 is NOT a PWP price — the server's law since 0186 is `p == null || p <= 0`
+  // means NOT SET, and the POS never offers it. Refusing the ROW (not silently
+  // dropping the cell) tells the keyer their sheet says something the system
+  // cannot mean; a free reward is a 'promo' rule, never a price of 0.
+  if (pwpP.value !== null && pwpP.value <= 0) {
+    return { ok: false, reason: `pwp_price must be above 0 (a free reward is a promo rule, not price 0)` };
+  }
 
   const description = get("description");
   if (description.length > 200) {
@@ -184,6 +202,7 @@ export function csvRecordToImportRow(rec: Record<string, string>): ImportRowResu
   if (variantKind !== undefined) row.variantKind = variantKind;
   if (priceP.value !== null) row.price = priceP.value;
   if (costP.value !== null) row.cost = costP.value;
+  if (pwpP.value !== null) row.pwpPrice = pwpP.value;
   if (description) row.description = description;
   const posActive = parseBoolish(get("pos_active"));
   if (posActive !== undefined) row.posActive = posActive;
@@ -212,6 +231,10 @@ export const skuImportRowSchema = z
     variantKind: variantKindSchema.optional(),
     price: z.number().nonnegative().max(MAX_IMPORT_MONEY).optional(),
     cost: z.number().nonnegative().max(MAX_IMPORT_MONEY).optional(),
+    // POSITIVE, not nonnegative: 0 means NOT SET under the 0186 law and the
+    // mapper already refuses it — this mirror keeps a hand-built payload from
+    // sneaking a 0 past the client.
+    pwpPrice: z.number().positive().max(MAX_IMPORT_MONEY).optional(),
     description: z.string().trim().max(200).optional(),
     supplierCode: z.string().trim().max(80).optional(),
     posActive: z.boolean().optional(),
@@ -242,7 +265,17 @@ export interface SkuImportResult {
   failures: SkuImportFailure[];
 }
 
-/** Whether a batch carries any pricing intent (=> principal-only on the server). */
-export function hasPricingIntent(rows: Pick<SkuImportRow, "price" | "cost">[]): boolean {
-  return rows.some((r) => typeof r.price === "number" || typeof r.cost === "number");
+/** Whether a batch carries any pricing intent (=> principal-only on the server).
+ *  pwpPrice counts: it is money locked to the principal by the extended 0175
+ *  trigger, so gating it HERE turns what would be N per-row trigger errors
+ *  into one clean whole-batch refusal before anything runs. */
+export function hasPricingIntent(
+  rows: Pick<SkuImportRow, "price" | "cost" | "pwpPrice">[],
+): boolean {
+  return rows.some(
+    (r) =>
+      typeof r.price === "number" ||
+      typeof r.cost === "number" ||
+      typeof r.pwpPrice === "number",
+  );
 }
