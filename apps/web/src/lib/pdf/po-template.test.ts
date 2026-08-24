@@ -28,7 +28,7 @@ describe("po-template obeys docs/pdf/PO-PDF-STANDARD.md", () => {
   });
 
   /**
-   * ⭐ 0377 — THE DOCUMENT PRINTS ITS OWN VERSION, INCLUDING VERSION 1.
+   * ⭐ 0378 — THE DOCUMENT PRINTS ITS OWN VERSION, INCLUDING VERSION 1.
    *
    * A supplier holding two papers with one number and no version cannot tell
    * which to build from. (`Version 1 prints nothing` is the internal REVISIONS

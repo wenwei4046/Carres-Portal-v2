@@ -1,10 +1,10 @@
 -- ============================================================================
--- 0377 — confirm what you actually SAW
+-- 0378 — confirm what you actually SAW
 --        (CARD-2026-08-22-purchasing-02, release-blocker correction 2026-08-24)
 --
--- THE RACE 0376 LEFT OPEN
+-- THE RACE 0377 LEFT OPEN
 --
---   0376 read the CURRENT version off the purchase order and recorded that,
+--   0377 read the CURRENT version off the purchase order and recorded that,
 --   reasoning that a caller able to name a version could lie about it. The
 --   logic was backwards, and it created the exact defect it meant to prevent:
 --
@@ -35,7 +35,7 @@
 --       FOR UPDATE, compares, and raises `stale_po_version` on a mismatch —
 --       writing NO `po_sends` and NO `po_history` row.
 --
--- 0376 IS NOT EDITED. It is committed, so it is immutable (Constitution §5.6);
+-- 0377 IS NOT EDITED. It is committed, so it is immutable (Constitution §5.6);
 -- this file supersedes its function and leaves its table shape alone.
 -- No row count is asserted anywhere.
 -- ============================================================================
@@ -110,7 +110,7 @@ begin
   return jsonb_build_object(
     'po_number',   v_po.id,
     'po_id',       v_po.id,
-    -- 0377: the document's OWN version. The PDF prints it and hands it back at
+    -- 0378: the document's OWN version. The PDF prints it and hands it back at
     -- confirmation, so "the version we recorded" is by construction "the
     -- version the operator looked at".
     'version',     coalesce(v_po.version, 1),
@@ -133,7 +133,7 @@ end;
 $function$;
 
 comment on function public.purchasing_po_document(text) is
-  '0377: the money-free supplier-facing PO payload, now carrying its own `version`. The PDF prints it and the confirmation hands it back, so the recorded version is the rendered one.';
+  '0378: the money-free supplier-facing PO payload, now carrying its own `version`. The PDF prints it and the confirmation hands it back, so the recorded version is the rendered one.';
 
 -- ---------------------------------------------------------------------------
 -- 2 · the unsafe signature is REMOVED, not left beside its replacement
@@ -242,4 +242,4 @@ revoke all on function public.purchasing_confirm_po_sent(text, integer, text, te
 grant execute on function public.purchasing_confirm_po_sent(text, integer, text, text, text) to authenticated;
 
 comment on function public.purchasing_confirm_po_sent(text, integer, text, text, text) is
-  '0377: records that a PO PDF actually reached its supplier. The caller DECLARES the version it rendered; this locks the row, compares, and refuses `stale_po_version` on a mismatch without writing anything. Current PO Duty only; recipient required; the stored version is the server''s own read.';
+  '0378: records that a PO PDF actually reached its supplier. The caller DECLARES the version it rendered; this locks the row, compares, and refuses `stale_po_version` on a mismatch without writing anything. Current PO Duty only; recipient required; the stored version is the server''s own read.';

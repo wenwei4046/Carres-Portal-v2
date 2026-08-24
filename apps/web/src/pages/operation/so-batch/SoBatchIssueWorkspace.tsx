@@ -134,7 +134,7 @@ export default function SoBatchIssueWorkspace({
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [pdfError, setPdfError] = useState<string | null>(null);
   /* ⭐ THE VERSION THAT WAS ACTUALLY RENDERED, off the official document data
-     (0377). The confirmation declares this number, so what Carres records is by
+     (0378). The confirmation declares this number, so what Carres records is by
      construction what the operator looked at. Reading it from anywhere else —
      a list row, a second fetch — would reintroduce the race. */
   const [pdfVersion, setPdfVersion] = useState<number | null>(null);
@@ -546,7 +546,7 @@ export default function SoBatchIssueWorkspace({
           ) : currentPo ? (
             /* The form appears only once the official document has rendered:
                until then there is no version to declare, and a confirmation
-               without one is the defect 0377 closes. */
+               without one is the defect 0378 closes. */
             pdfVersion != null ? (
               <PoIssueEvidence
                 po={currentPo}

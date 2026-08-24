@@ -154,7 +154,7 @@ export type PoTemplateData = {
   po_number: string;
   po_id: string;
   /**
-   * 0377 — which version of this document the factory is being handed. It
+   * 0378 — which version of this document the factory is being handed. It
    * PRINTS, including Version 1: a supplier holding two papers with one number
    * and no version cannot tell which one to build from, and "an unrevised PO is
    * just the PO" is a rule for the internal panel, not for paper that leaves

@@ -343,7 +343,7 @@ operationPosRouter.get("/", requireOperation, async (c) => {
     return c.json(m.body, m.status);
   }
 
-  // What LEFT Carres (0312), and since 0376 WHAT KIND of leaving it was: an
+  // What LEFT Carres (0312), and since 0377 WHAT KIND of leaving it was: an
   // `external_open` is communication history and completes nothing; a
   // `confirmed_sent` carries recipient, actor, time and the exact version the
   // supplier received.
@@ -351,7 +351,7 @@ operationPosRouter.get("/", requireOperation, async (c) => {
   if (poIds.length > 0) {
     const { data: sendRows, error: sendErr } = await sb
       .from("po_sends")
-      /* 0376/0377 — an OPEN and a CONFIRMED SEND are different facts, and the
+      /* 0377/0378 — an OPEN and a CONFIRMED SEND are different facts, and the
          detail page has to be able to tell them apart. `kind`, `recipient` and
          `po_version` ride with the row so the evidence surface reads persisted
          truth rather than whatever it happens to remember. */
@@ -1619,12 +1619,12 @@ operationPosRouter.post("/:id/ready-date", requireOperation, async (c) => {
 });
 
 // ----- POST /:id/sends -----
-// AN APP THAT OPENED, NOT A PDF THAT ARRIVED (0376, Card 02 §7.4).
+// AN APP THAT OPENED, NOT A PDF THAT ARRIVED (0377, Card 02 §7.4).
 //
 // This door records that an external channel was OPENED. It once meant "sent",
 // and that was the defect: the operator opens the WhatsApp group, gets
 // interrupted, never pastes the file, and the Portal says the order went out.
-// Since 0376 its rows are `external_open` and they close nothing. The act that
+// Since 0377 its rows are `external_open` and they close nothing. The act that
 // completes Issue PO is `POST /:id/confirm-sent` below.
 //
 // It is KEPT rather than deleted: knowing an operator opened the group at
@@ -1643,7 +1643,7 @@ operationPosRouter.post("/:id/sends", requireOperation, async (c) => {
 });
 
 // ----- POST /:id/confirm-sent -----
-// THE ONE ACT THAT CLOSES ISSUE PO (0376; purchasing/MASTER.md §5.6).
+// THE ONE ACT THAT CLOSES ISSUE PO (0377; purchasing/MASTER.md §5.6).
 //
 // The operator has actually sent the official PDF and says so. The RPC records
 // channel, recipient, actor, Malaysia time and — read from the purchase order,
@@ -1655,7 +1655,7 @@ operationPosRouter.post("/:id/confirm-sent", requireOperation, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
   const { data, error } = await sb.rpc("purchasing_confirm_po_sent", {
     p_po_id: c.req.param("id"),
-    /* 0377 — the version the operator RENDERED, declared. SQL locks the row and
+    /* 0378 — the version the operator RENDERED, declared. SQL locks the row and
        compares it against the version that exists; a mismatch writes nothing.
        The stored version is still SQL's own read. */
     p_expected_version: parsed.data.poVersion,

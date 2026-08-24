@@ -3538,7 +3538,7 @@ function ActivityDesk({
             This REPLACES the 2026-08-02 note that said "opening WhatsApp IS
             the send".
 
-            ⭐ AND IT SUPERSEDES ITS OWN SUCCESSOR (0376/0377,
+            ⭐ AND IT SUPERSEDES ITS OWN SUCCESSOR (0377/0378,
             CARD-2026-08-22-purchasing-02). That note went on to say there was
             deliberately no "I've sent" action, because a record somebody must
             remember to make afterwards is a record that will be wrong. The

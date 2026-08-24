@@ -1,5 +1,5 @@
 -- ============================================================================
--- 0376 — an app that opened is not a PDF that arrived
+-- 0377 — an app that opened is not a PDF that arrived
 --        (CARD-2026-08-22-purchasing-02 §7.4; purchasing/MASTER.md §5.6)
 --
 -- THE DEFECT THIS CLOSES
@@ -49,17 +49,17 @@ end $$;
 alter table public.po_sends
   add column if not exists kind public.po_send_kind not null default 'external_open';
 comment on column public.po_sends.kind is
-  '0376: external_open = an app was opened. confirmed_sent = the operator states the PDF actually reached the supplier. Only confirmed_sent closes Issue PO. Every pre-0376 row is external_open, because that is all any of them ever proved.';
+  '0377: external_open = an app was opened. confirmed_sent = the operator states the PDF actually reached the supplier. Only confirmed_sent closes Issue PO. Every pre-0377 row is external_open, because that is all any of them ever proved.';
 
 alter table public.po_sends
   add column if not exists recipient text;
 comment on column public.po_sends.recipient is
-  '0376: who received it, in the operator''s own words — a WhatsApp group name, an email address. Required on confirmed_sent, NULL on an open.';
+  '0377: who received it, in the operator''s own words — a WhatsApp group name, an email address. Required on confirmed_sent, NULL on an open.';
 
 alter table public.po_sends
   add column if not exists po_version integer;
 comment on column public.po_sends.po_version is
-  '0376: the exact purchase_orders.version that left. A PO revised to Version 2 is NOT shared merely because Version 1 once was.';
+  '0377: the exact purchase_orders.version that left. A PO revised to Version 2 is NOT shared merely because Version 1 once was.';
 
 -- Existing rows are opens. They were written by a click on `Open WhatsApp`,
 -- and that is the only thing any of them can honestly claim.
@@ -163,4 +163,4 @@ revoke all on function public.purchasing_confirm_po_sent(text, text, text, text)
 grant execute on function public.purchasing_confirm_po_sent(text, text, text, text) to authenticated;
 
 comment on function public.purchasing_confirm_po_sent(text, text, text, text) is
-  '0376: the ONE door that records that a purchase order PDF actually reached its supplier. Current PO Duty only; recipient required; the version is read from the PO, never accepted from the caller. Opening WhatsApp or email writes nothing here.';
+  '0377: the ONE door that records that a purchase order PDF actually reached its supplier. Current PO Duty only; recipient required; the version is read from the PO, never accepted from the caller. Opening WhatsApp or email writes nothing here.';

@@ -17,7 +17,7 @@ import PoIssueEvidence, {
 
 /**
  * THE ONE EVIDENCE JOURNEY, SHARED BY BOTH SURFACES
- * (CARD-2026-08-22-purchasing-02 §5.3 / §9 Task 6; migrations 0376 · 0377).
+ * (CARD-2026-08-22-purchasing-02 §5.3 / §9 Task 6; migrations 0377 · 0378).
  *
  * Its whole job is to keep two facts apart — an app that OPENED and a PDF that
  * ARRIVED — and to bind the second one to the exact version the operator saw.

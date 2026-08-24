@@ -3,7 +3,7 @@
 **Module:** Purchasing · **Sequence:** 02
 **Owner authority:** `docs/purchasing/MASTER.md` §§2, 5–9, 13–15 — approved / locked 2026-08-22
 **Status:** BUILT — all eight tasks executed, all gates green, six-view walk captured; owner correction of
-2026-08-23 closed in full. Stopped at the merge boundary per §9 Task 8 and §14; migration 0376 is written
+2026-08-23 closed in full. Stopped at the merge boundary per §9 Task 8 and §14; migration 0377 is written
 and validated, NOT applied.
 **Lane:** BUILD / DELIVERY
 **Depends on:** `PURCHASING — CARD 01 · FIX SIDE MENU TO THE FINAL 4-GROUP / 11-PAGE LISTING`
@@ -728,7 +728,7 @@ merge/deploy boundary required by repository governance.
 | `eada1e01` | 1 | the demand row learns what a buy needs |
 | `baadbe3c` | 2–3 | the Register and the `Deliver To` split |
 | `853f58f7` | 4 | one whole-batch issue door |
-| `039d5526` | 6 | migration 0376 + the confirmed-evidence door |
+| `039d5526` | 6 | migration 0377 + the confirmed-evidence door |
 | `187426cc` | 5, 7 | the 50/50 journey; the old buying page retires |
 
 ### 15.2 Migration
@@ -743,12 +743,12 @@ immediately before the file was written, against all four sources red line 7 nam
 | both `.codex/worktrees` checkouts | 0364 |
 | the live tracker (`supabase_migrations.schema_migrations`) | 0374 applied |
 
-MAX = 0375, so **0376 was free** and the Card's proposed number stood. `pnpm ci:migrations`
+MAX = 0375, so **0377 was free** and the Card's proposed number stood. `pnpm ci:migrations`
 validates it. **It has NOT been applied** — that is the governed approval path, and §9/§14 stop
 this Card at the merge boundary.
 
 ⚠️ Worth the owner knowing: repository migration **0375** is merged but not yet in the live
-tracker. 0376 therefore queues behind it, and 0375 must be applied first.
+tracker. 0377 therefore queues behind it, and 0375 must be applied first.
 
 ### 15.3 Gates — all green on the final branch
 
@@ -903,7 +903,7 @@ same bytes with pdf.js; the product keeps the iframe, which a real browser paint
 
 ### 15.8 Still owed
 
-- 🔴 **Migration 0376 is not applied.** Governed approval path, and repository **0375 must be
+- 🔴 **Migration 0377 is not applied.** Governed approval path, and repository **0375 must be
   applied first** — it is merged but not yet in the live tracker.
 - Nothing else. The three items above were the outstanding scope.
 
@@ -915,9 +915,9 @@ same bytes with pdf.js; the product keeps the iframe, which a real browser paint
 
 **RESOLVED FROM AUTHORITY.** Existing Card scope (§5.3, §7.4, §9 Task 6), not a new Card.
 
-### 16.1 The race 0376 left open
+### 16.1 The race 0377 left open
 
-0376 read the CURRENT version off the purchase order and recorded that, on the reasoning that a
+0377 read the CURRENT version off the purchase order and recorded that, on the reasoning that a
 caller able to name a version could lie about it. **The logic was backwards, and it built the defect
 it meant to stop:**
 
@@ -939,8 +939,8 @@ it never saw is refused rather than believed.
 ### 16.2 What changed
 
 **Migration `0377_confirm_what_you_actually_saw.sql`** — number re-measured immediately before
-writing against all four sources: repo `0376` · every branch `0376` · both worktrees `0364` ·
-live tracker `0374`. MAX = `0376`, so **`0377` was free**. **0376 is NOT edited** — it is committed,
+writing against all four sources: repo `0377` · every branch `0377` · both worktrees `0364` ·
+live tracker `0374`. MAX = `0377`, so **`0378` was free**. **0377 is NOT edited** — it is committed,
 therefore immutable (red line 6); this file supersedes its function and leaves its table alone.
 
 - `purchasing_po_document` now returns `version`, so the official document carries its own identity.
@@ -996,11 +996,37 @@ Version 1 was sent, the PO was then revised, and the surface reads
 `Version 1 sent to Hooka Purchasing Group by WhatsApp` kept below as history. The rendered PDF
 beside it prints `Version 2`.
 
-### 16.5 Migration order — unchanged stop boundary
+### 16.5 Migration order — RENUMBERED after a collision on `main`
+
+⚠️ **A second `0376` landed on `main` while this PR was open.** PR #893
+(`0376_the_import_carries_the_suppliers_own_code.sql`) merged on 2026-08-23; this branch already
+carried `0376_an_app_that_opened_is_not_a_pdf_that_arrived.sql`. Two files, one number, same
+directory — the P0 class red line 7 exists to prevent.
+
+**Git saw no conflict** (different filenames) and **CI passed** — `scripts/check-migrations.mjs`
+validates filename SHAPE and immutability, and never checks for a duplicate NUMBER. Found by
+comparing against `origin/main` after CI went green, not by any gate.
+
+`origin/main` was merged in and this branch's two migrations were renumbered behind the one that
+reached `main` first:
+
+| | was | is |
+|---|---|---|
+| evidence kind / recipient / version | `0376` | **`0377`** |
+| declared-version confirmation | `0377` | **`0378`** |
+
+Renumbering an unmerged, unapplied migration is not an edit to a committed one (red line 6): neither
+file exists on `main`, and neither is in the live tracker. Every in-code reference was moved with
+them; PR #893's own `0376` was not touched.
 
 ```
-0375  (merged, unapplied)  →  0376  (this PR)  →  0377  (this correction)
+0375 (merged, unapplied) → 0376 (PR #893, merged, unapplied) → 0377 (this PR) → 0378 (this PR)
 ```
 
-🔴 **None of the three is applied.** They go through the governed approval path, in that order.
+🔴 **None of the four is applied.** They go through the governed approval path, in that order.
 Merge and deployment wait for that decision and the owner's approval.
+
+🟡 **Carried forward, not fixed here:** `scripts/check-migrations.mjs` cannot see a duplicate
+number. Two branches open at once will collide again, and the next one may not be caught by hand.
+A duplicate-number check belongs in that gate; it is a change to shared CI tooling and is outside
+this Card's file map.

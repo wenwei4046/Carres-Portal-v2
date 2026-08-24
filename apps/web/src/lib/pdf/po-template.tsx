@@ -162,7 +162,7 @@ function isChaise(code: string): boolean {
 
 export function PoTemplate(data: PoTemplateData) {
   const { po_number, version, issue_date, supplier, destination, delivery_instructions, eta_date, so_refs, issued_by, lines } = data;
-  /* 0377 — the document's own identity. A supplier holding two papers with one
+  /* 0378 — the document's own identity. A supplier holding two papers with one
      number and no version cannot tell which to build from, so Version 1 prints
      too. (`Version 1 prints nothing` is the internal REVISIONS PANEL's rule —
      `docs/COPY-STANDARD.md` — and this is paper that leaves the building.) */

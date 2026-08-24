@@ -5,7 +5,7 @@ import { fmtDate } from "@/lib/fmt-date";
 /**
  * WHAT ACTUALLY REACHED THE SUPPLIER
  * (CARD-2026-08-22-purchasing-02 §5.3; `docs/purchasing/MASTER.md` §5.6;
- * migrations 0376 · 0377).
+ * migrations 0377 · 0378).
  *
  * ── THE ONE DISTINCTION THIS COMPONENT EXISTS TO HOLD ───────────────────────
  *
@@ -26,7 +26,7 @@ import { fmtDate } from "@/lib/fmt-date";
  * refused with `Purchase order changed`. Without that, a revise landing between
  * looking and confirming would record the NEW version as sent while the
  * supplier holds the old one — and the work to send the new document would
- * never appear (0377).
+ * never appear (0378).
  *
  * ── IT READS PERSISTED EVIDENCE, NOT ITS OWN MEMORY ─────────────────────────
  *

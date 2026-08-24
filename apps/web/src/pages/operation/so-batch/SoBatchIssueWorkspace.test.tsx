@@ -311,7 +311,7 @@ describe("Issue PO stays open until the PDF actually reaches the supplier", () =
     expect(path).not.toContain("/sends");
     const body = JSON.parse((init as { body: string }).body);
     /* ⭐ THE VERSION RIDES, and it is the one the RENDERED document reported —
-       not a list row, not a second fetch (0377). */
+       not a list row, not a second fetch (0378). */
     expect(body).toEqual({
       channel: "whatsapp",
       recipient: "Hooka Purchasing Group",
@@ -583,7 +583,7 @@ describe("after creation the preview is the real official PDF", () => {
         "not_found",
       ),
     );
-    /* ⭐ NO VERSION MEANS NOTHING SAFE TO CONFIRM (0377). The document never
+    /* ⭐ NO VERSION MEANS NOTHING SAFE TO CONFIRM (0378). The document never
        rendered, so the operator cannot have seen a version, so the form that
        would declare one is not offered at all. */
     expect(screen.queryByTestId("so-batch-evidence-confirm")).not.toBeInTheDocument();

@@ -2252,7 +2252,7 @@ describe("POST /api/operation/pos/:id/ready-date", () => {
 
 
 /**
- * CONFIRMED OUTBOUND EVIDENCE (0376; CARD-2026-08-22-purchasing-02 §7.4).
+ * CONFIRMED OUTBOUND EVIDENCE (0377; CARD-2026-08-22-purchasing-02 §7.4).
  *
  * The whole point of this block: an app that OPENED is not a PDF that ARRIVED.
  */
@@ -2297,9 +2297,9 @@ describe("POST /api/operation/pos/:id/confirm-sent", () => {
   });
 
   /**
-   * ⭐ 0377 — the caller DECLARES the version it rendered.
+   * ⭐ 0378 — the caller DECLARES the version it rendered.
    *
-   * 0376 had SQL read the newest version instead, reasoning that a caller able
+   * 0377 had SQL read the newest version instead, reasoning that a caller able
    * to name one could lie. That was backwards: send Version 1, let another
    * session revise to Version 2, confirm — and Carres recorded Version 2 as
    * shared while the supplier held Version 1. Declaring is not trusting; SQL

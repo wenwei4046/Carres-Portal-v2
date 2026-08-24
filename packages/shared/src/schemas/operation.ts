@@ -106,7 +106,7 @@ export const recordSendInput = z.object({
 export type RecordSendInput = z.infer<typeof recordSendInput>;
 
 /**
- * CONFIRMED OUTBOUND EVIDENCE (0376; CARD-2026-08-22-purchasing-02 §7.4).
+ * CONFIRMED OUTBOUND EVIDENCE (0377; CARD-2026-08-22-purchasing-02 §7.4).
  *
  * The operator states that the official PDF actually reached the supplier.
  * `recipient` is required and is not decoration: "sent" that cannot say TO WHOM
@@ -119,9 +119,9 @@ export const confirmPoSentInput = z.object({
   channel: z.enum(["whatsapp", "email", "print"]),
   recipient: z.string().trim().min(1).max(200),
   /**
-   * ⭐ THE VERSION THE OPERATOR ACTUALLY RENDERED (0377).
+   * ⭐ THE VERSION THE OPERATOR ACTUALLY RENDERED (0378).
    *
-   * 0376 left this out and had SQL read the newest version instead, reasoning
+   * 0377 left this out and had SQL read the newest version instead, reasoning
    * that a caller able to name a version could lie about it. That was
    * backwards, and it built the defect it meant to stop: send Version 1, let
    * another session revise to Version 2, confirm — and Carres records Version 2
