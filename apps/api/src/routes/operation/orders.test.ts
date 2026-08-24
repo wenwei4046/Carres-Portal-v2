@@ -235,6 +235,100 @@ describe("GET /api/operation/orders", () => {
     });
   });
 
+  /**
+   * THE LIST CARRIES THE CATALOG'S CATEGORY (2026-08-24).
+   *
+   * Jess: "Other goods 44 - the number doesn't tally." The register footer
+   * classified a line from its SKU TEXT alone while the SO detail read the
+   * catalog first, so one product counted two ways on two screens. The list
+   * now stamps `category` the SAME way the detail route has since PR 885,
+   * through `skuCategories` - the ONE category reader (Law D).
+   */
+  describe("category on list lines", () => {
+    function mockWithCatalog(
+      orders: Record<string, unknown>[],
+      productSkus: Record<string, unknown>[],
+    ) {
+      const from = vi.fn((table: string) => {
+        if (table === "product_skus") {
+          // ONE fixture serves BOTH readers of this table -
+          // `resolveSkuLabels` (name) and `skuCategories` (category).
+          const inFn = vi.fn().mockResolvedValue({ data: productSkus, error: null });
+          return { select: vi.fn(() => ({ in: inFn })) };
+        }
+        if (table === "purchase_orders") {
+          const or = vi.fn().mockResolvedValue({ data: [], error: null });
+          return { select: vi.fn(() => ({ or })) };
+        }
+        if (table === "purchase_order_lines") {
+          const inFn = vi.fn().mockResolvedValue({ data: [], error: null });
+          return { select: vi.fn(() => ({ in: inFn })) };
+        }
+        const chain: Record<string, unknown> = {};
+        for (const k of ["in", "eq", "ilike", "or", "not", "is", "order"])
+          chain[k] = vi.fn(() => chain);
+        chain.limit = vi.fn().mockResolvedValue({ data: orders, error: null });
+        return { select: vi.fn(() => chain) };
+      });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      vi.mocked(userClient).mockReturnValue({ from } as any);
+      return from;
+    }
+
+    async function lines() {
+      const jwt = await makeJwt("operation");
+      const res = await app.fetch(
+        new Request("http://t/api/operation/orders", {
+          headers: { Authorization: `Bearer ${jwt}` },
+        }),
+        env,
+      );
+      const body = (await res.json()) as {
+        orders: { order_lines: { sku: string; category: string | null }[] }[];
+      };
+      return body.orders[0]?.order_lines ?? [];
+    }
+
+    it("stamps the catalog category onto a line the SKU parser cannot read", async () => {
+      mockWithCatalog(
+        [{ ...ORDER_ROW, order_lines: [{ sku: "1013Jager/Fab3-King", qty: 1 }] }],
+        [
+          {
+            sku: "1013Jager/Fab3-King",
+            variant: "King",
+            product_models: { name: "Jager", category: "mattress" },
+          },
+        ],
+      );
+      expect((await lines())[0]?.category).toBe("mattress");
+    });
+
+    it("a SKU the catalog does not hold reads null - never a guessed category", async () => {
+      mockWithCatalog(
+        [{ ...ORDER_ROW, order_lines: [{ sku: "NOT-IN-CATALOG", qty: 1 }] }],
+        [],
+      );
+      expect((await lines())[0]?.category).toBeNull();
+    });
+
+    it("ONE batched product_skus read for the whole page, never one per order", async () => {
+      // `skuCategories` and `resolveSkuLabels` each read this table once
+      // for the page. Two reads total is the documented price of keeping
+      // ONE category owner; what must never happen is a read PER ORDER.
+      const from = mockWithCatalog(
+        [
+          { ...ORDER_ROW, id: "a", so: 1206, order_lines: [{ sku: "S-1", qty: 1 }] },
+          { ...ORDER_ROW, id: "b", so: 1213, order_lines: [{ sku: "S-2", qty: 1 }] },
+          { ...ORDER_ROW, id: "c", so: 1216, order_lines: [{ sku: "S-3", qty: 1 }] },
+        ],
+        [],
+      );
+      await lines();
+      const skuCalls = from.mock.calls.filter((c) => c[0] === "product_skus");
+      expect(skuCalls.length).toBeLessThanOrEqual(2);
+    });
+  });
+
   it("returns status='place' rows in the response (pipeline v2 'Placed' column)", async () => {
     const PLACE_ROW = {
       ...ORDER_ROW,

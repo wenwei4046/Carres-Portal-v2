@@ -2835,6 +2835,13 @@ export interface operationOrderListRow {
      *  browser on this build against an older Worker reads it as absent and
      *  falls back the same way. */
     label?: string | null;
+    /** 2026-08-24 (OTHER GOODS TALLY) — the catalog's own category word,
+     *  resolved server-side through `skuCategories` (the ONE category reader,
+     *  Law D), exactly as the DETAIL route has served it since PR 885. `null`
+     *  = asked, the catalog holds no such SKU. Optional: an older Worker
+     *  sends nothing, the classifiers fall through to the SKU parser, and the
+     *  footer behaves exactly as it did before this field existed. */
+    category?: string | null;
   }[];
   /** C5 (2026-07-27) — the money truth. `orders.paid` is the only figure a
    *  live payment path writes; with the add-on sum below and the line prices

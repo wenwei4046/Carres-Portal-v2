@@ -729,12 +729,58 @@ const FOOTER_WORDS = [
   "Mattress protector",
   "Topper",
   "Footrest",
+  // A line the ORDER or the CATALOG says is an accessory, whose TYPE nothing
+  // recognises. Already a ruled word — the SO document's own fallback prints it
+  // (`categoryWord`) — so the footer saying `Other goods` over the same line
+  // was the register disagreeing with the document it summarises.
+  "Accessory",
   "Service",
   "Other goods",
 ] as const;
 
-function footerWord(sku: string): (typeof FOOTER_WORDS)[number] {
+/**
+ * ⭐ THE FOOTER READS THE SAME LADDER AS THE DOCUMENT (2026-08-24).
+ *
+ * Jess: "Other goods 44 — the number doesn't tally." It didn't, and the
+ * arithmetic was never the problem: this classifier read the SKU TEXT ALONE
+ * while the SO detail reads recorded `attrs.category`, then the catalog, then
+ * the SKU. A product the document names `MATTRESS` counted here as
+ * `Other goods`, so the footer's number could not be reproduced from the
+ * open orders. Same ladder now, then the footer's own dictionary mapping —
+ * the recognised accessory TYPE where one exists, the ruled word `Accessory`
+ * where only the category is known, `Other goods` ONLY for a line neither the
+ * order, the catalog, nor the classifier recognises. That word now means what
+ * it says: genuinely unclassified goods — a data-quality fact, not a
+ * classifier gap.
+ *
+ * A recorded category outside this footer's vocabulary (e.g. `guarantee`)
+ * falls through to the SKU path unchanged — the footer prints ONLY the words
+ * above, by construction, and inventing a new word here would be writing
+ * dictionary. numbers are QUANTITIES (`line.qty`), not row counts — unchanged.
+ */
+function footerWord(line: {
+  sku: string;
+  attrs?: Record<string, unknown> | null;
+  category?: string | null;
+}): (typeof FOOTER_WORDS)[number] {
+  const sku = line.sku;
   if (lineKind(sku) === "service") return "Service";
+  const recorded = (
+    (typeof line.attrs?.category === "string" ? line.attrs.category : "") ||
+    (typeof line.category === "string" ? line.category : "")
+  )
+    .trim()
+    .toLowerCase();
+  if (recorded === "mattress") return "Mattress";
+  if (recorded === "bedframe") return "Bedframe";
+  if (recorded === "sofa") return "Sofa";
+  if (recorded === "service") return "Service";
+  if (recorded === "accessory") {
+    const short = accShort(sku);
+    return (FOOTER_WORDS as readonly string[]).includes(short)
+      ? (short as (typeof FOOTER_WORDS)[number])
+      : "Accessory";
+  }
   const cls = lineClass(sku);
   if (cls === "mattress") return "Mattress";
   if (cls === "bedframe") return "Bedframe";
@@ -758,7 +804,7 @@ function RegisterResultSummary({
   const counts = new Map<string, number>();
   for (const row of scope) {
     for (const line of row.o.order_lines ?? []) {
-      counts.set(footerWord(line.sku), (counts.get(footerWord(line.sku)) ?? 0) + Number(line.qty || 0));
+      counts.set(footerWord(line), (counts.get(footerWord(line)) ?? 0) + Number(line.qty || 0));
     }
     for (const addon of row.o.order_addons ?? []) {
       counts.set("Service", (counts.get("Service") ?? 0) + Number(addon.qty || 0));
