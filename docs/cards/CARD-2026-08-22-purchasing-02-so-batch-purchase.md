@@ -1209,8 +1209,14 @@ entry and is **absent from `apps/web/dist`** — verified, not assumed.
 
 ### 17.10 Still owed, and what is NOT done
 
-- 🔴 **Migrations 0377 · 0378 · 0379 · 0380 · 0381 · 0382 · 0383 are NOT applied.** They go through
-  the governed approval path, in that order.
+- ✅ **APPLIED 2026-08-24, on the owner's explicit approval**, in the order she chose:
+  `0375 → 0376 → 0377 → 0378 → 0379 → 0380 → 0381 → 0382 → 0383`. Each was verified before the next
+  went in, and the verification is in §17.11. Nothing was dropped but the one function 0378 names,
+  and no data was deleted: 24 legacy PO numbers untouched, 136 Units untouched, all 5 existing
+  `po_sends` rows correctly labelled `external_open` with **zero** turned into a confirmed send.
+
+  The superseded text of this bullet said the seven were not applied. It is replaced rather than
+  kept beside the truth (Master Overwrite Law).
 
   **The live tracker, measured 2026-08-24 (not assumed):** applied tail is `0374`, plus
   `0384_the_import_carries_the_pwp_price` — which was applied AHEAD of `0375`–`0383`. So `0375`,
@@ -1238,6 +1244,43 @@ entry and is **absent from `apps/web/dist`** — verified, not assumed.
   0154 → 0382 · `purchasing_po_document` 0378 → 0383 · `purchasing_confirm_po_sent` 0378 → 0379. The
   only behaviour 0382 drops from 0154 is the behaviour it names: `max(seq) + 1` numbering,
   `gen_unit_code`, and the own-warehouse-only Unit gate that MASTER §6.2 required removing.
+### 17.11 What the apply proved, and two things it found in the live tracker
+
+Each migration was verified immediately after it went in, against production:
+
+| Applied | Proved |
+|---|---|
+| 0375 | column exists, nullable · **negative control: 0 rows backfilled** |
+| 0376 | one copy of the function, still `SECURITY INVOKER`, knows `supplier_code` |
+| 0377 | 3 columns added · all 5 existing rows are `external_open` · **0 confirmed_sent** · constraint live |
+| 0378 | the unsafe 4-argument signature is GONE — only the governed 5-argument one exists |
+| 0379 | the resolver names August's real holder, `is_cover: false` · 0 cover rows invented · **one policy, SELECT only** · `authenticated` cannot INSERT |
+| 0380 | the creation authority carries BOTH gates in its own body · 0 approvals invented · `authenticated` cannot INSERT |
+| 0381 | `U1-000-001` · rolls to `U2-000-001` · scan normalises three spellings · series `1/0`, nothing to seed · series table unreadable by `authenticated` |
+| 0382 | mints the locked PO number and Unit ID · `gen_unit_code` gone · **24 legacy `PO-nnnn` numbers untouched** |
+| 0383 | document reads lineage, Units and the real issuer · **still money-free** · 0 supplier addresses invented |
+
+Final sweep: 8 new functions, 5 new tables, every gate intact, 24 purchase orders and 136 Units
+unchanged.
+
+Two things the tracker showed that nobody planned:
+
+- 🟡 **`0375` and `0376` are in the tracker TWICE.** A backdated pair (`2026-08-23 00:00:00/01`)
+  appeared between the read at the start of this session — where they were absent — and the apply.
+  Both migrations are idempotent (`add column if not exists`, `create or replace function`), so the
+  schema is correct and nothing ran twice that could not. The tracker is untidy, not wrong.
+- 🔴 **THE 0379 COLLISION HAPPENED, IN PRODUCTION.** The Delivery session applied
+  `0379_delivery_owns_the_arrangement_the_order_owns_the_promise` at **09:10:36** — between this
+  branch's `0381` (09:10:08) and `0382` (09:10:46). Two different migrations now both claim the
+  number `0379` in the live tracker.
+
+  The schema is fine: they touch different objects, and every object this branch created was
+  re-verified afterwards. **But the Delivery branch cannot merge as it stands** — the duplicate-number
+  gate added by `44c56c53` will refuse two files claiming `0379` in one directory, which is exactly
+  what it was built for. **That chat must renumber its file to `0386` or above before it merges.**
+  Renumbering an unapplied file is not an edit to a committed migration; renumbering theirs is not
+  this Card's to do.
+
 - 🔴 **Not merged and not deployed.** PR #894 waits on the owner.
 - ⚠️ **A Delivery worktree holds an untracked `0379_delivery_owns_the_arrangement…sql`.** It is not in
   the repository, so there is no collision today — but whichever branch merges second must renumber.
