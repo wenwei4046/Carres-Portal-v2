@@ -570,8 +570,12 @@ cover changes who sees today's work while preserving normal owner and cover evid
 Deliver To, Goods Must Arrive, Work.
 **Journey:** choose ready lines → group by supplier → change/split destination if exceptional →
 50/50 check grouped POs → send PDFs.
-**Object/placement:** row inspector explains demand arithmetic and source; Batch Purchase owns no
-duplicate demand editor.
+**Object/placement:** the row expand is **`GoodsMiniTable`**, the ONE child table Sales Orders and
+Delivery draw (owner ruling 2026-08-15; corrected onto this page 2026-08-24). It says only what the
+ROW cannot: the parts of a matched set, which purchase order already covers them, where a split
+sends each unit, and that no Unit is minted before Issue PO. It never re-prints Required · Stock ·
+Open PO · Buy — those are columns. Batch Purchase owns no duplicate demand editor and no second
+mini-table.
 **Exceptions:** cancelled/changed SO, stock becomes available, supplier missing, supplier date too
 late, price changed, split destination.
 **Connections:** Sales Orders, Stock, Delivery calendar, Catalog, PO.

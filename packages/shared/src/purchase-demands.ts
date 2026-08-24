@@ -213,7 +213,18 @@ export interface PurchaseDemandRow {
    * It is the CATALOG's number, carried for display and for the unchanged-cost
    * comparison. The server re-reads it at issue and refuses a stale one.
    */
-  costs: Array<{ sku: string; unitCost: number | null }>;
+  /**
+   * ⭐ THE PARTS INSIDE THIS BUYING LINE — one entry per SKU.
+   *
+   * A row is one BUILD, and a build can be a matched set: a sofa is one row and
+   * three module codes. The row itself can only name the set, so this is where
+   * the modules live — the expand lists them, and the issue surface prices them.
+   *
+   * It was called `costs` and carried only the price, so the expand had no
+   * quantity to print and re-stated the row's own numbers instead. One list,
+   * three facts (Law D): what it is, how many, what Catalog charges.
+   */
+  parts: Array<{ sku: string; qty: number; unitCost: number | null }>;
   /**
    * Whether this supplier's goods are collected from the factory. A
    * factory-pickup document needs a procurement partner before it can be
@@ -647,7 +658,7 @@ export const purchaseDemandRowSchema = z.object({
     .object({ proposalKey: z.string(), buildKey: z.string() })
     .nullable(),
   action: soBatchPurchaseActionSchema.nullable(),
-  costs: z.array(z.object({ sku: z.string(), unitCost: z.number().nullable() })),
+  parts: z.array(z.object({ sku: z.string(), qty: z.number(), unitCost: z.number().nullable() })),
   supplierKind: z.enum(["own_logistics", "factory_pickup"]).nullable(),
   ownerName: z.string().nullable(),
   ownerDuty: z.string().nullable(),

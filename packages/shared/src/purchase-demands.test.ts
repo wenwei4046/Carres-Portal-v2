@@ -43,7 +43,7 @@ function row(over: Partial<PurchaseDemandRow> = {}): PurchaseDemandRow {
     goodsMustArrive: "2026-08-19",
     issueRef: { proposalKey: "s1::mattress", buildKey: "b1" },
     action: null,
-    costs: [{ sku: "B1201S-K", unitCost: 100 }],
+    parts: [{ sku: "B1201S-K", qty: 2, unitCost: 100 }],
     supplierKind: "own_logistics",
     ownerName: null,
     ownerDuty: null,

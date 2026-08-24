@@ -59,15 +59,13 @@ export const SO_BATCH_PURCHASE_WORDS = {
   goodsMustArrive: "Goods Must Arrive",
   colWork: "Work",
 
-  /** The row inspector's four-number explanation. */
-  inspectorRequired: "REQUIRED",
-  inspectorFromStock: "FROM STOCK",
-  inspectorOnOpenPo: "ON OPEN PO",
-  inspectorBuy: "BUY",
-  inspectorSource: "Source",
-  inspectorRequiredFor: "Required for",
-  inspectorGoodsMustArrive: "Goods must arrive",
-  inspectorDeliverTo: "Deliver to",
+  /* THE ROW INSPECTOR HAS NO WORDS OF ITS OWN (owner correction 2026-08-24).
+     It draws `GoodsMiniTable`, the child table Sales Orders and Delivery draw,
+     and that component owns its own headings. The eight labels that used to
+     live here — REQUIRED · FROM STOCK · ON OPEN PO · BUY · Source ·
+     Required for · Goods must arrive · Deliver to — are DELETED rather than
+     kept beside the new truth: seven of the eight were re-printing a column
+     the row already carried. */
 
   /** The destination editor. */
   split: "Split",
@@ -293,8 +291,9 @@ export interface SoBatchDocumentLine {
   qty: number;
   goodsMustArrive: string | null;
   issueRef: { proposalKey: string; buildKey: string };
-  /** The catalog cost per SKU behind this line. `null` = Catalog has none. */
-  costs: Array<{ sku: string; unitCost: number | null }>;
+  /** The parts this line puts on the document — one per SKU, with the quantity
+   *  the factory must make and the catalog cost behind it. */
+  parts: Array<{ sku: string; qty: number; unitCost: number | null }>;
 }
 
 export interface SoBatchDocument {
@@ -365,7 +364,7 @@ export function groupSelectionsIntoDocuments(
         qty: a.qty,
         goodsMustArrive: row.goodsMustArrive,
         issueRef: row.issueRef,
-        costs: row.costs,
+        parts: row.parts,
       });
     }
   }

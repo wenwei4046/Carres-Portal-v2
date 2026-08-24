@@ -92,7 +92,7 @@ function documentSkus(
 ): Array<{ sku: string; catalogCost: number | null }> {
   const out = new Map<string, number | null>();
   for (const line of doc.lines) {
-    for (const c of line.costs) {
+    for (const c of line.parts) {
       if (!out.has(c.sku)) out.set(c.sku, c.unitCost);
     }
   }
