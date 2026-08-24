@@ -629,3 +629,126 @@ describe("NewSkuModal — Add to existing model: option chips", () => {
     expect(screen.getByText("Add SKU")).toBeInTheDocument();
   });
 });
+
+// ---------------------------------------------------------------------------
+// THE SUPPLIER OVERRIDE ON BULK-GENERATE (2026-08-24).
+//
+// generate-skus and offer-compartments both auto-resolve a supplier server-
+// side (whichever supplier's cat_covered[] names the category first) — a real
+// blind spot when two suppliers cover the same category, since a keyer had no
+// way to say "this batch is Hookka's". The picker rendered in the classic
+// single-SKU flow only; these tests pin it in the two bulk flows too, and pin
+// that leaving it on Auto keeps the payload byte-identical to before.
+// ---------------------------------------------------------------------------
+describe("NewSkuModal — supplier override on bulk-generate flows", () => {
+  const HOOKKA_ID = "00000000-0000-4000-8000-0000000000a1";
+
+  it("size flow: the picker renders, and picking Hookka sends supplierId to generate-skus", async () => {
+    const onClose = vi.fn();
+    render(<NewSkuModal models={MODELS} optionPools={SIZE_POOLS} onClose={onClose} />);
+    fireEvent.change(screen.getByTestId("new-sku-name"), { target: { value: "Lumi FirmCare" } });
+    expect(screen.getByTestId("new-sku-supplier")).toBeInTheDocument();
+    fireEvent.change(screen.getByTestId("new-sku-supplier"), { target: { value: HOOKKA_ID } });
+    fireEvent.click(screen.getByText("Create model + 3 SKUs"));
+
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    expect(mockGenerateSkusMutateAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        input: expect.objectContaining({ supplierId: HOOKKA_ID }),
+      }),
+    );
+  });
+
+  it("size flow: Auto (the default) omits supplierId — byte-identical to before the picker existed", async () => {
+    const onClose = vi.fn();
+    render(<NewSkuModal models={MODELS} optionPools={SIZE_POOLS} onClose={onClose} />);
+    fireEvent.change(screen.getByTestId("new-sku-name"), { target: { value: "Lumi FirmCare" } });
+    fireEvent.click(screen.getByText("Create model + 3 SKUs"));
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    const call = mockGenerateSkusMutateAsync.mock.calls[0][0];
+    expect(call.input.supplierId).toBeUndefined();
+  });
+
+  it("compartment flow: the picker renders, and picking Hookka sends supplierId to offer-compartments", async () => {
+    const onClose = vi.fn();
+    render(
+      <NewSkuModal
+        models={MODELS}
+        sofaCompartments={[comp("c1", "1A(LHF)", 1), comp("c2", "2A(LHF)", 2)]}
+        onClose={onClose}
+      />,
+    );
+    fireEvent.change(screen.getByTestId("new-sku-category"), { target: { value: "sofa" } });
+    fireEvent.change(screen.getByTestId("new-sku-name"), { target: { value: "Booqit" } });
+    expect(screen.getByTestId("new-sku-supplier")).toBeInTheDocument();
+    fireEvent.change(screen.getByTestId("new-sku-supplier"), { target: { value: HOOKKA_ID } });
+    fireEvent.click(screen.getByText("Create model + 2 SKUs"));
+
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    expect(mockOfferMutateAsync).toHaveBeenCalledWith(
+      expect.objectContaining({ supplierId: HOOKKA_ID }),
+    );
+  });
+
+  it("compartment flow: Auto omits supplierId from the offer call", async () => {
+    const onClose = vi.fn();
+    render(
+      <NewSkuModal models={MODELS} sofaCompartments={[comp("c1", "1A(LHF)", 1)]} onClose={onClose} />,
+    );
+    fireEvent.change(screen.getByTestId("new-sku-category"), { target: { value: "sofa" } });
+    fireEvent.change(screen.getByTestId("new-sku-name"), { target: { value: "Booqit" } });
+    fireEvent.click(screen.getByText("Create model + 1 SKU"));
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    const call = mockOfferMutateAsync.mock.calls[0][0];
+    expect(call.supplierId).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// TWO MODELS CAN SHARE A NAME (2026-08-24).
+//
+// The real identity is (category, model_key), not name — two suppliers each
+// pitching a "Booqit" land as two models the moment either model_key differs.
+// The "Add to existing model" list rendered `{Category} {Name}` only, so two
+// same-named rows in one category were LITERALLY IDENTICAL TEXT: a keyer had
+// no way to tell them apart and could add a SKU to the wrong one.
+// ---------------------------------------------------------------------------
+describe("NewSkuModal — same-name models are disambiguated in the picker", () => {
+  const DUPES: ProductModelDto[] = [
+    exModel({ id: "m-hk", category: "sofa", modelKey: "booqit-hookka", name: "Booqit" }),
+    exModel({ id: "m-other", category: "sofa", modelKey: "booqit-nicefuture", name: "Booqit" }),
+    exModel({ id: "m-solo", category: "mattress", modelKey: "forte", name: "Forte" }),
+  ];
+
+  it("⭐ a real name collision shows the model_key alongside each option", () => {
+    render(<NewSkuModal models={DUPES} onClose={vi.fn()} />);
+    fireEvent.click(screen.getByTestId("new-sku-mode-existing"));
+    const select = screen.getByTestId("new-sku-model") as HTMLSelectElement;
+    const labels = Array.from(select.options).map((o) => o.textContent);
+    expect(labels).toContain("Sofa Booqit (booqit-hookka)");
+    expect(labels).toContain("Sofa Booqit (booqit-nicefuture)");
+  });
+
+  it("NEGATIVE CONTROL: a model with no name collision renders WITHOUT its key — no visual noise for the common case", () => {
+    render(<NewSkuModal models={DUPES} onClose={vi.fn()} />);
+    fireEvent.click(screen.getByTestId("new-sku-mode-existing"));
+    const select = screen.getByTestId("new-sku-model") as HTMLSelectElement;
+    const labels = Array.from(select.options).map((o) => o.textContent);
+    expect(labels).toContain("Mattress Forte");
+    expect(labels).not.toContain("Mattress Forte (forte)");
+  });
+
+  it("the SAME name in DIFFERENT categories is not a collision — sofa Booqit vs a hypothetical accessory Booqit", () => {
+    const crossCategory: ProductModelDto[] = [
+      exModel({ id: "m1", category: "sofa", modelKey: "booqit", name: "Booqit" }),
+      exModel({ id: "m2", category: "accessory", modelKey: "booqit-pillow", name: "Booqit" }),
+    ];
+    render(<NewSkuModal models={crossCategory} onClose={vi.fn()} />);
+    fireEvent.click(screen.getByTestId("new-sku-mode-existing"));
+    const select = screen.getByTestId("new-sku-model") as HTMLSelectElement;
+    const labels = Array.from(select.options).map((o) => o.textContent);
+    // Neither collides WITHIN its own category, so neither is suffixed.
+    expect(labels).toContain("Sofa Booqit");
+    expect(labels).toContain("Accessory Booqit");
+  });
+});
