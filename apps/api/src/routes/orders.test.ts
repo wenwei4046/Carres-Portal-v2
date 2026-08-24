@@ -208,13 +208,22 @@ function buildSbForCreate(opts: {
   const rpcCalls: Array<{ name: string; payload: unknown }> = [];
   const eqs: Array<[string, unknown]> = [];
   let currentTable: string | null = null;
+  // 2026-08-24: the active-rule read is `.eq().order().order()` through the ONE
+  // ordered door (readActivePwpRules), so `order` has to CHAIN. This chain has
+  // no `then`, so the hop object carries its own - and it still resolves EMPTY,
+  // which is the point: this builder is the UNCONFIGURED-rule path, and an
+  // empty rule set is what makes a claim reject as pwp_unknown_rule.
+  const orderChain: Record<string, unknown> = {
+    order: () => orderChain,
+    then: (resolve: (v: unknown) => unknown) => resolve({ data: [], error: null }),
+  };
   const chain = {
     eq(col: string, val: unknown) {
       eqs.push([col, val]);
       return chain;
     },
     in: async () => ({ data: opts.productSkuCategoryRows ?? [], error: null }),
-    order: async () => ({ data: [], error: null }),
+    order: () => orderChain,
     maybeSingle: async () => {
       // P1 — the earliest-sell floor is a setting, not a constant.
       if (currentTable === "purchasing_settings") {
@@ -347,7 +356,13 @@ function buildSbForCreatePwp(opts: {
         return chain;
       },
       maybeSingle: async () => ({ data: opts.fetchedRow ?? null, error: null }),
-      order: async () => ({ data: [], error: null }),
+      // 2026-08-24: `order` was TERMINAL here, resolving an empty list. The
+      // active-rule read now goes through the ONE ordered door
+      // (readActivePwpRules) as .eq().order().order(), so a terminal stub
+      // handed every PWP test an EMPTY rule set and 11 of them 500'd.
+      // Chainable instead: the chain is awaitable via `then` -> rowsFor,
+      // which still yields [] for every dormant table.
+      order: () => chain,
       then: (resolve: (v: unknown) => unknown) => resolve({ data: rowsFor(table), error: null }),
     };
     return chain;

@@ -43,6 +43,9 @@ function mockSb(opts: MockOpts = {}): SupabaseClient {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const b: any = {
       eq: () => b,
+      // 2026-08-24: the active-rule read goes through the ONE ordered door
+      // (readActivePwpRules), so the chain is now .eq().order().order().
+      order: () => b,
       in: () => listRes(),
       maybeSingle: async () => ({ data: null, error: d.error ?? null }),
       // `.from(PWP_RULES).select("*").eq("active",true)` is awaited directly.

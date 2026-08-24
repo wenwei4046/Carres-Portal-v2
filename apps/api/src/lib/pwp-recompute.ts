@@ -1,8 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
-  Adapters,
-  DB,
-  PWP_RULES,
   SOFA_COMBO_PRICING,
   matchSofaCombo,
   resolvePwp,
@@ -13,7 +10,7 @@ import {
 } from "@carres/shared";
 
 import type { RecomputableLine } from "./sofa-recompute";
-import { resolveSkuInfo, type SkuInfo } from "./rule-line-input";
+import { readActivePwpRules, resolveSkuInfo, type SkuInfo } from "./rule-line-input";
 
 /**
  * Order-path PWP / Promo claim gate (2990s Products parity Phase 8b, migration
@@ -317,11 +314,11 @@ export async function recomputePwpLines(
   const claimIndexSet = new Set(claims.map((c) => c.index));
 
   // 2. ACTIVE rules (the adapter runs parseRuleTargets). RLS — never service_role.
-  const rulesR = await sb.from(PWP_RULES).select("*").eq("active", true);
-  if (rulesR.error) return { status: "server_error", message: rulesR.error.message };
-  const domainRules: PwpRuleDomain[] = ((rulesR.data ?? []) as DB.PwpRuleRow[]).map((r) =>
-    Adapters.pwpRuleFromRow(r),
-  );
+  //    Read through the ONE ordered door: `resolvePwp` is greedy, so the order
+  //    decides which rule pays for a line and therefore what it costs.
+  const rulesR = await readActivePwpRules(sb);
+  if (!rulesR.ok) return { status: "server_error", message: rulesR.message };
+  const domainRules: PwpRuleDomain[] = rulesR.rules;
   const rulesById = new Map(domainRules.map((r) => [r.id, r] as const));
 
   // 3. Unknown / inactive rule — a claimed ruleId not in the active set rejects.
