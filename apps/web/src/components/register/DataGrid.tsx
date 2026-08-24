@@ -1459,8 +1459,10 @@ function DataGridInner<T>({
                          more here". Red down a whole column reads as ninety
                          problems. Neutral grey is what a chevron is for, and
                          fixing it in the ENGINE fixes every register at once
-                         rather than teaching one page a private colour. */
-                      color: "var(--c-slate-9, #8B8D98)",
+                         rather than teaching one page a private colour.
+                         `--fg-muted` is the module's own base-500 alias — a
+                         token the sheet already speaks, not a new literal. */
+                      color: "var(--fg-muted)",
                       fontSize: 14,
                       lineHeight: 1,
                       display: "inline-block",
