@@ -3,7 +3,41 @@ import type { SalesOrderRevisionRow } from "@/lib/queries";
 import { fmtDate } from "@/lib/fmt-date";
 import { describeRevisionChanges } from "./sales-order-revisions";
 
-interface HistoryEvent { text: string; occurred_at: string }
+/**
+ * ⭐ AN EVENT NAMES ITS ACTOR (2026-08-24).
+ *
+ * `by_role` says "Salesperson"; it never says WHICH salesperson, and a ledger
+ * that cannot name its actor is an audit trail with the audit removed
+ * (MASTER.md:146 — History is "the append-only event ledger").
+ *
+ * `actor` is the resolved display name, `null` when the id could not be
+ * resolved — a cron, a database trigger, a deleted account, or a row written
+ * before the column carried anyone. Both fields are OPTIONAL so a browser on
+ * this build against an older Worker renders exactly as it did before.
+ */
+interface HistoryEvent {
+  text: string;
+  occurred_at: string;
+  by_role?: string | null;
+  actor?: string | null;
+}
+
+/**
+ * Who to print for an event. NEVER invents a person: an unresolved actor says
+ * `Unknown user` rather than borrowing the role as if it were a name, and the
+ * role rides alongside so "Unknown user · Salesperson" still tells the reader
+ * what KIND of actor it was even when the account is gone.
+ */
+export function historyActorWords(event: HistoryEvent): string {
+  const who = (event.actor ?? "").trim();
+  const role = (event.by_role ?? "").trim();
+  const roleWord = role ? role.charAt(0).toUpperCase() + role.slice(1) : "";
+  if (who && roleWord) return `${who} · ${roleWord}`;
+  if (who) return who;
+  // An event with neither is older than the column — say so plainly rather
+  // than printing an empty gap the reader has to interpret.
+  return roleWord ? `Unknown user · ${roleWord}` : "Unknown user";
+}
 
 /**
  * History is an operator ledger, not a database log. Older records contain
@@ -135,7 +169,13 @@ export default function SalesOrderLedger({
           {history.map((event, i) => (
             <li key={i} className="flex gap-3 text-body">
               <span className="shrink-0 text-meta text-base-500 tabular-nums">{fmtDate(event.occurred_at, { time: true })}</span>
-              <span className="min-w-0 break-words">{historyWords(event.text)}</span>
+              <span className="min-w-0 break-words">
+                <span className="text-meta font-medium text-base-700" data-testid={`history-actor-${i}`}>
+                  {historyActorWords(event)}
+                </span>
+                <span className="text-base-400"> · </span>
+                {historyWords(event.text)}
+              </span>
             </li>
           ))}
         </ul>
