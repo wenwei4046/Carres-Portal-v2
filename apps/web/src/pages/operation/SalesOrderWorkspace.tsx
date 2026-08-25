@@ -2493,7 +2493,26 @@ export default function SalesOrderWorkspace() {
           of a locked ruling doing its job. Reopening it needs an owner ruling,
           not a build decision. */}
       {!isNew && mode !== "oldrev" && (
-        <Block title="Related Documents">
+        <Block
+          title="Related Documents"
+          summary={relatedDocumentsSummary(
+            [
+              { label: "Purchase Orders", count: relatedDocuments.pos.length },
+              { label: "Receiving Sessions", count: relatedDocuments.receiving.length },
+              { label: "Stock Units", count: relatedDocuments.stock.length },
+              { label: "Delivery Orders", count: relatedDocuments.deliveryOrders.length },
+              { label: "Payments", count: relatedDocuments.payments.length },
+              { label: "Service Cases", count: relatedDocuments.cases.length },
+              { label: "Guarantees", count: relatedDocuments.guarantees.length },
+            ],
+            routeFactsQ.isLoading ||
+              goodsTruthQ.isLoading ||
+              deliveryOrdersQ.isLoading ||
+              paymentsQ.isLoading ||
+              serviceCasesQ.isLoading ||
+              guaranteesQ.isLoading,
+          )}
+        >
           <div data-testid="sales-order-related-documents">
             <RelatedDocumentLine label="Purchase Orders">
               <DocumentLinks documents={relatedDocuments.pos} />
@@ -3000,4 +3019,44 @@ function operationalConfig(line: { attrs?: Record<string, unknown> | null }): st
     facts.push(`${label}: ${String(value)}`);
   }
   return facts;
+}
+
+/**
+ * ⭐ WHAT IS BEHIND THE FOLD — Related Documents (2026-08-25).
+ *
+ * I refused to collapse this block on 2026-08-24, and I was over-cautious. What
+ * `docs/orders/MASTER.md:226` actually rules is that the index is COMPLETE —
+ * *"It must not show only the latest or first Delivery Order when more exist"* —
+ * and it sanctions a summary in the same breath: *"For many documents the
+ * summary says, for example, `2 Delivery Orders →`"*. Nothing there says the
+ * card must stand open. The `ui-contract` test I pointed at was asserting the
+ * SHAPE OF THE SOURCE LINE, not that ruling, which is a test enforcing its own
+ * spelling rather than its own intent.
+ *
+ * Collapsing hides no door. All seven owners stay in the block; the fold only
+ * decides whether they are on screen before the operator asks.
+ *
+ * The summary NAMES what exists, because a fold the operator cannot see past is
+ * a fold they must open every time to learn there was nothing behind it. The
+ * count-then-label shape is MASTER's own (`2 Delivery Orders`); a lone item
+ * takes the singular of that same approved noun, which is grammar, not a second
+ * word for the same thing. Empty is the governed `—` the MASTER names, and a
+ * still-loading block borrows `Loading…` from the rows below it rather than
+ * inventing a second way to say the same thing.
+ */
+export function relatedDocumentsSummary(
+  groups: ReadonlyArray<{ label: string; count: number }>,
+  loading: boolean,
+): string {
+  /* Loading must NOT read as empty. Saying "—" while the answer is still in
+     flight tells the operator this order has no documents, which is a lie that
+     resolves itself silently a second later. */
+  if (loading) return "Loading…";
+  const present = groups.filter((g) => g.count > 0);
+  if (present.length === 0) return "—";
+  const named = present
+    .slice(0, 3)
+    .map((g) => `${g.count} ${g.count === 1 ? g.label.replace(/s$/, "") : g.label}`);
+  const rest = present.length - named.length;
+  return rest > 0 ? `${named.join(" · ")} · +${rest} more` : named.join(" · ");
 }

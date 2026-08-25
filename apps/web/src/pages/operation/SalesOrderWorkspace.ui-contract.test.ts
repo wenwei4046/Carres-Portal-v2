@@ -151,9 +151,19 @@ describe("Sales Order object template contract", () => {
     );
   });
 
+  /* ⭐ COMPLETE, NOT PERMANENTLY OPEN (2026-08-25).
+     This assertion used to pin `<Block title="Related Documents">` as one exact
+     source line, which made it fail the moment the block gained a summary — and
+     I read that failure as the RULING forbidding a fold. It was not. MASTER.md
+     :226 rules the index COMPLETE ("must not show only the latest or first
+     Delivery Order when more exist") and sanctions a summary in the same breath
+     ("the summary says, for example, `2 Delivery Orders →`"). A test that
+     enforces its own spelling instead of its own intent is a test that blocks
+     correct work, so it now asserts the SEVEN OWNERS — which is the thing the
+     ruling actually protects, and which a fold cannot take away. */
   it("shows Delivery Journey and a complete read-only Related Documents index", () => {
     expect(workspace).toContain('<Block title="Delivery Journey">');
-    expect(workspace).toContain('<Block title="Related Documents">');
+    expect(workspace).toContain('title="Related Documents"');
     expect(workspace).toContain('data-testid="sales-order-related-documents"');
     for (const word of [
       "Purchase Orders",
