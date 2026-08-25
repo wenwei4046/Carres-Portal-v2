@@ -20,6 +20,7 @@ import { ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import {
   useCreateCatalogModel,
+  useCreateSupplier,
   useOperationSuppliers,
   useCreateCatalogSku,
   useCreateGuaranteeProduct,
@@ -149,6 +150,15 @@ export default function NewSkuModal({
    * the NAME is only ever derived from it (Law A/D), never typed here. */
   const [supplierId, setSupplierId] = useState("");
   const suppliersQ = useOperationSuppliers();
+  /* ⭐ Adding a supplier without leaving the SKU (2026-08-24). Principal-only,
+   * because `suppliers_principal_write` (0002) has always been the boundary —
+   * the panel simply does not render for anyone who would be refused. */
+  const createSupplier = useCreateSupplier();
+  const [newSupplierOpen, setNewSupplierOpen] = useState(false);
+  const [newSupplierName, setNewSupplierName] = useState("");
+  const [newSupplierKind, setNewSupplierKind] =
+    useState<"own_logistics" | "factory_pickup">("factory_pickup");
+  const [newSupplierCats, setNewSupplierCats] = useState<ProductCategory[]>([]);
   // new-product fields
   const [category, setCategory] = useState<ProductCategory>("mattress");
   const [name, setName] = useState("");
@@ -198,24 +208,145 @@ export default function NewSkuModal({
   // means the same thing everywhere: empty = Auto (today's resolve), a pick =
   // an explicit override sent to whichever endpoint this flow calls.
   const supplierPickerField = (
-    <label className="block">
-      <span className="label block mb-1">Supplier</span>
-      <select
-        value={supplierId}
-        onChange={(e) => setSupplierId(e.target.value)}
-        data-testid="new-sku-supplier"
-        className={INPUT_CLS}
-      >
-        {/* Auto keeps the route's category-based resolution - the behaviour
-            every SKU before this picker was created under. */}
-        <option value="">Auto (by category)</option>
-        {(suppliersQ.data?.suppliers ?? []).map((s) => (
-          <option key={s.id} value={s.id}>
-            {s.name}
-          </option>
-        ))}
-      </select>
-    </label>
+    <div className="block">
+      <label className="block">
+        <span className="label block mb-1">Supplier</span>
+        <select
+          value={supplierId}
+          onChange={(e) => setSupplierId(e.target.value)}
+          data-testid="new-sku-supplier"
+          className={INPUT_CLS}
+        >
+          {/* Auto keeps the route's category-based resolution - the behaviour
+              every SKU before this picker was created under. */}
+          <option value="">Auto (by category)</option>
+          {(suppliersQ.data?.suppliers ?? []).map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      {/* ⭐ MEETING A NEW SUPPLIER MID-CATALOG (2026-08-24).
+          Until today the portal had NO supplier-creation door anywhere, so a
+          keyer who reached a factory nobody had entered yet had to stop, open
+          the SQL editor (or ask someone who could) and come back. The record
+          still belongs to Purchasing; this is a door onto it, and the point of
+          putting it HERE is that the half-written SKU survives. */}
+      {isPrincipal && !newSupplierOpen && (
+        <button
+          type="button"
+          onClick={() => {
+            setNewSupplierOpen(true);
+            /* Pre-tick the category being keyed: it is the answer nine times
+               out of ten, and it is the one fact this modal already knows. */
+            setNewSupplierCats(effectiveCategory ? [effectiveCategory] : []);
+          }}
+          className="mt-1.5 text-meta font-medium text-kit-blue-9 underline underline-offset-2"
+          data-testid="new-sku-supplier-add-open"
+        >
+          + New supplier
+        </button>
+      )}
+      {isPrincipal && newSupplierOpen && (
+        <div
+          className="mt-2 flex flex-col gap-2 rounded-card border border-base-200 bg-base-50 p-2.5"
+          data-testid="new-sku-supplier-add"
+        >
+          <label className="block">
+            <span className="label block mb-1">New supplier name</span>
+            <input
+              value={newSupplierName}
+              onChange={(e) => setNewSupplierName(e.target.value)}
+              placeholder="e.g. Hookka"
+              data-testid="new-sku-supplier-add-name"
+              className={INPUT_CLS}
+            />
+          </label>
+          <label className="block">
+            <span className="label block mb-1">How the goods leave the factory</span>
+            <select
+              value={newSupplierKind}
+              onChange={(e) =>
+                setNewSupplierKind(e.target.value as "own_logistics" | "factory_pickup")
+              }
+              data-testid="new-sku-supplier-add-kind"
+              className={INPUT_CLS}
+            >
+              <option value="factory_pickup">We collect from the factory</option>
+              <option value="own_logistics">They deliver to us</option>
+            </select>
+          </label>
+          <div className="block">
+            <span className="label block mb-1">What they supply</span>
+            <div className="flex flex-wrap gap-1.5">
+              {PRODUCT_CATEGORIES.map((cat) => {
+                const on = newSupplierCats.includes(cat);
+                return (
+                  <button
+                    key={cat}
+                    type="button"
+                    aria-pressed={on}
+                    onClick={() =>
+                      setNewSupplierCats((prev) =>
+                        prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat],
+                      )
+                    }
+                    className={`rounded-[4px] border px-2 py-1 text-meta font-semibold transition-colors ${
+                      on
+                        ? "border-base-900 bg-base-900 text-white"
+                        : "border-base-200 bg-white text-base-500 hover:border-base-400"
+                    }`}
+                    data-testid={`new-sku-supplier-add-cat-${cat}`}
+                  >
+                    {CATEGORY_LABEL[cat]}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="mt-1 text-meta text-base-500">
+              Ticking a category lets Carres pick this supplier on its own. You can always choose
+              them by hand instead.
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              disabled={newSupplierName.trim().length < 2 || createSupplier.isPending}
+              onClick={async () => {
+                try {
+                  const { supplier } = await createSupplier.mutateAsync({
+                    name: newSupplierName.trim(),
+                    kind: newSupplierKind,
+                    catCovered: newSupplierCats,
+                  });
+                  /* Select it immediately — the keyer asked for this supplier
+                     because they are keying its SKU right now. */
+                  setSupplierId(supplier.id);
+                  setNewSupplierOpen(false);
+                  setNewSupplierName("");
+                  toast.success(`${supplier.name} added — selected for this SKU`);
+                } catch (e) {
+                  toast.error(e instanceof ApiError ? e.message : "Could not add the supplier");
+                }
+              }}
+              className="btn-primary text-meta"
+              data-testid="new-sku-supplier-add-save"
+            >
+              {createSupplier.isPending ? "Adding…" : "Add supplier"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setNewSupplierOpen(false)}
+              className="btn-ghost text-meta"
+              data-testid="new-sku-supplier-add-cancel"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 
   /* The batch-default code plus one box per piece being generated. Rendered by

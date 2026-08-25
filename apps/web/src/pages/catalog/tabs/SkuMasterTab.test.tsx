@@ -63,6 +63,14 @@ vi.mock("@/lib/queries", () => ({
     data: { suppliers: [{ id: "00000000-0000-4000-8000-0000000000s1".replace("s","a"), name: "Hookka" }] },
     isLoading: false,
   }),
+  /* 2026-08-24 - the New SKU modal now offers the portal's FIRST
+   * supplier-creation door. This file renders that modal for the 0175
+   * price-lock cases, so the hook has to exist here too. */
+  useCreateSupplier: () => ({
+    mutate: vi.fn(),
+    mutateAsync: vi.fn().mockResolvedValue({ supplier: { id: "sup-new", name: "New" } }),
+    isPending: false,
+  }),
   usePatchCatalogSku: () => ({
     mutate: mockPatchMutate,
     mutateAsync: mockPatchMutateAsync,

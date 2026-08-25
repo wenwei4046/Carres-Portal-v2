@@ -1380,3 +1380,45 @@ export const catalogOptionPoolPatchInput = z
   })
   .strict();
 export type CatalogOptionPoolPatchInput = z.infer<typeof catalogOptionPoolPatchInput>;
+
+/**
+ * ⭐ CREATING A SUPPLIER — POST /api/operation/suppliers (2026-08-24).
+ *
+ * Until today the portal had NO supplier-creation door at all: not a route,
+ * not a screen. Every supplier in the database was inserted by hand in SQL,
+ * which meant onboarding a factory was an engineering task and a keyer who met
+ * a new one mid-catalog simply stopped.
+ *
+ * Purchasing still OWNS the record; this is a door, not a second home for it
+ * (Architecture Law C). `suppliers_principal_write` (0002) already answers who
+ * may walk through — principal only — so nothing about RLS changes here.
+ *
+ * `slug` is deliberately NOT an input. It is `suppliers_slug_unique` in
+ * production and keys SUPPLIER_SOP across environments (0032), so it is
+ * derived from the name server-side: a keyer who never heard of a slug cannot
+ * mistype one, and two suppliers cannot quietly agree on it.
+ */
+export const supplierCreateInput = z
+  .object({
+    name: z.string().trim().min(2).max(80),
+    kind: z.enum(["own_logistics", "factory_pickup"]),
+    /* The categories this supplier can be auto-resolved for. Empty is legal —
+     * an explicit pick on the SKU still routes to it — so a keyer is never
+     * blocked by a question they cannot answer yet. */
+    catCovered: z.array(productCategorySchema).max(20).default([]),
+    contact: z.string().trim().max(200).optional(),
+    leadTime: z.string().trim().max(60).optional(),
+  })
+  .strict();
+export type SupplierCreateInput = z.infer<typeof supplierCreateInput>;
+
+/** The stable slug for a supplier name: lowercase, punctuation folded to single
+ *  hyphens, ends trimmed. `HoOKkA` → `hookka`, matching the 0032 backfill so a
+ *  supplier created today and one created by that migration read alike. */
+export function supplierSlug(name: string): string {
+  return name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}

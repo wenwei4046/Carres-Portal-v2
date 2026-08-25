@@ -23,12 +23,14 @@ import NewSkuModal from "./NewSkuModal";
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 let mockRole: string | null = "principal";
+let mockSuppliers: { id: string; name: string }[] = [];
 vi.mock("@/lib/auth", () => ({
   useAuth: (selector: (s: { role: string | null }) => unknown) =>
     selector({ role: mockRole }),
 }));
 
 const mockCreateModelMutateAsync = vi.fn();
+const mockCreateSupplierMutateAsync = vi.fn();
 const mockCreateSkuMutateAsync = vi.fn();
 const mockOfferMutateAsync = vi.fn();
 const mockGenerateSkusMutateAsync = vi.fn();
@@ -38,8 +40,19 @@ vi.mock("@/lib/queries", () => ({
   /* 2026-08-24 - the supplier picker/filter/column reads the roster through
    * this hook; one named supplier is enough to pin the render path. */
   useOperationSuppliers: () => ({
-    data: { suppliers: [{ id: "00000000-0000-4000-8000-0000000000s1".replace("s","a"), name: "Hookka" }] },
+    /* A MUTABLE roster, because the real hook is invalidated by the create
+       mutation and refetches. A frozen list would make the picker look broken
+       in a test while working in production. */
+    data: { suppliers: mockSuppliers },
     isLoading: false,
+  }),
+  /* 2026-08-24 - the FIRST supplier-creation door the portal has ever had.
+   * Principal-only, so the panel simply does not render for anyone the
+   * `suppliers_principal_write` policy (0002) would refuse. */
+  useCreateSupplier: () => ({
+    mutate: vi.fn(),
+    mutateAsync: mockCreateSupplierMutateAsync,
+    isPending: false,
   }),
   useCreateCatalogModel: () => ({
     mutate: vi.fn(),
@@ -107,6 +120,12 @@ function openSofa() {
 
 beforeEach(() => {
   mockRole = "principal";
+  mockSuppliers = [{ id: "00000000-0000-4000-8000-0000000000a1", name: "Hookka" }];
+  mockCreateSupplierMutateAsync.mockReset().mockImplementation(async () => {
+    const supplier = { id: "sup-new", name: "Hookka Two" };
+    mockSuppliers = [...mockSuppliers, supplier];
+    return { supplier };
+  });
   mockCreateModelMutateAsync.mockReset().mockResolvedValue({ model: { id: "m-new" } });
   mockCreateSkuMutateAsync.mockReset().mockResolvedValue({});
   mockOfferMutateAsync.mockReset().mockResolvedValue({ offered: 2, failed: [] });
@@ -849,5 +868,99 @@ describe("NewSkuModal — the supplier's own code on a bulk batch", () => {
     // server resolves per-variant → batch → NULL.
     expect(call.input.supplierCode).toBe("LM-100");
     expect(call.input.supplierCodes).toEqual({ King: "LM-100-K" });
+  });
+});
+
+/**
+ * ⭐ MEETING A NEW SUPPLIER MID-CATALOG (2026-08-24).
+ *
+ * The portal had NO supplier-creation door anywhere — no route, no screen — so
+ * a keyer who reached a factory nobody had entered yet had to stop, open the
+ * SQL editor (or find someone who could) and come back to a modal they had
+ * already lost. The point of putting the door HERE is that the half-written SKU
+ * survives being interrupted by a supplier.
+ *
+ * Purchasing still owns the record. This is a door, not a second home for it.
+ */
+describe("NewSkuModal — adding a supplier without losing the SKU", () => {
+  it("offers the door, and pre-ticks the category being keyed", () => {
+    render(<NewSkuModal models={MODELS} sofaCompartments={POOL} onClose={vi.fn()} />);
+    openSofa();
+    fireEvent.click(screen.getByTestId("new-sku-supplier-add-open"));
+    /* The category is the one fact this modal already knows and the answer nine
+       times out of ten — asking it again would be asking the keyer to repeat
+       themselves. */
+    expect(screen.getByTestId("new-sku-supplier-add-cat-sofa")).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.getByTestId("new-sku-supplier-add-cat-mattress")).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+  });
+
+  it("⭐ never shows the door to a role the policy would refuse", () => {
+    /* `suppliers_principal_write` (0002) is principal-only and the route
+       enforces it. A button that always refuses teaches the operator to ignore
+       refusals, so it simply is not drawn. */
+    mockRole = "operation";
+    render(<NewSkuModal models={MODELS} optionPools={SIZE_POOLS} onClose={vi.fn()} />);
+    expect(screen.queryByTestId("new-sku-supplier-add-open")).not.toBeInTheDocument();
+  });
+
+  it("refuses to submit a name too short to be a name", () => {
+    render(<NewSkuModal models={MODELS} optionPools={SIZE_POOLS} onClose={vi.fn()} />);
+    fireEvent.click(screen.getByTestId("new-sku-supplier-add-open"));
+    const save = screen.getByTestId("new-sku-supplier-add-save") as HTMLButtonElement;
+    expect(save.disabled).toBe(true);
+    fireEvent.change(screen.getByTestId("new-sku-supplier-add-name"), { target: { value: "H" } });
+    expect(save.disabled).toBe(true);
+    fireEvent.change(screen.getByTestId("new-sku-supplier-add-name"), {
+      target: { value: "Hookka Two" },
+    });
+    expect(save.disabled).toBe(false);
+  });
+
+  it("⭐ selects the new supplier the moment it exists, and closes the panel", async () => {
+    render(<NewSkuModal models={MODELS} optionPools={SIZE_POOLS} onClose={vi.fn()} />);
+    fireEvent.click(screen.getByTestId("new-sku-supplier-add-open"));
+    fireEvent.change(screen.getByTestId("new-sku-supplier-add-name"), {
+      target: { value: "  Hookka Two  " },
+    });
+    fireEvent.click(screen.getByTestId("new-sku-supplier-add-save"));
+
+    await waitFor(() =>
+      expect(mockCreateSupplierMutateAsync).toHaveBeenCalledWith({
+        name: "Hookka Two",
+        kind: "factory_pickup",
+        catCovered: ["mattress"],
+      }),
+    );
+    /* The keyer asked for this supplier BECAUSE they are writing its SKU right
+       now — making them find it in the list again would be the modal forgetting
+       what it was just told. */
+    await waitFor(() =>
+      expect((screen.getByTestId("new-sku-supplier") as HTMLSelectElement).value).toBe("sup-new"),
+    );
+    expect(screen.queryByTestId("new-sku-supplier-add")).not.toBeInTheDocument();
+  });
+
+  it("keeps the panel open when the server refuses, so the typing is not lost", async () => {
+    mockCreateSupplierMutateAsync.mockRejectedValueOnce(new Error("already a supplier"));
+    render(<NewSkuModal models={MODELS} optionPools={SIZE_POOLS} onClose={vi.fn()} />);
+    fireEvent.click(screen.getByTestId("new-sku-supplier-add-open"));
+    fireEvent.change(screen.getByTestId("new-sku-supplier-add-name"), {
+      target: { value: "Hookka Two" },
+    });
+    fireEvent.click(screen.getByTestId("new-sku-supplier-add-save"));
+
+    await waitFor(() => expect(mockCreateSupplierMutateAsync).toHaveBeenCalled());
+    // Still open, still holding what was typed — a refusal is not a reason to
+    // throw the keyer's work away.
+    expect(screen.getByTestId("new-sku-supplier-add")).toBeInTheDocument();
+    expect((screen.getByTestId("new-sku-supplier-add-name") as HTMLInputElement).value).toBe(
+      "Hookka Two",
+    );
   });
 });

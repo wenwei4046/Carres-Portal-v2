@@ -297,6 +297,7 @@ import {
   type DeliveryArrangementEventRow,
   type AssignLogisticsInput,
   type SaveDeliveryArrangementInput,
+  type SupplierCreateInput,
 } from "@carres/shared";
 import { ApiError, apiFetch } from "./api";
 import { uploadCompartmentPhoto, uploadDeliveryPhoto, uploadModelPhoto } from "./photo-upload";
@@ -4134,6 +4135,48 @@ export function useOperationSuppliers(
       apiFetch<SuppliersListResponse>("/api/operation/suppliers"),
     staleTime: 5 * 60_000,
     ...opts,
+  });
+}
+
+/**
+ * ⭐ useCreateSupplier — POST /api/operation/suppliers (2026-08-24).
+ *
+ * The portal's FIRST supplier-creation door. Before this, a new factory was an
+ * engineering task: someone opened the SQL editor. Principal-only, which is not
+ * a new rule — `suppliers_principal_write` (0002) has always said so; there was
+ * simply nothing to call.
+ *
+ * Invalidates the suppliers list so the picker that opened this shows the new
+ * name without a reload — the whole point is that the keyer never leaves the
+ * SKU they were in the middle of writing.
+ */
+export function useCreateSupplier() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: SupplierCreateInput) =>
+      apiFetch<{ supplier: SupplierRow }>(
+        "/api/operation/suppliers",
+        catalogJson("POST", input),
+      ),
+    onSuccess: ({ supplier }) => {
+      /* ⭐ PUT IT IN THE LIST BEFORE THE REFETCH LANDS. The caller selects the
+         new supplier the instant it exists, and a <select> whose value matches
+         no option renders BLANK — so an invalidate alone would flash "nothing
+         selected" over a supplier that was created successfully. Seeding the
+         cache makes the option exist in the same paint as the selection.
+         Sorted by name because the list route orders that way; the invalidate
+         still runs, so the server's answer remains the one that survives. */
+      qc.setQueryData<SuppliersListResponse>(qk.operation.suppliers(), (prev) =>
+        prev
+          ? {
+              suppliers: [...prev.suppliers, supplier].sort((a, b) =>
+                a.name.localeCompare(b.name),
+              ),
+            }
+          : { suppliers: [supplier] },
+      );
+      qc.invalidateQueries({ queryKey: qk.operation.suppliers() });
+    },
   });
 }
 

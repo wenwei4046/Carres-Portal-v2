@@ -369,6 +369,11 @@ export {
   pwpDiscoverResponseSchema,
   type PwpDiscoverDto,
   type PwpDiscoverResponse,
+  // 2026-08-24 — the FIRST supplier-creation door the portal has ever had.
+  // Purchasing still owns the record; this is the shared contract for it.
+  supplierCreateInput,
+  supplierSlug,
+  type SupplierCreateInput,
 } from "./schemas/catalog";
 
 // 0219 — Order Entry config (payment methods + form fields).
