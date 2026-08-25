@@ -297,6 +297,7 @@ import {
   type DeliveryArrangementEventRow,
   type AssignLogisticsInput,
   type SaveDeliveryArrangementInput,
+  type SupplierCreateInput,
 } from "@carres/shared";
 import { ApiError, apiFetch } from "./api";
 import { uploadCompartmentPhoto, uploadDeliveryPhoto, uploadModelPhoto } from "./photo-upload";
@@ -4134,6 +4135,48 @@ export function useOperationSuppliers(
       apiFetch<SuppliersListResponse>("/api/operation/suppliers"),
     staleTime: 5 * 60_000,
     ...opts,
+  });
+}
+
+/**
+ * ⭐ useCreateSupplier — POST /api/operation/suppliers (2026-08-24).
+ *
+ * The portal's FIRST supplier-creation door. Before this, a new factory was an
+ * engineering task: someone opened the SQL editor. Principal-only, which is not
+ * a new rule — `suppliers_principal_write` (0002) has always said so; there was
+ * simply nothing to call.
+ *
+ * Invalidates the suppliers list so the picker that opened this shows the new
+ * name without a reload — the whole point is that the keyer never leaves the
+ * SKU they were in the middle of writing.
+ */
+export function useCreateSupplier() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: SupplierCreateInput) =>
+      apiFetch<{ supplier: SupplierRow }>(
+        "/api/operation/suppliers",
+        catalogJson("POST", input),
+      ),
+    onSuccess: ({ supplier }) => {
+      /* ⭐ PUT IT IN THE LIST BEFORE THE REFETCH LANDS. The caller selects the
+         new supplier the instant it exists, and a <select> whose value matches
+         no option renders BLANK — so an invalidate alone would flash "nothing
+         selected" over a supplier that was created successfully. Seeding the
+         cache makes the option exist in the same paint as the selection.
+         Sorted by name because the list route orders that way; the invalidate
+         still runs, so the server's answer remains the one that survives. */
+      qc.setQueryData<SuppliersListResponse>(qk.operation.suppliers(), (prev) =>
+        prev
+          ? {
+              suppliers: [...prev.suppliers, supplier].sort((a, b) =>
+                a.name.localeCompare(b.name),
+              ),
+            }
+          : { suppliers: [supplier] },
+      );
+      qc.invalidateQueries({ queryKey: qk.operation.suppliers() });
+    },
   });
 }
 
@@ -9234,6 +9277,7 @@ export function useOfferModelCompartments() {
       modelId,
       compartmentIds,
       supplierId,
+      supplierCodes,
     }: {
       modelId: string;
       compartmentIds: string[];
@@ -9241,13 +9285,23 @@ export function useOfferModelCompartments() {
        * to send on every call: syncCompartmentSku's own inherit-from-siblings
        * step wins the moment one compartment in the batch has written it. */
       supplierId?: string;
+      /* ⭐ The supplier's own code per compartment (2026-08-24), keyed by
+       * compartmentId. This loop already sends one request per compartment, so
+       * a per-piece code costs nothing extra: it rides the request that
+       * compartment was making anyway. An absent entry sends nothing, which
+       * the server reads as "leave the existing code alone". */
+      supplierCodes?: Record<string, string>;
     }) => {
       const failed: { compartmentId: string; message: string }[] = [];
       for (const compartmentId of compartmentIds) {
         try {
+          const code = supplierCodes?.[compartmentId]?.trim();
           await apiFetch<{ modelSofaCompartment: ModelSofaCompartmentDto }>(
             `/api/catalog/models/${modelId}/compartments/${compartmentId}`,
-            catalogJson("PUT", supplierId ? { supplierId } : {}),
+            catalogJson("PUT", {
+              ...(supplierId ? { supplierId } : {}),
+              ...(code ? { supplierCode: code } : {}),
+            }),
           );
         } catch (e) {
           failed.push({

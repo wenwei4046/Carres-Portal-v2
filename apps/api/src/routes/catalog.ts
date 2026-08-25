@@ -1503,6 +1503,29 @@ catalogRouter.post("/models/:id/generate-skus", async (c) => {
   if (exErr) { const m = mapPgError(exErr); return c.json(m.body, m.status); }
   const existing = new Set((existingRows ?? []).map((r) => (r as { sku: string }).sku));
 
+  /* ⭐ The supplier's own code per generated row (2026-08-24): the per-variant
+     override first, then the batch default, then NULL. Read against the RAW
+     variant the caller sent — the canonical size (`K` → `King`) is computed
+     here, so the caller cannot have keyed the map by it. A blank string is
+     NULL, not "", so an untouched box never writes an empty code. */
+  const supplierCodeFor = (v: string): string | null => {
+    /* A BLANK OVERRIDE IS AN ABSENT ONE, not an instruction to clear. The box
+       for a piece starts empty and shows the batch code as its placeholder, so
+       "left alone" and "deliberately emptied" look identical to the operator —
+       reading `""` as a clear would blank the code they had just typed above.
+       `??` alone gets this wrong: an empty string is not nullish, so it would
+       win the coalesce and take the batch default out of play. */
+    const own = (parsed.data.supplierCodes?.[v] ?? "").trim();
+    return own || (parsed.data.supplierCode ?? "").trim() || null;
+  };
+  /* THE DEPLOY-ORDER HAZARD, RESPECTED (`catalog.skus-supplier-code.test.ts`).
+     `supplier_code` (0375) was applied by hand, and PostgREST refuses an INSERT
+     naming a column that does not exist — which would take out SKU GENERATION
+     entirely rather than just the new field. So the key is named only when a
+     code was actually typed, and then on EVERY row of the batch, because a
+     bulk insert whose objects disagree about their keys is its own hazard. */
+  const anySupplierCode = variants.some((v) => supplierCodeFor(v) !== null);
+
   const toInsert = variants
     .filter((v) => !existing.has(codeFor(v)))
     .map((v) => ({
@@ -1513,6 +1536,7 @@ catalogRouter.post("/models/:id/generate-skus", async (c) => {
       price: parsed.data.price ?? 0,
       cost: null,
       supplier_id: supplierId,
+      ...(anySupplierCode ? { supplier_code: supplierCodeFor(v) } : {}),
       pos_active: true,
       description: autoBedSkuDescription(
         modelRow.category,
@@ -2166,6 +2190,7 @@ catalogRouter.put("/models/:modelId/compartments/:compartmentId", async (c) => {
     compartmentId,
     priceOverride: parsed.data.priceOverride ?? null,
     supplierId: parsed.data.supplierId,
+    supplierCode: parsed.data.supplierCode,
   });
   if (!synced.ok) return c.json(synced.body, synced.status);
 

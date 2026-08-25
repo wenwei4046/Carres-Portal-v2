@@ -23,12 +23,14 @@ import NewSkuModal from "./NewSkuModal";
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 let mockRole: string | null = "principal";
+let mockSuppliers: { id: string; name: string }[] = [];
 vi.mock("@/lib/auth", () => ({
   useAuth: (selector: (s: { role: string | null }) => unknown) =>
     selector({ role: mockRole }),
 }));
 
 const mockCreateModelMutateAsync = vi.fn();
+const mockCreateSupplierMutateAsync = vi.fn();
 const mockCreateSkuMutateAsync = vi.fn();
 const mockOfferMutateAsync = vi.fn();
 const mockGenerateSkusMutateAsync = vi.fn();
@@ -38,8 +40,19 @@ vi.mock("@/lib/queries", () => ({
   /* 2026-08-24 - the supplier picker/filter/column reads the roster through
    * this hook; one named supplier is enough to pin the render path. */
   useOperationSuppliers: () => ({
-    data: { suppliers: [{ id: "00000000-0000-4000-8000-0000000000s1".replace("s","a"), name: "Hookka" }] },
+    /* A MUTABLE roster, because the real hook is invalidated by the create
+       mutation and refetches. A frozen list would make the picker look broken
+       in a test while working in production. */
+    data: { suppliers: mockSuppliers },
     isLoading: false,
+  }),
+  /* 2026-08-24 - the FIRST supplier-creation door the portal has ever had.
+   * Principal-only, so the panel simply does not render for anyone the
+   * `suppliers_principal_write` policy (0002) would refuse. */
+  useCreateSupplier: () => ({
+    mutate: vi.fn(),
+    mutateAsync: mockCreateSupplierMutateAsync,
+    isPending: false,
   }),
   useCreateCatalogModel: () => ({
     mutate: vi.fn(),
@@ -107,6 +120,12 @@ function openSofa() {
 
 beforeEach(() => {
   mockRole = "principal";
+  mockSuppliers = [{ id: "00000000-0000-4000-8000-0000000000a1", name: "Hookka" }];
+  mockCreateSupplierMutateAsync.mockReset().mockImplementation(async () => {
+    const supplier = { id: "sup-new", name: "Hookka Two" };
+    mockSuppliers = [...mockSuppliers, supplier];
+    return { supplier };
+  });
   mockCreateModelMutateAsync.mockReset().mockResolvedValue({ model: { id: "m-new" } });
   mockCreateSkuMutateAsync.mockReset().mockResolvedValue({});
   mockOfferMutateAsync.mockReset().mockResolvedValue({ offered: 2, failed: [] });
@@ -750,5 +769,198 @@ describe("NewSkuModal — same-name models are disambiguated in the picker", () 
     // Neither collides WITHIN its own category, so neither is suffixed.
     expect(labels).toContain("Sofa Booqit");
     expect(labels).toContain("Accessory Booqit");
+  });
+});
+
+/**
+ * ⭐ THE SUPPLIER'S OWN CODE ON A BULK BATCH (2026-08-24).
+ *
+ * A quotation names the SUPPLIER's code and never Carres' SKU — it is the only
+ * string a keyer can match a factory's paperwork against. The classic
+ * single-SKU flow has had a code box since 0375; the two BULK flows had the
+ * supplier PICKER but no code, so a batch of sofa compartments or mattress
+ * sizes could name its factory and not one of its part numbers.
+ *
+ * One box defaults the batch, any piece overrides it. The override is keyed by
+ * what the SUBMIT sends — compartmentId for the compartment lane, the canonical
+ * size NAME for the size lane — because a key the server cannot recognise would
+ * drop the code silently rather than loudly.
+ */
+describe("NewSkuModal — the supplier's own code on a bulk batch", () => {
+  it("gives the compartment flow a batch box and one box per ticked piece", () => {
+    render(<NewSkuModal models={MODELS} sofaCompartments={POOL} onClose={vi.fn()} />);
+    openSofa();
+    expect(screen.getByTestId("new-sku-supplier-code-batch")).toBeInTheDocument();
+    // Both live compartments start ticked; the retired one is not offered.
+    expect(screen.getByTestId("new-sku-supplier-code-piece-c1")).toBeInTheDocument();
+    expect(screen.getByTestId("new-sku-supplier-code-piece-c2")).toBeInTheDocument();
+    expect(screen.queryByTestId("new-sku-supplier-code-piece-c-off")).not.toBeInTheDocument();
+  });
+
+  it("drops a piece's box the moment that piece is unticked", () => {
+    /* A code typed against a compartment then unticked must not travel — the
+       submit builds its map from the SELECTED ids, and the box disappearing is
+       what tells the keyer that. */
+    render(<NewSkuModal models={MODELS} sofaCompartments={POOL} onClose={vi.fn()} />);
+    openSofa();
+    fireEvent.change(screen.getByTestId("new-sku-supplier-code-piece-c2"), {
+      target: { value: "HK-1NA" },
+    });
+    fireEvent.click(screen.getByTestId("new-sku-comp-1NA"));
+    expect(screen.queryByTestId("new-sku-supplier-code-piece-c2")).not.toBeInTheDocument();
+  });
+
+  it("⭐ sends the batch code to every compartment, and the override to just one", async () => {
+    const onClose = vi.fn();
+    render(<NewSkuModal models={MODELS} sofaCompartments={POOL} onClose={onClose} />);
+    openSofa();
+    fireEvent.change(screen.getByTestId("new-sku-name"), { target: { value: "Angsa" } });
+    fireEvent.change(screen.getByTestId("new-sku-supplier-code"), {
+      target: { value: "  HK-390  " },
+    });
+    fireEvent.change(screen.getByTestId("new-sku-supplier-code-piece-c2"), {
+      target: { value: "HK-390-1NA" },
+    });
+    fireEvent.click(screen.getByText("Create model + 2 SKUs"));
+
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    /* The compartment lane sends ONE code per request, so the batch default is
+       resolved HERE — each PUT carries the single code that piece ends up with,
+       trimmed. */
+    expect(mockOfferMutateAsync).toHaveBeenCalledWith({
+      modelId: "m-new",
+      compartmentIds: ["c1", "c2"],
+      supplierCodes: { c1: "HK-390", c2: "HK-390-1NA" },
+    });
+  });
+
+  it("sends NOTHING extra when no code was typed", async () => {
+    /* The payload stays byte-identical to what it sent before this field
+       existed — an empty map is a key the server would have to interpret. */
+    const onClose = vi.fn();
+    render(<NewSkuModal models={MODELS} sofaCompartments={POOL} onClose={onClose} />);
+    openSofa();
+    fireEvent.change(screen.getByTestId("new-sku-name"), { target: { value: "Angsa" } });
+    fireEvent.click(screen.getByText("Create model + 2 SKUs"));
+
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    const payload = mockOfferMutateAsync.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(payload).not.toHaveProperty("supplierCodes");
+  });
+
+  it("⭐ keys the size flow's override by the CANONICAL NAME the submit sends", async () => {
+    const onClose = vi.fn();
+    render(<NewSkuModal models={MODELS} optionPools={SIZE_POOLS} onClose={onClose} />);
+    fireEvent.change(screen.getByTestId("new-sku-name"), { target: { value: "Lumi FirmCare" } });
+    fireEvent.change(screen.getByTestId("new-sku-supplier-code"), { target: { value: "LM-100" } });
+    /* The pool VALUE is `K`; the variant sent is `King`. The box is keyed by
+       the name for exactly that reason — a map keyed `K` would never match. */
+    fireEvent.change(screen.getByTestId("new-sku-supplier-code-piece-King"), {
+      target: { value: "LM-100-K" },
+    });
+    fireEvent.click(screen.getByText("Create model + 3 SKUs"));
+
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    const call = mockGenerateSkusMutateAsync.mock.calls[0]?.[0] as {
+      input: { supplierCode?: string; supplierCodes?: Record<string, string> };
+    };
+    // Batch default and the one override both ride the SAME request; the
+    // server resolves per-variant → batch → NULL.
+    expect(call.input.supplierCode).toBe("LM-100");
+    expect(call.input.supplierCodes).toEqual({ King: "LM-100-K" });
+  });
+});
+
+/**
+ * ⭐ MEETING A NEW SUPPLIER MID-CATALOG (2026-08-24).
+ *
+ * The portal had NO supplier-creation door anywhere — no route, no screen — so
+ * a keyer who reached a factory nobody had entered yet had to stop, open the
+ * SQL editor (or find someone who could) and come back to a modal they had
+ * already lost. The point of putting the door HERE is that the half-written SKU
+ * survives being interrupted by a supplier.
+ *
+ * Purchasing still owns the record. This is a door, not a second home for it.
+ */
+describe("NewSkuModal — adding a supplier without losing the SKU", () => {
+  it("offers the door, and pre-ticks the category being keyed", () => {
+    render(<NewSkuModal models={MODELS} sofaCompartments={POOL} onClose={vi.fn()} />);
+    openSofa();
+    fireEvent.click(screen.getByTestId("new-sku-supplier-add-open"));
+    /* The category is the one fact this modal already knows and the answer nine
+       times out of ten — asking it again would be asking the keyer to repeat
+       themselves. */
+    expect(screen.getByTestId("new-sku-supplier-add-cat-sofa")).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.getByTestId("new-sku-supplier-add-cat-mattress")).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+  });
+
+  it("⭐ never shows the door to a role the policy would refuse", () => {
+    /* `suppliers_principal_write` (0002) is principal-only and the route
+       enforces it. A button that always refuses teaches the operator to ignore
+       refusals, so it simply is not drawn. */
+    mockRole = "operation";
+    render(<NewSkuModal models={MODELS} optionPools={SIZE_POOLS} onClose={vi.fn()} />);
+    expect(screen.queryByTestId("new-sku-supplier-add-open")).not.toBeInTheDocument();
+  });
+
+  it("refuses to submit a name too short to be a name", () => {
+    render(<NewSkuModal models={MODELS} optionPools={SIZE_POOLS} onClose={vi.fn()} />);
+    fireEvent.click(screen.getByTestId("new-sku-supplier-add-open"));
+    const save = screen.getByTestId("new-sku-supplier-add-save") as HTMLButtonElement;
+    expect(save.disabled).toBe(true);
+    fireEvent.change(screen.getByTestId("new-sku-supplier-add-name"), { target: { value: "H" } });
+    expect(save.disabled).toBe(true);
+    fireEvent.change(screen.getByTestId("new-sku-supplier-add-name"), {
+      target: { value: "Hookka Two" },
+    });
+    expect(save.disabled).toBe(false);
+  });
+
+  it("⭐ selects the new supplier the moment it exists, and closes the panel", async () => {
+    render(<NewSkuModal models={MODELS} optionPools={SIZE_POOLS} onClose={vi.fn()} />);
+    fireEvent.click(screen.getByTestId("new-sku-supplier-add-open"));
+    fireEvent.change(screen.getByTestId("new-sku-supplier-add-name"), {
+      target: { value: "  Hookka Two  " },
+    });
+    fireEvent.click(screen.getByTestId("new-sku-supplier-add-save"));
+
+    await waitFor(() =>
+      expect(mockCreateSupplierMutateAsync).toHaveBeenCalledWith({
+        name: "Hookka Two",
+        kind: "factory_pickup",
+        catCovered: ["mattress"],
+      }),
+    );
+    /* The keyer asked for this supplier BECAUSE they are writing its SKU right
+       now — making them find it in the list again would be the modal forgetting
+       what it was just told. */
+    await waitFor(() =>
+      expect((screen.getByTestId("new-sku-supplier") as HTMLSelectElement).value).toBe("sup-new"),
+    );
+    expect(screen.queryByTestId("new-sku-supplier-add")).not.toBeInTheDocument();
+  });
+
+  it("keeps the panel open when the server refuses, so the typing is not lost", async () => {
+    mockCreateSupplierMutateAsync.mockRejectedValueOnce(new Error("already a supplier"));
+    render(<NewSkuModal models={MODELS} optionPools={SIZE_POOLS} onClose={vi.fn()} />);
+    fireEvent.click(screen.getByTestId("new-sku-supplier-add-open"));
+    fireEvent.change(screen.getByTestId("new-sku-supplier-add-name"), {
+      target: { value: "Hookka Two" },
+    });
+    fireEvent.click(screen.getByTestId("new-sku-supplier-add-save"));
+
+    await waitFor(() => expect(mockCreateSupplierMutateAsync).toHaveBeenCalled());
+    // Still open, still holding what was typed — a refusal is not a reason to
+    // throw the keyer's work away.
+    expect(screen.getByTestId("new-sku-supplier-add")).toBeInTheDocument();
+    expect((screen.getByTestId("new-sku-supplier-add-name") as HTMLInputElement).value).toBe(
+      "Hookka Two",
+    );
   });
 });

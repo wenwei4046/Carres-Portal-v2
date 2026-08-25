@@ -20,6 +20,7 @@ import { ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import {
   useCreateCatalogModel,
+  useCreateSupplier,
   useOperationSuppliers,
   useCreateCatalogSku,
   useCreateGuaranteeProduct,
@@ -128,6 +129,20 @@ export default function NewSkuModal({
   /* 0375 — the SUPPLIER'S own item code (their quotation's code for this
    * piece). Free text, optional; ours is the SKU code above. */
   const [supplierCode, setSupplierCode] = useState("");
+  /* ⭐ ONE CODE FOR THE BATCH, ANY PIECE OVERRIDDEN (2026-08-24).
+   *
+   * A supplier's quotation names the SUPPLIER's code, never Carres' SKU — it is
+   * the only string a keyer can match a factory's paperwork against. The bulk
+   * flows generate many SKUs at once and a quotation usually lists a different
+   * code per size or per compartment, so one shared box would write the same
+   * wrong code onto every row.
+   *
+   * `supplierCode` above is the batch default; this map overrides one piece.
+   * Keyed by what the SUBMIT sends — the canonical size NAME for the size flow
+   * (`King`, which is what `variants` carries) and the compartmentId for the
+   * compartment flow (which is what that loop iterates). Keying by anything the
+   * server cannot recognise would silently drop the override. */
+  const [supplierCodes, setSupplierCodes] = useState<Record<string, string>>({});
   /* 2026-08-24 - WHO supplies this piece. Empty = Auto: the route resolves
    * the supplier from `suppliers.cat_covered[]` exactly as it always has,
    * so an untouched form is byte-identical to before this picker existed.
@@ -135,6 +150,15 @@ export default function NewSkuModal({
    * the NAME is only ever derived from it (Law A/D), never typed here. */
   const [supplierId, setSupplierId] = useState("");
   const suppliersQ = useOperationSuppliers();
+  /* ⭐ Adding a supplier without leaving the SKU (2026-08-24). Principal-only,
+   * because `suppliers_principal_write` (0002) has always been the boundary —
+   * the panel simply does not render for anyone who would be refused. */
+  const createSupplier = useCreateSupplier();
+  const [newSupplierOpen, setNewSupplierOpen] = useState(false);
+  const [newSupplierName, setNewSupplierName] = useState("");
+  const [newSupplierKind, setNewSupplierKind] =
+    useState<"own_logistics" | "factory_pickup">("factory_pickup");
+  const [newSupplierCats, setNewSupplierCats] = useState<ProductCategory[]>([]);
   // new-product fields
   const [category, setCategory] = useState<ProductCategory>("mattress");
   const [name, setName] = useState("");
@@ -184,24 +208,186 @@ export default function NewSkuModal({
   // means the same thing everywhere: empty = Auto (today's resolve), a pick =
   // an explicit override sent to whichever endpoint this flow calls.
   const supplierPickerField = (
-    <label className="block">
-      <span className="label block mb-1">Supplier</span>
-      <select
-        value={supplierId}
-        onChange={(e) => setSupplierId(e.target.value)}
-        data-testid="new-sku-supplier"
-        className={INPUT_CLS}
-      >
-        {/* Auto keeps the route's category-based resolution - the behaviour
-            every SKU before this picker was created under. */}
-        <option value="">Auto (by category)</option>
-        {(suppliersQ.data?.suppliers ?? []).map((s) => (
-          <option key={s.id} value={s.id}>
-            {s.name}
-          </option>
-        ))}
-      </select>
-    </label>
+    <div className="block">
+      <label className="block">
+        <span className="label block mb-1">Supplier</span>
+        <select
+          value={supplierId}
+          onChange={(e) => setSupplierId(e.target.value)}
+          data-testid="new-sku-supplier"
+          className={INPUT_CLS}
+        >
+          {/* Auto keeps the route's category-based resolution - the behaviour
+              every SKU before this picker was created under. */}
+          <option value="">Auto (by category)</option>
+          {(suppliersQ.data?.suppliers ?? []).map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      {/* ⭐ MEETING A NEW SUPPLIER MID-CATALOG (2026-08-24).
+          Until today the portal had NO supplier-creation door anywhere, so a
+          keyer who reached a factory nobody had entered yet had to stop, open
+          the SQL editor (or ask someone who could) and come back. The record
+          still belongs to Purchasing; this is a door onto it, and the point of
+          putting it HERE is that the half-written SKU survives. */}
+      {isPrincipal && !newSupplierOpen && (
+        <button
+          type="button"
+          onClick={() => {
+            setNewSupplierOpen(true);
+            /* Pre-tick the category being keyed: it is the answer nine times
+               out of ten, and it is the one fact this modal already knows. */
+            setNewSupplierCats(effectiveCategory ? [effectiveCategory] : []);
+          }}
+          className="mt-1.5 text-meta font-medium text-kit-blue-9 underline underline-offset-2"
+          data-testid="new-sku-supplier-add-open"
+        >
+          + New supplier
+        </button>
+      )}
+      {isPrincipal && newSupplierOpen && (
+        <div
+          className="mt-2 flex flex-col gap-2 rounded-card border border-base-200 bg-base-50 p-2.5"
+          data-testid="new-sku-supplier-add"
+        >
+          <label className="block">
+            <span className="label block mb-1">New supplier name</span>
+            <input
+              value={newSupplierName}
+              onChange={(e) => setNewSupplierName(e.target.value)}
+              placeholder="e.g. Hookka"
+              data-testid="new-sku-supplier-add-name"
+              className={INPUT_CLS}
+            />
+          </label>
+          <label className="block">
+            <span className="label block mb-1">How the goods leave the factory</span>
+            <select
+              value={newSupplierKind}
+              onChange={(e) =>
+                setNewSupplierKind(e.target.value as "own_logistics" | "factory_pickup")
+              }
+              data-testid="new-sku-supplier-add-kind"
+              className={INPUT_CLS}
+            >
+              <option value="factory_pickup">We collect from the factory</option>
+              <option value="own_logistics">They deliver to us</option>
+            </select>
+          </label>
+          <div className="block">
+            <span className="label block mb-1">What they supply</span>
+            <div className="flex flex-wrap gap-1.5">
+              {PRODUCT_CATEGORIES.map((cat) => {
+                const on = newSupplierCats.includes(cat);
+                return (
+                  <button
+                    key={cat}
+                    type="button"
+                    aria-pressed={on}
+                    onClick={() =>
+                      setNewSupplierCats((prev) =>
+                        prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat],
+                      )
+                    }
+                    className={`rounded-[4px] border px-2 py-1 text-meta font-semibold transition-colors ${
+                      on
+                        ? "border-base-900 bg-base-900 text-white"
+                        : "border-base-200 bg-white text-base-500 hover:border-base-400"
+                    }`}
+                    data-testid={`new-sku-supplier-add-cat-${cat}`}
+                  >
+                    {CATEGORY_LABEL[cat]}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="mt-1 text-meta text-base-500">
+              Ticking a category lets Carres pick this supplier on its own. You can always choose
+              them by hand instead.
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              disabled={newSupplierName.trim().length < 2 || createSupplier.isPending}
+              onClick={async () => {
+                try {
+                  const { supplier } = await createSupplier.mutateAsync({
+                    name: newSupplierName.trim(),
+                    kind: newSupplierKind,
+                    catCovered: newSupplierCats,
+                  });
+                  /* Select it immediately — the keyer asked for this supplier
+                     because they are keying its SKU right now. */
+                  setSupplierId(supplier.id);
+                  setNewSupplierOpen(false);
+                  setNewSupplierName("");
+                  toast.success(`${supplier.name} added — selected for this SKU`);
+                } catch (e) {
+                  toast.error(e instanceof ApiError ? e.message : "Could not add the supplier");
+                }
+              }}
+              className="btn-primary text-meta"
+              data-testid="new-sku-supplier-add-save"
+            >
+              {createSupplier.isPending ? "Adding…" : "Add supplier"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setNewSupplierOpen(false)}
+              className="btn-ghost text-meta"
+              data-testid="new-sku-supplier-add-cancel"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  /* The batch-default code plus one box per piece being generated. Rendered by
+     both bulk flows; the classic single-SKU flow keeps its own plain field
+     below, because there is no batch to default and no second piece to
+     override — a "same as above" placeholder would be describing nothing. */
+  const supplierCodeBatchField = (pieces: { key: string; label: string }[]) => (
+    <div className="block" data-testid="new-sku-supplier-code-batch">
+      <label className="block">
+        <span className="label block mb-1">Supplier item code (optional)</span>
+        <input
+          value={supplierCode}
+          onChange={(e) => setSupplierCode(e.target.value)}
+          placeholder="One code for the whole batch — override any piece below"
+          data-testid="new-sku-supplier-code"
+          className={INPUT_CLS}
+        />
+      </label>
+      {pieces.length > 0 && (
+        <div className="mt-2 flex flex-col gap-1.5" data-testid="new-sku-supplier-code-pieces">
+          {pieces.map((p) => (
+            <label key={p.key} className="flex items-center gap-2">
+              <span className="w-24 shrink-0 truncate font-mono text-meta text-base-500">
+                {p.label}
+              </span>
+              <input
+                value={supplierCodes[p.key] ?? ""}
+                onChange={(e) =>
+                  setSupplierCodes((prev) => ({ ...prev, [p.key]: e.target.value }))
+                }
+                /* The placeholder SHOWS the inherited value, so an empty box is
+                   never mistaken for an empty code. */
+                placeholder={supplierCode.trim() || "same as above"}
+                data-testid={`new-sku-supplier-code-piece-${p.key}`}
+                className={INPUT_CLS}
+              />
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
   );
 
   const modelOptionLabel = (m: ProductModelDto): string => {
@@ -457,10 +643,22 @@ export default function NewSkuModal({
           setCreatedModelId(sofaModelId); // lock identity; a retry only re-offers
         }
         const ids = compPool.filter((c) => selectedComps.has(c.id)).map((c) => c.id);
+        /* The compartment lane sends ONE code per request, so the batch default
+           is resolved here rather than on the server — each PUT carries the
+           single code that compartment should end up with. */
+        const batch = supplierCode.trim();
+        const codes: Record<string, string> = {};
+        for (const compartmentId of ids) {
+          const code = (supplierCodes[compartmentId] ?? "").trim() || batch;
+          if (code) codes[compartmentId] = code;
+        }
         const { failed } = await offerCompartments.mutateAsync({
           modelId: sofaModelId,
           compartmentIds: ids,
           supplierId: supplierId || undefined,
+          /* Omitted when nobody typed a code, so a batch with no codes sends
+             the byte-identical payload it sent before this field existed. */
+          ...(Object.keys(codes).length > 0 ? { supplierCodes: codes } : {}),
         });
         if (failed.length > 0) {
           // Keep the modal open with ONLY the failed compartments selected —
@@ -511,6 +709,20 @@ export default function NewSkuModal({
             variants: sizes,
             price: isPrincipal && priceNum > 0 ? priceNum : undefined,
             supplierId: supplierId || undefined,
+            /* The server resolves per-variant → batch → NULL, so both ride the
+               one request. Only the sizes actually being generated are sent —
+               a code typed against a size then unticked must not travel. */
+            supplierCode: supplierCode.trim() || undefined,
+            ...(() => {
+              const own = sizes.reduce<Record<string, string>>((acc, v) => {
+                const code = (supplierCodes[v] ?? "").trim();
+                if (code) acc[v] = code;
+                return acc;
+              }, {});
+              /* Same rule as the compartment lane: an empty map is not sent, so
+                 a batch with no per-piece codes is byte-identical to before. */
+              return Object.keys(own).length > 0 ? { supplierCodes: own } : {};
+            })(),
           },
         });
         toast.success(
@@ -868,6 +1080,12 @@ export default function NewSkuModal({
           </div>
         )}
         {compFlow && supplierPickerField}
+        {compFlow &&
+          supplierCodeBatchField(
+            compPool
+              .filter((c) => selectedComps.has(c.id))
+              .map((c) => ({ key: c.id, label: c.code })),
+          )}
         {sizeSection && (
           <div className="block" data-testid="new-sku-sizes">
             <div className="flex items-center justify-between mb-1">
@@ -987,6 +1205,18 @@ export default function NewSkuModal({
             </div>
           ))}
         {sizeFlow && supplierPickerField}
+        {sizeFlow &&
+          supplierCodeBatchField(
+            /* Keyed by the CANONICAL NAME, because that is what the submit puts
+               in `variants` — keying by the raw pool value would hand the server
+               a map it cannot match and the override would vanish silently. */
+            sizePool
+              .filter((p) => selectedSizes.has(p.value))
+              .map((p) => ({
+                key: canonicalSize(p.value).name,
+                label: canonicalSize(p.value).name,
+              })),
+          )}
 
         {/* Classic single-SKU fields — hidden on the compartment path (codes,
             descriptions + prices all derive per compartment there) AND on the

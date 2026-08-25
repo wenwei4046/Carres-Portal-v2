@@ -1810,6 +1810,111 @@ describe("POST /api/catalog/models/:id/generate-skus (idempotent skip)", () => {
     ]);
   });
 
+  /* ⭐ THE SUPPLIER'S OWN CODE ON A GENERATED BATCH (2026-08-24).
+   *
+   * A quotation names the SUPPLIER's code, never Carres' SKU, and it usually
+   * lists a different one per size — so one shared box would have written the
+   * same wrong code onto every row. Batch default, per-piece override. */
+  function generateSkusMock(records: { table: string; op: "insert" | "update"; body: unknown }[]) {
+    vi.mocked(userClient).mockReturnValue(
+      scriptedSb({
+        reads: {
+          product_models: { category: "mattress", model_key: "lumi-classic", allowed_options: {} },
+          suppliers: { id: "00000000-0000-0000-0000-00000000ff01" },
+          product_skus__list: [],
+        },
+        inserted: [
+          { id: "00000000-0000-0000-0000-00000000bb41" },
+          { id: "00000000-0000-0000-0000-00000000bb42" },
+        ],
+        records,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      }) as any,
+    );
+  }
+
+  async function generate(body: unknown) {
+    const jwt = await makeJwt("operation", null);
+    return app.fetch(
+      new Request(`http://t/api/catalog/models/${MODEL_ID_LIVE}/generate-skus`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+      env,
+    );
+  }
+
+  it("writes ONE batch code onto every generated row", async () => {
+    const records: { table: string; op: "insert" | "update"; body: unknown }[] = [];
+    generateSkusMock(records);
+    const res = await generate({ variants: ["K", "SS"], supplierCode: "  HK-390  " });
+    expect(res.status).toBe(200);
+    const rows = records.find((r) => r.op === "insert")?.body as { supplier_code: string }[];
+    // Trimmed — a code with the keyer's stray spaces will not match a quotation.
+    expect(rows.map((r) => r.supplier_code)).toEqual(["HK-390", "HK-390"]);
+  });
+
+  it("⭐ lets ONE piece override the batch, keyed by the variant the caller sent", async () => {
+    const records: { table: string; op: "insert" | "update"; body: unknown }[] = [];
+    generateSkusMock(records);
+    const res = await generate({
+      variants: ["K", "SS"],
+      supplierCode: "HK-390",
+      // Keyed by the RAW variant. `K` becomes `King` on the way in, so a map
+      // keyed by the canonical name would silently never match.
+      supplierCodes: { K: "HK-390-KING" },
+    });
+    expect(res.status).toBe(200);
+    const rows = records.find((r) => r.op === "insert")?.body as {
+      sku: string;
+      supplier_code: string;
+    }[];
+    expect(rows).toEqual([
+      expect.objectContaining({ sku: "LUMI-CLASSIC-K", supplier_code: "HK-390-KING" }),
+      expect.objectContaining({ sku: "LUMI-CLASSIC-SS", supplier_code: "HK-390" }),
+    ]);
+  });
+
+  it("falls back to the batch when a piece's box was left blank", async () => {
+    const records: { table: string; op: "insert" | "update"; body: unknown }[] = [];
+    generateSkusMock(records);
+    const res = await generate({
+      variants: ["K", "SS"],
+      supplierCode: "HK-390",
+      supplierCodes: { K: "   " },
+    });
+    expect(res.status).toBe(200);
+    const rows = records.find((r) => r.op === "insert")?.body as { supplier_code: string }[];
+    expect(rows.map((r) => r.supplier_code)).toEqual(["HK-390", "HK-390"]);
+  });
+
+  it("⭐ names the column NOT AT ALL when nobody typed a code", async () => {
+    /* The deploy-order hazard `catalog.skus-supplier-code.test.ts` documents:
+       PostgREST refuses an INSERT naming a column that does not exist, so an
+       always-present `supplier_code: null` would take out SKU GENERATION rather
+       than just the new field. Absent stays byte-identical to pre-feature. */
+    const records: { table: string; op: "insert" | "update"; body: unknown }[] = [];
+    generateSkusMock(records);
+    const res = await generate({ variants: ["K", "SS"] });
+    expect(res.status).toBe(200);
+    const rows = records.find((r) => r.op === "insert")?.body as Record<string, unknown>[];
+    for (const row of rows) expect(row).not.toHaveProperty("supplier_code");
+  });
+
+  it("keeps every row of one batch agreeing about its keys", async () => {
+    /* A bulk insert whose objects disagree about which columns they name is its
+       own hazard — so one piece carrying a code puts the key on ALL of them,
+       null where nothing was typed. */
+    const records: { table: string; op: "insert" | "update"; body: unknown }[] = [];
+    generateSkusMock(records);
+    const res = await generate({ variants: ["K", "SS"], supplierCodes: { K: "HK-390-KING" } });
+    expect(res.status).toBe(200);
+    const rows = records.find((r) => r.op === "insert")?.body as Record<string, unknown>[];
+    for (const row of rows) expect(row).toHaveProperty("supplier_code");
+    expect(rows.map((r) => r.supplier_code)).toEqual(["HK-390-KING", null]);
+  });
+
   // Loo 2026-07-21 — adding a size to an EXISTING model unions it into
   // allowed_options.sizes (the sizes-active cascade / POS size source);
   // deliberately-inactive existing sizes are never clobbered (union, not

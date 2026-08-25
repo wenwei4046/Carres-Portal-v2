@@ -606,13 +606,20 @@ export function Block({
   return (
     <section className="rounded-card border border-kit-slate-5 bg-white px-4 py-3" data-block={title}>
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-l-2 border-base-300 pl-2">
-        <h2 id={headingId} className="text-label font-semibold tracking-wide text-base-700 uppercase">
+        {/* ⭐ A CARD TITLE WEARS THE CARD-TITLE TOKEN (2026-08-24).
+            `01-design-tokens.md` §1 assigns `text-strong` to "card title ·
+            field-group heading" and `text-label` to "field labels, micro-labels,
+            pill text". This heading wore `text-label` — an 11px uppercase
+            micro-label doing a section's job, which is exactly why the sections
+            did not read as sections. Restoring the documented token is the fix;
+            uppercase goes with it, because 15px shouting is a different defect. */}
+        <h2 id={headingId} className="text-strong text-base-900">
           {title}
         </h2>
-        {note && <span className="text-label font-normal text-base-600">{note}</span>}
+        {note && <span className="text-meta font-normal text-base-600">{note}</span>}
       </div>
       {subtitle && (
-        <p className="mt-1 pl-2 text-label font-normal text-base-500" data-testid={`block-subtitle-${title}`}>
+        <p className="mt-1 pl-2 text-meta font-normal text-base-500" data-testid={`block-subtitle-${title}`}>
           {subtitle}
         </p>
       )}
@@ -1886,7 +1893,11 @@ export default function SalesOrderWorkspace() {
       data-testid="sales-order-workspace"
       id="sales-order-workspace"
     >
-    <div className="flex flex-col gap-3">
+    {/* §3 of the token table names 24px "between blocks · card padding" and 12px
+        "standard gap". The left pane stacked eight sections at the standard gap,
+        so neighbouring cards sat as close as two fields inside one card — the
+        second half of why the sections did not separate. */}
+    <div className="flex flex-col gap-6">
       {mode === "oldrev" && viewedRevision && (
         <div className="px-1">
           <span className="rounded-full bg-base-900 px-2 py-0.5 text-label font-semibold text-white">
