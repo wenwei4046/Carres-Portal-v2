@@ -566,7 +566,7 @@ function draftFromSnapshot(snap: SalesOrderSnapshot): Draft {
  * spend the accent eight times and leave nothing to mark the current thing.
  * The tab underline above already holds the screen's one accent.
  */
-function Block({
+export function Block({
   title,
   note,
   subtitle,
