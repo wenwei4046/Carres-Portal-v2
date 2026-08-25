@@ -175,6 +175,12 @@ export default function OperationApp() {
   const isIssuesUrl = location.pathname.startsWith("/operation/issues");
   const isUrlDriven =
     isProcurementUrl || isToOrderUrl || isOrdersUrl || isOldOrdersUrl ||
+    /* Edit Delivery (2026-08-24) is a real route. Its flag joined the
+       GlobalTopBar suppression on day one but NOT this gate, so the URL fell
+       through to the `?tab=` branch and rendered an empty main pane — found on
+       the production walk, invisible to a component test that never mounts the
+       router. A new route joins BOTH lists in the same commit. */
+    isEditDeliveryUrl ||
     isDeliveryOrdersUrl || isSettingsUrl || isIssuesUrl;
 
   const [tab, setTab] = useState<string>("dashboard");
