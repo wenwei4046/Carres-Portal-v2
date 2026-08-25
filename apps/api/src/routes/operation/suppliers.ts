@@ -32,7 +32,12 @@ operationSuppliersRouter.get("/", async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
   const { data, error } = await sb
     .from("suppliers")
-    .select("id, name, kind, cat_covered, lead_time, contact, contact_email, whatsapp_group_url")
+    /* `slug` rides along (2026-08-25): it is the IDENTITY the server checks a
+       new supplier against, and a supplier can be RENAMED while the slug stays
+       (Ohana still carries `hookka` from 0032). A client deriving slugs from
+       NAMES would let "Hookka" through and be refused server-side — the exact
+       dead end this list exists to prevent. */
+    .select("id, name, slug, kind, cat_covered, lead_time, contact, contact_email, whatsapp_group_url")
     .order("name", { ascending: true });
   if (error) {
     const m = mapPgError(error);
@@ -116,7 +121,7 @@ operationSuppliersRouter.post("/", async (c) => {
        supplier row the caller can drop straight into its picker — never a
        narrower lookalike the client has to reconcile. */
     .select(
-      "id, name, kind, cat_covered, lead_time, contact, contact_email, whatsapp_group_url",
+      "id, name, slug, kind, cat_covered, lead_time, contact, contact_email, whatsapp_group_url",
     )
     .maybeSingle();
   if (error) {

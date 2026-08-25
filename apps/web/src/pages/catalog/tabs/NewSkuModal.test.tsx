@@ -23,7 +23,7 @@ import NewSkuModal from "./NewSkuModal";
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 let mockRole: string | null = "principal";
-let mockSuppliers: { id: string; name: string }[] = [];
+let mockSuppliers: { id: string; name: string; slug?: string }[] = [];
 vi.mock("@/lib/auth", () => ({
   useAuth: (selector: (s: { role: string | null }) => unknown) =>
     selector({ role: mockRole }),
@@ -120,7 +120,12 @@ function openSofa() {
 
 beforeEach(() => {
   mockRole = "principal";
-  mockSuppliers = [{ id: "00000000-0000-4000-8000-0000000000a1", name: "Hookka" }];
+  mockSuppliers = [
+    { id: "00000000-0000-4000-8000-0000000000a1", name: "Hookka" },
+    /* The RENAMED row — production's Ohana still carries the `hookka`-family
+       slug from 0032 while wearing a name that derives a different one. */
+    { id: "sup-ohana", name: "Ohana", slug: "hookka-manufacturing" },
+  ];
   mockCreateSupplierMutateAsync.mockReset().mockImplementation(async () => {
     const supplier = { id: "sup-new", name: "Hookka Two" };
     mockSuppliers = [...mockSuppliers, supplier];
@@ -1022,6 +1027,23 @@ describe("NewSkuModal — a duplicate supplier is caught early and is not a dead
       "00000000-0000-4000-8000-0000000000a1",
     );
     expect(screen.queryByTestId("new-sku-supplier-add")).not.toBeInTheDocument();
+  });
+
+  it("⭐ catches a RENAMED supplier by its stored slug, not its name's", () => {
+    /* Reproduced in production: typing "Hookka Manufacturing" while the row is
+       NAMED Ohana. Deriving from names says no match; the server refuses on the
+       stored slug — the inline check must agree with the server or the dead
+       end returns. */
+    render(<NewSkuModal models={MODELS} optionPools={SIZE_POOLS} onClose={vi.fn()} />);
+    fireEvent.click(screen.getByTestId("new-sku-supplier-add-open"));
+    fireEvent.change(screen.getByTestId("new-sku-supplier-add-name"), {
+      target: { value: "Hookka Manufacturing" },
+    });
+    expect(screen.getByTestId("new-sku-supplier-add-duplicate").textContent).toContain(
+      "Ohana is already a supplier",
+    );
+    fireEvent.click(screen.getByTestId("new-sku-supplier-add-use-existing"));
+    expect((screen.getByTestId("new-sku-supplier") as HTMLSelectElement).value).toBe("sup-ohana");
   });
 
   it("still allows a genuinely new name through", () => {
