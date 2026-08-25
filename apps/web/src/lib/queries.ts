@@ -2731,6 +2731,10 @@ export interface DeliveryPartnersListResponse {
 export interface SupplierRow {
   id: string;
   name: string;
+  /** The STORED identity slug (0032 — keys SUPPLIER_SOP, unique in prod). A
+   *  supplier can be renamed while this stays: `Ohana` still carries `hookka`.
+   *  Optional so a browser on this build against an older Worker still parses. */
+  slug?: string | null;
   kind: "own_logistics" | "factory_pickup";
   cat_covered: string[];
   lead_time: string | null;

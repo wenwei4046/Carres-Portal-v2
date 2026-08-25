@@ -179,9 +179,16 @@ export default function NewSkuModal({
    * on the slug, not the name, is what makes `HoOKkA` and `hookka` collide here
    * exactly as they collide in the database. */
   const typedSupplierSlug = supplierSlug(newSupplierName);
+  /* ⭐ MATCH ON THE STORED SLUG, NOT THE NAME'S (2026-08-25). A supplier can be
+     RENAMED while its slug stays — `Ohana` still carries `hookka` from 0032.
+     Deriving from the name said "no match" for "Hookka" here while the server
+     refused it on the stored column: the exact dead end this check exists to
+     prevent, reproduced in production while keying the Hookka quotation. The
+     name-derived slug remains only as the fallback for a roster row an older
+     Worker served without the column. */
   const existingSupplierMatch = typedSupplierSlug
     ? ((suppliersQ.data?.suppliers ?? []).find(
-        (s) => supplierSlug(s.name) === typedSupplierSlug,
+        (s) => (s.slug ?? supplierSlug(s.name)) === typedSupplierSlug,
       ) ?? null)
     : null;
   // new-product fields
