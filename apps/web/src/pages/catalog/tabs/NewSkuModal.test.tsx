@@ -1036,3 +1036,65 @@ describe("NewSkuModal — a duplicate supplier is caught early and is not a dead
     );
   });
 });
+
+/**
+ * ⭐ A QUOTATION PRICES EACH SIZE DIFFERENTLY (2026-08-25).
+ *
+ * The measured case is Hookka's Cody bedframe — K 550 · Q 425 · S 395 ·
+ * SS 407.50, with a PWP-style Price 1 on only some rows. One batch price box
+ * generated every SKU wrong-or-zero, to be re-keyed by hand in SKU Master.
+ * One price + PWP box per ticked size, principal only, keyed by the canonical
+ * size NAME the submit sends (the supplierCodes contract).
+ */
+describe("NewSkuModal — per-size price and PWP on the generate flow", () => {
+  it("shows one price + PWP box per ticked size for the principal", () => {
+    render(<NewSkuModal models={MODELS} optionPools={SIZE_POOLS} onClose={vi.fn()} />);
+    expect(screen.getByTestId("new-sku-size-price-Single")).toBeInTheDocument();
+    expect(screen.getByTestId("new-sku-size-pwp-Queen")).toBeInTheDocument();
+    expect(screen.getByTestId("new-sku-size-price-King")).toBeInTheDocument();
+  });
+
+  it("⭐ never shows the boxes to a role the price lock would refuse", () => {
+    /* 0175/0186: price and pwp_price are principal-only writes. A box that
+       always fails teaches the operator to ignore failures. */
+    mockRole = "operation";
+    render(<NewSkuModal models={MODELS} optionPools={SIZE_POOLS} onClose={vi.fn()} />);
+    expect(screen.queryByTestId("new-sku-size-prices")).not.toBeInTheDocument();
+  });
+
+  it("⭐ sends the per-size maps keyed by the canonical name the variants use", async () => {
+    const onClose = vi.fn();
+    render(<NewSkuModal models={MODELS} optionPools={SIZE_POOLS} onClose={onClose} />);
+    fireEvent.change(screen.getByTestId("new-sku-name"), { target: { value: "Cody" } });
+    fireEvent.change(screen.getByTestId("new-sku-price"), { target: { value: "550" } });
+    fireEvent.change(screen.getByTestId("new-sku-size-price-Queen"), {
+      target: { value: "425" },
+    });
+    fireEvent.change(screen.getByTestId("new-sku-size-pwp-Queen"), { target: { value: "305" } });
+    fireEvent.click(screen.getByText("Create model + 3 SKUs"));
+
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    const call = mockGenerateSkusMutateAsync.mock.calls[0]?.[0] as {
+      input: { price?: number; prices?: Record<string, number>; pwpPrices?: Record<string, number> };
+    };
+    expect(call.input.price).toBe(550);
+    // Only the overridden size travels — the rest inherit the batch price
+    // server-side, so an untouched box adds nothing to the payload.
+    expect(call.input.prices).toEqual({ Queen: 425 });
+    expect(call.input.pwpPrices).toEqual({ Queen: 305 });
+  });
+
+  it("sends neither map when no box was touched — byte-identical to before", async () => {
+    const onClose = vi.fn();
+    render(<NewSkuModal models={MODELS} optionPools={SIZE_POOLS} onClose={onClose} />);
+    fireEvent.change(screen.getByTestId("new-sku-name"), { target: { value: "Cody" } });
+    fireEvent.click(screen.getByText("Create model + 3 SKUs"));
+
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    const call = mockGenerateSkusMutateAsync.mock.calls[0]?.[0] as {
+      input: Record<string, unknown>;
+    };
+    expect(call.input).not.toHaveProperty("prices");
+    expect(call.input).not.toHaveProperty("pwpPrices");
+  });
+});

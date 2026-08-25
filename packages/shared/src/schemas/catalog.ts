@@ -1258,6 +1258,20 @@ export const generateSkusInput = z
      * caller has no way to know that `K` becomes `King` on the way in. */
     supplierCode: z.string().trim().max(60).optional(),
     supplierCodes: z.record(z.string(), z.string().trim().max(60)).optional(),
+    /* ⭐ A QUOTATION PRICES EACH SIZE DIFFERENTLY (2026-08-25). The Hookka
+     * bedframe list is the measured case: Cody at K/Q/S/SS is 550/425/395/
+     * 407.50 — one batch `price` cannot say that, so every generated SKU came
+     * out wrong-or-zero and was re-keyed by hand in SKU Master. Same contract
+     * as `supplierCodes`: keyed by the RAW variant the caller sent, a variant's
+     * entry wins over the batch `price`, absent falls back. Principal-only in
+     * effect — the 0175/0186 trigger refuses the write for anyone else, and the
+     * modal never renders the boxes for them.
+     *
+     * `pwpPrices` seeds pwp_price the same way. There is deliberately no BATCH
+     * pwp: the measured quotation's Price 1 exists only on some rows and never
+     * repeats across sizes, so a batch default would only invent numbers. */
+    prices: z.record(z.string(), z.number().nonnegative()).optional(),
+    pwpPrices: z.record(z.string(), z.number().nonnegative()).optional(),
   })
   .strict();
 export type GenerateSkusInput = z.infer<typeof generateSkusInput>;

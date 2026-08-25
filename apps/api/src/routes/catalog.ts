@@ -1526,6 +1526,22 @@ catalogRouter.post("/models/:id/generate-skus", async (c) => {
      bulk insert whose objects disagree about their keys is its own hazard. */
   const anySupplierCode = variants.some((v) => supplierCodeFor(v) !== null);
 
+  /* ⭐ PER-VARIANT PRICE AND PWP (2026-08-25) — the quotation case: a bedframe
+     is priced per size, so ONE batch price wrote the wrong number on every row.
+     A variant's own entry wins; absent falls back to the batch price, then 0
+     (UNPRICED). An explicit per-variant 0 is a deliberate "unpriced at this
+     size" and is kept — `??` passes 0 through, which is exactly right.
+     pwp_price obeys the 0186 server law: a value <= 0 means NOT SET and is
+     stored as NULL, never as a zero that half-reads as a price. The key rides
+     every row of the batch or none (rows of one bulk insert must agree about
+     their columns). */
+  const priceFor = (v: string): number => parsed.data.prices?.[v] ?? parsed.data.price ?? 0;
+  const pwpFor = (v: string): number | null => {
+    const p = parsed.data.pwpPrices?.[v];
+    return typeof p === "number" && p > 0 ? p : null;
+  };
+  const anyPwp = variants.some((v) => pwpFor(v) !== null);
+
   const toInsert = variants
     .filter((v) => !existing.has(codeFor(v)))
     .map((v) => ({
@@ -1533,7 +1549,8 @@ catalogRouter.post("/models/:id/generate-skus", async (c) => {
       sku: codeFor(v),
       variant: resolve(v).name,
       variant_kind: "size" as const,
-      price: parsed.data.price ?? 0,
+      price: priceFor(v),
+      ...(anyPwp ? { pwp_price: pwpFor(v) } : {}),
       cost: null,
       supplier_id: supplierId,
       ...(anySupplierCode ? { supplier_code: supplierCodeFor(v) } : {}),
