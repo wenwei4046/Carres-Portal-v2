@@ -13,6 +13,7 @@ import {
   PRODUCT_CATEGORIES,
   autoBedSkuDescription,
   canonicalSize,
+  supplierSlug,
   guaranteeVisitsTotal,
   type GuaranteeKind,
 } from "@carres/shared";
@@ -159,6 +160,21 @@ export default function NewSkuModal({
   const [newSupplierKind, setNewSupplierKind] =
     useState<"own_logistics" | "factory_pickup">("factory_pickup");
   const [newSupplierCats, setNewSupplierCats] = useState<ProductCategory[]>([]);
+  /* ⭐ A DUPLICATE IS CAUGHT BEFORE THE ROUND-TRIP, AND IS NOT A DEAD END
+   * (2026-08-25). The server refuses a second supplier with the same derived
+   * slug, correctly — but a red toast saying "already a supplier, pick it from
+   * the list" leaves the keyer holding a form they must now dismantle by hand,
+   * and it arrives only after a request. The roster is ALREADY loaded, and the
+   * slug is derived by the SAME shared function the server derives it with
+   * (`supplierSlug`), so the same answer is available while they type. Matching
+   * on the slug, not the name, is what makes `HoOKkA` and `hookka` collide here
+   * exactly as they collide in the database. */
+  const typedSupplierSlug = supplierSlug(newSupplierName);
+  const existingSupplierMatch = typedSupplierSlug
+    ? ((suppliersQ.data?.suppliers ?? []).find(
+        (s) => supplierSlug(s.name) === typedSupplierSlug,
+      ) ?? null)
+    : null;
   // new-product fields
   const [category, setCategory] = useState<ProductCategory>("mattress");
   const [name, setName] = useState("");
@@ -238,6 +254,11 @@ export default function NewSkuModal({
           type="button"
           onClick={() => {
             setNewSupplierOpen(true);
+            /* ⭐ A FRESH PANEL IS A FRESH SUPPLIER (2026-08-25). Cancelling used
+               to leave the last name in the box, so reopening it later to add a
+               DIFFERENT factory submitted the old one and the server refused a
+               duplicate the keyer could not see they had asked for. */
+            setNewSupplierName("");
             /* Pre-tick the category being keyed: it is the answer nine times
                out of ten, and it is the one fact this modal already knows. */
             setNewSupplierCats(effectiveCategory ? [effectiveCategory] : []);
@@ -309,10 +330,37 @@ export default function NewSkuModal({
               them by hand instead.
             </div>
           </div>
+          {existingSupplierMatch && (
+            <div
+              className="flex flex-wrap items-center gap-2 text-meta text-base-700"
+              data-testid="new-sku-supplier-add-duplicate"
+            >
+              <span>{existingSupplierMatch.name} is already a supplier.</span>
+              <button
+                type="button"
+                onClick={() => {
+                  /* One click finishes what they meant: select it and close.
+                     Refusing without doing the obvious next thing is what made
+                     the server's message a dead end. */
+                  setSupplierId(existingSupplierMatch.id);
+                  setNewSupplierOpen(false);
+                  setNewSupplierName("");
+                }}
+                className="font-medium text-kit-blue-9 underline underline-offset-2"
+                data-testid="new-sku-supplier-add-use-existing"
+              >
+                Use {existingSupplierMatch.name}
+              </button>
+            </div>
+          )}
           <div className="flex items-center gap-2">
             <button
               type="button"
-              disabled={newSupplierName.trim().length < 2 || createSupplier.isPending}
+              disabled={
+                newSupplierName.trim().length < 2 ||
+                createSupplier.isPending ||
+                existingSupplierMatch !== null
+              }
               onClick={async () => {
                 try {
                   const { supplier } = await createSupplier.mutateAsync({
@@ -337,7 +385,10 @@ export default function NewSkuModal({
             </button>
             <button
               type="button"
-              onClick={() => setNewSupplierOpen(false)}
+              onClick={() => {
+                setNewSupplierOpen(false);
+                setNewSupplierName("");
+              }}
               className="btn-ghost text-meta"
               data-testid="new-sku-supplier-add-cancel"
             >

@@ -484,7 +484,7 @@ operationOrdersRouter.get("/:id", requireOperation, async (c) => {
     // by identity (update-in-place keeps attrs + source_po).
     sb.from("order_lines").select("id, sku, qty, unit_price, attrs, source_po").eq("order_id", id),
     sb.from("order_addons").select("addon_key, qty, unit_price").eq("order_id", id),
-    sb.from("order_history").select("text, by_role, by_user_id, occurred_at").eq("order_id", id).order("occurred_at", { ascending: true }),
+    sb.from("order_history").select("text, by_role, by_user_id, occurred_at, metadata").eq("order_id", id).order("occurred_at", { ascending: true }),
     sb
       .from("order_supplier_threads")
       .select(
@@ -708,6 +708,18 @@ operationOrdersRouter.get("/:id", requireOperation, async (c) => {
     by_role: string | null;
     by_user_id: string | null;
     occurred_at: string;
+    /* ⭐ THE STRUCTURED HALF OF THE EVENT (2026-08-25).
+     *
+     * `docs/orders/MASTER.md:1142` asks History for
+     * `actor/time/reason/Before/After`. Every governed writer has been STORING
+     * that all along — `metadata.reason` on a cancellation, `metadata.note` and
+     * `metadata.changed` on an edit, `metadata.revision` naming the version the
+     * edit minted — and this route selected four scalar columns and left it in
+     * the database. The ledger was not missing the facts; it was not asking for
+     * them. One more column on the SAME read: no extra subrequest, no new
+     * access, and the shape stays `unknown` because a writer may add a key
+     * without this route being redeployed. */
+    metadata: unknown;
   }>;
   const actorIds = [...new Set(historyRows.map((h) => h.by_user_id).filter((v): v is string => !!v))];
   const actorById = new Map<string, string>();

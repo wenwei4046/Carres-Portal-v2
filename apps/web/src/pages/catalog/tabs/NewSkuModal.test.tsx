@@ -964,3 +964,75 @@ describe("NewSkuModal — adding a supplier without losing the SKU", () => {
     );
   });
 });
+
+/**
+ * ⭐ THE DUPLICATE-SUPPLIER DEAD END (2026-08-25).
+ *
+ * Reported from production: adding a supplier for a Cody bedframe produced
+ * "Ohana is already a supplier — pick it from the list instead of adding it
+ * twice." The server was RIGHT; the door was wrong, in two ways.
+ *
+ * 1. Cancelling the panel left the previous name in the box, so reopening it
+ *    later submitted a supplier the keyer had not typed and could not see.
+ * 2. The refusal arrived as a red toast after a round-trip and left the form
+ *    to be dismantled by hand — correct, and a dead end.
+ */
+describe("NewSkuModal — a duplicate supplier is caught early and is not a dead end", () => {
+  it("⭐ forgets the last name when the panel is reopened", () => {
+    render(<NewSkuModal models={MODELS} optionPools={SIZE_POOLS} onClose={vi.fn()} />);
+    fireEvent.click(screen.getByTestId("new-sku-supplier-add-open"));
+    fireEvent.change(screen.getByTestId("new-sku-supplier-add-name"), {
+      target: { value: "Ohana" },
+    });
+    fireEvent.click(screen.getByTestId("new-sku-supplier-add-cancel"));
+
+    fireEvent.click(screen.getByTestId("new-sku-supplier-add-open"));
+    expect((screen.getByTestId("new-sku-supplier-add-name") as HTMLInputElement).value).toBe("");
+  });
+
+  it("⭐ names the existing supplier while typing, and refuses to submit", () => {
+    render(<NewSkuModal models={MODELS} optionPools={SIZE_POOLS} onClose={vi.fn()} />);
+    fireEvent.click(screen.getByTestId("new-sku-supplier-add-open"));
+    /* A DIFFERENT spelling of a supplier already in the roster. The match is on
+       the derived slug — the same function the server derives it with — so it
+       collides here exactly as it would collide in the database. */
+    fireEvent.change(screen.getByTestId("new-sku-supplier-add-name"), {
+      target: { value: "hookka" },
+    });
+    expect(screen.getByTestId("new-sku-supplier-add-duplicate").textContent).toContain(
+      "Hookka is already a supplier",
+    );
+    expect((screen.getByTestId("new-sku-supplier-add-save") as HTMLButtonElement).disabled).toBe(
+      true,
+    );
+    expect(mockCreateSupplierMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it("⭐ finishes what the keyer meant — one click selects the existing supplier", () => {
+    render(<NewSkuModal models={MODELS} optionPools={SIZE_POOLS} onClose={vi.fn()} />);
+    fireEvent.click(screen.getByTestId("new-sku-supplier-add-open"));
+    fireEvent.change(screen.getByTestId("new-sku-supplier-add-name"), {
+      target: { value: "HoOKkA" },
+    });
+    fireEvent.click(screen.getByTestId("new-sku-supplier-add-use-existing"));
+
+    /* Refusing without doing the obvious next thing is what made the server's
+       message a dead end: the supplier they wanted is now simply chosen. */
+    expect((screen.getByTestId("new-sku-supplier") as HTMLSelectElement).value).toBe(
+      "00000000-0000-4000-8000-0000000000a1",
+    );
+    expect(screen.queryByTestId("new-sku-supplier-add")).not.toBeInTheDocument();
+  });
+
+  it("still allows a genuinely new name through", () => {
+    render(<NewSkuModal models={MODELS} optionPools={SIZE_POOLS} onClose={vi.fn()} />);
+    fireEvent.click(screen.getByTestId("new-sku-supplier-add-open"));
+    fireEvent.change(screen.getByTestId("new-sku-supplier-add-name"), {
+      target: { value: "Cody Furniture" },
+    });
+    expect(screen.queryByTestId("new-sku-supplier-add-duplicate")).not.toBeInTheDocument();
+    expect((screen.getByTestId("new-sku-supplier-add-save") as HTMLButtonElement).disabled).toBe(
+      false,
+    );
+  });
+});

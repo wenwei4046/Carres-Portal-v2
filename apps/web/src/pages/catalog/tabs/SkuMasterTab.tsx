@@ -131,6 +131,19 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
   // to the canonical SOFA_HEIGHTS when the pool is empty, so the sofa grid
   // variant only needs the pools field to be present.
   const sofaSizes = useMemo(() => activeSofaSizes(catalog.optionPools), [catalog.optionPools]);
+  /* 🟡 A CONTRADICTION LEFT STANDING, DELIBERATELY (2026-08-25).
+     The comment above says this variant "only needs the pools field to be
+     present", and `activeSofaSizes` returns the canonical SOFA_HEIGHTS when the
+     pool has no active rows — a fallback this gate can never reach, because it
+     also demands an active row. So on a database whose `sofa_size` pool is
+     empty, a sofa shows ONE price column and nothing says where the seat
+     heights went.
+     I changed this to `category === "sofa"` and reverted it: the empty-pool
+     behaviour is PINNED by "Sofa filter WITHOUT a pool keeps the normal grid",
+     and a pinned behaviour with no recorded reason is still somebody's
+     decision. The operator fix is to activate the sofa_size pool, which is
+     configuration the sizes deserve anyway. Raised for an owner ruling rather
+     than settled by whoever edited this file last. */
   const sofaSizeMode =
     category === "sofa" &&
     (catalog.optionPools ?? []).some((p) => p.pool === "sofa_size" && p.active);
