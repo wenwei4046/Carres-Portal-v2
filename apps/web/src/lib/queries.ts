@@ -4184,6 +4184,63 @@ export function useCreateSupplier() {
   });
 }
 
+/** 0388 — dual-sourcing's recording half. The SKU's supplier SLOT stays the
+ *  routing truth; these record what each supplier QUOTED for the piece. */
+export interface SkuSupplierOfferRow {
+  supplierId: string;
+  supplierName: string | null;
+  supplierCode: string | null;
+  price: number | null;
+  pwpPrice: number | null;
+  updatedAt: string;
+}
+
+export function useSkuSupplierOffers(skuId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ["sku-supplier-offers", skuId],
+    queryFn: () =>
+      apiFetch<{ offers: SkuSupplierOfferRow[] }>(
+        `/api/catalog/skus/${encodeURIComponent(skuId)}/supplier-offers`,
+      ),
+    /* Fetched ONLY while the row's offers strip is open — a register of 500
+       SKUs must not make 500 of these on load. */
+    enabled,
+    staleTime: 30_000,
+  });
+}
+
+export function useUpsertSkuSupplierOffer() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ skuId, ...input }: {
+      skuId: string;
+      supplierId: string;
+      supplierCode?: string | null;
+      price?: number | null;
+      pwpPrice?: number | null;
+    }) =>
+      apiFetch<{ offer: SkuSupplierOfferRow }>(
+        `/api/catalog/skus/${encodeURIComponent(skuId)}/supplier-offers`,
+        catalogJson("PUT", input),
+      ),
+    onSuccess: (_d, v) =>
+      qc.invalidateQueries({ queryKey: ["sku-supplier-offers", v.skuId] }),
+  });
+}
+
+export function useDeleteSkuSupplierOffer() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ skuId, supplierId }: { skuId: string; supplierId: string }) =>
+      apiFetch<{ ok: true }>(
+        `/api/catalog/skus/${encodeURIComponent(skuId)}/supplier-offers/${encodeURIComponent(supplierId)}`,
+        catalogJson("DELETE"),
+      ),
+    onSuccess: (_d, v) =>
+      qc.invalidateQueries({ queryKey: ["sku-supplier-offers", v.skuId] }),
+  });
+}
+
 /**
  * usePurchaseToday — GET /api/operation/purchase/today (the Procurement MRP
  * cockpit). Read-only: assembles live demand + supply, runs the net-requirements

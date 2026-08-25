@@ -8,7 +8,14 @@ import type {
 } from "@carres/shared";
 import { PRODUCT_CATEGORIES } from "@carres/shared";
 import { ApiError } from "@/lib/api";
-import { useOperationSuppliers, usePatchCatalogSku } from "@/lib/queries";
+import { useAuth } from "@/lib/auth";
+import {
+  useDeleteSkuSupplierOffer,
+  useOperationSuppliers,
+  usePatchCatalogSku,
+  useSkuSupplierOffers,
+  useUpsertSkuSupplierOffer,
+} from "@/lib/queries";
 import { INPUT_CLS } from "@/pages/operation/components/Modal";
 import { CategoryChip, CATEGORY_LABEL, CodeChip } from "../components/atoms";
 
@@ -237,6 +244,7 @@ const CostRowView = memo(function CostRowView({
   const { sku, category, productName } = row;
   const patch = usePatchCatalogSku();
   const discontinued = !!sku.discontinuedAt;
+  const [offersOpen, setOffersOpen] = useState(false);
 
   // Blank clears back to "not set" (cost is nullable, unlike selling price).
   function commitCost(raw: string) {
@@ -288,6 +296,7 @@ const CostRowView = memo(function CostRowView({
   }
 
   return (
+    <>
     <div
       className="grid items-center gap-3 px-3 py-2 border-b border-base-100 last:border-b-0"
       style={{ gridTemplateColumns: GRID_COLS, opacity: discontinued ? 0.5 : 1 }}
@@ -341,6 +350,17 @@ const CostRowView = memo(function CostRowView({
             ) : null}
           </div>
         )}
+        {/* 0388 — the OTHER suppliers' paper. The slot above stays the routing
+            truth; this strip records what everyone else quoted so a second
+            source's code and prices stop living on paper only. */}
+        <button
+          type="button"
+          onClick={() => setOffersOpen((v) => !v)}
+          className="mt-0.5 text-label font-medium text-kit-blue-9 underline underline-offset-2"
+          data-testid={`opcost-offers-toggle-${sku.sku}`}
+        >
+          {offersOpen ? "Hide other suppliers" : "Other suppliers"}
+        </button>
       </div>
       <div className="text-right" data-testid={`opcost-cost-${sku.sku}`}>
         {editMode ? (
@@ -365,5 +385,161 @@ const CostRowView = memo(function CostRowView({
       </div>
       <div />
     </div>
+    {offersOpen && <SupplierOffersStrip sku={sku} suppliers={suppliers} />}
+    </>
   );
 });
+
+/**
+ * ⭐ 0388 — EVERY SUPPLIER'S PAPER FOR ONE SKU (YH, 2026-08-26).
+ *
+ * The measured case: both Hookkas supply some of the same bedframes, and the
+ * one supplier slot meant the second company's own item code and prices had
+ * nowhere to be written — the keyer was holding a quotation the system refused
+ * to remember. This strip records one offer per supplier: THEIR code, THEIR
+ * price/PWP. The slot above remains the only thing POs route by; recording an
+ * offer changes no behaviour anywhere.
+ *
+ * Writes are principal-only (offers carry prices — the 0175/0186 boundary);
+ * everyone internal may read.
+ */
+function SupplierOffersStrip({
+  sku,
+  suppliers,
+}: {
+  sku: ProductSkuDto;
+  suppliers: Array<{ id: string; name: string }>;
+}) {
+  const isPrincipal = useAuth((s) => s.role) === "principal";
+  const offersQ = useSkuSupplierOffers(sku.id, true);
+  const upsert = useUpsertSkuSupplierOffer();
+  const remove = useDeleteSkuSupplierOffer();
+  const [supplierId, setSupplierId] = useState("");
+  const [code, setCode] = useState("");
+  const [price, setPrice] = useState("");
+  const [pwp, setPwp] = useState("");
+  const offers = offersQ.data?.offers ?? [];
+
+  function save() {
+    if (!supplierId) return;
+    const p = price.trim() === "" ? null : Number(price);
+    const w = pwp.trim() === "" ? null : Number(pwp);
+    if (
+      (p !== null && (!Number.isFinite(p) || p < 0)) ||
+      (w !== null && (!Number.isFinite(w) || w < 0))
+    ) {
+      toast.error("Enter non-negative numbers (blank = not quoted)");
+      return;
+    }
+    upsert.mutate(
+      { skuId: sku.id, supplierId, supplierCode: code.trim() || null, price: p, pwpPrice: w },
+      {
+        onSuccess: () => {
+          toast.success(`${sku.sku} · offer saved`);
+          setSupplierId("");
+          setCode("");
+          setPrice("");
+          setPwp("");
+        },
+        onError: (e: unknown) =>
+          toast.error(e instanceof ApiError ? e.message : "Save failed"),
+      },
+    );
+  }
+
+  return (
+    <div
+      className="border-b border-base-100 bg-base-50 px-3 py-2"
+      data-testid={`opcost-offers-${sku.sku}`}
+    >
+      {offersQ.isLoading ? (
+        <span className="text-meta text-base-500">Loading…</span>
+      ) : offers.length === 0 ? (
+        <span className="text-meta text-base-500">No offers recorded</span>
+      ) : (
+        <ul className="flex flex-col gap-1">
+          {offers.map((o) => (
+            <li
+              key={o.supplierId}
+              className="flex flex-wrap items-center gap-2 text-meta text-base-700"
+            >
+              <span className="font-medium">{o.supplierName ?? "—"}</span>
+              <span className="font-mono text-base-500">{o.supplierCode ?? "—"}</span>
+              <span>{o.price == null ? "—" : `RM ${o.price.toFixed(2)}`}</span>
+              <span className="text-base-500">
+                {o.pwpPrice == null ? "PWP —" : `PWP RM ${o.pwpPrice.toFixed(2)}`}
+              </span>
+              {isPrincipal && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    remove.mutate(
+                      { skuId: sku.id, supplierId: o.supplierId },
+                      {
+                        onError: (e: unknown) =>
+                          toast.error(e instanceof ApiError ? e.message : "Remove failed"),
+                      },
+                    )
+                  }
+                  aria-label={`Remove ${o.supplierName ?? "offer"}`}
+                  data-testid={`opcost-offer-remove-${sku.sku}-${o.supplierId}`}
+                  className="text-base-400 hover:text-kit-red-11"
+                >
+                  ×
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      {isPrincipal && (
+        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+          <select
+            value={supplierId}
+            onChange={(e) => setSupplierId(e.target.value)}
+            aria-label={`${sku.sku} offer supplier`}
+            data-testid={`opcost-offer-supplier-${sku.sku}`}
+            className={`${INPUT_CLS} w-44 text-meta`}
+          >
+            <option value="">Supplier…</option>
+            {suppliers.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+          <input
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+            placeholder="Their code"
+            data-testid={`opcost-offer-code-${sku.sku}`}
+            className={`${INPUT_CLS} w-36 text-meta font-mono`}
+          />
+          <input
+            value={price}
+            onChange={(e) => setPrice(e.target.value)}
+            placeholder="Price"
+            data-testid={`opcost-offer-price-${sku.sku}`}
+            className={`${INPUT_CLS} w-24 text-meta`}
+          />
+          <input
+            value={pwp}
+            onChange={(e) => setPwp(e.target.value)}
+            placeholder="PWP"
+            data-testid={`opcost-offer-pwp-${sku.sku}`}
+            className={`${INPUT_CLS} w-24 text-meta`}
+          />
+          <button
+            type="button"
+            onClick={save}
+            disabled={!supplierId || upsert.isPending}
+            data-testid={`opcost-offer-save-${sku.sku}`}
+            className="btn-primary text-meta"
+          >
+            Save offer
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}

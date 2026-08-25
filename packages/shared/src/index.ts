@@ -374,6 +374,12 @@ export {
   supplierCreateInput,
   supplierSlug,
   type SupplierCreateInput,
+  // 0388 — dual-sourcing's recording half: a SKU remembers every supplier
+  // that quoted it; the supplier_id slot stays the routing truth.
+  skuSupplierOfferSchema,
+  skuSupplierOfferUpsertInput,
+  type SkuSupplierOfferDto,
+  type SkuSupplierOfferUpsertInput,
 } from "./schemas/catalog";
 
 // 0219 — Order Entry config (payment methods + form fields).

@@ -1436,3 +1436,32 @@ export function supplierSlug(name: string): string {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
 }
+
+/**
+ * ⭐ DUAL-SOURCING, THE RECORDING HALF (0388 · YH, 2026-08-26).
+ *
+ * One row per (sku, supplier): that supplier's OWN code and quoted prices for
+ * the piece. The SKU's `supplier_id` slot stays the routing truth for POs —
+ * these are the offers the slot chooses from, so the fact that had nowhere to
+ * live (the second Hookka's paper) is recorded without any behaviour moving.
+ */
+export const skuSupplierOfferSchema = z.object({
+  supplierId: z.string().uuid(),
+  /** Joined for display — the IDENTITY is the id (Law A/D). */
+  supplierName: z.string().nullable(),
+  supplierCode: z.string().nullable(),
+  price: z.number().nullable(),
+  pwpPrice: z.number().nullable(),
+  updatedAt: z.string(),
+});
+export type SkuSupplierOfferDto = z.infer<typeof skuSupplierOfferSchema>;
+
+export const skuSupplierOfferUpsertInput = z
+  .object({
+    supplierId: z.string().uuid(),
+    supplierCode: z.string().trim().max(60).nullable().optional(),
+    price: z.number().nonnegative().nullable().optional(),
+    pwpPrice: z.number().nonnegative().nullable().optional(),
+  })
+  .strict();
+export type SkuSupplierOfferUpsertInput = z.infer<typeof skuSupplierOfferUpsertInput>;

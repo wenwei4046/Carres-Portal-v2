@@ -16,7 +16,26 @@ import OperationSkuCostTab from "./OperationSkuCostTab";
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 const mockPatchMutate = vi.fn();
+const mockUpsertOffer = vi.fn();
+const mockRemoveOffer = vi.fn();
+let mockRole: string | null = "principal";
+let mockOffers: Array<{
+  supplierId: string;
+  supplierName: string | null;
+  supplierCode: string | null;
+  price: number | null;
+  pwpPrice: number | null;
+  updatedAt: string;
+}> = [];
+vi.mock("@/lib/auth", () => ({
+  useAuth: (selector: (s: { role: string | null }) => unknown) => selector({ role: mockRole }),
+}));
 vi.mock("@/lib/queries", () => ({
+  /* 0388 - the offers strip. A mutable roster so a test can seed what the
+   * lazy fetch would have returned. */
+  useSkuSupplierOffers: () => ({ data: { offers: mockOffers }, isLoading: false }),
+  useUpsertSkuSupplierOffer: () => ({ mutate: mockUpsertOffer, isPending: false }),
+  useDeleteSkuSupplierOffer: () => ({ mutate: mockRemoveOffer, isPending: false }),
   /* 2026-08-24 - the supplier picker/filter/column reads the roster through
    * this hook; one named supplier is enough to pin the render path. */
   useOperationSuppliers: () => ({
@@ -230,6 +249,120 @@ describe("supplier editing (2026-08-24)", () => {
     });
     const input = screen.getByTestId("opcost-supplier-code-CLOUD-KING");
     fireEvent.blur(input);
+    expect(mockPatchMutate).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * ⭐ 0388 — EVERY SUPPLIER'S PAPER FOR ONE SKU (YH, 2026-08-26).
+ *
+ * The measured case: both Hookkas supply some of the same bedframes, and the
+ * single supplier slot meant the second company's code and prices had nowhere
+ * to be written. The strip records offers; the slot stays the routing truth.
+ */
+describe("supplier offers strip (0388)", () => {
+  beforeEach(() => {
+    mockRole = "principal";
+    mockOffers = [];
+    mockUpsertOffer.mockReset();
+    mockRemoveOffer.mockReset();
+  });
+
+  function open() {
+    render(<OperationSkuCostTab catalog={makeCatalog([SKU_COST_SET])} />);
+    fireEvent.click(screen.getByTestId("opcost-offers-toggle-CLOUD-KING"));
+  }
+
+  it("opens per row and says plainly when nothing is recorded", () => {
+    open();
+    expect(screen.getByTestId("opcost-offers-CLOUD-KING")).toBeInTheDocument();
+    expect(screen.getByText("No offers recorded")).toBeInTheDocument();
+  });
+
+  it("lists each supplier's own code and prices", () => {
+    mockOffers = [
+      {
+        supplierId: "sup-hki",
+        supplierName: "Hookka Industries",
+        supplierCode: "1007-(K)",
+        price: 550,
+        pwpPrice: 495,
+        updatedAt: "2026-08-26T00:00:00Z",
+      },
+    ];
+    open();
+    const strip = screen.getByTestId("opcost-offers-CLOUD-KING");
+    expect(strip.textContent).toContain("Hookka Industries");
+    expect(strip.textContent).toContain("1007-(K)");
+    expect(strip.textContent).toContain("RM 550.00");
+    expect(strip.textContent).toContain("PWP RM 495.00");
+  });
+
+  it("⭐ saves an offer with the supplier's code and prices", () => {
+    open();
+    fireEvent.change(screen.getByTestId("opcost-offer-supplier-CLOUD-KING"), {
+      target: { value: "00000000-0000-4000-8000-0000000000a1" },
+    });
+    fireEvent.change(screen.getByTestId("opcost-offer-code-CLOUD-KING"), {
+      target: { value: "  1007-(K)  " },
+    });
+    fireEvent.change(screen.getByTestId("opcost-offer-price-CLOUD-KING"), {
+      target: { value: "550" },
+    });
+    fireEvent.click(screen.getByTestId("opcost-offer-save-CLOUD-KING"));
+    expect(mockUpsertOffer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        skuId: "s1",
+        supplierId: "00000000-0000-4000-8000-0000000000a1",
+        supplierCode: "1007-(K)",
+        price: 550,
+        // Blank PWP is NOT QUOTED — null, never zero half-reading as a price.
+        pwpPrice: null,
+      }),
+      expect.anything(),
+    );
+  });
+
+  it("⭐ shows no write controls to a role the price lock would refuse", () => {
+    mockRole = "operation";
+    mockOffers = [
+      {
+        supplierId: "sup-hki",
+        supplierName: "Hookka Industries",
+        supplierCode: "1007-(K)",
+        price: 550,
+        pwpPrice: null,
+        updatedAt: "2026-08-26T00:00:00Z",
+      },
+    ];
+    open();
+    // Operation READS the offers — that is the point of recording them —
+    // but the save row and the remove control are principal-only (0175/0186).
+    expect(screen.getByText("Hookka Industries")).toBeInTheDocument();
+    expect(screen.queryByTestId("opcost-offer-save-CLOUD-KING")).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("opcost-offer-remove-CLOUD-KING-sup-hki"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("removes one supplier's offer without touching the slot", () => {
+    mockOffers = [
+      {
+        supplierId: "sup-hki",
+        supplierName: "Hookka Industries",
+        supplierCode: null,
+        price: null,
+        pwpPrice: null,
+        updatedAt: "2026-08-26T00:00:00Z",
+      },
+    ];
+    open();
+    fireEvent.click(screen.getByTestId("opcost-offer-remove-CLOUD-KING-sup-hki"));
+    expect(mockRemoveOffer).toHaveBeenCalledWith(
+      expect.objectContaining({ skuId: "s1", supplierId: "sup-hki" }),
+      expect.anything(),
+    );
+    // The slot writer was never called — an offer is not the routing truth.
     expect(mockPatchMutate).not.toHaveBeenCalled();
   });
 });
