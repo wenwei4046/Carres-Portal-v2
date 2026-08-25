@@ -9234,6 +9234,7 @@ export function useOfferModelCompartments() {
       modelId,
       compartmentIds,
       supplierId,
+      supplierCodes,
     }: {
       modelId: string;
       compartmentIds: string[];
@@ -9241,13 +9242,23 @@ export function useOfferModelCompartments() {
        * to send on every call: syncCompartmentSku's own inherit-from-siblings
        * step wins the moment one compartment in the batch has written it. */
       supplierId?: string;
+      /* ⭐ The supplier's own code per compartment (2026-08-24), keyed by
+       * compartmentId. This loop already sends one request per compartment, so
+       * a per-piece code costs nothing extra: it rides the request that
+       * compartment was making anyway. An absent entry sends nothing, which
+       * the server reads as "leave the existing code alone". */
+      supplierCodes?: Record<string, string>;
     }) => {
       const failed: { compartmentId: string; message: string }[] = [];
       for (const compartmentId of compartmentIds) {
         try {
+          const code = supplierCodes?.[compartmentId]?.trim();
           await apiFetch<{ modelSofaCompartment: ModelSofaCompartmentDto }>(
             `/api/catalog/models/${modelId}/compartments/${compartmentId}`,
-            catalogJson("PUT", supplierId ? { supplierId } : {}),
+            catalogJson("PUT", {
+              ...(supplierId ? { supplierId } : {}),
+              ...(code ? { supplierCode: code } : {}),
+            }),
           );
         } catch (e) {
           failed.push({

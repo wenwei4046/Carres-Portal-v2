@@ -62,6 +62,12 @@ export async function syncCompartmentSku(
      * only matters the one time it is genuinely ambiguous. Absent keeps the
      * existing inherit-then-category-cover fallback byte-identical. */
     supplierId?: string | null;
+    /* The supplier's own code for THIS compartment (2026-08-24). Absent means
+     * LEAVE ALONE — the key is omitted from the upsert payload entirely rather
+     * than written as null, so a re-offer cannot blank a code somebody keyed
+     * from the quotation. Compare `supplierId`, which a sibling SKU overrules:
+     * a code is per piece, so an explicit one always wins. */
+    supplierCode?: string | null;
   },
 ): Promise<CompartmentSkuResult> {
   // 1. The model gives the sku prefix (model_key), the category (supplier +
@@ -188,6 +194,12 @@ export async function syncCompartmentSku(
           : {}
         : { price: seedPrice, pos_active: true }),
       supplier_id: supplierId,
+      /* Omitted entirely when the caller said nothing — see the arg's note.
+         A trimmed-empty string is a deliberate CLEAR, so the keyer can undo a
+         typo; only `undefined` means "leave whatever is there". */
+      ...(args.supplierCode === undefined
+        ? {}
+        : { supplier_code: args.supplierCode?.trim() || null }),
       // "Sofa {Model} {code}" (Loo 2026-07-06) — the SKU Master row names the
       // model+compartment pair, NOT the pool compartment's own description
       // (e.g. "Sofa Angsa 1A(LHF)", not "Left hand facing"). Format lives in

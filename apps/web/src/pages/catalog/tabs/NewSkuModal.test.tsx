@@ -752,3 +752,102 @@ describe("NewSkuModal — same-name models are disambiguated in the picker", () 
     expect(labels).toContain("Accessory Booqit");
   });
 });
+
+/**
+ * ⭐ THE SUPPLIER'S OWN CODE ON A BULK BATCH (2026-08-24).
+ *
+ * A quotation names the SUPPLIER's code and never Carres' SKU — it is the only
+ * string a keyer can match a factory's paperwork against. The classic
+ * single-SKU flow has had a code box since 0375; the two BULK flows had the
+ * supplier PICKER but no code, so a batch of sofa compartments or mattress
+ * sizes could name its factory and not one of its part numbers.
+ *
+ * One box defaults the batch, any piece overrides it. The override is keyed by
+ * what the SUBMIT sends — compartmentId for the compartment lane, the canonical
+ * size NAME for the size lane — because a key the server cannot recognise would
+ * drop the code silently rather than loudly.
+ */
+describe("NewSkuModal — the supplier's own code on a bulk batch", () => {
+  it("gives the compartment flow a batch box and one box per ticked piece", () => {
+    render(<NewSkuModal models={MODELS} sofaCompartments={POOL} onClose={vi.fn()} />);
+    openSofa();
+    expect(screen.getByTestId("new-sku-supplier-code-batch")).toBeInTheDocument();
+    // Both live compartments start ticked; the retired one is not offered.
+    expect(screen.getByTestId("new-sku-supplier-code-piece-c1")).toBeInTheDocument();
+    expect(screen.getByTestId("new-sku-supplier-code-piece-c2")).toBeInTheDocument();
+    expect(screen.queryByTestId("new-sku-supplier-code-piece-c-off")).not.toBeInTheDocument();
+  });
+
+  it("drops a piece's box the moment that piece is unticked", () => {
+    /* A code typed against a compartment then unticked must not travel — the
+       submit builds its map from the SELECTED ids, and the box disappearing is
+       what tells the keyer that. */
+    render(<NewSkuModal models={MODELS} sofaCompartments={POOL} onClose={vi.fn()} />);
+    openSofa();
+    fireEvent.change(screen.getByTestId("new-sku-supplier-code-piece-c2"), {
+      target: { value: "HK-1NA" },
+    });
+    fireEvent.click(screen.getByTestId("new-sku-comp-1NA"));
+    expect(screen.queryByTestId("new-sku-supplier-code-piece-c2")).not.toBeInTheDocument();
+  });
+
+  it("⭐ sends the batch code to every compartment, and the override to just one", async () => {
+    const onClose = vi.fn();
+    render(<NewSkuModal models={MODELS} sofaCompartments={POOL} onClose={onClose} />);
+    openSofa();
+    fireEvent.change(screen.getByTestId("new-sku-name"), { target: { value: "Angsa" } });
+    fireEvent.change(screen.getByTestId("new-sku-supplier-code"), {
+      target: { value: "  HK-390  " },
+    });
+    fireEvent.change(screen.getByTestId("new-sku-supplier-code-piece-c2"), {
+      target: { value: "HK-390-1NA" },
+    });
+    fireEvent.click(screen.getByText("Create model + 2 SKUs"));
+
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    /* The compartment lane sends ONE code per request, so the batch default is
+       resolved HERE — each PUT carries the single code that piece ends up with,
+       trimmed. */
+    expect(mockOfferMutateAsync).toHaveBeenCalledWith({
+      modelId: "m-new",
+      compartmentIds: ["c1", "c2"],
+      supplierCodes: { c1: "HK-390", c2: "HK-390-1NA" },
+    });
+  });
+
+  it("sends NOTHING extra when no code was typed", async () => {
+    /* The payload stays byte-identical to what it sent before this field
+       existed — an empty map is a key the server would have to interpret. */
+    const onClose = vi.fn();
+    render(<NewSkuModal models={MODELS} sofaCompartments={POOL} onClose={onClose} />);
+    openSofa();
+    fireEvent.change(screen.getByTestId("new-sku-name"), { target: { value: "Angsa" } });
+    fireEvent.click(screen.getByText("Create model + 2 SKUs"));
+
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    const payload = mockOfferMutateAsync.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(payload).not.toHaveProperty("supplierCodes");
+  });
+
+  it("⭐ keys the size flow's override by the CANONICAL NAME the submit sends", async () => {
+    const onClose = vi.fn();
+    render(<NewSkuModal models={MODELS} optionPools={SIZE_POOLS} onClose={onClose} />);
+    fireEvent.change(screen.getByTestId("new-sku-name"), { target: { value: "Lumi FirmCare" } });
+    fireEvent.change(screen.getByTestId("new-sku-supplier-code"), { target: { value: "LM-100" } });
+    /* The pool VALUE is `K`; the variant sent is `King`. The box is keyed by
+       the name for exactly that reason — a map keyed `K` would never match. */
+    fireEvent.change(screen.getByTestId("new-sku-supplier-code-piece-King"), {
+      target: { value: "LM-100-K" },
+    });
+    fireEvent.click(screen.getByText("Create model + 3 SKUs"));
+
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    const call = mockGenerateSkusMutateAsync.mock.calls[0]?.[0] as {
+      input: { supplierCode?: string; supplierCodes?: Record<string, string> };
+    };
+    // Batch default and the one override both ride the SAME request; the
+    // server resolves per-variant → batch → NULL.
+    expect(call.input.supplierCode).toBe("LM-100");
+    expect(call.input.supplierCodes).toEqual({ King: "LM-100-K" });
+  });
+});

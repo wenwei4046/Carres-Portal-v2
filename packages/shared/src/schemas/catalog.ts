@@ -460,6 +460,13 @@ export const modelSofaCompartmentInput = z
      * inherits it — see syncCompartmentSku). Absent keeps today's inherit-
      * then-category-cover fallback byte-identical. */
     supplierId: z.string().uuid().optional(),
+    /* The supplier's own code for THIS compartment (2026-08-24). Unlike
+     * `supplierId` — which a sibling SKU's answer deliberately overrules,
+     * because one model may not fork onto two factories — the code is per
+     * PIECE: a quotation lists one code per compartment, so an explicit value
+     * always wins. Absent leaves whatever the row already holds, so a re-offer
+     * never blanks a code somebody keyed. */
+    supplierCode: z.string().trim().max(60).optional(),
   })
   .strict();
 export type ModelSofaCompartmentInput = z.infer<typeof modelSofaCompartmentInput>;
@@ -1239,6 +1246,18 @@ export const generateSkusInput = z
      * both cover mattress; without this a keyer has no way to say a brand-new
      * batch is Hookka's, not whichever supplier happened to sort first. */
     supplierId: z.string().uuid().optional(),
+    /* ⭐ THE SUPPLIER'S OWN CODE, BATCH DEFAULT + PER-PIECE OVERRIDE
+     * (2026-08-24). A quotation names Carres' SKU nowhere — it names the
+     * supplier's code, and that is the only string a keyer can match a
+     * factory's paperwork against. `supplierCode` fills every generated row;
+     * `supplierCodes` overrides it for one variant, because a quotation
+     * usually lists a DIFFERENT code per size. Both absent writes NULL, which
+     * is what every row generated before today already holds.
+     *
+     * Keyed by the RAW variant the caller sent, never the canonical size: the
+     * caller has no way to know that `K` becomes `King` on the way in. */
+    supplierCode: z.string().trim().max(60).optional(),
+    supplierCodes: z.record(z.string(), z.string().trim().max(60)).optional(),
   })
   .strict();
 export type GenerateSkusInput = z.infer<typeof generateSkusInput>;

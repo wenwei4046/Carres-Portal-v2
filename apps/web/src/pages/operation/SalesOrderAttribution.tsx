@@ -286,15 +286,29 @@ export default function SalesOrderAttribution({
               teaches the operator to ignore refusals. The door appears for the
               roles GATE 3 lets decide it; the REQUEST panel above stays visible
               to everyone, because a pending change is truth, not an action. */}
+          {/* ⭐ THE LABEL IS LOCKED, SO THE EXPLANATION SITS BESIDE IT
+              (2026-08-24). `COPY-STANDARD.md:1427` is a `Use exactly` row, and
+              its `Do NOT use` column already rejects `Request ownership change`,
+              `Reassign` and `Change owner` — the three renames anyone reaching
+              for a clearer word lands on. What was missing is not a better noun
+              but the sentence saying what pressing it does, and that sentence
+              already exists as APPROVED copy on the modal this button opens. It
+              is repeated here rather than reworded, so no new string is minted
+              and the two surfaces cannot drift apart. */}
           {canRequest && (
-            <Button
-              size="sm"
-              variant="neutral"
-              onClick={() => setFormOpen(true)}
-              data-testid="attribution-open"
-            >
-              Change salesperson — needs approval
-            </Button>
+            <div className="flex flex-col items-start gap-1">
+              <Button
+                size="sm"
+                variant="neutral"
+                onClick={() => setFormOpen(true)}
+                data-testid="attribution-open"
+              >
+                Change salesperson — needs approval
+              </Button>
+              <p className="text-meta text-base-500" data-testid="attribution-open-note">
+                This is sent for approval. The sales order does not change until it is applied.
+              </p>
+            </div>
           )}
         </div>
       )}

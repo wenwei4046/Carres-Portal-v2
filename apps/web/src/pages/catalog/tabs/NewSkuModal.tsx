@@ -128,6 +128,20 @@ export default function NewSkuModal({
   /* 0375 — the SUPPLIER'S own item code (their quotation's code for this
    * piece). Free text, optional; ours is the SKU code above. */
   const [supplierCode, setSupplierCode] = useState("");
+  /* ⭐ ONE CODE FOR THE BATCH, ANY PIECE OVERRIDDEN (2026-08-24).
+   *
+   * A supplier's quotation names the SUPPLIER's code, never Carres' SKU — it is
+   * the only string a keyer can match a factory's paperwork against. The bulk
+   * flows generate many SKUs at once and a quotation usually lists a different
+   * code per size or per compartment, so one shared box would write the same
+   * wrong code onto every row.
+   *
+   * `supplierCode` above is the batch default; this map overrides one piece.
+   * Keyed by what the SUBMIT sends — the canonical size NAME for the size flow
+   * (`King`, which is what `variants` carries) and the compartmentId for the
+   * compartment flow (which is what that loop iterates). Keying by anything the
+   * server cannot recognise would silently drop the override. */
+  const [supplierCodes, setSupplierCodes] = useState<Record<string, string>>({});
   /* 2026-08-24 - WHO supplies this piece. Empty = Auto: the route resolves
    * the supplier from `suppliers.cat_covered[]` exactly as it always has,
    * so an untouched form is byte-identical to before this picker existed.
@@ -202,6 +216,47 @@ export default function NewSkuModal({
         ))}
       </select>
     </label>
+  );
+
+  /* The batch-default code plus one box per piece being generated. Rendered by
+     both bulk flows; the classic single-SKU flow keeps its own plain field
+     below, because there is no batch to default and no second piece to
+     override — a "same as above" placeholder would be describing nothing. */
+  const supplierCodeBatchField = (pieces: { key: string; label: string }[]) => (
+    <div className="block" data-testid="new-sku-supplier-code-batch">
+      <label className="block">
+        <span className="label block mb-1">Supplier item code (optional)</span>
+        <input
+          value={supplierCode}
+          onChange={(e) => setSupplierCode(e.target.value)}
+          placeholder="One code for the whole batch — override any piece below"
+          data-testid="new-sku-supplier-code"
+          className={INPUT_CLS}
+        />
+      </label>
+      {pieces.length > 0 && (
+        <div className="mt-2 flex flex-col gap-1.5" data-testid="new-sku-supplier-code-pieces">
+          {pieces.map((p) => (
+            <label key={p.key} className="flex items-center gap-2">
+              <span className="w-24 shrink-0 truncate font-mono text-meta text-base-500">
+                {p.label}
+              </span>
+              <input
+                value={supplierCodes[p.key] ?? ""}
+                onChange={(e) =>
+                  setSupplierCodes((prev) => ({ ...prev, [p.key]: e.target.value }))
+                }
+                /* The placeholder SHOWS the inherited value, so an empty box is
+                   never mistaken for an empty code. */
+                placeholder={supplierCode.trim() || "same as above"}
+                data-testid={`new-sku-supplier-code-piece-${p.key}`}
+                className={INPUT_CLS}
+              />
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
   );
 
   const modelOptionLabel = (m: ProductModelDto): string => {
@@ -457,10 +512,22 @@ export default function NewSkuModal({
           setCreatedModelId(sofaModelId); // lock identity; a retry only re-offers
         }
         const ids = compPool.filter((c) => selectedComps.has(c.id)).map((c) => c.id);
+        /* The compartment lane sends ONE code per request, so the batch default
+           is resolved here rather than on the server — each PUT carries the
+           single code that compartment should end up with. */
+        const batch = supplierCode.trim();
+        const codes: Record<string, string> = {};
+        for (const compartmentId of ids) {
+          const code = (supplierCodes[compartmentId] ?? "").trim() || batch;
+          if (code) codes[compartmentId] = code;
+        }
         const { failed } = await offerCompartments.mutateAsync({
           modelId: sofaModelId,
           compartmentIds: ids,
           supplierId: supplierId || undefined,
+          /* Omitted when nobody typed a code, so a batch with no codes sends
+             the byte-identical payload it sent before this field existed. */
+          ...(Object.keys(codes).length > 0 ? { supplierCodes: codes } : {}),
         });
         if (failed.length > 0) {
           // Keep the modal open with ONLY the failed compartments selected —
@@ -511,6 +578,20 @@ export default function NewSkuModal({
             variants: sizes,
             price: isPrincipal && priceNum > 0 ? priceNum : undefined,
             supplierId: supplierId || undefined,
+            /* The server resolves per-variant → batch → NULL, so both ride the
+               one request. Only the sizes actually being generated are sent —
+               a code typed against a size then unticked must not travel. */
+            supplierCode: supplierCode.trim() || undefined,
+            ...(() => {
+              const own = sizes.reduce<Record<string, string>>((acc, v) => {
+                const code = (supplierCodes[v] ?? "").trim();
+                if (code) acc[v] = code;
+                return acc;
+              }, {});
+              /* Same rule as the compartment lane: an empty map is not sent, so
+                 a batch with no per-piece codes is byte-identical to before. */
+              return Object.keys(own).length > 0 ? { supplierCodes: own } : {};
+            })(),
           },
         });
         toast.success(
@@ -868,6 +949,12 @@ export default function NewSkuModal({
           </div>
         )}
         {compFlow && supplierPickerField}
+        {compFlow &&
+          supplierCodeBatchField(
+            compPool
+              .filter((c) => selectedComps.has(c.id))
+              .map((c) => ({ key: c.id, label: c.code })),
+          )}
         {sizeSection && (
           <div className="block" data-testid="new-sku-sizes">
             <div className="flex items-center justify-between mb-1">
@@ -987,6 +1074,18 @@ export default function NewSkuModal({
             </div>
           ))}
         {sizeFlow && supplierPickerField}
+        {sizeFlow &&
+          supplierCodeBatchField(
+            /* Keyed by the CANONICAL NAME, because that is what the submit puts
+               in `variants` — keying by the raw pool value would hand the server
+               a map it cannot match and the override would vanish silently. */
+            sizePool
+              .filter((p) => selectedSizes.has(p.value))
+              .map((p) => ({
+                key: canonicalSize(p.value).name,
+                label: canonicalSize(p.value).name,
+              })),
+          )}
 
         {/* Classic single-SKU fields — hidden on the compartment path (codes,
             descriptions + prices all derive per compartment there) AND on the
