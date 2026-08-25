@@ -1915,6 +1915,65 @@ describe("POST /api/catalog/models/:id/generate-skus (idempotent skip)", () => {
     expect(rows.map((r) => r.supplier_code)).toEqual(["HK-390-KING", null]);
   });
 
+  /* ⭐ A QUOTATION PRICES EACH SIZE DIFFERENTLY (2026-08-25). The measured
+     case: Hookka's Cody bedframe is K 550 · Q 425 · S 395 · SS 407.50, and one
+     batch price wrote the wrong number on every generated row. Same contract
+     as supplierCodes: keyed by the RAW variant, own entry wins, absent falls
+     back to the batch price. */
+  it("⭐ prices each variant from its own entry, falling back to the batch", async () => {
+    const records: { table: string; op: "insert" | "update"; body: unknown }[] = [];
+    generateSkusMock(records);
+    const res = await generate({
+      variants: ["K", "SS"],
+      price: 550,
+      prices: { SS: 407.5 },
+    });
+    expect(res.status).toBe(200);
+    const rows = records.find((r) => r.op === "insert")?.body as {
+      sku: string;
+      price: number;
+    }[];
+    expect(rows).toEqual([
+      expect.objectContaining({ sku: "LUMI-CLASSIC-K", price: 550 }),
+      expect.objectContaining({ sku: "LUMI-CLASSIC-SS", price: 407.5 }),
+    ]);
+  });
+
+  it("keeps an explicit per-variant 0 — deliberately unpriced at that size", async () => {
+    const records: { table: string; op: "insert" | "update"; body: unknown }[] = [];
+    generateSkusMock(records);
+    const res = await generate({ variants: ["K", "SS"], price: 550, prices: { SS: 0 } });
+    expect(res.status).toBe(200);
+    const rows = records.find((r) => r.op === "insert")?.body as { price: number }[];
+    expect(rows.map((r) => r.price)).toEqual([550, 0]);
+  });
+
+  it("⭐ seeds pwp_price per variant, NULL where unset, the key on EVERY row", async () => {
+    /* The 0186 server law: pwp <= 0 means NOT SET, stored as NULL — never as a
+       zero that half-reads as a price. And rows of one bulk insert must agree
+       about their columns, so the key rides every row once any row has one. */
+    const records: { table: string; op: "insert" | "update"; body: unknown }[] = [];
+    generateSkusMock(records);
+    const res = await generate({
+      variants: ["K", "SS"],
+      price: 550,
+      pwpPrices: { K: 495 },
+    });
+    expect(res.status).toBe(200);
+    const rows = records.find((r) => r.op === "insert")?.body as Record<string, unknown>[];
+    for (const row of rows) expect(row).toHaveProperty("pwp_price");
+    expect(rows.map((r) => r.pwp_price)).toEqual([495, null]);
+  });
+
+  it("names pwp_price NOT AT ALL when nobody set one", async () => {
+    const records: { table: string; op: "insert" | "update"; body: unknown }[] = [];
+    generateSkusMock(records);
+    const res = await generate({ variants: ["K", "SS"], price: 550 });
+    expect(res.status).toBe(200);
+    const rows = records.find((r) => r.op === "insert")?.body as Record<string, unknown>[];
+    for (const row of rows) expect(row).not.toHaveProperty("pwp_price");
+  });
+
   // Loo 2026-07-21 — adding a size to an EXISTING model unions it into
   // allowed_options.sizes (the sizes-active cascade / POS size source);
   // deliberately-inactive existing sizes are never clobbered (union, not

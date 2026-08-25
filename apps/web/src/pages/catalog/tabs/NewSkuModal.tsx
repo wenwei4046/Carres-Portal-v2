@@ -144,6 +144,15 @@ export default function NewSkuModal({
    * compartment flow (which is what that loop iterates). Keying by anything the
    * server cannot recognise would silently drop the override. */
   const [supplierCodes, setSupplierCodes] = useState<Record<string, string>>({});
+  /* ⭐ A QUOTATION PRICES EACH SIZE DIFFERENTLY (2026-08-25). Hookka's Cody
+   * bedframe is K 550 · Q 425 · S 395 · SS 407.50 — the one batch price box
+   * cannot say that, so 66 bedframe SKUs were generating wrong-or-zero and
+   * being re-keyed by hand in SKU Master. One box per ticked size, price and
+   * PWP, keyed by the canonical size NAME the submit sends (same contract as
+   * `supplierCodes`). Empty box = the batch price; PWP has NO batch default
+   * because the measured quotation's Price 1 never repeats across sizes. */
+  const [sizePrices, setSizePrices] = useState<Record<string, string>>({});
+  const [sizePwp, setSizePwp] = useState<Record<string, string>>({});
   /* 2026-08-24 - WHO supplies this piece. Empty = Auto: the route resolves
    * the supplier from `suppliers.cat_covered[]` exactly as it always has,
    * so an untouched form is byte-identical to before this picker existed.
@@ -774,6 +783,27 @@ export default function NewSkuModal({
                  a batch with no per-piece codes is byte-identical to before. */
               return Object.keys(own).length > 0 ? { supplierCodes: own } : {};
             })(),
+            /* Per-size price / PWP ride the same request, principal only (the
+               boxes never render otherwise) and only for the sizes actually
+               being generated — a number typed against a size then unticked
+               must not travel. A box that fails to parse is treated as empty
+               rather than sent as NaN for the server to refuse. */
+            ...(() => {
+              const priceMap: Record<string, number> = {};
+              const pwpMap: Record<string, number> = {};
+              for (const v of sizes) {
+                const pTxt = (sizePrices[v] ?? "").trim();
+                const p = Number(pTxt);
+                if (pTxt !== "" && Number.isFinite(p) && p >= 0) priceMap[v] = p;
+                const wTxt = (sizePwp[v] ?? "").trim();
+                const w = Number(wTxt);
+                if (wTxt !== "" && Number.isFinite(w) && w > 0) pwpMap[v] = w;
+              }
+              return {
+                ...(isPrincipal && Object.keys(priceMap).length > 0 ? { prices: priceMap } : {}),
+                ...(isPrincipal && Object.keys(pwpMap).length > 0 ? { pwpPrices: pwpMap } : {}),
+              };
+            })(),
           },
         });
         toast.success(
@@ -1255,6 +1285,52 @@ export default function NewSkuModal({
               </div>
             </div>
           ))}
+        {sizeFlow && isPrincipal && selectedSizes.size > 0 && (
+          <div className="block" data-testid="new-sku-size-prices">
+            <span className="label block mb-1">Price per size — overrides the price above</span>
+            <div className="flex flex-col gap-1.5">
+              {sizePool
+                .filter((po) => selectedSizes.has(po.value))
+                .map((po) => {
+                  const nm = canonicalSize(po.value).name;
+                  return (
+                    <div key={nm} className="flex items-center gap-2">
+                      <span className="w-24 shrink-0 truncate text-meta text-base-500">{nm}</span>
+                      <input
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        value={sizePrices[nm] ?? ""}
+                        onChange={(e) =>
+                          setSizePrices((prev) => ({ ...prev, [nm]: e.target.value }))
+                        }
+                        /* The placeholder SHOWS the inherited batch price, so an
+                           empty box never reads as a free bedframe. */
+                        placeholder={price.trim() || "0.00"}
+                        data-testid={`new-sku-size-price-${nm}`}
+                        className={INPUT_CLS}
+                      />
+                      <input
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        value={sizePwp[nm] ?? ""}
+                        onChange={(e) => setSizePwp((prev) => ({ ...prev, [nm]: e.target.value }))}
+                        placeholder="PWP —"
+                        title="PWP price at this size (blank = no PWP)"
+                        data-testid={`new-sku-size-pwp-${nm}`}
+                        className={INPUT_CLS}
+                      />
+                    </div>
+                  );
+                })}
+            </div>
+            <div className="mt-1 text-meta text-base-500">
+              Left box is the price, right box the PWP price. Blank price = the batch price above;
+              blank PWP = no PWP at that size.
+            </div>
+          </div>
+        )}
         {sizeFlow && supplierPickerField}
         {sizeFlow &&
           supplierCodeBatchField(
