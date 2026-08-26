@@ -199,11 +199,25 @@ export default function SalesOrderAmendment({
           )}
         </div>
       ) : (
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-meta text-base-500">
-            Items, price and the promised date are what the customer agreed to — they change by
-            proposal, not by editing.
-          </p>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {/* ⭐ THE STANDING EXPLANATION IS GONE — YH, 2026-08-26. The line read
+              "Items, price and the promised date are what the customer agreed
+              to — they change by proposal, not by editing", and it was written
+              when those three sat beside EDITABLE boxes and the reader had to
+              be told why some fields opened and others did not. They are
+              read-only facts now, so the sentence explains a distinction the
+              screen no longer draws, and the modal states the rule where it is
+              actually needed.
+
+              🟡 THE DOOR ITSELF STAYS, and that is deliberate rather than a
+              half-done removal. YH asked for the button to go too, on the
+              grounds that "the 3 dates in order info are fixed" — true of the
+              DATES, and `Amend delivery date` covers those on its own. But this
+              modal is also the ONLY way to change ITEMS, UNIT PRICE and
+              INSTALMENT MONTHS anywhere on the Sales Order (its single mount is
+              asserted by the ui-contract suite). Deleting it would retire three
+              capabilities on a reason that names none of them, so it is raised
+              rather than assumed. */}
           <Button size="sm" variant="neutral" onClick={() => startProposal()} data-testid="amendment-open-form">
             Propose a change to the customer
           </Button>

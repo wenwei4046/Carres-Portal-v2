@@ -1793,6 +1793,19 @@ export default function SalesOrderWorkspace() {
   const customerBuiltins = tab("customer").builtins;
   const emergencyEnabled = tab("emergency").builtins["emergency"]?.enabled !== false;
 
+  /* Is there an address on this order AT ALL? Any one structured part counts,
+     and so does an imported one-string address (AutoCount rows carry the whole
+     thing in `customer_address` with every part null) — otherwise every legacy
+     order would claim to have no address and be offered the tickbox that
+     erases it. */
+  const addressIsBlank =
+    !draft.customer_address_line1.trim() &&
+    !draft.customer_address_line2.trim() &&
+    !draft.customer_address_state &&
+    !draft.customer_address_city &&
+    !draft.customer_address_postcode &&
+    !(order?.customer_address ?? "").trim();
+
   /* ⭐ THE STAIR CARRY, SHOWN THE WAY THE POS SHOWS IT (Jess, 2026-08-26).
    *
    * The office keyed `Floor`, `Items needing stair carry` and the lift answer
@@ -1941,11 +1954,21 @@ export default function SalesOrderWorkspace() {
             customer it belongs to. */}
         <SubHead>Delivery address</SubHead>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2" data-pos-field="address">
-          <div className="sm:col-span-2">
-            <Checkbox id="so-address-unknown" label="Address not given yet"
-              checked={draft.customer_address_unknown}
-              onCheckedChange={(v) => setField("customer_address_unknown", v)} />
-          </div>
+          {/* ⭐ THE ESCAPE HATCH ONLY APPEARS WHEN IT IS NEEDED (YH,
+              2026-08-26). `Address not given yet` is the answer to a MISSING
+              address; on an order that already carries one it is a permanent
+              tickbox whose only power is to throw that address away. It shows
+              while the address is blank, and while it is already ticked (so it
+              can be unticked) — and disappears once there is an address to
+              read. The FIELD is untouched: `customer_address_unknown` still
+              round-trips, and the POS still asks the same question. */}
+          {(addressIsBlank || draft.customer_address_unknown) && (
+            <div className="sm:col-span-2">
+              <Checkbox id="so-address-unknown" label="Address not given yet"
+                checked={draft.customer_address_unknown}
+                onCheckedChange={(v) => setField("customer_address_unknown", v)} />
+            </div>
+          )}
           <Input id="so-line1" label="Address line 1" value={draft.customer_address_line1}
             disabled={draft.customer_address_unknown}
             onChange={(e) => setField("customer_address_line1", e.target.value)} />
@@ -2020,10 +2043,11 @@ export default function SalesOrderWorkspace() {
       </Block>
 
       {/* ② ORDER INFO */}
-      <Block
-        title="Order info"
-        subtitle="The dates this order runs on. Proceed date is when production may start."
-      >
+      {/* No subtitle (YH, 2026-08-26). The 2026-08-24 teaching line explained
+          what `Proceed date` meant while it was an editable box the office had
+          to reason about. It is a recorded fact now, and a sentence explaining
+          a read-only date is the "reduce descriptions" Jess asked for. */}
+      <Block title="Order info">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <Fact label="Ordered" value={isNew ? "Today" : fmtDate(order?.placed_at ?? null)} />
           {mode === "create" ? (
@@ -2075,8 +2099,12 @@ export default function SalesOrderWorkspace() {
                 The POS has clamped this since the wizard was written; this door
                 accepted any number, so an office-keyed order could promise a
                 carry nobody performs. */}
-            <Input id="so-floor" label="Floor" type="number" min={0} max={MAX_DELIVERY_FLOOR}
-              hint={`Stair carry up to floor ${MAX_DELIVERY_FLOOR}`}
+            {/* The ceiling rides the LABEL (YH, 2026-08-26) — it was a hint
+                under the box, which reads as advice rather than as the limit
+                the input actually enforces. One statement, in the field's own
+                name, and the separate hint line goes with it. */}
+            <Input id="so-floor" label={`Floor (Max is ${MAX_DELIVERY_FLOOR}rd Floor)`}
+              type="number" min={0} max={MAX_DELIVERY_FLOOR}
               value={String(draft.delivery_floor)}
               onChange={(e) =>
                 setField(
@@ -2085,8 +2113,16 @@ export default function SalesOrderWorkspace() {
                 )
               } />
           </div>
+          {/* ⭐ THE BLANK SAYS WHAT IT MEANS (YH, 2026-08-26). This was a bare
+              number box with `Empty = every item` underneath it — a rule the
+              reader had to hold in their head to interpret an empty cell. The
+              answer now sits IN the cell: an untouched field reads `All 5
+              items`, so nothing has to be remembered and the count it stands
+              for is on screen. Still null on the wire — 0104's column comment
+              rules that NULL means every item, and a number is never invented
+              here to avoid a blank. */}
           <Input id="so-stair-items" label="Items needing stair carry" type="number" min={0}
-            hint="Empty = every item"
+            placeholder={stair ? `All ${stair.itemsTotal} item${stair.itemsTotal === 1 ? "" : "s"}` : "All items"}
             value={draft.delivery_stair_items == null ? "" : String(draft.delivery_stair_items)}
             onChange={(e) =>
               setField(
@@ -2108,23 +2144,20 @@ export default function SalesOrderWorkspace() {
         </div>
         {/* The three fields above, added up out loud — the POS's own sentence
             (`pos/StairCarryFields.tsx`), so the office reads the number the
-            salesperson quoted instead of re-deriving it. */}
-        {stair && (
+            salesperson quoted instead of re-deriving it.
+            ⭐ ONLY WHEN THERE IS A CHARGE (YH, 2026-08-26). It used to narrate
+            the zero too — "No stair carry — floor 1 is within the free 2F" —
+            which is a sentence saying nothing happened, printed on the majority
+            of orders. The fields above already state the floor and the lift; a
+            line that only repeats them back is the noise Jess asked to cut. */}
+        {stair && stair.fee > 0 && (
           <p className="mt-2 text-meta text-base-500" data-testid="so-stair-working">
-            {stair.fee > 0 ? (
-              <>
-                {stair.items} of {stair.itemsTotal} item{stair.itemsTotal === 1 ? "" : "s"} ×{" "}
-                {stair.floors} floor{stair.floors === 1 ? "" : "s"} above {stair.cfg.freeUpToFloor}F ×{" "}
-                <Money value={stair.cfg.perFloorPerItem} /> ={" "}
-                <span className="font-semibold text-base-900">
-                  <Money value={stair.fee} />
-                </span>
-              </>
-            ) : draft.delivery_has_lift ? (
-              "No stair carry — the building has a lift."
-            ) : (
-              `No stair carry — floor ${draft.delivery_floor} is within the free ${stair.cfg.freeUpToFloor}F.`
-            )}
+            {stair.items} of {stair.itemsTotal} item{stair.itemsTotal === 1 ? "" : "s"} ×{" "}
+            {stair.floors} floor{stair.floors === 1 ? "" : "s"} above {stair.cfg.freeUpToFloor}F ×{" "}
+            <Money value={stair.cfg.perFloorPerItem} /> ={" "}
+            <span className="font-semibold text-base-900">
+              <Money value={stair.fee} />
+            </span>
           </p>
         )}
         <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">

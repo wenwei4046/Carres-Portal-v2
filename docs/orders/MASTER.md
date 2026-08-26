@@ -252,6 +252,30 @@ surfaces import them. The same ruling brought the POS's stair-carry working-out 
 `3 of 5 items × 2 floors above 2F × RM50 = RM300` — through the one imported `floorSurchargeRaw`
 (Law D: one derived fact, ONE arithmetic).
 
+**THE SECOND DENSITY PASS — 2026-08-26 (YH), after reading the merged page.** Six lines of standing
+explanation came off once the fields they explained stopped being editable:
+
+- `ORDER INFO` loses its subtitle. It taught what `Proceed date` meant while that was a box the
+  office had to reason about; it is a recorded fact now.
+- The stair-carry working-out prints **only when there is a charge**. It used to narrate the zero
+  (*"No stair carry — floor 1 is within the free 2F"*) on the majority of orders, repeating the two
+  fields directly above it.
+- `Floor` carries its own ceiling — **`Floor (Max is 3rd Floor)`** — instead of a hint underneath
+  that read as advice rather than as the limit the input enforces.
+- `Items needing stair carry` states its blank in the cell: an untouched field reads **`All {n}
+  items`**. The rule `Empty = every item` no longer has to be held in the reader's head. The wire
+  value is unchanged — NULL still means every item (0104).
+- **`Address not given yet` appears only while there is no address**, or while it is already
+  ticked. On an order that carries one, a permanent tickbox whose only power is to discard it is a
+  hazard, not a field.
+- The `SALES OWNERSHIP` door drops its suffix and both standing sentences — see the ruling above.
+
+🟡 **The `Propose a change to the customer` door was asked for and NOT removed.** The reason given
+was that the three dates in `ORDER INFO` are fixed — true, and `AMEND DELIVERY DATE` covers dates
+on its own. But that modal is also the only way to change **items, unit price and instalment
+months** anywhere on the Sales Order. Its standing explanation went; the door waits for a ruling
+that names those three.
+
 Sales may directly correct only its governed safe/customer facts. A commercial commitment change
 uses the amendment path. Purchasing, Warehouse, Delivery and Finance facts have links, never forms.
 
@@ -1072,8 +1096,10 @@ the amendment machinery, the goods truth and the Order Route architecture are un
   existing `Open this order in Payments` door is unchanged.
 - **`SALES OWNERSHIP` is read-only for Operation — no button.** A management-authorised role
   (principal or HR, the same lane GATE 3 lets decide it) sees the one door, worded
-  `Change salesperson — needs approval`. A pending request stays visible to everyone: it is truth,
-  not an action.
+  **`Change salesperson`** (⛔ the `— needs approval` suffix ruled here on 2026-08-15 was retired
+  2026-08-26: it was the third statement of one fact around an unpressed button, and the rule is
+  carried once by the modal the button opens). A pending request stays visible to everyone: it is
+  truth, not an action.
 - **`Report a problem` moved into `More actions`**, beside `Copy to new Sales Order` and
   `Cancel SO`. The permanent Problems card is deleted; the order's Service Cases remain on
   `Order Route`, which already reads them from the route facts.
