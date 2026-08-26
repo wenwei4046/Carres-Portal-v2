@@ -22,6 +22,10 @@ import { fmtDate } from "@/lib/fmt-date";
 import { RailGroup, RailItem } from "../components/workspace-rail";
 import PurchasingTabs from "../PurchasingTabs";
 import DestinationAllocationEditor from "./DestinationAllocationEditor";
+import GoodsMiniTable, {
+  categoryWord,
+  type GoodsMiniLine,
+} from "../components/GoodsMiniTable";
 
 /**
  * SO BATCH PURCHASE — THE REGISTER
@@ -184,9 +188,31 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
         width: 128,
         sortable: true,
         chooserGroup: "Source",
+        /* ⭐ THE LINK LIVES ON THE COLUMN, where the Card put it (§3.2 —
+           "Link to Sales Order; customer is the quiet second line").
+           It used to live only inside the expand, so reaching the order the
+           demand came from meant opening a box first — and the column that was
+           supposed to carry it was plain text. Moving it here is what let the
+           expand stop repeating the row (owner correction 2026-08-24). */
         accessor: (r) => (
           <span className="flex flex-col leading-tight" data-testid={`so-batch-source-${r.id}`}>
-            <span className="font-mono font-medium">{r.so == null ? "" : `SO-${r.so}`}</span>
+            {r.so == null ? (
+              <span className="font-mono font-medium" />
+            ) : (
+              <button
+                type="button"
+                className="self-start font-mono font-medium text-kit-blue-11 underline-offset-2 hover:underline"
+                data-testid={`so-batch-source-link-${r.id}`}
+                onClick={(e) => {
+                  /* The row's own click opens the expand; this one leaves the
+                     page, so it must not do both. */
+                  e.stopPropagation();
+                  navigate(`/operation/orders/so/${r.orderId}`);
+                }}
+              >
+                {`SO-${r.so}`}
+              </button>
+            )}
             <span className="truncate text-meta text-kit-slate-11">{r.customer ?? ""}</span>
           </span>
         ),
@@ -399,66 +425,86 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
   );
 
   /* ── The inspector ────────────────────────────────────────────────────── */
+  /**
+   * ⭐ THE SAME CHILD TABLE SALES ORDERS AND DELIVERY DRAW
+   * (owner correction 2026-08-24; `GoodsMiniTable`'s own ruling, Chai
+   * 2026-08-15 — "written ONCE so that two pages cannot drift into two
+   * mini-tables that almost agree").
+   *
+   * ── WHAT THIS REPLACES, AND WHY IT READ AS CONFUSION ────────────────────
+   *
+   * A hand-drawn `grid-cols-2` label/value list — the second mini-table that
+   * ruling exists to forbid — and it failed twice over:
+   *
+   *   · IT WAS AS WIDE AS THE TABLE. `justify-between` across a half of a
+   *     1600px row put `REQUIRED` at the left edge and its `1` some 780px
+   *     away, with nothing in between. The parent is a table with aligned
+   *     columns; the child was a form floating in white space.
+   *   · IT RE-PRINTED THE ROW. Seven of its eight facts — Required, From
+   *     Stock, On Open PO, Buy, Source, Required for, Goods must arrive,
+   *     Deliver to — are ALREADY columns on the row above it. `Expand has
+   *     exactly one job` (CLAUDE.md §2), and its job was not to say
+   *     everything again.
+   *
+   * ── WHAT THE ROW GENUINELY CANNOT SAY ───────────────────────────────────
+   *
+   * The row is one line per BUILD. A matched set is one row and several module
+   * codes, so the PARTS are the child's job — and beside them, the two facts
+   * the row only summarises: WHICH purchase order already covers this
+   * (`Open PO` prints a number, never its document), and where a SPLIT
+   * arrangement actually sends each unit.
+   */
   const renderExpansion = (r: PurchaseDemandRow) => {
     const arranged = live.get(r.id) ?? [];
+    /* A SPLIT earns its quantity; one destination prints its name alone — the
+       sibling register's own rule, so the two boxes read the same way. */
     const deliverTo =
       arranged.length > 0
-        ? arranged.map((a) => `${destinationName(a.destinationId)} ${a.qty}`).join(" · ")
+        ? arranged.map((a) =>
+            arranged.length > 1
+              ? `${destinationName(a.destinationId)} ×${a.qty}`
+              : destinationName(a.destinationId),
+          )
         : data.defaultDestinationId
-          ? destinationName(data.defaultDestinationId)
-          : "";
-    const fact = (label: string, value: React.ReactNode) => (
-      <div className="flex items-baseline justify-between gap-4 py-0.5">
-        <span className="text-label uppercase tracking-wide text-kit-slate-11">{label}</span>
-        <span className="tabular-nums">{value}</span>
-      </div>
-    );
+          ? [destinationName(data.defaultDestinationId)]
+          : [];
+
+    /* A row always has at least one part. The fallback names the row itself
+       rather than printing an empty box for a demand the projection has not
+       broken down. */
+    const parts =
+      r.parts.length > 0
+        ? r.parts
+        : [{ sku: r.skus[0] ?? r.item, qty: r.qtyNeeded, unitCost: null }];
+
+    const lines: GoodsMiniLine[] = parts.map((part) => ({
+      key: `${r.id}::${part.sku}`,
+      testId: `so-batch-part-${part.sku}`,
+      category: r.category ? categoryWord(r.category) : "Other goods",
+      /* NOTHING IS MINTED BEFORE ISSUE. The Unit IDs are allocated when the
+         purchase order is created, so the honest answer here is the governed
+         absence — not a blank, and never an invented code. */
+      unitIds: [],
+      unitAbsence: "Not allocated",
+      coveredBy: r.poNumbers,
+      coveredByAbsence: "Not ordered yet",
+      deliverTo,
+      deliverToAbsence: "Not chosen",
+      sku: part.sku,
+      qty: part.qty,
+      item: r.item,
+      ...(r.variant ? { itemDetail: r.variant } : {}),
+      /* Buying is ticked on the PARENT row — one whole-line switch, not two. */
+      selectable: false,
+    }));
+
     return (
-      <div
-        className="grid gap-x-10 gap-y-1 bg-white px-4 py-3 text-body sm:grid-cols-2"
-        data-testid={`so-batch-inspector-${r.id}`}
-      >
-        {/* The four numbers, in the order the arithmetic runs. */}
-        <div className="flex flex-col">
-          {fact(W.inspectorRequired, r.qtyNeeded)}
-          {fact(W.inspectorFromStock, <Count n={r.takenFromStock} />)}
-          {fact(
-            W.inspectorOnOpenPo,
-            <span className="flex items-center gap-2">
-              <Count n={r.onPo} />
-              {r.poNumbers.length > 0 ? (
-                <span className="font-mono text-meta text-kit-slate-11">
-                  {r.poNumbers.join(" · ")}
-                </span>
-              ) : null}
-            </span>,
-          )}
-          {fact(W.inspectorBuy, <Count n={r.toBuy} />)}
-        </div>
-        <div className="flex flex-col">
-          <div className="flex items-baseline justify-between gap-4 py-0.5">
-            <span className="text-label uppercase tracking-wide text-kit-slate-11">
-              {W.inspectorSource}
-            </span>
-            <button
-              type="button"
-              className="font-mono text-kit-blue-11 underline-offset-2 hover:underline"
-              data-testid={`so-batch-inspector-so-${r.id}`}
-              onClick={() => navigate(`/operation/orders/so/${r.orderId}`)}
-            >
-              {r.so == null ? r.item : `SO-${r.so} · ${r.skus[0] ?? r.item}`}
-            </button>
-          </div>
-          {fact(
-            W.inspectorRequiredFor,
-            r.customerDelivery ? fmtDate(r.customerDelivery) : <Absent>No delivery date yet</Absent>,
-          )}
-          {fact(
-            W.inspectorGoodsMustArrive,
-            r.goodsMustArrive ? fmtDate(r.goodsMustArrive) : <Absent>—</Absent>,
-          )}
-          {fact(W.inspectorDeliverTo, deliverTo)}
-        </div>
+      <div data-testid={`so-batch-inspector-${r.id}`}>
+        <GoodsMiniTable
+          label={r.so == null ? `Goods on ${r.item}` : `Goods on SO-${r.so}`}
+          lines={lines}
+          showCoveredBy
+        />
       </div>
     );
   };

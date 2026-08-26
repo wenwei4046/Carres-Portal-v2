@@ -52,7 +52,7 @@ function row(over: Partial<PurchaseDemandRow> = {}): PurchaseDemandRow {
     goodsMustArrive: "2026-08-19",
     issueRef: { proposalKey: "s-hooka::mattress", buildKey: "b1" },
     action: null,
-    costs: [{ sku: "B1201S-K", unitCost: 100 }],
+    parts: [{ sku: "B1201S-K", qty: 2, unitCost: 100 }],
     supplierKind: "own_logistics",
     ownerName: null,
     ownerDuty: null,
@@ -333,17 +333,46 @@ describe("Deliver To defaults to Carres Klang and may be changed before issue", 
   });
 });
 
-describe("the row inspector explains the arithmetic and edits nothing", () => {
-  it("prints Required − Stock − Open PO = Buy, with the source facts", () => {
+/**
+ * ⭐ THE EXPAND DRAWS THE SIBLING'S CHILD TABLE (owner correction 2026-08-24).
+ *
+ * It used to be a hand-drawn two-column fact list — the second mini-table
+ * `GoodsMiniTable`'s own ruling forbids (Chai, 2026-08-15) — and seven of its
+ * eight facts were columns the row already carried.
+ */
+describe("the row expand is the same child table Sales Orders draws", () => {
+  it("uses the SHARED component, not a second mini-table", () => {
     renderRegister();
     fireEvent.click(screen.getByTestId("so-batch-expand-build::o3::b3"));
     const panel = screen.getByTestId("so-batch-inspector-build::o3::b3");
-    expect(panel).toHaveTextContent("REQUIRED");
-    expect(panel).toHaveTextContent("FROM STOCK");
-    expect(panel).toHaveTextContent("ON OPEN PO");
-    expect(panel).toHaveTextContent("BUY");
+    /* The one implementation identifies itself, exactly as it does on the
+       Sales Orders register and on Delivery. */
+    expect(within(panel).getByTestId("goods-mini-table")).toBeInTheDocument();
+    expect(within(panel).getByRole("table")).toHaveAccessibleName("Goods on SO-1330");
+  });
+
+  it("says what the ROW cannot: the parts, and the purchase order covering them", () => {
+    renderRegister();
+    fireEvent.click(screen.getByTestId("so-batch-expand-build::o3::b3"));
+    const panel = screen.getByTestId("so-batch-inspector-build::o3::b3");
+    /* `Open PO` on the row prints a NUMBER; only here does it name the
+       document. */
+    expect(within(panel).getByRole("columnheader", { name: "Covered by" })).toBeInTheDocument();
     expect(panel).toHaveTextContent("PO-20260820-4827");
-    expect(panel).toHaveTextContent("Carres Klang");
+    /* One line per part, with the quantity the factory must make. */
+    expect(within(panel).getByTestId("so-batch-part-B1201S-K")).toBeInTheDocument();
+    /* Nothing is minted before Issue PO, and the box says so rather than
+       printing a blank or inventing a code. */
+    expect(panel).toHaveTextContent("Not allocated");
+  });
+
+  it("stops re-printing the four numbers the row already carries", () => {
+    renderRegister();
+    fireEvent.click(screen.getByTestId("so-batch-expand-build::o3::b3"));
+    const panel = screen.getByTestId("so-batch-inspector-build::o3::b3");
+    for (const repeated of ["REQUIRED", "FROM STOCK", "ON OPEN PO", "BUY", "Required for"]) {
+      expect(panel, repeated).not.toHaveTextContent(repeated);
+    }
   });
 
   it("holds no input, no save and no second Buy", () => {
@@ -355,10 +384,15 @@ describe("the row inspector explains the arithmetic and edits nothing", () => {
     expect(within(panel).queryByRole("button", { name: /save/i })).not.toBeInTheDocument();
   });
 
-  it("links to the Sales Order it came from", () => {
+  /**
+   * ⭐ THE SALES ORDER LINK MOVED TO ITS COLUMN (Card §3.2 — "Source SO: link
+   * to Sales Order"). It used to live only inside the expand, so reaching the
+   * order meant opening a box first, and the column the Card named was plain
+   * text.
+   */
+  it("links to the Sales Order from the ROW, without opening anything", () => {
     renderRegister();
-    fireEvent.click(screen.getByTestId("so-batch-expand-build::o1::b1"));
-    fireEvent.click(screen.getByTestId("so-batch-inspector-so-build::o1::b1"));
+    fireEvent.click(screen.getByTestId("so-batch-source-link-build::o1::b1"));
     expect(navigate).toHaveBeenCalledWith("/operation/orders/so/o1");
   });
 });

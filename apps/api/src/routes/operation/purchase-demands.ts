@@ -193,8 +193,12 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
              one it does not have. `null` is load-bearing: a SKU with no price
              cannot be issued until somebody states a cost or marks it Free of
              Charge, and a `0` here would be a price nobody set. */
-          costs: build.lines.map((l) => ({
+          /* The build's own lines — the modules a matched set is made of. The
+             quantity rides with them, so the expand can list the parts instead
+             of re-stating the row's numbers. */
+          parts: build.lines.map((l) => ({
             sku: l.sku,
+            qty: l.qty,
             unitCost: catalog.get(l.sku)?.cost ?? null,
           })),
           supplierKind: supplierKinds.get(proposal.supplierId) ?? "own_logistics",
@@ -257,7 +261,7 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
          offer an act that cannot succeed. */
       goodsMustArrive: null,
       issueRef: null,
-      costs: [{ sku: line.sku, unitCost: catalog.get(line.sku)?.cost ?? null }],
+      parts: [{ sku: line.sku, qty: line.qty, unitCost: catalog.get(line.sku)?.cost ?? null }],
       supplierKind: line.supplierId
         ? (supplierKinds.get(line.supplierId) ?? "own_logistics")
         : null,
