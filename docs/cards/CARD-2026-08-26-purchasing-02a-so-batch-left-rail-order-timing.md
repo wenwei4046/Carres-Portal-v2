@@ -246,3 +246,95 @@ may interrupt.
 
 When complete, report the production result and stop. Do not begin redesigning the right
 Register.
+
+---
+
+## 10 · Execution record — 2026-08-26
+
+**Branch:** `claude/purchasing-02a-left-rail-timing`, cut fresh from `origin/main` `48940312`
+(#924), built in an isolated worktree. **PR:** https://github.com/wenwei4046/Carres-Portal-v2/pull/926
+
+### 10.1 Authority persisted first
+
+One commit before any code: `docs/purchasing/MASTER.md` §9.1 (the rail contract, the Safety-days
+law and timing classification), `docs/COPY-STANDARD.md` (the rail block rewritten; dictionary
+`order-by buffer` → **Safety days** with `Buffer` banned; `Overdue`/`Buffer` added to the
+Purchasing surface bans; the retired rail words listed), `docs/03-page-patterns.md` (the frozen
+2026-08-01 To Order example overwritten with the current SO Batch Purchase pattern; the
+"`Order By` never reaches the screen" rule retired — Order By now DRIVES the timing rows and
+remains a planned date, never an unlock date), `docs/ACTION-FLOW-STANDARD.md` ("arrival buffer" →
+"Safety days"). Nothing appended beside old truth.
+
+### 10.2 The model
+
+- `PurchaseDemandState` = five timing states (`can_order_early` · `safety_days_full` ·
+  `safety_days_low` · `safety_days_none` · `not_enough_production_time`) + four blockers.
+  **`covered` no longer exists on the wire**: a fully covered / `Buy = 0` build or
+  stock-covered line is not returned at all, and returns automatically by recomputation when
+  the covering PO is cancelled (`purchase_order_lines` is read `status = 'open'` and nothing
+  else) — proved by test.
+- `purchaseDemandStateWords(safetyDays)` / `purchaseDemandRailWords(safetyDays)` compose the
+  safety-band words from the governed value, so a changed setting can never make the screen lie.
+  At 14 they are the approved words exactly.
+- **One engine.** `ToOrderBuild` now carries its bundle's own `raiseBy` (Order By) and
+  `promiseIfOrderedToday` (expected production completion). `purchaseDemandTimingOf` only
+  COMPARES the engine's dates: `today < Order By → Can order early`, `today = Order By → full`,
+  then office-calendar working days between expected completion and Customer Delivery
+  (`≥ safetyDays → full` on calendar rounding, `1…13 → low`, `0 → none`,
+  `completion > delivery → not enough`). Safety days are subtracted exactly once, in
+  `net-requirements.ts`, where they always were.
+- A carried build the engine gave no dates falls to `no_production_days` — the one
+  Purchasing-owned setup facet — never a silently defaulted timing. The three Sales/Catalog
+  blockers stay row facts (fact/fix two-line treatment) and are not rail facets.
+- The rail: `TO ORDER · All not ordered` (active = no facet; clicking clears — the shared
+  local-rail `All` law), five timing rows (all orderable, all selectable), `SETUP TO FIX`
+  rendered only above zero, with a guard that drops its filter when the section hides.
+- Settings: `Safety days` · `Extra time allowed for delays.` · `working days`; the save key and
+  engine field stay `order_by_buffer_days` — one setting, one arithmetic, no migration.
+
+### 10.3 Gates — all green on the final branch
+
+| Gate | Result |
+|---|---|
+| `pnpm test` | shared 115/2686 · api 126/2481 · web 280/3466 — **8,633 tests, 0 failed** |
+| `pnpm typecheck` · `pnpm lint` · `check:v4` | clean |
+| `node scripts/check-migrations.mjs` | 402 filenames validated; **this Card adds no migration** |
+| `pnpm build` | clean; `so-batch-rail-preview.html` **absent from `apps/web/dist`** — verified |
+| `git diff --check` | clean |
+
+Tests written first and proved failing: 37 failures across the two shared contract files before
+the model landed; the API projection fixture was re-anchored (Date faked to Wed 2026-09-02,
+deliveries composed with the shared calendar engine relative to expected completion) so the five
+timing bands are deterministic on any run day.
+
+### 10.4 The dev walk — real component, seeded payload
+
+`apps/web/so-batch-rail-preview.html` + `src/dev/so-batch-rail-preview.tsx` (dev-only vite
+entry, the `route-preview` precedent; cannot reach production). Evidence in
+`docs/evidence/purchasing-02a-rail/`:
+
+| File | Proves |
+|---|---|
+| `1-1440-rail-complete.png` | the complete corrected rail at 1440×900, one row per category |
+| `2-can-order-early-selected.png` | `Can order early` active (NavRow wash + 2px line), 2 rows, both selectable, honest footer |
+| `3-risk-bands-filtered.png` | `1–13` + `No safety days left` + `Not enough production time` selected together, rows still selectable |
+| `4a/4b` | `SETUP TO FIX` visible with its one unselectable line · the whole section absent at zero |
+| `6-expansion-unchanged.png` | the shared `GoodsMiniTable` expansion untouched |
+| `0-old-vs-new.png` · `old-vs-new-rail.html` | the retired six-state rail reconstructed beside the real corrected page |
+
+Measured in the rendered DOM: the rail's exact text is the §3 contract verbatim; 8 rows → 8
+tick-boxes with exactly the two blocked rows disabled; `All not ordered` `aria-pressed=true` at
+rest and after clearing.
+
+- 🟡 **`Not enough production time` truncates by ~10px** in the governed 200px rail
+  (`Not enough producti…`); the tooltip carries the full words. The words are the owner's exact
+  approved copy, so nothing was shortened. Proposed fix if she wants it: let this rail's labels
+  wrap to a second line instead of truncating.
+
+### 10.5 Release steps still owed (autonomous)
+
+1. CI green → merge → automatic deploy → production SHA proof.
+2. Set the governed value 7 → 14 through the existing settings authority (measured live
+   2026-08-26: `order_by_buffer_days = 7`; range check 0–60 admits 14; config row + audit line,
+   **no migration** — §4's own instruction).
+3. Production walk per §8 and closure of this record.
