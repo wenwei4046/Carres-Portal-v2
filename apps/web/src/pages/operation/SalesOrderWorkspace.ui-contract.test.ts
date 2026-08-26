@@ -10,6 +10,15 @@ const header = readFileSync(join(here, "SalesOrderTabs.tsx"), "utf8");
 const attribution = readFileSync(join(here, "SalesOrderAttribution.tsx"), "utf8");
 const amendDate = readFileSync(join(here, "SalesOrderAmendDeliveryDate.tsx"), "utf8");
 const render = readFileSync(join(here, "../../lib/pdf/render.ts"), "utf8");
+/* The POS half of the parity contract (owner ruling 2026-08-26). A fact both
+   surfaces ask for must offer the same answers, so the list lives in shared and
+   BOTH files are read here — a POS that stopped importing it would pass its own
+   suite while silently re-forking the question. */
+const stairCarry = readFileSync(join(here, "../dealer/pos/StairCarryFields.tsx"), "utf8");
+const salesOrderForm = readFileSync(
+  join(here, "../../../../../packages/shared/src/sales-order-form.ts"),
+  "utf8",
+);
 
 describe("Sales Order object template contract", () => {
   it("keeps one object identity and the exact four-item object navigation", () => {
@@ -151,35 +160,116 @@ describe("Sales Order object template contract", () => {
     );
   });
 
-  /* ⭐ COMPLETE, NOT PERMANENTLY OPEN (2026-08-25).
-     This assertion used to pin `<Block title="Related Documents">` as one exact
-     source line, which made it fail the moment the block gained a summary — and
-     I read that failure as the RULING forbidding a fold. It was not. MASTER.md
-     :226 rules the index COMPLETE ("must not show only the latest or first
-     Delivery Order when more exist") and sanctions a summary in the same breath
-     ("the summary says, for example, `2 Delivery Orders →`"). A test that
-     enforces its own spelling instead of its own intent is a test that blocks
-     correct work, so it now asserts the SEVEN OWNERS — which is the thing the
-     ruling actually protects, and which a fold cannot take away. */
-  it("shows Delivery Journey and a complete read-only Related Documents index", () => {
-    expect(workspace).toContain('<Block title="Delivery Journey">');
-    expect(workspace).toContain('title="Related Documents"');
-    expect(workspace).toContain('data-testid="sales-order-related-documents"');
-    for (const word of [
-      "Purchase Orders",
-      "Receiving Sessions",
-      "Stock Units",
-      "Delivery Orders",
-      "Payments",
-      "Service Cases",
-      "Guarantees",
-    ]) {
-      expect(workspace).toContain(`label="${word}"`);
+  /* ⭐ THE ORDER TAB STOPS RE-PRINTING WHAT `Order Route` OWNS — owner ruling
+     2026-08-26 (Jess). This assertion is INVERTED, not deleted, and that needs
+     its reasoning recorded because it used to protect two whole cards.
+
+     `Delivery Journey` and `Related Documents` were both read-only mirrors of
+     facts another view already draws. Jess ruled them off the Order tab; the
+     facts survive because `Order Route` carries every one of them —
+     `packages/shared/src/sales-order-route.ts` builds a `LOGISTICS` node from
+     the same `logistics.partnerName`, a `DELIVERY DATE` node carrying the
+     appointment and its slot, a `DELIVERY ORDER` node, and a door on each of
+     PURCHASING · RECEIVING · STOCK · MONEY · the Service branch. Nothing was
+     the Order tab's alone.
+
+     Two duplications died with them and are asserted below so they cannot come
+     back: the customer's promised date was printed TWICE (`Customer Delivery`
+     in Order info and `Customer promise` in Delivery Journey — one fact, two
+     labels, ownership Law D), and `Journey` is a word COPY-STANDARD:1337 and
+     :1453 both ban in favour of `Order Route`. */
+  it("leaves the delivery journey and the document index to Order Route", () => {
+    expect(workspace).not.toContain('title="Delivery Journey"');
+    expect(workspace).not.toContain('title="Related Documents"');
+    expect(workspace).not.toContain('data-testid="sales-order-related-documents"');
+    /* The banned word is gone from the surface entirely. */
+    expect(workspace).not.toContain("Journey");
+    /* ONE promised-date FACT, under the one governed label. `Customer
+       Delivery` still appears twice — the create picker and the object-mode
+       Fact, which are the same field in two modes. `Customer promise` was a
+       SECOND label for that same date on a card that is now gone. */
+    expect(workspace).not.toContain('label="Customer promise"');
+    /* The tab that inherited the work is still reachable and still exists. */
+    expect(workspace).toContain('const OBJECT_VIEWS = ["Order", "Revisions", "History", "Order Route"]');
+    expect(workspace).toContain("<SalesOrderRoute");
+    /* And the queries that fed ONLY those two cards left with them, or the page
+       would still pay for three round trips it never renders. */
+    for (const dead of ["deliveryOrdersQ", "paymentsQ", "guaranteesQ", "relatedDocuments"]) {
+      expect(workspace, `${dead} outlived the card that read it`).not.toContain(dead);
     }
-    expect(workspace).toContain("<SalesOrderDeliveryOrdersBlock payload={deliveryOrdersQ.data} />");
-    expect(workspace).toContain("Delivery Orders could not be loaded");
-    expect(workspace).toContain("Documents could not be loaded");
-    expect(workspace).toContain("Open Order Route →");
+  });
+
+  /* ⭐ FEWER CARDS, SAME FACTS — owner ruling 2026-08-26 (Jess): "make it merge
+     more". `DELIVERY ADDRESS` joined `CUSTOMER` and `SALES OWNERSHIP` joined
+     `ORDER INFO`. The merge may not cost a locked WORD, so each keeps its exact
+     name as a subsection heading; what it loses is a border, a 24px gap and a
+     second heading rule. */
+  it("merges the address into Customer and ownership into Order info, keeping both names", () => {
+    expect(workspace).toContain("<SubHead>Delivery address</SubHead>");
+    expect(workspace).toContain("<SubHead>Sales ownership</SubHead>");
+    expect(workspace).not.toContain('<Block title="Delivery address">');
+    /* Every field of both merged sections still renders. */
+    expect(workspace).toContain('data-pos-field="address"');
+    expect(workspace).toContain('data-pos-field="billing"');
+    expect(workspace).toContain("<SalesOrderAttribution");
+  });
+
+  /* ⭐ THE STANDING FACT SITS BESIDE THE CARD'S NAME (Jess, 2026-08-26) —
+     "add stuff to header part like the new/existing customer thingy". It stays
+     a FACT, never a control: the phone probe derives it and MASTER.md:1038
+     rules it read-only on both surfaces. */
+  it("answers new-or-existing in the Customer heading, and still never lets it be typed", () => {
+    expect(workspace).toContain('data-testid="customer-type-chip"');
+    expect(workspace).toContain("headerSlot=");
+    expect(workspace).not.toContain('label="Customer type (auto)"');
+    expect(workspace).toContain("customerTypeWord");
+    /* The accent is spent once, on the tab underline — a chip may not take it. */
+    expect(workspace.match(/bg-kit-blue-9/g)).toHaveLength(1);
+  });
+
+  /* ⭐ ONE FACT, ONE CONTROL SHAPE, BOTH SURFACES — owner ruling 2026-08-26
+     (Jess): "ensure both sides of filling in are the same". The POS offers two
+     named answers to the lift question; this page offered an unlabelled
+     tickbox, where unticked meant BOTH "no lift" and "nobody said". The two
+     words now live in ONE place and both surfaces import them. */
+  it("asks the lift question with the POS's own two words", () => {
+    expect(workspace).toContain('<Select id="so-lift" label="Lift available?"');
+    expect(workspace).toContain("LIFT_OPTIONS");
+    expect(workspace).not.toContain('<Checkbox id="so-lift"');
+    expect(stairCarry, "the POS must read the same list").toContain("LIFT_OPTIONS");
+    expect(salesOrderForm).toContain('export const LIFT_OPTIONS = ["No lift", "Has lift"] as const');
+  });
+
+  /* ⭐ THE STAIR CARRY IS ADDED UP OUT LOUD (Jess, 2026-08-26) — the office
+     keyed floor, quantity and lift and was told nothing back while the POS
+     printed the whole working-out. ⛔ The arithmetic is IMPORTED: one derived
+     fact has ONE arithmetic (ownership Law D), so a second copy of the formula
+     on this page is the failure being asserted against. */
+  it("shows the stair-carry working-out, without a second copy of the sum", () => {
+    expect(workspace).toContain('data-testid="so-stair-working"');
+    expect(workspace).toContain("floorSurchargeRaw(");
+    expect(workspace).toContain('from "@/lib/order-totals"');
+    /* The rate and the free floors are READ from config, never retyped. */
+    expect(workspace).toContain("cfg.freeUpToFloor");
+    expect(workspace).toContain("cfg.perFloorPerItem");
+    expect(workspace).not.toMatch(/freeUpToFloor\s*[:=]\s*\d/);
+  });
+
+  /* ⭐ PROCEED DATE IS READ-ONLY ON AN EXISTING ORDER (Jess, 2026-08-26).
+     This OVERWRITES `docs/orders/MASTER.md`:725-728, which gave Operations a
+     direct writer. CREATE keeps the picker — `createOrderInput` refuses an
+     order without a proceed date, so the office could not key one otherwise. */
+  it("records the proceed date on an existing order instead of offering it", () => {
+    const field = workspace.slice(
+      workspace.indexOf('data-pos-field="proceedDate"'),
+      workspace.indexOf('data-pos-field="stairCarry"'),
+    );
+    expect(field).toContain('mode === "create" ?');
+    expect(field).toContain('<Fact label="Proceed date"');
+    expect(field).toContain('<DatePicker id="so-proceed"');
+    /* The builtin still has a control on the page — the completeness test below
+       walks the POS registry and would not accept the field simply vanishing. */
+    expect(workspace).toContain('id="so-proceed"');
   });
 
   it("puts no toolbar on or above the paper", () => {
@@ -301,7 +391,10 @@ describe("Sales Order object template contract", () => {
   });
 
   it("names the governed ownership request and hides it from Operation", () => {
-    expect(workspace).toContain('title="Sales ownership"');
+    /* The section merged into `Order info` on 2026-08-26 and kept its locked
+       word as the subsection heading — the merge moved the border, not the
+       name (COPY-STANDARD:1427 still governs the door below it). */
+    expect(workspace).toContain("<SubHead>Sales ownership</SubHead>");
     expect(attribution).toContain("Change salesperson — needs approval");
     expect(attribution).toContain('role === "principal" || role === "hr"');
     expect(attribution).toContain("Request ownership change");

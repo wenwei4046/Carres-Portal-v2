@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { Block, relatedDocumentsSummary } from "./SalesOrderWorkspace";
+import { Block } from "./SalesOrderWorkspace";
 
 /**
  * ⭐ LESS AT ONCE, IN THE SAME ORDER (2026-08-24).
@@ -21,16 +21,16 @@ describe("A left-pane block shows less at once, and never less than the truth", 
 
   it("stays open when it has no summary — a chevron may not hide an unknown", () => {
     render(
-      <Block title="Related Documents">
-        <p>every downstream document</p>
+      <Block title="Goods">
+        <p>the six-column goods truth</p>
       </Block>,
     );
-    /* No summary, no control, no way to close it. This is the shape Related
-       Documents relies on: its ui-contract test asserts a COMPLETE index, so a
-       collapsed one would be a contract failure wearing a chevron. */
-    expect(screen.getByText("every downstream document")).toBeTruthy();
-    expect(screen.queryByTestId("block-expand-Related Documents")).toBeNull();
-    expect(screen.queryByTestId("block-collapse-Related Documents")).toBeNull();
+    /* No summary, no control, no way to close it. This is the shape `Goods`
+       relies on: its ui-contract test asserts the COMPLETE six-column truth, so
+       a collapsed one would be a contract failure wearing a chevron. */
+    expect(screen.getByText("the six-column goods truth")).toBeTruthy();
+    expect(screen.queryByTestId("block-expand-Goods")).toBeNull();
+    expect(screen.queryByTestId("block-collapse-Goods")).toBeNull();
   });
 
   it("renders collapsed behind its one line when it has a summary", () => {
@@ -166,78 +166,5 @@ describe("A left-pane block shows less at once, and never less than the truth", 
     expect(
       screen.getByTestId("block-collapse-Emergency contact").getAttribute("aria-controls"),
     ).toBe("block-b-emergency-contact");
-  });
-});
-
-/**
- * ⭐ RELATED DOCUMENTS FOLDS, AND SAYS WHAT IS BEHIND THE FOLD (2026-08-25).
- *
- * I refused this on 2026-08-24 and was over-cautious. `docs/orders/MASTER.md`
- * :226 rules the index COMPLETE — "must not show only the latest or first
- * Delivery Order when more exist" — and sanctions a summary in the same breath:
- * "the summary says, for example, `2 Delivery Orders →`". Nothing there says the
- * card must stand open, and a fold removes no door.
- *
- * What the summary must never do is READ AS EMPTY WHEN IT IS NOT — a fold the
- * operator cannot see past is a fold they open every time to learn there was
- * nothing behind it, which is the crowding this exists to fix, moved one click
- * away.
- */
-describe("Related Documents says what is behind the fold", () => {
-  const G = (over: Record<string, number> = {}) =>
-    [
-      { label: "Purchase Orders", count: 0 },
-      { label: "Receiving Sessions", count: 0 },
-      { label: "Stock Units", count: 0 },
-      { label: "Delivery Orders", count: 0 },
-      { label: "Payments", count: 0 },
-      { label: "Service Cases", count: 0 },
-      { label: "Guarantees", count: 0 },
-    ].map((g) => ({ ...g, count: over[g.label] ?? 0 }));
-
-  it("⭐ never reads as empty while the answer is still in flight", () => {
-    /* The failure this guards: saying "—" during load tells the operator this
-       order has no documents, then silently contradicts itself a second later.
-       It borrows `Loading…` from the rows below rather than minting a second
-       way to say the same thing. */
-    expect(relatedDocumentsSummary(G({ "Delivery Orders": 2 }), true)).toBe("Loading…");
-  });
-
-  it("uses the governed em dash when there is genuinely nothing", () => {
-    expect(relatedDocumentsSummary(G(), false)).toBe("—");
-  });
-
-  it("names what exists, count first, in MASTER's own shape", () => {
-    expect(relatedDocumentsSummary(G({ "Delivery Orders": 2 }), false)).toBe("2 Delivery Orders");
-  });
-
-  it("takes the singular of the same noun for one document", () => {
-    /* Grammar, not a second word for the same thing — "1 Delivery Orders" is
-       the kind of sentence that makes an operator distrust the number. */
-    expect(relatedDocumentsSummary(G({ "Purchase Orders": 1 }), false)).toBe("1 Purchase Order");
-    expect(relatedDocumentsSummary(G({ Guarantees: 1 }), false)).toBe("1 Guarantee");
-    expect(relatedDocumentsSummary(G({ "Receiving Sessions": 1 }), false)).toBe(
-      "1 Receiving Session",
-    );
-  });
-
-  it("keeps the fold to one line, and says how much it did not name", () => {
-    const all = relatedDocumentsSummary(
-      G({
-        "Purchase Orders": 1,
-        "Delivery Orders": 2,
-        Payments: 1,
-        "Service Cases": 3,
-        Guarantees: 1,
-      }),
-      false,
-    );
-    /* Three named, the rest counted. A summary that grows to seven groups is a
-       second copy of the block, not a summary of it. */
-    expect(all).toBe("1 Purchase Order · 2 Delivery Orders · 1 Payment · +2 more");
-  });
-
-  it("counts only what is there — an empty owner never reaches the line", () => {
-    expect(relatedDocumentsSummary(G({ Payments: 1 }), false)).toBe("1 Payment");
   });
 });

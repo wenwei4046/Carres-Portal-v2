@@ -194,53 +194,66 @@ It reads Unit ID from Stock and Deliver To from Purchasing. It never infers or w
 
 ## Order view — one page, foreign facts read-only
 
-The Order view keeps the governed object header and one-page document composition. Its business
-sections are:
+The Order view keeps the governed object header and one-page document composition.
+
+### THE MERGED ORDER TAB — OWNER RULING 2026-08-26 (Jess) · APPROVED / LOCKED
+
+**This OVERWRITES the seven-section list ruled on 2026-08-20 and the left-pane block order ruled
+on 2026-08-15 (§ SALES ORDER OBJECT PAGE V2).** Jess reviewed the built page and ruled it too tall
+and too fragmented: *"reduce scrolling need"*, *"put more effort into reducing space occupied on
+each card"*, *"make it merge more"*. Eleven cards became seven. **No fact left the system — two
+sections left THIS TAB because `Order Route` already owns them.**
 
 ```
-CUSTOMER PROMISE
-Customer · phone · address · Customer Delivery · Delivery Location
-
-SALES OWNERSHIP
-Dealer · Showroom · Salesperson
-
-DATES / ACCESS
-Ordered · Proceed date · floor · lift and governed access facts
-
-GOODS
-Item · SKU · quantity · commercial value
-
-DELIVERY JOURNEY
-Read-only Delivery calculation, legs, dates, current holder and risk · Open Order Route →
-
-MONEY
-Total · paid · outstanding · Open Payments →
-
-RELATED DOCUMENTS
-Every linked PO, Receiving Session, Unit, DO, Payment and applicable Case/Guarantee
+CUSTOMER              name · phone · email · demographics
+  ├ header            New customer / Existing customer — the standing answer, beside the name
+  └ Delivery address  the MY cascade · building type · billing
+ORDER INFO            Ordered · Customer Delivery · Proceed date · floor · stair carry · lift
+  └ Sales ownership   Dealer · Showroom · Salesperson
+AMEND DELIVERY DATE   the governed three fields (collapsible)
+EMERGENCY CONTACT     name · phone · relationship (collapsible)
+MONEY                 Total · paid · outstanding · Open Payments →
+GOODS                 the six-column truth
+WHAT THIS CHANGE STARTED ELSEWHERE   only when work exists
 ```
+
+**A merged section keeps its NAME.** `Delivery address` and `Sales ownership` are locked words and
+survive as in-card headings; the merge moves a border, a 24px gap and a second heading rule, never
+a word. The names are governed by `docs/COPY-STANDARD.md` § *Its section names*.
+
+**`DELIVERY JOURNEY` LEAVES THE ORDER TAB.** *"Delivery journey doesn't need to be viewed at order
+tab or a SO but keep it at order route tab."* It was a read-only mirror: `Order Route` builds a
+`LOGISTICS` node from the same partner name, a `DELIVERY DATE` node carrying the appointment and
+its slot, and a `DELIVERY ORDER` node. Removing it also ended a **Law D duplication** — the
+customer's promised date printed twice under two labels, `Customer Delivery` in Order info and
+`Customer promise` here — and retired a banned word: `Journey` was already ruled out in favour of
+`Order Route` (COPY-STANDARD:1337, :1453).
+
+**`RELATED DOCUMENTS` LEAVES THE ORDER TAB.** *"Remove related documents."* Every owner it indexed
+— PO, Receiving Session, Stock Unit, DO, Payment, Case, Guarantee — is a node with a door on
+`Order Route`, and each document stays independently findable in its own Register. The card was a
+second index of facts the map already draws, and it cost three network round-trips (Delivery
+Orders, Payments, Guarantees) on every open. **The completeness rule that governed it is retired
+with it**; what survives is the rule it existed to serve — *a door, never a duplicate* (Law C).
+
+**PROCEED DATE IS READ-ONLY ONCE THE ORDER EXISTS.** *"Proceed date shouldn't be editable at SO
+view under operations."* **This overwrites §725-728 below**, which gave Operations a direct writer
+here. The Sales Portal asks for the production start as a REQUIRED question at the point of sale,
+so on an existing order it is a recorded answer, not a field. The CREATE door keeps the picker —
+`createOrderInput` refuses an order without one. 🟡 An imported order carrying no proceed date
+therefore has no screen that can supply one; if that appears in practice the fix is a governed
+correction door, not re-opening the field.
+
+**BOTH SIDES ASK EACH QUESTION THE SAME WAY.** *"Ensure both sides of filling in are the same."*
+The measured failure was the lift: the POS offered two named answers (`No lift` / `Has lift`) while
+this page offered an unlabelled tickbox, so an unticked box meant BOTH *no lift* and *nobody said*.
+The answers now live once, in `packages/shared/src/sales-order-form.ts` (`LIFT_OPTIONS`), and both
+surfaces import them. The same ruling brought the POS's stair-carry working-out to this page —
+`3 of 5 items × 2 floors above 2F × RM50 = RM300` — through the one imported `floorSurchargeRaw`
+(Law D: one derived fact, ONE arithmetic).
 
 Sales may directly correct only its governed safe/customer facts. A commercial commitment change
 uses the amendment path. Purchasing, Warehouse, Delivery and Finance facts have links, never forms.
-
-### Related Documents is complete, not a one-number mirror
-
-The object lists zero, one or many documents from each owner. It must not show only the latest or
-first Delivery Order when more exist.
-
-```
-Purchase Orders       PO-2048
-Receiving Sessions    —
-Stock Units           UNT-8821
-Delivery Orders       DO-KLJB-001 · DO-JBSG-001
-Payments              1 receipt
-Service Cases         —
-```
-
-For many documents the summary says, for example, `2 Delivery Orders →`; the door opens the
-authoritative Delivery Orders Register filtered to this SO. Every related document also remains
-independently findable in its owning Register. Optional Route branches such as Loan or Service are
-absent when no such obligation exists; the Related Documents summary may use the governed `—`.
 
 ## Order Route — one connected drawing
 
@@ -722,8 +735,9 @@ Wiring Delivery's handover status is approved-target, not built.
   `b7d68eed`; its production acceptance exposed only the Edit notice occupying a document column.
   PR #788 corrected that composition and merged as `ebc8fb5d`; deploy run `31790978222` proved the
   exact final SHA. Authenticated checks covered the Register and approved goods expansion, Object
-  View/Edit/Revisions/History/Order Route, and coexistence with My Work open. Proceed date uses the
-  pre-existing Operations writer; Customer Delivery remains read-only and Delivery's Confirmed
+  View/Edit/Revisions/History/Order Route, and coexistence with My Work open. Proceed date used the
+  pre-existing Operations writer — **superseded 2026-08-26: it is read-only on an existing order,
+  see § THE MERGED ORDER TAB**; Customer Delivery remains read-only and Delivery's Confirmed
   Delivery Date remains distinct. No new address, access, delivery-date or destination field was
   created. `docs/ui/MASTER.md` §6.6 records the final reusable UI proof.
 - **FINAL OWNER VISUAL CORRECTION — PRODUCTION-VERIFIED / LOCKED 2026-08-14.** Owner review
@@ -986,8 +1000,11 @@ the amendment machinery, the goods truth and the Order Route architecture are un
 - **Two panes, 50% / 50%.** Left is the form, right is the document. Each pane scrolls on its
   own and the page itself does not scroll at desktop widths. Below ~1024px the panes stack, form
   first, and the page scrolls normally.
-- **The left pane's block order is:** `CUSTOMER → ORDER INFO → AMEND DELIVERY DATE →
-  EMERGENCY CONTACT → DELIVERY ADDRESS → MONEY → SALES OWNERSHIP`. **`GOODS` follows them**, and
+- **The left pane's block order** was `CUSTOMER → ORDER INFO → AMEND DELIVERY DATE →
+  EMERGENCY CONTACT → DELIVERY ADDRESS → MONEY → SALES OWNERSHIP`. ⛔ **OVERWRITTEN 2026-08-26 —
+  see § THE MERGED ORDER TAB, which is the current composition:** `DELIVERY ADDRESS` merged into
+  `CUSTOMER` and `SALES OWNERSHIP` into `ORDER INFO`, both keeping their names as in-card
+  headings. What survives from this ruling is the rest of the sentence — **`GOODS` follows them**, and
   it is not a form: the six-column `Category | Unit ID | SKU | Qty | Item | Deliver To` truth
   locked above is Stock's and Purchasing's fact, and the customer document beside it never prints
   Unit ID or Deliver To. Removing it would have lost governed truth the card did not name.
