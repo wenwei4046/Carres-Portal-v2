@@ -1452,6 +1452,9 @@ export const skuSupplierOfferSchema = z.object({
   supplierCode: z.string().nullable(),
   price: z.number().nullable(),
   pwpPrice: z.number().nullable(),
+  /** 0389 — the supplier's quote per sofa seat height, the 0204 {size → RM}
+   *  shape. NULL = not quoted by height. */
+  pricesBySize: z.record(z.string(), z.number()).nullable(),
   updatedAt: z.string(),
 });
 export type SkuSupplierOfferDto = z.infer<typeof skuSupplierOfferSchema>;
@@ -1462,6 +1465,10 @@ export const skuSupplierOfferUpsertInput = z
     supplierCode: z.string().trim().max(60).nullable().optional(),
     price: z.number().nonnegative().nullable().optional(),
     pwpPrice: z.number().nonnegative().nullable().optional(),
+    /* 0389 — per-seat-height quote. ABSENT = leave whatever is stored (and,
+     * until the column is applied, keeps the write payload free of a column
+     * PostgREST would refuse — the 0375 deploy-order lesson). */
+    pricesBySize: z.record(z.string(), z.number().nonnegative()).nullable().optional(),
   })
   .strict();
 export type SkuSupplierOfferUpsertInput = z.infer<typeof skuSupplierOfferUpsertInput>;

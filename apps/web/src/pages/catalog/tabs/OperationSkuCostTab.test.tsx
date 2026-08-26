@@ -25,6 +25,7 @@ let mockOffers: Array<{
   supplierCode: string | null;
   price: number | null;
   pwpPrice: number | null;
+  pricesBySize?: Record<string, number> | null;
   updatedAt: string;
 }> = [];
 vi.mock("@/lib/auth", () => ({
@@ -435,5 +436,105 @@ describe("offers strip — editing an existing offer starts from what is on file
     expect((screen.getByTestId("opcost-offer-price-CLOUD-KING") as HTMLInputElement).value).toBe(
       "",
     );
+  });
+});
+
+/**
+ * ⭐ 0389 — A SOFA OFFER PRICES EACH SEAT HEIGHT (YH, 2026-08-26).
+ *
+ * Xammar modules come from BOTH Hookkas at 24"/28"/30". The slot supplier's
+ * heights live on the SKU (0204 grid); the OTHER supplier's offer carried one
+ * flat price — their per-height quote had nowhere to go. Sofa offers now key
+ * one box per active height; everything else keeps the flat box.
+ */
+describe("offers strip — per-seat-height sofa offers (0389)", () => {
+  beforeEach(() => {
+    mockRole = "principal";
+    mockOffers = [];
+    mockUpsertOffer.mockReset();
+  });
+
+  function openSofaStrip() {
+    render(<OperationSkuCostTab catalog={makeCatalog([SKU_COST_NULL])} />);
+    fireEvent.click(screen.getByTestId("opcost-offers-toggle-LUNA-3S"));
+  }
+
+  it("⭐ shows one box per height for a sofa SKU, and no flat price box", () => {
+    openSofaStrip();
+    expect(screen.getByTestId("opcost-offer-height-LUNA-3S-24")).toBeInTheDocument();
+    expect(screen.getByTestId("opcost-offer-height-LUNA-3S-28")).toBeInTheDocument();
+    expect(screen.queryByTestId("opcost-offer-price-LUNA-3S")).not.toBeInTheDocument();
+  });
+
+  it("keeps the flat price box for a non-sofa SKU", () => {
+    render(<OperationSkuCostTab catalog={makeCatalog([SKU_COST_SET])} />);
+    fireEvent.click(screen.getByTestId("opcost-offers-toggle-CLOUD-KING"));
+    expect(screen.getByTestId("opcost-offer-price-CLOUD-KING")).toBeInTheDocument();
+    expect(screen.queryByTestId("opcost-offer-height-CLOUD-KING-24")).not.toBeInTheDocument();
+  });
+
+  it("⭐ saves the typed heights as a {height → RM} map, blanks not quoted", () => {
+    openSofaStrip();
+    fireEvent.change(screen.getByTestId("opcost-offer-supplier-LUNA-3S"), {
+      target: { value: "00000000-0000-4000-8000-0000000000a1" },
+    });
+    fireEvent.change(screen.getByTestId("opcost-offer-height-LUNA-3S-24"), {
+      target: { value: "992.25" },
+    });
+    fireEvent.change(screen.getByTestId("opcost-offer-height-LUNA-3S-28"), {
+      target: { value: "1039.5" },
+    });
+    fireEvent.click(screen.getByTestId("opcost-offer-save-LUNA-3S"));
+    expect(mockUpsertOffer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pricesBySize: { "24": 992.25, "28": 1039.5 },
+      }),
+      expect.anything(),
+    );
+  });
+
+  it("prefills the height boxes from an existing offer's map", () => {
+    mockOffers = [
+      {
+        supplierId: "00000000-0000-4000-8000-0000000000a1",
+        supplierName: "Hookka",
+        supplierCode: "XAM-3S",
+        price: null,
+        pwpPrice: null,
+        pricesBySize: { "24": 992.25, "30": 1086.75 },
+        updatedAt: "2026-08-26T00:00:00Z",
+      },
+    ];
+    openSofaStrip();
+    fireEvent.change(screen.getByTestId("opcost-offer-supplier-LUNA-3S"), {
+      target: { value: "00000000-0000-4000-8000-0000000000a1" },
+    });
+    expect((screen.getByTestId("opcost-offer-height-LUNA-3S-24") as HTMLInputElement).value).toBe(
+      "992.25",
+    );
+    expect((screen.getByTestId("opcost-offer-height-LUNA-3S-30") as HTMLInputElement).value).toBe(
+      "1086.75",
+    );
+    expect((screen.getByTestId("opcost-offer-height-LUNA-3S-28") as HTMLInputElement).value).toBe(
+      "",
+    );
+  });
+
+  it("lists a per-height offer height by height, not as a flat dash", () => {
+    mockOffers = [
+      {
+        supplierId: "sup-hki",
+        supplierName: "Hookka Industries",
+        supplierCode: null,
+        price: null,
+        pwpPrice: null,
+        pricesBySize: { "24": 992.25, "28": 1039.5 },
+        updatedAt: "2026-08-26T00:00:00Z",
+      },
+    ];
+    openSofaStrip();
+    const strip = screen.getByTestId("opcost-offers-LUNA-3S");
+    expect(strip.textContent).toContain("24″ RM 992.25");
+    expect(strip.textContent).toContain("28″ RM 1039.50");
   });
 });

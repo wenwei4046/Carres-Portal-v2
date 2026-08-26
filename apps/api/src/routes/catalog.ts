@@ -1603,8 +1603,10 @@ catalogRouter.post("/models/:id/generate-skus", async (c) => {
 // prices — so the second Hookka's paper stops being thrown away. Nothing that
 // reads the slot changes.
 
-const OFFER_SELECT =
-  "supplier_id, supplier_code, price, pwp_price, updated_at, suppliers(name)";
+/* `*` rather than a column list (0389): the strip must keep working in the
+   window between this code deploying and the hand-applied column existing —
+   a named missing column makes PostgREST refuse the whole select. */
+const OFFER_SELECT = "*, suppliers(name)";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function offerFromRow(r: any) {
@@ -1614,6 +1616,7 @@ function offerFromRow(r: any) {
     supplierCode: (r.supplier_code as string | null) ?? null,
     price: (r.price as number | null) ?? null,
     pwpPrice: (r.pwp_price as number | null) ?? null,
+    pricesBySize: (r.prices_by_size as Record<string, number> | null | undefined) ?? null,
     updatedAt: r.updated_at as string,
   };
 }
@@ -1670,6 +1673,12 @@ catalogRouter.put("/skus/:id/supplier-offers", async (c) => {
         supplier_code: parsed.data.supplierCode?.trim() || null,
         price: parsed.data.price ?? null,
         pwp_price: parsed.data.pwpPrice ?? null,
+        /* Named ONLY when the caller sent it — an upsert naming a not-yet-
+           applied column would take out offer saving entirely (0375 lesson),
+           and ABSENT also means "leave the stored map alone". */
+        ...(parsed.data.pricesBySize !== undefined
+          ? { prices_by_size: parsed.data.pricesBySize }
+          : {}),
         updated_at: new Date().toISOString(),
         updated_by: c.var.auth.id,
       },
