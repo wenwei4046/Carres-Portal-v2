@@ -493,7 +493,26 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
       sku: part.sku,
       qty: part.qty,
       item: r.item,
-      ...(r.variant ? { itemDetail: r.variant } : {}),
+      /* ⭐ NO SECOND LINE FOR A FACT THAT IS ALREADY BESIDE IT.
+       *
+       * MEASURED on production 2026-08-26: passing `r.variant` here ("King")
+       * made the `Item` cell two lines, which took the child row from 26.5px to
+       * 54.5px — and with `align-top` every other cell then sat above ~28px of
+       * white. One line of goods cost 108px of expansion against a 38px parent
+       * row.
+       *
+       * And it bought nothing. The size is ALREADY printed twice within a
+       * centimetre of it: the `SKU` column in this same box reads `L1201S-K`,
+       * and the parent row's `SKU / configuration` column reads
+       * `L1201S · King · L1201S-K`. A third printing is what doubled the row.
+       *
+       * The sibling register DOES pass `itemDetail`, and must keep it: there it
+       * carries fabric, firmness and seat height — configuration that appears
+       * nowhere else on the row. The line is earned there and not here.
+       *
+       * (`docs/ui/MASTER.md` REGISTER TABLE DENSITY LAW — expanded content takes
+       * its NATURAL child-row height. Natural is what the content needs, not
+       * what a repeated fact inflates it to.) */
       /* Buying is ticked on the PARENT row — one whole-line switch, not two. */
       selectable: false,
     }));
