@@ -163,6 +163,38 @@ Buy = Required − usable Stock allocated − valid Open PO allocated
 it was plain text, and the only link lived inside the expand — so reaching the order meant opening a
 box first. The column carries it now, and the expand carries none.
 
+**AND THE HEIGHT MUST BE EARNED — measured on production, 2026-08-26.** The first shipped version of
+this box passed the variant as a second line under the item, and it cost more than it looked:
+
+| Piece | px |
+|---|---|
+| child body row (`Item` on TWO lines) | 54.5 |
+| child header row | 26.5 |
+| box borders | 2 |
+| the engine's expansion padding (12 + 12) | 24 |
+| **one expansion row** | **108** |
+
+against a **38px** parent row — roughly three parent rows to show ONE line of goods, with every
+single-line cell sitting above ~28px of white because the box aligns to the top.
+
+The second line bought nothing. The size was already printed twice within a centimetre of it: the
+`SKU` column in this same box (`L1201S-K`), and the parent row's `SKU / configuration` column
+(`L1201S · King · L1201S-K`).
+
+**MEASURED AGAIN AFTER THE FIX SHIPPED (production, 2026-08-26, `3bf5c7cf`):** child row
+**54.5px → 34.5px**, expansion row **108px → 88px**. Shorter than its 38px parent, which is what a
+child should be.
+
+> An earlier draft of this section predicted **26.5px**. That was wrong, and the mistake is worth
+> keeping visible: 26.5px is the HEADER row's height (`text-label` 11px/14px on `py-1.5`). A body
+> row is `text-body` 13px/18px on `py-2` — 18 + 8 + 8 = **34px**. Quoting one row's geometry as
+> another's is how a prediction replaces a measurement.
+
+The sibling register keeps its `itemDetail` and must: there it carries fabric, firmness and seat
+height, configuration that appears nowhere else on the row. The line is earned there and not here.
+`docs/ui/MASTER.md`'s **REGISTER TABLE DENSITY LAW** says expanded content takes its NATURAL
+child-row height — natural is what the content needs, never what a repeated fact inflates it to.
+
 The expand may still not save a `Buy`, a supplier, a date or a coverage value.
 
 ## 4 · `Deliver To` contract

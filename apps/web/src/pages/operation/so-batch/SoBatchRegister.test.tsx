@@ -375,6 +375,29 @@ describe("the row expand is the same child table Sales Orders draws", () => {
     }
   });
 
+  /**
+   * ⭐ THE HEIGHT MUST BE EARNED (owner correction 2026-08-26).
+   *
+   * MEASURED on production: the `Item` cell printed the size on a second line,
+   * which took the child row from 26.5px to 54.5px and left every other cell
+   * sitting above ~28px of white — 108px of expansion for ONE line of goods,
+   * against a 38px parent row. The size was already printed twice within a
+   * centimetre: the `SKU` column here, and the parent row's
+   * `SKU / configuration` column.
+   */
+  it("does not repeat the size under the item — the SKU column already carries it", () => {
+    renderRegister();
+    fireEvent.click(screen.getByTestId("so-batch-expand-build::o3::b3"));
+    const panel = screen.getByTestId("so-batch-inspector-build::o3::b3");
+    const itemCell = within(panel).getByTestId("so-batch-part-B1201S-K").children[6]!;
+    /* ONE line in the Item cell — the name, and nothing the row already said. */
+    expect(itemCell.textContent?.trim()).toBe("Booqit");
+    /* The size the cell used to repeat is nowhere in this box… */
+    expect(panel).not.toHaveTextContent("Beige");
+    /* …because the SKU column right beside it already identifies the goods. */
+    expect(panel).toHaveTextContent("B1201S-K");
+  });
+
   it("holds no input, no save and no second Buy", () => {
     renderRegister();
     fireEvent.click(screen.getByTestId("so-batch-expand-build::o1::b1"));
