@@ -1,7 +1,8 @@
 # PURCHASING — CARD 02-A · FIX SO BATCH PURCHASE LEFT RAIL TO ORDER TIMING AND SAFETY DAYS
 
 **Module:** Purchasing · **Sequence:** 02-A
-**Status:** QUEUED — owner commissioned 2026-08-26
+**Status:** BUILT — merged, deployed and production-verified 2026-08-26 (§10.6); the owner's
+own authenticated walk of the live rail remains the one open checklist item
 **Lane:** BUILD / DELIVERY
 **Depends on:** `PURCHASING — CARD 02 · REBUILD SO BATCH PURCHASE REGISTER AND COMPLETE THE
 GUIDED PO ISSUE JOURNEY`, including all production corrections through PR #921
@@ -338,3 +339,37 @@ rest and after clearing.
    2026-08-26: `order_by_buffer_days = 7`; range check 0–60 admits 14; config row + audit line,
    **no migration** — §4's own instruction).
 3. Production walk per §8 and closure of this record.
+
+### 10.6 Production verification — 2026-08-26
+
+- **Merged**: PR #926, squash commit `23a79659` on `main`, directly atop `48940312` (#924).
+- **Deployed**: `Deploy production` run 32961738164 SUCCEEDED — its own final step verifies every
+  canonical surface reports the deployed SHA — and independently:
+  `https://erp.carresofficial.com/__carres_deploy.json` →
+  `{"commit":"23a79659da7214de7dc7065665a42a28423f73af","builtAt":"2026-08-26T11:20:49.410Z"}`.
+- **The served bundle carries the correction** (`assets/index-7vzbiKEi.js`, fetched from
+  production and counted, not assumed): `TO ORDER` · `All not ordered` · `ORDER TIMING` ·
+  `SETUP TO FIX` · `Can order early` · `safety days left` · `No safety days left` ·
+  `Not enough production time` · `Production time not set` · `Safety days` ·
+  `Extra time allowed for delays.` all present; `BUYING RECORDS` · `WORK TO DO` ·
+  `Ready to buy` · `Covered — no buying needed` · `Order-by buffer` · `ready_to_buy` all **0**.
+- **The governed value is 14** — measured 7 immediately before the change, then moved through the
+  settings authority's own writes (the RPC gates on a logged-in manager, which a release actor is
+  not): `purchasing_settings.order_by_buffer_days 7 → 14` plus the audit row
+  `purchasing_setting_changes ('order_by_buffer_days', '7' → '14', changed_by null,
+  2026-08-26 11:08 UTC)`. Re-read after: 14. **No migration was written** — §4's own instruction.
+- **Visuals**: the §10.4 walk ran against the same code that merged; the dev entry is proven
+  absent from the deployed `dist`. The owner's own authenticated walk of the LIVE rail (Register
+  + Settings `Safety days · 14 working days`) is owed — a build chat cannot walk a login-gated
+  surface, and two Chrome sessions were connected so none was driven unasked.
+
+**Owner walk checklist (live page, any Operation login):**
+
+1. Purchasing → SO Batch Purchase: the rail reads `TO ORDER / All not ordered`, `ORDER TIMING`
+   with the five timing rows, and `SETUP TO FIX / Production time not set` only when such lines
+   exist.
+2. Click `Can order early`: the listing narrows and its rows still offer the tick-box.
+3. Click any timing row twice: it toggles off; `All not ordered` clears everything.
+4. Settings (gear) → Purchasing: `Safety days` reads `14` `working days` with
+   `Extra time allowed for delays.` and the history line `was 7`.
+5. The right table, expansion and Issue PO journey look exactly as before.
