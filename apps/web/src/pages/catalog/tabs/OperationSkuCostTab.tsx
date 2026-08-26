@@ -6,7 +6,7 @@ import type {
   ProductModelDto,
   ProductSkuDto,
 } from "@carres/shared";
-import { PRODUCT_CATEGORIES } from "@carres/shared";
+import { PRODUCT_CATEGORIES, activeSofaSizes } from "@carres/shared";
 import { ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import {
@@ -63,6 +63,9 @@ export default function OperationSkuCostTab({ catalog }: { catalog: CatalogRespo
   /* The roster is already cached by the order drawer / Suppliers tab; this
    * adds no server work of its own. Map once, look up per row. */
   const suppliersQ = useOperationSuppliers();
+  /* 0389 — the active sofa seat heights, pool-ordered with the canonical
+     fallback: the same axis the SKU Master grid prices the slot on. */
+  const sofaHeights = useMemo(() => activeSofaSizes(catalog.optionPools), [catalog.optionPools]);
   const supplierNameById = useMemo(() => {
     const m = new Map<string, string>();
     for (const s of suppliersQ.data?.suppliers ?? []) m.set(s.id, s.name);
@@ -219,6 +222,7 @@ export default function OperationSkuCostTab({ catalog }: { catalog: CatalogRespo
             editMode={editMode}
             supplierName={r.sku.supplierId ? supplierNameById.get(r.sku.supplierId) ?? null : null}
             suppliers={suppliersQ.data?.suppliers ?? []}
+            heights={sofaHeights}
           />
         ))}
       </div>
@@ -231,6 +235,7 @@ const CostRowView = memo(function CostRowView({
   editMode,
   supplierName,
   suppliers,
+  heights,
 }: {
   row: FlatRow;
   editMode: boolean;
@@ -240,6 +245,9 @@ const CostRowView = memo(function CostRowView({
   /** The roster, for the edit-mode picker. The IDENTITY written is always
    *  supplier_id; the name is only ever what the picker displays. */
   suppliers: Array<{ id: string; name: string }>;
+  /** Active sofa seat heights (0389) — the offers strip prices sofa offers
+   *  per height, the same axis the SKU Master grid prices the slot on. */
+  heights: string[];
 }) {
   const { sku, category, productName } = row;
   const patch = usePatchCatalogSku();
@@ -385,7 +393,9 @@ const CostRowView = memo(function CostRowView({
       </div>
       <div />
     </div>
-    {offersOpen && <SupplierOffersStrip sku={sku} suppliers={suppliers} />}
+    {offersOpen && (
+      <SupplierOffersStrip sku={sku} suppliers={suppliers} category={category ?? null} heights={heights} />
+    )}
     </>
   );
 });
@@ -406,9 +416,16 @@ const CostRowView = memo(function CostRowView({
 function SupplierOffersStrip({
   sku,
   suppliers,
+  category,
+  heights,
 }: {
   sku: ProductSkuDto;
   suppliers: Array<{ id: string; name: string }>;
+  /** The MODEL's category — a sofa offer is priced per seat height (0389),
+   *  everything else keeps the flat price box. */
+  category: string | null;
+  /** The active sofa seat heights, pool-ordered — one box per height. */
+  heights: string[];
 }) {
   const isPrincipal = useAuth((s) => s.role) === "principal";
   const offersQ = useSkuSupplierOffers(sku.id, true);
@@ -418,6 +435,10 @@ function SupplierOffersStrip({
   const [code, setCode] = useState("");
   const [price, setPrice] = useState("");
   const [pwp, setPwp] = useState("");
+  /* 0389 — a sofa module is priced per seat height (Xammar: 24"/28"/30", from
+     BOTH Hookkas). One box per active height; blanks are simply not quoted. */
+  const [heightPrices, setHeightPrices] = useState<Record<string, string>>({});
+  const sofa = category === "sofa";
   const offers = offersQ.data?.offers ?? [];
 
   function save() {
@@ -431,8 +452,32 @@ function SupplierOffersStrip({
       toast.error("Enter non-negative numbers (blank = not quoted)");
       return;
     }
+    const heightMap: Record<string, number> = {};
+    for (const h of heights) {
+      const t = (heightPrices[h] ?? "").trim();
+      if (t === "") continue;
+      const n = Number(t);
+      if (!Number.isFinite(n) || n < 0) {
+        toast.error("Enter non-negative numbers (blank = not quoted)");
+        return;
+      }
+      heightMap[h] = n;
+    }
     upsert.mutate(
-      { skuId: sku.id, supplierId, supplierCode: code.trim() || null, price: p, pwpPrice: w },
+      {
+        skuId: sku.id,
+        supplierId,
+        supplierCode: code.trim() || null,
+        price: p,
+        pwpPrice: w,
+        /* Sent only from the sofa lane, and null when every box is blank — an
+           explicit clear, matching what the boxes show. Non-sofa saves omit
+           the key entirely: leave the stored map alone, and keep the payload
+           free of a column an older Worker's schema would refuse. */
+        ...(sofa
+          ? { pricesBySize: Object.keys(heightMap).length > 0 ? heightMap : null }
+          : {}),
+      },
       {
         onSuccess: () => {
           toast.success(`${sku.sku} · offer saved`);
@@ -465,7 +510,16 @@ function SupplierOffersStrip({
             >
               <span className="font-medium">{o.supplierName ?? "—"}</span>
               <span className="font-mono text-base-500">{o.supplierCode ?? "—"}</span>
-              <span>{o.price == null ? "—" : `RM ${o.price.toFixed(2)}`}</span>
+              <span>
+                {o.pricesBySize && Object.keys(o.pricesBySize).length > 0
+                  ? heights
+                      .filter((h) => typeof o.pricesBySize?.[h] === "number")
+                      .map((h) => `${h}″ RM ${(o.pricesBySize as Record<string, number>)[h].toFixed(2)}`)
+                      .join(" · ")
+                  : o.price == null
+                    ? "—"
+                    : `RM ${o.price.toFixed(2)}`}
+              </span>
               <span className="text-base-500">
                 {o.pwpPrice == null ? "PWP —" : `PWP RM ${o.pwpPrice.toFixed(2)}`}
               </span>
@@ -509,6 +563,11 @@ function SupplierOffersStrip({
               setCode(existing?.supplierCode ?? "");
               setPrice(existing?.price == null ? "" : String(existing.price));
               setPwp(existing?.pwpPrice == null ? "" : String(existing.pwpPrice));
+              const map: Record<string, string> = {};
+              for (const [k, v] of Object.entries(existing?.pricesBySize ?? {})) {
+                if (typeof v === "number") map[k] = String(v);
+              }
+              setHeightPrices(map);
             }}
             aria-label={`${sku.sku} offer supplier`}
             data-testid={`opcost-offer-supplier-${sku.sku}`}
@@ -528,13 +587,29 @@ function SupplierOffersStrip({
             data-testid={`opcost-offer-code-${sku.sku}`}
             className={`${INPUT_CLS} w-36 text-meta font-mono`}
           />
-          <input
-            value={price}
-            onChange={(e) => setPrice(e.target.value)}
-            placeholder="Price"
-            data-testid={`opcost-offer-price-${sku.sku}`}
-            className={`${INPUT_CLS} w-24 text-meta`}
-          />
+          {sofa ? (
+            heights.map((h) => (
+              <input
+                key={h}
+                value={heightPrices[h] ?? ""}
+                onChange={(e) =>
+                  setHeightPrices((prev) => ({ ...prev, [h]: e.target.value }))
+                }
+                placeholder={`${h}″`}
+                title={`Price at ${h}″`}
+                data-testid={`opcost-offer-height-${sku.sku}-${h}`}
+                className={`${INPUT_CLS} w-20 text-meta`}
+              />
+            ))
+          ) : (
+            <input
+              value={price}
+              onChange={(e) => setPrice(e.target.value)}
+              placeholder="Price"
+              data-testid={`opcost-offer-price-${sku.sku}`}
+              className={`${INPUT_CLS} w-24 text-meta`}
+            />
+          )}
           <input
             value={pwp}
             onChange={(e) => setPwp(e.target.value)}

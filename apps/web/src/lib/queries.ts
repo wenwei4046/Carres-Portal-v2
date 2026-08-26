@@ -4192,6 +4192,9 @@ export interface SkuSupplierOfferRow {
   supplierCode: string | null;
   price: number | null;
   pwpPrice: number | null;
+  /** 0389 — the supplier's quote per sofa seat height ({size → RM}, the 0204
+   *  shape). Null = not quoted by height. */
+  pricesBySize: Record<string, number> | null;
   updatedAt: string;
 }
 
@@ -4231,6 +4234,9 @@ export function useUpsertSkuSupplierOffer() {
       supplierCode?: string | null;
       price?: number | null;
       pwpPrice?: number | null;
+      /* Absent = leave the stored map alone (and keep the payload free of a
+         column an un-migrated database would refuse — the 0375 lesson). */
+      pricesBySize?: Record<string, number> | null;
     }) =>
       apiFetch<{ offer: SkuSupplierOfferRow }>(
         `/api/catalog/skus/${encodeURIComponent(skuId)}/supplier-offers`,

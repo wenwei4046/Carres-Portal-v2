@@ -124,6 +124,7 @@ describe("GET /api/catalog/skus/:id/supplier-offers", () => {
         supplierCode: "1007-(K)",
         price: 550,
         pwpPrice: 495,
+        pricesBySize: null,
         updatedAt: "2026-08-26T00:00:00Z",
       },
     ]);
@@ -222,6 +223,36 @@ describe("PUT /api/catalog/skus/:id/supplier-offers", () => {
     // `isDefault` is the ROUTING half — deliberately not built (owner
     // write-up 2026-08-25). A caller sending it has misread the scope.
     expect(res.status).toBe(422);
+  });
+
+  /* 0389 — a sofa offer prices each seat height. */
+  it("⭐ writes pricesBySize when sent, and NAMES the column not at all when absent", async () => {
+    const records: Array<{ body: unknown; conflict: string | undefined }> = [];
+    mockSb({ upserted: ROW, records });
+    const jwt = await makeJwt("principal");
+    let res = await app.fetch(
+      new Request(`http://t/api/catalog/skus/${SKU_ID}/supplier-offers`, {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ supplierId: HKI, pricesBySize: { "24": 992.25, "28": 1039.5 } }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(records[0].body).toMatchObject({ prices_by_size: { "24": 992.25, "28": 1039.5 } });
+
+    res = await app.fetch(
+      new Request(`http://t/api/catalog/skus/${SKU_ID}/supplier-offers`, {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ supplierId: HKI, supplierCode: "XAM-3S" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    /* Absent means LEAVE ALONE - and, until the hand-applied column exists,
+       keeps the payload free of a column PostgREST would refuse (0375). */
+    expect(records[1].body).not.toHaveProperty("prices_by_size");
   });
 });
 
