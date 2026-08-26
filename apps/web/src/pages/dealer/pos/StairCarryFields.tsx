@@ -1,4 +1,4 @@
-import { MAX_DELIVERY_FLOOR, type FloorConfigDto } from "@carres/shared";
+import { LIFT_OPTIONS, MAX_DELIVERY_FLOOR, type FloorConfigDto } from "@carres/shared";
 import { floorSurchargeRaw } from "@/lib/order-totals";
 import { rm } from "@/lib/format-currency";
 import type { WizardDraft } from "../new-order/draft";
@@ -119,22 +119,27 @@ export default function StairCarryFields({
           </div>
         </Field>
 
+        {/* ⭐ THE WORDS COME FROM SHARED (Jess, 2026-08-26). They were typed
+            here and nowhere else until the Sales Order object page had to ask
+            the same question; two hand-typed copies of one answer list is how
+            the two surfaces stop tallying. The SHAPE stays a pill pair — this
+            is a tablet on a shop floor and a two-option pill is a bigger target
+            than a select — but the list is no longer this file's to invent. */}
         <Field label="Lift available?">
           <div className="grid grid-cols-2 gap-1.5">
-            <button
-              type="button"
-              onClick={() => setDelivery({ hasLift: false })}
-              className={pillClass(!draft.delivery.hasLift)}
-            >
-              No lift
-            </button>
-            <button
-              type="button"
-              onClick={() => setDelivery({ hasLift: true })}
-              className={pillClass(draft.delivery.hasLift)}
-            >
-              Has lift
-            </button>
+            {LIFT_OPTIONS.map((word) => {
+              const isLift = word === "Has lift";
+              return (
+                <button
+                  key={word}
+                  type="button"
+                  onClick={() => setDelivery({ hasLift: isLift })}
+                  className={pillClass(draft.delivery.hasLift === isLift)}
+                >
+                  {word}
+                </button>
+              );
+            })}
           </div>
         </Field>
 

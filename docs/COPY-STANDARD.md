@@ -1416,6 +1416,20 @@ object page** — nothing announces permission to type into a field that is alre
 Register's context menu keeps the word `Edit` only because it names a destination, and that
 destination is the same one `View` opens.
 
+#### Its section names — owner ruling 2026-08-26 (Jess)
+
+Jess ruled the Order tab MERGED: fewer, fuller cards. A merged section keeps its exact word as
+an in-card heading — the merge moves a border, never a name — so this table governs FIVE
+surviving names and retires two.
+
+| Meaning | Use exactly | Do NOT use |
+|---|---|---|
+| The customer and everywhere their goods go | **`Customer`**, with **`Delivery address`** as its in-card heading | Customer details · Buyer · Client · Contact · Ship to |
+| The order's own administrative facts | **`Order info`**, with **`Sales ownership`** as its in-card heading | Order details · Dates · Dates / Access · Admin · Meta |
+| Whether we already have this customer, beside the card's name | **`New customer`** · **`Existing customer`** · **`Checking…`** · **`Not known yet`** | New/Returning · First-time · Repeat · a coloured status dot with no word |
+| ⛔ RETIRED — the delivery legs, holder, partner and appointment | nothing. **`Order Route` owns them** and always did; the Order tab printed a read-only copy | `Delivery Journey` — and `Journey` was already banned two sections below, against `Order Route` |
+| ⛔ RETIRED — the index of every linked document | nothing. **`Order Route` carries a door to each owner** | `Related Documents` · Linked documents · Attachments · Files |
+
 | Meaning | Use exactly | Do NOT use |
 |---|---|---|
 | The bar that appears when something has changed | **`⚠ {n} changes`** with **`Discard`** and **`Save`** | Unsaved changes · You have edits · Save changes · Apply |
@@ -1430,6 +1444,11 @@ destination is the same one `View` opens.
 | Billing that repeats the delivery address | **`Billing address same as delivery`** | Same as above · Use delivery address |
 | The stair-carry count, when the salesperson named none | the field's own hint **`Empty = every item`** | Auto · All · Default |
 | The auto-detected customer type, before a dial-able phone | **`Not known yet`** | — · N/A · Unknown |
+| Whether the building has a lift — the QUESTION | **`Lift available?`** | Lift · Lift available · Elevator · Has lift? — the POS has asked it this way since the wizard was written; the object page asked the same fact as an unlabelled tickbox until 2026-08-26 |
+| Its two ANSWERS, in this order | **`No lift`** · **`Has lift`** | Yes/No · ✓/✗ · With lift/Without lift · True/False — a tickbox cannot say the difference between *no lift* and *nobody asked*, which is why the answers are named. `No lift` leads because it is the stored default and the answer that costs the customer money. Both surfaces import `LIFT_OPTIONS` from `packages/shared/src/sales-order-form.ts`; neither may retype them |
+| Carrying goods up stairs — the CHARGEABLE fact | **`Stair carry`** (two words, no hyphen) | Stair-carry · Staircarry · Carry charge · Portage · Walk-up fee. **The hyphen is correct only as a compound ADJECTIVE** — `stair-carry fee`, `stair-carry items` — and the bare noun never takes it |
+| The count of items needing it, as a field label | **`Items needing stair carry`** | Stair carry items · Stair-carry items · Quantity · Qty |
+| The sum, shown to whoever keyed it | **`{n} of {m} items × {f} floors above {free}F × {rate} = {total}`** | a bare total with no working-out. Both surfaces print the same sentence from the same `floorSurchargeRaw`; a second copy of the arithmetic is a Law D failure |
 
 `Customer type (auto)`, `Existing customer`, `New customer` and `Checking…` are the Sales
 Portal's own words and are printed unchanged on the object page — one fact, one spelling.
