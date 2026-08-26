@@ -77,6 +77,20 @@ const CHILD_COLUMNS = [
   { key: "item", label: "Item", width: null },
 ] as const;
 
+/**
+ * ⭐ `Covered by` — THE BUYING PAGE'S OWN COLUMN (Card 02 follow-up, 2026-08-24).
+ *
+ * Optional, exactly like `selection` and for the same reason (law ④): a page
+ * that BUYS has to say what ALREADY covers a line, and a truth register does
+ * not. Sales Orders and Delivery pass neither and render byte-identically to
+ * what they rendered before.
+ *
+ * It sits beside `Unit ID` because the two answer one question — *what exists
+ * for this line already* — an allocated Unit, or an open purchase order. It is
+ * a fixed column and it is not last, because law ① keeps `Item` last.
+ */
+const COVERED_BY_COLUMN = { key: "coveredBy", label: "Covered by", width: 168 } as const;
+
 /** ☑ is chrome, so it is narrow and it is not one of the six ruled columns. */
 const SELECT_WIDTH = 36;
 
@@ -100,6 +114,10 @@ export interface GoodsMiniLine {
   unitAbsence: string;
   deliverTo: string[];
   deliverToAbsence: string;
+  /** One printed line each. Read only when the table is asked for the column. */
+  coveredBy?: string[];
+  /** The governed word for a line nothing covers yet. */
+  coveredByAbsence?: string;
   sku: string;
   qty: number;
   item: string;
@@ -194,14 +212,26 @@ export default function GoodsMiniTable({
   label,
   lines,
   selection,
+  showCoveredBy = false,
 }: {
   /** The table's accessible name — `Goods on SO-1303`. */
   label: string;
   lines: GoodsMiniLine[];
   /** Present only on a page that buys from these lines. */
   selection?: GoodsMiniTableSelection;
+  /** A page that BUYS asks for `Covered by`; a truth register does not. */
+  showCoveredBy?: boolean;
 }) {
-  const minWidth = FIXED_TOTAL + ITEM_FLOOR + (selection ? SELECT_WIDTH : 0);
+  /* The six ruled columns, plus the buying page's own — inserted after
+     `Unit ID`, never after `Item` (law ①). */
+  const columns = showCoveredBy
+    ? [CHILD_COLUMNS[0], CHILD_COLUMNS[1], COVERED_BY_COLUMN, ...CHILD_COLUMNS.slice(2)]
+    : [...CHILD_COLUMNS];
+  const minWidth =
+    FIXED_TOTAL +
+    ITEM_FLOOR +
+    (selection ? SELECT_WIDTH : 0) +
+    (showCoveredBy ? COVERED_BY_COLUMN.width : 0);
   return (
     /* ⭐ A BOX, NOT A CONTINUATION OF THE SHEET — owner correction 2026-08-15.
        The first shipped version fused it into the grid: two rules and nothing
@@ -223,7 +253,7 @@ export default function GoodsMiniTable({
       >
         <colgroup>
           {selection ? <col style={{ width: SELECT_WIDTH }} /> : null}
-          {CHILD_COLUMNS.map((c) => (
+          {columns.map((c) => (
             <col key={c.key} style={c.width ? { width: c.width } : undefined} />
           ))}
         </colgroup>
@@ -235,7 +265,7 @@ export default function GoodsMiniTable({
             {/* THE HEADER ROW CARRIES NO CHECKBOX (owner ruling). Select-all is
                 the PARENT row's box — one whole-order switch, not two. */}
             {selection ? <th className="px-2 py-1.5" aria-label="Select goods line" /> : null}
-            {CHILD_COLUMNS.map((c) => (
+            {columns.map((c) => (
               <th
                 key={c.key}
                 scope="col"
@@ -287,6 +317,15 @@ export default function GoodsMiniTable({
                   <Absence>{line.unitAbsence}</Absence>
                 )}
               </td>
+              {showCoveredBy ? (
+                <td className="px-2 py-2 font-mono">
+                  {line.coveredBy?.length ? (
+                    line.coveredBy.map((po) => <div key={po}>{po}</div>)
+                  ) : (
+                    <Absence>{line.coveredByAbsence ?? "—"}</Absence>
+                  )}
+                </td>
+              ) : null}
               <td className="px-2 py-2">
                 {line.deliverTo.length ? (
                   line.deliverTo.map((d) => <div key={d}>{d}</div>)

@@ -113,30 +113,57 @@ The default visible view is the 11 business columns after Select. `Item · Descr
 Category, detailed Coverage and technical source IDs may be optional Display fields, but may not
 replace or duplicate the default truth.
 
-### 3.3 Row inspector
+### 3.3 Row expand — OVERWRITTEN 2026-08-24 (owner correction)
 
-One row expand has one job: explain this demand without creating a second editor.
+One row expand has one job, and it is **not** to say the row again.
 
 ```text
-REQUIRED                 3
-FROM STOCK               1
-ON OPEN PO               1 · PO-20260820-4827
-BUY                      1
-
-Source                   SO-1318 · B1201S-K
-Required for             Fri, 28 Aug 2026
-Goods must arrive        Wed, 19 Aug 2026
-Deliver to               Carres Klang
+┌ Goods on SO-1330 ────────────────────────────────────────────────────────────┐
+│ CATEGORY │ UNIT ID       │ COVERED BY     │ DELIVER TO      │ SKU        │QTY│ ITEM          │
+├──────────┼───────────────┼────────────────┼─────────────────┼────────────┼───┼───────────────┤
+│ Sofa     │ Not allocated │ Not ordered yet│ Carres Klang ×3 │5539-1B(LHF)│ 1 │ Chelsea       │
+│          │               │                │ AL Sungai Buloh×1│           │   │ 3 Modules     │
+│ Sofa     │ Not allocated │ Not ordered yet│ …               │5539-CNR    │ 2 │ …             │
+│ Sofa     │ Not allocated │ Not ordered yet│ …               │5539-2A(RHF)│ 1 │ …             │
+└──────────────────────────────────────────────────────────────────────────────┘
 ```
 
-The arithmetic is server-owned:
+It is **`GoodsMiniTable`** — the ONE child table Sales Orders and Delivery already draw
+(owner ruling, Chai 2026-08-15: *"written ONCE so that two pages cannot drift into two mini-tables
+that almost agree"*). SO Batch Purchase passes the buying page's optional `Covered by` column, the
+same way a buying page passes `selection`; the two sibling registers pass neither and render exactly
+as before.
+
+**WHAT THIS REPLACED, AND WHY IT READ AS CONFUSION.** A hand-drawn `grid-cols-2` label/value list —
+the second mini-table that ruling exists to forbid — and it failed twice:
+
+- **It was as wide as the table.** `justify-between` across half of a 1600px row put `REQUIRED` at
+  the left edge and its `1` some 780px away with nothing between them. The parent is a table with
+  aligned columns; the child was a form floating in white space.
+- **It re-printed the row.** Seven of its eight facts — Required · From Stock · On Open PO · Buy ·
+  Source · Required for · Goods must arrive · Deliver to — were ALREADY columns on the row above it.
+
+**WHAT THE ROW GENUINELY CANNOT SAY**, and therefore what the expand is for:
+
+| Fact | Why the row cannot carry it |
+|---|---|
+| The PARTS of a matched set | The row is one line per BUILD. A sofa is one row and three module codes. |
+| WHICH purchase order covers it | `Open PO` prints a number; only here does it name the document. |
+| Where a SPLIT actually sends each unit | The row's `Deliver To` cell summarises; the box lists. |
+| Whether a Unit exists yet | `Not allocated` — nothing is minted before Issue PO, and the box says so instead of printing a blank or inventing a code. |
+
+The four numbers are NOT repeated: `Required`, `Stock`, `Open PO` and `Buy` are columns on the row,
+and the arithmetic behind them stays server-owned:
 
 ```text
 Buy = Required − usable Stock allocated − valid Open PO allocated
 ```
 
-The inspector may link to SO, PO, Catalog or Stock facts. It may not save another `Buy`, supplier,
-date or coverage value.
+**THE SALES ORDER LINK MOVED TO ITS COLUMN.** §3.2 always said `Source SO` links to the Sales Order;
+it was plain text, and the only link lived inside the expand — so reaching the order meant opening a
+box first. The column carries it now, and the expand carries none.
+
+The expand may still not save a `Buy`, a supplier, a date or a coverage value.
 
 ## 4 · `Deliver To` contract
 
