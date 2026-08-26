@@ -277,38 +277,32 @@ export default function SalesOrderAttribution({
           </p>
         </div>
       ) : (
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-meta text-base-500">
-            Sales ownership changes only after approval.
-          </p>
+        <div className="flex flex-wrap items-center justify-end gap-2">
           {/* ⭐ READ-ONLY FOR OPERATION — owner ruling 2026-08-15. Who gets paid
               is not an Operation correction, and a button that always refuses
               teaches the operator to ignore refusals. The door appears for the
               roles GATE 3 lets decide it; the REQUEST panel above stays visible
               to everyone, because a pending change is truth, not an action. */}
-          {/* ⭐ THE LABEL IS LOCKED, SO THE EXPLANATION SITS BESIDE IT
-              (2026-08-24). `COPY-STANDARD.md:1427` is a `Use exactly` row, and
-              its `Do NOT use` column already rejects `Request ownership change`,
-              `Reassign` and `Change owner` — the three renames anyone reaching
-              for a clearer word lands on. What was missing is not a better noun
-              but the sentence saying what pressing it does, and that sentence
-              already exists as APPROVED copy on the modal this button opens. It
-              is repeated here rather than reworded, so no new string is minted
-              and the two surfaces cannot drift apart. */}
+          {/* ⭐ THE DOOR IS JUST ITS VERB NOW — YH, 2026-08-26. It said
+              `Change salesperson — needs approval`, under a line reading "Sales
+              ownership changes only after approval", above a second line
+              reading "This is sent for approval…". THREE statements of one
+              fact, before anybody had pressed anything.
+              The modal this opens already carries that sentence as approved
+              copy, and it is read at the moment it matters — when the operator
+              is filling the form, not while they are scanning past the card.
+              So the two standing lines go and the suffix goes with them; what
+              was a warning becomes a verb. `COPY-STANDARD.md` records the new
+              word and keeps every rejected rename in its `Do NOT use` column. */}
           {canRequest && (
-            <div className="flex flex-col items-start gap-1">
-              <Button
-                size="sm"
-                variant="neutral"
-                onClick={() => setFormOpen(true)}
-                data-testid="attribution-open"
-              >
-                Change salesperson — needs approval
-              </Button>
-              <p className="text-meta text-base-500" data-testid="attribution-open-note">
-                This is sent for approval. The sales order does not change until it is applied.
-              </p>
-            </div>
+            <Button
+              size="sm"
+              variant="neutral"
+              onClick={() => setFormOpen(true)}
+              data-testid="attribution-open"
+            >
+              Change salesperson
+            </Button>
           )}
         </div>
       )}

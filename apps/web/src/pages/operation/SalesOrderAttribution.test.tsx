@@ -88,22 +88,38 @@ beforeEach(() => {
 });
 
 describe("no live request — one way in, and it is a request", () => {
-  it("offers the request, and says why editing is not the way", () => {
+  /* ⭐ REWRITTEN 2026-08-26 (YH) — the door is just its verb now.
+     It used to read `Change salesperson — needs approval`, under a line saying
+     "Sales ownership changes only after approval", above another saying "This
+     is sent for approval…". THREE statements of one fact before anyone had
+     pressed anything, and these tests pinned two of them.
+
+     The fact is NOT dropped — it moved to where it is read at the moment it
+     matters, on the modal the button opens. So the assertion moves with it:
+     the standing lines are gone AND the sentence is still reachable. */
+  it("offers the request as a plain verb, and says why once the form is open", () => {
     draw();
-    expect(screen.getByTestId("attribution-open").textContent).toBe(
-      "Change salesperson — needs approval",
-    );
+    expect(screen.getByTestId("attribution-open").textContent).toBe("Change salesperson");
     expect(screen.queryByTestId("attribution-request")).toBeNull();
-    expect(screen.getByText("Sales ownership changes only after approval.")).toBeTruthy();
+    // No standing lecture beside a button nobody has pressed.
+    expect(screen.queryByText("Sales ownership changes only after approval.")).toBeNull();
+    expect(screen.queryByTestId("attribution-open-note")).toBeNull();
+    // …and the rule is stated where it is acted on.
+    fireEvent.click(screen.getByTestId("attribution-open"));
+    expect(
+      screen.getByText(
+        "This is sent for approval. The sales order does not change until it is applied.",
+      ),
+    ).toBeTruthy();
   });
 
   /* Who gets PAID is not an Operation correction (owner ruling 2026-08-15).
-     The fact stays on screen; the door does not. */
-  it("hides the door from Operation and still states the fact", () => {
+     The DOOR is what Operation does not get; the pending request stays visible
+     to them (asserted in the next test), which is the half that is truth. */
+  it("hides the door from Operation", () => {
     useAuth.setState({ role: "operation" });
     draw();
     expect(screen.queryByTestId("attribution-open")).toBeNull();
-    expect(screen.getByText("Sales ownership changes only after approval.")).toBeTruthy();
   });
 
   /* A pending change is TRUTH, not an action — everyone sees it. */

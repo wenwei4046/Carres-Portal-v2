@@ -49,11 +49,19 @@ const VISIBLE_CAP = 300;
 // (PWP = the 0186 per-SKU PWP reward price, 2990s "PWP Price" column. The sofa
 // per-size grid variant deliberately has NO pwp column — a sofa's PWP price
 // lives on the matched COMBO (pwp_prices_by_height), never on component SKUs.)
-const GRID_COLS = "32px 170px minmax(180px,1.4fr) minmax(120px,1fr) 110px 100px 110px 90px 90px";
-// Same tracks minus the 100px SIZE one — used when the active filter is a
-// category with no size axis (Service / Guarantee), where every SIZE cell would
-// either repeat the CODE column or print an invoice sentence (Loo 2026-07-26).
-const GRID_COLS_NO_SIZE = "32px 170px minmax(180px,1.4fr) minmax(120px,1fr) 110px 110px 90px 90px";
+// 2026-08-26 (YH) — SUPPLIER joins them, name + their own code in one cell:
+// "show supplier too, show supplier code too if possible so if supplier code
+// entered wrong can check from there as well". It is the SAME pair the
+// Operations catalog edits, resolved through the roster by supplier_id and
+// never stored as text here (Law A/D). COST deliberately did NOT come with it —
+// Loo dropped that column on 2026-07-06 and nothing has reopened it.
+const GRID_COLS =
+  "32px 170px minmax(180px,1.4fr) minmax(120px,1fr) 100px 90px minmax(140px,1fr) 100px 100px 80px";
+// Same tracks minus the SIZE one — used when the active filter is a category
+// with no size axis (Service / Guarantee), where every SIZE cell would either
+// repeat the CODE column or print an invoice sentence (Loo 2026-07-26).
+const GRID_COLS_NO_SIZE =
+  "32px 170px minmax(180px,1.4fr) minmax(120px,1fr) 100px minmax(140px,1fr) 100px 100px 80px";
 
 type CatFilter = ProductCategory | "all";
 
@@ -86,6 +94,13 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
    * the FK, never by text - the same identity rule the Suppliers tab lives by. */
   const [supplierFilter, setSupplierFilter] = useState<string>("all");
   const suppliersQ = useOperationSuppliers();
+  /* The roster, keyed by id — the SKU stores `supplier_id` and the NAME is
+     always derived through this map, never held on the row (Law A/D). */
+  const supplierNameById = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const s of suppliersQ.data?.suppliers ?? []) m.set(s.id, s.name);
+    return m;
+  }, [suppliersQ.data?.suppliers]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [newOpen, setNewOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
@@ -426,6 +441,7 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
               <div className="label">Product</div>
               <div className="label">Category</div>
               {!sizelessMode && <div className="label">Size</div>}
+              <div className="label">Supplier</div>
               <div className="label text-right">Price</div>
               <div className="label text-right">PWP Price</div>
               <div className="label text-right">Margin</div>
@@ -450,6 +466,8 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
             sofaSizes={sofaSizeMode ? sofaSizes : null}
             gridCols={gridCols}
             showSize={!sizelessMode}
+            supplierName={r.sku.supplierId ? supplierNameById.get(r.sku.supplierId) ?? null : null}
+            suppliers={suppliersQ.data?.suppliers ?? []}
           />
         ))}
       </div>
@@ -478,6 +496,8 @@ const SkuRowView = memo(function SkuRowView({
   sofaSizes,
   gridCols,
   showSize,
+  supplierName,
+  suppliers,
 }: {
   row: FlatRow;
   /** 0175 — true only for the principal; price/PWP cells stay read-only otherwise. */
@@ -495,6 +515,12 @@ const SkuRowView = memo(function SkuRowView({
   /** false when the whole SIZE column is dropped (Service / Guarantee filter);
    *  the row must then omit its SIZE cell or every later cell shifts a track. */
   showSize: boolean;
+  /** Resolved through the roster by supplier_id; null = the SKU names no
+   *  supplier (legitimate for service/accessory, 0171). */
+  supplierName: string | null;
+  /** The roster, for the inline picker. The IDENTITY written is always
+   *  supplier_id; the name is only ever what the picker displays. */
+  suppliers: Array<{ id: string; name: string }>;
 }) {
   const { sku, model, category, productName } = row;
   const priceEdit = inlineEdit && canEditPrices;
@@ -609,6 +635,36 @@ const SkuRowView = memo(function SkuRowView({
       {sku.description || <span className="text-base-400">—</span>}
     </div>
   );
+
+  /* 2026-08-26 (YH) — the same two supplier facts the Operations catalog
+     writes, editable here too: neither is money, so neither is 0175-locked and
+     the API leaves both ungated. The point of showing them on this door is
+     checking a keyed-in supplier code against the quotation without switching
+     pages — and a typo you can see is a typo you should be able to fix. */
+  function commitSupplier(nextId: string) {
+    const val = nextId || null;
+    if (val === (sku.supplierId ?? null)) return;
+    patch.mutate(
+      { id: sku.id, patch: { supplierId: val } },
+      {
+        onSuccess: () => toast.success(`${sku.sku} · supplier updated`),
+        onError: (e: unknown) =>
+          toast.error(e instanceof ApiError ? e.message : "Update failed"),
+      },
+    );
+  }
+  function commitSupplierCode(raw: string) {
+    const val = raw.trim() || null;
+    if (val === (sku.supplierCode ?? null)) return;
+    patch.mutate(
+      { id: sku.id, patch: { supplierCode: val } },
+      {
+        onSuccess: () => toast.success(`${sku.sku} · supplier code updated`),
+        onError: (e: unknown) =>
+          toast.error(e instanceof ApiError ? e.message : "Update failed"),
+      },
+    );
+  }
 
   function commitPrice(raw: string) {
     const trimmed = raw.trim();
@@ -767,6 +823,46 @@ const SkuRowView = memo(function SkuRowView({
         ) : (
           <div className="text-body text-base-700">{sizeless ? "—" : sku.variant || "—"}</div>
         ))}
+
+      {/* Supplier + THEIR code for it — one cell, because they are one fact
+          about one relationship and reading them apart is what made a wrong
+          code hard to spot. */}
+      <div data-testid={`sku-supplier-${sku.sku}`}>
+        {inlineEdit ? (
+          <div className="flex flex-col gap-1">
+            <select
+              defaultValue={sku.supplierId ?? ""}
+              onChange={(e) => commitSupplier(e.target.value)}
+              aria-label={`${sku.sku} supplier`}
+              className={`${INPUT_CLS} text-meta`}
+            >
+              <option value="">No supplier</option>
+              {suppliers.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+            <input
+              defaultValue={sku.supplierCode ?? ""}
+              onBlur={(e) => commitSupplierCode(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+              }}
+              placeholder="Their code"
+              aria-label={`${sku.sku} supplier code`}
+              className={`${INPUT_CLS} text-meta font-mono`}
+            />
+          </div>
+        ) : (
+          <div className="text-meta text-base-600 truncate" title={supplierName ?? ""}>
+            {supplierName || <span className="text-base-400">—</span>}
+            {sku.supplierCode ? (
+              <span className="text-base-400 font-mono"> · {sku.supplierCode}</span>
+            ) : null}
+          </div>
+        )}
+      </div>
 
       {/* Price */}
       <div className="text-right">

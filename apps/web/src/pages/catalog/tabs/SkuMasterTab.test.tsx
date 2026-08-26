@@ -798,11 +798,18 @@ describe("SkuMasterTab — header and rows share ONE grid template", () => {
     // while the row kept the 9-track one, so every column after Description
     // drifted left inside the row.
     const { container } = render(wrap(<SkuMasterTab catalog={CAT()} />));
+    const sizedCols = headerCols(container); // the "All" filter still has SIZE
     fireEvent.click(screen.getByRole("button", { name: "Service" }));
     const row = screen.getByTestId("sku-row-SVC-DISPOSE-SOFA");
     expect(row.style.gridTemplateColumns).toBe(headerCols(container));
-    // …and that template really is the one WITHOUT the 100px size track.
-    expect(row.style.gridTemplateColumns).not.toContain("100px");
+    /* …and that template really is the one WITHOUT the size track.
+       This used to assert `not.toContain("100px")`, which read the SPELLING of
+       the template rather than its shape: the moment any other column was
+       sized 100px the test failed on a grid that was perfectly aligned (the
+       supplier column, 2026-08-26). Counting tracks says the actual thing —
+       one column fewer — and survives every later column change. */
+    const tracks = (s: string) => s.trim().split(/\s+/).length;
+    expect(tracks(row.style.gridTemplateColumns)).toBe(tracks(sizedCols) - 1);
   });
 
   it("rows line up with the header on the Guarantee filter too", () => {

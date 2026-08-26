@@ -333,6 +333,15 @@ supplier · supplier code · rest   any internal user
 let them see and not change it, cuz it avoids data pollution"*. A read-only number answers the
 question that was previously asked across the room; it cannot be typed into the customer's price.
 
+**SUPPLIER JOINS THE SELLING DOOR TOO — 2026-08-26 (YH):** *"make the admin catalog show supplier
+too, show supplier code too if possible so if supplier code entered wrong can check from there as
+well."* Both doors now carry the supplier and THEIR code for the item, in one cell, editable in
+either place — neither is money, so neither is 0175-locked and the API leaves both ungated.
+
+⛔ **COST did NOT come with it, and that is a ruling, not an oversight.** Loo dropped the cost
+column from the selling grid on 2026-07-06 (*"not needed for now"*, `9f21582e`) and nothing has
+reopened it. The alignment is therefore asymmetric ON ONE COLUMN by explicit decision.
+
 🟡 **Bulk delete is the one gap deliberately left open.** Every other difference Jess named is
 closed, but permanently destroying catalog rows was never asked for by name, and *align* is not a
 yes to it. It needs its own ruling.
