@@ -270,11 +270,16 @@ explanation came off once the fields they explained stopped being editable:
   hazard, not a field.
 - The `SALES OWNERSHIP` door drops its suffix and both standing sentences — see the ruling above.
 
-🟡 **The `Propose a change to the customer` door was asked for and NOT removed.** The reason given
-was that the three dates in `ORDER INFO` are fixed — true, and `AMEND DELIVERY DATE` covers dates
-on its own. But that modal is also the only way to change **items, unit price and instalment
-months** anywhere on the Sales Order. Its standing explanation went; the door waits for a ruling
-that names those three.
+**`Propose a change to the customer` MOVED INTO `More actions`** — 2026-08-26, on the exact
+precedent `Report a problem` set on 2026-08-15: a rare act does not hold permanent space on a page
+read every day. Its standing sentence is deleted and its idle strip with it.
+
+⛔ **The door was NOT deleted, and that distinction is load-bearing.** That modal is the only way to
+change **items, unit price and instalment months** anywhere on the Sales Order — `AMEND DELIVERY
+DATE` submits a date and nothing else. Removing the button would have retired three capabilities
+silently, so it moved instead. A LIVE proposal still draws its panel on the card, because a pending
+amendment is truth rather than an action; only the rule and padding are conditional on one
+existing. Held mechanically by `SalesOrderWorkspace.ui-contract.test.ts`.
 
 Sales may directly correct only its governed safe/customer facts. A commercial commitment change
 uses the amendment path. Purchasing, Warehouse, Delivery and Finance facts have links, never forms.

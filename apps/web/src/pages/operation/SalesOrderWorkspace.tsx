@@ -938,6 +938,9 @@ export default function SalesOrderWorkspace() {
   const [amendmentSeed, setAmendmentSeed] = useState<AmendmentProposal | null>(null);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [problemOpen, setProblemOpen] = useState(false);
+  /* Bumped by `More actions → Propose a change to the customer`. A counter, not
+     a boolean, so the menu item still works after the modal was cancelled. */
+  const [amendSignal, setAmendSignal] = useState(0);
   const [objectView, setObjectView] = useState<ObjectView>(showRoute ? "Order Route" : "Order");
 
   /* ⛔ `?edit=1` IS RETIRED — owner ruling 2026-08-15. A bookmark, a browser
@@ -1739,6 +1742,20 @@ export default function SalesOrderWorkspace() {
             >
               Report a problem
             </button>
+            {/* ⭐ THE AMENDMENT DOOR MADE THE SAME JOURNEY (YH, 2026-08-26).
+                It was a standing strip at the foot of `Order info`; proposing a
+                contractual change is rarer than reading an order, and this is
+                where this page already keeps its rare acts. The strip is gone;
+                the capability — items, unit price, instalment months — is not,
+                and `Amend delivery date` still handles the date on the card. */}
+            <button
+              type="button"
+              onClick={() => setAmendSignal((n) => n + 1)}
+              data-testid="workspace-propose-change"
+              className="w-full rounded-control px-2 py-1.5 text-left text-meta text-base-700 hover:bg-hovertint"
+            >
+              Propose a change to the customer
+            </button>
             <button type="button" onClick={() => setCancelOpen(true)} data-testid="workspace-cancel-so" className="w-full rounded-control px-2 py-1.5 text-left text-meta text-danger hover:bg-hovertint">Cancel SO</button>
           </div>
         </details>
@@ -2163,9 +2180,15 @@ export default function SalesOrderWorkspace() {
         <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
           <CustomFields fields={tab("target").custom} values={draft.custom} onChange={setCustom} />
         </div>
-        {/* THE ONE DOOR for goods, price and the promised date. */}
+        {/* THE ONE DOOR for goods, price and the promised date — opened from
+            `More actions` since 2026-08-26. The component still MOUNTS here
+            because a LIVE proposal is truth and belongs on the card, and
+            because the modal it owns has to exist to be opened at all. The
+            rule + padding therefore appear only when there is a live panel to
+            separate; with nothing pending this renders an empty, invisible
+            div rather than a bordered strip with no content in it. */}
         {!isNew && mode === "object" && orderId && (
-          <div className="mt-3 border-t border-kit-slate-5 pt-3">
+          <div className={liveAmendment ? "mt-3 border-t border-kit-slate-5 pt-3" : ""}>
             <SalesOrderAmendment
               orderId={orderId}
               currentLines={(detailQ.data?.lines ?? []).map((l) => ({
@@ -2178,6 +2201,8 @@ export default function SalesOrderWorkspace() {
               currentDeliveryDateTbd={order?.delivery_date_tbd ?? false}
               currentInstallmentMonths={(order as { installment_months?: number | null } | undefined)?.installment_months ?? null}
               proposalSeed={amendmentSeed}
+              openSignal={amendSignal}
+              inlineTrigger={false}
             />
           </div>
         )}

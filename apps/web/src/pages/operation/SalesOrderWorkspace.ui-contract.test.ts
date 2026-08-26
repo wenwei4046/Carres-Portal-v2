@@ -9,6 +9,7 @@ const workspace = readFileSync(join(here, "SalesOrderWorkspace.tsx"), "utf8");
 const header = readFileSync(join(here, "SalesOrderTabs.tsx"), "utf8");
 const attribution = readFileSync(join(here, "SalesOrderAttribution.tsx"), "utf8");
 const amendDate = readFileSync(join(here, "SalesOrderAmendDeliveryDate.tsx"), "utf8");
+const amendment = readFileSync(join(here, "SalesOrderAmendment.tsx"), "utf8");
 const render = readFileSync(join(here, "../../lib/pdf/render.ts"), "utf8");
 /* The POS half of the parity contract (owner ruling 2026-08-26). A fact both
    surfaces ask for must offer the same answers, so the list lives in shared and
@@ -388,6 +389,30 @@ describe("Sales Order object template contract", () => {
 
   it("keeps one door for goods, price and the promise", () => {
     expect(workspace.match(/<SalesOrderAmendment\b/g)).toHaveLength(1);
+  });
+
+  /* ⭐ THAT DOOR MOVED TO `More actions` — YH, 2026-08-26, following the exact
+     precedent `Report a problem` set on 2026-08-15: a rare act does not hold
+     permanent space on a page read every day.
+
+     The strip is gone from `Order info`; the CAPABILITY is not, and that is
+     what this pins. The modal is the only way to change items, unit price or
+     instalment months anywhere on the Sales Order — `Amend delivery date`
+     submits a date and nothing else — so a later "remove the button" would
+     silently retire three capabilities. It must fail here first. */
+  it("opens the amendment from More actions, and keeps no idle strip on the card", () => {
+    expect(workspace).toContain('data-testid="workspace-propose-change"');
+    expect(workspace).toContain("Propose a change to the customer");
+    expect(workspace).toContain("inlineTrigger={false}");
+    expect(workspace).toContain("openSignal={amendSignal}");
+    /* A counter, not a boolean — a boolean cannot reopen the modal after a
+       cancel, which is the bug this shape exists to avoid. */
+    expect(workspace).toContain("setAmendSignal((n) => n + 1)");
+    /* The standing sentence that sat beside it is gone for good. */
+    expect(amendment).not.toContain("they change by proposal, not by editing");
+    /* Still MOUNTED on the card, because a LIVE proposal is truth and belongs
+       there — only the rule + padding are conditional on one existing. */
+    expect(workspace).toContain('liveAmendment ? "mt-3 border-t border-kit-slate-5 pt-3" : ""');
   });
 
   it("names the governed ownership request and hides it from Operation", () => {
