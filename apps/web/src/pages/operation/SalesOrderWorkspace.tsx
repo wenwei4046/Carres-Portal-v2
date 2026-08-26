@@ -566,7 +566,7 @@ function draftFromSnapshot(snap: SalesOrderSnapshot): Draft {
  * spend the accent eight times and leave nothing to mark the current thing.
  * The tab underline above already holds the screen's one accent.
  */
-function Block({
+export function Block({
   title,
   note,
   subtitle,
@@ -606,13 +606,20 @@ function Block({
   return (
     <section className="rounded-card border border-kit-slate-5 bg-white px-4 py-3" data-block={title}>
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-l-2 border-base-300 pl-2">
-        <h2 id={headingId} className="text-label font-semibold tracking-wide text-base-700 uppercase">
+        {/* ⭐ A CARD TITLE WEARS THE CARD-TITLE TOKEN (2026-08-24).
+            `01-design-tokens.md` §1 assigns `text-strong` to "card title ·
+            field-group heading" and `text-label` to "field labels, micro-labels,
+            pill text". This heading wore `text-label` — an 11px uppercase
+            micro-label doing a section's job, which is exactly why the sections
+            did not read as sections. Restoring the documented token is the fix;
+            uppercase goes with it, because 15px shouting is a different defect. */}
+        <h2 id={headingId} className="text-strong text-base-900">
           {title}
         </h2>
-        {note && <span className="text-label font-normal text-base-600">{note}</span>}
+        {note && <span className="text-meta font-normal text-base-600">{note}</span>}
       </div>
       {subtitle && (
-        <p className="mt-1 pl-2 text-label font-normal text-base-500" data-testid={`block-subtitle-${title}`}>
+        <p className="mt-1 pl-2 text-meta font-normal text-base-500" data-testid={`block-subtitle-${title}`}>
           {subtitle}
         </p>
       )}
@@ -1886,7 +1893,11 @@ export default function SalesOrderWorkspace() {
       data-testid="sales-order-workspace"
       id="sales-order-workspace"
     >
-    <div className="flex flex-col gap-3">
+    {/* §3 of the token table names 24px "between blocks · card padding" and 12px
+        "standard gap". The left pane stacked eight sections at the standard gap,
+        so neighbouring cards sat as close as two fields inside one card — the
+        second half of why the sections did not separate. */}
+    <div className="flex flex-col gap-6">
       {mode === "oldrev" && viewedRevision && (
         <div className="px-1">
           <span className="rounded-full bg-base-900 px-2 py-0.5 text-label font-semibold text-white">
@@ -2482,7 +2493,26 @@ export default function SalesOrderWorkspace() {
           of a locked ruling doing its job. Reopening it needs an owner ruling,
           not a build decision. */}
       {!isNew && mode !== "oldrev" && (
-        <Block title="Related Documents">
+        <Block
+          title="Related Documents"
+          summary={relatedDocumentsSummary(
+            [
+              { label: "Purchase Orders", count: relatedDocuments.pos.length },
+              { label: "Receiving Sessions", count: relatedDocuments.receiving.length },
+              { label: "Stock Units", count: relatedDocuments.stock.length },
+              { label: "Delivery Orders", count: relatedDocuments.deliveryOrders.length },
+              { label: "Payments", count: relatedDocuments.payments.length },
+              { label: "Service Cases", count: relatedDocuments.cases.length },
+              { label: "Guarantees", count: relatedDocuments.guarantees.length },
+            ],
+            routeFactsQ.isLoading ||
+              goodsTruthQ.isLoading ||
+              deliveryOrdersQ.isLoading ||
+              paymentsQ.isLoading ||
+              serviceCasesQ.isLoading ||
+              guaranteesQ.isLoading,
+          )}
+        >
           <div data-testid="sales-order-related-documents">
             <RelatedDocumentLine label="Purchase Orders">
               <DocumentLinks documents={relatedDocuments.pos} />
@@ -2989,4 +3019,44 @@ function operationalConfig(line: { attrs?: Record<string, unknown> | null }): st
     facts.push(`${label}: ${String(value)}`);
   }
   return facts;
+}
+
+/**
+ * ⭐ WHAT IS BEHIND THE FOLD — Related Documents (2026-08-25).
+ *
+ * I refused to collapse this block on 2026-08-24, and I was over-cautious. What
+ * `docs/orders/MASTER.md:226` actually rules is that the index is COMPLETE —
+ * *"It must not show only the latest or first Delivery Order when more exist"* —
+ * and it sanctions a summary in the same breath: *"For many documents the
+ * summary says, for example, `2 Delivery Orders →`"*. Nothing there says the
+ * card must stand open. The `ui-contract` test I pointed at was asserting the
+ * SHAPE OF THE SOURCE LINE, not that ruling, which is a test enforcing its own
+ * spelling rather than its own intent.
+ *
+ * Collapsing hides no door. All seven owners stay in the block; the fold only
+ * decides whether they are on screen before the operator asks.
+ *
+ * The summary NAMES what exists, because a fold the operator cannot see past is
+ * a fold they must open every time to learn there was nothing behind it. The
+ * count-then-label shape is MASTER's own (`2 Delivery Orders`); a lone item
+ * takes the singular of that same approved noun, which is grammar, not a second
+ * word for the same thing. Empty is the governed `—` the MASTER names, and a
+ * still-loading block borrows `Loading…` from the rows below it rather than
+ * inventing a second way to say the same thing.
+ */
+export function relatedDocumentsSummary(
+  groups: ReadonlyArray<{ label: string; count: number }>,
+  loading: boolean,
+): string {
+  /* Loading must NOT read as empty. Saying "—" while the answer is still in
+     flight tells the operator this order has no documents, which is a lie that
+     resolves itself silently a second later. */
+  if (loading) return "Loading…";
+  const present = groups.filter((g) => g.count > 0);
+  if (present.length === 0) return "—";
+  const named = present
+    .slice(0, 3)
+    .map((g) => `${g.count} ${g.count === 1 ? g.label.replace(/s$/, "") : g.label}`);
+  const rest = present.length - named.length;
+  return rest > 0 ? `${named.join(" · ")} · +${rest} more` : named.join(" · ");
 }

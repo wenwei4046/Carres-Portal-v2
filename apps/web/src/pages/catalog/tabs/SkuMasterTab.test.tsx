@@ -63,6 +63,14 @@ vi.mock("@/lib/queries", () => ({
     data: { suppliers: [{ id: "00000000-0000-4000-8000-0000000000s1".replace("s","a"), name: "Hookka" }] },
     isLoading: false,
   }),
+  /* 2026-08-24 - the New SKU modal now offers the portal's FIRST
+   * supplier-creation door. This file renders that modal for the 0175
+   * price-lock cases, so the hook has to exist here too. */
+  useCreateSupplier: () => ({
+    mutate: vi.fn(),
+    mutateAsync: vi.fn().mockResolvedValue({ supplier: { id: "sup-new", name: "New" } }),
+    isPending: false,
+  }),
   usePatchCatalogSku: () => ({
     mutate: mockPatchMutate,
     mutateAsync: mockPatchMutateAsync,
@@ -460,7 +468,7 @@ describe("0175 — price/cost lock (non-principal read-only)", () => {
     // New product: fill name + variant; price/cost fields are absent.
     fireEvent.change(screen.getByTestId("new-sku-name"), { target: { value: "Lite Foam" } });
     fireEvent.change(screen.getByTestId("new-sku-variant"), { target: { value: "Queen" } });
-    fireEvent.click(screen.getByText("Create product + SKU"));
+    fireEvent.click(screen.getByText("Create Mattress product + SKU"));
     await waitFor(() => expect(mockCreateSkuMutateAsync).toHaveBeenCalledOnce());
     const args = mockCreateSkuMutateAsync.mock.calls[0][0];
     expect(args.price).toBe(0);
@@ -475,7 +483,7 @@ describe("0175 — price/cost lock (non-principal read-only)", () => {
     fireEvent.change(screen.getByTestId("new-sku-variant"), { target: { value: "King" } });
     fireEvent.change(screen.getByTestId("new-sku-price"), { target: { value: "2990" } });
     fireEvent.change(screen.getByTestId("new-sku-cost"), { target: { value: "1800" } });
-    fireEvent.click(screen.getByText("Create product + SKU"));
+    fireEvent.click(screen.getByText("Create Mattress product + SKU"));
     await waitFor(() => expect(mockCreateSkuMutateAsync).toHaveBeenCalledOnce());
     const args = mockCreateSkuMutateAsync.mock.calls[0][0];
     expect(args.price).toBe(2990);

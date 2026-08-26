@@ -369,6 +369,17 @@ export {
   pwpDiscoverResponseSchema,
   type PwpDiscoverDto,
   type PwpDiscoverResponse,
+  // 2026-08-24 — the FIRST supplier-creation door the portal has ever had.
+  // Purchasing still owns the record; this is the shared contract for it.
+  supplierCreateInput,
+  supplierSlug,
+  type SupplierCreateInput,
+  // 0388 — dual-sourcing's recording half: a SKU remembers every supplier
+  // that quoted it; the supplier_id slot stays the routing truth.
+  skuSupplierOfferSchema,
+  skuSupplierOfferUpsertInput,
+  type SkuSupplierOfferDto,
+  type SkuSupplierOfferUpsertInput,
 } from "./schemas/catalog";
 
 // 0219 — Order Entry config (payment methods + form fields).

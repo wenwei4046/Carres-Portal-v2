@@ -477,6 +477,12 @@ describe("GET /api/operation/orders/:id", () => {
      *  `skuCategories` (category) — which is the point: they read one join. */
     productSkus?: any[];
     freeUnits?: any[];
+    /** The two name sources the History actor is resolved from. They are
+     *  SEPARATE fixtures on purpose: `app_users` under an operation JWT cannot
+     *  see a dealer-role account (0235), so a test that fed one list to both
+     *  would prove nothing about the case that actually breaks. */
+    appUsers?: any[];
+    salespersons?: any[];
   }) {
     const fromImpl = vi.fn((table: string) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -503,6 +509,12 @@ describe("GET /api/operation/orders/:id", () => {
           break;
         case 'order_history':
           chain.order = vi.fn(() => promise(opts.history ?? []));
+          break;
+        case 'app_users':
+          chain.in = vi.fn(() => promise(opts.appUsers ?? []));
+          break;
+        case 'salespersons':
+          chain.in = vi.fn(() => promise(opts.salespersons ?? []));
           break;
         case 'purchase_orders':
           chain.or = vi.fn(() => promise(opts.pos ?? []));
@@ -705,6 +717,137 @@ describe("GET /api/operation/orders/:id", () => {
 
     // The label reader still works off the same rows — one join, two consumers.
     expect(body.lines[0].label).toBe("Hookka · Charcoal");
+  });
+
+  /**
+   * ⭐ HISTORY NAMES ITS ACTOR — TWO SOURCES, BECAUSE ONE CANNOT SEE EVERYONE
+   * (2026-08-24).
+   *
+   * `by_role` said "Salesperson" and never which salesperson. The fix reads the
+   * name, and the reason it reads TWO tables is an RLS fact, not a preference:
+   *
+   *   0235  an operation JWT may read `app_users` rows whose role IS
+   *         'operation'. A salesperson's account is role 'dealer' — invisible.
+   *   0002  `salespersons_scoped_read` lets any internal role read
+   *         `salespersons`, and that table carries `user_id`.
+   *
+   * So the commonest actor on a sales order is exactly the one `app_users`
+   * cannot answer for. A test that only fed `app_users` would pass while the
+   * real page said "Unknown user" on nearly every row — the defect moved rather
+   * than fixed. These cases hold both halves down.
+   */
+  describe("History names its actor", () => {
+    const SELLER = "00000000-0000-0000-0000-0000000000s1";
+    const STAFF = "00000000-0000-0000-0000-0000000000f1";
+    const BASE_ORDER = {
+      id: ORDER_ID, so: 4003, status: "proceed_order", operation_stage: "in_production",
+      warehouse_id: null,
+      customer_name: "Tan Ah Kow", customer_phone: "+60123456789", customer_address: "...",
+      delivery_date: null, placed_at: "2026-08-22T10:00:00Z",
+      do_number: null, do_note: null, dispatched_at: null, delivered_at: null,
+      delivery_partner_id: null, dealer_id: "00000000-0000-0000-0000-000000000d01",
+      dealers: { name: "BedHouse KL" }, outlet_id: null, outlets: null,
+    };
+
+    async function detail() {
+      const jwt = await makeJwt("operation");
+      const res = await app.fetch(
+        new Request(`http://t/api/operation/orders/${ORDER_ID}`, {
+          headers: { Authorization: `Bearer ${jwt}` },
+        }),
+        env,
+      );
+      expect(res.status).toBe(200);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (await res.json()) as any;
+    }
+
+    it("⭐ names a salesperson `app_users` is not allowed to see", async () => {
+      mockDetailQueries({
+        order: BASE_ORDER,
+        history: [{ text: "Amendment proposed", by_role: "salesperson", by_user_id: SELLER, occurred_at: "2026-08-22T11:00:00Z" }],
+        // Exactly what production returns for a dealer-role id under 0235:
+        // not an error, just no row.
+        appUsers: [],
+        salespersons: [{ user_id: SELLER, name: "Kimmy Lee" }],
+      });
+      const body = await detail();
+      expect(body.history[0].actor).toBe("Kimmy Lee");
+      expect(body.history[0].by_role).toBe("salesperson");
+    });
+
+    it("names operation staff from `app_users`", async () => {
+      mockDetailQueries({
+        order: BASE_ORDER,
+        history: [{ text: "Warehouse set", by_role: "operation", by_user_id: STAFF, occurred_at: "2026-08-22T11:00:00Z" }],
+        appUsers: [{ id: STAFF, name: "Wen Wei" }],
+        salespersons: [],
+      });
+      expect((await detail()).history[0].actor).toBe("Wen Wei");
+    });
+
+    it("prefers the account when the same person answers from both tables", async () => {
+      /* `app_users` IS the account; the `salespersons` row is the sales-side
+         profile of the same human. One person may not print two names. */
+      mockDetailQueries({
+        order: BASE_ORDER,
+        history: [{ text: "Order placed", by_role: "salesperson", by_user_id: SELLER, occurred_at: "2026-08-22T11:00:00Z" }],
+        appUsers: [{ id: SELLER, name: "Kimmy Lee" }],
+        salespersons: [{ user_id: SELLER, name: "Kimmy (showroom)" }],
+      });
+      expect((await detail()).history[0].actor).toBe("Kimmy Lee");
+    });
+
+    it("fails OPEN — an unresolvable id keeps the event and names nobody", async () => {
+      /* A cron, a database trigger, a deleted account, an RLS miss. The event
+         is the record; losing it to protect a name would be the worse bug. */
+      mockDetailQueries({
+        order: BASE_ORDER,
+        history: [
+          { text: "Stock reserved", by_role: "system", by_user_id: "00000000-0000-0000-0000-0000000000c1", occurred_at: "2026-08-22T11:00:00Z" },
+          { text: "Order placed", by_role: "dealer", by_user_id: null, occurred_at: "2026-08-22T10:00:00Z" },
+        ],
+        appUsers: [],
+        salespersons: [],
+      });
+      const body = await detail();
+      expect(body.history).toHaveLength(2);
+      expect(body.history[0].actor).toBeNull();
+      expect(body.history[1].actor).toBeNull();
+      expect(body.history[0].text).toBe("Stock reserved");
+    });
+
+    it("asks neither table when no event carries an actor id", async () => {
+      /* Cloudflare caps subrequests per invocation (50 Free / 1000 Paid) and
+         this route is already one of the heaviest reads in the portal. Two name
+         lookups are worth it when there is a name to look up, and are pure cost
+         when there is not. */
+      const fromImpl = mockDetailQueries({
+        order: BASE_ORDER,
+        history: [{ text: "Order placed", by_role: "dealer", by_user_id: null, occurred_at: "2026-08-22T10:00:00Z" }],
+      });
+      const body = await detail();
+      expect(body.history[0].actor).toBeNull();
+      const tables = fromImpl.mock.calls.map((c) => c[0]);
+      expect(tables).not.toContain("app_users");
+      expect(tables).not.toContain("salespersons");
+    });
+
+    it("looks each id up ONCE, however many events that person wrote", async () => {
+      mockDetailQueries({
+        order: BASE_ORDER,
+        history: [
+          { text: "Amendment proposed", by_role: "salesperson", by_user_id: SELLER, occurred_at: "2026-08-22T12:00:00Z" },
+          { text: "Amendment withdrawn", by_role: "salesperson", by_user_id: SELLER, occurred_at: "2026-08-22T11:00:00Z" },
+          { text: "Order placed", by_role: "salesperson", by_user_id: SELLER, occurred_at: "2026-08-22T10:00:00Z" },
+        ],
+        appUsers: [],
+        salespersons: [{ user_id: SELLER, name: "Kimmy Lee" }],
+      });
+      const body = await detail();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      expect(body.history.map((h: any) => h.actor)).toEqual(["Kimmy Lee", "Kimmy Lee", "Kimmy Lee"]);
+    });
   });
 });
 

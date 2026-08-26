@@ -460,6 +460,13 @@ export const modelSofaCompartmentInput = z
      * inherits it — see syncCompartmentSku). Absent keeps today's inherit-
      * then-category-cover fallback byte-identical. */
     supplierId: z.string().uuid().optional(),
+    /* The supplier's own code for THIS compartment (2026-08-24). Unlike
+     * `supplierId` — which a sibling SKU's answer deliberately overrules,
+     * because one model may not fork onto two factories — the code is per
+     * PIECE: a quotation lists one code per compartment, so an explicit value
+     * always wins. Absent leaves whatever the row already holds, so a re-offer
+     * never blanks a code somebody keyed. */
+    supplierCode: z.string().trim().max(60).optional(),
   })
   .strict();
 export type ModelSofaCompartmentInput = z.infer<typeof modelSofaCompartmentInput>;
@@ -1239,6 +1246,32 @@ export const generateSkusInput = z
      * both cover mattress; without this a keyer has no way to say a brand-new
      * batch is Hookka's, not whichever supplier happened to sort first. */
     supplierId: z.string().uuid().optional(),
+    /* ⭐ THE SUPPLIER'S OWN CODE, BATCH DEFAULT + PER-PIECE OVERRIDE
+     * (2026-08-24). A quotation names Carres' SKU nowhere — it names the
+     * supplier's code, and that is the only string a keyer can match a
+     * factory's paperwork against. `supplierCode` fills every generated row;
+     * `supplierCodes` overrides it for one variant, because a quotation
+     * usually lists a DIFFERENT code per size. Both absent writes NULL, which
+     * is what every row generated before today already holds.
+     *
+     * Keyed by the RAW variant the caller sent, never the canonical size: the
+     * caller has no way to know that `K` becomes `King` on the way in. */
+    supplierCode: z.string().trim().max(60).optional(),
+    supplierCodes: z.record(z.string(), z.string().trim().max(60)).optional(),
+    /* ⭐ A QUOTATION PRICES EACH SIZE DIFFERENTLY (2026-08-25). The Hookka
+     * bedframe list is the measured case: Cody at K/Q/S/SS is 550/425/395/
+     * 407.50 — one batch `price` cannot say that, so every generated SKU came
+     * out wrong-or-zero and was re-keyed by hand in SKU Master. Same contract
+     * as `supplierCodes`: keyed by the RAW variant the caller sent, a variant's
+     * entry wins over the batch `price`, absent falls back. Principal-only in
+     * effect — the 0175/0186 trigger refuses the write for anyone else, and the
+     * modal never renders the boxes for them.
+     *
+     * `pwpPrices` seeds pwp_price the same way. There is deliberately no BATCH
+     * pwp: the measured quotation's Price 1 exists only on some rows and never
+     * repeats across sizes, so a batch default would only invent numbers. */
+    prices: z.record(z.string(), z.number().nonnegative()).optional(),
+    pwpPrices: z.record(z.string(), z.number().nonnegative()).optional(),
   })
   .strict();
 export type GenerateSkusInput = z.infer<typeof generateSkusInput>;
@@ -1361,3 +1394,74 @@ export const catalogOptionPoolPatchInput = z
   })
   .strict();
 export type CatalogOptionPoolPatchInput = z.infer<typeof catalogOptionPoolPatchInput>;
+
+/**
+ * ⭐ CREATING A SUPPLIER — POST /api/operation/suppliers (2026-08-24).
+ *
+ * Until today the portal had NO supplier-creation door at all: not a route,
+ * not a screen. Every supplier in the database was inserted by hand in SQL,
+ * which meant onboarding a factory was an engineering task and a keyer who met
+ * a new one mid-catalog simply stopped.
+ *
+ * Purchasing still OWNS the record; this is a door, not a second home for it
+ * (Architecture Law C). `suppliers_principal_write` (0002) already answers who
+ * may walk through — principal only — so nothing about RLS changes here.
+ *
+ * `slug` is deliberately NOT an input. It is `suppliers_slug_unique` in
+ * production and keys SUPPLIER_SOP across environments (0032), so it is
+ * derived from the name server-side: a keyer who never heard of a slug cannot
+ * mistype one, and two suppliers cannot quietly agree on it.
+ */
+export const supplierCreateInput = z
+  .object({
+    name: z.string().trim().min(2).max(80),
+    kind: z.enum(["own_logistics", "factory_pickup"]),
+    /* The categories this supplier can be auto-resolved for. Empty is legal —
+     * an explicit pick on the SKU still routes to it — so a keyer is never
+     * blocked by a question they cannot answer yet. */
+    catCovered: z.array(productCategorySchema).max(20).default([]),
+    contact: z.string().trim().max(200).optional(),
+    leadTime: z.string().trim().max(60).optional(),
+  })
+  .strict();
+export type SupplierCreateInput = z.infer<typeof supplierCreateInput>;
+
+/** The stable slug for a supplier name: lowercase, punctuation folded to single
+ *  hyphens, ends trimmed. `HoOKkA` → `hookka`, matching the 0032 backfill so a
+ *  supplier created today and one created by that migration read alike. */
+export function supplierSlug(name: string): string {
+  return name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+/**
+ * ⭐ DUAL-SOURCING, THE RECORDING HALF (0388 · YH, 2026-08-26).
+ *
+ * One row per (sku, supplier): that supplier's OWN code and quoted prices for
+ * the piece. The SKU's `supplier_id` slot stays the routing truth for POs —
+ * these are the offers the slot chooses from, so the fact that had nowhere to
+ * live (the second Hookka's paper) is recorded without any behaviour moving.
+ */
+export const skuSupplierOfferSchema = z.object({
+  supplierId: z.string().uuid(),
+  /** Joined for display — the IDENTITY is the id (Law A/D). */
+  supplierName: z.string().nullable(),
+  supplierCode: z.string().nullable(),
+  price: z.number().nullable(),
+  pwpPrice: z.number().nullable(),
+  updatedAt: z.string(),
+});
+export type SkuSupplierOfferDto = z.infer<typeof skuSupplierOfferSchema>;
+
+export const skuSupplierOfferUpsertInput = z
+  .object({
+    supplierId: z.string().uuid(),
+    supplierCode: z.string().trim().max(60).nullable().optional(),
+    price: z.number().nonnegative().nullable().optional(),
+    pwpPrice: z.number().nonnegative().nullable().optional(),
+  })
+  .strict();
+export type SkuSupplierOfferUpsertInput = z.infer<typeof skuSupplierOfferUpsertInput>;
