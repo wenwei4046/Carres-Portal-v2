@@ -1631,6 +1631,28 @@ catalogRouter.get("/skus/:id/supplier-offers", async (c) => {
   return c.json({ offers });
 });
 
+/* The WHOLE offer list in one read — the Supplier Items view joins it against
+   the catalog bundle client-side, exactly as it joins the slot. Without this,
+   an offer was visible only inside its own SKU's strip: Cody quoted by Hookka
+   Industries did not appear under Industries in Supplier Items, which reads
+   as "we never recorded it" — the precise impression 0388 exists to end. */
+catalogRouter.get("/supplier-offers", async (c) => {
+  internalOnly(c);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from("sku_supplier_offers")
+    .select("sku_id, supplier_id, supplier_code");
+  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  return c.json({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    offers: (data ?? []).map((r: any) => ({
+      skuId: r.sku_id as string,
+      supplierId: r.supplier_id as string,
+      supplierCode: (r.supplier_code as string | null) ?? null,
+    })),
+  });
+});
+
 catalogRouter.put("/skus/:id/supplier-offers", async (c) => {
   /* Offers carry PRICES, and price-bearing catalog writes have been principal
      locked since 0175/0186 — the same person who may set a SKU's price may

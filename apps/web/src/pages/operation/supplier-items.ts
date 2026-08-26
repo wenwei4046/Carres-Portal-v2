@@ -12,8 +12,9 @@ import type { SupplierRow } from "@/lib/queries";
  * a write misses one of them (ownership Laws C and D). A join has nothing to
  * keep in step: the catalog IS the list, read a second way.
  *
- * Composed CLIENT-SIDE from bundles both screens already hold — no new API
- * route, no new query, no server work.
+ * Composed CLIENT-SIDE from bundles the screens already hold, plus (0388) the
+ * one-read offers list — an offer is a supplier's item too, or recording it
+ * would change nothing anyone can see here.
  */
 export interface SupplierItemRow {
   /** `${supplierId}:${skuId}` — stable across reorders, unique per row. */
@@ -31,6 +32,11 @@ export interface SupplierItemRow {
    *  no variant axis (accessory / service). */
   ourName: string;
   category: string | null;
+  /** 0388 — HOW this supplier relates to the item. `supplies` = the SKU's
+   *  supplier SLOT (POs route here). `quoted` = an offer on file only. One
+   *  supplier can be both for one SKU; the slot row wins and the offer is not
+   *  printed twice. */
+  source: "supplies" | "quoted";
 }
 
 /**
@@ -46,17 +52,24 @@ export interface SupplierItemRow {
 export function buildSupplierItems(
   catalog: CatalogResponse | undefined,
   suppliers: readonly SupplierRow[] | undefined,
+  /* 0388 — the offers table, joined the same way the slot is. Optional so
+     every existing caller (and a browser against an older Worker) renders
+     exactly what it rendered before: slot rows only. */
+  offers: ReadonlyArray<{ skuId: string; supplierId: string; supplierCode: string | null }> = [],
 ): SupplierItemRow[] {
   if (!catalog || !suppliers?.length) return [];
   const supplierById = new Map(suppliers.map((s) => [s.id, s]));
   const modelById = new Map(catalog.models.map((m) => [m.id, m]));
+  const skuById = new Map(catalog.skus.map((s) => [s.id, s]));
 
   const rows: SupplierItemRow[] = [];
+  const seen = new Set<string>();
   for (const sku of catalog.skus) {
     if (!sku.supplierId) continue;
     const supplier = supplierById.get(sku.supplierId);
     if (!supplier) continue;
     const model = modelById.get(sku.modelId);
+    seen.add(`${supplier.id}:${sku.id}`);
     rows.push({
       key: `${supplier.id}:${sku.id}`,
       supplierId: supplier.id,
@@ -66,6 +79,32 @@ export function buildSupplierItems(
       sku: sku.sku,
       ourName: [model?.name ?? "", sku.variant].filter(Boolean).join(" · "),
       category: model?.category ?? null,
+      source: "supplies",
+    });
+  }
+  /* An offer is this supplier's item too — that is the whole point of
+     recording it. The SAME data-fault stance as the slot: an offer pointing at
+     a SKU or supplier the bundles do not hold is DROPPED, not rendered blank.
+     Where one supplier is both slot and offer for one SKU, the slot row wins
+     and the pair prints once. */
+  for (const offer of offers) {
+    const pair = `${offer.supplierId}:${offer.skuId}`;
+    if (seen.has(pair)) continue;
+    const supplier = supplierById.get(offer.supplierId);
+    const sku = skuById.get(offer.skuId);
+    if (!supplier || !sku) continue;
+    seen.add(pair);
+    const model = modelById.get(sku.modelId);
+    rows.push({
+      key: pair,
+      supplierId: supplier.id,
+      supplierName: supplier.name,
+      supplierCode: offer.supplierCode,
+      description: sku.description ?? null,
+      sku: sku.sku,
+      ourName: [model?.name ?? "", sku.variant].filter(Boolean).join(" · "),
+      category: model?.category ?? null,
+      source: "quoted",
     });
   }
   /* Supplier first, then OUR code — the order someone reads a quotation in:
