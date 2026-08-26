@@ -366,3 +366,74 @@ describe("supplier offers strip (0388)", () => {
     expect(mockPatchMutate).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * ⭐ A CODE-TYPO FIX MUST NOT WIPE THE PRICE (YH, 2026-08-26).
+ *
+ * A re-save writes the WHOLE offer, so correcting a supplier code with blank
+ * price boxes silently erased the recorded price — blank meant "erase" while
+ * reading as "keep". Picking a supplier who already has an offer now loads
+ * that offer into the boxes, and the save writes back exactly what is shown.
+ */
+describe("offers strip — editing an existing offer starts from what is on file", () => {
+  beforeEach(() => {
+    mockRole = "principal";
+    mockUpsertOffer.mockReset();
+    mockOffers = [
+      {
+        supplierId: "00000000-0000-4000-8000-0000000000a1",
+        supplierName: "Hookka",
+        supplierCode: "1007-(K)",
+        price: 550,
+        pwpPrice: 495,
+        updatedAt: "2026-08-26T00:00:00Z",
+      },
+    ];
+  });
+
+  it("⭐ prefills code, price and PWP when that supplier is picked", () => {
+    render(<OperationSkuCostTab catalog={makeCatalog([SKU_COST_SET])} />);
+    fireEvent.click(screen.getByTestId("opcost-offers-toggle-CLOUD-KING"));
+    fireEvent.change(screen.getByTestId("opcost-offer-supplier-CLOUD-KING"), {
+      target: { value: "00000000-0000-4000-8000-0000000000a1" },
+    });
+    expect((screen.getByTestId("opcost-offer-code-CLOUD-KING") as HTMLInputElement).value).toBe(
+      "1007-(K)",
+    );
+    expect((screen.getByTestId("opcost-offer-price-CLOUD-KING") as HTMLInputElement).value).toBe(
+      "550",
+    );
+    expect((screen.getByTestId("opcost-offer-pwp-CLOUD-KING") as HTMLInputElement).value).toBe(
+      "495",
+    );
+  });
+
+  it("⭐ fixing only the code keeps the recorded prices", () => {
+    render(<OperationSkuCostTab catalog={makeCatalog([SKU_COST_SET])} />);
+    fireEvent.click(screen.getByTestId("opcost-offers-toggle-CLOUD-KING"));
+    fireEvent.change(screen.getByTestId("opcost-offer-supplier-CLOUD-KING"), {
+      target: { value: "00000000-0000-4000-8000-0000000000a1" },
+    });
+    fireEvent.change(screen.getByTestId("opcost-offer-code-CLOUD-KING"), {
+      target: { value: "1007-(Q)" },
+    });
+    fireEvent.click(screen.getByTestId("opcost-offer-save-CLOUD-KING"));
+    expect(mockUpsertOffer).toHaveBeenCalledWith(
+      expect.objectContaining({ supplierCode: "1007-(Q)", price: 550, pwpPrice: 495 }),
+      expect.anything(),
+    );
+  });
+
+  it("clears the boxes when switching to a supplier with no offer yet", () => {
+    render(<OperationSkuCostTab catalog={makeCatalog([SKU_COST_SET])} />);
+    fireEvent.click(screen.getByTestId("opcost-offers-toggle-CLOUD-KING"));
+    const pick = screen.getByTestId("opcost-offer-supplier-CLOUD-KING");
+    fireEvent.change(pick, { target: { value: "00000000-0000-4000-8000-0000000000a1" } });
+    fireEvent.change(pick, { target: { value: "" } });
+    // A stale prefill travelling to a DIFFERENT supplier would write Hookka's
+    // numbers onto someone else's offer.
+    expect((screen.getByTestId("opcost-offer-price-CLOUD-KING") as HTMLInputElement).value).toBe(
+      "",
+    );
+  });
+});
