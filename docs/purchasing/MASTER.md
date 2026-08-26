@@ -565,7 +565,74 @@ cover changes who sees today's work while preserving normal owner and cover evid
 ### 9.1 SO Batch Purchase
 
 **Purpose / source:** system-generated uncovered SO lines only; no `+ New`.
-**Left rail:** `Ready to buy`, `Customer date missing`, `SKU missing`, `Supplier missing`, `Production days missing`, `Covered — no purchase`.
+
+**Left rail — APPROVED / LOCKED, owner correction 2026-08-26.** The rail shows only unissued
+buying demand, order timing, remaining Safety days and the one Purchasing-owned setup exception:
+
+```text
+TO ORDER
+  All not ordered
+
+ORDER TIMING
+  Can order early
+  14 safety days left
+  1–13 safety days left
+  No safety days left
+  Not enough production time
+
+SETUP TO FIX              ← the whole section renders only when its count is above zero
+  Production time not set
+```
+
+- Counts are uncovered SO buying lines, never documents or notifications. A zero count prints no
+  number. Rows use the governed `NavRow` active treatment; every filter toggles and clears
+  completely under the shared local-rail law.
+- Every timing row remains orderable. `Can order early`, `1–13 safety days left`,
+  `No safety days left` and `Not enough production time` express timing risk, never `Cannot buy`.
+  Order By is a planned date, never an unlock date.
+- `Production time not set` is the only normal setup blocker on this surface. It belongs to
+  Purchasing Settings, and its lines are not selectable until the Supplier × Category production
+  time exists.
+- Fully covered / `Buy = 0` lines do not remain in SO Batch Purchase; they are found through
+  Purchase Orders, Stock and Order Route. After a PO is issued, its covered quantity leaves this
+  page; if the PO is cancelled and the quantity is still required, the demand returns
+  automatically.
+- A line whose customer date, SKU or supplier is unexpectedly missing fails safely at its owning
+  boundary (Sales / Catalog). It is named on its own row; it never becomes a permanent Purchasing
+  rail facet and is never silently defaulted.
+- Every category derives from the one server planning engine. There is no second stored status.
+- Retired rail words, never to return on this surface: `Ready to buy` · `Covered` ·
+  `No customer date` · `No SKU` · `No supplier` · `No production days` · `BUYING RECORDS` ·
+  `WORK TO DO` · `All lines` · `No buying needed` · `Cannot buy` — alongside the standing bans
+  `Today` · `Tomorrow` · `Overdue` · `Follow Up` · `Needs Attention` · `Priority` · `Pending` ·
+  `Waiting` · `Next Action` · `Buffer`.
+
+**Safety days — APPROVED 2026-08-26.** The visible term is `Safety days`; `buffer` never reaches
+a screen. `Safety days = 14 working days` on the governed Office working calendar and holidays;
+`Production working days` is the existing Supplier × Category setting on the supplier's configured
+work week and holidays. The one server planning engine owns the arithmetic — browser code performs
+no working-day arithmetic, and Safety days are subtracted exactly once:
+
+```text
+Customer Delivery − 14 Safety days                             = Goods Must Arrive
+Goods Must Arrive − Supplier × Category production working days = Order By
+```
+
+Timing classification, derived by the same engine:
+
+```text
+today < Order By                                                   → Can order early
+today = Order By                                                   → 14 safety days left
+today > Order By · completion lands 1–13 working days early        → 1–13 safety days left
+expected production completion = Customer Delivery                 → No safety days left
+expected production completion > Customer Delivery                 → Not enough production time
+```
+
+`Order By` stays fixed for a demand unless an authoritative source fact changes; `Safety days
+left` changes as working days pass. The Settings row reads
+`Safety days · 14 working days` with the line `Extra time allowed for delays.` — the one existing
+governed setting and engine field, never a second Safety-days field or arithmetic.
+
 **Columns:** Source SO, Required For, SKU/configuration, Required, Stock, Open PO, Buy, Supplier,
 Deliver To, Goods Must Arrive, Work.
 **Journey:** choose ready lines → group by supplier → change/split destination if exceptional →

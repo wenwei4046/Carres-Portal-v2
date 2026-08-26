@@ -154,7 +154,7 @@ automatically to the next working day OF ITS OWN CALENDAR.
 
 **An action that does not name its calendar is not finished.** Two examples of why, both
 real: a supplier's own production week is neither of the three (docs/purchasing/MASTER.md); and the
-purchasing engine's arrival buffer has always counted on Monday–Friday, which looked like a
+purchasing engine's Safety days have always counted on Monday–Friday, which looked like a
 hard-coded contradiction of the old one-definition rule and is in fact the **Office
 Calendar**, correct all along.
 
