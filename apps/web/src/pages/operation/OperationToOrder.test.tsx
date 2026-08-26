@@ -44,7 +44,7 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 function payload(over: Partial<SoBatchPurchaseResponse> = {}): SoBatchPurchaseResponse {
   const base = {
     id: "build::o1::b1",
-    state: "ready_to_buy" as const,
+    state: "can_order_early" as const,
     lineIds: ["l1"],
     orderId: "o1",
     so: 1318,
@@ -94,6 +94,7 @@ function payload(over: Partial<SoBatchPurchaseResponse> = {}): SoBatchPurchaseRe
     actingPoDuty: null,
     mayIssue: true,
     procurementPartners: [{ id: "p-nets", name: "NETS" }],
+    safetyDays: 14,
     ...over,
   };
 }
@@ -129,15 +130,17 @@ describe("the page reads the ONE projection and draws the Register", () => {
     expect(apiFetch.mock.calls[0]![0]).toBe("/api/operation/purchase/demands");
   });
 
-  it("opens straight onto the header, the six-state rail and the Register", async () => {
+  it("opens straight onto the header, the order-timing rail and the Register", async () => {
     apiFetch.mockResolvedValue(payload());
     renderPage();
     await screen.findByTestId("so-batch-page");
     expect(screen.getByTestId("purchasing-tabs")).toHaveTextContent("SO Batch Purchase");
-    expect(screen.getByTestId("so-batch-rail")).toBeInTheDocument();
-    expect(
-      screen.getByTestId("so-batch-rail").querySelectorAll("[data-testid^='so-batch-state-']"),
-    ).toHaveLength(6);
+    const rail = screen.getByTestId("so-batch-rail");
+    expect(rail).toBeInTheDocument();
+    expect(rail.querySelector("[data-testid='so-batch-all-not-ordered']")).not.toBeNull();
+    // The five timing rows; `SETUP TO FIX` hides while its count is zero.
+    expect(rail.querySelectorAll("[data-testid^='so-batch-state-']")).toHaveLength(5);
+    expect(rail.textContent).not.toContain("SETUP TO FIX");
     expect(await screen.findByTestId("so-batch-row-build::o1::b1")).toBeInTheDocument();
   });
 

@@ -1,7 +1,9 @@
 import { Hono } from "hono";
 import {
+  myHolidaySet,
+  purchaseDemandBlockerOf,
   purchaseDemandQuantities,
-  purchaseDemandStateOf,
+  purchaseDemandTimingOf,
   soBatchAction,
   PURCHASE_DEMAND_OWNER_DUTY,
   type ProductCategory,
@@ -62,7 +64,11 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
 
   const res = await loadToOrder(sb);
   if (!res.ok) return c.json(res.body as Record<string, unknown>, res.status as 400);
-  const { proposals, registerFacts, supplierNames, supplierKinds, catalog, today } = res.data;
+  const { proposals, registerFacts, supplierNames, supplierKinds, catalog, today, settings } =
+    res.data;
+  /* The SAME holiday set the engine planned with — the classification only
+     compares the engine's dates, it never re-plans them. */
+  const holidays = myHolidaySet();
 
   /**
    * The two owner facts, read here because they are Register-only.
@@ -148,19 +154,37 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
       // guard costs nothing and keeps the boundary explicit.
       if (row.readyStock) continue;
       for (const build of row.builds) {
+        /* A FULLY COVERED build does not remain in SO Batch Purchase (Card
+           02-A §3): it is found through Purchase Orders, Stock and Order
+           Route. The engine reads `status = 'open'` and nothing else, so the
+           moment that purchase order is cancelled the coverage falls away and
+           the demand returns here by recomputation — nothing is stored. */
+        if (build.fullyOnPo === true) continue;
         const q = purchaseDemandQuantities(build, proposal.category);
         /* THE ENGINE'S OWN ARRIVAL DATE. `stockReady` IS `arriveBy` — the day
            the goods must be at Carres for this customer promise to hold. */
         const goodsMustArrive = row.stockReady;
-        const state = purchaseDemandStateOf({
-          inCatalog: true,
-          hasSupplier: true,
-          // A pair with no production days never reaches a proposal — the read
-          // refuses it line by line and records it in `registerFacts` below.
-          hasProductionDays: true,
-          fullyCovered: build.fullyOnPo === true,
-          hasCustomerDate: row.delivery != null,
-        });
+        /* A carried build has its SKU, supplier and production days by
+           construction — the read refuses the others line by line into
+           `registerFacts` below. The one blocker it can still carry is the
+           missing customer date. */
+        const state: PurchaseDemandState =
+          row.delivery == null
+            ? "no_customer_date"
+            : build.readyIfOrderedToday != null
+              ? purchaseDemandTimingOf({
+                  today,
+                  orderBy: build.orderBy ?? null,
+                  readyIfOrderedToday: build.readyIfOrderedToday,
+                  customerDelivery: row.delivery,
+                  safetyDays: settings.orderByBufferDays,
+                  holidays,
+                })
+              : /* The engine planned this build but gave it no dates — a pair
+                   whose production facts went missing mid-read. Fail safely at
+                   the Purchasing-owned boundary: `SETUP TO FIX` names it, and
+                   nothing silently defaults an order timing. */
+                "no_production_days";
         const fact = orderFact(row.orderId);
         rows.push({
           id: `build::${row.orderId}::${build.key}`,
@@ -225,15 +249,21 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
 
   /* ── 2 · the demand the engine REFUSED ──────────────────────────────────── */
   for (const line of registerFacts.lines) {
+    /* A line fully covered from ready stock has `Buy = 0`, and `Buy = 0`
+       lines do not remain in SO Batch Purchase (Card 02-A §3). */
+    if (line.refusal === "covered_by_stock") continue;
     const fact = orderFact(line.orderId);
-    const state = purchaseDemandStateOf({
-      inCatalog: line.refusal !== "no_sku",
-      hasSupplier: line.refusal !== "no_supplier",
-      hasProductionDays: line.refusal !== "no_production_days",
-      fullyCovered: line.refusal === "covered_by_stock",
-      hasCustomerDate: fact.delivery != null,
-    });
-    const covered = line.refusal === "covered_by_stock";
+    const state =
+      purchaseDemandBlockerOf({
+        inCatalog: line.refusal !== "no_sku",
+        hasSupplier: line.refusal !== "no_supplier",
+        hasProductionDays: line.refusal !== "no_production_days",
+        hasCustomerDate: fact.delivery != null,
+      }) ??
+      /* The engine refused the line, so a blocker must exist; if the refusal
+         reason is one this projection does not know, fail safely at the
+         Purchasing-owned boundary rather than inventing an order timing. */
+      "no_production_days";
     rows.push({
       id: `line::${line.lineId}`,
       state,
@@ -249,13 +279,13 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
       supplierId: line.supplierId,
       supplier: line.supplierId ? (supplierNames.get(line.supplierId) ?? null) : null,
       qtyNeeded: line.qty,
-      // Covered by an already-drawn unit IS a counted answer; the three
-      // refusals are not — see this file's header.
-      readyStock: covered ? 0 : null,
-      takenFromStock: covered ? line.takenFromStock : null,
-      onPo: covered ? 0 : null,
+      // A refusal blocks the allocation too, so there is no coverage answer —
+      // see this file's header.
+      readyStock: null,
+      takenFromStock: null,
+      onPo: null,
       poNumbers: [],
-      toBuy: covered ? 0 : null,
+      toBuy: null,
       /* The engine refused this line, so there is no build and no plan — and
          therefore no arrival date and nothing to issue. Inventing either would
          offer an act that cannot succeed. */
@@ -342,6 +372,9 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
        the act and a principal who holds neither role is not. */
     mayIssue: actorId != null && actorId === me,
     procurementPartners,
+    /* Card 02-A — the governed Safety days value, so the rail words follow
+       the one setting. The browser prints it; the arithmetic stayed here. */
+    safetyDays: settings.orderByBufferDays,
   };
   return c.json(body);
 });

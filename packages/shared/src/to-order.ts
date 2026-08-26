@@ -1220,6 +1220,16 @@ export interface ToOrderBuild {
    * joins the pool. Nothing is lost when it moves; the allocation moved.
    */
   fullyOnPo?: boolean;
+  /**
+   * Card 02-A — the engine's own timing facts, off the SAME bundle that
+   * produced this build's `arriveBy`. `orderBy` is the bundle's `raiseBy` (a
+   * bed set gates on its earlier leg on purpose) and `readyIfOrderedToday` is
+   * the bundle's `promiseIfOrderedToday` (the set is done when its last member
+   * is). They are CARRIED so the SO Batch rail can classify order timing
+   * without a second working-day arithmetic anywhere.
+   */
+  orderBy?: IsoDate | null;
+  readyIfOrderedToday?: IsoDate | null;
 }
 
 export interface ToOrderRow {
@@ -1758,6 +1768,10 @@ export function buildToOrder(input: BuildToOrderInput): ToOrderProposal[] {
           coveredByOpenPoPos: namePos(
             members.flatMap((m) => poRefsByLine.get(m.lineId) ?? []),
           ),
+          // Card 02-A — the bundle's own dates, never recomputed here.
+          orderBy: bundleByLine.get(members[0]!.lineId)?.raiseBy ?? null,
+          readyIfOrderedToday:
+            bundleByLine.get(members[0]!.lineId)?.promiseIfOrderedToday ?? null,
         });
       }
 
