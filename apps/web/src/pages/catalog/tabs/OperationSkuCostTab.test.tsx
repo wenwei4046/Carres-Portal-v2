@@ -105,17 +105,82 @@ beforeEach(() => {
 });
 
 describe("OperationSkuCostTab — costing view", () => {
-  it("renders the COST column and never the selling price / PWP / margin", () => {
+  /* ⭐ THIS TEST WAS INVERTED, NOT DELETED — owner ruling 2026-08-26 (Jess).
+     It used to assert the opposite: "renders the COST column and NEVER the
+     selling price / PWP / margin". That pinned a real ruling — the two catalog
+     doors were deliberately different surfaces, structure on one, costing on
+     the other. Jess ended that: *"the 2 catalogues should align"*, and on
+     price specifically: *"it makes sense to let them see and not change it,
+     cuz it avoids data pollution"*.
+
+     So the assertion moves from "the number is absent" to "the number is
+     there and the CELL DOES NOT OPEN", which is the thing that actually
+     protects the price — and the thing the server enforces anyway. The
+     read-only half is asserted in its own test below. */
+  it("shows cost AND the selling price, PWP and margin on one row", () => {
     render(<OperationSkuCostTab catalog={makeCatalog([SKU_COST_SET, SKU_COST_NULL])} />);
-    expect(screen.getByText("Cost")).toBeInTheDocument();
-    expect(screen.queryByText("PWP Price")).not.toBeInTheDocument();
-    expect(screen.queryByText("Margin")).not.toBeInTheDocument();
-    // Cost value renders; the SELLING price (3500 / 4200) never appears.
+    for (const header of ["Cost", "Price", "PWP Price", "Margin"]) {
+      expect(screen.getByText(header)).toBeInTheDocument();
+    }
     expect(screen.getByTestId("opcost-cost-CLOUD-KING").textContent).toContain("2,100.00");
-    expect(screen.queryByText(/3,500/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/4,200/)).not.toBeInTheDocument();
-    // Null cost → muted "not set".
+    expect(screen.getByTestId("opcost-price-CLOUD-KING").textContent).toContain("3,500.00");
+    // Null cost → muted "not set", and margin cannot be computed from it.
     expect(screen.getByTestId("opcost-cost-LUNA-3S").textContent).toContain("not set");
+    expect(screen.getByTestId("opcost-margin-LUNA-3S").textContent).toContain("—");
+    // 3500 − 2100 = 1400 → 40%. Derived, never stored (Law D).
+    expect(screen.getByTestId("opcost-margin-CLOUD-KING").textContent).toContain("40%");
+  });
+
+  it("⭐ never opens the price cell for a non-principal, even in edit mode", () => {
+    /* The whole of Jess's "see and not change it". The API refuses the write
+       either way (`gateSkuPatchPriceCost`) and a DB trigger refuses it under
+       that — this asserts the UI does not offer a door the server will slam. */
+    mockRole = "operation";
+    render(<OperationSkuCostTab catalog={makeCatalog([SKU_COST_SET])} />);
+    fireEvent.click(screen.getByTestId("opcost-edit-costs"));
+    /* COST still opens — 0226 gave operation that standing, and this ruling
+       did not take it away. */
+    expect(screen.getByLabelText("CLOUD-KING cost")).toBeInTheDocument();
+    expect(screen.queryByLabelText("CLOUD-KING price")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("CLOUD-KING PWP price")).not.toBeInTheDocument();
+    /* …and the number is still READ, which is the half Jess asked for. */
+    expect(screen.getByTestId("opcost-price-CLOUD-KING").textContent).toContain("3,500.00");
+    expect(screen.getByTestId("opcost-price-lock-hint")).toBeInTheDocument();
+    mockRole = "principal";
+  });
+
+  it("opens the price and PWP cells for the principal", () => {
+    render(<OperationSkuCostTab catalog={makeCatalog([SKU_COST_SET])} />);
+    fireEvent.click(screen.getByTestId("opcost-edit-costs"));
+    const price = screen.getByLabelText("CLOUD-KING price");
+    fireEvent.change(price, { target: { value: "3600" } });
+    fireEvent.blur(price);
+    expect(mockPatchMutate.mock.calls[0][0]).toEqual({ id: "s1", patch: { price: 3600 } });
+    const pwp = screen.getByLabelText("CLOUD-KING PWP price");
+    fireEvent.change(pwp, { target: { value: "3150" } });
+    fireEvent.blur(pwp);
+    expect(mockPatchMutate.mock.calls[1][0]).toEqual({ id: "s1", patch: { pwpPrice: 3150 } });
+    /* Blanking a PWP that is ALREADY unset writes nothing — ≤0 and null both
+       mean NOT SET (0186), so there is no change to record. */
+    fireEvent.change(pwp, { target: { value: "" } });
+    fireEvent.blur(pwp);
+    expect(mockPatchMutate).toHaveBeenCalledTimes(2);
+    expect(screen.queryByTestId("opcost-price-lock-hint")).not.toBeInTheDocument();
+  });
+
+  /* ⭐ Jess's literal ask: "if it available [at the admin catalog] to add stuff
+     into catalog then it should be doable from operations' side catalog as
+     well". The doors are the same components, so a file exported here imports
+     through the admin dialog and vice versa. */
+  it("carries the same add / import / export doors as the admin catalog", () => {
+    render(<OperationSkuCostTab catalog={makeCatalog([SKU_COST_SET])} />);
+    expect(screen.getByTestId("opcost-new-sku").textContent).toContain("New SKU");
+    expect(screen.getByTestId("opcost-import")).toBeInTheDocument();
+    expect(screen.getByTestId("opcost-export")).toBeInTheDocument();
+    expect(screen.getByTestId("opcost-supplier-filter")).toBeInTheDocument();
+    /* 🟡 Bulk delete is the ONE gap left open on purpose — destroying catalog
+       rows was never asked for by name, and "align" is not a yes to it. */
+    expect(screen.queryByTestId("opcost-bulk-delete")).not.toBeInTheDocument();
   });
 
   it("Edit Costs → inline input commits { cost } via usePatchCatalogSku", () => {
