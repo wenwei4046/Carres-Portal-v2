@@ -303,6 +303,46 @@ else is a consequence of it.**
 
 **LINKS TO** — Purchasing (which factory makes this), Stock (what is on the shelf).
 
+### THE TWO CATALOG DOORS SHOW THE SAME CATALOG — OWNER RULING 2026-08-26 (Jess)
+
+The catalog is reachable through two destinations: **Product & Maintenance** (Admin) and
+**Catalog** (Operations). They had grown into two different surfaces — selling price, margin,
+import/export and `+ New SKU` on one; cost and supplier on the other — and neither could see what
+the other did. Jess ruled that off:
+
+> *"if it available [at the admin catalog] to add stuff into catalog then it should be doable from
+> operations' side catalog as well — the 2 catalogues should align"*
+
+**The split had no authority behind it.** It was never written in any governing document: it lived
+in a source comment and an archived worklog, and `docs/archive/` is not read as authority (Law 1).
+The architecture above says the opposite in its first line — a SKU's **cost and its price** belong
+to ONE owner — and the approved Shell IA names **one** `Catalog` destination under `MASTER DATA`.
+
+**What aligns, and what does not.** Both doors show the same columns and offer the same doors
+(`+ New SKU`, Import, Export, supplier filter). What differs is who may WRITE, and that is not a
+second policy invented in the UI — **the screen mirrors the API gate exactly**, so no cell offers
+an edit the server would refuse:
+
+```
+price · pwpPrice · pricesBySize    principal ONLY   (0175 + enforce_sku_price_cost_principal_only)
+cost                              operation OR principal (0226)
+supplier · supplier code · rest   any internal user
+```
+
+**Operation SEES the selling price and cannot change it** — Jess, 2026-08-26: *"it makes sense to
+let them see and not change it, cuz it avoids data pollution"*. A read-only number answers the
+question that was previously asked across the room; it cannot be typed into the customer's price.
+
+🟡 **Bulk delete is the one gap deliberately left open.** Every other difference Jess named is
+closed, but permanently destroying catalog rows was never asked for by name, and *align* is not a
+yes to it. It needs its own ruling.
+
+🟡 **Once aligned, the two doors show the same page.** That is the honest consequence, and it makes
+the follow-up question concrete rather than theoretical: whether Carres wants one Catalog
+destination (as the Shell IA already says) or two doors into one surface. **Supplier Items** is a
+third, different thing and is NOT a catalog door — it is a read-only report answering *"what does
+each supplier call the things they sell us?"*, derived from the catalog and never editing it.
+
 > ### 🔴 THE MEASURED FAILURE THIS FIXES
 > Today three functions answer *"what kind of product is this?"* — `product_models.category`
 > (the catalog, correct), `lineCategory()` (a keyword regex, partly correct) and
