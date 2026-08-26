@@ -295,7 +295,7 @@ export default function OperationPurchasingSettings({
       <div className="px-9 py-8 pb-14 overflow-auto" data-testid="purchasing-settings">
         <div className="text-body text-base-600 mb-[18px] max-w-[720px]">
           The numbers the ordering engine reads. Change one here and the
-          order-by date on To Order moves the same day.
+          order timing on SO Batch Purchase moves the same day.
           {!canEdit && " Manager only — read-only for your role."}
         </div>
 
@@ -483,15 +483,15 @@ export default function OperationPurchasingSettings({
           </h2>
           <div className="bg-white border border-base-200 rounded-[10px] px-4">
             <NumberRow
-              label="Order-by buffer"
-              hint="Days kept back after the goods arrive, for arranging the delivery."
+              label="Safety days"
+              hint="Extra time allowed for delays."
               unit="working days"
               value={data.orderByBufferDays}
               min={PURCHASING_NUMBER_RANGE.order_by_buffer_days.min}
               max={PURCHASING_NUMBER_RANGE.order_by_buffer_days.max}
               canEdit={canEdit}
               pending={setNumber.isPending}
-              testId="order-by-buffer"
+              testId="safety-days"
               onSave={(n) => saveNumber("order_by_buffer_days", n)}
             >
               <ChangeLine settings={data} settingKey="order_by_buffer_days" />

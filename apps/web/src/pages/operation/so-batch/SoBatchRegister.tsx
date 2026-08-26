@@ -1,11 +1,11 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  PURCHASE_DEMAND_RAIL_WORDS,
-  PURCHASE_DEMAND_STATE_WORDS,
   SO_BATCH_PURCHASE_WORDS as W,
-  SO_BATCH_RAIL_GROUPS,
+  SO_BATCH_RAIL,
   defaultAllocations,
+  purchaseDemandRailWords,
+  purchaseDemandStateWords,
   filterPurchaseDemands,
   isSelectableForBuying,
   purchaseDemandStateCounts,
@@ -105,6 +105,24 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
       return next;
     });
   }, []);
+  /* THE WORDS FOLLOW THE GOVERNED SETTING. The safety-band labels carry the
+     number (`14 safety days left`), so they are composed from the server's own
+     `safetyDays` — never a hard-coded 14 (Card 02-A §4). */
+  const stateWords = useMemo(() => purchaseDemandStateWords(data.safetyDays), [data.safetyDays]);
+  const railWords = useMemo(() => purchaseDemandRailWords(data.safetyDays), [data.safetyDays]);
+  /* `SETUP TO FIX` renders only while its count is above zero. When the last
+     such line is fixed, its filter must not survive as an invisible narrowing
+     the operator can no longer see or clear. */
+  const setupCount = counts.no_production_days;
+  useEffect(() => {
+    if (setupCount > 0) return;
+    setStates((prev) => {
+      if (!prev.has("no_production_days")) return prev;
+      const next = new Set(prev);
+      next.delete("no_production_days");
+      return next;
+    });
+  }, [setupCount]);
 
   /* ── The arrangement ──────────────────────────────────────────────────────
    *
@@ -389,7 +407,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
           const owner = r.action.ownerName;
           return (
             <span className="flex flex-col leading-tight" data-testid={`so-batch-work-${r.id}`}>
-              <span className="truncate">{PURCHASE_DEMAND_STATE_WORDS[r.state]}</span>
+              <span className="truncate">{stateWords[r.state]}</span>
               <span className="flex items-center gap-1.5">
                 {owner ? (
                   <span
@@ -417,11 +435,11 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
             </span>
           );
         },
-        filterValue: (r) => PURCHASE_DEMAND_STATE_WORDS[r.state],
+        filterValue: (r) => stateWords[r.state],
         exportValue: (r) => r.action?.action ?? "",
       },
     ],
-    [data.destinations, data.defaultDestinationId, live, changeWholeRow, setRowAllocations, destinationName],
+    [data.destinations, data.defaultDestinationId, live, changeWholeRow, setRowAllocations, destinationName, stateWords],
   );
 
   /* ── The inspector ────────────────────────────────────────────────────── */
@@ -542,23 +560,50 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
           className="flex w-[200px] min-h-0 shrink-0 flex-col gap-4 overflow-y-auto border-r border-kit-slate-5 bg-white px-3 py-3"
           data-testid="so-batch-rail"
         >
-          {SO_BATCH_RAIL_GROUPS.map((group) => (
-            <RailGroup key={group.heading} title={group.heading}>
-              {group.states.map((s) => (
+          <RailGroup title={SO_BATCH_RAIL.toOrder.heading}>
+            {/* The whole unissued listing — selecting it CLEARS every facet,
+                which is the shared local-rail law's `All` behaviour. */}
+            <RailItem
+              active={states.size === 0}
+              onClick={() => setStates(new Set())}
+              testId="so-batch-all-not-ordered"
+              label={SO_BATCH_RAIL.toOrder.all}
+              count={rows.length > 0 ? rows.length : undefined}
+              title={`${rows.length} ${W.footerUnit}`}
+            />
+          </RailGroup>
+          <RailGroup title={SO_BATCH_RAIL.timing.heading}>
+            {SO_BATCH_RAIL.timing.states.map((s) => (
+              <RailItem
+                key={s}
+                active={states.has(s)}
+                onClick={() => toggleState(s)}
+                testId={`so-batch-state-${s}`}
+                label={railWords[s] ?? ""}
+                /* A zero prints nothing: an absent queue and an empty one
+                   read the same to an operator, and only one is news. */
+                count={counts[s] > 0 ? counts[s] : undefined}
+                title={`${counts[s]} ${W.footerUnit} · ${stateWords[s]}`}
+              />
+            ))}
+          </RailGroup>
+          {/* The one Purchasing-owned setup exception, and only while it
+              exists — an empty exception section is noise wearing a heading. */}
+          {setupCount > 0 && (
+            <RailGroup title={SO_BATCH_RAIL.setup.heading}>
+              {SO_BATCH_RAIL.setup.states.map((s) => (
                 <RailItem
                   key={s}
                   active={states.has(s)}
                   onClick={() => toggleState(s)}
                   testId={`so-batch-state-${s}`}
-                  label={PURCHASE_DEMAND_RAIL_WORDS[s]}
-                  /* A zero prints nothing: an absent queue and an empty one
-                     read the same to an operator, and only one is news. */
+                  label={railWords[s] ?? ""}
                   count={counts[s] > 0 ? counts[s] : undefined}
-                  title={`${counts[s]} ${W.footerUnit} · ${PURCHASE_DEMAND_STATE_WORDS[s]}`}
+                  title={`${counts[s]} ${W.footerUnit} · ${stateWords[s]}`}
                 />
               ))}
             </RailGroup>
-          ))}
+          )}
         </aside>
 
         <div className="flex min-w-0 flex-1 flex-col p-2">

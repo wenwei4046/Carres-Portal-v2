@@ -1,17 +1,20 @@
 import { describe, it, expect } from "vitest";
 import {
   PURCHASE_DEMAND_STATES,
-  PURCHASE_DEMAND_STATE_WORDS,
-  PURCHASE_DEMAND_RAIL_WORDS,
+  PURCHASE_DEMAND_TIMING_STATES,
   PURCHASE_DEMAND_WORDS,
   filterPurchaseDemands,
   groupPurchaseDemands,
+  isPurchaseDemandTimingState,
+  purchaseDemandBlockerOf,
   purchaseDemandCoverageLine,
   purchaseDemandFooter,
   purchaseDemandHelpLine,
   purchaseDemandQuantities,
+  purchaseDemandRailWords,
   purchaseDemandStateCounts,
-  purchaseDemandStateOf,
+  purchaseDemandStateWords,
+  purchaseDemandTimingOf,
   purchaseDemandsResponseSchema,
   soBatchAction,
   soBatchPurchaseResponseSchema,
@@ -22,7 +25,7 @@ import {
 function row(over: Partial<PurchaseDemandRow> = {}): PurchaseDemandRow {
   return {
     id: "r1",
-    state: "ready_to_buy",
+    state: "can_order_early",
     lineIds: ["l1"],
     orderId: "o1",
     so: 1207,
@@ -51,33 +54,31 @@ function row(over: Partial<PurchaseDemandRow> = {}): PurchaseDemandRow {
   };
 }
 
-describe("purchaseDemandStateOf — one derivation, engine precedence", () => {
+describe("purchaseDemandBlockerOf — one derivation, engine precedence", () => {
   const base = {
     inCatalog: true,
     hasSupplier: true,
     hasProductionDays: true,
-    fullyCovered: false,
     hasCustomerDate: true,
   };
 
-  it("names every one of the six states", () => {
-    expect(purchaseDemandStateOf(base)).toBe("ready_to_buy");
-    expect(purchaseDemandStateOf({ ...base, hasCustomerDate: false })).toBe(
+  it("names every blocker, and an unblocked line has none", () => {
+    expect(purchaseDemandBlockerOf(base)).toBeNull();
+    expect(purchaseDemandBlockerOf({ ...base, hasCustomerDate: false })).toBe(
       "no_customer_date",
     );
-    expect(purchaseDemandStateOf({ ...base, inCatalog: false })).toBe("no_sku");
-    expect(purchaseDemandStateOf({ ...base, hasSupplier: false })).toBe("no_supplier");
-    expect(purchaseDemandStateOf({ ...base, hasProductionDays: false })).toBe(
+    expect(purchaseDemandBlockerOf({ ...base, inCatalog: false })).toBe("no_sku");
+    expect(purchaseDemandBlockerOf({ ...base, hasSupplier: false })).toBe("no_supplier");
+    expect(purchaseDemandBlockerOf({ ...base, hasProductionDays: false })).toBe(
       "no_production_days",
     );
-    expect(purchaseDemandStateOf({ ...base, fullyCovered: true })).toBe("covered");
   });
 
   it("a SKU absent from Catalog is `SKU not found`, never silently Service", () => {
     // Catalog is the only authority able to decide what a sold SKU is, so an
     // absent one is NAMED rather than assumed away (card §3).
     expect(
-      purchaseDemandStateOf({
+      purchaseDemandBlockerOf({
         ...base,
         inCatalog: false,
         hasSupplier: false,
@@ -86,32 +87,198 @@ describe("purchaseDemandStateOf — one derivation, engine precedence", () => {
     ).toBe("no_sku");
   });
 
-  it("covered outranks a missing customer date — nothing is left to buy", () => {
-    expect(
-      purchaseDemandStateOf({ ...base, fullyCovered: true, hasCustomerDate: false }),
-    ).toBe("covered");
-  });
-
   it("a supplier-less line never hides behind a missing date", () => {
     expect(
-      purchaseDemandStateOf({ ...base, hasSupplier: false, hasCustomerDate: false }),
+      purchaseDemandBlockerOf({ ...base, hasSupplier: false, hasCustomerDate: false }),
     ).toBe("no_supplier");
   });
+});
 
-  it("every state has a fact word and a rail word", () => {
+describe("purchaseDemandTimingOf — the engine's dates, the card's classification", () => {
+  const none: ReadonlySet<string> = new Set();
+  const base = {
+    today: "2026-09-02",
+    orderBy: "2026-09-01",
+    safetyDays: 14,
+    holidays: none,
+  };
+
+  it("today before Order By is `Can order early`", () => {
+    expect(
+      purchaseDemandTimingOf({
+        ...base,
+        today: "2026-08-25",
+        readyIfOrderedToday: "2026-09-01",
+        customerDelivery: "2026-10-30",
+      }),
+    ).toBe("can_order_early");
+  });
+
+  it("today exactly on Order By holds the full 14 safety days", () => {
+    expect(
+      purchaseDemandTimingOf({
+        ...base,
+        today: "2026-09-01",
+        readyIfOrderedToday: "2026-09-10",
+        customerDelivery: "2026-09-30",
+      }),
+    ).toBe("safety_days_full");
+  });
+
+  it("13 office working days left is the top of the low band", () => {
+    // 2026-09-01 (Tue) → 2026-09-18 (Fri) is 13 Mon–Fri working days.
+    expect(
+      purchaseDemandTimingOf({
+        ...base,
+        readyIfOrderedToday: "2026-09-01",
+        customerDelivery: "2026-09-18",
+      }),
+    ).toBe("safety_days_low");
+  });
+
+  it("1 office working day left is the bottom of the low band", () => {
+    expect(
+      purchaseDemandTimingOf({
+        ...base,
+        readyIfOrderedToday: "2026-09-10",
+        customerDelivery: "2026-09-11",
+      }),
+    ).toBe("safety_days_low");
+  });
+
+  it("14 working days left after Order By still reads full — never a lie downward", () => {
+    // Calendar rounding can leave the full band intact one day past Order By.
+    // 2026-09-01 (Tue) → 2026-09-21 (Mon) is 14 Mon–Fri working days.
+    expect(
+      purchaseDemandTimingOf({
+        ...base,
+        readyIfOrderedToday: "2026-09-01",
+        customerDelivery: "2026-09-21",
+      }),
+    ).toBe("safety_days_full");
+  });
+
+  it("completion on the delivery day itself leaves no safety days", () => {
+    expect(
+      purchaseDemandTimingOf({
+        ...base,
+        readyIfOrderedToday: "2026-09-21",
+        customerDelivery: "2026-09-21",
+      }),
+    ).toBe("safety_days_none");
+  });
+
+  it("a weekend between completion and delivery buys no safety days", () => {
+    // Fri 18th → Sun 20th crosses no office working day.
+    expect(
+      purchaseDemandTimingOf({
+        ...base,
+        readyIfOrderedToday: "2026-09-18",
+        customerDelivery: "2026-09-20",
+      }),
+    ).toBe("safety_days_none");
+  });
+
+  it("a public holiday is not a safety day", () => {
+    // The one working day between the two dates is a holiday.
+    expect(
+      purchaseDemandTimingOf({
+        ...base,
+        readyIfOrderedToday: "2026-09-10",
+        customerDelivery: "2026-09-11",
+        holidays: new Set(["2026-09-11"]),
+      }),
+    ).toBe("safety_days_none");
+  });
+
+  it("completion after the delivery day is not enough production time", () => {
+    expect(
+      purchaseDemandTimingOf({
+        ...base,
+        readyIfOrderedToday: "2026-09-22",
+        customerDelivery: "2026-09-21",
+      }),
+    ).toBe("not_enough_production_time");
+  });
+
+  it("without an Order By date the safety arithmetic alone still classifies", () => {
+    expect(
+      purchaseDemandTimingOf({
+        ...base,
+        orderBy: null,
+        today: "2026-08-25",
+        readyIfOrderedToday: "2026-09-01",
+        customerDelivery: "2026-10-30",
+      }),
+    ).toBe("can_order_early");
+  });
+});
+
+describe("the state words — every category, no banned word", () => {
+  it("the timing words at the governed 14 are the approved words exactly", () => {
+    const words = purchaseDemandStateWords(14);
+    expect(words.can_order_early).toBe("Can order early");
+    expect(words.safety_days_full).toBe("14 safety days left");
+    expect(words.safety_days_low).toBe("1–13 safety days left");
+    expect(words.safety_days_none).toBe("No safety days left");
+    expect(words.not_enough_production_time).toBe("Not enough production time");
+  });
+
+  it("the safety words follow the governed value, so the screen cannot lie", () => {
+    const words = purchaseDemandStateWords(10);
+    expect(words.safety_days_full).toBe("10 safety days left");
+    expect(words.safety_days_low).toBe("1–9 safety days left");
+  });
+
+  it("every state has a fact word; the rail words are the timing rows plus the one setup row", () => {
+    const words = purchaseDemandStateWords(14);
     for (const s of PURCHASE_DEMAND_STATES) {
-      expect(PURCHASE_DEMAND_STATE_WORDS[s].length).toBeGreaterThan(0);
-      expect(PURCHASE_DEMAND_RAIL_WORDS[s].length).toBeGreaterThan(0);
+      expect(words[s].length).toBeGreaterThan(0);
+    }
+    const rail = purchaseDemandRailWords(14);
+    for (const s of PURCHASE_DEMAND_TIMING_STATES) {
+      expect(rail[s]).toBe(words[s]);
+    }
+    expect(rail.no_production_days).toBe("Production time not set");
+    // The Sales/Catalog blockers are row facts, never rail facets.
+    expect(rail.no_customer_date).toBeUndefined();
+    expect(rail.no_sku).toBeUndefined();
+    expect(rail.no_supplier).toBeUndefined();
+  });
+
+  it("no word uses a banned or retired rail word", () => {
+    const banned = [
+      "Today",
+      "Tomorrow",
+      "Overdue",
+      "Needs attention",
+      "Follow up",
+      "Pending",
+      "Waiting",
+      "Priority",
+      "Next Action",
+      "Buffer",
+      "buffer",
+      "Ready to buy",
+      "Covered",
+    ];
+    const words = purchaseDemandStateWords(14);
+    const rail = purchaseDemandRailWords(14);
+    for (const s of PURCHASE_DEMAND_STATES) {
+      for (const b of banned) {
+        expect(words[s]).not.toContain(b);
+        const r = rail[s];
+        if (r != null) expect(r).not.toContain(b);
+      }
     }
   });
 
-  it("no rail word uses a banned generic attention word", () => {
-    const banned = ["Today", "Tomorrow", "Needs attention", "Follow up", "Pending", "Waiting"];
-    for (const s of PURCHASE_DEMAND_STATES) {
-      for (const b of banned) {
-        expect(PURCHASE_DEMAND_RAIL_WORDS[s]).not.toContain(b);
-        expect(PURCHASE_DEMAND_STATE_WORDS[s]).not.toContain(b);
-      }
+  it("isPurchaseDemandTimingState separates orderable timing from blockers", () => {
+    for (const s of PURCHASE_DEMAND_TIMING_STATES) {
+      expect(isPurchaseDemandTimingState(s)).toBe(true);
+    }
+    for (const s of ["no_customer_date", "no_sku", "no_supplier", "no_production_days"]) {
+      expect(isPurchaseDemandTimingState(s as PurchaseDemandState)).toBe(false);
     }
   });
 });
@@ -168,9 +335,9 @@ describe("purchaseDemandQuantities — the engine's numbers, never a second coun
 });
 
 describe("the two-line treatment", () => {
-  it("every blocker carries a help line; a good row carries none", () => {
-    expect(purchaseDemandHelpLine(row({ state: "ready_to_buy" }))).toBeNull();
-    expect(purchaseDemandHelpLine(row({ state: "covered" }))).toBeNull();
+  it("every blocker carries a help line; an orderable row carries none", () => {
+    expect(purchaseDemandHelpLine(row({ state: "can_order_early" }))).toBeNull();
+    expect(purchaseDemandHelpLine(row({ state: "not_enough_production_time" }))).toBeNull();
     expect(purchaseDemandHelpLine(row({ state: "no_customer_date" }))).toBe(
       "Ask customer for a delivery date",
     );
@@ -249,11 +416,11 @@ describe("grouping, filtering, counting", () => {
       id: "c",
       item: "Haven",
       variant: null,
-      toBuy: 0,
+      toBuy: 1,
       qtyNeeded: 3,
-      onPo: 3,
+      onPo: 2,
       poNumbers: ["PO-2051"],
-      state: "covered",
+      state: "safety_days_low",
     }),
     row({ id: "d", item: "Transport Fees", variant: null, state: "no_sku", category: null,
       supplier: null, supplierId: null, readyStock: null, takenFromStock: null, onPo: null,
@@ -281,25 +448,30 @@ describe("grouping, filtering, counting", () => {
     expect(fees.toBuy).toBe(0);
   });
 
-  it("an empty rail selection means every state", () => {
+  it("an empty rail selection means every state — that is `All not ordered`", () => {
     expect(filterPurchaseDemands(rows, new Set()).length).toBe(4);
-    expect(filterPurchaseDemands(rows, new Set(["covered"] as const)).map((r) => r.id)).toEqual([
-      "c",
-    ]);
     expect(
-      filterPurchaseDemands(rows, new Set(["covered", "no_sku"] as const)).map((r) => r.id),
+      filterPurchaseDemands(rows, new Set(["safety_days_low"] as const)).map((r) => r.id),
+    ).toEqual(["c"]);
+    expect(
+      filterPurchaseDemands(rows, new Set(["safety_days_low", "no_sku"] as const)).map(
+        (r) => r.id,
+      ),
     ).toEqual(["c", "d"]);
   });
 
   it("counts every state, including the zeroes", () => {
     const counts = purchaseDemandStateCounts(rows);
     expect(counts).toEqual({
-      ready_to_buy: 2,
+      can_order_early: 2,
+      safety_days_full: 0,
+      safety_days_low: 1,
+      safety_days_none: 0,
+      not_enough_production_time: 0,
       no_customer_date: 0,
       no_sku: 1,
       no_supplier: 0,
       no_production_days: 0,
-      covered: 1,
     });
   });
 });
@@ -374,8 +546,16 @@ describe("the buying facts the row now carries", () => {
   });
 
   it("every trigger names its owner rule and its completion fact", () => {
+    const buyRule: [string, string] = [
+      "Current PO Duty",
+      "Current PO version reached supplier with evidence",
+    ];
     const expected: Record<string, [string, string]> = {
-      ready_to_buy: ["Current PO Duty", "Current PO version reached supplier with evidence"],
+      can_order_early: buyRule,
+      safety_days_full: buyRule,
+      safety_days_low: buyRule,
+      safety_days_none: buyRule,
+      not_enough_production_time: buyRule,
       no_customer_date: ["Responsible Salesperson", "Customer Delivery exists"],
       no_sku: ["Catalog/Master Data through Current PO Duty", "Approved SKU exists"],
       no_supplier: ["Current PO Duty", "Approved supplier relationship exists"],
@@ -402,22 +582,6 @@ describe("the buying facts the row now carries", () => {
     }
   });
 
-  it("a covered line has no action — nothing is owed on it", () => {
-    expect(
-      soBatchAction({
-        state: "covered",
-        item: "Booqit",
-        supplier: "Hooka",
-        category: "mattress",
-        ownerId: null,
-        ownerName: null,
-        orderId: "o1",
-        so: 1318,
-        dueDate: null,
-      }),
-    ).toBeNull();
-  });
-
   it("the owner is METADATA — the sentence never carries the person's name", () => {
     const a = soBatchAction({
       state: "no_supplier",
@@ -435,9 +599,9 @@ describe("the buying facts the row now carries", () => {
     expect(a.ownerId).toBe("u9");
   });
 
-  it("the ready line's act names the supplier and the document it owes", () => {
+  it("an orderable line's act names the supplier and the document it owes", () => {
     const a = soBatchAction({
-      state: "ready_to_buy",
+      state: "safety_days_none",
       item: "Booqit",
       supplier: "Hooka",
       category: "mattress",
@@ -488,10 +652,14 @@ describe("the SO Batch response carries destinations, duty and permission", () =
       actingPoDuty: { userId: "u2", name: "Shasha" },
       mayIssue: true,
       procurementPartners: [{ id: "p1", name: "NETS" }],
+      safetyDays: 14,
     });
     expect(parsed.destinations[0]!.name).toBe("Carres Klang");
     expect(parsed.mayIssue).toBe(true);
     expect(parsed.actingPoDuty).toEqual({ userId: "u2", name: "Shasha" });
+    // The governed Safety days ride the payload so the rail words follow the
+    // one setting instead of a hard-coded number.
+    expect(parsed.safetyDays).toBe(14);
   });
 
   it("a reader who is not on duty is told so honestly", () => {
@@ -504,6 +672,7 @@ describe("the SO Batch response carries destinations, duty and permission", () =
       actingPoDuty: null,
       mayIssue: false,
       procurementPartners: [],
+      safetyDays: 14,
     });
     expect(parsed.mayIssue).toBe(false);
     expect(parsed.currentPoDuty).toBeNull();
