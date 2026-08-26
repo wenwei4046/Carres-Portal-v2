@@ -71,9 +71,49 @@ const SET_LINES: GoodsMiniLine[] = [
   selectable: false,
 })) as GoodsMiniLine[];
 
+/**
+ * ⭐ WHAT THE EXPAND USED TO BE — re-created here, and ONLY here.
+ *
+ * The owner asked to SEE the difference, and a description of a deleted layout
+ * is not seeing it. This is the old hand-drawn box, byte-for-byte, so the two
+ * can be looked at together. It lives in a dev-only entry and ships nowhere.
+ */
+function OldExpand() {
+  const fact = (label: string, value: string) => (
+    <div className="flex items-baseline justify-between gap-4 py-0.5">
+      <span className="text-label uppercase tracking-wide text-kit-slate-11">{label}</span>
+      <span className="tabular-nums">{value}</span>
+    </div>
+  );
+  return (
+    <div className="grid gap-x-10 gap-y-1 bg-white px-4 py-3 text-body sm:grid-cols-2">
+      <div className="flex flex-col">
+        {fact("REQUIRED", "1")}
+        {fact("FROM STOCK", "0")}
+        {fact("ON OPEN PO", "1  PO-20260820-4827")}
+        {fact("BUY", "0")}
+      </div>
+      <div className="flex flex-col">
+        {fact("Source", "SO-1203 · L1201S-K")}
+        {fact("Required for", "Tue, 4 Aug")}
+        {fact("Goods must arrive", "Fri, 24 Jul")}
+        {fact("Deliver to", "Carres Klang")}
+      </div>
+    </div>
+  );
+}
+
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <div className="flex flex-col gap-6 bg-kit-canvas p-4">
+      <section className="flex flex-col gap-1">
+        <span className="text-label uppercase tracking-wide text-kit-red-11">
+          BEFORE — SO Batch Purchase drew its own box
+        </span>
+        <div className="rounded-control border border-dashed border-kit-red-9 bg-white">
+          <OldExpand />
+        </div>
+      </section>
       <section className="flex flex-col gap-1">
         <span className="text-label uppercase tracking-wide text-kit-slate-11">
           Sales Orders register — the sibling
@@ -82,13 +122,13 @@ createRoot(document.getElementById("root")!).render(
       </section>
       <section className="flex flex-col gap-1">
         <span className="text-label uppercase tracking-wide text-kit-slate-11">
-          SO Batch Purchase — one part, already on a purchase order
+          AFTER — SO Batch Purchase, one part already on a purchase order
         </span>
         <GoodsMiniTable label="Goods on SO-1203" lines={BUYING_LINES} showCoveredBy />
       </section>
       <section className="flex flex-col gap-1">
         <span className="text-label uppercase tracking-wide text-kit-slate-11">
-          SO Batch Purchase — a matched set the row can only name
+          AFTER — a matched set the row can only name
         </span>
         <GoodsMiniTable label="Goods on SO-1330" lines={SET_LINES} showCoveredBy />
       </section>
