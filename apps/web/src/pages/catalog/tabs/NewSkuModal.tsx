@@ -114,7 +114,20 @@ export default function NewSkuModal({
   // non-principal may still create a SKU — it's just UNPRICED (price 0 / cost
   // null) and the principal prices it later. Hide the price/cost fields and
   // force the unpriced payload for them.
-  const isPrincipal = useAuth((s) => s.role) === "principal";
+  const role = useAuth((s) => s.role);
+  const isPrincipal = role === "principal";
+  /* ⭐ COST IS OPERATION'S LANE TOO (0226), and this modal was narrower than
+   * the server it posts to. `gateSkuCreatePriceCost` says so in as many words —
+   * *"a non-principal MAY create an UNPRICED sku; operation may additionally
+   * seed the buying cost"* — but the form offered the cost box to the principal
+   * alone and hard-sent `null` otherwise.
+   *
+   * Nobody noticed while `+ New SKU` lived only on the admin door. Jess's
+   * 2026-08-26 alignment ruling put that button on the Operations catalog, and
+   * the whole reason that catalog exists is recording what we pay: an operation
+   * user could create the SKU and then had to go back to the grid to key the
+   * one number they opened the form for. */
+  const canSetCost = isPrincipal || role === "operation";
   const createModel = useCreateCatalogModel();
   const createSku = useCreateCatalogSku();
   const createGuarantee = useCreateGuaranteeProduct();
@@ -648,8 +661,9 @@ export default function NewSkuModal({
       ? chipTargetOk && selectedSizes.size > 0 && (!isPrincipal || priceOk)
       : // No-variant-axis categories (accessory / service) need no size/variant.
         (noVariantAxis || variant.trim().length > 0) &&
-        // Price/cost only gate validity when the principal can actually set them.
-        (!isPrincipal || (priceOk && costOk)) &&
+        // Each money field gates validity only for the role that can set it.
+        (!isPrincipal || priceOk) &&
+        (!canSetCost || costOk) &&
         (mode === "new" ? name.trim().length >= 2 && modelKey.length >= 2 : !!existingModel);
 
   const pending =
@@ -845,7 +859,9 @@ export default function NewSkuModal({
         // 0175 — non-principal creates an UNPRICED SKU (price 0 / cost null);
         // the principal prices it later. Principal can seed price/cost here.
         price: isPrincipal ? priceNum : 0,
-        cost: isPrincipal ? costNum : null,
+        /* Sent for whoever the SERVER allows, not for the principal alone —
+           `gateSkuCreatePriceCost` admits operation here (0226). */
+        cost: canSetCost ? costNum : null,
         description: description.trim() || null,
         supplierId: supplierId || null,
         supplierCode: supplierCode.trim() || null,
@@ -1391,45 +1407,49 @@ export default function NewSkuModal({
               </label>
             )}
 
-            {isPrincipal ? (
-              <>
-                <label className="block">
-                  <span className="label block mb-1">Price (RM, optional)</span>
-                  <input
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    value={price}
-                    onChange={(e) => setPrice(e.target.value)}
-                    placeholder="0.00"
-                    data-testid="new-sku-price"
-                    className={INPUT_CLS}
-                  />
-                </label>
+            {isPrincipal && (
+              <label className="block">
+                <span className="label block mb-1">Price (RM, optional)</span>
+                <input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value)}
+                  placeholder="0.00"
+                  data-testid="new-sku-price"
+                  className={INPUT_CLS}
+                />
+              </label>
+            )}
 
-                <label className="block">
-                  <span className="label block mb-1">Cost (RM, optional)</span>
-                  <input
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    value={cost}
-                    onChange={(e) => setCost(e.target.value)}
-                    placeholder="not set"
-                    data-testid="new-sku-cost"
-                    className={INPUT_CLS}
-                  />
-                </label>
-              </>
-            ) : (
+            {/* Offered to whoever the SERVER admits — operation included (0226). */}
+            {canSetCost && (
+              <label className="block">
+                <span className="label block mb-1">Cost (RM, optional)</span>
+                <input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={cost}
+                  onChange={(e) => setCost(e.target.value)}
+                  placeholder="not set"
+                  data-testid="new-sku-cost"
+                  className={INPUT_CLS}
+                />
+              </label>
+            )}
+
+            {!isPrincipal && (
               <div
                 className="rounded-[4px] border border-base-200 bg-base-50 px-3 py-2"
                 data-testid="new-sku-price-lock-hint"
               >
-                <div className="text-body text-base-600">Price &amp; cost</div>
+                <div className="text-body text-base-600">Selling price</div>
                 <div className="text-meta text-base-400 mt-0.5">
                   Set by the principal (Master Admin). This SKU is created unpriced —
-                  the principal will price it.
+                  the principal will price it
+                  {canSetCost ? ". The cost above is yours to record." : "."}
                 </div>
               </div>
             )}

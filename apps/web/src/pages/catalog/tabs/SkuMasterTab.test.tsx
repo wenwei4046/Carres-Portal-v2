@@ -454,25 +454,58 @@ describe("0175 — price/cost lock (non-principal read-only)", () => {
     expect(row.querySelector('input[type="number"]')).toBeNull();
   });
 
-  it("NewSkuModal: non-principal sees NO price/cost inputs (shows lock hint)", () => {
+  /* ⭐ CORRECTED 2026-08-26 — the form was NARROWER THAN THE SERVER.
+     This used to assert that operation sees neither a price nor a cost box.
+     Half of that was a real rule and half was a bug: `gateSkuCreatePriceCost`
+     says in as many words that *"a non-principal MAY create an UNPRICED sku;
+     operation may additionally seed the buying cost"* (0226). The cost box was
+     withheld from the one role whose whole job is recording what we pay.
+
+     It went unnoticed while `+ New SKU` lived only on the admin door. Jess's
+     alignment ruling put that button on the Operations catalog, where an
+     operation user would have created the SKU and then gone back to the grid
+     to key the single number they opened the form for. */
+  it("NewSkuModal: operation sees the COST box and never the price box", () => {
     mockRole = "operation";
+    render(wrap(<NewSkuModal models={[MODEL_MAT, MODEL_SOFA]} onClose={() => {}} />));
+    expect(screen.queryByTestId("new-sku-price")).not.toBeInTheDocument();
+    expect(screen.getByTestId("new-sku-cost")).toBeInTheDocument();
+    expect(screen.getByTestId("new-sku-price-lock-hint")).toBeInTheDocument();
+  });
+
+  it("NewSkuModal: a role outside the cost lane sees neither money box", () => {
+    /* The gate is `principal || operation`, so anyone else — a dealer reaching
+       this component — still gets the plain unpriced/uncosted form. */
+    mockRole = "dealer";
     render(wrap(<NewSkuModal models={[MODEL_MAT, MODEL_SOFA]} onClose={() => {}} />));
     expect(screen.queryByTestId("new-sku-price")).not.toBeInTheDocument();
     expect(screen.queryByTestId("new-sku-cost")).not.toBeInTheDocument();
     expect(screen.getByTestId("new-sku-price-lock-hint")).toBeInTheDocument();
+    mockRole = "operation";
   });
 
-  it("NewSkuModal: non-principal creates an UNPRICED sku (price 0 / cost null)", async () => {
+  it("NewSkuModal: operation creates an UNPRICED sku and CAN seed the cost", async () => {
     mockRole = "operation";
     render(wrap(<NewSkuModal models={[MODEL_MAT, MODEL_SOFA]} onClose={vi.fn()} />));
-    // New product: fill name + variant; price/cost fields are absent.
+    fireEvent.change(screen.getByTestId("new-sku-name"), { target: { value: "Lite Foam" } });
+    fireEvent.change(screen.getByTestId("new-sku-variant"), { target: { value: "Queen" } });
+    fireEvent.change(screen.getByTestId("new-sku-cost"), { target: { value: "870" } });
+    fireEvent.click(screen.getByText("Create Mattress product + SKU"));
+    await waitFor(() => expect(mockCreateSkuMutateAsync).toHaveBeenCalledOnce());
+    const args = mockCreateSkuMutateAsync.mock.calls[0][0];
+    // The selling price is still NOT theirs to set — 0 is the unpriced sentinel.
+    expect(args.price).toBe(0);
+    expect(args.cost).toBe(870);
+  });
+
+  it("NewSkuModal: a blank cost is still 'not set', never zero", async () => {
+    mockRole = "operation";
+    render(wrap(<NewSkuModal models={[MODEL_MAT, MODEL_SOFA]} onClose={vi.fn()} />));
     fireEvent.change(screen.getByTestId("new-sku-name"), { target: { value: "Lite Foam" } });
     fireEvent.change(screen.getByTestId("new-sku-variant"), { target: { value: "Queen" } });
     fireEvent.click(screen.getByText("Create Mattress product + SKU"));
     await waitFor(() => expect(mockCreateSkuMutateAsync).toHaveBeenCalledOnce());
-    const args = mockCreateSkuMutateAsync.mock.calls[0][0];
-    expect(args.price).toBe(0);
-    expect(args.cost).toBeNull();
+    expect(mockCreateSkuMutateAsync.mock.calls[0][0].cost).toBeNull();
   });
 
   it("NewSkuModal: principal can seed price + cost", async () => {
