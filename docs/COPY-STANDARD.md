@@ -630,33 +630,54 @@ sidebar page. Existing implementation constants do not override these approved p
 |---|---|
 | Page | No page — use `SO Batch Purchase` or the source object |
 | Search | `Search Sales Order, customer, SKU or supplier…` |
-| Rail heading | `BUYING RECORDS` · `WORK TO DO` |
+| Rail headings | `TO ORDER` · `ORDER TIMING` · `SETUP TO FIX` |
 | Empty state | `Nothing needs buying.` |
 | Columns | `Item · Description` · `Variant` · `Category` · `SKU` · `SO No` · `Customer` · `Customer Delivery` · `Supplier` · `Qty Needed` · `Ready Stock` · `On PO` · `To Buy` · `Coverage` |
 
-**The six states, and there is no seventh.** Line 1 is the FACT; line 2 is the FIX, in the
-imperative. The rail carries the short form, because 200px is 200px:
+**The rail — owner correction 2026-08-26.** Three headings, and there is no fourth. `SETUP TO FIX`
+renders only when its count is above zero:
 
-| Fact (line 1) | Rail word | Fix (line 2) |
-|---|---|---|
-| `Ready to buy` | `Ready to buy` | — |
-| `Customer delivery date is missing` | `No customer date` | `Ask customer for a delivery date` |
-| `SKU not found` | `No SKU` | `Add this item to the SKU catalog` |
-| `Supplier not assigned` | `No supplier` | `Check the supplier for {model}` |
-| `Production days are missing` | `No production days` | `Add production days for {supplier} · {category}` |
-| `Covered — no buying needed` | `Covered` | — |
+| Heading | Rail rows |
+|---|---|
+| `TO ORDER` | `All not ordered` |
+| `ORDER TIMING` | `Can order early` · `14 safety days left` · `1–13 safety days left` · `No safety days left` · `Not enough production time` |
+| `SETUP TO FIX` | `Production time not set` |
+
+Counts are uncovered SO buying lines, never documents or notifications; a zero count prints no
+number. Every `ORDER TIMING` row stays orderable — the words say timing risk, never `Cannot buy`,
+and Order By is a planned date, never an unlock date. `Production time not set` lines are not
+selectable until the Supplier × Category production time exists. Fully covered / `Buy = 0` lines
+do not appear on this page at all.
+
+**The row facts.** Line 1 is the FACT; line 2 is the FIX, in the imperative. A line the owning
+boundary (Sales / Catalog) unexpectedly let through without its customer date, SKU or supplier is
+NAMED on its own row — it is never silently defaulted and never a rail facet:
+
+| Fact (line 1) | Fix (line 2) |
+|---|---|
+| `Customer delivery date is missing` | `Ask customer for a delivery date` |
+| `SKU not found` | `Add this item to the SKU catalog` |
+| `Supplier not assigned` | `Check the supplier for {model}` |
+| `Production days are missing` | `Add production days for {supplier} · {category}` |
 
 `Check the supplier for {model}` is the Work Engine's own dictionary row above, reused verbatim
 rather than respelt.
+
+**The Safety-days words.** The visible term is `Safety days`; `buffer` never reaches a screen.
+The Purchasing Settings row reads `Safety days` · `14 working days` with the explanation line
+`Extra time allowed for delays.`
 
 **The absence words.** A cell never prints a bare dash where a sentence is owed:
 `No delivery date yet` · `No supplier yet` · `Not counted yet` (the blocker also blocks the
 coverage arithmetic, so nothing is known) · `Nothing covers it yet` (the arithmetic ran and
 found nothing). The last two are DIFFERENT answers and may not be merged.
 
-**Banned on Purchasing surfaces:** `Today` · `Tomorrow` · `Needs attention` · `Follow up` · `Pending` ·
-`Waiting` · `Priority` · a generic `Next action` column. A word that tells the operator a row is
-important without telling them what is wrong with it is not a word this Register may use.
+**Banned on Purchasing surfaces:** `Today` · `Tomorrow` · `Overdue` · `Needs attention` ·
+`Follow up` · `Pending` · `Waiting` · `Priority` · `Buffer` · a generic `Next action` column. A
+word that tells the operator a row is important without telling them what is wrong with it is not
+a word this Register may use. **Retired from the SO Batch Purchase rail, never to return:**
+`Ready to buy` · `Covered` · `No customer date` · `No SKU` · `No supplier` · `No production days` ·
+`BUYING RECORDS` · `WORK TO DO` · `All lines` · `No buying needed` · `Cannot buy`.
 
 **MANUAL PURCHASE — the internal buy's own words.**
 
@@ -1316,7 +1337,7 @@ Information Architecture and live in [`ERP-ARCHITECTURE.md`](ERP-ARCHITECTURE.md
 | The earliest delivery date a store may sell | **Earliest date a store may sell** | Lead time · Minimum lead · Sell-from date · Earliest available |
 | The last day we may send the PO and still be safe | **order-by date** | Raise-by · Trigger date · Reorder date |
 | The days of the week we send POs | **PO days** | Cycle · Review day · Batch day |
-| Days kept back for arranging the delivery | **order-by buffer** | Safety stock days · Slack · Padding |
+| Days kept back for arranging the delivery | **Safety days** | Buffer · order-by buffer · Safety stock days · Slack · Padding |
 | Where the supplier must send the goods | **Deliver To** | Where the goods go · Ship-to · Destination · Drop point · Location |
 | Physical identity assigned to one stock unit | **Unit ID** | Serial · Item ID |
 | What is still owed after a short delivery | **balance** | Outstanding qty · Back-order · Shortfall |

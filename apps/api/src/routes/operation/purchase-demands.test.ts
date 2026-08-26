@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
+import { describe, it, expect, afterAll, beforeAll, beforeEach, vi } from "vitest";
 import {
   SignJWT,
   createLocalJWKSet,
@@ -14,7 +14,11 @@ import app from "../../index";
 import { _setJwksForTesting } from "../../middleware/auth";
 
 vi.mock("../../lib/supabase", () => ({ userClient: vi.fn() }));
-import type { SoBatchPurchaseResponse } from "@carres/shared";
+import {
+  addWorkingDays,
+  myHolidaySet,
+  type SoBatchPurchaseResponse,
+} from "@carres/shared";
 import { userClient } from "../../lib/supabase";
 
 /**
@@ -51,6 +55,29 @@ async function makeJwt(role: string) {
     .sign(signKey);
 }
 
+/**
+ * THE CLOCK IS FROZEN (Card 02-A). The timing states are derived against the
+ * real read's `todayIso()`, so the fixture pins the day — a Wednesday with no
+ * Malaysian holiday — and composes every delivery date RELATIVE to it with the
+ * same calendar engine the server plans on. The classification itself is not
+ * computed here (that would test the engine against itself); each delivery is
+ * placed a known number of working days from the expected completion, and the
+ * test asserts the state that distance must produce.
+ */
+const TODAY = "2026-09-02";
+const HOLIDAYS = myHolidaySet();
+/** Nice Future works Mon–Sat. */
+const NICE_WEEK = { offDays: [0] as number[], holidays: HOLIDAYS };
+/** The governed Office week. */
+const OFFICE = { offDays: [0, 6] as number[], holidays: HOLIDAYS };
+/** Expected production completion of a Nice Future mattress ordered today. */
+const READY = addWorkingDays(TODAY, 7, NICE_WEEK);
+const DELIVERY_EARLY = addWorkingDays(READY, 40, OFFICE);
+const DELIVERY_FULL = addWorkingDays(READY, 14, OFFICE);
+const DELIVERY_LOW = addWorkingDays(READY, 5, OFFICE);
+const DELIVERY_NONE = READY;
+const DELIVERY_SHORT = addWorkingDays(TODAY, 2, OFFICE);
+
 const NICE = "11111111-1111-1111-1111-111111111111";
 const OHANA = "22222222-2222-2222-2222-222222222222";
 const WAREHOUSE = "00000000-0000-0000-0000-000000000c03";
@@ -82,7 +109,7 @@ function line(
 const TABLES = () => ({
   purchasing_settings: {
     data: {
-      order_by_buffer_days: 7,
+      order_by_buffer_days: 14,
       earliest_sell_days: 21,
       logistics_call_working_days: 1,
       po_days: [1, 3, 5],
@@ -112,7 +139,7 @@ const TABLES = () => ({
     data: [
       {
         id: "o1", so: 1207, customer_name: "PETER", status: "proceed_order",
-        delivery_date: "2026-09-30", delivery_date_tbd: false,
+        delivery_date: DELIVERY_EARLY, delivery_date_tbd: false,
         placed_at: "2026-07-01", created_at: "2026-07-01", proceed_date: null,
         salesperson_id: SALES,
       },
@@ -130,7 +157,26 @@ const TABLES = () => ({
       },
       {
         id: "o4", so: 1211, customer_name: "BOB", status: "proceed_order",
-        delivery_date: "2026-09-25", delivery_date_tbd: false,
+        delivery_date: DELIVERY_LOW, delivery_date_tbd: false,
+        placed_at: "2026-07-01", created_at: "2026-07-01", proceed_date: null,
+        salesperson_id: null,
+      },
+      /* The three remaining timing bands, one order each (Card 02-A §4). */
+      {
+        id: "o5", so: 1212, customer_name: "MEI", status: "proceed_order",
+        delivery_date: DELIVERY_FULL, delivery_date_tbd: false,
+        placed_at: "2026-07-01", created_at: "2026-07-01", proceed_date: null,
+        salesperson_id: null,
+      },
+      {
+        id: "o6", so: 1213, customer_name: "RAJ", status: "proceed_order",
+        delivery_date: DELIVERY_NONE, delivery_date_tbd: false,
+        placed_at: "2026-07-01", created_at: "2026-07-01", proceed_date: null,
+        salesperson_id: null,
+      },
+      {
+        id: "o7", so: 1214, customer_name: "LIN", status: "proceed_order",
+        delivery_date: DELIVERY_SHORT, delivery_date_tbd: false,
         placed_at: "2026-07-01", created_at: "2026-07-01", proceed_date: null,
         salesperson_id: null,
       },
@@ -151,6 +197,9 @@ const TABLES = () => ({
       line("l6", "o3", "H1401S-K", 1),
       line("l7", "o4", "COV-K", 3),
       line("l8", "o4", "PART-K", 3),
+      line("l10", "o5", "B1201S-Q", 1),
+      line("l11", "o6", "B1201S-Q", 1),
+      line("l12", "o7", "B1201S-Q", 1),
     ],
     error: null,
   },
@@ -314,12 +363,19 @@ function makeSb(tables: Record<string, { data: unknown; error: unknown }>) {
 }
 
 beforeAll(async () => {
+  // Only Date is faked — timers stay real so the in-process fetches run.
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date(`${TODAY}T04:00:00Z`));
   const kp = await generateKeyPair("ES256", { extractable: true });
   signKey = kp.privateKey;
   publicJwk = await exportJWK(kp.publicKey);
   publicJwk.kid = KID;
   publicJwk.alg = "ES256";
   publicJwk.use = "sig";
+});
+
+afterAll(() => {
+  vi.useRealTimers();
 });
 
 beforeEach(() => {
@@ -374,7 +430,7 @@ describe("GET /api/operation/purchase/demands — one read, two projections", ()
     const { rows } = await rowsOf();
     // 2 asked for, nothing covering → 2 to buy.
     expect(bySku(rows, "B1201S-K")).toMatchObject({
-      state: "ready_to_buy",
+      state: "can_order_early",
       qtyNeeded: 2,
       toBuy: 2,
       onPo: 0,
@@ -383,7 +439,7 @@ describe("GET /api/operation/purchase/demands — one read, two projections", ()
   });
 });
 
-describe("the six derived states", () => {
+describe("the derived states — blockers and order timing", () => {
   it("a sold SKU absent from the Catalog stays visible as `SKU not found`", async () => {
     const { rows } = await rowsOf();
     const fees = bySku(rows, 'Transport Fees 4"');
@@ -441,25 +497,62 @@ describe("the six derived states", () => {
       so: 1210,
     });
     // Nice Future × mattress has its number, so its rows are untouched.
-    expect(bySku(rows, "B1201S-K")!.state).toBe("ready_to_buy");
+    expect(bySku(rows, "B1201S-K")!.state).toBe("can_order_early");
   });
 
-  it("fully and partly covered demand state the exact coverage and the PO numbers", async () => {
+  it("every timing band classifies from the engine's own dates", async () => {
     const { rows } = await rowsOf();
-    expect(bySku(rows, "COV-K")).toMatchObject({
-      state: "covered",
-      qtyNeeded: 3,
-      onPo: 3,
-      toBuy: 0,
-      poNumbers: ["PO-2051"],
-    });
+    // Delivery 14 office working days after expected completion — Order By is today.
+    expect(rows.find((r) => r.so === 1212)!.state).toBe("safety_days_full");
+    // Delivery 5 office working days after expected completion.
+    expect(rows.find((r) => r.so === 1211 && r.skus.includes("PART-K"))!.state).toBe(
+      "safety_days_low",
+    );
+    // Delivery ON the expected completion day.
+    expect(rows.find((r) => r.so === 1213)!.state).toBe("safety_days_none");
+    // Delivery before production can finish.
+    expect(rows.find((r) => r.so === 1214)!.state).toBe("not_enough_production_time");
+  });
+
+  it("every timing band remains orderable — the risk words are not `Cannot buy`", async () => {
+    const { rows } = await rowsOf();
+    for (const so of [1207, 1211, 1212, 1213, 1214]) {
+      const r = rows.find(
+        (x) => x.so === so && x.supplier === "Nice Future" && (x.toBuy ?? 0) > 0,
+      )!;
+      expect(r.issueRef, `SO-${so}`).not.toBeNull();
+      expect(r.action?.action, `SO-${so}`).toBe("Issue PO to Nice Future");
+    }
+  });
+
+  it("a fully covered build LEAVES the page; a partly covered one stays with its numbers", async () => {
+    const { rows } = await rowsOf();
+    // Every COV-K unit is on PO-2051 — Buy = 0 does not remain in SO Batch Purchase.
+    expect(bySku(rows, "COV-K")).toBeUndefined();
     expect(bySku(rows, "PART-K")).toMatchObject({
-      state: "ready_to_buy",
+      state: "safety_days_low",
       qtyNeeded: 3,
       onPo: 2,
       toBuy: 1,
       poNumbers: ["PO-2052"],
     });
+  });
+
+  it("a cancelled covering PO returns the demand automatically — nothing is stored", async () => {
+    const t = TABLES() as unknown as Record<string, { data: unknown; error: unknown }>;
+    /* The read asks the database for OPEN purchase-order lines only
+       (`.eq("purchase_orders.status", "open")`), so a cancelled PO-2051 simply
+       stops coming back. */
+    t.purchase_order_lines = {
+      data: [
+        { po_id: "PO-2052", sku: "PART-K", qty: 2, received_qty: 0,
+          purchase_orders: { status: "open" } },
+      ],
+      error: null,
+    };
+    const { rows } = await rowsOf(t);
+    // The coverage fell away on recomputation, so the demand is back in full.
+    expect(bySku(rows, "COV-K")).toMatchObject({ qtyNeeded: 3, toBuy: 3, onPo: 0 });
   });
 
   it("a line taken out of the plan stays out", async () => {
@@ -480,14 +573,22 @@ describe("the six derived states", () => {
     const states = new Set(rows.map((r) => r.state));
     for (const s of states) {
       expect([
-        "ready_to_buy",
+        "can_order_early",
+        "safety_days_full",
+        "safety_days_low",
+        "safety_days_none",
+        "not_enough_production_time",
         "no_customer_date",
         "no_sku",
         "no_supplier",
         "no_production_days",
-        "covered",
       ]).toContain(s);
     }
+  });
+
+  it("the governed Safety days value rides the payload for the rail words", async () => {
+    const { body } = await rowsOf();
+    expect(body.safetyDays).toBe(14);
   });
 });
 
@@ -516,7 +617,7 @@ describe("the owner chip", () => {
     expect(bySku(rows, "H1401S-K")!.ownerDuty).toBe("Purchasing Settings");
   });
 
-  it("a ready row has no owner — there is nothing to fix", async () => {
+  it("an orderable timing row has no owner — there is nothing to fix", async () => {
     const { rows } = await rowsOf();
     const ready = bySku(rows, "B1201S-K")!;
     expect(ready.ownerName).toBeNull();
@@ -609,7 +710,7 @@ describe("the buying facts SO Batch Purchase needs", () => {
     const { rows } = await rowsOf();
     const ready = bySku(rows, "B1201S-K")!;
     expect(ready.action).toMatchObject({
-      trigger: "ready_to_buy",
+      trigger: "can_order_early",
       ownerRule: "Current PO Duty",
       completionFact: "Current PO version reached supplier with evidence",
       sourceObject: { type: "sales_order", id: "o1", number: "SO-1207" },
@@ -632,14 +733,7 @@ describe("the buying facts SO Batch Purchase needs", () => {
     expect(tbd.action!.action).not.toContain("Siew Hong");
   });
 
-  it("a covered row owes nobody anything", async () => {
-    const { rows } = await rowsOf();
-    const covered = rows.find((r) => r.state === "covered");
-    expect(covered).toBeDefined();
-    expect(covered!.action).toBeNull();
-  });
-
-  it("the ready action is DATED by the arrival the goods must make", async () => {
+  it("the buying action is DATED by the arrival the goods must make", async () => {
     const { rows } = await rowsOf();
     const ready = bySku(rows, "B1201S-K")!;
     expect(ready.action!.dueDate).toBe(ready.goodsMustArrive);
@@ -715,7 +809,7 @@ describe("SO demand only — Manual Purchase never leaks in", () => {
     for (const r of rows) {
       expect(r.orderId, r.id).not.toBe("");
       // Every row traces to a real customer order in the fixture.
-      expect(["o1", "o2", "o3", "o4"], r.id).toContain(r.orderId);
+      expect(["o1", "o2", "o3", "o4", "o5", "o6", "o7"], r.id).toContain(r.orderId);
     }
   });
 });

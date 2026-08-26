@@ -1,7 +1,12 @@
 import { z } from "zod";
 import { isOnePoPerOrder } from "./to-order";
 import type { ProductCategory } from "./db-types";
-import type { PurchaseDemandRow, PurchaseDemandState } from "./purchase-demands";
+import {
+  PURCHASE_DEMAND_TIMING_STATES,
+  isPurchaseDemandTimingState,
+  type PurchaseDemandRow,
+  type PurchaseDemandState,
+} from "./purchase-demands";
 
 /**
  * SO BATCH PURCHASE — the arrangement a buyer makes BEFORE a purchase order
@@ -80,26 +85,25 @@ export const SO_BATCH_PURCHASE_WORDS = {
 
 // ─── The rail ────────────────────────────────────────────────────────────────
 
-export interface SoBatchRailGroup {
-  heading: string;
-  states: readonly PurchaseDemandState[];
-}
-
 /**
- * Two headings over the six governed states, and there is no seventh
- * (`docs/COPY-STANDARD.md` — `Rail heading | BUYING RECORDS · WORK TO DO`).
+ * THE RAIL CONTRACT — owner correction 2026-08-26 (Card 02-A;
+ * `docs/COPY-STANDARD.md` — the rail; `docs/purchasing/MASTER.md` §9.1).
  *
- * The split is not cosmetic. `BUYING RECORDS` answers *what is the buying
- * position*; `WORK TO DO` answers *what must somebody fix first*. A rail that
- * mixed them would make a blocked line look like a buying choice.
+ * Three headings, and there is no fourth. `TO ORDER` holds the one `All not
+ * ordered` row — the whole unissued listing, which is also what clearing every
+ * facet shows. `ORDER TIMING` holds the five timing rows, every one of them
+ * orderable. `SETUP TO FIX` holds the one Purchasing-owned setup blocker and
+ * renders ONLY when its count is above zero — an exception section with
+ * nothing in it is noise wearing a heading.
  */
-export const SO_BATCH_RAIL_GROUPS: readonly SoBatchRailGroup[] = [
-  { heading: "BUYING RECORDS", states: ["ready_to_buy", "covered"] },
-  {
-    heading: "WORK TO DO",
-    states: ["no_customer_date", "no_sku", "no_supplier", "no_production_days"],
+export const SO_BATCH_RAIL = {
+  toOrder: { heading: "TO ORDER", all: "All not ordered" },
+  timing: { heading: "ORDER TIMING", states: PURCHASE_DEMAND_TIMING_STATES },
+  setup: {
+    heading: "SETUP TO FIX",
+    states: ["no_production_days"] as readonly PurchaseDemandState[],
   },
-] as const;
+} as const;
 
 // ─── Destinations ────────────────────────────────────────────────────────────
 
@@ -137,10 +141,13 @@ export interface SoBatchSelection {
  * reference it will accept back. A row missing any of them cannot be turned
  * into a purchase order, so offering a tick-box would be offering an act that
  * fails — the Register refuses it here and the API refuses it again.
+ *
+ * EVERY timing state is selectable (Card 02-A): the timing rows express risk,
+ * never `Cannot buy`, and Order By is a planned date, not an unlock date.
  */
 export function isSelectableForBuying(row: PurchaseDemandRow): boolean {
   return (
-    row.state === "ready_to_buy" &&
+    isPurchaseDemandTimingState(row.state) &&
     row.toBuy != null &&
     row.toBuy > 0 &&
     row.supplierId != null &&

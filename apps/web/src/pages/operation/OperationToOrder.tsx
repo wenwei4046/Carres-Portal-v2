@@ -100,6 +100,7 @@ export default function OperationToOrder() {
     actingPoDuty: null,
     mayIssue: false,
     procurementPartners: [],
+    safetyDays: 14,
   };
 
   if (selections && documents.length > 0 && data) {

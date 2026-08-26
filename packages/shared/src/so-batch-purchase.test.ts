@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   SO_BATCH_PURCHASE_WORDS as W,
-  SO_BATCH_RAIL_GROUPS,
+  SO_BATCH_RAIL,
   defaultAllocations,
   setDestination,
   splitAllocation,
@@ -50,7 +50,7 @@ const DESTINATIONS = [KLANG, SG_BULOH, CLOSED];
 function row(over: Partial<PurchaseDemandRow> = {}): PurchaseDemandRow {
   return {
     id: "build::o1::b1",
-    state: "ready_to_buy",
+    state: "can_order_early",
     lineIds: ["l1"],
     orderId: "o1",
     so: 1318,
@@ -84,25 +84,28 @@ const sel = (r: PurchaseDemandRow, allocations: DestinationAllocation[]): SoBatc
   allocations,
 });
 
-describe("the rail is two headings over the six governed states", () => {
-  it("is BUYING RECORDS then WORK TO DO, in the approved order", () => {
-    expect(SO_BATCH_RAIL_GROUPS.map((g) => g.heading)).toEqual([
-      "BUYING RECORDS",
-      "WORK TO DO",
+describe("the rail — owner correction 2026-08-26", () => {
+  it("is TO ORDER, then ORDER TIMING, then SETUP TO FIX, in the approved order", () => {
+    expect(SO_BATCH_RAIL.toOrder.heading).toBe("TO ORDER");
+    expect(SO_BATCH_RAIL.toOrder.all).toBe("All not ordered");
+    expect(SO_BATCH_RAIL.timing.heading).toBe("ORDER TIMING");
+    expect(SO_BATCH_RAIL.timing.states).toEqual([
+      "can_order_early",
+      "safety_days_full",
+      "safety_days_low",
+      "safety_days_none",
+      "not_enough_production_time",
     ]);
-    expect(SO_BATCH_RAIL_GROUPS[0]!.states).toEqual(["ready_to_buy", "covered"]);
-    expect(SO_BATCH_RAIL_GROUPS[1]!.states).toEqual([
-      "no_customer_date",
-      "no_sku",
-      "no_supplier",
-      "no_production_days",
-    ]);
+    expect(SO_BATCH_RAIL.setup.heading).toBe("SETUP TO FIX");
+    expect(SO_BATCH_RAIL.setup.states).toEqual(["no_production_days"]);
   });
 
-  it("names all six states exactly once — there is no seventh", () => {
-    const all = SO_BATCH_RAIL_GROUPS.flatMap((g) => g.states);
-    expect(all).toHaveLength(6);
-    expect(new Set(all).size).toBe(6);
+  it("no facet appears twice, and the Sales/Catalog blockers are not facets", () => {
+    const all = [...SO_BATCH_RAIL.timing.states, ...SO_BATCH_RAIL.setup.states];
+    expect(new Set(all).size).toBe(all.length);
+    for (const gone of ["no_customer_date", "no_sku", "no_supplier"]) {
+      expect(all).not.toContain(gone);
+    }
   });
 
   it("the page's own words are the governed ones", () => {
@@ -114,17 +117,33 @@ describe("the rail is two headings over the six governed states", () => {
     expect(W.buy).toBe("Buy");
   });
 
-  it("no banned Purchasing word is spelt anywhere in the dictionary", () => {
-    const spelt = Object.values(W).join(" ");
+  it("no banned or retired Purchasing word is spelt anywhere in the dictionary or the rail", () => {
+    const spelt = [
+      ...Object.values(W),
+      SO_BATCH_RAIL.toOrder.heading,
+      SO_BATCH_RAIL.toOrder.all,
+      SO_BATCH_RAIL.timing.heading,
+      SO_BATCH_RAIL.setup.heading,
+    ].join(" ");
     for (const banned of [
       "Today",
       "Tomorrow",
+      "Overdue",
       "Needs attention",
       "Follow up",
       "Pending",
       "Waiting",
       "Priority",
       "Next action",
+      "Buffer",
+      "buffer",
+      "Ready to buy",
+      "Covered",
+      "BUYING RECORDS",
+      "WORK TO DO",
+      "All lines",
+      "No buying needed",
+      "Cannot buy",
       "PO Schedule",
       "CATEGORY",
     ]) {
@@ -133,9 +152,11 @@ describe("the rail is two headings over the six governed states", () => {
   });
 });
 
-describe("only a ready row with something to buy may be selected", () => {
-  it("takes a ready row whose Buy is positive", () => {
-    expect(isSelectableForBuying(row())).toBe(true);
+describe("every timing row stays orderable; blockers and Buy = 0 do not", () => {
+  it("takes any timing state whose Buy is positive — timing risk is not `Cannot buy`", () => {
+    for (const state of SO_BATCH_RAIL.timing.states) {
+      expect(isSelectableForBuying(row({ state })), state).toBe(true);
+    }
   });
 
   it("refuses every blocked state, however tempting its numbers look", () => {
@@ -144,17 +165,16 @@ describe("only a ready row with something to buy may be selected", () => {
     }
   });
 
-  it("refuses a covered row and a row with nothing left to buy", () => {
-    expect(isSelectableForBuying(row({ state: "covered", toBuy: 0 }))).toBe(false);
+  it("refuses a row with nothing left to buy", () => {
     expect(isSelectableForBuying(row({ toBuy: 0 }))).toBe(false);
     expect(isSelectableForBuying(row({ toBuy: null }))).toBe(false);
   });
 
-  it("refuses a ready row the engine gave no issue reference", () => {
+  it("refuses a row the engine gave no issue reference", () => {
     expect(isSelectableForBuying(row({ issueRef: null }))).toBe(false);
   });
 
-  it("refuses a ready row with no supplier resolved", () => {
+  it("refuses a row with no supplier resolved", () => {
     expect(isSelectableForBuying(row({ supplierId: null, supplier: null }))).toBe(false);
   });
 });
