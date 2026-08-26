@@ -1470,17 +1470,26 @@ export default function NewSkuModal({
       <ModalActions
         onCancel={onClose}
         onPrimary={submit}
+        /* ⭐ THE BUTTON NAMES THE CATEGORY (YH keying incident, 2026-08-26).
+            The modal opens defaulted to Mattress, and a whole Regal-A bedframe
+            family was generated as mattresses because nothing at the moment of
+            commitment said which category was about to be written. The last
+            thing the keyer reads before clicking now carries the word —
+            `Create Bedframe model + 5 SKUs` — using the same governed
+            CATEGORY_LABEL every other surface prints. Existing-model adds keep
+            their short labels: the model (and so its category) was explicitly
+            picked two fields up. */
         primary={
           compFlow
             ? mode === "existing"
               ? `Add ${selectedComps.size} SKU${selectedComps.size === 1 ? "" : "s"}`
-              : `Create model + ${selectedComps.size} SKU${selectedComps.size === 1 ? "" : "s"}`
+              : `Create ${CATEGORY_LABEL[category]} model + ${selectedComps.size} SKU${selectedComps.size === 1 ? "" : "s"}`
             : sizeFlow
               ? mode === "existing"
                 ? `Add ${selectedSizes.size} SKU${selectedSizes.size === 1 ? "" : "s"}`
-                : `Create model + ${selectedSizes.size} SKU${selectedSizes.size === 1 ? "" : "s"}`
+                : `Create ${CATEGORY_LABEL[category]} model + ${selectedSizes.size} SKU${selectedSizes.size === 1 ? "" : "s"}`
               : mode === "new"
-                ? "Create product + SKU"
+                ? `Create ${CATEGORY_LABEL[category]} product + SKU`
                 : "Add SKU"
         }
         primaryDisabled={!valid}

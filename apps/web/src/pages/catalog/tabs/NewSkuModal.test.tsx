@@ -162,7 +162,7 @@ describe("NewSkuModal — sofa compartment picker", () => {
     expect(screen.queryByTestId("new-sku-price")).not.toBeInTheDocument();
     expect(screen.queryByTestId("new-sku-cost")).not.toBeInTheDocument();
 
-    expect(screen.getByText("Create model + 2 SKUs")).toBeInTheDocument();
+    expect(screen.getByText("Create Sofa model + 2 SKUs")).toBeInTheDocument();
   });
 
   it("None deselects everything and falls back to the classic flat-SKU flow", () => {
@@ -172,10 +172,10 @@ describe("NewSkuModal — sofa compartment picker", () => {
     fireEvent.click(screen.getByTestId("new-sku-comps-none"));
     expect(screen.getByTestId("new-sku-comp-1A(LHF)")).toHaveAttribute("aria-pressed", "false");
     expect(screen.getByTestId("new-sku-variant")).toBeInTheDocument();
-    expect(screen.getByText("Create product + SKU")).toBeInTheDocument();
+    expect(screen.getByText("Create Sofa product + SKU")).toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId("new-sku-comps-all"));
-    expect(screen.getByText("Create model + 2 SKUs")).toBeInTheDocument();
+    expect(screen.getByText("Create Sofa model + 2 SKUs")).toBeInTheDocument();
   });
 
   it("submit creates the model (sofa_mode 'custom') then offers each ticked compartment — no single-SKU insert", async () => {
@@ -183,7 +183,7 @@ describe("NewSkuModal — sofa compartment picker", () => {
     render(<NewSkuModal models={MODELS} sofaCompartments={POOL} onClose={onClose} />);
     openSofa();
     fireEvent.change(screen.getByTestId("new-sku-name"), { target: { value: "Angsa" } });
-    fireEvent.click(screen.getByText("Create model + 2 SKUs"));
+    fireEvent.click(screen.getByText("Create Sofa model + 2 SKUs"));
 
     await waitFor(() => expect(onClose).toHaveBeenCalled());
     expect(mockCreateModelMutateAsync).toHaveBeenCalledWith({
@@ -208,7 +208,7 @@ describe("NewSkuModal — sofa compartment picker", () => {
     fireEvent.change(screen.getByTestId("new-sku-name"), { target: { value: "Angsa" } });
     fireEvent.click(screen.getByTestId("new-sku-comp-1NA")); // untick c2
     mockOfferMutateAsync.mockResolvedValue({ offered: 1, failed: [] });
-    fireEvent.click(screen.getByText("Create model + 1 SKU"));
+    fireEvent.click(screen.getByText("Create Sofa model + 1 SKU"));
 
     await waitFor(() => expect(onClose).toHaveBeenCalled());
     expect(mockOfferMutateAsync).toHaveBeenCalledWith({
@@ -228,7 +228,7 @@ describe("NewSkuModal — sofa compartment picker", () => {
     render(<NewSkuModal models={MODELS} sofaCompartments={POOL} onClose={onClose} />);
     openSofa();
     fireEvent.change(screen.getByTestId("new-sku-name"), { target: { value: "Angsa" } });
-    fireEvent.click(screen.getByText("Create model + 2 SKUs"));
+    fireEvent.click(screen.getByText("Create Sofa model + 2 SKUs"));
 
     // Failure: stays open, model identity locked, only c2 still selected.
     await waitFor(() =>
@@ -242,7 +242,7 @@ describe("NewSkuModal — sofa compartment picker", () => {
     expect(screen.getByTestId("new-sku-category")).toBeDisabled();
 
     // Retry: NO second model insert; offers only the failed compartment.
-    fireEvent.click(screen.getByText("Create model + 1 SKU"));
+    fireEvent.click(screen.getByText("Create Sofa model + 1 SKU"));
     await waitFor(() => expect(onClose).toHaveBeenCalled());
     expect(mockCreateModelMutateAsync).toHaveBeenCalledTimes(1);
     expect(mockOfferMutateAsync).toHaveBeenLastCalledWith({
@@ -257,7 +257,7 @@ describe("NewSkuModal — sofa compartment picker", () => {
     openSofa();
     expect(screen.queryByTestId("new-sku-compartments")).not.toBeInTheDocument();
     expect(screen.getByTestId("new-sku-variant")).toBeInTheDocument();
-    expect(screen.getByText("Create product + SKU")).toBeInTheDocument();
+    expect(screen.getByText("Create Sofa product + SKU")).toBeInTheDocument();
   });
 
   it("non-sofa categories keep the classic flow untouched", () => {
@@ -273,7 +273,7 @@ describe("NewSkuModal — sofa compartment picker", () => {
     expect(screen.getByTestId("new-sku-compartments")).toBeInTheDocument();
     expect(screen.getByText(/No compartments in the pool yet/)).toBeInTheDocument();
     expect(screen.getByTestId("new-sku-variant")).toBeInTheDocument();
-    expect(screen.getByText("Create product + SKU")).toBeInTheDocument();
+    expect(screen.getByText("Create Sofa product + SKU")).toBeInTheDocument();
   });
 });
 
@@ -295,7 +295,7 @@ describe("NewSkuModal — mattress/bedframe size chips", () => {
     expect(screen.queryByTestId("new-sku-cost")).not.toBeInTheDocument();
     // the one price field that seeds every generated SKU stays (principal)
     expect(screen.getByTestId("new-sku-price")).toBeInTheDocument();
-    expect(screen.getByText("Create model + 3 SKUs")).toBeInTheDocument();
+    expect(screen.getByText("Create Mattress model + 3 SKUs")).toBeInTheDocument();
   });
 
   it("bedframe reads the bedframe_size pool; category switch re-defaults the selection", () => {
@@ -304,7 +304,7 @@ describe("NewSkuModal — mattress/bedframe size chips", () => {
     fireEvent.change(screen.getByTestId("new-sku-category"), { target: { value: "bedframe" } });
     expect(screen.getByTestId("new-sku-size-K")).toHaveAttribute("aria-pressed", "true");
     expect(screen.queryByTestId("new-sku-size-S")).not.toBeInTheDocument(); // mattress-only value
-    expect(screen.getByText("Create model + 1 SKU")).toBeInTheDocument();
+    expect(screen.getByText("Create Bedframe model + 1 SKU")).toBeInTheDocument();
   });
 
   it("submit creates the model (sizes seed allowed_options) + generate-skus with the ticked sizes + price", async () => {
@@ -313,7 +313,7 @@ describe("NewSkuModal — mattress/bedframe size chips", () => {
     fireEvent.change(screen.getByTestId("new-sku-name"), { target: { value: "Lumi FirmCare" } });
     fireEvent.click(screen.getByTestId("new-sku-size-Q")); // untick Q → S + K remain
     fireEvent.change(screen.getByTestId("new-sku-price"), { target: { value: "1990" } });
-    fireEvent.click(screen.getByText("Create model + 2 SKUs"));
+    fireEvent.click(screen.getByText("Create Mattress model + 2 SKUs"));
 
     await waitFor(() => expect(onClose).toHaveBeenCalled());
     expect(mockCreateModelMutateAsync).toHaveBeenCalledWith({
@@ -337,7 +337,7 @@ describe("NewSkuModal — mattress/bedframe size chips", () => {
     expect(screen.queryByTestId("new-sku-price")).not.toBeInTheDocument();
     expect(screen.getByTestId("new-sku-price-lock-hint")).toBeInTheDocument();
     fireEvent.change(screen.getByTestId("new-sku-name"), { target: { value: "Lumi FirmCare" } });
-    fireEvent.click(screen.getByText("Create model + 3 SKUs"));
+    fireEvent.click(screen.getByText("Create Mattress model + 3 SKUs"));
     await waitFor(() => expect(onClose).toHaveBeenCalled());
     expect(mockGenerateSkusMutateAsync).toHaveBeenCalledWith({
       modelId: "m-new",
@@ -349,7 +349,7 @@ describe("NewSkuModal — mattress/bedframe size chips", () => {
     render(<NewSkuModal models={MODELS} optionPools={SIZE_POOLS} onClose={vi.fn()} />);
     fireEvent.click(screen.getByTestId("new-sku-sizes-none"));
     expect(screen.getByTestId("new-sku-variant")).toBeInTheDocument();
-    expect(screen.getByText("Create product + SKU")).toBeInTheDocument();
+    expect(screen.getByText("Create Mattress product + SKU")).toBeInTheDocument();
   });
 
   it("accessory/service categories never show the size chips", () => {
@@ -445,7 +445,7 @@ describe("NewSkuModal — accessory/service: no variant axis", () => {
       target: { value: "Memory Foam Pillow" },
     });
     fireEvent.change(screen.getByTestId("new-sku-price"), { target: { value: "99" } });
-    fireEvent.click(screen.getByText("Create product + SKU"));
+    fireEvent.click(screen.getByText("Create Accessory product + SKU"));
 
     await waitFor(() => expect(onClose).toHaveBeenCalled());
     expect(mockCreateModelMutateAsync).toHaveBeenCalledWith({
@@ -477,7 +477,7 @@ describe("NewSkuModal — accessory/service: no variant axis", () => {
     // …then flip to accessory and create.
     fireEvent.change(screen.getByTestId("new-sku-category"), { target: { value: "accessory" } });
     fireEvent.change(screen.getByTestId("new-sku-name"), { target: { value: "Bolster" } });
-    fireEvent.click(screen.getByText("Create product + SKU"));
+    fireEvent.click(screen.getByText("Create Accessory product + SKU"));
 
     await waitFor(() => expect(onClose).toHaveBeenCalled());
     expect(mockCreateSkuMutateAsync).toHaveBeenCalledWith(
@@ -673,7 +673,7 @@ describe("NewSkuModal — supplier override on bulk-generate flows", () => {
     fireEvent.change(screen.getByTestId("new-sku-name"), { target: { value: "Lumi FirmCare" } });
     expect(screen.getByTestId("new-sku-supplier")).toBeInTheDocument();
     fireEvent.change(screen.getByTestId("new-sku-supplier"), { target: { value: HOOKKA_ID } });
-    fireEvent.click(screen.getByText("Create model + 3 SKUs"));
+    fireEvent.click(screen.getByText("Create Mattress model + 3 SKUs"));
 
     await waitFor(() => expect(onClose).toHaveBeenCalled());
     expect(mockGenerateSkusMutateAsync).toHaveBeenCalledWith(
@@ -687,7 +687,7 @@ describe("NewSkuModal — supplier override on bulk-generate flows", () => {
     const onClose = vi.fn();
     render(<NewSkuModal models={MODELS} optionPools={SIZE_POOLS} onClose={onClose} />);
     fireEvent.change(screen.getByTestId("new-sku-name"), { target: { value: "Lumi FirmCare" } });
-    fireEvent.click(screen.getByText("Create model + 3 SKUs"));
+    fireEvent.click(screen.getByText("Create Mattress model + 3 SKUs"));
     await waitFor(() => expect(onClose).toHaveBeenCalled());
     const call = mockGenerateSkusMutateAsync.mock.calls[0][0];
     expect(call.input.supplierId).toBeUndefined();
@@ -706,7 +706,7 @@ describe("NewSkuModal — supplier override on bulk-generate flows", () => {
     fireEvent.change(screen.getByTestId("new-sku-name"), { target: { value: "Booqit" } });
     expect(screen.getByTestId("new-sku-supplier")).toBeInTheDocument();
     fireEvent.change(screen.getByTestId("new-sku-supplier"), { target: { value: HOOKKA_ID } });
-    fireEvent.click(screen.getByText("Create model + 2 SKUs"));
+    fireEvent.click(screen.getByText("Create Sofa model + 2 SKUs"));
 
     await waitFor(() => expect(onClose).toHaveBeenCalled());
     expect(mockOfferMutateAsync).toHaveBeenCalledWith(
@@ -721,7 +721,7 @@ describe("NewSkuModal — supplier override on bulk-generate flows", () => {
     );
     fireEvent.change(screen.getByTestId("new-sku-category"), { target: { value: "sofa" } });
     fireEvent.change(screen.getByTestId("new-sku-name"), { target: { value: "Booqit" } });
-    fireEvent.click(screen.getByText("Create model + 1 SKU"));
+    fireEvent.click(screen.getByText("Create Sofa model + 1 SKU"));
     await waitFor(() => expect(onClose).toHaveBeenCalled());
     const call = mockOfferMutateAsync.mock.calls[0][0];
     expect(call.supplierId).toBeUndefined();
@@ -826,7 +826,7 @@ describe("NewSkuModal — the supplier's own code on a bulk batch", () => {
     fireEvent.change(screen.getByTestId("new-sku-supplier-code-piece-c2"), {
       target: { value: "HK-390-1NA" },
     });
-    fireEvent.click(screen.getByText("Create model + 2 SKUs"));
+    fireEvent.click(screen.getByText("Create Sofa model + 2 SKUs"));
 
     await waitFor(() => expect(onClose).toHaveBeenCalled());
     /* The compartment lane sends ONE code per request, so the batch default is
@@ -846,7 +846,7 @@ describe("NewSkuModal — the supplier's own code on a bulk batch", () => {
     render(<NewSkuModal models={MODELS} sofaCompartments={POOL} onClose={onClose} />);
     openSofa();
     fireEvent.change(screen.getByTestId("new-sku-name"), { target: { value: "Angsa" } });
-    fireEvent.click(screen.getByText("Create model + 2 SKUs"));
+    fireEvent.click(screen.getByText("Create Sofa model + 2 SKUs"));
 
     await waitFor(() => expect(onClose).toHaveBeenCalled());
     const payload = mockOfferMutateAsync.mock.calls[0]?.[0] as Record<string, unknown>;
@@ -863,7 +863,7 @@ describe("NewSkuModal — the supplier's own code on a bulk batch", () => {
     fireEvent.change(screen.getByTestId("new-sku-supplier-code-piece-King"), {
       target: { value: "LM-100-K" },
     });
-    fireEvent.click(screen.getByText("Create model + 3 SKUs"));
+    fireEvent.click(screen.getByText("Create Mattress model + 3 SKUs"));
 
     await waitFor(() => expect(onClose).toHaveBeenCalled());
     const call = mockGenerateSkusMutateAsync.mock.calls[0]?.[0] as {
@@ -1093,7 +1093,7 @@ describe("NewSkuModal — per-size price and PWP on the generate flow", () => {
       target: { value: "425" },
     });
     fireEvent.change(screen.getByTestId("new-sku-size-pwp-Queen"), { target: { value: "305" } });
-    fireEvent.click(screen.getByText("Create model + 3 SKUs"));
+    fireEvent.click(screen.getByText("Create Mattress model + 3 SKUs"));
 
     await waitFor(() => expect(onClose).toHaveBeenCalled());
     const call = mockGenerateSkusMutateAsync.mock.calls[0]?.[0] as {
@@ -1110,7 +1110,7 @@ describe("NewSkuModal — per-size price and PWP on the generate flow", () => {
     const onClose = vi.fn();
     render(<NewSkuModal models={MODELS} optionPools={SIZE_POOLS} onClose={onClose} />);
     fireEvent.change(screen.getByTestId("new-sku-name"), { target: { value: "Cody" } });
-    fireEvent.click(screen.getByText("Create model + 3 SKUs"));
+    fireEvent.click(screen.getByText("Create Mattress model + 3 SKUs"));
 
     await waitFor(() => expect(onClose).toHaveBeenCalled());
     const call = mockGenerateSkusMutateAsync.mock.calls[0]?.[0] as {
