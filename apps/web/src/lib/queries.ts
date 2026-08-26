@@ -9365,9 +9365,9 @@ export function useOfferModelCompartments() {
     }: {
       modelId: string;
       compartmentIds: string[];
-      /* 2026-08-24 - override for the model's FIRST supplier'd sku. Harmless
-       * to send on every call: syncCompartmentSku's own inherit-from-siblings
-       * step wins the moment one compartment in the batch has written it. */
+      /* An explicit pick wins outright (2026-08-26) — the server's one
+       * precedence is explicit → sibling inherit → category cover, so every
+       * compartment in the batch lands on the supplier the keyer chose. */
       supplierId?: string;
       /* ⭐ The supplier's own code per compartment (2026-08-24), keyed by
        * compartmentId. This loop already sends one request per compartment, so

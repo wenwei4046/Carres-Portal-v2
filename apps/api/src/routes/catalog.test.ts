@@ -3077,6 +3077,43 @@ describe("0178 — sofa compartments (pool + per-model offered)", () => {
     expect(skuUpsert?.payload).toMatchObject({ supplier_id: "00000000-0000-0000-0000-00000000ffa2", price: 0, pos_active: true });
   });
 
+  /* ⭐ AN EXPLICIT PICK BEATS THE SIBLING (YH, 2026-08-26). The old rule let
+     a sibling SKU's supplier overrule the keyer's pick — written when "one
+     model, one supplier" was an invariant. Dual-sourcing ended it: adding
+     Xammar compartments with Hookka Industries PICKED silently wrote Ohana.
+     A fork the keyer chose is a decision; a swap they did not see is a
+     defect. One precedence now, shared with generate-skus:
+     explicit → sibling inherit → category cover. */
+  it("PUT — sibling supplier EXISTS, caller picks a different one → the PICK wins", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({
+        recorded,
+        reads: {
+          product_models: [{ id: MODEL_ID_LIVE, model_key: "BOOQIT", category: "sofa", name: "Booqit" }],
+          sofa_compartments: [COMP_ROW],
+          // A sibling already supplied by Ohana — the OLD rule would inherit it.
+          product_skus: [{ supplier_id: "00000000-0000-0000-0000-00000000aaa1" }],
+          suppliers: [{ id: "00000000-0000-0000-0000-00000000fff1" }],
+        },
+        writeReturn: { model_id: MODEL_ID_LIVE, compartment_id: COMP_ROW.id, price_override: null, sort_order: 0 },
+      }),
+    );
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/models/${MODEL_ID_LIVE}/compartments/${COMP_ROW.id}`, {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ supplierId: "00000000-0000-0000-0000-00000000fff1" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const skuUpsert = recorded.find((r) => r.op === "upsert" && r.table === "product_skus");
+    // The keyer's pick, not the sibling's Ohana.
+    expect(skuUpsert?.payload).toMatchObject({ supplier_id: "00000000-0000-0000-0000-00000000fff1" });
+  });
+
   // 2026-08-24 — the ONE ambiguous case: a model's first compartment, no
   // sibling sku's supplier to inherit yet. An explicit supplierId must win
   // over the category-cover guess, or a keyer has no way to say a brand-new
@@ -3140,7 +3177,14 @@ describe("0178 — sofa compartments (pool + per-model offered)", () => {
     expect(body.code).toBe("not_found");
   });
 
-  it("PUT — a model-own supplier still wins over an override (never fork one model onto two suppliers)", async () => {
+  /* REWRITTEN 2026-08-26. This test used to pin the OPPOSITE — the sibling
+     beating an explicit pick — from the era when "one model, one supplier" was
+     an invariant. Dual-sourcing ended that era, and in production the old rule
+     silently swapped a keyer's PICKED Hookka Industries for Ohana. What
+     survives of the old rule is exactly this: with NO explicit pick, the
+     sibling's supplier is still inherited — the model's own answer beats the
+     category-cover guess. */
+  it("PUT — no explicit pick → the sibling's supplier is inherited, not the category cover", async () => {
     const recorded: AdminCall[] = [];
     vi.mocked(userClient).mockReturnValue(
       buildWriteSb({
@@ -3150,6 +3194,7 @@ describe("0178 — sofa compartments (pool + per-model offered)", () => {
           sofa_compartments: [COMP_ROW],
           // The model already has a real supplier'd sku.
           product_skus: [{ model_id: MODEL_ID_LIVE, supplier_id: "sup-ohana" }],
+          // The cover fallback WOULD pick this one — proving inherit wins.
           suppliers: [{ id: "00000000-0000-0000-0000-00000000ffa3" }],
         },
         writeReturn: { model_id: MODEL_ID_LIVE, compartment_id: COMP_ID, price_override: null, sort_order: 0 },
@@ -3160,7 +3205,7 @@ describe("0178 — sofa compartments (pool + per-model offered)", () => {
       new Request(`http://t/api/catalog/models/${MODEL_ID_LIVE}/compartments/${COMP_ID}`, {
         method: "PUT",
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ priceOverride: null, supplierId: "00000000-0000-0000-0000-00000000ffa3" }),
+        body: JSON.stringify({ priceOverride: null }),
       }),
       env,
     );
