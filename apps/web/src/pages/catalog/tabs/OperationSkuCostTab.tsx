@@ -496,7 +496,20 @@ function SupplierOffersStrip({
         <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
           <select
             value={supplierId}
-            onChange={(e) => setSupplierId(e.target.value)}
+            onChange={(e) => {
+              const next = e.target.value;
+              setSupplierId(next);
+              /* ⭐ PICKING A SUPPLIER WITH AN OFFER LOADS THAT OFFER
+                 (2026-08-26). A re-save writes the WHOLE offer, so fixing a
+                 code typo with blank price boxes silently wiped the recorded
+                 price — the keyer had no way to know the blank meant "erase",
+                 not "keep". The boxes now start from what is on file, and the
+                 save writes back exactly what is shown. */
+              const existing = offers.find((o) => o.supplierId === next);
+              setCode(existing?.supplierCode ?? "");
+              setPrice(existing?.price == null ? "" : String(existing.price));
+              setPwp(existing?.pwpPrice == null ? "" : String(existing.pwpPrice));
+            }}
             aria-label={`${sku.sku} offer supplier`}
             data-testid={`opcost-offer-supplier-${sku.sku}`}
             className={`${INPUT_CLS} w-44 text-meta`}
