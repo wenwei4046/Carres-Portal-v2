@@ -69,6 +69,14 @@ export default function OperationSupplierItems() {
         minWidth: 140,
         sortable: true,
         chooserGroup: "Supplier",
+        /* ⭐ THE PILL MADE THE SUPPLIER INVISIBLE (YH, 2026-08-26). The grid
+           derives filter/group/sort strings from the accessor, and a ReactNode
+           coerces to "" — so every quoted row filed under BLANK and the
+           supplier filter could not find Hookka Industries' own offers. The
+           kit's documented remedy: name the string explicitly. */
+        filterValue: (r) => r.supplierName,
+        groupValue: (r) => r.supplierName,
+        searchValue: (r) => r.supplierName,
         accessor: (r) =>
           r.source === "quoted" ? (
             <span className="inline-flex items-center gap-1.5">
