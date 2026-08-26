@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import ModuleHeader from "./components/ModuleHeader";
-import { useCatalog, useOperationSuppliers } from "@/lib/queries";
+import { useAllSkuSupplierOffers, useCatalog, useOperationSuppliers } from "@/lib/queries";
 import { buildSupplierItems, missingSupplierCodeCount, type SupplierItemRow } from "./supplier-items";
 
 /**
@@ -34,6 +34,10 @@ const W = {
   colOurCode: "Our code",
   colOurName: "Our name",
   none: "Not recorded",
+  /* 0388 — a row born from the offers table, not the SKU's supplier slot:
+     this supplier has QUOTED the item; POs still route to the slot. Same word
+     the offers strip already uses. */
+  offer: "Offer",
 } as const;
 
 const STORAGE_KEY = "carres.supplier-items.v1";
@@ -45,10 +49,14 @@ export default function OperationSupplierItems() {
      a supplier's item does not stop being theirs because we stopped selling it. */
   const catalogQ = useCatalog({ admin: true });
   const suppliersQ = useOperationSuppliers();
+  /* 0388 — the offers table, one read, joined exactly as the slot is. Without
+     it a recorded offer was invisible here: Cody quoted by Hookka Industries
+     did not appear under Industries, which read as "never recorded". */
+  const offersQ = useAllSkuSupplierOffers();
 
   const rows = useMemo(
-    () => buildSupplierItems(catalogQ.data, suppliersQ.data?.suppliers),
-    [catalogQ.data, suppliersQ.data?.suppliers],
+    () => buildSupplierItems(catalogQ.data, suppliersQ.data?.suppliers, offersQ.data?.offers),
+    [catalogQ.data, suppliersQ.data?.suppliers, offersQ.data?.offers],
   );
   const missing = useMemo(() => missingSupplierCodeCount(rows), [rows]);
 
@@ -61,7 +69,20 @@ export default function OperationSupplierItems() {
         minWidth: 140,
         sortable: true,
         chooserGroup: "Supplier",
-        accessor: (r) => r.supplierName,
+        accessor: (r) =>
+          r.source === "quoted" ? (
+            <span className="inline-flex items-center gap-1.5">
+              {r.supplierName}
+              <span
+                className="rounded-full border border-base-200 bg-base-50 px-1.5 py-px text-label text-base-700"
+                title="This supplier has quoted the item; POs still go to the SKU's supplier."
+              >
+                {W.offer}
+              </span>
+            </span>
+          ) : (
+            r.supplierName
+          ),
       },
       {
         key: "their_code",

@@ -4209,6 +4209,19 @@ export function useSkuSupplierOffers(skuId: string, enabled: boolean) {
   });
 }
 
+/** Every offer in one read — the Supplier Items view joins these against the
+ *  catalog bundle exactly as it joins the slot. */
+export function useAllSkuSupplierOffers() {
+  return useQuery({
+    queryKey: ["sku-supplier-offers", "all"],
+    queryFn: () =>
+      apiFetch<{ offers: Array<{ skuId: string; supplierId: string; supplierCode: string | null }> }>(
+        "/api/catalog/supplier-offers",
+      ),
+    staleTime: 30_000,
+  });
+}
+
 export function useUpsertSkuSupplierOffer() {
   const qc = useQueryClient();
   return useMutation({
@@ -4223,8 +4236,10 @@ export function useUpsertSkuSupplierOffer() {
         `/api/catalog/skus/${encodeURIComponent(skuId)}/supplier-offers`,
         catalogJson("PUT", input),
       ),
-    onSuccess: (_d, v) =>
-      qc.invalidateQueries({ queryKey: ["sku-supplier-offers", v.skuId] }),
+    onSuccess: () =>
+      /* The prefix, so BOTH the per-SKU strip and the all-offers list (the
+         Supplier Items join) refresh from one write. */
+      qc.invalidateQueries({ queryKey: ["sku-supplier-offers"] }),
   });
 }
 
@@ -4236,8 +4251,10 @@ export function useDeleteSkuSupplierOffer() {
         `/api/catalog/skus/${encodeURIComponent(skuId)}/supplier-offers/${encodeURIComponent(supplierId)}`,
         catalogJson("DELETE"),
       ),
-    onSuccess: (_d, v) =>
-      qc.invalidateQueries({ queryKey: ["sku-supplier-offers", v.skuId] }),
+    onSuccess: () =>
+      /* The prefix, so BOTH the per-SKU strip and the all-offers list (the
+         Supplier Items join) refresh from one write. */
+      qc.invalidateQueries({ queryKey: ["sku-supplier-offers"] }),
   });
 }
 
