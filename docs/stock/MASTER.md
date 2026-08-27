@@ -130,7 +130,7 @@ check, completeness, pack and handover facts; it never guesses the date.
 
 A Transfer has exact Units, From, To, collection and arrival. Collection and arrival are separate
 facts. Partial handover changes only affected Units. A Unit not confirmed at destination remains
-with its last confirmed holder. Customer Delivery remains Delivery's record; Stock reads its
+with its last confirmed holder. Requested Delivery Date remains Delivery's record; Stock reads its
 handover facts instead of creating a duplicate Transfer.
 
 A Singapore SO has two Delivery legs: Carres Klang Warehouse to the selected JB partner warehouse,

@@ -187,7 +187,7 @@ No deposit · Online order
 The approved default columns remain:
 
 ```
-SO No | Ordered | Customer Delivery | Customer | Delivery Location | Showroom | PO No | DO No
+SO No | Ordered | Requested Delivery Date | Customer | Delivery Location | Showroom | PO No | DO No
 ```
 
 Search, filters, sorting, Columns and Export remain. Selection scopes output only. The Register
@@ -242,7 +242,7 @@ CUSTOMER                name · phone · email · demographics
   ├ Delivery address    the MY cascade · building type · billing
   └ Emergency contact   name · phone · relationship
 MONEY                   Total · paid · outstanding · Open Payments →
-ORDER INFO              Ordered · Customer Delivery · Proceed date · floor · stair carry · lift
+ORDER INFO              Ordered · Requested Delivery Date · Proceed date · floor · stair carry · lift
   ├ Sales ownership     Dealer · Showroom · Salesperson
   └ Amend delivery date the governed three fields · creates a Revision · needs approval
 GOODS                   the six-column truth
@@ -268,7 +268,7 @@ a word. The names are governed by `docs/COPY-STANDARD.md` § *Its section names*
 tab or a SO but keep it at order route tab."* It was a read-only mirror: `Order Route` builds a
 `LOGISTICS` node from the same partner name, a `DELIVERY DATE` node carrying the appointment and
 its slot, and a `DELIVERY ORDER` node. Removing it also ended a **Law D duplication** — the
-customer's promised date printed twice under two labels, `Customer Delivery` in Order info and
+customer's promised date printed twice under two labels, `Requested Delivery Date` in Order info and
 `Customer promise` here — and retired a banned word: `Journey` was already ruled out in favour of
 `Order Route` (COPY-STANDARD:1337, :1453).
 
@@ -427,7 +427,7 @@ CUSTOMER PROMISE (Sales Orders)
 Delivery owns the one backward calculation:
 
 ```
-customer delivery date
+requested delivery date
 → latest stock arrival at the selected JB partner warehouse
 → KL pickup date
 → latest Carres Warehouse ready date
@@ -541,7 +541,7 @@ read only as implementation history.
 ## Register
 
 - The default business columns are exactly, in order:
-  `SO No | Ordered | Customer Delivery | Customer | Delivery Location | Showroom | PO No | DO No`
+  `SO No | Ordered | Requested Delivery Date | Customer | Delivery Location | Showroom | PO No | DO No`
   (re-ruled to EIGHT by the owner on 2026-08-15 — see REGISTER AND OBJECT COMPOSITION below).
   The small `▸` is UI chrome, not a business column. There is no invented overall `Current` or
   combined status column.
@@ -817,18 +817,18 @@ Wiring Delivery's handover status is approved-target, not built.
   exact final SHA. Authenticated checks covered the Register and approved goods expansion, Object
   View/Edit/Revisions/History/Order Route, and coexistence with My Work open. Proceed date used the
   pre-existing Operations writer — **superseded 2026-08-26: it is read-only on an existing order,
-  see § THE MERGED ORDER TAB**; Customer Delivery remains read-only and Delivery's Confirmed
+  see § THE MERGED ORDER TAB**; Requested Delivery Date remains read-only and Delivery's Confirmed
   Delivery Date remains distinct. No new address, access, delivery-date or destination field was
   created. `docs/ui/MASTER.md` §6.6 records the final reusable UI proof.
 - **FINAL OWNER VISUAL CORRECTION — PRODUCTION-VERIFIED / LOCKED 2026-08-14.** Owner review
   reopened the preceding acceptance record. The final correction is PR #795, merged as
   `759d49efaee6c643bd9d8e1840cb991dee2b7015`; CI run `31804608716` passed the complete gate and
   deploy run `31805501074` converged the exact
-  SHA on the governed production surfaces. Authenticated acceptance proved: Customer Delivery
+  SHA on the governed production surfaces. Authenticated acceptance proved: Requested Delivery Date
   remains a date fact with exact missing value `No delivery date` and separate two-line guidance;
   Register location is concise and collapses duplicate city/state; the six-column goods mini-table
   remains unchanged, with `Carres Klang` shown without quantity for a single destination; the
-  object exposes the governed goods truth, keeps Customer Delivery read-only and Sales ownership
+  object exposes the governed goods truth, keeps Requested Delivery Date read-only and Sales ownership
   governed; Save and Discard disappear in Revisions, History and Order Route and dirty navigation
   is refused safely; Activity translates logistics and
   stock ETA events into governed operator terms; and Order Route retains its per-goods architecture
@@ -840,22 +840,34 @@ Wiring Delivery's handover status is approved-target, not built.
   governed print handler, focused tests and production build passed. This record supersedes the
   earlier closure and locks Owner Visual Acceptance without changing business authority.
 
-## THE THREE DELIVERY DATES — OWNER RULING 2026-08-15 (Jess) · APPROVED / LOCKED
+## THE THREE DELIVERY DATES — the split ruled 2026-08-15 (Jess); fact #1 re-ruled 2026-08-27 (owner) · APPROVED / LOCKED
 
 **One cell has been carrying three different business facts.** Sales Order owns exactly one of
 them. This section defines all three so that no screen, import or job may substitute one for
 another.
 
+> ### ⛔ WHAT `Requested Delivery Date` IS — OWNER RULING 2026-08-27
+>
+> **The date the customer is currently asking Carres to deliver on.**
+>
+> It is **NOT** Carres' latest-delivery commitment · **NOT** the delivery Logistics has confirmed ·
+> **NOT** the date the goods actually arrived. Those are three other facts with three other owners
+> — see § THE CROSS-MODULE DATE CONTRACT below.
+>
+> **Retired, and banned from reuse:** `Customer Delivery` · `Deliver By` · `Promised Delivery` ·
+> `Customer 1st Requested Delivery`. **`Delivery Window` may never name this date** — `window`
+> already carries another meaning in the Delivery authority.
+
 | # | Name | What it is | Who writes it | Where it shows | May it be overwritten? |
 |---|---|---|---|---|---|
-| 1 | **`Customer Delivery`** | The date Carres has **promised** the customer. A commitment. | Sales at order entry; Operation only through the governed amendment, which records who and why | `Customer Delivery` column · Object Header · every customer-facing document | **NEVER automatically.** Only a governed amendment with an owner and a reason. |
-| 2 | **`Customer Delivery Window`** | What the customer answered when they have no firm date — `Mid September`, `This month`, `Customer will call` | Sales, at the Sales Portal, at the moment the customer cannot give a date | The same `Customer Delivery` cell, **marked as a window, never rendered as a date** | Replaced by #1 the moment a firm date is agreed. Never by a job. |
-| 3 | **`Estimated delivery`** | When Carres **believes** it can deliver, derived from goods arrival and logistics facts. **Not a promise.** | Nobody types it. Derived from Purchasing/Delivery facts. | Order Route and Delivery surfaces; in the Register cell only as the third fallback, **always labelled `Estimated`** | Recomputed freely — it is derived, never committed |
+| 1 | **`Requested Delivery Date`** | The date the customer is currently asking Carres to deliver on. | Sales at order entry; Operation only through the governed revision/amendment path, which records who, when and why | `Requested Delivery Date` column · Object Header · every customer-facing document | **NEVER automatically and NEVER silently.** Only through the governed revision path, which preserves the original and every previous requested date. |
+| 2 | **`Requested Delivery Window`** | What the customer answered when they have no firm date — `Mid September`, `This month`, `Customer will call` | Sales, at the Sales Portal, at the moment the customer cannot give a date | The same `Requested Delivery Date` cell, **marked as a window, never rendered as a date** | Replaced by #1 the moment a firm date is agreed. Never by a job. |
+| 3 | **`Estimated delivery`** | When Carres **believes** it can deliver, derived from goods arrival and logistics facts. **Not what the customer asked for.** | Nobody types it. Derived from Purchasing/Delivery facts. | Order Route and Delivery surfaces; in the Register cell only as the third fallback, **always labelled `Estimated`** | Recomputed freely — it is derived, never committed |
 
-### FALLBACK ORDER — what the `Customer Delivery` cell shows
+### FALLBACK ORDER — what the `Requested Delivery Date` cell shows
 
 ```
-1  a promised date exists            →  show the date
+1  a requested date exists           →  show the date
 2  else a customer window exists     →  show the window, marked as a window
 3  else goods/logistics facts exist  →  show it, labelled `Estimated`
 4  else nobody has asked the customer→  the fact, then the action
@@ -863,15 +875,17 @@ another.
 
 ### TWO HARD RULES
 
-- **`Estimated delivery` is never presented as `Customer Delivery`.** It is always labelled and
-  always visually quieter. A derived guess may not wear a promise's clothes — a customer-facing
-  document carries #1 and nothing else.
-- **No process, import, scheduled job or screen may overwrite an existing `Customer Delivery`.**
-  Changing a promise is an amendment: it has an owner, a reason and a history entry.
+- **`Estimated delivery` is never presented as `Requested Delivery Date`.** It is always labelled
+  and always visually quieter. A derived guess may not wear the customer's own words — a
+  customer-facing document carries #1 and nothing else.
+- **No process, import, scheduled job or screen may overwrite an existing `Requested Delivery
+  Date`.** Changing it is a governed revision: it has an owner, a reason and a history entry, and
+  **History preserves the original requested date and every previous one.** The active Register
+  column shows the LATEST requested date and **never carries `First` or `Original` in its name.**
 
 ### THE WRONG ATTRIBUTION THIS RULING CORRECTS
 
-Measured on production 2026-08-15 — 11 not-delivered orders carry no `Customer Delivery`:
+Measured on production 2026-08-15 — 11 not-delivered orders carry no `Requested Delivery Date`:
 
 ```
 8  delivery_date_tbd = TRUE    the customer WAS asked and answered "not sure yet"
@@ -887,13 +901,83 @@ carries the distinction and the screen discards it.
 `Estimated delivery` does not exist as a stored fact today and is not invented by this ruling; it
 enters the fallback only where Purchasing/Delivery already own the facts it derives from.
 
+## THE CROSS-MODULE DATE CONTRACT — OWNER RULING 2026-08-27 · APPROVED / LOCKED
+
+**Four different dates, four different owners. No surface may substitute one for another, and no
+module may rename another module's date.**
+
+| Canonical label | What it means | Owner |
+|---|---|---|
+| **`Requested Delivery Date`** | Customer requested this date. | **Sales Orders** |
+| **`Confirmed Delivery`** | Logistics and the customer agreed to this delivery day. | **Delivery** |
+| **`Confirmed Time`** | Logistics and the customer agreed to this time range. | **Delivery** |
+| **`Delivered`** | The goods were actually delivered. | **Delivery result** |
+
+**Sales Orders owns `Requested Delivery Date`. Delivery may READ it and may NEVER silently
+overwrite it.**
+
+### When the customer requests another date
+
+- the current Sales Order shows the **latest** `Requested Delivery Date`;
+- the change follows the governed Sales Order revision / amendment path;
+- History preserves the original requested date, every previous date, **who** changed it, **when**
+  and **why**;
+- **`First` and `Original` never appear in the active Register column name.**
+
+### The Purchasing connection
+
+SO Batch Purchase reads `Requested Delivery Date` and derives purchasing timing from it:
+
+```
+Requested Delivery Date − 14 Safety days                          = Goods Must Arrive
+Goods Must Arrive − Supplier × Category production working days   = Order By
+```
+
+**Purchasing must NEVER wait for `Confirmed Delivery` before ordering.**
+
+### The Delivery connection
+
+Delivery keeps the three apart and prints them apart:
+
+```
+Requested Delivery Date  |  Confirmed Delivery  |  Confirmed Time
+```
+
+`Confirmed Delivery` and `Confirmed Time` are **NOT renamed by this ruling.**
+**No confirmed-logistics column is added to the Sales Orders Register by this ruling** — that
+placement requires separate owner review.
+
+### Required UI wording — every surface, one label
+
+Register · Object Detail · create/edit flow · document preview · Revisions · History · Order Route
+· filters · exports · every cross-module reader print the same canonical label:
+
+```
+Requested Delivery Date
+Thu, 24 Sep
+```
+
+Where a second explanatory line helps, and **always smaller than the fact line**:
+
+```
+Customer requested this date
+```
+
+A legacy record with no date:
+
+```
+No requested delivery date
+Ask the customer which date they want
+```
+
+
 ## THE SALES PORTAL ENTRY GATE — OWNER RULING 2026-08-15 (Chai) · APPROVED / LOCKED
 
 **Two things must be true before Operation may receive a Sales Order.** Both are enforced in the
 wizard AND at the create door, because a rule that lives only in the browser is a rule a stale tab
 can break.
 
-### 1 · Customer Delivery is mandatory at order entry
+### 1 · Requested Delivery Date is mandatory at order entry
 
 **If the date is not confirmed with the customer, Operation must not receive the order.** The
 `(TBD)` / `Confirm later` option is REMOVED from the new-order wizard's Step 3; a real date
@@ -943,7 +1027,7 @@ query.**
 ### Register
 
 - **The default columns are exactly EIGHT**, in order:
-  `SO No | Ordered | Customer Delivery | Customer | Delivery Location | Showroom | PO No | DO No`.
+  `SO No | Ordered | Requested Delivery Date | Customer | Delivery Location | Showroom | PO No | DO No`.
   This overwrites the seven-column default in §0.1. `Showroom` READS the Sales-ownership fact the
   order already carries (`outlets.name`); it has been a declaration in the register's catalog since
   Stage 1 and is promoted, not invented. It is read-only and the register may never gain a writer
@@ -1131,8 +1215,8 @@ the amendment machinery, the goods truth and the Order Route architecture are un
   customer_billing_same · delivery_stair_items · entry_fields` (the 0219 bag carrying the building
   type and the operator's custom fields). `entry_fields` MERGES — a config field retired last month
   is not erased by an unrelated save.
-- **The write boundary is unchanged.** Goods, price and `Customer Delivery` are never a direct
-  write here; `Ordered` and `Customer Delivery` render as read-only facts. Attribution still moves
+- **The write boundary is unchanged.** Goods, price and `Requested Delivery Date` are never a direct
+  write here; `Ordered` and `Requested Delivery Date` render as read-only facts. Attribution still moves
   by request (0329). `Customer type (auto)` is derived from the same phone probe the POS runs and
   is read-only on both surfaces.
 
@@ -1194,12 +1278,12 @@ gate proves the code does what its tests say; only the walk proves it does what 
 ## Guided operations and Service Case boundary — CLOSED / PRODUCTION-VERIFIED 2026-08-14
 
 - ⭐ **RE-RULED 2026-08-18 (owner): the fact is said ONCE per surface, and never as a lecture.**
-  A missing Customer Delivery date prints the amber fact (`No delivery date`) with no action
+  A missing Requested Delivery Date date prints the amber fact (`No delivery date`) with no action
   clause in the Register cell — **a register lists documents; actions live in My Work /
   Team Work / the Order Route.** The SO object page's seven-answer guidance banner
   (Why · Who must act · Who to contact · What to ask · What to use · What to record · What
   happens next) is **DELETED** — it lectured instead of working and said one thing in three
-  places. What survives: the amber field-level note on `Customer Delivery`, the cell's
+  places. What survives: the amber field-level note on `Requested Delivery Date`, the cell's
   who/phone/ask hover, and the owned action in My Work / Team Work / the Order Route. This
   overwrites the 2026-08-14 guidance-block ruling under the MASTER OVERWRITE LAW. The guidance
   stores no second action or delivery truth.
@@ -1269,7 +1353,7 @@ official Card numbers.
    `carres-pos` `db39d1c6`) and all four canonicals converged on that exact asset. Production Worker
    version `5c669747-8a6b-4998-9643-fcc39604c69d` serves the API change at 100%. Authenticated
    production verification on `erp.carresofficial.com/operation/orders` proved the exact default
-   order **SO No / Ordered / Customer Delivery / Customer / Delivery Location / PO No / DO No**,
+   order **SO No / Ordered / Requested Delivery Date / Customer / Delivery Location / PO No / DO No**,
    bounded bordered surface, preserved Search / typed filters / Columns / Export,
    inline goods-only grouped disclosure (SKU/model/size/quantity), direct SO document
    navigation, and the 2990-style right-click actions **View / Edit / Preview PDF / Print PDF / Copy
@@ -4548,7 +4632,7 @@ scope still re-verified atomically. The fallback manual door and the work-engine
 
 **AUTHENTICATED PRODUCTION ACCEPTANCE — walked 2026-08-18 on `erp.carresofficial.com`, PASS.**
 Staged on **SO-1322** (`IT WALK SLICE2 AUTO` · JAGER-SS ×1 · RM 1,500 outstanding · NETS ·
-deliberately no customer delivery date beforehand — the gate does not need one):
+deliberately no requested delivery date beforehand — the gate does not need one):
 
 - Old Orders drawer → Delivery panel → `Confirm with customer` → **Thu 20 Aug + Afternoon
   (12pm–3pm)** → `Record confirmation`. The DELIVERY ORDER row filled **by itself** with

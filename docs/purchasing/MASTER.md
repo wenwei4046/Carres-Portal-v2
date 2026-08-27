@@ -614,8 +614,8 @@ work week and holidays. The one server planning engine owns the arithmetic — b
 no working-day arithmetic, and Safety days are subtracted exactly once:
 
 ```text
-Customer Delivery − 14 Safety days                             = Goods Must Arrive
-Goods Must Arrive − Supplier × Category production working days = Order By
+Requested Delivery Date − 14 Safety days                         = Goods Must Arrive
+Goods Must Arrive − Supplier × Category production working days  = Order By
 ```
 
 Timing classification, derived by the same engine:
@@ -624,8 +624,8 @@ Timing classification, derived by the same engine:
 today < Order By                                                   → Can order early
 today = Order By                                                   → 14 safety days left
 today > Order By · completion lands 1–13 working days early        → 1–13 safety days left
-expected production completion = Customer Delivery                 → No safety days left
-expected production completion > Customer Delivery                 → Not enough production time
+expected production completion = Requested Delivery Date            → No safety days left
+expected production completion > Requested Delivery Date            → Not enough production time
 ```
 
 `Order By` stays fixed for a demand unless an authoritative source fact changes; `Safety days

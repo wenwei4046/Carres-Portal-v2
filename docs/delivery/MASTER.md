@@ -314,11 +314,11 @@ KPI cards do not precede the work/Register.
 **The unified Delivery listing — owner ruling 2026-08-24:**
 
 ```
-SO / Ref · Customer · Customer Delivery · Delivery Location · Building · Logistics Partner ·
+SO / Ref · Customer · Requested Delivery Date · Delivery Location · Building · Logistics Partner ·
 Confirmed Delivery · Confirmed Time · Goods · DO No · Delivery Status
 ```
 
-`Customer Delivery` is the Sales Order promise. `Confirmed Delivery` and `Confirmed Time` are
+`Requested Delivery Date` is the date the customer asked for, owned by Sales Orders. `Confirmed Delivery` and `Confirmed Time` are
 Delivery's operational arrangement. `DO No` appears in that same row only after system issue;
 before issue it says `No delivery order yet`. DO No opens the formal document and SO / Ref opens
 the source Sales Order. One row = one Delivery scope/Journey leg; a split or multi-leg journey
@@ -351,7 +351,7 @@ replacement:
 > date and time, the expected arrival, the logistics note, the partner's actual reply proof and the
 > Condo driver/vehicle are **Delivery's writes**, made from this workspace. **Sales Orders remains
 > the owner of the commercial customer promise** — the customer, the address, the building facts and
-> the promised `Customer Delivery` date — and Delivery may never write one of them.
+> the customer-requested `Requested Delivery Date` — and Delivery may never write one of them.
 
 It is an operational workspace with formal DO doors in the same listing; arrangement facts and the
 issued DO remain different objects. What is unchanged is §3's ruling: **the SYSTEM issues the
@@ -395,7 +395,7 @@ is Delivery Orders and Delivery History.
 **Default columns, in this order (owner ruling 2026-08-24, OVERWRITING the 2026-08-21 order):**
 
 ```
-☐ · ▸ · SO / Ref · Customer · Delivery Location · Building · Customer Delivery ·
+☐ · ▸ · SO / Ref · Customer · Delivery Location · Building · Requested Delivery Date ·
 Confirmed Delivery · Confirmed Time · Logistics Partner · Goods · DO No · Delivery Status
 ```
 
@@ -454,7 +454,7 @@ LEFT — read-only, from the Sales Order      LEFT — Delivery owns and edits t
   Customer · Phone                            Logistics Partner
   Delivery location                           Confirmed Delivery · Confirmed Time
   Building / floor / lift                     Expected arrival time
-  Customer Delivery                           Logistics note · Actual reply proof
+  Requested Delivery Date                           Logistics note · Actual reply proof
   Customer preferred time                     Driver / Vehicle — Condo only
 ```
 
@@ -653,7 +653,7 @@ in production and has been verified through an authenticated Operations session:
 - `/operation?tab=delivery` is the one operational listing for delivery planning and issued DO
   facts;
 - the date rail uses **No confirmed date** and **Overdue**;
-- the listing keeps Customer Delivery separate from Confirmed Delivery and Confirmed Time, shows
+- the listing keeps Requested Delivery Date separate from Confirmed Delivery and Confirmed Time, shows
   Logistics Partner and Goods, and adds DO No and Delivery Status to the same row;
 - expanding a row shows its product lines and the shared Stock facts Where, Who has it and Stock
   ETA without leaving Delivery;
