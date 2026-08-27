@@ -215,6 +215,44 @@ describe("Sales Order object template contract", () => {
     expect(workspace).toContain("<SalesOrderAttribution");
   });
 
+  /* ⭐ THE THIRD MERGE PASS — YH, 2026-08-27. Seven cards became FOUR (plus
+     the conditional work card), and the order changed: MONEY rose above
+     ORDER INFO, directly under CUSTOMER.
+
+     `Emergency contact` and `Amend delivery date` were the last two collapsible
+     cards. Merged, they lose the fold with the border — which also retires the
+     `forceOpen` machinery that existed ONLY because they could be collapsed: a
+     section that is always on screen cannot hide an unsaved change or a live
+     amendment, which is what those two guards were for.
+
+     Neither loses its NAME or its governed copy: `creates a Revision · needs
+     approval` moved onto the subsection heading rather than being reworded. */
+  it("keeps four cards, in the ruled order, with the two folds merged in", () => {
+    const cards = [...workspace.matchAll(/<Block$\s+title="([^"]+)"|<Block title="([^"]+)"/gm)]
+      .map((m) => m[1] ?? m[2]);
+    expect(cards).toEqual([
+      "Customer",
+      "Money",
+      "Order info",
+      "Goods",
+      "What this change started elsewhere",
+    ]);
+    /* Both merged sections survive as named subsections… */
+    expect(workspace).toContain("<SubHead>Emergency contact</SubHead>");
+    expect(workspace).toContain(
+      '<SubHead note="creates a Revision · needs approval">Amend delivery date</SubHead>',
+    );
+    /* …and neither is a card any more. */
+    expect(workspace).not.toContain('title="Emergency contact"');
+    expect(workspace).not.toContain('title="Amend delivery date"');
+    /* The fields and the machinery came across untouched. */
+    expect(workspace).toContain("so-emergency-name");
+    expect(workspace).toContain("<SalesOrderAmendDeliveryDate");
+    /* The gate on the emergency section is still the 0219 config, not a
+       hardcoded always-on. */
+    expect(workspace).toContain("{emergencyEnabled && (");
+  });
+
   /* ⭐ THE STANDING FACT SITS BESIDE THE CARD'S NAME (Jess, 2026-08-26) —
      "add stuff to header part like the new/existing customer thingy". It stays
      a FACT, never a control: the phone probe derives it and MASTER.md:1038

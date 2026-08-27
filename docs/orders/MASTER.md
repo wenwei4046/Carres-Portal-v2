@@ -205,17 +205,28 @@ each card"*, *"make it merge more"*. Eleven cards became seven. **No fact left t
 sections left THIS TAB because `Order Route` already owns them.**
 
 ```
-CUSTOMER              name · phone · email · demographics
-  ├ header            New customer / Existing customer — the standing answer, beside the name
-  └ Delivery address  the MY cascade · building type · billing
-ORDER INFO            Ordered · Customer Delivery · Proceed date · floor · stair carry · lift
-  └ Sales ownership   Dealer · Showroom · Salesperson
-AMEND DELIVERY DATE   the governed three fields (collapsible)
-EMERGENCY CONTACT     name · phone · relationship (collapsible)
-MONEY                 Total · paid · outstanding · Open Payments →
-GOODS                 the six-column truth
+CUSTOMER                name · phone · email · demographics
+  ├ header              New customer / Existing customer — the standing answer, beside the name
+  ├ Delivery address    the MY cascade · building type · billing
+  └ Emergency contact   name · phone · relationship
+MONEY                   Total · paid · outstanding · Open Payments →
+ORDER INFO              Ordered · Customer Delivery · Proceed date · floor · stair carry · lift
+  ├ Sales ownership     Dealer · Showroom · Salesperson
+  └ Amend delivery date the governed three fields · creates a Revision · needs approval
+GOODS                   the six-column truth
 WHAT THIS CHANGE STARTED ELSEWHERE   only when work exists
 ```
+
+**THE THIRD MERGE PASS — 2026-08-27 (YH).** Seven cards became **four**, and the order changed:
+`MONEY` rises above `ORDER INFO`, directly under `CUSTOMER`. `Emergency contact` joins the customer
+it describes; `Amend delivery date` joins the dates it moves.
+
+Those were the last two COLLAPSIBLE cards, and merging retires the `forceOpen` machinery with the
+fold: a section that is always on screen cannot hide an unsaved change or a live amendment, which
+is the only thing those guards existed for. Neither section loses its name, and
+`creates a Revision · needs approval` is governed copy that moved onto the subsection heading
+rather than being reworded. Held mechanically by `SalesOrderWorkspace.ui-contract.test.ts`, which
+now pins the card list and its order.
 
 **A merged section keeps its NAME.** `Delivery address` and `Sales ownership` are locked words and
 survive as in-card headings; the merge moves a border, a 24px gap and a second heading rule, never
