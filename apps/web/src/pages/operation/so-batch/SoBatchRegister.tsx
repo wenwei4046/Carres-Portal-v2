@@ -304,7 +304,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
       {
         key: "status",
         label: W.colStatus,
-        width: 84,
+        width: 76,
         sortable: true,
         chooserGroup: "Order",
         accessor: (o) => (
@@ -319,7 +319,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
       {
         key: "proceedDate",
         label: W.colProceedDate,
-        width: 116,
+        width: 104,
         sortable: true,
         chooserGroup: "Order",
         accessor: (o) => (
@@ -335,7 +335,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
       {
         key: "poNo",
         label: W.colPoNo,
-        width: 130,
+        width: 144,
         sortable: true,
         chooserGroup: "Documents",
         accessor: (o) => {
@@ -369,7 +369,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
            loses WHICH record a row is (Card §9). */
         key: "soNo",
         label: W.colSoNo,
-        width: 96,
+        width: 90,
         sortable: true,
         chooserGroup: "Order",
         accessor: (o) => (
@@ -403,7 +403,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
       {
         key: "customer",
         label: W.colCustomer,
-        width: 150,
+        width: 130,
         sortable: true,
         chooserGroup: "Order",
         accessor: (o) => (
@@ -420,7 +420,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
            cannot print two localities for one order. */
         key: "deliveryLocation",
         label: W.colDeliveryLocation,
-        width: 170,
+        width: 160,
         sortable: true,
         chooserGroup: "Order",
         accessor: (o) => {
@@ -438,7 +438,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
       {
         key: "requestedDelivery",
         label: W.colRequestedDelivery,
-        width: 168,
+        width: 158,
         sortable: true,
         chooserGroup: "Order",
         accessor: (o) => (
@@ -459,7 +459,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
       {
         key: "supplier",
         label: W.colSupplier,
-        width: 130,
+        width: 110,
         sortable: true,
         chooserGroup: "Buying",
         accessor: (o) => {
@@ -477,7 +477,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
            carries — never silently rewritten. */
         key: "deliverTo",
         label: W.deliverTo,
-        width: 190,
+        width: 176,
         chooserGroup: "Buying",
         accessor: (o) => {
           const eligible = (leafsByOrder.get(o.orderId) ?? []).filter(isSelectableForBuying);
@@ -560,7 +560,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
            Never `Goods Must Arrive`, never an "if ordered today" estimate. */
         key: "poDeliveryDate",
         label: W.colPoDeliveryDate,
-        width: 140,
+        width: 126,
         sortable: true,
         chooserGroup: "Documents",
         accessor: (o) => {
@@ -696,10 +696,13 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
                 testId: (o: SoBatchOrderRow) => `so-batch-select-${o.orderId}`,
               }}
               statusSummary={(filtered) => {
-                const not = filtered.filter((o) => o.status === "blank").length;
+                /* `not ordered` is the RAIL's word for outstanding demand —
+                   printing a second, status-based "not ordered" number here
+                   would put two arithmetics behind one phrase. The footer
+                   states the Register's own status tallies and stops. */
                 const partial = filtered.filter((o) => o.status === "partial").length;
                 const ordered = filtered.filter((o) => o.status === "ordered").length;
-                const line = `${filtered.length} ${W.footerUnit} · ${not} not ordered · ${partial} Partial · ${ordered} Ordered`;
+                const line = `${filtered.length} ${W.footerUnit} · ${partial} Partial · ${ordered} Ordered`;
                 return (
                   <span className="block truncate" data-testid="so-batch-footer" title={line}>
                     {line}

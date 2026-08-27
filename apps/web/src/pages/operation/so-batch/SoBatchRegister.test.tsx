@@ -515,7 +515,7 @@ describe("the rail — Card 02-A wording, Card 02-B counting", () => {
   it("the footer counts Sales Orders by status", () => {
     renderRegister();
     expect(screen.getByTestId("so-batch-footer").textContent).toBe(
-      "7 Sales Orders · 5 not ordered · 1 Partial · 1 Ordered",
+      "7 Sales Orders · 1 Partial · 1 Ordered",
     );
   });
 });
