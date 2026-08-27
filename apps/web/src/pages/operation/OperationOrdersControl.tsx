@@ -35,6 +35,7 @@ import { apiFetch } from "@/lib/api";
 import { orderBookingDay, orderControlOf } from "@/lib/order-booking";
 import { personLabel, personInitials, avatarColor } from "@/lib/staff-avatar";
 import OrderDetailDrawer from "./components/OrderDetailDrawer";
+import { stageOf } from "./components/StageChip";
 import type { OrderJourneySignals } from "./components/OrderJourneyHeader";
 import ModuleHeader from "./components/ModuleHeader";
 import FollowUpForm from "./components/FollowUpForm";
@@ -91,7 +92,6 @@ import ChasePartnerReview, {
   type PartnerChaseOrder,
 } from "./components/ChasePartnerReview";
 import { useAuth } from "@/lib/auth";
-import type { OperationStage } from "./components/StageChip";
 import {
   RefreshCw,
   ChevronRight,
@@ -207,14 +207,10 @@ const TAB_DESC: Record<SettledTab, string> = {
   completed: "Delivered and closed",
 };
 
-/** Stage derivation — mirrors OperationOrders.stageOf so the two surfaces never
- *  disagree on where an order sits in the pipeline. */
-export function stageOf(o: operationOrderListRow): OperationStage {
-  if (o.status === "place") return "placed";
-  if (o.operation_stage) return o.operation_stage as OperationStage;
-  if (o.status === "delivered") return "delivered";
-  return "in_production";
-}
+/* D3 — the derivation moved to `components/StageChip`, beside the type, so the
+   drawer can read the SAME one without importing this file (which imports it).
+   Re-exported here because this module's consumers already name it. */
+export { stageOf };
 
 /** C13 (Loo, 2026-08-04) — the imported AutoCount archive is not WORK.
  *
@@ -245,7 +241,9 @@ function controlTabOf(
 ): SettledTab {
   const s = stageOf(o);
   if (s === "delivered") return "completed";
-  // Native POS order not yet proceeded stays "placed".
+  // Native POS order not yet proceeded stays "placed". An IMPORT must fall
+  // through to the `proceed` return at the bottom, which is why `stageOf` stays
+  // raw and the display rule is a separate, named function (D3).
   if (s === "placed" && o.source_system !== "autocount") return "placed";
   // In-pipeline (proceeded / autocount / confirmed / in_production / dispatched).
   // READINESS split (Jess 2026-07-19): the pipeline stage never advances in the
