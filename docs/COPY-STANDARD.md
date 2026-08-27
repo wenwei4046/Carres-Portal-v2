@@ -136,8 +136,11 @@ Add today's PO Duty holder · The system must route PO-2041.
 [Open duty roster]
 ```
 
-The two-line form is not forced onto ordinary History facts, completed records, small field
-validation or empty states. Their existing patterns below still govern them.
+The two-line ACTION form is not forced onto completed records, small field validation or empty
+states. **History and Revision records use their own governed three-rank grammar in
+`ui/MASTER.md`: what happened first, who/when second, and only the important result third.** A
+simple record may omit the third line when no result/detail exists, but actor, time and fact may
+never be flattened into one dot-separated database sentence.
 
 ## Work detail — five answers, not five compulsory boxes
 

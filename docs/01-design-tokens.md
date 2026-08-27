@@ -68,6 +68,13 @@ apart do not read as two ranks; these two do. The law itself is
 `ui/MASTER.md` §5 — this row exists so the ramp above is not read as leaving
 the pairing open.
 
+**The History / Revision record grammar is 13 / 12 / 11** — `text-body`
+semibold for what happened, `text-meta` for actor + role + actual date/time,
+then `text-label` at `font-normal` for the important result or detail (owner
+ruling 2026-08-27). The third rank is omitted when there is no detail; the
+remaining ranks do not collapse into one sentence. The law itself is in
+`ui/MASTER.md`.
+
 ---
 
 ## 2 · Colour

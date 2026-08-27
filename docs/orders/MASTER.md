@@ -150,6 +150,38 @@ Order | Revisions | History | Order Route
 The identity/header persists across all four views. There is no invented overall status and no
 second View/Edit page state.
 
+### Revisions and History — operator-readable records
+
+Both views obey the shared `ui/MASTER.md` **History + Revision three-rank record grammar**. They do
+not place actor, role, event and raw field values on one line merely because every value is present.
+
+```text
+REVISIONS
+
+Original order
+Rev 1 · Current
+Recorded by {real staff name} · Mon, 24 Aug 11:16
+
+HISTORY
+
+Order created
+{real staff name} · Principal · Mon, 24 Aug 11:16
+No deposit · Online order
+```
+
+- **Revisions** remains the complete-version index. `Original order` is Rev 1; each later row names
+  the approved/applied change. Selecting a row opens the complete read-only SO version and its
+  historical PDF/document truth.
+- **History** remains the append-only event ledger. Line 1 states the event in Primary School
+  Standard English; line 2 names the actor, role and actual time; line 3 states only the important
+  result. A simple event without extra detail uses two lines.
+- `Unknown user` is not an acceptable final state. Resolve the real actor from the authoritative
+  identity record, or say `System` only when the portal truly performed the event. A missing actor
+  link is an audit-data defect; the UI does not conceal it by flattening role and fields beside the
+  word `Unknown`.
+- `0% deposit · online` is raw-field copy. The employee-facing result is `No deposit · Online
+  order` when those are the authoritative facts.
+
 ## Sales Orders Register — find truth, never assign work
 
 The approved default columns remain:
