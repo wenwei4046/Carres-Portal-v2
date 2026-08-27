@@ -1078,14 +1078,18 @@ compact destination header / work toolbar
 
 breathing gap
 
-┌─ light bordered Register ──────────────────────────────────────────────┐
-│ ▸ | SO No | Ordered | Requested Delivery Date | Customer |             │
-│   | Delivery Location | Showroom | PO No | DO No                       │
-└────────────────────────────────────────────────────────────────────────┘
+  ▸ | SO No | Ordered | Requested Delivery Date | Customer |
+    | Delivery Location | Showroom | PO No | DO No
 ```
 
+- **NO OUTER FRAME — owner ruling 2026-08-27 (Jess), overwriting this section's earlier "light
+  bordered Register".** The page is the header and the table listing; a border wrapping the Work
+  Toolbar, grid and status footer read as a box around the whole page and is deleted. The toolbar
+  band, the table header rule and the fixed footer give all the structure. This is Register
+  template grammar (`register/DataGrid` `appearance="reference"`), so every Register on the
+  engine inherits it — the frame does not survive page by page.
 - Sales Orders is a truth Register, not Work and not a dashboard. No KPI-card preamble, no
-  borderless Linear-style continuous slab, and no giant card around the page.
+  giant card around the page.
 - The seven business columns above are the governed default and exact order. `▸` is chrome.
   There is no overall `Current`/status column. Content sets predetermined usable widths; staff do
   not resize to repair the default. Optional columns may cause grid-owned horizontal overflow and

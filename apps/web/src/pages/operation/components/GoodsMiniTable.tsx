@@ -341,11 +341,14 @@ export default function GoodsMiniTable({
                   )}
                 </td>
               ) : null}
-              {/* ONE ink for every value. `Category` used to be its own
-                  colour as well as its own size — two ways of saying it
-                  outranks `SKU`, which it does not. */}
+              {/* ONE ink for every value — and ONE FACE (Jess, 2026-08-27:
+                  "why all the font type different"). `font-mono` fell back to
+                  the browser's monospace stack, so Unit ID, PO and SKU wore a
+                  different typeface than the row they sit in. Carres has no
+                  mono face — the register engine itself aliases --font-mono
+                  to Inter — so an identifier is plain body text here too. */}
               <td className="px-2 py-2">{line.category}</td>
-              <td className="px-2 py-2 font-mono">
+              <td className="px-2 py-2">
                 {line.unitIds.length ? (
                   line.unitIds.map((id) => <div key={id}>{id}</div>)
                 ) : (
@@ -353,7 +356,7 @@ export default function GoodsMiniTable({
                 )}
               </td>
               {showCoveredBy ? (
-                <td className="px-2 py-2 font-mono">
+                <td className="px-2 py-2">
                   {line.coveredBy?.length ? (
                     line.coveredBy.map((po) => <div key={po}>{po}</div>)
                   ) : (
@@ -370,7 +373,7 @@ export default function GoodsMiniTable({
                   <Absence>{line.deliverToAbsence}</Absence>
                 )}
               </td>
-              <td className="px-2 py-2 font-mono">{line.sku}</td>
+              <td className="px-2 py-2">{line.sku}</td>
               <td className="px-2 py-2 tabular-nums">{line.qty}</td>
               {showSupplier ? (
                 <td className="px-2 py-2">
