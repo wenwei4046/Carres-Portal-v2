@@ -699,10 +699,23 @@ developer who knows the schema is not the acceptance reader; a new operator is.
 - Do not concatenate actor, role, action and raw fields into one sentence separated by dots. That
   makes a schema-literate developer do the hierarchy work in their head and leaves a new operator
   without a reading path.
-- **`Unknown user` is forbidden employee copy.** If a person acted, show the recorded real name.
-  If the portal acted automatically, show `System`. If neither can be established, the missing
-  actor/source is an audit-data defect to repair; never invent a person and never borrow the role
-  as if it were a name.
+- **STAFF IDENTITY LAW — OWNER RULING 2026-08-27 (Jess), after the failed five-second walk.**
+  `Who did it?` is answered by a PERSON, never a permission. The first cold read failed on
+  `principal · Principal` — a role/account label repeated twice — and the ruling that closed it:
+  1. Every staff member uses an **individual authenticated account**. `Principal`, `Operation`
+     and `Finance` are permission roles, never staff names, and a shared role-labeled login is
+     not an actor.
+  2. Every Sales Order write stores the authenticated individual `user_id`; Revisions and
+     History resolve that id to the staff member's **real display name** from the authoritative
+     identity source. The UI never hardcodes an account→person mapping and never translates a
+     role into a person.
+  3. Approved display: `Jess · Principal · Thu, 27 Aug 12:30` · `Recorded by Jess · Thu, 27 Aug
+     12:30`. Forbidden display: `principal · Principal` · `Recorded by principal` ·
+     `Unknown user`.
+  4. `System` appears only when the event's own authoritative facts prove the portal, a
+     scheduled job or database automation acted — never inferred from a missing id.
+  5. An old record whose individual actor cannot be recovered — including one written by a
+     shared role login — says **`Staff identity not recorded`**. A person is never invented.
 - A Revision uses the same ranks but remains a complete-version door, not an event. Rev 1 says
   `Original order`; a later approved/applied Revision names the governed change. Selecting a
   Revision opens the complete read-only version and its document truth.
