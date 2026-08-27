@@ -550,3 +550,51 @@ describe("Sales Order object template contract", () => {
     }
   });
 });
+
+/**
+ * ⭐ THE THREE-RANK RECORD GRAMMAR IS STRUCTURE, NOT STYLE (CARD 2026-08-27).
+ * `ui/MASTER.md` § HISTORY + REVISION THREE-RANK RECORD GRAMMAR is
+ * owner-approved/locked; this pins the parts a green component suite could
+ * quietly lose: the governed audit-defect words, the deleted `Unknown user`,
+ * the 13/12/11 tokens, and the complete-version navigation that must survive
+ * around them.
+ */
+describe("Sales Order record grammar contract", () => {
+  const ledger = readFileSync(join(here, "SalesOrderLedger.tsx"), "utf8");
+
+  it("⭐ has deleted `Unknown user` from employee copy, for good", () => {
+    expect(ledger).not.toContain("Unknown user");
+    expect(workspace).not.toContain("Unknown user");
+    /* The governed audit-data defect sentence stands in its place — a legacy
+       row without an actor states the defect; it never invents a person. */
+    expect(ledger).toContain("Actor was not recorded");
+  });
+
+  it("renders the three ranks in the ruled 13/12/11 tokens", () => {
+    expect(ledger).toContain("text-body font-semibold");
+    expect(ledger).toContain("text-meta font-normal");
+    expect(ledger).toContain("text-label font-normal");
+  });
+
+  it("translates raw stored values at the read boundary, never in the store", () => {
+    expect(ledger).toContain('"No deposit"');
+    expect(ledger).toContain('"Online order"');
+  });
+
+  it("keeps every revision record a real door into the complete version", () => {
+    /* Semantic list + button, with the existing focus token — mouse and
+       keyboard both activate it, and an old version opens the same complete
+       read-only workspace the assertions above pin. */
+    expect(ledger).toContain('data-testid="revision-list"');
+    expect(ledger).toContain("focus-visible:ring-2 focus-visible:ring-kit-blue-9");
+    expect(ledger).toContain("Propose this version again");
+    /* The duplicate chip strip above a second list is retired. */
+    expect(ledger).not.toContain("flex-wrap gap-1.5");
+  });
+
+  it("keeps the four object views and the old-revision door wired together", () => {
+    expect(workspace).toContain('const OBJECT_VIEWS = ["Order", "Revisions", "History", "Order Route"]');
+    expect(workspace).toContain("onViewRevision={setViewRev}");
+    expect(workspace).toContain('disabled={mode === "oldrev"}');
+  });
+});

@@ -684,6 +684,44 @@ directory only and said so.*
   opens work renders the fact/problem plus its action; bare `Not given` or `Not recorded` must not
   impersonate an actionable warning.
 
+### HISTORY + REVISION THREE-RANK RECORD GRAMMAR — OWNER-APPROVED / LOCKED 2026-08-27
+
+History and Revisions are not database dumps. They are employee-facing records that must answer,
+in five seconds: **what happened · who did it · when · what important result was recorded.** A
+developer who knows the schema is not the acceptance reader; a new operator is.
+
+- Use **up to three visual lines**, in this fixed reading order. Omit an inapplicable third line;
+  never render an empty line merely to preserve height.
+  1. **What happened** — `text-body` (13), semibold, primary text.
+  2. **Who and when** — `text-meta` (12), regular, secondary text. Use structured actor identity:
+     real staff name + role + actual `fmtDate()` date/time.
+  3. **Important result/detail** — `text-label` (11) at `font-normal`, quieter but accessible.
+- Do not concatenate actor, role, action and raw fields into one sentence separated by dots. That
+  makes a schema-literate developer do the hierarchy work in their head and leaves a new operator
+  without a reading path.
+- **`Unknown user` is forbidden employee copy.** If a person acted, show the recorded real name.
+  If the portal acted automatically, show `System`. If neither can be established, the missing
+  actor/source is an audit-data defect to repair; never invent a person and never borrow the role
+  as if it were a name.
+- A Revision uses the same ranks but remains a complete-version door, not an event. Rev 1 says
+  `Original order`; a later approved/applied Revision names the governed change. Selecting a
+  Revision opens the complete read-only version and its document truth.
+
+```text
+Order created
+Jess · Principal · Mon, 24 Aug 11:16
+No deposit · Online order
+
+Original order
+Rev 1 · Current
+Recorded by Jess · Mon, 24 Aug 11:16
+```
+
+**Acceptance.** Give the record to a staff member who did not build the screen. Within five
+seconds they must answer what happened, who did it, when, and the important result. Failure to
+answer any applicable question means the record fails UI acceptance even when every stored field
+is technically present.
+
 ### ERP SHELL V1 — OWNER RULING 2026-08-13
 
 - The left navigation is grouped by responsibility using the destination grammar in

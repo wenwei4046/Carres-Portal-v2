@@ -3195,6 +3195,18 @@ export interface operationOrderDetailHistoryRow {
   text: string;
   by_role: string | null;
   occurred_at: string;
+  /** The audit identity the event recorded (0387 stamps it on new writes).
+   *  Optional: an older Worker does not send it. */
+  by_user_id?: string | null;
+  /** The resolved real staff/salesperson name — resolved SERVER-SIDE from the
+   *  authoritative identity tables, never in the browser. */
+  actor?: string | null;
+  /** The server's truthful classification of who acted. `system` only when the
+   *  event's own facts prove automation; the browser never infers it from a
+   *  null id. Optional: an older Worker does not send it. */
+  actor_kind?: "human" | "system" | "missing";
+  /** The structured half of the event — reason/note/changed/revision. */
+  metadata?: unknown;
 }
 export interface operationOrderDetailWarehouse {
   id: string;
@@ -4789,6 +4801,13 @@ export interface SalesOrderRevisionRow {
   snapshot: SalesOrderSnapshot;
   created_at: string;
   created_by: string | null;
+  /** CARD 2026-08-27 — the recorder's real display name, resolved server-side
+   *  from the authoritative identity tables (`created_by` stays the audit
+   *  identity). Optional: an older Worker does not send it. */
+  created_by_name?: string | null;
+  /** Server-side classification of the recorder; the browser never infers
+   *  `system` from a null id. Optional: an older Worker does not send it. */
+  actor_kind?: "human" | "system" | "missing";
   /** CARD 1 (0340) — who asked: staff_correction | customer_change. NULL on
    *  Rev 1 (the original) and on pre-0340 rows — history is never guessed. */
   change_type?: "staff_correction" | "customer_change" | null;
