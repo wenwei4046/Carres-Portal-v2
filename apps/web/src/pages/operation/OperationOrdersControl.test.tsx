@@ -2101,30 +2101,45 @@ describe("nextActionOf (C2)", () => {
     });
   });
 
-  it("PO open + inside the MS/BF window (deadline−7d) → Chase supplier (red)", () => {
+  it("PO open + inside Purchasing's Safety days → Chase supplier (red)", () => {
     const o = makeRow({ id: "x", so: 1, delivery_date: inDays(5) });
-    expect(nextActionOf(o, { state: "awaiting" }, MS)).toMatchObject({
+    expect(nextActionOf(o, { state: "awaiting" }, MS, 7)).toMatchObject({
       label: "Confirm ready date",
       tone: "danger",
     });
   });
 
-  it("PO open + still outside the window → Chase supplier (amber)", () => {
-    const o = makeRow({ id: "x", so: 1, delivery_date: inDays(10) });
-    expect(nextActionOf(o, { state: "awaiting" }, MS)).toMatchObject({
+  /* D8 — the window is one governed number, and this module no longer holds
+     one. A ladder asked before Purchasing's settings land has no window, and
+     an unanswered window may not escalate: amber, never red. */
+  it("no Safety days yet → Chase supplier stays amber, never red", () => {
+    const o = makeRow({ id: "x", so: 1, delivery_date: inDays(1) });
+    expect(nextActionOf(o, { state: "awaiting" }, MS, null)).toMatchObject({
       label: "Confirm ready date",
       tone: "warning",
     });
   });
 
-  it("Sofa uses a 5-day window, not 7 (deadline−6d = amber, −3d = red)", () => {
-    expect(
-      nextActionOf(makeRow({ id: "x", so: 1, delivery_date: inDays(6) }), { state: "awaiting" }, SOFA).tone,
-    ).toBe("warning");
-    expect(
-      nextActionOf(makeRow({ id: "y", so: 2, delivery_date: inDays(3) }), { state: "awaiting" }, SOFA).tone,
-    ).toBe("danger");
+  it("the window is Purchasing's number, not a per-category constant", () => {
+    /* The same order, the same goods, two governed values — the only thing
+       that moves the colour is the number Purchasing owns. The retired code
+       forked on `lineCategory()`, so a sofa got 5 and everything else 7; a
+       manager editing Safety days could not move either. */
+    const o = makeRow({ id: "x", so: 1, delivery_date: inDays(6) });
+    expect(nextActionOf(o, { state: "awaiting" }, SOFA, 5).tone).toBe("warning");
+    expect(nextActionOf(o, { state: "awaiting" }, SOFA, 14).tone).toBe("danger");
+    expect(nextActionOf(o, { state: "awaiting" }, MS, 5).tone).toBe("warning");
+    expect(nextActionOf(o, { state: "awaiting" }, MS, 14).tone).toBe("danger");
   });
+
+  it("PO open + still outside the window → Chase supplier (amber)", () => {
+    const o = makeRow({ id: "x", so: 1, delivery_date: inDays(10) });
+    expect(nextActionOf(o, { state: "awaiting" }, MS, 7)).toMatchObject({
+      label: "Confirm ready date",
+      tone: "warning",
+    });
+  });
+
 
   // ── T3 · Delay Radar — catch the miss BEFORE the window ──
   it("stock ETA overshoots the customer date (date still future) → Delay planning (red)", () => {
