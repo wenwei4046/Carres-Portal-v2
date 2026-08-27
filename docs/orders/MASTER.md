@@ -4938,7 +4938,6 @@ right-click menu follows the approved 2990 Sales Orders action set and order exa
 ```
 Edit
 View
-Preview
 Print
 ────────
 Issue Delivery Order
@@ -4947,12 +4946,21 @@ Copy to new Sales Order
 Cancel SO
 ```
 
+**`Preview` IS RETIRED — owner ruling (YH, 2026-08-28), overwriting the Loo 2026-08-11 line
+above.** The locked menu had meant `Preview` and `Print` as two acts: a governed document
+preview, and the governed document output. Only the second was ever built. Both rows shipped
+calling `openSalesOrderPdf(r.id, r.so)` with the same arguments, so the menu asked the reader to
+choose between two names for one behaviour — the shape ERP-ARCHITECTURE ownership law C
+(*a door, never a duplicate*) exists to stop. The duplicate label is removed and the act is named
+once. **No capability was lost, because none was ever built behind the first name.** A real
+preview act, if Carres wants one, is a BUILD with its own card — not a restoration of this row.
+
 This is a Sales Orders module exception, not a Register Template requirement for every module.
 The menu copies the reference action inventory and ordering; Carres frozen tokens, typography,
 spacing, hover/current treatment, permissions and confirmation components still govern its visual
 and interaction treatment. Each item routes to the Carres-owned capability rather than executing
 foreign business rules inside the grid: `Edit` opens the full Sales Order Workspace in edit intent;
-`View` opens the owned read view; `Preview` opens the governed document preview; `Print` uses the
+`View` opens the owned read view; `Print` uses the
 governed Sales Order document output; `Issue Delivery Order` hands off to the Delivery-owned issue
 flow; `Copy to new Sales Order` starts a new draft from the governed copy boundary; and `Cancel SO`
 uses the owned cancellation gate and destructive confirmation. The implementation cards must

@@ -939,12 +939,25 @@ describe("Cancel SO", () => {
         [
           "View",
           "Edit",
-          "Preview PDF",
           "Print PDF",
           "Copy to new Sales Order",
           "Cancel SO",
         ].includes(t ?? ""),
       );
     expect(labels[labels.length - 1]).toBe("Cancel SO");
+  });
+
+  /* ONE ACT, ONE NAME (YH, 2026-08-28). `Preview PDF` and `Print PDF` were
+     two rows calling one handler with one argument list, so the menu offered
+     a choice that did not exist. This pins the INTENT — the row menu names an
+     act once — not the surviving spelling of the word. */
+  it("names the document act ONCE — no Preview row shadowing Print", () => {
+    mount();
+    fireEvent.contextMenu(screen.getByTestId("grid-parent-row"));
+    const labels = screen
+      .getAllByRole("button")
+      .map((b) => b.textContent?.trim());
+    expect(labels).toContain("Print PDF");
+    expect(labels).not.toContain("Preview PDF");
   });
 });
