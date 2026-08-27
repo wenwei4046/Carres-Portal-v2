@@ -633,29 +633,37 @@ sidebar page. Existing implementation constants do not override these approved p
 |---|---|
 | Page | No page — use `SO Batch Purchase` or the source object |
 | Search | `Search Sales Order, customer, SKU or supplier…` |
-| Rail headings | `TO ORDER` · `ORDER TIMING` · `SETUP TO FIX` |
+| Rail headings | `TO ORDER` · `ORDER TIMING` · `PRODUCT` · `SUPPLIER` · `SETUP TO FIX` |
 | Empty state | `No proceeded Sales Orders.` |
 | Register columns (Card 02-B, 2026-08-27 — exactly, in this order) | `Status` · `Proceed Date` · `PO No` · `SO No` · `Customer` · `Delivery Location` · `Requested Delivery Date` · `Supplier` · `Deliver To` · `PO Delivery Date` |
 | The Status words | blank · `Partial` · `Ordered` — and nothing else. Never `Ready Stock` · `Ready to buy` · `Cannot buy` · `No buying needed` · `Posted` · `Sent` · `Not sent` · `Covered` |
 | A parent cell over several values | one value prints itself; several print `2 POs` · `2 suppliers` · `Multiple` — the exact mapping lives in the expansion |
 
-**The rail — owner correction 2026-08-26; counting corrected 2026-08-27 (Card 02-B).** Three
-headings, and there is no fourth. `SETUP TO FIX` renders only when its count is above zero:
+**The rail — owner ruling 2026-08-27 (Card 02-C).** Five sections, in this order.
+`SETUP TO FIX` renders only when at least one affected Sales Order exists:
 
 | Heading | Rail rows |
 |---|---|
 | `TO ORDER` | `All not ordered` |
-| `ORDER TIMING` | `Can order early` · `14 safety days left` · `1–13 safety days left` · `No safety days left` · `Not enough production time` |
-| `SETUP TO FIX` | `Production time not set` |
+| `ORDER TIMING` | `Can order early` · `14 safety days left` · `1–13 safety days left` · `No safety days left` · `Not enough production days` |
+| `PRODUCT` | `All products` · `Mattress` · `Bedframe` · `Sofa` |
+| `SUPPLIER` | `All suppliers` · actual supplier names, alphabetical — never hardcoded, never a placeholder, and no `No supplier` row |
+| `SETUP TO FIX` | `Production days not set` |
 
-Counts are UNIQUE Sales Orders with outstanding eligible buying demand, never documents,
-notifications or leaf lines — a fully Ordered or fully Ready-Stock-covered order is never counted
-as not ordered; a zero count prints no number. The default no-filter Register shows every
-proceeded record; `All not ordered` is a real outstanding-only filter that excludes fully Ordered
-records. Every `ORDER TIMING` row stays orderable — the words say timing risk, never `Cannot buy`,
-and Order By is a planned date, never an unlock date. `Production time not set` lines are not
-selectable until the Supplier × Category production time exists. Fully covered / `Buy = 0` DEMAND
-is never selectable, but the Sales Order's own row is permanent and never leaves the Register.
+Counts are UNIQUE Sales Orders, never documents, notifications, leaf lines, SKU quantities or
+PO counts, and each section's counts update against the other selected sections. The fixed
+rows print their live count, zero included; a supplier row exists only while it matches —
+except the selected supplier, which stays visible with `0`. The default no-filter Register
+shows every proceeded record; `All not ordered` is a real outstanding-only filter that
+excludes fully Ordered records. One filter per section; sections combine; a second click on
+the selected timing row clears it; `All products` and `All suppliers` clear their sections.
+The rail carries NO checkboxes — filters are `NavRow` rows; the only checkboxes on the page
+are the Register's `Issue PO` selection. Every `ORDER TIMING` row stays orderable — the words
+say timing risk, never `Cannot buy`, and Order By is a planned date, never an unlock date.
+`Production days not set` lines are not selectable until the Supplier × Category production
+days exist. Fully covered / `Buy = 0` DEMAND is never selectable, but the Sales Order's own
+row is permanent and never leaves the Register. A governed rail label is never truncated —
+it wraps onto a second line in the same body font, never a tooltip.
 
 **The row facts.** Line 1 is the FACT; line 2 is the FIX, in the imperative. A line the owning
 boundary (Sales / Catalog) unexpectedly let through without its customer date, SKU or supplier is
