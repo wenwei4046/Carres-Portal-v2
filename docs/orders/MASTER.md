@@ -1283,7 +1283,7 @@ gate proves the code does what its tests say; only the walk proves it does what 
 ## Guided operations and Service Case boundary — CLOSED / PRODUCTION-VERIFIED 2026-08-14
 
 - ⭐ **RE-RULED 2026-08-18 (owner): the fact is said ONCE per surface, and never as a lecture.**
-  A missing Requested Delivery Date date prints the amber fact (`No delivery date`) with no action
+  A missing Requested Delivery Date prints the amber fact (`No delivery date`) with no action
   clause in the Register cell — **a register lists documents; actions live in My Work /
   Team Work / the Order Route.** The SO object page's seven-answer guidance banner
   (Why · Who must act · Who to contact · What to ask · What to use · What to record · What
@@ -2867,11 +2867,38 @@ work resolves to the responsible salesperson; Purchasing, Receiving, Payment and
 resolves through those modules' governed duty/ownership rules. Owner identity is displayed
 structurally and is not repeated inside every action sentence.
 
-**APPROVED TARGET / NOT BUILT — 2026-08-14.** The current shipped order work composition still
-uses the Sales Order PIC for its order-track items and its registry does not yet carry separate
-Owner Rule and Display Owner fields. This documentation ruling does not change ERP code. A later
-BUILD/DELIVERY scope must migrate the registry and Work surfaces, preserve the existing completion
-facts and clocks, and production-verify roster/cover resolution plus the two-line presentation.
+**BUILT 2026-08-27 — the Action Owner Engine resolution.** The Card 9 registry
+(`packages/shared/src/work-engine.ts`) now carries a **structured `ownerRule` beside the prose**
+(`po_duty · salesperson · order_pic · payment_duty · delivery_duty · finance_duty · system`, plus
+the cross-module rules' own precise keys `grn_duty · claim_month_po_duty` recorded for the later
+feed wiring), and `workItemsForOrder` resolves the person per RULE instead of borrowing the PIC:
+
+- **Purchasing's order-track work (`Issue PO` · `Confirm ready date`) lands on the month's
+  PO-duty holder** (`ops_po_duty`, the one rostered duty that exists) — in the holder's My Work,
+  their Team group and their Quick Rail counts. A dormant duty layer leaves the duty word
+  `Purchasing` standing; the PIC is never borrowed for Purchasing's work.
+- **The missing customer promise composes `Ask for the delivery date` for the responsible
+  salesperson** (§0.1 row 1) — a NAME from Sales ownership grouped as a person in Team Work, not
+  an ops account; the fallback duty word is `Sales`, exactly as the register's hover guidance
+  falls back. Composed only for the rows nobody asked (`delivery_date` null AND
+  `delivery_date_tbd` false — the 3, never the 8; owner ruling 2026-08-15) on an unfinished
+  order. The ladder never raises it, so no register cell or drawer headline changed.
+- **The PIC keeps what is truthfully the relationship owner's** — delay decision, logistics
+  choice and calls (ACTION-FLOW Law 4 rung 2: the conversation is logistics', the closable ACTION
+  is ours, and a partner has no login), today's run and its photo.
+- **`collect` records `payment_duty` as its rule** (payment/MASTER §5); no payment-duty roster
+  exists yet, so the PIC stands as governed COVER — money never sits unowned (the 2026-08-19
+  incident is why). When a payment-duty roster exists, only the resolver changes.
+- Completion facts, clocks, the two-line presentation and the duty-word honest-gap rule
+  (`Delivery staff` · `Finance`) are unchanged. `WorkItem` gained `ownerUserId` so My Work
+  filters on the RESOLVED account, and Team Work groups by account, then named person, then duty
+  word.
+
+**Measured boundaries, reported not hidden:** no delivery-staff, finance or payment-duty roster
+fact exists (0363 records none; HR duty keys carry none), so those rules resolve to duty words or
+the PIC-as-cover exactly as written above. The `assigned Partner` half of the booking rule stays
+unresolved on purpose — a company without a login cannot close portal work. Buddy-cover beyond
+what `/api/operation/po-duty` already applies is not re-derived here.
 
 **How the PIC is decided** (LIVE, migrations 0232 + 0235;
 `ops_order_control.assigned_staff / assigned_by / assigned_at` + `ops_staff_settings`):

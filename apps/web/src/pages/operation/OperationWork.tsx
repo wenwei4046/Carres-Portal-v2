@@ -7,9 +7,11 @@
  * another dashboard.** This page is ASSEMBLY:
  *
  *   WHAT is open   ← the same `openActionsOf` the Orders list runs, plus the
- *                    card's two composed facts (loan out · Finance exception)
- *   WHO + WHEN     ← Card 9's `workItemsForOrder` (one clock per key ·
- *                    working-days-late over a due that never moves)
+ *                    composed facts (loan out · Finance exception · the
+ *                    never-asked missing delivery date)
+ *   WHO + WHEN     ← Card 9's `workItemsForOrder` — owner resolved per RULE
+ *                    (§0.1: PO-duty holder · salesperson · PIC) · one clock
+ *                    per key · working-days-late over a due that never moves
  *
  * THE TWO-LINE GRAMMAR (card §7, sizes 13/11 — ui/MASTER.md §5):
  *   line 1  the SHORT action sentence — the dictionary's own QUEUE word,
@@ -137,24 +139,39 @@ export default function OperationWork() {
   );
   const myGroups = useMemo(() => groupWorkItemsByDay(mine), [mine]);
 
-  /** Team Work — grouped per staff (card §7). An item whose duty has no
-   *  roster holder yet groups under its DUTY word. */
+  /** Team Work — grouped per RESOLVED owner (§0.1 Action Owner Engine,
+   *  2026-08-27): an ops account (PIC · PO-duty holder), a named non-account
+   *  person (a salesperson), or — where no roster holder exists — the DUTY
+   *  word. */
   const teamGroups = useMemo(() => {
     const byOwner = new Map<string, WorkRow[]>();
     for (const i of allItems) {
-      const key = i.ownerId ?? `duty:${i.ownerDuty ?? "No owner yet"}`;
+      const key =
+        i.ownerId ??
+        (i.ownerName
+          ? `person:${i.ownerName}`
+          : `duty:${i.ownerDuty ?? "No owner yet"}`);
       const list = byOwner.get(key) ?? [];
       list.push(i);
       byOwner.set(key, list);
     }
     const groups = [...byOwner.entries()].map(([key, items]) => {
-      const person = key.startsWith("duty:") ? null : staffById.get(key) ?? null;
+      const staffMember = key.startsWith("duty:") || key.startsWith("person:")
+        ? null
+        : staffById.get(key) ?? null;
+      // A resolved person without an ops account still has a NAME (the
+      // salesperson) — a person group, initials and all, never a duty word.
+      const personName = staffMember
+        ? personLabel(staffMember.name, staffMember.email)
+        : key.startsWith("person:")
+          ? key.slice(7)
+          : (items[0]?.ownerName ?? null);
       const dutyWord = key.startsWith("duty:") ? key.slice(5) : null;
       return {
         key,
-        person,
-        userId: person ? key : null,
-        name: person ? personLabel(person.name, person.email) : dutyWord ?? "No owner yet",
+        person: personName !== null,
+        userId: staffMember ? key : null,
+        name: personName ?? dutyWord ?? "No owner yet",
         items: [...items].sort((a, b) =>
           (a.dueIso ?? "9999").localeCompare(b.dueIso ?? "9999"),
         ),
@@ -272,11 +289,14 @@ export default function OperationWork() {
                     aria-hidden="true"
                     className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold"
                     style={{
-                      backgroundColor: avatarColor(g.userId!).bg,
-                      color: avatarColor(g.userId!).fg,
+                      /* Stable per-person colour — the account id where one
+                         exists, else the group key (a salesperson has no ops
+                         account; the hash only needs a stable string). */
+                      backgroundColor: avatarColor(g.userId ?? g.key).bg,
+                      color: avatarColor(g.userId ?? g.key).fg,
                     }}
                   >
-                    {personInitials(g.person.name, g.person.email)}
+                    {personInitials(g.name, "")}
                   </span>
                 ) : null}
                 <span className="text-body font-semibold text-base-900">{g.name}</span>

@@ -386,7 +386,9 @@ export default function DeliveryOrderPage() {
                       </span>
                     ) : (
                       <span className="shrink-0 rounded-full border border-base-200 px-1.5 text-[9px] font-semibold text-base-500">
-                        {i.ownerDuty ?? "No owner yet"}
+                        {/* A duty word, or a resolved person without an ops
+                            account (a salesperson) — never a blank accusation. */}
+                        {i.ownerDuty ?? i.ownerName ?? "No owner yet"}
                       </span>
                     )}
                     <span className="min-w-0">
