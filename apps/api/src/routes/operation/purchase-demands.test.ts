@@ -143,11 +143,30 @@ const TABLES = () => ({
         placed_at: "2026-07-01", created_at: "2026-07-01", proceed_date: null,
         salesperson_id: SALES,
       },
+      /* PROCEEDED with no agreed date — the `no_customer_date` story. It was
+         a `place` order until Card 02-C drew the proceeded-order boundary; a
+         dateless order is a Sales gap, not a not-yet-proceeded one. */
       {
-        id: "o2", so: 1204, customer_name: "ella", status: "place",
+        id: "o2", so: 1204, customer_name: "ella", status: "proceed_order",
         delivery_date: null, delivery_date_tbd: true,
         placed_at: "2026-07-01", created_at: "2026-07-01", proceed_date: null,
         salesperson_id: SALES,
+      },
+      /* ⭐ Card 02-C — the `place` order. EARLIER than every proceeded order,
+         demanding the same SKU an open PO partly covers, so the old behaviour
+         (place demand consuming coverage ahead of proceeded demand) would be
+         visible the moment it returned. It must contribute NOTHING. */
+      {
+        id: "o12", so: 1219, customer_name: "NOT YET PROCEEDED", status: "place",
+        delivery_date: DELIVERY_EARLY, delivery_date_tbd: false,
+        placed_at: "2026-06-01", created_at: "2026-06-01", proceed_date: null,
+        salesperson_id: null,
+      },
+      {
+        id: "o13", so: 1220, customer_name: "PROCEEDED ONE", status: "proceed_order",
+        delivery_date: DELIVERY_EARLY, delivery_date_tbd: false,
+        placed_at: "2026-07-15", created_at: "2026-07-15", proceed_date: null,
+        salesperson_id: null,
       },
       {
         id: "o3", so: 1210, customer_name: "ANNE", status: "proceed_order",
@@ -200,6 +219,10 @@ const TABLES = () => ({
       line("l10", "o5", "B1201S-Q", 1),
       line("l11", "o6", "B1201S-Q", 1),
       line("l12", "o7", "B1201S-Q", 1),
+      /* Card 02-C — one open-PO unit, two claimants; only the proceeded order
+         may consume it. */
+      line("l17", "o12", "COV2-K", 1),
+      line("l18", "o13", "COV2-K", 1),
     ],
     error: null,
   },
@@ -220,6 +243,8 @@ const TABLES = () => ({
         product_models: { category: "mattress", name: "Covered" } },
       { sku: "PART-K", supplier_id: NICE, cost: 100, variant: "King", variant_kind: "size",
         product_models: { category: "mattress", name: "Partly" } },
+      { sku: "COV2-K", supplier_id: NICE, cost: 100, variant: "King", variant_kind: "size",
+        product_models: { category: "mattress", name: "Contested" } },
     ],
     error: null,
   },
@@ -228,6 +253,8 @@ const TABLES = () => ({
       { po_id: "PO-2051", sku: "COV-K", qty: 3, received_qty: 0,
         purchase_orders: { status: "open" } },
       { po_id: "PO-2052", sku: "PART-K", qty: 2, received_qty: 0,
+        purchase_orders: { status: "open" } },
+      { po_id: "PO-2053", sku: "COV2-K", qty: 1, received_qty: 0,
         purchase_orders: { status: "open" } },
     ],
     error: null,
@@ -560,12 +587,16 @@ describe("the derived states — blockers and order timing", () => {
     expect(rows.some((r) => r.lineIds.includes("l9"))).toBe(false);
   });
 
-  it("only live customer orders are asked for", async () => {
+  it("only PROCEEDED customer orders are asked for — the Card 02-C boundary in the SQL itself", async () => {
     const { sb } = await rowsOf();
     const statusFilter = sb.filters.find(
-      (f) => f.table === "orders" && f.method === "in" && f.col === "status",
+      (f) => f.table === "orders" && f.method === "eq" && f.col === "status",
     );
-    expect(statusFilter?.val).toEqual(["place", "proceed_order"]);
+    expect(statusFilter?.val).toBe("proceed_order");
+    // And the old two-status read is gone for good.
+    expect(
+      sb.filters.some((f) => f.table === "orders" && f.method === "in" && f.col === "status"),
+    ).toBe(false);
   });
 
   it("no row carries a generic attention word or an invented status", async () => {
@@ -809,7 +840,7 @@ describe("SO demand only — Manual Purchase never leaks in", () => {
     for (const r of rows) {
       expect(r.orderId, r.id).not.toBe("");
       // Every row traces to a real customer order in the fixture.
-      expect(["o1", "o2", "o3", "o4", "o5", "o6", "o7"], r.id).toContain(r.orderId);
+      expect(["o1", "o2", "o3", "o4", "o5", "o6", "o7", "o13"], r.id).toContain(r.orderId);
     }
   });
 });
@@ -971,7 +1002,8 @@ describe("Card 02-B · one permanent row per proceeded Sales Order", () => {
     const { body } = await rowsOf(registerTables());
     const ids = body.registerRows.map((r) => r.orderId);
     expect(ids).toContain("o1");
-    expect(ids).not.toContain("o2"); // status `place`
+    expect(ids).toContain("o2"); // proceeded, even with no agreed date
+    expect(ids).not.toContain("o12"); // status `place`
   });
 
   it("one SO with several item lines is ONE parent row, newest order first", async () => {
@@ -1091,5 +1123,44 @@ describe("Card 02-B · one permanent row per proceeded Sales Order", () => {
       await res.json(),
     );
     expect(parsed.registerRows.length).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * ⭐ CARD 02-C — THE PROCEEDED-ORDER BOUNDARY (RESOLVED FROM AUTHORITY,
+ * 2026-08-27). A Sales Order enters SO Batch Purchase only after Sales
+ * completes `Proceed`. A `place` order is invisible to Purchasing: no leaf
+ * row (so no rail count — the rail counts unique orders OVER the leafs), no
+ * Register row, and no ability to consume Open PO coverage ahead of a
+ * proceeded order.
+ */
+describe("Card 02-C · a `place` order is invisible to Purchasing", () => {
+  it("contributes ZERO leaf rows — the population every rail count draws from", async () => {
+    const { rows } = await rowsOf();
+    expect(rows.filter((r) => r.orderId === "o12")).toEqual([]);
+    expect(rows.find((r) => r.so === 1219)).toBeUndefined();
+  });
+
+  it("has no Register row", async () => {
+    const { body } = await rowsOf();
+    expect(body.registerRows.find((r) => r.orderId === "o12")).toBeUndefined();
+  });
+
+  it("cannot consume Open PO coverage ahead of a proceeded order", async () => {
+    /* One open unit of COV2-K; the `place` order asked first (2026-06-01).
+       Under the corrected boundary the PROCEEDED order's unit is fully
+       covered — its leaf leaves the buying listing entirely. If the `place`
+       order were still allowed to drink the coverage, the proceeded order
+       would surface here with `toBuy: 1`. */
+    const { rows, body } = await rowsOf();
+    expect(bySku(rows, "COV2-K")).toBeUndefined();
+    /* And the proceeded order's PERMANENT row is still on the Register. */
+    expect(body.registerRows.find((r) => r.orderId === "o13")).toBeDefined();
+  });
+
+  it("a dateless PROCEEDED order still enters — the boundary is Proceed, not the date", async () => {
+    const { rows } = await rowsOf();
+    const tbd = rows.find((r) => r.so === 1204)!;
+    expect(tbd.state).toBe("no_customer_date");
   });
 });

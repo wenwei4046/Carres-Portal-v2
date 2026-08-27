@@ -512,6 +512,22 @@ describe("the rail — Card 02-A wording, Card 02-B counting", () => {
     expect(screen.queryByTestId("so-batch-row-o7")).not.toBeInTheDocument();
   });
 
+  it("`All not ordered` and a timing facet combine with AND — never a widening OR (Card 02-C)", () => {
+    renderRegister();
+    fireEvent.click(screen.getByTestId("so-batch-all-not-ordered"));
+    /* Alone, the outstanding filter still shows the setup-blocked o4. */
+    expect(screen.getByTestId("so-batch-row-o4")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("so-batch-state-can_order_early"));
+    /* Both on: only rows satisfying BOTH — outstanding AND in the band. An OR
+       would have quietly widened the timing facet back to all outstanding. */
+    expect(screen.getByTestId("so-batch-row-o1")).toBeInTheDocument();
+    expect(screen.getByTestId("so-batch-row-o3")).toBeInTheDocument();
+    expect(screen.getByTestId("so-batch-row-o8")).toBeInTheDocument();
+    expect(screen.queryByTestId("so-batch-row-o4")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("so-batch-row-o5")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("so-batch-row-o7")).not.toBeInTheDocument();
+  });
+
   it("the footer counts Sales Orders by status", () => {
     renderRegister();
     expect(screen.getByTestId("so-batch-footer").textContent).toBe(
