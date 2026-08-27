@@ -645,6 +645,17 @@ The right Register shows **one row per proceeded physical-goods Sales Order**
 Purchasing), and the row never leaves when a purchase order is issued — the page is both the
 buying surface and the permanent purchasing audit register.
 
+**THE PROCEEDED-ORDER BOUNDARY — RESOLVED FROM AUTHORITY, Card 02-C, 2026-08-27.** A Sales
+Order enters SO Batch Purchase only after Sales completes `Proceed`. The boundary is drawn ONCE,
+at the one demand read (`loadToOrder`), before the engine ever sees a line — so a `place` order
+is invisible to the WHOLE surface: no planning, no netting (it cannot consume Open PO coverage
+ahead of a proceeded order), no rail count, no Register row, no selection, no Ready Stock take
+and no PO. Both write doors (`take-stock`, `issue-batch`) recompute through the same read at
+POST time; a demand naming a `place` order resolves to nothing and is refused by name, creating
+and reserving nothing. Every present and future rail count — timing, Product, Supplier — draws
+from this same proceeded-SO population. Rail filters combine with AND: `All not ordered` plus a
+timing facet shows only rows satisfying both.
+
 **Columns, exactly and in this order:** Status · Proceed Date · PO No · SO No · Customer ·
 Delivery Location · Requested Delivery Date · Supplier · Deliver To · PO Delivery Date.
 `Delivery Location` sits immediately after `Customer`; `SO No` is the identity and stays sticky

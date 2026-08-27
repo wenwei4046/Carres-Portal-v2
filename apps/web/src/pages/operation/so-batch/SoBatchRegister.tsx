@@ -143,12 +143,17 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
   );
   const shown = useMemo(() => {
     if (!notOrderedOnly && states.size === 0) return orders;
+    /* ⭐ FILTERS COMBINE WITH AND (Card 02-C, 2026-08-27). `All not ordered`
+       narrows to outstanding orders; a timing facet narrows to its band; both
+       active means BOTH must hold. An OR here quietly widened a timing facet
+       back to the whole outstanding listing the moment `All not ordered` was
+       also on — the click stopped predicting the rows. */
     return orders.filter((o) => {
-      if (notOrderedOnly && outstandingOrders.has(o.orderId)) return true;
-      for (const s of states) {
-        if (soCounts.get(s)?.has(o.orderId)) return true;
+      if (notOrderedOnly && !outstandingOrders.has(o.orderId)) return false;
+      if (states.size > 0 && ![...states].some((s) => soCounts.get(s)?.has(o.orderId))) {
+        return false;
       }
-      return false;
+      return true;
     });
   }, [orders, notOrderedOnly, states, outstandingOrders, soCounts]);
   const toggleState = useCallback((s: PurchaseDemandState) => {
