@@ -52,6 +52,8 @@ export interface WorkRow extends WorkItem {
   /** The party-named row line — the SAME words the Orders list prints. */
   line: string;
   customer: string | null;
+  /** WHO the row belongs to, or null when the engine named a DUTY instead.
+   *  A duty row never borrows the order's salesperson — see the composition. */
   ownerId: string | null;
 }
 
@@ -161,7 +163,15 @@ export function useOpenWorkSet(): OpenWorkSet {
              item is composed, so the Work row, the Quick Rail peek and the
              action sentence above all name the customer identically. */
           customer: displayCustomerName(o.customer_name) ?? null,
-          ownerId,
+          /* A DUTY ROW HAS NO PERSON. The engine says so itself: for the two
+             composed keys that route to Delivery staff and Finance it returns
+             `ownerName: null` plus an `ownerDuty` word, because neither role
+             has a roster fact yet. Stapling the order's salesperson on top of
+             that answer made `OperationWork`'s `duty:` bucket unreachable for
+             any order with an assigned staff member, filed Finance's payment
+             exceptions in that salesperson's My Work, and counted them in the
+             person's open/overdue tally. The engine's answer stands. */
+          ownerId: it.ownerDuty ? null : ownerId,
         });
       }
     }

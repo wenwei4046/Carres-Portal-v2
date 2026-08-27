@@ -287,3 +287,94 @@ describe("OperationWork — the rail deep-links into a person's work", () => {
     expect(shell.textContent).not.toMatch(/\d+ overdue\b/);
   });
 });
+
+/**
+ * THE DUTY ROW BELONGS TO ITS DUTY, NOT TO THE ORDER'S OWNER.
+ *
+ * `work-engine.ts` answers WHO for two composed keys with a DUTY word instead
+ * of a name — `resolve_payment_exception` → Finance, `collect_loan_item` →
+ * Delivery staff — because neither role has a roster fact yet.
+ * `use-open-work` then stapled the order's `assigned_staff` onto EVERY row it
+ * composed, which overwrote that answer. Three things broke at once, and all
+ * three are silent: the `duty:` bucket this page already implements could
+ * never be reached on an order that had an owner, Finance's exceptions were
+ * filed in the salesperson's My Work, and they counted toward that person's
+ * total. Finance and Delivery could not see their own work anywhere.
+ *
+ * These pin the INTENT — a duty row groups under its duty and belongs to no
+ * person — not the spelling of either duty word.
+ */
+describe("OperationWork — a duty row belongs to its duty, not to the order's owner", () => {
+  it("an open finance exception groups under Finance, never under the assigned salesperson", () => {
+    listState.data = {
+      orders: [
+        makeRow({
+          id: "a",
+          so: 1203,
+          order_finance_exceptions: [{ status: "open" }],
+        }),
+      ],
+    };
+    wrap(<OperationWork />, "/operation?tab=work&scope=team");
+
+    const finance = screen.getByTestId("work-owner-group-duty:Finance");
+    expect(finance).toHaveTextContent("Finance");
+    expect(
+      finance.querySelector(
+        '[data-testid="work-row-SO-1203-resolve_payment_exception"]',
+      ),
+    ).toBeTruthy();
+
+    // Shasha owns SO-1203, so she keeps her OWN action — and not Finance's.
+    const shasha = screen.getByTestId(`work-owner-group-${OP_UID}`);
+    expect(
+      shasha.querySelector('[data-testid="work-row-SO-1203-assign_logistics"]'),
+    ).toBeTruthy();
+    expect(
+      shasha.querySelector(
+        '[data-testid="work-row-SO-1203-resolve_payment_exception"]',
+      ),
+    ).toBeNull();
+  });
+
+  it("an outstanding loan on a delivered order groups under Delivery staff", () => {
+    listState.data = {
+      orders: [
+        makeRow({
+          id: "a",
+          so: 1204,
+          delivered_at: "2026-07-20T00:00:00Z",
+          ops_sofa_loans: [{ status: "on_loan" }],
+        }),
+      ],
+    };
+    wrap(<OperationWork />, "/operation?tab=work&scope=team");
+
+    const delivery = screen.getByTestId("work-owner-group-duty:Delivery staff");
+    expect(
+      delivery.querySelector('[data-testid="work-row-SO-1204-collect_loan_item"]'),
+    ).toBeTruthy();
+  });
+
+  it("Finance's exception stays out of the salesperson's My Work", () => {
+    listState.data = {
+      orders: [
+        makeRow({
+          id: "a",
+          so: 1203,
+          order_finance_exceptions: [{ status: "open" }],
+        }),
+      ],
+    };
+    // Signed in as Shasha, a non-manager: the default view is My Work.
+    wrap(<OperationWork />);
+    // Her own action is hers…
+    expect(
+      screen.getByTestId("work-row-SO-1203-assign_logistics"),
+    ).toBeInTheDocument();
+    // …the Finance duty is not.
+    expect(
+      screen.queryByTestId("work-row-SO-1203-resolve_payment_exception"),
+    ).toBeNull();
+  });
+});
