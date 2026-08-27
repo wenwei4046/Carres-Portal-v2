@@ -535,7 +535,7 @@ Purchasing                                               ▾
 │  SHOWROOM                                              ▸
 ```
 
-This is navigation only. The 200px `STATUS / WORK TO DO` rail belongs inside an individual Work
+This is navigation only. A page's own local filter rail belongs inside an individual Work
 Surface and never becomes a second module sidebar. A Purchasing Listing follows the Sales Orders
 Register shell; its compact Destination Header shows the current page word once, at the same
 size/weight, without a leading icon or `Purchasing ·` prefix. Formal Object Detail alone may use
@@ -976,6 +976,18 @@ permits invented styling.
 uses the governed Carres `NavRow` treatment: `rounded-control`; `blue-3` selection wash; one
 straight 2px `blue-9` line inset on the left; slate hover for inactive rows. It is not a bordered
 card, not a module tab, not a foreign reference colour and not a newly invented rail variant.
+
+**LOCAL FILTER RAIL — READABLE SHELL — APPROVED / LOCKED, owner ruling 2026-08-27 (Purchasing
+Card 02-C).** The page-owned filter rail's shell, group and row grammar is the shared
+`FilterRail` / `FilterRailGroup` / `FilterRailRow` component (`workspace-rail.tsx`): 240px
+wide · 12px outer padding · 8px heading → first row · 20px between groups · 36px minimum row.
+A governed filter label is NEVER truncated and never hidden behind a hover or tooltip — it
+wraps onto a second line in the same body font at its natural height (≥ 48px), with the count
+still visible and right-aligned. The rail scrolls vertically as rows grow; it keeps its border
+against the Register; at narrower desktop widths the Register scrolls horizontally and the
+rail is never squeezed below 240px. The rail is navigation, not batch selection — it carries
+no checkboxes. Pages still drawing the older 200px `RailGroup`/`RailItem` pair migrate to this
+shell in their own cards, not as a side effect of someone else's.
 
 **PORTAL NAVIGATION ACTIVE COLOUR — APPROVED / LOCKED.** The flame repoint applies to active
 navigation too: the current destination uses the governed blue selection treatment, never a

@@ -520,6 +520,200 @@ describe("the rail — Card 02-A wording, Card 02-B counting", () => {
   });
 });
 
+describe("the rail — Card 02-C: five readable sections, navigation not selection", () => {
+  const rail = () => screen.getByTestId("so-batch-rail");
+
+  it("renders the five sections in the approved order, with the approved words", () => {
+    renderRegister();
+    const text = rail().textContent ?? "";
+    const order = ["TO ORDER", "ORDER TIMING", "PRODUCT", "SUPPLIER", "SETUP TO FIX"];
+    const positions = order.map((h) => text.indexOf(h));
+    expect(positions.every((p) => p >= 0)).toBe(true);
+    expect([...positions].sort((a, b) => a - b)).toEqual(positions);
+    for (const word of [
+      "All not ordered",
+      "Can order early",
+      "14 safety days left",
+      "1–13 safety days left",
+      "No safety days left",
+      "Not enough production days",
+      "All products",
+      "Mattress",
+      "Bedframe",
+      "Sofa",
+      "All suppliers",
+      "Production days not set",
+    ]) {
+      expect(text, word).toContain(word);
+    }
+    /* The retired wording never returns. */
+    expect(text).not.toContain("Not enough production time");
+    expect(text).not.toContain("Production time not set");
+  });
+
+  it("all five timing rows stay visible, and an empty band prints 0, not silence", () => {
+    renderRegister();
+    /* No fixture sits in these bands — the row still shows, with its 0. */
+    expect(screen.getByTestId("so-batch-state-safety_days_full").textContent).toContain("0");
+    expect(screen.getByTestId("so-batch-state-safety_days_none").textContent).toContain("0");
+    expect(
+      screen.getByTestId("so-batch-state-not_enough_production_time"),
+    ).toBeInTheDocument();
+  });
+
+  it("no rail row carries a checkbox; the Register's own selection checkboxes survive", () => {
+    renderRegister();
+    expect(within(rail()).queryAllByRole("checkbox")).toHaveLength(0);
+    /* Every rail row is a NavRow button with a pressed state, not a tick. */
+    for (const b of within(rail()).getAllByRole("button")) {
+      expect(b).toHaveAttribute("aria-pressed");
+    }
+    expect(screen.getByTestId("so-batch-select-o1")).toBeInTheDocument();
+  });
+
+  it("the rail is the 240px readable shell, and labels wrap instead of truncating", () => {
+    renderRegister();
+    expect(rail().className).toContain("w-[240px]");
+    const long = screen.getByTestId("so-batch-state-not_enough_production_time");
+    const label = long.querySelector("span.break-words");
+    expect(label).not.toBeNull();
+    expect(label!.textContent).toBe("Not enough production days");
+    expect(label!.className).not.toContain("truncate");
+  });
+
+  it("product filters by the CATALOG category and counts unique Sales Orders", () => {
+    renderRegister();
+    /* o5 is the one order with a sofa line — one ORDER, though it also has a
+       mattress line. */
+    expect(screen.getByTestId("so-batch-product-sofa").textContent).toContain("1");
+    expect(screen.getByTestId("so-batch-product-mattress").textContent).toContain("7");
+    expect(screen.getByTestId("so-batch-product-bedframe").textContent).toContain("0");
+    fireEvent.click(screen.getByTestId("so-batch-product-sofa"));
+    expect(screen.getAllByTestId("so-batch-row-o5")).toHaveLength(1);
+    expect(screen.queryByTestId("so-batch-row-o1")).not.toBeInTheDocument();
+  });
+
+  it("a multi-category order counts under EVERY matching category and appears once", () => {
+    renderRegister();
+    fireEvent.click(screen.getByTestId("so-batch-product-mattress"));
+    expect(screen.getAllByTestId("so-batch-row-o5")).toHaveLength(1);
+    fireEvent.click(screen.getByTestId("so-batch-product-sofa"));
+    expect(screen.getAllByTestId("so-batch-row-o5")).toHaveLength(1);
+  });
+
+  it("`All products` clears the product dimension and is active at rest", () => {
+    renderRegister();
+    const all = screen.getByTestId("so-batch-product-all");
+    expect(all).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(screen.getByTestId("so-batch-product-mattress"));
+    expect(all).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(all);
+    expect(all).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByTestId("so-batch-row-o5")).toBeInTheDocument();
+  });
+
+  it("suppliers are dynamic, alphabetical, and the Register's own projection", () => {
+    renderRegister();
+    const text = rail().textContent ?? "";
+    /* Hooka before Ohana — and nobody else, because the fixtures name nobody
+       else. Ohana enters through outstanding demand (o4, o8) AND lineage
+       (o5); one projection, one row. */
+    expect(screen.getByTestId("so-batch-supplier-Hooka")).toBeInTheDocument();
+    expect(screen.getByTestId("so-batch-supplier-Ohana")).toBeInTheDocument();
+    expect(text.indexOf("Hooka")).toBeLessThan(text.indexOf("Ohana"));
+    expect(
+      within(rail())
+        .getAllByRole("button")
+        .filter((b) => b.getAttribute("data-testid")?.startsWith("so-batch-supplier-")),
+    ).toHaveLength(3); // All suppliers + the two real names
+  });
+
+  it("the supplier filter narrows by the same facts the Supplier column prints", () => {
+    renderRegister();
+    fireEvent.click(screen.getByTestId("so-batch-supplier-Ohana"));
+    /* Ohana touches o4 + o8 (outstanding) and o5 (PO lineage). */
+    expect(screen.getByTestId("so-batch-row-o4")).toBeInTheDocument();
+    expect(screen.getByTestId("so-batch-row-o5")).toBeInTheDocument();
+    expect(screen.getByTestId("so-batch-row-o8")).toBeInTheDocument();
+    expect(screen.queryByTestId("so-batch-row-o1")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("so-batch-supplier-all"));
+    expect(screen.getByTestId("so-batch-row-o1")).toBeInTheDocument();
+  });
+
+  it("filters combine across sections — All not ordered + Mattress + Hooka", () => {
+    renderRegister();
+    fireEvent.click(screen.getByTestId("so-batch-all-not-ordered"));
+    fireEvent.click(screen.getByTestId("so-batch-product-mattress"));
+    fireEvent.click(screen.getByTestId("so-batch-supplier-Hooka"));
+    for (const on of ["o1", "o3", "o8"]) {
+      expect(screen.getByTestId(`so-batch-row-${on}`)).toBeInTheDocument();
+    }
+    for (const off of ["o4", "o5", "o6", "o7"]) {
+      expect(screen.queryByTestId(`so-batch-row-${off}`)).not.toBeInTheDocument();
+    }
+  });
+
+  it("counts cross-update against the other selected sections", () => {
+    renderRegister();
+    fireEvent.click(screen.getByTestId("so-batch-product-sofa"));
+    /* Under `Sofa`, nothing is outstanding and nothing can order early —
+       the numbers say so instead of keeping yesterday's totals. */
+    expect(screen.getByTestId("so-batch-all-not-ordered").textContent).toContain("0");
+    expect(screen.getByTestId("so-batch-state-can_order_early").textContent).toContain("0");
+    /* A supplier with no sofa drops off; the sofa's own suppliers stay. */
+    expect(screen.getByTestId("so-batch-supplier-Ohana")).toBeInTheDocument();
+    expect(screen.queryByTestId("so-batch-supplier-Hooka")).toBeInTheDocument(); // o5 lineage
+  });
+
+  it("the SELECTED supplier stays visible with 0 when another filter empties it", () => {
+    renderRegister();
+    fireEvent.click(screen.getByTestId("so-batch-supplier-Hooka"));
+    fireEvent.click(screen.getByTestId("so-batch-state-no_production_days"));
+    /* The only setup order is Ohana's — Hooka matches nothing now, but the
+       operator must still SEE the narrowing to clear it. */
+    const hooka = screen.getByTestId("so-batch-supplier-Hooka");
+    expect(hooka).toHaveAttribute("aria-pressed", "true");
+    expect(hooka.textContent).toContain("0");
+  });
+
+  it("one timing filter at a time — a new pick replaces, a second click clears", () => {
+    renderRegister();
+    const early = screen.getByTestId("so-batch-state-can_order_early");
+    fireEvent.click(early);
+    expect(early).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(screen.getByTestId("so-batch-state-safety_days_low"));
+    expect(early).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(screen.getByTestId("so-batch-state-safety_days_low"));
+    /* Cleared — the complete permanent Register returns. */
+    for (const on of ["o1", "o3", "o4", "o5", "o6", "o7", "o8"]) {
+      expect(screen.getByTestId(`so-batch-row-${on}`)).toBeInTheDocument();
+    }
+  });
+
+  it("SETUP TO FIX leaves the rail — and drops its filter — when the last affected SO goes", () => {
+    const { rerender } = renderRegister();
+    fireEvent.click(screen.getByTestId("so-batch-state-no_production_days"));
+    expect(screen.getByTestId("so-batch-row-o4")).toBeInTheDocument();
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    rerender(
+      <QueryClientProvider client={client}>
+        <MemoryRouter initialEntries={["/operation?tab=purchase"]}>
+          <SoBatchRegister
+            data={data({ rows: [LEAF_O1, LEAF_O3, LEAF_O8A, LEAF_O8B] })}
+            isLoading={false}
+            onIssue={onIssue}
+          />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    expect(screen.queryByTestId("so-batch-state-no_production_days")).not.toBeInTheDocument();
+    /* The dead filter must not survive invisibly: every record shows. */
+    for (const on of ["o1", "o3", "o4", "o5", "o6", "o7", "o8"]) {
+      expect(screen.getByTestId(`so-batch-row-${on}`)).toBeInTheDocument();
+    }
+  });
+});
+
 describe("the expansion — the ONE shared child table", () => {
   it("uses GoodsMiniTable, with coverage, supplier and PO Delivery Date columns", async () => {
     renderRegister();

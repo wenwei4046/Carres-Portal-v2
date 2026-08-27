@@ -1,18 +1,19 @@
 /**
- * SO BATCH PURCHASE · RAIL PREVIEW — DEV ONLY (Card 02-A).
+ * SO BATCH PURCHASE · RAIL PREVIEW — DEV ONLY (Cards 02-A · 02-B · 02-C).
  *
  * The REAL `SoBatchRegister`, the REAL stylesheet, only the payload seeded:
- * one row in every rail category, so the corrected TO ORDER · ORDER TIMING ·
- * SETUP TO FIX rail can be walked and photographed. The live screen is behind
- * a login, and live data cannot be made to hold all five timing bands at once.
+ * one row in every rail category, so the five-section TO ORDER · ORDER
+ * TIMING · PRODUCT · SUPPLIER · SETUP TO FIX rail can be walked and
+ * photographed. The live screen is behind a login, and live data cannot be
+ * made to hold all five timing bands at once.
  *
- * `?setup=0` removes the one `Production time not set` line, proving the whole
- * `SETUP TO FIX` section leaves the rail with it.
+ * `?setup=0` removes the one `Production days not set` line, proving the
+ * whole `SETUP TO FIX` section leaves the rail with it.
  *
- * `?old=1` draws, beside the real page, a static reconstruction of the RETIRED
- * six-state rail — the owner asked to SEE changes, and a description of a
- * deleted layout is not seeing it. It uses the same governed `RailGroup` /
- * `RailItem` kit, is labelled as retired, and ships nowhere.
+ * `?old=1` draws, beside the real page, a static reconstruction of the
+ * RETIRED 200px truncating rail — the owner asked to SEE changes, and a
+ * description of a deleted layout is not seeing it. It uses the legacy
+ * `RailGroup` / `RailItem` pair, is labelled as retired, and ships nowhere.
  *
  * A separate vite entry (`so-batch-rail-preview.html`), not a route:
  * `vite build` only emits `index.html`'s graph, so this cannot reach
@@ -151,6 +152,23 @@ const rows: PurchaseDemandRow[] = [
     qtyNeeded: 1,
     toBuy: 1,
     parts: [{ sku: "L1201S-K", qty: 1, unitCost: 90 }],
+  }),
+  /* Card 02-C — a BEDFRAME from a second supplier, so the PRODUCT and
+     SUPPLIER sections have something real to say. */
+  row({
+    state: "safety_days_low",
+    customer: "FARIDAH",
+    item: "Nordic Bedframe",
+    variant: "Queen",
+    category: "bedframe",
+    skus: ["NBF-Q"],
+    supplier: "Nice Future",
+    supplierId: "s-nicefuture",
+    customerDelivery: "2026-09-20",
+    goodsMustArrive: "2026-09-08",
+    qtyNeeded: 1,
+    toBuy: 1,
+    parts: [{ sku: "NBF-Q", qty: 1, unitCost: 150 }],
   }),
   row({
     state: "no_customer_date",
@@ -322,22 +340,29 @@ const data: SoBatchPurchaseResponse = {
   safetyDays: 14,
 };
 
-/** The RETIRED rail, reconstructed so old and new can be looked at together. */
+/**
+ * The RETIRED rail, reconstructed so old and new can be looked at together —
+ * the pre-02-C production rail: 200px, three sections, truncating labels,
+ * `…time` wording, zero counts hidden.
+ */
 function OldRail() {
   return (
-    <div className="flex w-[240px] shrink-0 flex-col gap-2 border-r border-kit-slate-5 bg-white p-3">
+    <div className="flex w-[200px] shrink-0 flex-col gap-4 border-r border-kit-slate-5 bg-white px-3 py-3">
       <div className="text-meta font-semibold text-kit-red-9">
-        RETIRED 2026-08-26 — the old rail, for comparison only
+        RETIRED 2026-08-27 — the old rail, for comparison only
       </div>
-      <RailGroup title="BUYING RECORDS">
-        <RailItem label="Ready to buy" count={2} active={false} onClick={() => {}} testId="old-ready" />
-        <RailItem label="Covered" count={1} active={false} onClick={() => {}} testId="old-covered" />
+      <RailGroup title="TO ORDER">
+        <RailItem label="All not ordered" count={8} active={false} onClick={() => {}} testId="old-all" />
       </RailGroup>
-      <RailGroup title="WORK TO DO">
-        <RailItem label="No customer date" count={1} active={false} onClick={() => {}} testId="old-date" />
-        <RailItem label="No SKU" active={false} onClick={() => {}} testId="old-sku" />
-        <RailItem label="No supplier" active={false} onClick={() => {}} testId="old-supplier" />
-        <RailItem label="No production days" count={1} active={false} onClick={() => {}} testId="old-days" />
+      <RailGroup title="ORDER TIMING">
+        <RailItem label="Can order early" count={2} active={false} onClick={() => {}} testId="old-early" />
+        <RailItem label="14 safety days left" count={1} active={false} onClick={() => {}} testId="old-full" />
+        <RailItem label="1–13 safety days left" count={2} active={false} onClick={() => {}} testId="old-low" />
+        <RailItem label="No safety days left" count={1} active={false} onClick={() => {}} testId="old-none" />
+        <RailItem label="Not enough production time" count={1} active={false} onClick={() => {}} testId="old-time" />
+      </RailGroup>
+      <RailGroup title="SETUP TO FIX">
+        <RailItem label="Production time not set" count={1} active={false} onClick={() => {}} testId="old-setup" />
       </RailGroup>
     </div>
   );
