@@ -274,3 +274,48 @@ describe("OrderDetailDrawer — a voided payment is not money (CARD 4, 0347)", (
     expect(SRC).toContain("Voided");
   });
 });
+
+/**
+ * D4 - ONE MONEY RULE, ASKED ONCE (docs/orders/MASTER.md 12).
+ *
+ * The audit recorded D4 as "the drawer separately fetches `order_payments` for
+ * Collected", and that half was corrected on 2026-07-27 (C5). What survived was
+ * different and worse: the goods half came through the shared `orderMoney`
+ * while the storage half was re-derived here as
+ * `invoiceTotal - collectedAll`, clamped as one figure. The screen then carried
+ * TWO "outstanding" numbers - the money sticker showing the shared rule's
+ * goods-only figure, the payment dial showing the local goods+storage one - and
+ * they disagreed on every order with a storage fee owing.
+ *
+ * Source scan, in this file's established method: the divergence only appears
+ * on an order that is BOTH overpaid on goods AND carrying a fee, which is a
+ * state no fixture mounts.
+ */
+describe("OrderDetailDrawer - one money rule, asked once (D4)", () => {
+  it("asks the shared rule for the storage half instead of re-deriving it", () => {
+    expect(SRC).toContain("storageOwing: storageOwingAmount,");
+    expect(SRC).toContain("storageReleased,");
+    // The retired second arithmetic, in full. Its return is the whole defect.
+    expect(SRC).not.toContain("Math.max(0, invoiceTotal - collectedAll)");
+  });
+
+  it("the owed figure IS the shared rule's, not a second sum", () => {
+    expect(SRC).toContain("const balanceDue = money.outstanding;");
+  });
+
+  it("a released fee is still owed - the waiver drops the hold, not the debt", () => {
+    // C9. The amount asks what was COLLECTED; the waiver rides separately, so
+    // `orderMoney` can keep it in `outstanding` and out of `holding`. Folding
+    // them together - which the boolean `storageOwing` does - would zero a
+    // waived fee out of the invoice the customer still owes.
+    expect(SRC).toContain("!form.control?.storage_collected_at");
+    expect(SRC).toContain(
+      'const storageReleased = form.control?.storage_waiver_status === "approved";',
+    );
+  });
+
+  it("the rule is called once, with everything it needs", () => {
+    const calls = SRC.match(/orderMoney\(\{/g) ?? [];
+    expect(calls, "a second call is a second answer waiting to happen").toHaveLength(1);
+  });
+});
