@@ -542,6 +542,13 @@ export const soBatchPurchaseResponseSchema = z.object({
    * put it, and the audit must still say who actually pressed Issue PO.
    */
   actingPoDuty: z.object({ userId: z.string(), name: z.string() }).nullable(),
+  /**
+   * A holder/cover ID exists, but its display name could not be resolved.
+   * This is different from there being no configured PO duty holder.
+   */
+  poDutyNameUnavailable: z.boolean(),
+  /** The authoritative duty resolver itself could not be read. */
+  poDutyUnavailable: z.boolean(),
   mayIssue: z.boolean(),
   /** Who may collect from a factory, for the documents that need one. */
   procurementPartners: z.array(z.object({ id: z.string(), name: z.string() })),

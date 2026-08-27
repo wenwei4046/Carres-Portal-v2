@@ -271,6 +271,8 @@ function data(over: Partial<SoBatchPurchaseResponse> = {}): SoBatchPurchaseRespo
     defaultDestinationId: KLANG,
     currentPoDuty: { userId: "u1", name: "Yee Jean" },
     actingPoDuty: null,
+    poDutyNameUnavailable: false,
+    poDutyUnavailable: false,
     mayIssue: true,
     procurementPartners: [],
     safetyDays: 14,
@@ -887,5 +889,42 @@ describe("what this page refuses to be", () => {
       "Shasha is covering PO duty",
     );
     expect(screen.getByTestId("so-batch-po-duty")).not.toHaveTextContent("Tan Qu Qu");
+  });
+
+  it("says the PO duty name is missing instead of saying nobody is on duty", () => {
+    const unresolvedDuty = {
+      /* The normal holder still has a name, but today's effective cover ID
+         does not. The page must not send staff to the absent holder. */
+      currentPoDuty: { userId: "normal-holder", name: "Normal Holder" },
+      actingPoDuty: null,
+      mayIssue: false,
+      poDutyNameUnavailable: true,
+    } as Partial<SoBatchPurchaseResponse> & { poDutyNameUnavailable: boolean };
+    renderRegister(unresolvedDuty);
+
+    expect(screen.getByTestId("so-batch-po-duty")).toHaveTextContent(
+      "PO duty name is missing.",
+    );
+    fireEvent.click(screen.getByTestId("so-batch-select-o1"));
+    expect(screen.getByTestId("so-batch-duty-chip")).toHaveTextContent(
+      "PO duty name is missing.",
+    );
+    expect(screen.queryByText(/Normal Holder holds PO duty/)).not.toBeInTheDocument();
+    expect(screen.queryByText("Nobody holds PO duty this month.")).not.toBeInTheDocument();
+  });
+
+  it("says duty could not be checked when the resolver is unavailable", () => {
+    renderRegister({
+      currentPoDuty: null,
+      actingPoDuty: null,
+      poDutyNameUnavailable: false,
+      poDutyUnavailable: true,
+      mayIssue: false,
+    });
+
+    expect(screen.getByTestId("so-batch-po-duty")).toHaveTextContent(
+      "PO duty could not be checked.",
+    );
+    expect(screen.queryByText("Nobody holds PO duty this month.")).not.toBeInTheDocument();
   });
 });

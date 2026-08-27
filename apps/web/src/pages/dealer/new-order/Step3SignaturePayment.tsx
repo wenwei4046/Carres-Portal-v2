@@ -7,6 +7,7 @@ import {
 } from "@carres/shared";
 import { draftTotals } from "@/lib/order-totals";
 import { newWizardSessionId } from "@/lib/storage";
+import { composeAddress } from "@/data/malaysia-postcodes";
 import { previewDefaultGifts } from "../pos/free-line";
 import { cartModeOf } from "../pos/rental-cart";
 import {
@@ -155,13 +156,27 @@ export default function Step3SignaturePayment({ draft, onChange, catalog, onStri
       hasSlip &&
       (!selectedMethod.approvalCodeRequired || hasApproval) &&
       !missingFollowUp;
+  const deliveryAddress = composeAddress({
+    line1: draft.customer.addressLine1,
+    line2: draft.customer.addressLine2,
+    state: draft.customer.addressState,
+    city: draft.customer.addressCity,
+    postcode: draft.customer.addressPostcode,
+  });
   // Stripe submits the order with paid 0 (money moves only when the customer
   // completes Checkout), so it can never auto-qualify for Proceed at submit.
   const willProceed =
     !isStripe &&
+    total > 0 &&
     paidPct >= 50 &&
+    draft.customer.name.trim().length > 0 &&
+    draft.customer.phone.trim().length > 0 &&
     !draft.customer.addressUnknown &&
+    deliveryAddress.trim().length > 0 &&
+    draft.delivery.date.trim().length > 0 &&
     !draft.delivery.dateTbd &&
+    !!draft.signature?.startsWith("data:image/") &&
+    draft.termsAccepted &&
     paymentMethodOk;
 
   function paymentBlockerLabel(): string | null {
@@ -465,10 +480,17 @@ export default function Step3SignaturePayment({ draft, onChange, catalog, onStri
                 <span className="text-[11px]">
                   Operations receives it when{" "}
                   {[
+                    total <= 0 && "the order has goods and a price",
                     paidPct < 50 && `payment reaches 50% (now ${paidPct}%)`,
                     paymentBlockerLabel(),
-                    draft.customer.addressUnknown && "delivery address is provided",
-                    draft.delivery.dateTbd && "delivery date is confirmed",
+                    !draft.customer.name.trim() && "customer name is entered",
+                    !draft.customer.phone.trim() && "customer phone is entered",
+                    (draft.customer.addressUnknown || !deliveryAddress.trim()) &&
+                      "delivery address is entered",
+                    (draft.delivery.dateTbd || !draft.delivery.date.trim()) &&
+                      "Requested Delivery Date is entered",
+                    !draft.signature?.startsWith("data:image/") && "customer signs",
+                    !draft.termsAccepted && "terms are accepted",
                   ]
                     .filter(Boolean)
                     .join(", ")}

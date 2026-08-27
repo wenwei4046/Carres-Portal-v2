@@ -335,6 +335,8 @@ const data: SoBatchPurchaseResponse = {
   defaultDestinationId: KLANG,
   currentPoDuty: { userId: "u1", name: "Yee Jean" },
   actingPoDuty: null,
+  poDutyNameUnavailable: false,
+  poDutyUnavailable: false,
   mayIssue: true,
   procurementPartners: [],
   safetyDays: 14,

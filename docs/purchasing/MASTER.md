@@ -692,8 +692,10 @@ database transaction; the salesperson does not press a second button. A submitte
 still missing a governed Proceed fact remains `place` and stays outside Purchasing. When payment,
 address, date or a governed correction supplies the last missing fact, the same transition is
 retried automatically. `Move to Proceed` remains only as a recovery door for legacy/raw records.
-`orders.sales_final_submitted_at` is the authoritative boundary. Raw, office, rental and imported
-orders do not receive it. Historical Portal and raw records cannot be separated truthfully from
+`orders.status = 'proceed_order'` is the authoritative Purchasing boundary.
+`orders.sales_final_submitted_at` is the final-submit/retry fact that lets the system re-test that
+boundary after a later correction. Raw, office, rental and imported orders do not receive it.
+Historical Portal and raw records cannot be separated truthfully from
 creator role or completeness, so legacy recovery accepts only exact IDs confirmed by Principal,
 requires a written reason, rejects office/rental/imported records and records
 History + Audit before using the canonical transition. The retry runs at the final transaction

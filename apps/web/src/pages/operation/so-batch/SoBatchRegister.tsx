@@ -790,11 +790,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
                   className="shrink-0 truncate text-meta text-kit-slate-11"
                   data-testid="so-batch-duty-chip"
                 >
-                  {data.actingPoDuty
-                    ? `${data.actingPoDuty.name} is covering PO duty`
-                    : data.currentPoDuty
-                      ? `${data.currentPoDuty.name} holds PO duty`
-                      : "Nobody holds PO duty this month."}
+                  {poDutyLabel(data)}
                 </span>
               )}
             </div>
@@ -806,12 +802,10 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
 }
 
 function SoBatchPoDuty({ data }: { data: SoBatchPurchaseResponse }) {
-  const person = data.actingPoDuty ?? data.currentPoDuty;
-  const label = data.actingPoDuty
-    ? `${data.actingPoDuty.name} is covering PO duty`
-    : data.currentPoDuty
-      ? `${data.currentPoDuty.name} holds PO duty`
-      : "Nobody holds PO duty this month.";
+  const person = data.poDutyUnavailable || data.poDutyNameUnavailable
+    ? null
+    : (data.actingPoDuty ?? data.currentPoDuty);
+  const label = poDutyLabel(data);
 
   if (!person) {
     return (
@@ -844,6 +838,14 @@ function SoBatchPoDuty({ data }: { data: SoBatchPurchaseResponse }) {
       <span>{label}</span>
     </span>
   );
+}
+
+function poDutyLabel(data: SoBatchPurchaseResponse): string {
+  if (data.poDutyUnavailable) return "PO duty could not be checked.";
+  if (data.actingPoDuty) return `${data.actingPoDuty.name} is covering PO duty`;
+  if (data.poDutyNameUnavailable) return "PO duty name is missing.";
+  if (data.currentPoDuty) return `${data.currentPoDuty.name} holds PO duty`;
+  return "Nobody holds PO duty this month.";
 }
 
 /**

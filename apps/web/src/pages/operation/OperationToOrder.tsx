@@ -99,6 +99,8 @@ export default function OperationToOrder() {
     defaultDestinationId: null,
     currentPoDuty: null,
     actingPoDuty: null,
+    poDutyNameUnavailable: false,
+    poDutyUnavailable: false,
     mayIssue: false,
     procurementPartners: [],
     safetyDays: 14,

@@ -114,6 +114,8 @@ function payload(over: Partial<SoBatchPurchaseResponse> = {}): SoBatchPurchaseRe
     currentPoDuty: { userId: "u1", name: "Yee Jean" },
     /* 0379 — nobody is covering by default. */
     actingPoDuty: null,
+    poDutyNameUnavailable: false,
+    poDutyUnavailable: false,
     mayIssue: true,
     procurementPartners: [{ id: "p-nets", name: "NETS" }],
     safetyDays: 14,

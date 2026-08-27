@@ -85,6 +85,30 @@ describe("Sales final submit is the Sales → Purchasing handoff", () => {
     expect(rawSql.slice(0, rawSql.indexOf("$fn$;", 10))).not.toContain("sales_final_submitted_at");
   });
 
+  it("retires the direct birth primitive after the new Worker is live", () => {
+    const cutover = migration("0392_");
+    const route = read("apps/api/src/routes/orders.ts");
+
+    expect(cutover).toMatch(
+      /apply only after[\s\S]*?Worker[\s\S]*?production SHA is verified/i,
+    );
+    expect(cutover).toMatch(
+      /revoke execute on function public\.create_order\(jsonb\)[\s\S]*?public, anon, authenticated/i,
+    );
+    expect(cutover).toMatch(
+      /alter function public\.recover_legacy_sales_final_submits\(uuid\[\],text\)[\s\S]*?rename to _recover_legacy_sales_final_submits_0391_impl/i,
+    );
+    expect(cutover).toMatch(
+      /o\.status not in \('place', 'proceed_order'\)[\s\S]*?detail = 'wrong_status'/i,
+    );
+    expect(cutover).toMatch(
+      /return public\._recover_legacy_sales_final_submits_0391_impl\(/i,
+    );
+    expect(route).not.toMatch(/rpc\("create_order", \{ payload \}\)/);
+    expect(route).toMatch(/rpc\("create_order_from_sales_portal", \{ payload \}\)/);
+    expect(route).toMatch(/rpc\("create_raw_order", \{ payload \}\)/);
+  });
+
   it("fails closed for orphan authenticated callers and authorizes Proceed under the row lock", () => {
     const sql = migration("0391_");
     const portal = sql.slice(sql.indexOf("create or replace function public.create_order_from_sales_portal"));

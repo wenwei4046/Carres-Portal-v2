@@ -414,14 +414,15 @@ ordersRouter.get("/customer-search", async (c) => {
 });
 
 /**
- * POST /api/orders — atomic create via RPC `create_order(payload jsonb)`.
+ * POST /api/orders — atomic final submit via the governed Sales Portal wrapper.
  *
  * Flow:
  *   1. Verify caller is dealer/salesperson/internal (middleware sets c.var.auth)
  *   2. Validate camelCase input with zod
  *   3. Adapter converts → snake_case jsonb RPC payload (+ injects dealerId from JWT)
- *   4. Call RPC — atomic insert across 5 tables (orders + lines + addons +
- *      history + audit_log). If anything fails, Postgres rolls back the whole TX.
+ *   4. Call `create_order_from_sales_portal` — atomic insert across 5 tables
+ *      plus the governed Sales → Operations handoff when its facts are ready.
+ *      If anything fails, Postgres rolls back the whole TX.
  *   5. Re-fetch the inserted order with rels (same shape as GET /:id) so the
  *      client can route directly to /dealer/orders/:id without a second fetch.
  *

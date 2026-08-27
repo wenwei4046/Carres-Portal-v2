@@ -314,6 +314,7 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
   let poDutyId: string | null = null;
   let actingId: string | null = null;
   let actingName: string | null = null;
+  let poDutyUnavailable = false;
   /** Who may act TODAY — the holder, or the dated cover when one is open. */
   let actorId: string | null = null;
   const nameById = new Map<string, string>();
@@ -334,28 +335,34 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
       const l = label(u);
       if (l) nameById.set(u.id as string, l);
     }
-    const actor = (actorRes.data ?? {}) as {
-      normal_user_id?: string | null;
-      acting_user_id?: string | null;
-      actor_user_id?: string | null;
-    };
-    poDutyId = actor.normal_user_id ?? null;
-    actingId = actor.acting_user_id ?? null;
-    actorId = actor.actor_user_id ?? null;
-    const wanted = [poDutyId, actingId].filter((v): v is string => v != null);
-    if (wanted.length > 0) {
-      const who = await sb
-        .from("app_users")
-        .select("id, name, email")
-        .in("id", [...new Set(wanted)]);
-      for (const u of (who.data ?? []) as Record<string, unknown>[]) {
-        const l = label(u);
-        if (!l) continue;
-        if (u.id === poDutyId) poDutyName = l;
-        if (u.id === actingId) actingName = l;
+    if (actorRes.error) {
+      poDutyUnavailable = true;
+      console.error("purchase demands — PO duty unavailable", actorRes.error.message);
+    } else {
+      const actor = (actorRes.data ?? {}) as {
+        normal_user_id?: string | null;
+        acting_user_id?: string | null;
+        actor_user_id?: string | null;
+      };
+      poDutyId = actor.normal_user_id ?? null;
+      actingId = actor.acting_user_id ?? null;
+      actorId = actor.actor_user_id ?? null;
+      const wanted = [poDutyId, actingId].filter((v): v is string => v != null);
+      if (wanted.length > 0) {
+        const who = await sb
+          .from("app_users")
+          .select("id, name, email")
+          .in("id", [...new Set(wanted)]);
+        for (const u of (who.data ?? []) as Record<string, unknown>[]) {
+          const l = label(u);
+          if (!l) continue;
+          if (u.id === poDutyId) poDutyName = l;
+          if (u.id === actingId) actingName = l;
+        }
       }
     }
   } catch (e) {
+    poDutyUnavailable = true;
     console.error("purchase demands — owner names unavailable", (e as Error).message);
   }
 
@@ -599,6 +606,12 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
     defaultDestinationId: defaultDestination?.id ?? null,
     currentPoDuty: poDutyId && poDutyName ? { userId: poDutyId, name: poDutyName } : null,
     actingPoDuty: actingId && actingName ? { userId: actingId, name: actingName } : null,
+    /* An unresolved name must not erase a real configured duty/cover fact.
+       The dated cover is the effective person today; otherwise it is the
+       normal holder. Only no effective ID means nobody holds the duty. */
+    poDutyNameUnavailable:
+      (actingId ?? poDutyId) != null && (actingId != null ? actingName : poDutyName) == null,
+    poDutyUnavailable,
     /* Convenience only. `mayIssue` decides whether the browser OFFERS the act;
        the issue endpoint asks the same resolver again and the creation RPC asks
        it a third time (Card §6 — UI hiding is convenience, API/RPC is
