@@ -111,6 +111,71 @@ function mapPipelineV2Error(error: { code?: string; message?: string; details?: 
 }
 
 /**
+ * ⭐ ONE ACTOR RESOLVER FOR EVERY SALES ORDER RECORD (CARD 2026-08-27).
+ *
+ * History events and Revision rows both answer "who did this" from the same
+ * two identity sources, and Law D says a derived fact has ONE arithmetic —
+ * this function is that arithmetic, extracted from the detail route where it
+ * was born (2026-08-24) so the Revisions read cannot drift from it.
+ *
+ * TWO SOURCES, BECAUSE ONE CANNOT SEE EVERYONE. 0235 lets an operation JWT
+ * read app_users rows whose role IS 'operation' — deliberately, so staff can
+ * see colleagues without reading every dealer account. But the actor on a
+ * sales order is very often a SALESPERSON, whose app_users row is role
+ * 'dealer' and therefore invisible there. `salespersons` carries `user_id`
+ * and is readable by any internal role (0002 `salespersons_scoped_read`), so
+ * it answers exactly the half app_users cannot. app_users wins where both
+ * answer: it is the account; the salesperson row is the sales-side profile of
+ * the same person.
+ *
+ * BOUNDED: each distinct id is asked for once, however many events or
+ * revisions it authored. FAILS OPEN: a read error or an unresolved id leaves
+ * the record unnamed — the caller classifies that as an audit-data defect; a
+ * person is never invented and an event is never dropped.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function resolveActorNames(sb: any, ids: ReadonlyArray<string | null | undefined>): Promise<Map<string, string>> {
+  const distinct = [...new Set(ids.filter((v): v is string => !!v))];
+  const byId = new Map<string, string>();
+  if (distinct.length === 0) return byId;
+  const [staffRes, sellerRes] = await Promise.all([
+    sb.from("app_users").select("id, name").in("id", distinct),
+    sb.from("salespersons").select("user_id, name").in("user_id", distinct),
+  ]);
+  for (const r of (staffRes.data ?? []) as Array<{ id: string; name: string | null }>) {
+    if (r.name) byId.set(r.id, r.name);
+  }
+  for (const r of (sellerRes.data ?? []) as Array<{ user_id: string | null; name: string | null }>) {
+    if (r.user_id && r.name && !byId.has(r.user_id)) byId.set(r.user_id, r.name);
+  }
+  return byId;
+}
+
+/**
+ * The server's truthful classification of who acted — the browser renders it
+ * and never re-derives it (the Card's contract: "The browser does not infer
+ * `System` from a null id").
+ *
+ *   human    a person id was recorded and resolved to a real name
+ *   system   the event's own structured facts prove the portal/automation
+ *            acted (`metadata.actor === "system"`, the marker an automated
+ *            writer stamps). A missing person id is NEVER promoted to this.
+ *   missing  the actor was not recorded, or the recorded id cannot be
+ *            resolved to a name — an audit-data defect the UI states plainly
+ *            (`Actor was not recorded`), never a person guess.
+ */
+function actorKindOf(
+  byUserId: string | null | undefined,
+  resolvedName: string | null,
+  metadata?: unknown,
+): "human" | "system" | "missing" {
+  if (byUserId) return resolvedName ? "human" : "missing";
+  const meta = metadata as Record<string, unknown> | null | undefined;
+  if (meta && typeof meta === "object" && meta.actor === "system") return "system";
+  return "missing";
+}
+
+/**
  * sku → `Model · Variant`, the ONE human-readable product name in this module.
  *
  * **Extracted by STAGE 1, not written by it.** The detail route has resolved
@@ -690,19 +755,11 @@ operationOrdersRouter.get("/:id", requireOperation, async (c) => {
   // MASTER.md:146 calls History "the append-only event ledger"; a ledger that
   // cannot name its actor is an audit trail with the audit removed.
   //
-  // TWO SOURCES, BECAUSE ONE CANNOT SEE EVERYONE. 0235 lets an operation JWT
-  // read app_users rows whose role IS 'operation' - deliberately, so staff can
-  // see colleagues without reading every dealer account. But the actor on a
-  // sales order is very often a SALESPERSON, whose app_users row is role
-  // 'dealer' and therefore invisible here. `salespersons` carries `user_id` and
-  // is readable by any internal role (0002 `salespersons_scoped_read`), so it
-  // answers exactly the half app_users cannot. Reading only app_users would
-  // have silently dropped the name in the commonest case - which is the whole
-  // defect, moved rather than fixed.
-  //
-  // FAILS OPEN, ALWAYS. An unresolved id (a cron, a trigger, a deleted account,
-  // an RLS miss) yields `actor: null` and the UI says `Unknown user`. It never
-  // invents an actor, and it never drops the event.
+  // The two-source lookup lives in `resolveActorNames` (CARD 2026-08-27 moved
+  // it there so the Revisions read shares the one arithmetic). FAILS OPEN,
+  // ALWAYS: an unresolved id (a cron, a trigger, a deleted account, an RLS
+  // miss) yields `actor: null` + `actor_kind: "missing"` and the UI states the
+  // audit-data defect. It never invents an actor, and it never drops the event.
   const historyRows = (historyRes.data ?? []) as Array<{
     text: string;
     by_role: string | null;
@@ -721,27 +778,15 @@ operationOrdersRouter.get("/:id", requireOperation, async (c) => {
      * without this route being redeployed. */
     metadata: unknown;
   }>;
-  const actorIds = [...new Set(historyRows.map((h) => h.by_user_id).filter((v): v is string => !!v))];
-  const actorById = new Map<string, string>();
-  if (actorIds.length > 0) {
-    const [staffRes, sellerRes] = await Promise.all([
-      sb.from("app_users").select("id, name").in("id", actorIds),
-      sb.from("salespersons").select("user_id, name").in("user_id", actorIds),
-    ]);
-    // A read error is not fatal - the ledger still renders, unnamed.
-    for (const r of (staffRes.data ?? []) as Array<{ id: string; name: string | null }>) {
-      if (r.name) actorById.set(r.id, r.name);
-    }
-    // app_users wins where both answer: it is the account, the salesperson row
-    // is the sales-side profile of the same person.
-    for (const r of (sellerRes.data ?? []) as Array<{ user_id: string | null; name: string | null }>) {
-      if (r.user_id && r.name && !actorById.has(r.user_id)) actorById.set(r.user_id, r.name);
-    }
-  }
-  const historyWithActor = historyRows.map((h) => ({
-    ...h,
-    actor: h.by_user_id ? (actorById.get(h.by_user_id) ?? null) : null,
-  }));
+  const actorById = await resolveActorNames(sb, historyRows.map((h) => h.by_user_id));
+  const historyWithActor = historyRows.map((h) => {
+    const actor = h.by_user_id ? (actorById.get(h.by_user_id) ?? null) : null;
+    return {
+      ...h,
+      actor,
+      actor_kind: actorKindOf(h.by_user_id, actor, h.metadata),
+    };
+  });
 
   return c.json({
     order,
@@ -831,6 +876,13 @@ const revisionHeaderInput = z
   .strict();
 
 // GET /:id/revisions — the order's immutable snapshots, oldest first.
+//
+// ⭐ A REVISION NAMES ITS RECORDER (CARD 2026-08-27). `created_by` has been
+// stored since 0327 and this read handed the browser a bare uuid it could do
+// nothing with — so the Revisions view could not say WHO recorded a version.
+// The SAME resolver History uses answers it here (Law D: one arithmetic), in
+// one bounded read per identity table. `created_by` still rides the wire —
+// it remains the audit identity; the name is presentation, not a replacement.
 operationOrdersRouter.get("/:id/revisions", requireOperation, async (c) => {
   const id = c.req.param("id");
   const sb = userClient(c.env, c.var.auth.jwt);
@@ -843,7 +895,24 @@ operationOrdersRouter.get("/:id/revisions", requireOperation, async (c) => {
     const m = mapPgError(error);
     return c.json(m.body, m.status);
   }
-  return c.json({ revisions: data ?? [] });
+  const rows = (data ?? []) as Array<{
+    revision: number;
+    snapshot: unknown;
+    created_at: string;
+    created_by: string | null;
+    change_type: string | null;
+    note: string | null;
+  }>;
+  const nameById = await resolveActorNames(sb, rows.map((r) => r.created_by));
+  const revisions = rows.map((r) => {
+    const created_by_name = r.created_by ? (nameById.get(r.created_by) ?? null) : null;
+    return {
+      ...r,
+      created_by_name,
+      actor_kind: actorKindOf(r.created_by, created_by_name),
+    };
+  });
+  return c.json({ revisions });
 });
 
 // GET /:id/commitment — CARD 1's one authoritative read: what is the
