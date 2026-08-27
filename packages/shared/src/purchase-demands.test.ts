@@ -223,7 +223,9 @@ describe("the state words — every category, no banned word", () => {
     expect(words.safety_days_full).toBe("14 safety days left");
     expect(words.safety_days_low).toBe("1–13 safety days left");
     expect(words.safety_days_none).toBe("No safety days left");
-    expect(words.not_enough_production_time).toBe("Not enough production time");
+    /* Card 02-C (2026-08-27): `days`, never `time` — the unit the arithmetic
+       itself counts in. */
+    expect(words.not_enough_production_time).toBe("Not enough production days");
   });
 
   it("the safety words follow the governed value, so the screen cannot lie", () => {
@@ -241,7 +243,7 @@ describe("the state words — every category, no banned word", () => {
     for (const s of PURCHASE_DEMAND_TIMING_STATES) {
       expect(rail[s]).toBe(words[s]);
     }
-    expect(rail.no_production_days).toBe("Production time not set");
+    expect(rail.no_production_days).toBe("Production days not set");
     // The Sales/Catalog blockers are row facts, never rail facets.
     expect(rail.no_customer_date).toBeUndefined();
     expect(rail.no_sku).toBeUndefined();
