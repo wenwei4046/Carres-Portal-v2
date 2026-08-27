@@ -862,3 +862,234 @@ describe("closure §1 · the Register offers the act to whoever may act today", 
     expect(body.actingPoDuty).toBeNull();
   });
 });
+
+/**
+ * ⭐ CARD 02-B — ONE PERMANENT ROW PER PROCEEDED SALES ORDER (owner ruling
+ * 2026-08-27).
+ *
+ * The fixture overlay adds the three authorities the order Register runs on:
+ * `po_line_sources` (the ONLY visible PO attribution), `purchase_orders`
+ * (status · version · `eta_date` · supplier · destination) and `po_sends`
+ * (confirmed-sent evidence at the current version). Five extra orders cover
+ * the five Status stories: fully sent, numbered-but-unsent, cancelled,
+ * stale-revision and received.
+ */
+function registerTables() {
+  const t = TABLES() as unknown as Record<string, { data: unknown; error: unknown }>;
+  const orders = t.orders.data as Record<string, unknown>[];
+  /* o1 gains the order facts the Register prints. */
+  Object.assign(orders.find((o) => o.id === "o1")!, {
+    proceed_date: "2026-08-20",
+    customer_address_city: "Petaling Jaya",
+    customer_address_state: "Selangor",
+  });
+  orders.push(
+    { id: "o8", so: 1215, customer_name: "ORDERED ONE", status: "proceed_order",
+      delivery_date: DELIVERY_EARLY, delivery_date_tbd: false,
+      placed_at: "2026-07-01", created_at: "2026-07-01", proceed_date: "2026-08-21",
+      salesperson_id: null },
+    { id: "o9", so: 1216, customer_name: "UNSENT ONE", status: "proceed_order",
+      delivery_date: DELIVERY_EARLY, delivery_date_tbd: false,
+      placed_at: "2026-07-01", created_at: "2026-07-01", proceed_date: null,
+      salesperson_id: null },
+    { id: "o10", so: 1217, customer_name: "CANCELLED ONE", status: "proceed_order",
+      delivery_date: DELIVERY_EARLY, delivery_date_tbd: false,
+      placed_at: "2026-07-01", created_at: "2026-07-01", proceed_date: null,
+      salesperson_id: null },
+    { id: "o11", so: 1218, customer_name: "REVISED ONE", status: "proceed_order",
+      delivery_date: DELIVERY_EARLY, delivery_date_tbd: false,
+      placed_at: "2026-07-01", created_at: "2026-07-01", proceed_date: null,
+      salesperson_id: null },
+  );
+  const lines = t.order_lines.data as Record<string, unknown>[];
+  lines.push(
+    line("l13", "o8", "ORD-K", 2),
+    line("l14", "o9", "UNS-K", 1),
+    line("l15", "o10", "CAN-K", 1),
+    line("l16", "o11", "REV-K", 1),
+  );
+  const skus = t.product_skus.data as Record<string, unknown>[];
+  for (const sku of ["ORD-K", "UNS-K", "CAN-K", "REV-K"]) {
+    skus.push({
+      sku, supplier_id: NICE, cost: 100, variant: "King", variant_kind: "size",
+      product_models: { category: "mattress", name: sku.slice(0, 3) },
+    });
+  }
+  t.purchase_orders = {
+    data: [
+      /* Received, current version confirmed sent — stays Ordered forever. */
+      { id: "PO-9001", status: "received", version: 1, eta_date: "2026-09-18",
+        supplier_id: NICE, destination_id: KLANG_DEST },
+      /* Numbered, never sent — visible under PO No, Status stays blank. */
+      { id: "PO-9002", status: "open", version: 1, eta_date: null,
+        supplier_id: NICE, destination_id: KLANG_DEST },
+      /* Cancelled — never counts, never attributed. */
+      { id: "PO-9003", status: "cancelled", version: 1, eta_date: "2026-09-10",
+        supplier_id: NICE, destination_id: KLANG_DEST },
+      /* Revised to v2; only v1 was ever sent — the old send completes nothing. */
+      { id: "PO-9004", status: "open", version: 2, eta_date: "2026-09-12",
+        supplier_id: NICE, destination_id: BULOH_DEST },
+      /* The o4 covers, so Partial can be proven on a real engine order. */
+      { id: "PO-2051", status: "open", version: 1, eta_date: "2026-09-15",
+        supplier_id: NICE, destination_id: KLANG_DEST },
+      { id: "PO-2052", status: "open", version: 1, eta_date: "2026-09-15",
+        supplier_id: NICE, destination_id: KLANG_DEST },
+    ],
+    error: null,
+  };
+  t.po_line_sources = {
+    data: [
+      { id: "src1", po_id: "PO-9001", order_id: "o8", order_line_id: "l13", qty: 2 },
+      { id: "src2", po_id: "PO-9002", order_id: "o9", order_line_id: "l14", qty: 1 },
+      { id: "src3", po_id: "PO-9003", order_id: "o10", order_line_id: "l15", qty: 1 },
+      { id: "src4", po_id: "PO-9004", order_id: "o11", order_line_id: "l16", qty: 1 },
+      { id: "src5", po_id: "PO-2051", order_id: "o4", order_line_id: "l7", qty: 3 },
+      { id: "src6", po_id: "PO-2052", order_id: "o4", order_line_id: "l8", qty: 2 },
+    ],
+    error: null,
+  };
+  t.po_sends = {
+    data: [
+      { po_id: "PO-9001", po_version: 1, kind: "confirmed_sent" },
+      { po_id: "PO-9003", po_version: 1, kind: "confirmed_sent" },
+      { po_id: "PO-9004", po_version: 1, kind: "confirmed_sent" },
+      { po_id: "PO-2051", po_version: 1, kind: "confirmed_sent" },
+      { po_id: "PO-2052", po_version: 1, kind: "confirmed_sent" },
+      /* An app open is not an arrival — it must never count. */
+      { po_id: "PO-9002", po_version: 1, kind: "external_open" },
+    ],
+    error: null,
+  };
+  return t;
+}
+
+const registerRow = (body: SoBatchPurchaseResponse, orderId: string) =>
+  body.registerRows.find((r) => r.orderId === orderId);
+
+describe("Card 02-B · one permanent row per proceeded Sales Order", () => {
+  it("only `proceed_order` orders get a row — `place` does not, Service-only does not", async () => {
+    const { body } = await rowsOf(registerTables());
+    const ids = body.registerRows.map((r) => r.orderId);
+    expect(ids).toContain("o1");
+    expect(ids).not.toContain("o2"); // status `place`
+  });
+
+  it("one SO with several item lines is ONE parent row, newest order first", async () => {
+    const { body } = await rowsOf(registerTables());
+    expect(body.registerRows.filter((r) => r.orderId === "o1")).toHaveLength(1);
+    const soNumbers = body.registerRows.map((r) => r.so);
+    expect([...soNumbers].sort((a, b) => (b ?? -1) - (a ?? -1))).toEqual(soNumbers);
+  });
+
+  it("carries the order facts the columns print — Proceed Date, Requested Delivery Date, locality", async () => {
+    const { body } = await rowsOf(registerTables());
+    const o1 = registerRow(body, "o1")!;
+    expect(o1.proceedDate).toBe("2026-08-20");
+    expect(o1.requestedDeliveryDate).toBe(DELIVERY_EARLY);
+    expect(o1.deliveryCity).toBe("Petaling Jaya");
+    expect(o1.deliveryState).toBe("Selangor");
+    expect(o1.customer).toBe("PETER");
+  });
+
+  it("no lineage and outstanding demand is blank, with the outstanding supplier named", async () => {
+    const { body } = await rowsOf(registerTables());
+    const o1 = registerRow(body, "o1")!;
+    expect(o1.status).toBe("blank");
+    expect(o1.pos).toEqual([]);
+    expect(o1.outstandingSuppliers).toEqual(["Nice Future"]);
+  });
+
+  it("a received PO with current-version confirmed-send stays Ordered — and the row stays", async () => {
+    const { body } = await rowsOf(registerTables());
+    const o8 = registerRow(body, "o8")!;
+    expect(o8.status).toBe("ordered");
+    expect(o8.pos.map((p) => p.poId)).toEqual(["PO-9001"]);
+    expect(o8.pos[0]).toMatchObject({
+      status: "received",
+      supplierName: "Nice Future",
+      destinationId: KLANG_DEST,
+      etaDate: "2026-09-18",
+      sentCurrentVersion: true,
+    });
+  });
+
+  it("a numbered but unsent PO shows under PO No while Status stays blank — `external_open` never counts", async () => {
+    const { body } = await rowsOf(registerTables());
+    const o9 = registerRow(body, "o9")!;
+    expect(o9.pos.map((p) => p.poId)).toEqual(["PO-9002"]);
+    expect(o9.pos[0]!.sentCurrentVersion).toBe(false);
+    expect(o9.status).toBe("blank");
+    /* A PO without a date prints nothing — never an estimate. */
+    expect(o9.pos[0]!.etaDate).toBeNull();
+  });
+
+  it("a cancelled PO neither counts nor attributes, even with send evidence", async () => {
+    const { body } = await rowsOf(registerTables());
+    const o10 = registerRow(body, "o10")!;
+    expect(o10.pos).toEqual([]);
+    expect(o10.status).toBe("blank");
+  });
+
+  it("a new unsent revision invalidates older-version send completeness", async () => {
+    const { body } = await rowsOf(registerTables());
+    const o11 = registerRow(body, "o11")!;
+    expect(o11.pos.map((p) => p.poId)).toEqual(["PO-9004"]);
+    expect(o11.pos[0]!.sentCurrentVersion).toBe(false);
+    expect(o11.status).toBe("blank");
+  });
+
+  it("part of the buying-required quantity covered and sent is Partial, with the exact line mapping", async () => {
+    const { body } = await rowsOf(registerTables());
+    const o4 = registerRow(body, "o4")!;
+    // COV-K: 3 of 3 on PO-2051 (sent) · PART-K: 2 of 3 on PO-2052 (sent).
+    expect(o4.status).toBe("partial");
+    expect(o4.pos.map((p) => p.poId)).toEqual(["PO-2051", "PO-2052"]);
+    const part = o4.lines.find((l) => l.sku === "PART-K")!;
+    expect(part.qty).toBe(3);
+    expect(part.pos).toEqual([{ poId: "PO-2052", qty: 2 }]);
+  });
+
+  it("visible PO attribution comes ONLY from po_line_sources — a document with no lineage never appears", async () => {
+    const t = registerTables();
+    (t.purchase_orders.data as Record<string, unknown>[]).push({
+      /* A PO that merely mentions the customer order some other way. */
+      id: "PO-9099", status: "open", version: 1, eta_date: "2026-09-01",
+      supplier_id: NICE, destination_id: KLANG_DEST, so: 1207, so_refs: [1207],
+    });
+    const { body } = await rowsOf(t);
+    for (const r of body.registerRows) {
+      expect(r.pos.map((p) => p.poId), r.orderId).not.toContain("PO-9099");
+    }
+  });
+
+  it("a fully Ready-Stock covered order keeps its row, blank, with the coverage on its lines", async () => {
+    const t = registerTables();
+    /* One unit of B1201S-Q free in Klang, already drawn for SO-1212 (o5). */
+    t.ops_stock_items = {
+      data: [{ id: "st1", sku: "B1201S-Q", qty: 1, date_in: "2026-08-01", created_at: "2026-08-01" }],
+      error: null,
+    };
+    t.ops_stock_pool_usage = {
+      data: [{ sku: "B1201S-Q", qty: 1, ref: "SO-1212" }],
+      error: null,
+    };
+    const { body, rows } = await rowsOf(t);
+    const o5 = registerRow(body, "o5")!;
+    expect(o5.status).toBe("blank");
+    const covered = o5.lines.find((l) => l.orderLineId === "l10")!;
+    expect(covered.stockTaken).toBe(1);
+    expect(covered.qty).toBe(1);
+    /* And the leaf listing no longer carries it — nothing left to buy — so the
+       ROW is the only thing keeping the order visible. */
+    expect(rows.find((r) => r.lineIds.includes("l10"))).toBeUndefined();
+  });
+
+  it("the wire schema parses the whole payload, registerRows included", async () => {
+    const { res } = await getDemands(registerTables());
+    expect(res.status).toBe(200);
+    const parsed = (await import("@carres/shared")).soBatchPurchaseResponseSchema.parse(
+      await res.json(),
+    );
+    expect(parsed.registerRows.length).toBeGreaterThan(0);
+  });
+});

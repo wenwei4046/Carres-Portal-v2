@@ -91,6 +91,18 @@ const CHILD_COLUMNS = [
  */
 const COVERED_BY_COLUMN = { key: "coveredBy", label: "Covered by", width: 168 } as const;
 
+/**
+ * ⭐ `Supplier` · `PO Delivery Date` — CARD 02-B's exact-mapping columns
+ * (owner ruling 2026-08-27). Optional, exactly like `Covered by` and for the
+ * same reason: when one Sales Order spans two purchase orders, the parent row
+ * can only summarise (`2 suppliers` · `Multiple`), so the child box is where
+ * the exact item-to-PO/supplier/date mapping lives. Both are fixed columns
+ * inserted BEFORE `Item` — law ① keeps `Item` last and flexible. Sales Orders
+ * and Delivery pass neither and render byte-identically.
+ */
+const SUPPLIER_COLUMN = { key: "supplier", label: "Supplier", width: 140 } as const;
+const PO_DATE_COLUMN = { key: "poDeliveryDate", label: "PO Delivery Date", width: 150 } as const;
+
 /** ☑ is chrome, so it is narrow and it is not one of the six ruled columns. */
 const SELECT_WIDTH = 36;
 
@@ -114,10 +126,22 @@ export interface GoodsMiniLine {
   unitAbsence: string;
   deliverTo: string[];
   deliverToAbsence: string;
+  /**
+   * Card 02-B — a line whose destination is still being ARRANGED renders its
+   * own editable control instead of the printed strings. The page owns the
+   * control (the existing `DestinationAllocationEditor`); this box only gives
+   * it the cell. Absent = the strings render exactly as before.
+   */
+  deliverToNode?: ReactNode;
   /** One printed line each. Read only when the table is asked for the column. */
   coveredBy?: string[];
   /** The governed word for a line nothing covers yet. */
   coveredByAbsence?: string;
+  /** Card 02-B — read only when the table is asked for the column. */
+  supplier?: string;
+  supplierAbsence?: string;
+  poDeliveryDate?: string;
+  poDeliveryDateAbsence?: string;
   sku: string;
   qty: number;
   item: string;
@@ -213,6 +237,8 @@ export default function GoodsMiniTable({
   lines,
   selection,
   showCoveredBy = false,
+  showSupplier = false,
+  showPoDeliveryDate = false,
 }: {
   /** The table's accessible name — `Goods on SO-1303`. */
   label: string;
@@ -221,17 +247,26 @@ export default function GoodsMiniTable({
   selection?: GoodsMiniTableSelection;
   /** A page that BUYS asks for `Covered by`; a truth register does not. */
   showCoveredBy?: boolean;
+  /** Card 02-B — the exact-mapping columns the buying Register asks for. */
+  showSupplier?: boolean;
+  showPoDeliveryDate?: boolean;
 }) {
-  /* The six ruled columns, plus the buying page's own — inserted after
-     `Unit ID`, never after `Item` (law ①). */
-  const columns = showCoveredBy
+  /* The six ruled columns, plus the buying page's own — `Covered by` after
+     `Unit ID`, the mapping columns before `Item`, never after it (law ①). */
+  type Column = { key: string; label: string; width: number | null };
+  const columns: Column[] = showCoveredBy
     ? [CHILD_COLUMNS[0], CHILD_COLUMNS[1], COVERED_BY_COLUMN, ...CHILD_COLUMNS.slice(2)]
     : [...CHILD_COLUMNS];
+  const itemAt = columns.length - 1;
+  if (showPoDeliveryDate) columns.splice(itemAt, 0, PO_DATE_COLUMN);
+  if (showSupplier) columns.splice(itemAt, 0, SUPPLIER_COLUMN);
   const minWidth =
     FIXED_TOTAL +
     ITEM_FLOOR +
     (selection ? SELECT_WIDTH : 0) +
-    (showCoveredBy ? COVERED_BY_COLUMN.width : 0);
+    (showCoveredBy ? COVERED_BY_COLUMN.width : 0) +
+    (showSupplier ? SUPPLIER_COLUMN.width : 0) +
+    (showPoDeliveryDate ? PO_DATE_COLUMN.width : 0);
   return (
     /* ⭐ A BOX, NOT A CONTINUATION OF THE SHEET — owner correction 2026-08-15.
        The first shipped version fused it into the grid: two rules and nothing
@@ -327,7 +362,9 @@ export default function GoodsMiniTable({
                 </td>
               ) : null}
               <td className="px-2 py-2">
-                {line.deliverTo.length ? (
+                {line.deliverToNode != null ? (
+                  line.deliverToNode
+                ) : line.deliverTo.length ? (
                   line.deliverTo.map((d) => <div key={d}>{d}</div>)
                 ) : (
                   <Absence>{line.deliverToAbsence}</Absence>
@@ -335,6 +372,24 @@ export default function GoodsMiniTable({
               </td>
               <td className="px-2 py-2 font-mono">{line.sku}</td>
               <td className="px-2 py-2 tabular-nums">{line.qty}</td>
+              {showSupplier ? (
+                <td className="px-2 py-2">
+                  {line.supplier ? (
+                    line.supplier
+                  ) : (
+                    <Absence>{line.supplierAbsence ?? "—"}</Absence>
+                  )}
+                </td>
+              ) : null}
+              {showPoDeliveryDate ? (
+                <td className="px-2 py-2">
+                  {line.poDeliveryDate ? (
+                    line.poDeliveryDate
+                  ) : (
+                    <Absence>{line.poDeliveryDateAbsence ?? "—"}</Absence>
+                  )}
+                </td>
+              ) : null}
               <td className="px-2 py-2">
                 <div className="font-medium text-base-900">{line.item}</div>
                 {line.itemDetail ? (

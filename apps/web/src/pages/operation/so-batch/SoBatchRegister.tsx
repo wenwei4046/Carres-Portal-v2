@@ -1,24 +1,29 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
+  SO_BATCH_ORDER_STATUS_WORDS,
   SO_BATCH_PURCHASE_WORDS as W,
   SO_BATCH_RAIL,
   defaultAllocations,
+  isSelectableForBuying,
   purchaseDemandRailWords,
   purchaseDemandStateWords,
-  filterPurchaseDemands,
-  isSelectableForBuying,
-  purchaseDemandStateCounts,
   setDestination,
+  soBatchCellSummary,
+  soBatchOrderSelection,
   soBatchSelectionSummary,
   type DestinationAllocation,
   type PurchaseDemandRow,
   type PurchaseDemandState,
+  type SoBatchCellSummary,
+  type SoBatchOrderRow,
   type SoBatchPurchaseResponse,
   type SoBatchSelection,
 } from "@carres/shared";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import { fmtDate } from "@/lib/fmt-date";
+import { conciseLocality, NOT_GIVEN } from "@/lib/locality";
+import { useSalesOrderExpansion } from "@/lib/queries";
 import { RailGroup, RailItem } from "../components/workspace-rail";
 import PurchasingTabs from "../PurchasingTabs";
 import DestinationAllocationEditor from "./DestinationAllocationEditor";
@@ -28,57 +33,50 @@ import GoodsMiniTable, {
 } from "../components/GoodsMiniTable";
 
 /**
- * SO BATCH PURCHASE — THE REGISTER
- * (CARD-2026-08-22-purchasing-02 §3; `docs/purchasing/MASTER.md` §9.1).
+ * SO BATCH PURCHASE — THE PERMANENT ORDER REGISTER
+ * (CARD 02-B, owner ruling 2026-08-27; `docs/purchasing/MASTER.md` §9.1).
  *
- * ONE question, answered without the operator knowing any history: **what must
- * Carres buy today, what is stopping the rest, and where do the goods go?**
+ * ONE ROW PER PROCEEDED PHYSICAL-GOODS SALES ORDER — and the row never leaves
+ * when a purchase order is issued. The page is the buying surface AND the
+ * permanent purchasing audit register: an inexperienced operator reads, per
+ * order, whether it is ordered (blank · `Partial` · `Ordered`), which PO
+ * covers it, who the customer is, where they are, what date they asked for,
+ * which supplier is involved, where the supplier must deliver, and the
+ * official date on the PO.
  *
- * ── WHAT REPLACED WHAT ──────────────────────────────────────────────────────
+ * ── EVERY NUMBER AND EVERY STATUS IS THE SERVER'S ───────────────────────────
  *
- * The PO Schedule and its category walk are GONE. They asked the operator to
- * hold two things the system already knows — which calendar day a buy snaps to,
- * and which category they were part-way through — and neither of them says what
- * is WRONG with a row. `Supplier not assigned` says both what is wrong and who
- * fixes it, so the rail names facts and nothing else.
+ * `registerRows` carries the aggregation: Status derived from the confirmed-
+ * sent lineage, PO attribution from `po_line_sources` ONLY, the official
+ * `PO Delivery Date` from `purchase_orders.eta_date`. This file composes
+ * words and cells; it performs no demand arithmetic (Law D).
  *
- * ── EVERY NUMBER ON THIS PAGE IS THE SERVER'S ───────────────────────────────
+ * ── THE LEAF ROWS REMAIN THE ISSUE CONTRACT ─────────────────────────────────
  *
- * `Required`, `Stock`, `Open PO`, `Buy` and `Goods Must Arrive` are carried, not
- * computed. `Buy` in particular is PRINTED and has no input near it: it is the
- * remainder of an arithmetic this browser cannot see (`docs/purchasing/MASTER.md`
- * §5.1), and a typed remainder would be a second demand truth. The one thing
- * the operator arranges here is WHERE the goods go — and even that is checked
- * again by the server at issue.
- *
- * ── SELECTION IS AN OFFER THAT MUST BE ABLE TO SUCCEED ──────────────────────
- *
- * A tick-box appears only where `isSelectableForBuying` says a purchase order
- * could actually be made: ready state, positive remainder, resolved supplier,
- * live engine reference. Offering the tick anywhere else offers an act that
- * fails, which is worse than not offering it.
+ * `rows` (the demand leafs) still power selection, destination arrangement
+ * and the unchanged 50/50 issue journey. The parent checkbox stands for ALL
+ * of its order's eligible uncovered leafs (`soBatchOrderSelection`); the
+ * expansion's per-line checkboxes narrow it; a stale tick is dropped the
+ * moment its leaf stops being buyable.
  */
 
-const STORAGE_KEY = "carres.soBatchPurchase.register.v1";
+/* v2 — Card 02-B changed the approved column set; a stale saved layout from
+   the leaf-grain Register must not override the owner-approved order. */
+const STORAGE_KEY = "carres.soBatchPurchase.register.v2";
 
 /** Governed absence — a muted sentence, never a bare dash. */
 function Absent({ children }: { children: string }) {
   return <span className="text-kit-slate-11">{children}</span>;
 }
 
-/** A number the server could not count says so, and never prints a `0`. */
-function Count({ n }: { n: number | null }) {
-  return n == null ? <Absent>Not counted yet</Absent> : <span className="tabular-nums">{n}</span>;
-}
-
-/** Initials for the owner avatar. The NAME never enters the sentence. */
-function initials(name: string): string {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((p) => p[0]!.toUpperCase())
-    .join("");
+/** A parent cell over many values: `—` · the value · the compact summary. */
+function summaryText(
+  s: SoBatchCellSummary,
+  many: (n: number) => string,
+): string | null {
+  if (s.kind === "none") return null;
+  if (s.kind === "one") return s.value;
+  return many(s.count);
 }
 
 export interface SoBatchRegisterProps {
@@ -90,13 +88,69 @@ export interface SoBatchRegisterProps {
 
 export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchRegisterProps) {
   const navigate = useNavigate();
-  const rows = data.rows;
-  const rowsById = useMemo(() => new Map(rows.map((r) => [r.id, r])), [rows]);
+  const leafs = data.rows;
+  const orders = data.registerRows;
+  const leafById = useMemo(() => new Map(leafs.map((r) => [r.id, r])), [leafs]);
+  const leafsByOrder = useMemo(() => {
+    const m = new Map<string, PurchaseDemandRow[]>();
+    for (const r of leafs) {
+      const arr = m.get(r.orderId);
+      if (arr) arr.push(r);
+      else m.set(r.orderId, [r]);
+    }
+    return m;
+  }, [leafs]);
+  /** The order's eligible uncovered demand — the parent checkbox's meaning. */
+  const eligibleByOrder = useMemo(() => {
+    const m = new Map<string, string[]>();
+    for (const o of orders) {
+      m.set(
+        o.orderId,
+        (leafsByOrder.get(o.orderId) ?? []).filter(isSelectableForBuying).map((r) => r.id),
+      );
+    }
+    return m;
+  }, [orders, leafsByOrder]);
 
-  /* ── The rail ─────────────────────────────────────────────────────────── */
+  /* ── The rail (Card 02-A wording, Card 02-B counting) ─────────────────────
+   *
+   * The DEFAULT no-filter view shows every proceeded record, Ordered ones
+   * included — the Register is permanent. `All not ordered` is therefore a
+   * REAL outstanding-only filter now, and every facet counts UNIQUE Sales
+   * Orders with outstanding eligible child demand, so an Ordered record can
+   * never be counted as not ordered. */
   const [states, setStates] = useState<Set<PurchaseDemandState>>(new Set());
-  const counts = useMemo(() => purchaseDemandStateCounts(rows), [rows]);
-  const shown = useMemo(() => filterPurchaseDemands(rows, states), [rows, states]);
+  const [notOrderedOnly, setNotOrderedOnly] = useState(false);
+  const outstandingOrders = useMemo(
+    () => new Set(leafs.map((r) => r.orderId)),
+    [leafs],
+  );
+  const soCounts = useMemo(() => {
+    const m = new Map<PurchaseDemandState, Set<string>>();
+    for (const r of leafs) {
+      let set = m.get(r.state);
+      if (!set) {
+        set = new Set();
+        m.set(r.state, set);
+      }
+      set.add(r.orderId);
+    }
+    return m;
+  }, [leafs]);
+  const countOf = useCallback(
+    (s: PurchaseDemandState) => soCounts.get(s)?.size ?? 0,
+    [soCounts],
+  );
+  const shown = useMemo(() => {
+    if (!notOrderedOnly && states.size === 0) return orders;
+    return orders.filter((o) => {
+      if (notOrderedOnly && outstandingOrders.has(o.orderId)) return true;
+      for (const s of states) {
+        if (soCounts.get(s)?.has(o.orderId)) return true;
+      }
+      return false;
+    });
+  }, [orders, notOrderedOnly, states, outstandingOrders, soCounts]);
   const toggleState = useCallback((s: PurchaseDemandState) => {
     setStates((prev) => {
       const next = new Set(prev);
@@ -105,15 +159,12 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
       return next;
     });
   }, []);
-  /* THE WORDS FOLLOW THE GOVERNED SETTING. The safety-band labels carry the
-     number (`14 safety days left`), so they are composed from the server's own
-     `safetyDays` — never a hard-coded 14 (Card 02-A §4). */
   const stateWords = useMemo(() => purchaseDemandStateWords(data.safetyDays), [data.safetyDays]);
   const railWords = useMemo(() => purchaseDemandRailWords(data.safetyDays), [data.safetyDays]);
   /* `SETUP TO FIX` renders only while its count is above zero. When the last
      such line is fixed, its filter must not survive as an invisible narrowing
      the operator can no longer see or clear. */
-  const setupCount = counts.no_production_days;
+  const setupCount = countOf("no_production_days");
   useEffect(() => {
     if (setupCount > 0) return;
     setStates((prev) => {
@@ -130,30 +181,30 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
    * order carries it; storing it here would create a second demand field that
    * nothing recomputes (Card §4.1).
    *
-   * A tick is dropped the moment its row stops being buyable — a refetch that
-   * covers a line must not leave a stale tick able to order it. */
+   * A tick is dropped the moment its leaf stops being buyable — a refetch
+   * that covers a line must not leave a stale tick able to order it. */
   const [selected, setSelected] = useState<Map<string, DestinationAllocation[]>>(new Map());
   const live = useMemo(() => {
     const out = new Map<string, DestinationAllocation[]>();
     for (const [id, allocations] of selected) {
-      const row = rowsById.get(id);
+      const row = leafById.get(id);
       if (row && isSelectableForBuying(row)) out.set(id, allocations);
     }
     return out;
-  }, [selected, rowsById]);
+  }, [selected, leafById]);
 
   const selections = useMemo<SoBatchSelection[]>(
     () => [...live].map(([demandId, allocations]) => ({ demandId, allocations })),
     [live],
   );
   const summary = useMemo(
-    () => soBatchSelectionSummary(selections, rowsById),
-    [selections, rowsById],
+    () => soBatchSelectionSummary(selections, leafById),
+    [selections, leafById],
   );
 
-  const toggleRow = useCallback(
+  const toggleLeaf = useCallback(
     (id: string) => {
-      const row = rowsById.get(id);
+      const row = leafById.get(id);
       if (!row || !isSelectableForBuying(row)) return;
       setSelected((prev) => {
         const next = new Map(prev);
@@ -164,10 +215,30 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
         return next;
       });
     },
-    [rowsById, data.defaultDestinationId],
+    [leafById, data.defaultDestinationId],
   );
 
-  const setRowAllocations = useCallback(
+  /** The parent switch: all of the order's eligible leafs, on or off. */
+  const setOrderSelected = useCallback(
+    (orderId: string, on: boolean) => {
+      const eligible = eligibleByOrder.get(orderId) ?? [];
+      if (eligible.length === 0) return;
+      setSelected((prev) => {
+        const next = new Map(prev);
+        for (const id of eligible) {
+          if (!on) next.delete(id);
+          else if (!next.has(id) && data.defaultDestinationId) {
+            const row = leafById.get(id);
+            if (row) next.set(id, defaultAllocations(row, data.defaultDestinationId));
+          }
+        }
+        return next;
+      });
+    },
+    [eligibleByOrder, leafById, data.defaultDestinationId],
+  );
+
+  const setLeafAllocations = useCallback(
     (id: string, allocations: DestinationAllocation[]) => {
       setSelected((prev) => new Map(prev).set(id, allocations));
     },
@@ -175,11 +246,11 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
   );
 
   /**
-   * Changing the destination on a row nobody ticked TICKS IT. The operator's
+   * Changing the destination on a leaf nobody ticked TICKS IT. The operator's
    * act said "this one goes to Sungai Buloh", and a destination on an unticked
-   * row would be an arrangement for a buy that is not happening.
+   * leaf would be an arrangement for a buy that is not happening.
    */
-  const changeWholeRow = useCallback(
+  const changeWholeLeaf = useCallback(
     (row: PurchaseDemandRow, destinationId: string) => {
       const current = live.get(row.id);
       const next = setDestination(
@@ -187,368 +258,350 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
         destinationId,
         row.toBuy ?? 0,
       );
-      setRowAllocations(row.id, next.allocations);
+      setLeafAllocations(row.id, next.allocations);
     },
-    [live, setRowAllocations],
+    [live, setLeafAllocations],
   );
 
   const destinationName = useCallback(
-    (id: string) => data.destinations.find((d) => d.id === id)?.name ?? "",
+    (id: string | null) => data.destinations.find((d) => d.id === id)?.name ?? "",
     [data.destinations],
   );
 
-  /* ── The columns ──────────────────────────────────────────────────────── */
-  const columns = useMemo<DataGridColumn<PurchaseDemandRow>[]>(
+  /** The leaf's CURRENT arrangement — the live tick, else the standing default. */
+  const leafAllocations = useCallback(
+    (row: PurchaseDemandRow): DestinationAllocation[] =>
+      live.get(row.id) ??
+      (data.defaultDestinationId ? defaultAllocations(row, data.defaultDestinationId) : []),
+    [live, data.defaultDestinationId],
+  );
+
+  /* ── The parent selection surface ─────────────────────────────────────── */
+  const orderSelection = useCallback(
+    (orderId: string) =>
+      soBatchOrderSelection({
+        eligibleIds: eligibleByOrder.get(orderId) ?? [],
+        selectedIds: new Set(live.keys()),
+      }),
+    [eligibleByOrder, live],
+  );
+  const selectedOrderKeys = useMemo(() => {
+    const s = new Set<string>();
+    for (const o of orders) {
+      if (orderSelection(o.orderId).checked) s.add(o.orderId);
+    }
+    return s;
+  }, [orders, orderSelection]);
+
+  /* ── The ten approved columns ─────────────────────────────────────────── */
+  const supplierSummaryOf = useCallback(
+    (o: SoBatchOrderRow) =>
+      soBatchCellSummary([...o.outstandingSuppliers, ...o.pos.map((p) => p.supplierName)]),
+    [],
+  );
+  const columns = useMemo<DataGridColumn<SoBatchOrderRow>[]>(
     () => [
       {
-        key: "source",
-        label: W.colSourceSo,
-        width: 128,
+        key: "status",
+        label: W.colStatus,
+        width: 84,
         sortable: true,
-        chooserGroup: "Source",
-        /* ⭐ THE LINK LIVES ON THE COLUMN, where the Card put it (§3.2 —
-           "Link to Sales Order; customer is the quiet second line").
-           It used to live only inside the expand, so reaching the order the
-           demand came from meant opening a box first — and the column that was
-           supposed to carry it was plain text. Moving it here is what let the
-           expand stop repeating the row (owner correction 2026-08-24). */
-        accessor: (r) => (
-          <span className="flex flex-col leading-tight" data-testid={`so-batch-source-${r.id}`}>
-            {r.so == null ? (
-              <span className="font-mono font-medium" />
-            ) : (
-              <button
-                type="button"
-                className="self-start font-mono font-medium text-kit-blue-11 underline-offset-2 hover:underline"
-                data-testid={`so-batch-source-link-${r.id}`}
-                onClick={(e) => {
-                  /* The row's own click opens the expand; this one leaves the
-                     page, so it must not do both. */
-                  e.stopPropagation();
-                  navigate(`/operation/orders/so/${r.orderId}`);
-                }}
-              >
-                {`SO-${r.so}`}
-              </button>
-            )}
-            <span className="truncate text-meta text-kit-slate-11">{r.customer ?? ""}</span>
+        chooserGroup: "Order",
+        accessor: (o) => (
+          <span data-testid={`so-batch-status-${o.orderId}`}>
+            {SO_BATCH_ORDER_STATUS_WORDS[o.status]}
           </span>
         ),
-        searchValue: (r) =>
-          [r.so == null ? "" : `SO-${r.so} ${r.so}`, r.customer ?? "", ...r.skus, r.supplier ?? ""]
-            .join(" "),
-        sortFn: (a, b) => (a.so ?? 0) - (b.so ?? 0),
-        exportValue: (r) => (r.so == null ? "" : `SO-${r.so}`),
+        filterValue: (o) => SO_BATCH_ORDER_STATUS_WORDS[o.status] || "Not ordered",
+        sortFn: (a, b) => a.status.localeCompare(b.status),
+        exportValue: (o) => SO_BATCH_ORDER_STATUS_WORDS[o.status],
       },
       {
-        key: "requiredFor",
-        label: W.colRequiredFor,
-        /* `No delivery date yet` is an owed sentence too — see `stock`. */
-        width: 146,
+        key: "proceedDate",
+        label: W.colProceedDate,
+        width: 116,
         sortable: true,
-        chooserGroup: "Dates",
-        accessor: (r) => (
-          <span data-testid={`so-batch-required-for-${r.id}`}>
-            {r.customerDelivery ? (
-              fmtDate(r.customerDelivery)
+        chooserGroup: "Order",
+        accessor: (o) => (
+          <span data-testid={`so-batch-proceed-${o.orderId}`}>
+            {o.proceedDate ? fmtDate(o.proceedDate) : null}
+          </span>
+        ),
+        dateValue: (o) => o.proceedDate,
+        filterType: "date",
+        sortFn: (a, b) => (a.proceedDate ?? "").localeCompare(b.proceedDate ?? ""),
+        exportValue: (o) => o.proceedDate ?? "",
+      },
+      {
+        key: "poNo",
+        label: W.colPoNo,
+        width: 130,
+        sortable: true,
+        chooserGroup: "Documents",
+        accessor: (o) => {
+          const s = soBatchCellSummary(o.pos.map((p) => p.poId));
+          if (s.kind === "none") return null;
+          if (s.kind === "one") {
+            return (
+              <button
+                type="button"
+                className="font-mono text-kit-blue-11 underline-offset-2 hover:underline"
+                data-testid={`so-batch-po-link-${o.orderId}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate(`/operation/procurement?po=${encodeURIComponent(s.value)}`);
+                }}
+              >
+                {s.value}
+              </button>
+            );
+          }
+          /* The exact numbers live in the expansion — the cell only counts. */
+          return <span data-testid={`so-batch-po-many-${o.orderId}`}>{`${s.count} POs`}</span>;
+        },
+        searchValue: (o) => o.pos.map((p) => p.poId).join(" "),
+        filterValue: (o) =>
+          summaryText(soBatchCellSummary(o.pos.map((p) => p.poId)), (n) => `${n} POs`) ?? "",
+        exportValue: (o) => o.pos.map((p) => p.poId).join(" · "),
+      },
+      {
+        /* THE IDENTITY — explicitly sticky, so horizontal scrolling never
+           loses WHICH record a row is (Card §9). */
+        key: "soNo",
+        label: W.colSoNo,
+        width: 96,
+        sortable: true,
+        chooserGroup: "Order",
+        accessor: (o) => (
+          <span data-testid={`so-batch-so-${o.orderId}`}>
+            {o.so == null ? null : (
+              <button
+                type="button"
+                className="font-mono font-medium text-kit-blue-11 underline-offset-2 hover:underline"
+                data-testid={`so-batch-so-link-${o.orderId}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate(`/operation/orders/so/${o.orderId}`);
+                }}
+              >
+                {`SO-${o.so}`}
+              </button>
+            )}
+          </span>
+        ),
+        searchValue: (o) =>
+          [
+            o.so == null ? "" : `SO-${o.so} ${o.so}`,
+            o.customer ?? "",
+            ...o.lines.map((l) => l.sku),
+            ...o.outstandingSuppliers,
+            ...o.pos.map((p) => `${p.poId} ${p.supplierName ?? ""}`),
+          ].join(" "),
+        sortFn: (a, b) => (a.so ?? 0) - (b.so ?? 0),
+        exportValue: (o) => (o.so == null ? "" : `SO-${o.so}`),
+      },
+      {
+        key: "customer",
+        label: W.colCustomer,
+        width: 150,
+        sortable: true,
+        chooserGroup: "Order",
+        accessor: (o) => (
+          <span className="truncate" data-testid={`so-batch-customer-${o.orderId}`}>
+            {o.customer ?? ""}
+          </span>
+        ),
+        searchValue: (o) => o.customer ?? "",
+        exportValue: (o) => o.customer ?? "",
+      },
+      {
+        /* The CUSTOMER's locality — never the supplier's destination. The one
+           shared rule Sales Orders reads (`conciseLocality`), so two registers
+           cannot print two localities for one order. */
+        key: "deliveryLocation",
+        label: W.colDeliveryLocation,
+        width: 170,
+        sortable: true,
+        chooserGroup: "Order",
+        accessor: (o) => {
+          const locality = conciseLocality(o.deliveryCity, o.deliveryState);
+          return (
+            <span data-testid={`so-batch-location-${o.orderId}`}>
+              {locality === NOT_GIVEN ? <Absent>{NOT_GIVEN}</Absent> : locality}
+            </span>
+          );
+        },
+        searchValue: (o) => conciseLocality(o.deliveryCity, o.deliveryState),
+        filterValue: (o) => conciseLocality(o.deliveryCity, o.deliveryState),
+        exportValue: (o) => conciseLocality(o.deliveryCity, o.deliveryState),
+      },
+      {
+        key: "requestedDelivery",
+        label: W.colRequestedDelivery,
+        width: 168,
+        sortable: true,
+        chooserGroup: "Order",
+        accessor: (o) => (
+          <span data-testid={`so-batch-requested-${o.orderId}`}>
+            {o.requestedDeliveryDate ? (
+              fmtDate(o.requestedDeliveryDate)
             ) : (
               <Absent>No delivery date yet</Absent>
             )}
           </span>
         ),
-        sortFn: (a, b) => (a.customerDelivery ?? "").localeCompare(b.customerDelivery ?? ""),
-        exportValue: (r) => r.customerDelivery ?? "",
-      },
-      {
-        key: "sku",
-        label: W.colSku,
-        width: 210,
-        sortable: true,
-        chooserGroup: "Item",
-        accessor: (r) => (
-          <span className="flex flex-col leading-tight">
-            <span className="truncate font-medium">{r.item}</span>
-            <span className="truncate text-meta text-kit-slate-11">
-              {[r.variant, r.skus.join(" · ")].filter(Boolean).join(" · ")}
-            </span>
-          </span>
-        ),
-        searchValue: (r) => [r.item, r.variant ?? "", ...r.skus].join(" "),
-        exportValue: (r) => `${r.item} ${r.skus.join(" · ")}`.trim(),
-      },
-      {
-        key: "required",
-        label: W.colRequired,
-        width: 84,
-        align: "right",
-        sortable: true,
-        chooserGroup: "Quantity",
-        accessor: (r) => <span className="tabular-nums">{r.qtyNeeded}</span>,
-        sortFn: (a, b) => a.qtyNeeded - b.qtyNeeded,
-        exportValue: (r) => r.qtyNeeded,
-        footerTotal: (rs) => (
-          <span className="tabular-nums">{rs.reduce((s, r) => s + r.qtyNeeded, 0)}</span>
-        ),
-      },
-      {
-        key: "stock",
-        label: W.colStock,
-        /* Wide enough for `Not counted yet` — the sentence COPY-STANDARD owes
-           when the blocker also blocks the arithmetic. A column that truncates
-           it to `Not cou…` prints neither a number nor an answer. */
-        width: 118,
-        align: "right",
-        sortable: true,
-        chooserGroup: "Quantity",
-        accessor: (r) => <Count n={r.readyStock} />,
-        sortFn: (a, b) => (a.readyStock ?? 0) - (b.readyStock ?? 0),
-        exportValue: (r) => r.readyStock ?? "",
-      },
-      {
-        key: "openPo",
-        label: W.colOpenPo,
-        width: 118,
-        align: "right",
-        sortable: true,
-        chooserGroup: "Quantity",
-        accessor: (r) => <Count n={r.onPo} />,
-        searchValue: (r) => r.poNumbers.join(" "),
-        sortFn: (a, b) => (a.onPo ?? 0) - (b.onPo ?? 0),
-        exportValue: (r) => r.onPo ?? "",
-      },
-      {
-        /* PRINTED. The remainder of the server's arithmetic, and the one
-           number on this page nobody may type (MASTER §5.1). */
-        key: "buy",
-        label: W.buy,
-        width: 72,
-        align: "right",
-        sortable: true,
-        chooserGroup: "Quantity",
-        accessor: (r) => (
-          <span className="tabular-nums font-medium" data-testid={`so-batch-buy-${r.id}`}>
-            {r.toBuy == null ? <Absent>—</Absent> : r.toBuy}
-          </span>
-        ),
-        sortFn: (a, b) => (a.toBuy ?? 0) - (b.toBuy ?? 0),
-        exportValue: (r) => r.toBuy ?? "",
-        footerTotal: (rs) => (
-          <span className="tabular-nums">{rs.reduce((s, r) => s + (r.toBuy ?? 0), 0)}</span>
-        ),
+        dateValue: (o) => o.requestedDeliveryDate,
+        filterType: "date",
+        sortFn: (a, b) =>
+          (a.requestedDeliveryDate ?? "").localeCompare(b.requestedDeliveryDate ?? ""),
+        exportValue: (o) => o.requestedDeliveryDate ?? "",
       },
       {
         key: "supplier",
         label: W.colSupplier,
-        width: 124,
+        width: 130,
         sortable: true,
-        chooserGroup: "Source",
-        accessor: (r) =>
-          r.supplier ? <span className="truncate">{r.supplier}</span> : <Absent>No supplier yet</Absent>,
-        filterValue: (r) => r.supplier ?? "No supplier yet",
-        exportValue: (r) => r.supplier ?? "",
+        chooserGroup: "Buying",
+        accessor: (o) => {
+          const text = summaryText(supplierSummaryOf(o), (n) => `${n} suppliers`);
+          return <span data-testid={`so-batch-supplier-${o.orderId}`}>{text}</span>;
+        },
+        searchValue: (o) =>
+          [...o.outstandingSuppliers, ...o.pos.map((p) => p.supplierName ?? "")].join(" "),
+        filterValue: (o) => summaryText(supplierSummaryOf(o), (n) => `${n} suppliers`) ?? "",
+        exportValue: (o) => summaryText(supplierSummaryOf(o), (n) => `${n} suppliers`) ?? "",
       },
       {
-        /* The ONE thing this page arranges — and only on a line that could
-           actually be bought. A blocked row gets no editor because it has no
-           buy to send anywhere. */
+        /* Before issue: the arrangement control over the order's eligible
+           demand. After issue: the destination the ISSUED document actually
+           carries — never silently rewritten. */
         key: "deliverTo",
         label: W.deliverTo,
         width: 190,
         chooserGroup: "Buying",
-        accessor: (r) => (
-          <span data-testid={`so-batch-deliver-to-${r.id}`}>
-            {isSelectableForBuying(r) ? (
-              <DestinationAllocationEditor
-                row={r}
-                destinations={data.destinations}
-                allocations={
-                  live.get(r.id) ??
-                  (data.defaultDestinationId
-                    ? defaultAllocations(r, data.defaultDestinationId)
-                    : [])
-                }
-                onWholeRow={(destinationId) => changeWholeRow(r, destinationId)}
-                onSplit={(allocations) => setRowAllocations(r.id, allocations)}
-              />
-            ) : (
-              <Absent>—</Absent>
-            )}
-          </span>
-        ),
-        exportValue: (r) =>
-          (live.get(r.id) ?? [])
-            .map((a) => `${destinationName(a.destinationId)} ${a.qty}`)
-            .join(" · "),
-      },
-      {
-        key: "goodsMustArrive",
-        label: W.goodsMustArrive,
-        width: 132,
-        sortable: true,
-        chooserGroup: "Dates",
-        accessor: (r) => (
-          <span data-testid={`so-batch-arrive-${r.id}`}>
-            {r.goodsMustArrive ? fmtDate(r.goodsMustArrive) : <Absent>—</Absent>}
-          </span>
-        ),
-        sortFn: (a, b) => (a.goodsMustArrive ?? "").localeCompare(b.goodsMustArrive ?? ""),
-        exportValue: (r) => r.goodsMustArrive ?? "",
-      },
-      {
-        /* THE TWO-LINE TREATMENT (`docs/purchasing/MASTER.md` §8.3). Line 1 is
-           the authoritative fact; line 2 is the 11px act. The owner is an
-           AVATAR beside them — never a word inside the sentence. */
-        key: "work",
-        label: W.colWork,
-        width: 230,
-        chooserGroup: "Work",
-        accessor: (r) => {
-          if (!r.action) return null;
-          const owner = r.action.ownerName;
-          return (
-            <span className="flex flex-col leading-tight" data-testid={`so-batch-work-${r.id}`}>
-              <span className="truncate">{stateWords[r.state]}</span>
-              <span className="flex items-center gap-1.5">
-                {owner ? (
-                  <span
-                    className="shrink-0 rounded-control bg-kit-slate-3 px-1 text-meta text-kit-slate-11"
-                    title={owner}
-                    data-testid={`so-batch-owner-${r.id}`}
-                  >
-                    {initials(owner)}
-                  </span>
-                ) : r.action.ownerDuty ? (
-                  <span
-                    className="shrink-0 rounded-control bg-kit-slate-3 px-1 text-meta text-kit-slate-11"
-                    data-testid={`so-batch-owner-${r.id}`}
-                  >
-                    {r.action.ownerDuty}
-                  </span>
-                ) : null}
-                <span
-                  className="truncate text-meta text-kit-slate-11"
-                  data-testid={`so-batch-act-${r.id}`}
-                >
-                  {r.action.action}
-                </span>
+        accessor: (o) => {
+          const eligible = (leafsByOrder.get(o.orderId) ?? []).filter(isSelectableForBuying);
+          if (eligible.length === 1) {
+            const row = eligible[0]!;
+            return (
+              <span data-testid={`so-batch-deliver-to-${o.orderId}`}>
+                <DestinationAllocationEditor
+                  row={row}
+                  destinations={data.destinations}
+                  allocations={leafAllocations(row)}
+                  onWholeRow={(destinationId) => changeWholeLeaf(row, destinationId)}
+                  onSplit={(allocations) => setLeafAllocations(row.id, allocations)}
+                />
               </span>
-            </span>
+            );
+          }
+          if (eligible.length > 1) {
+            /* One select for the whole order — the common act. The exact
+               per-item allocation (and Split) lives in the expansion. */
+            const arranged = soBatchCellSummary(
+              eligible.flatMap((r) => leafAllocations(r).map((a) => a.destinationId)),
+            );
+            const value = arranged.kind === "one" ? arranged.value : "";
+            return (
+              <span data-testid={`so-batch-deliver-to-${o.orderId}`}>
+                <select
+                  className="w-full min-w-0 truncate rounded-control border border-kit-slate-6 bg-white px-1.5 py-0.5 text-meta"
+                  data-testid={`so-batch-deliver-to-select-${o.orderId}`}
+                  value={value}
+                  onClick={(e) => e.stopPropagation()}
+                  onChange={(e) => {
+                    for (const r of eligible) changeWholeLeaf(r, e.target.value);
+                  }}
+                >
+                  {arranged.kind !== "one" ? (
+                    <option value="" disabled>
+                      {W.multiple}
+                    </option>
+                  ) : null}
+                  {data.destinations.map((d) => (
+                    <option key={d.id} value={d.id} disabled={!d.active}>
+                      {d.name}
+                    </option>
+                  ))}
+                </select>
+              </span>
+            );
+          }
+          const issued = soBatchCellSummary(
+            o.pos.map((p) => destinationName(p.destinationId)),
+          );
+          const text =
+            issued.kind === "none"
+              ? null
+              : issued.kind === "one"
+                ? issued.value
+                : W.multiple;
+          return <span data-testid={`so-batch-deliver-to-${o.orderId}`}>{text}</span>;
+        },
+        exportValue: (o) => {
+          const eligible = (leafsByOrder.get(o.orderId) ?? []).filter(isSelectableForBuying);
+          if (eligible.length > 0) {
+            return eligible
+              .flatMap((r) =>
+                leafAllocations(r).map((a) => `${destinationName(a.destinationId)} ${a.qty}`),
+              )
+              .join(" · ");
+          }
+          return (
+            summaryText(
+              soBatchCellSummary(o.pos.map((p) => destinationName(p.destinationId))),
+              () => W.multiple,
+            ) ?? ""
           );
         },
-        filterValue: (r) => stateWords[r.state],
-        exportValue: (r) => r.action?.action ?? "",
+      },
+      {
+        /* `purchase_orders.eta_date` — the OFFICIAL supplier-facing date.
+           Never `Goods Must Arrive`, never an "if ordered today" estimate. */
+        key: "poDeliveryDate",
+        label: W.colPoDeliveryDate,
+        width: 140,
+        sortable: true,
+        chooserGroup: "Documents",
+        accessor: (o) => {
+          const s = soBatchCellSummary(o.pos.map((p) => p.etaDate));
+          const text = s.kind === "none" ? null : s.kind === "one" ? fmtDate(s.value) : W.multiple;
+          return <span data-testid={`so-batch-po-date-${o.orderId}`}>{text}</span>;
+        },
+        sortFn: (a, b) =>
+          (a.pos[0]?.etaDate ?? "").localeCompare(b.pos[0]?.etaDate ?? ""),
+        exportValue: (o) =>
+          summaryText(soBatchCellSummary(o.pos.map((p) => p.etaDate)), () => W.multiple) ?? "",
       },
     ],
-    [data.destinations, data.defaultDestinationId, live, changeWholeRow, setRowAllocations, destinationName, stateWords],
+    [
+      navigate,
+      data.destinations,
+      leafsByOrder,
+      leafAllocations,
+      changeWholeLeaf,
+      setLeafAllocations,
+      destinationName,
+      supplierSummaryOf,
+    ],
   );
 
-  /* ── The inspector ────────────────────────────────────────────────────── */
-  /**
-   * ⭐ THE SAME CHILD TABLE SALES ORDERS AND DELIVERY DRAW
-   * (owner correction 2026-08-24; `GoodsMiniTable`'s own ruling, Chai
-   * 2026-08-15 — "written ONCE so that two pages cannot drift into two
-   * mini-tables that almost agree").
-   *
-   * ── WHAT THIS REPLACES, AND WHY IT READ AS CONFUSION ────────────────────
-   *
-   * A hand-drawn `grid-cols-2` label/value list — the second mini-table that
-   * ruling exists to forbid — and it failed twice over:
-   *
-   *   · IT WAS AS WIDE AS THE TABLE. `justify-between` across a half of a
-   *     1600px row put `REQUIRED` at the left edge and its `1` some 780px
-   *     away, with nothing in between. The parent is a table with aligned
-   *     columns; the child was a form floating in white space.
-   *   · IT RE-PRINTED THE ROW. Seven of its eight facts — Required, From
-   *     Stock, On Open PO, Buy, Source, Required for, Goods must arrive,
-   *     Deliver to — are ALREADY columns on the row above it. `Expand has
-   *     exactly one job` (CLAUDE.md §2), and its job was not to say
-   *     everything again.
-   *
-   * ── WHAT THE ROW GENUINELY CANNOT SAY ───────────────────────────────────
-   *
-   * The row is one line per BUILD. A matched set is one row and several module
-   * codes, so the PARTS are the child's job — and beside them, the two facts
-   * the row only summarises: WHICH purchase order already covers this
-   * (`Open PO` prints a number, never its document), and where a SPLIT
-   * arrangement actually sends each unit.
-   */
-  const renderExpansion = (r: PurchaseDemandRow) => {
-    const arranged = live.get(r.id) ?? [];
-    /* A SPLIT earns its quantity; one destination prints its name alone — the
-       sibling register's own rule, so the two boxes read the same way. */
-    const deliverTo =
-      arranged.length > 0
-        ? arranged.map((a) =>
-            arranged.length > 1
-              ? `${destinationName(a.destinationId)} ×${a.qty}`
-              : destinationName(a.destinationId),
-          )
-        : data.defaultDestinationId
-          ? [destinationName(data.defaultDestinationId)]
-          : [];
-
-    /* A row always has at least one part. The fallback names the row itself
-       rather than printing an empty box for a demand the projection has not
-       broken down. */
-    const parts =
-      r.parts.length > 0
-        ? r.parts
-        : [{ sku: r.skus[0] ?? r.item, qty: r.qtyNeeded, unitCost: null }];
-
-    const lines: GoodsMiniLine[] = parts.map((part) => ({
-      key: `${r.id}::${part.sku}`,
-      testId: `so-batch-part-${part.sku}`,
-      category: r.category ? categoryWord(r.category) : "Other goods",
-      /* NOTHING IS MINTED BEFORE ISSUE. The Unit IDs are allocated when the
-         purchase order is created, so the honest answer here is the governed
-         absence — not a blank, and never an invented code. */
-      unitIds: [],
-      unitAbsence: "Not allocated",
-      coveredBy: r.poNumbers,
-      coveredByAbsence: "Not ordered yet",
-      deliverTo,
-      deliverToAbsence: "Not chosen",
-      sku: part.sku,
-      qty: part.qty,
-      item: r.item,
-      /* ⭐ NO SECOND LINE FOR A FACT THAT IS ALREADY BESIDE IT.
-       *
-       * MEASURED on production 2026-08-26: passing `r.variant` here ("King")
-       * made the `Item` cell two lines, which took the child row from 26.5px to
-       * 54.5px — and with `align-top` every other cell then sat above ~28px of
-       * white. One line of goods cost 108px of expansion against a 38px parent
-       * row.
-       *
-       * And it bought nothing. The size is ALREADY printed twice within a
-       * centimetre of it: the `SKU` column in this same box reads `L1201S-K`,
-       * and the parent row's `SKU / configuration` column reads
-       * `L1201S · King · L1201S-K`. A third printing is what doubled the row.
-       *
-       * The sibling register DOES pass `itemDetail`, and must keep it: there it
-       * carries fabric, firmness and seat height — configuration that appears
-       * nowhere else on the row. The line is earned there and not here.
-       *
-       * (`docs/ui/MASTER.md` REGISTER TABLE DENSITY LAW — expanded content takes
-       * its NATURAL child-row height. Natural is what the content needs, not
-       * what a repeated fact inflates it to.) */
-      /* Buying is ticked on the PARENT row — one whole-line switch, not two. */
-      selectable: false,
-    }));
-
-    return (
-      <div data-testid={`so-batch-inspector-${r.id}`}>
-        <GoodsMiniTable
-          label={r.so == null ? `Goods on ${r.item}` : `Goods on SO-${r.so}`}
-          lines={lines}
-          showCoveredBy
-        />
-      </div>
-    );
-  };
+  /* ── The expansion — the shared child table, and only it ──────────────── */
+  const renderExpansion = (o: SoBatchOrderRow) => (
+    <SoBatchOrderExpansion
+      order={o}
+      leafs={leafsByOrder.get(o.orderId) ?? []}
+      selectedIds={new Set(live.keys())}
+      onToggleLeaf={toggleLeaf}
+      leafAllocations={leafAllocations}
+      onWholeLeaf={changeWholeLeaf}
+      onSplitLeaf={setLeafAllocations}
+      destinations={data.destinations}
+      destinationName={destinationName}
+    />
+  );
 
   /* ── The page ─────────────────────────────────────────────────────────── */
-  const selectedKeys = useMemo(() => new Set(live.keys()), [live]);
-
   return (
     <div
       className="flex h-full min-h-0 w-full flex-1 flex-col bg-kit-canvas"
@@ -561,15 +614,16 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
           data-testid="so-batch-rail"
         >
           <RailGroup title={SO_BATCH_RAIL.toOrder.heading}>
-            {/* The whole unissued listing — selecting it CLEARS every facet,
-                which is the shared local-rail law's `All` behaviour. */}
+            {/* Card 02-B — a REAL outstanding-only filter now that Ordered
+                records stay in the listing. It counts unique Sales Orders
+                with outstanding eligible demand, and it toggles. */}
             <RailItem
-              active={states.size === 0}
-              onClick={() => setStates(new Set())}
+              active={notOrderedOnly}
+              onClick={() => setNotOrderedOnly((v) => !v)}
               testId="so-batch-all-not-ordered"
               label={SO_BATCH_RAIL.toOrder.all}
-              count={rows.length > 0 ? rows.length : undefined}
-              title={`${rows.length} ${W.footerUnit}`}
+              count={outstandingOrders.size > 0 ? outstandingOrders.size : undefined}
+              title={`${outstandingOrders.size} ${W.footerUnit} not ordered`}
             />
           </RailGroup>
           <RailGroup title={SO_BATCH_RAIL.timing.heading}>
@@ -582,8 +636,8 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
                 label={railWords[s] ?? ""}
                 /* A zero prints nothing: an absent queue and an empty one
                    read the same to an operator, and only one is news. */
-                count={counts[s] > 0 ? counts[s] : undefined}
-                title={`${counts[s]} ${W.footerUnit} · ${stateWords[s]}`}
+                count={countOf(s) > 0 ? countOf(s) : undefined}
+                title={`${countOf(s)} ${W.footerUnit} · ${stateWords[s]}`}
               />
             ))}
           </RailGroup>
@@ -598,8 +652,8 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
                   onClick={() => toggleState(s)}
                   testId={`so-batch-state-${s}`}
                   label={railWords[s] ?? ""}
-                  count={counts[s] > 0 ? counts[s] : undefined}
-                  title={`${counts[s]} ${W.footerUnit} · ${stateWords[s]}`}
+                  count={countOf(s) > 0 ? countOf(s) : undefined}
+                  title={`${countOf(s)} ${W.footerUnit} · ${stateWords[s]}`}
                 />
               ))}
             </RailGroup>
@@ -608,42 +662,44 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
 
         <div className="flex min-w-0 flex-1 flex-col p-2">
           <div className="min-h-0 flex-1" data-testid="so-batch-grid">
-            <DataGrid<PurchaseDemandRow>
+            <DataGrid<SoBatchOrderRow>
               appearance="reference"
               rows={shown}
               columns={columns}
               storageKey={STORAGE_KEY}
-              rowKey={(r) => r.id}
-              rowTestId={(r) => `so-batch-row-${r.id}`}
+              rowKey={(o) => o.orderId}
+              rowTestId={(o) => `so-batch-row-${o.orderId}`}
               exportName={W.destination}
               searchPlaceholder={W.search}
               isLoading={isLoading}
               emptyMessage={W.empty}
               groupBanner={false}
-              stickyIdentity
-              chooserGroupOrder={["Source", "Item", "Quantity", "Buying", "Dates", "Work"]}
+              stickyIdentity={{ columnKey: "soNo" }}
+              chooserGroupOrder={["Order", "Documents", "Buying"]}
               expandable={{
                 renderExpansion,
-                testId: (r) => `so-batch-expand-${r.id}`,
+                testId: (o) => `so-batch-expand-${o.orderId}`,
               }}
               selectable={{
-                selectedKeys,
-                onToggle: toggleRow,
+                selectedKeys: selectedOrderKeys,
+                onToggle: (orderId) =>
+                  setOrderSelected(orderId, !orderSelection(orderId).checked),
                 onToggleAll: (keys, allSelected) => {
-                  for (const k of keys) {
-                    const isOn = selectedKeys.has(k);
-                    if (allSelected ? isOn : !isOn) toggleRow(k);
-                  }
+                  /* Visible rows only — a facet must never cause hidden
+                     demand to be selected by the header switch. */
+                  for (const k of keys) setOrderSelected(k, !allSelected);
                 },
-                isSelectable: (r: PurchaseDemandRow) => isSelectableForBuying(r),
-                testId: (r: PurchaseDemandRow) => `so-batch-select-${r.id}`,
+                isSelectable: (o: SoBatchOrderRow) =>
+                  (eligibleByOrder.get(o.orderId) ?? []).length > 0,
+                isIndeterminate: (o: SoBatchOrderRow) =>
+                  orderSelection(o.orderId).indeterminate,
+                testId: (o: SoBatchOrderRow) => `so-batch-select-${o.orderId}`,
               }}
               statusSummary={(filtered) => {
-                const needed = filtered.reduce((s, r) => s + r.qtyNeeded, 0);
-                const buy = filtered.reduce((s, r) => s + (r.toBuy ?? 0), 0);
-                const line = `${filtered.length} ${W.footerUnit} · ${needed} ${
-                  needed === 1 ? "unit" : "units"
-                } needed · ${buy} ${buy === 1 ? "unit" : "units"} to buy`;
+                const not = filtered.filter((o) => o.status === "blank").length;
+                const partial = filtered.filter((o) => o.status === "partial").length;
+                const ordered = filtered.filter((o) => o.status === "ordered").length;
+                const line = `${filtered.length} ${W.footerUnit} · ${not} not ordered · ${partial} Partial · ${ordered} Ordered`;
                 return (
                   <span className="block truncate" data-testid="so-batch-footer" title={line}>
                     {line}
@@ -690,6 +746,187 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
           ) : null}
         </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * ▸ THE ORDER'S OWN GOODS — the shared `GoodsMiniTable`, and nothing else
+ * (owner ruling 2026-08-15; Card 02-B §5).
+ *
+ * The expansion says only what the parent row cannot: per item line, what
+ * covers it (`Ready Stock` · the exact PO numbers · `Not ordered yet`), the
+ * Unit ID where one is allocated, the exact supplier / `Deliver To` /
+ * `PO Delivery Date` mapping when the parent cell could only summarise, and
+ * the arrangement editor for the lines still being bought.
+ *
+ * Unit IDs are read LAZILY through the Sales Order expansion endpoint — the
+ * same read the Sales Orders register uses (Law D: Stock owns the fact, both
+ * disclosures ask the same door), and only when a row is actually opened.
+ */
+function SoBatchOrderExpansion({
+  order,
+  leafs,
+  selectedIds,
+  onToggleLeaf,
+  leafAllocations,
+  onWholeLeaf,
+  onSplitLeaf,
+  destinations,
+  destinationName,
+}: {
+  order: SoBatchOrderRow;
+  leafs: PurchaseDemandRow[];
+  selectedIds: ReadonlySet<string>;
+  onToggleLeaf: (leafId: string) => void;
+  leafAllocations: (row: PurchaseDemandRow) => DestinationAllocation[];
+  onWholeLeaf: (row: PurchaseDemandRow, destinationId: string) => void;
+  onSplitLeaf: (leafId: string, allocations: DestinationAllocation[]) => void;
+  destinations: SoBatchPurchaseResponse["destinations"];
+  destinationName: (id: string | null) => string;
+}) {
+  const expansion = useSalesOrderExpansion(order.orderId);
+  const unitIdsByLine = useMemo(
+    () => new Map((expansion.data?.lines ?? []).map((l) => [l.lineId, l.unitIds])),
+    [expansion.data],
+  );
+  const leafByLineId = useMemo(() => {
+    const m = new Map<string, PurchaseDemandRow>();
+    for (const leaf of leafs) for (const id of leaf.lineIds) m.set(id, leaf);
+    return m;
+  }, [leafs]);
+  const poById = useMemo(() => new Map(order.pos.map((p) => [p.poId, p])), [order.pos]);
+
+  /* The editor renders ONCE per leaf — a matched set spans several item lines
+     but is arranged (and ticked) as one demand. */
+  const editorDrawn = new Set<string>();
+
+  const lines: GoodsMiniLine[] = order.lines.map((l) => {
+    const leaf = leafByLineId.get(l.orderLineId);
+    const linePos = l.pos.map((p) => poById.get(p.poId)).filter(Boolean);
+    const coveredBy = [
+      ...(l.stockTaken > 0 ? ["Ready Stock"] : []),
+      ...l.pos.map((p) => p.poId),
+    ];
+    const eligible = leaf != null && isSelectableForBuying(leaf);
+    const drawEditor = eligible && !editorDrawn.has(leaf.id);
+    if (drawEditor) editorDrawn.add(leaf.id);
+    const arranged = eligible ? leafAllocations(leaf) : [];
+    const issuedDest = soBatchCellSummary(
+      linePos.map((p) => destinationName(p!.destinationId)),
+    );
+    const supplier = soBatchCellSummary([
+      ...(eligible ? [leaf.supplier] : []),
+      ...linePos.map((p) => p!.supplierName),
+    ]);
+    const poDate = soBatchCellSummary(linePos.map((p) => p!.etaDate));
+    return {
+      key: l.orderLineId,
+      testId: `so-batch-part-${l.sku}`,
+      category: l.category ? categoryWord(l.category) : "Other goods",
+      unitIds: unitIdsByLine.get(l.orderLineId) ?? [],
+      unitAbsence: "Not allocated",
+      coveredBy,
+      coveredByAbsence: "Not ordered yet",
+      /* An eligible line carries its own editor (Split included); a covered
+         line states the destination the issued document carries. */
+      ...(drawEditor
+        ? {
+            deliverToNode: (
+              <DestinationAllocationEditor
+                row={leaf}
+                destinations={destinations}
+                allocations={arranged}
+                onWholeRow={(destinationId) => onWholeLeaf(leaf, destinationId)}
+                onSplit={(allocations) => onSplitLeaf(leaf.id, allocations)}
+              />
+            ),
+          }
+        : {}),
+      deliverTo: drawEditor
+        ? []
+        : eligible
+          ? arranged.map((a) =>
+              arranged.length > 1
+                ? `${destinationName(a.destinationId)} ×${a.qty}`
+                : destinationName(a.destinationId),
+            )
+          : issuedDest.kind === "none"
+            ? []
+            : issuedDest.kind === "one"
+              ? [issuedDest.value]
+              : issuedDest.values,
+      deliverToAbsence: eligible ? "Not chosen" : "—",
+      supplier: summaryText(supplier, (n) => `${n} suppliers`) ?? undefined,
+      supplierAbsence: "—",
+      poDeliveryDate:
+        poDate.kind === "none"
+          ? undefined
+          : poDate.kind === "one"
+            ? fmtDate(poDate.value)
+            : W.multiple,
+      poDeliveryDateAbsence: "—",
+      sku: l.sku,
+      qty: l.qty,
+      item: l.item,
+      selectable: eligible,
+    };
+  });
+
+  /* Demand the order Register's line facts cannot carry — a sold SKU Catalog
+     has never heard of. The leaf names it, so the expansion prints the leaf. */
+  for (const leaf of leafs) {
+    if (leaf.lineIds.some((id) => order.lines.some((l) => l.orderLineId === id))) continue;
+    for (const part of leaf.parts.length > 0
+      ? leaf.parts
+      : [{ sku: leaf.skus[0] ?? leaf.item, qty: leaf.qtyNeeded, unitCost: null }]) {
+      lines.push({
+        key: `${leaf.id}::${part.sku}`,
+        testId: `so-batch-part-${part.sku}`,
+        category: leaf.category ? categoryWord(leaf.category) : "Other goods",
+        unitIds: [],
+        unitAbsence: "Not allocated",
+        coveredBy: [],
+        coveredByAbsence: "Not ordered yet",
+        deliverTo: [],
+        deliverToAbsence: "—",
+        supplierAbsence: "—",
+        poDeliveryDateAbsence: "—",
+        sku: part.sku,
+        qty: part.qty,
+        item: leaf.item,
+        selectable: false,
+      });
+    }
+  }
+
+  if (lines.length === 0) {
+    return <div className="px-2 py-2 text-body text-kit-slate-11">No items on this order</div>;
+  }
+
+  return (
+    <div data-testid={`so-batch-inspector-${order.orderId}`}>
+      <GoodsMiniTable
+        label={order.so == null ? "Goods on this order" : `Goods on SO-${order.so}`}
+        lines={lines}
+        showCoveredBy
+        showSupplier
+        showPoDeliveryDate
+        selection={{
+          selectedKeys: new Set(
+            order.lines
+              .filter((l) => {
+                const leaf = leafByLineId.get(l.orderLineId);
+                return leaf != null && selectedIds.has(leaf.id);
+              })
+              .map((l) => l.orderLineId),
+          ),
+          onToggle: (lineKey) => {
+            const leaf = leafByLineId.get(lineKey);
+            if (leaf) onToggleLeaf(leaf.id);
+          },
+        }}
+      />
     </div>
   );
 }

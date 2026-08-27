@@ -233,8 +233,15 @@ export type DataGridProps<T> = {
    *
    * The FIRST data column is pinned, not a named one: the engine does not know
    * what a `SO No` is, and the identity column is whatever the page put first.
+   *
+   * ⭐ CARD 02-B EXTENSION (2026-08-27): `{ columnKey }` names the identity
+   * explicitly, for a Register whose approved column order does not put the
+   * identity first. At rest the sheet reads in the approved order; once it
+   * scrolls, the NAMED column pins directly after the control gutter and the
+   * intervening columns slide beneath it. `true` keeps the original
+   * first-data-column behaviour byte-identical for every existing caller.
    */
-  stickyIdentity?: boolean;
+  stickyIdentity?: boolean | { columnKey: string };
   /** show "Drag a column header here to group by that column" banner */
   groupBanner?: boolean;
   emptyMessage?: string;
@@ -284,6 +291,14 @@ export type DataGridProps<T> = {
      * every row is selectable, exactly as before.
      */
     isSelectable?: (row: never) => boolean;
+    /**
+     * ⭐ CARD 02-B (2026-08-27): a row whose checkbox stands for a SET of
+     * child records renders indeterminate when only part of that set is
+     * selected — the browser checkbox's own third state, set the same way the
+     * header checkbox already sets it. Omitted = never indeterminate, which
+     * keeps every existing caller byte-identical.
+     */
+    isIndeterminate?: (row: never) => boolean;
     /** Per-row test id for the checkbox. */
     testId?: (row: never) => string;
   };
@@ -825,12 +840,24 @@ function DataGridInner<T>({
   const pinnedLefts = useMemo(() => {
     const m = new Map<string, number>();
     if (!stickyIdentity) return m;
+    const identityKey =
+      typeof stickyIdentity === "object" ? stickyIdentity.columnKey : null;
     let left = 0;
     for (const col of visibleColumns) {
-      m.set(col.key, left);
-      left += Number(layout.widths[col.key] ?? col.width ?? 140);
-      // Stop AFTER the first real data column — the identity, not the record.
-      if (!col.key.startsWith("__")) break;
+      if (col.key.startsWith("__")) {
+        // The control gutter always pins, at cumulative offsets.
+        m.set(col.key, left);
+        left += Number(layout.widths[col.key] ?? col.width ?? 140);
+        continue;
+      }
+      if (identityKey == null || col.key === identityKey) {
+        // The identity: the first data column, or the NAMED one — pinned
+        // directly after the gutter, so a scrolled sheet slides the columns
+        // before it underneath. If the named column is hidden, only the
+        // gutter pins: a wrong identity is worse than none.
+        m.set(col.key, left);
+        break;
+      }
     }
     return m;
   }, [stickyIdentity, visibleColumns, layout.widths]);
@@ -1436,6 +1463,11 @@ function DataGridInner<T>({
                     data-testid={selectable.testId?.(row as never)}
                     checked={selectable.selectedKeys.has(key)}
                     disabled={!(selectable.isSelectable?.(row as never) ?? true)}
+                    /* A parent-of-children checkbox's third state — set via the
+                       ref exactly as the header checkbox sets its own. */
+                    ref={(el) => {
+                      if (el) el.indeterminate = selectable.isIndeterminate?.(row as never) ?? false;
+                    }}
                     onChange={() => selectable.onToggle(key)}
                   />
                 </td>

@@ -94,6 +94,7 @@ export default function OperationToOrder() {
   const empty: SoBatchPurchaseResponse = {
     today: "",
     rows: [],
+    registerRows: [],
     destinations: [],
     defaultDestinationId: null,
     currentPoDuty: null,
