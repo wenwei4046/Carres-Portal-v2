@@ -53,7 +53,7 @@ const order = (over: Partial<operationOrderListRow> = {}): operationOrderListRow
   }) as operationOrderListRow;
 
 describe("the default row is the owner's EIGHT, in the owner's order", () => {
-  it("SO No · Ordered · Customer Delivery · Customer · Delivery Location · Showroom · PO No · DO No", () => {
+  it("SO No · Ordered · Requested Delivery Date · Customer · Delivery Location · Showroom · PO No · DO No", () => {
     expect(DEFAULT_COLUMNS).toEqual([
       "so",
       "ordered",

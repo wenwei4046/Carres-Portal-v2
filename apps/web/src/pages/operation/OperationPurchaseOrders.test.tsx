@@ -14,7 +14,7 @@ const PO_DELAY_REASONS_FOR_TEST: readonly string[] = PO_DELAY_REASONS;
  * Purchase Orders — the Supplier Execution Register.
  *
  *   · **NINE columns, ONE fixed set** (Loo, 2026-08-04 · Q7): PO Issued ·
- *     Supplier · PO No. · SO No. · Items · Destination · Customer Delivery ·
+ *     Supplier · PO No. · SO No. · Items · Destination · Requested Delivery Date ·
  *     Expected Arrival · Current Action. **The set never changes because the
  *     panel opened** — the compact variant and its honesty guard are deleted,
  *     and that is the ruling most likely to be re-introduced under a new name;
@@ -474,7 +474,7 @@ const NINE = [
   "SO No.",
   "Items",
   "Destination",
-  "Customer Delivery",
+  "Requested Delivery Date",
   "Expected Arrival",
   "Current Action",
 ];
@@ -527,10 +527,10 @@ describe("the nine frozen columns — ONE set, always", () => {
     expect(headerTexts()).not.toContain("Received");
   });
 
-  it("Customer Delivery's header says it is the EARLIEST date on a merged PO", async () => {
+  it("Requested Delivery Date's header says it is the EARLIEST date on a merged PO", async () => {
     await mountLoaded();
-    const th = screen.getByRole("columnheader", { name: /Customer Delivery/ });
-    expect(th.getAttribute("title")).toMatch(/Earliest customer delivery/);
+    const th = screen.getByRole("columnheader", { name: /Requested Delivery Date/ });
+    expect(th.getAttribute("title")).toMatch(/Earliest requested delivery date/);
   });
 
   it("the expand control's column carries no header word", async () => {
@@ -1016,7 +1016,7 @@ describe("what the row states", () => {
   });
 });
 
-/** Jess, 2026-08-03 — the register put Customer Delivery and Goods Arrival
+/** Jess, 2026-08-03 — the register put Requested Delivery Date and Goods Arrival
  *  side by side and left the subtraction to the operator's head. Measured on
  *  live prod: 8 of 19 POs were already landing after the customer's date. */
 describe("the gap against the customer's date", () => {
@@ -1369,7 +1369,16 @@ describe("nine measured minimums, and no tail", () => {
       sono: "95px",
       items: "136px",
       dest: "135px",
-      custdel: "140px",
+      // 2026-08-27 · 140 → 192. The header word changed from
+      // `Customer Delivery` to `Requested Delivery Date` (owner ruling), and
+      // `.th` is `white-space: nowrap` with no `overflow: hidden` — a header
+      // wider than its column OVERFLOWS into the neighbour instead of
+      // ellipsising. MEASURED in a real browser at the governed header style
+      // (Inter 10px / 700 / uppercase / 0.06em): the word alone is 154px and
+      // the cell needs 189px once 8+8 padding, the 4px sort gap and the filter
+      // funnel are counted. 192 is that number rounded up, and it also clears
+      // the 170px absence line `No requested delivery date`.
+      custdel: "192px",
       arriving: "206px",
       // P20.1 · 192 → 193. `sizing="content"` puts a FILLER after the last
       // column, so `action` now carries P17's right-hand rule like the other
@@ -2168,7 +2177,7 @@ describe("the grid is the operator's (resize · reorder)", () => {
     await mountLoaded();
     for (const th of ths().slice(1)) {
       expect(th).toHaveAccessibleName(
-        /^(PO Issued|Supplier|PO No\.|SO No\.|Items|Destination|Customer Delivery|Expected Arrival|Current Action)$/,
+        /^(PO Issued|Supplier|PO No\.|SO No\.|Items|Destination|Requested Delivery Date|Expected Arrival|Current Action)$/,
       );
     }
   });
@@ -2354,7 +2363,7 @@ describe("what we sent the supplier (0312)", () => {
  * (Loo, 2026-08-05 — from a top-to-toe review of the LIVE page.)
  *
  * Measured at 1280 before this card: the register's table was 1203px inside a
- * 568px listing — 635px off the right edge, taking `Customer Delivery`,
+ * 568px listing — 635px off the right edge, taking `Requested Delivery Date`,
  * `Expected Arrival` and `Current Action` with it — while the expanded row
  * showed `PO-2038` and the panel beside it showed `PO-2032`. **Two different
  * purchase orders on one screen.**

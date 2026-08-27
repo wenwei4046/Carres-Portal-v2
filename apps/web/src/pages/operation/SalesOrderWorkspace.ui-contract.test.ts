@@ -175,7 +175,7 @@ describe("Sales Order object template contract", () => {
      the Order tab's alone.
 
      Two duplications died with them and are asserted below so they cannot come
-     back: the customer's promised date was printed TWICE (`Customer Delivery`
+     back: the customer's promised date was printed TWICE (`Requested Delivery Date`
      in Order info and `Customer promise` in Delivery Journey — one fact, two
      labels, ownership Law D), and `Journey` is a word COPY-STANDARD:1337 and
      :1453 both ban in favour of `Order Route`. */
@@ -255,7 +255,7 @@ describe("Sales Order object template contract", () => {
      not as a footnote beside the button that commits it. And a LIVE proposal
      is NOT behind the modal: a pending amendment is truth, so it prints beside
      the date it is waiting to move, where somebody reading that date sees it. */
-  it("opens the amend trio from beside Customer Delivery, and never hides a live one", () => {
+  it("opens the amend trio from beside Requested Delivery Date, and never hides a live one", () => {
     expect(workspace).toContain('data-testid="amend-date-open"');
     expect(workspace).toContain("setAmendDateOpen(true)");
     expect(workspace).toContain('title="Amend delivery date"');
@@ -420,8 +420,8 @@ describe("Sales Order object template contract", () => {
 
   /* ── THE WRITE BOUNDARY ────────────────────────────────────────────────── */
 
-  it("keeps goods, price and Customer Delivery out of the direct writer", () => {
-    expect(workspace).toContain('<Fact label="Customer Delivery"');
+  it("keeps goods, price and Requested Delivery Date out of the direct writer", () => {
+    expect(workspace).toContain('<Fact label="Requested Delivery Date"');
     /* One promised-date picker exists, and it is CREATE's — an existing
        order's promise moves by amendment only. */
     expect(workspace.match(/id="so-promised"/g)).toHaveLength(1);
@@ -534,7 +534,7 @@ describe("Sales Order object template contract", () => {
     for (const label of ["Who must act", "Who to contact", "What to use", "What happens next"]) {
       expect(workspace).not.toContain(label);
     }
-    // What survives: the amber field-level note on Customer Delivery.
+    // What survives: the amber field-level note on Requested Delivery Date.
     expect(workspace).toContain('>No delivery date</span>');
   });
 

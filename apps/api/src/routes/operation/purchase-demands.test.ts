@@ -728,7 +728,7 @@ describe("the buying facts SO Batch Purchase needs", () => {
       ownerRule: "Responsible Salesperson",
       ownerName: "Siew Hong",
       action: "Ask customer for a delivery date",
-      completionFact: "Customer Delivery exists",
+      completionFact: "Requested Delivery Date exists",
     });
     expect(tbd.action!.action).not.toContain("Siew Hong");
   });

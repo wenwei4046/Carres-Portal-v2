@@ -106,7 +106,7 @@ export type AssignLogisticsInput = z.infer<typeof assignLogisticsInputSchema>;
  * SAVE DELIVERY — the Edit Delivery form's whole payload for ONE scope.
  *
  * Every field here is Delivery-owned. The customer, the address, the building
- * facts and the promised `Customer Delivery` date are absent BY DESIGN: the
+ * facts and the promised `Requested Delivery Date` date are absent BY DESIGN: the
  * form shows them read-only and sends the operator to the Sales Order to change
  * one. A field this schema does not accept cannot be written from Delivery even
  * by a hand-made request.

@@ -100,7 +100,7 @@ import PoIssueEvidence from "./components/PoIssueEvidence";
  *     2026-08-02: the listing is for FINDING — sort, filter, search; the
  *     work happens in the workspace). **NINE frozen columns, ONE fixed set**
  *     (Loo, 2026-08-04 — Q7): PO Issued · Supplier · PO No. · SO No. ·
- *     Items · Destination · Customer Delivery · Expected Arrival ·
+ *     Items · Destination · Requested Delivery Date · Expected Arrival ·
  *     Current Action.
  *
  *     **THE SET NEVER CHANGES BECAUSE THE PANEL OPENED.** His words:
@@ -131,7 +131,7 @@ import PoIssueEvidence from "./components/PoIssueEvidence";
  * **ONE PURCHASE ORDER, ONE WAY OF LOOKING AT IT** (Q10 · Loo, 2026-08-05,
  * from a top-to-toe review of the LIVE page). Measured at 1280: the register's
  * table is 1203px inside a 568px listing — 635px off the right edge, taking
- * `Customer Delivery`, `Expected Arrival` and `Current Action` with it — while
+ * `Requested Delivery Date`, `Expected Arrival` and `Current Action` with it — while
  * the expanded row showed `PO-2038` and the panel beside it showed `PO-2032`.
  * **Two different purchase orders on one screen.**
  *
@@ -1058,7 +1058,7 @@ export default function OperationPurchaseOrders() {
   //
   // Loo's frozen order (2026-08-04 · Q7):
   //   PO Issued · Supplier · PO No. · SO No. · Items · Destination ·
-  //   Customer Delivery · Expected Arrival · Current Action
+  //   Requested Delivery Date · Expected Arrival · Current Action
   //
   // Every width below is MEASURED in a real browser against the app's own
   // stylesheet (13px Inter, the DataTable cell's `px-2` = 16px, header = the
@@ -1224,13 +1224,13 @@ export default function OperationPurchaseOrders() {
     },
     {
       key: "custdel",
-      label: "Customer Delivery",
+      label: "Requested Delivery Date",
       // A merged PO carries several customers' dates; until P5's allocation
       // splits them, this column is the EARLIEST — and says so (Jess,
       // 2026-08-02: never let staff read it as the whole PO's only date).
       headerTitle:
-        "Earliest customer delivery across this PO's sales orders — a merged PO carries more than one",
-      width: "140px",
+        "Earliest requested delivery date across this PO's sales orders — a merged PO carries more than one",
+      width: "192px",
       sortable: true,
       filter: filterFor("custdel", custdelOptions, { range: true }),
       cell: (p) => {
@@ -2445,7 +2445,7 @@ function WorkspaceBody({
               date has to be judged against, and it was not on this panel at
               all (Jess, 2026-08-03). Read-only here: purchasing cannot move
               a customer's promise. */}
-          <Prop label="Customer Delivery">
+          <Prop label="Requested Delivery Date">
             {po.customer_delivery ? (
               <span className="tabular-nums" data-testid="po-customer-delivery">
                 {fmtDateShort(po.customer_delivery)}

@@ -13,7 +13,7 @@
  * through.
  *
  * THE DEFAULT ROW — re-ruled to EIGHT by the owner, 2026-08-15:
- *   ☐ ▸ SO No · Ordered · Customer Delivery · Customer · Delivery Location ·
+ *   ☐ ▸ SO No · Ordered · Requested Delivery Date · Customer · Delivery Location ·
  *   Showroom · PO No · DO No
  *
  * `text` IS THE COLUMN. It is what the cell prints, what the column's filter
@@ -205,7 +205,7 @@ export const REGISTER_FIELDS: readonly RegisterField[] = [
   { key: "ordered", label: "Ordered", width: "113px", group: "Dates", on: true,
     text: (r) => fmtDate(r.ordered), sortBy: (r) => r.ordered,
     kind: "date", iso: (r) => r.ordered },
-  { key: "customer_delivery", label: "Customer Delivery", width: "148px", group: "Dates", on: true,
+  { key: "customer_delivery", label: "Requested Delivery Date", width: "192px", group: "Dates", on: true,
     text: (r) => date(r.customerDelivery, NO_DATE_YET), sortBy: (r) => r.customerDelivery ?? "",
     kind: "date", iso: (r) => r.customerDelivery },
   { key: "customer", label: "Customer", width: "190px", group: "Customer", on: true,
@@ -252,7 +252,7 @@ export const REGISTER_FIELDS: readonly RegisterField[] = [
       : null,
     footerSum: (r) => amountOf(r.balance) },
   /* `Promised` is DELETED (owner ruling 2026-08-18): it derived from exactly
-     the same fact as `Customer Delivery` (`orders.delivery_date` under the
+     the same fact as `Requested Delivery Date` (`orders.delivery_date` under the
      same tbd guard), so opening it printed one date twice under two labels —
      ONE customer date column is the law. */
   { key: "dealer", label: "Dealer", width: "160px", group: "Sales ownership",

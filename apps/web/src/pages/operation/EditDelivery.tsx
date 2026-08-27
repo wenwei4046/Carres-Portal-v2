@@ -18,7 +18,7 @@
  * │ FROM THE SALES ORDER (read-only)       │  LIVE DELIVERY ORDER PREVIEW   │
  * │   Customer · Phone · Delivery location │  the ACTUAL governed renderer, │
  * │   Building/floor/lift                  │  re-rendered as you type       │
- * │   Customer Delivery · preferred time   │                                │
+ * │   Requested Delivery Date · preferred time   │                                │
  * │   [Open Sales Order to change]         │  Preview · No delivery order   │
  * │                                        │  yet   — or the real DO number │
  * │ DELIVERY OWNS THESE                    │                                │
@@ -96,7 +96,7 @@ export const ED = {
   building: "Building",
   floor: "Floor",
   lift: "Lift",
-  customerDelivery: "Customer Delivery",
+  customerDelivery: "Requested Delivery Date",
   preferredTime: "Customer preferred time",
   partner: "Logistics Partner",
   confirmedDate: "Confirmed Delivery",

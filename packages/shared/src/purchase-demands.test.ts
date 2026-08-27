@@ -540,7 +540,7 @@ describe("the buying facts the row now carries", () => {
     expect(action!.ownerRule).toBe("Responsible Salesperson");
     expect(action!.ownerName).toBe("Shasha");
     expect(action!.action).toBe("Ask customer for a delivery date");
-    expect(action!.completionFact).toBe("Customer Delivery exists");
+    expect(action!.completionFact).toBe("Requested Delivery Date exists");
     expect(action!.sourceObject).toEqual({ type: "sales_order", id: "o1", number: "SO-1318" });
     expect(action!.dueDate).toBe("2026-08-19");
   });
@@ -556,7 +556,7 @@ describe("the buying facts the row now carries", () => {
       safety_days_low: buyRule,
       safety_days_none: buyRule,
       not_enough_production_time: buyRule,
-      no_customer_date: ["Responsible Salesperson", "Customer Delivery exists"],
+      no_customer_date: ["Responsible Salesperson", "Requested Delivery Date exists"],
       no_sku: ["Catalog/Master Data through Current PO Duty", "Approved SKU exists"],
       no_supplier: ["Current PO Duty", "Approved supplier relationship exists"],
       no_production_days: [

@@ -315,7 +315,7 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     expect(hover).toHaveAttribute("title", expect.stringContaining("Shasha"));
   });
 
-  it("shows a governed missing Customer Delivery exception instead of a passive empty value", () => {
+  it("shows a governed missing Requested Delivery Date exception instead of a passive empty value", () => {
     listHookState.data = { orders: [order({
       delivery_date: null,
       delivery_date_tbd: false,
@@ -336,7 +336,7 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
       [
         "Shasha · Kimmy · 019-3478913",
         "Ask which delivery date the customer agrees to.",
-        "Record the agreed Customer Delivery date.",
+        "Record the agreed Requested Delivery Date date.",
       ].join("\n"),
     );
     expect(screen.queryByText("No date yet")).not.toBeInTheDocument();
@@ -638,7 +638,7 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     expect(business.map((h) => h.replace(/[AV]$/, "").trim())).toEqual([
       "SO No",
       "Ordered",
-      "Customer Delivery",
+      "Requested Delivery Date",
       "Customer",
       "Delivery Location",
       "Showroom",

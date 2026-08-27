@@ -187,7 +187,7 @@ describe("historyRecordWords translates stored values into governed words", () =
       "Staff correction · Rev 2 · Customer name",
     );
     expect(historyWords("Changed delivery_date and delivery_has_lift")).toBe(
-      "Changed Customer Delivery and Lift available",
+      "Changed Requested Delivery Date and Lift available",
     );
   });
 });
