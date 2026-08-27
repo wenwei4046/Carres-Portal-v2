@@ -680,13 +680,18 @@ export function Block({
  * Deliberately quieter than a card title: `text-label` against the card's
  * `text-strong`, so one card still reads as one thing.
  */
-function SubHead({ children }: { children: React.ReactNode }) {
+function SubHead({ children, note }: { children: React.ReactNode; note?: string }) {
   return (
     <p
-      className="mb-2 mt-4 text-label font-semibold text-base-600 first:mt-0"
+      className="mb-2 mt-4 flex flex-wrap items-baseline gap-x-2 text-label font-semibold text-base-600 first:mt-0"
       data-testid={`subhead-${String(children).replace(/\s+/g, "-").toLowerCase()}`}
     >
       {children}
+      {/* The card-level `note` slot, one level down. `creates a Revision ·
+          needs approval` is governed copy that used to ride a Block title; the
+          merge moved the heading, so it moves with it rather than being
+          reworded or dropped. */}
+      {note && <span className="font-normal text-base-500">{note}</span>}
     </p>
   );
 }
@@ -2057,6 +2062,93 @@ export default function SalesOrderWorkspace() {
           )}
           <CustomFields fields={tab("address").custom} values={draft.custom} onChange={setCustom} />
         </div>
+        {/* ⭐ Merged from the retired `Emergency contact` card (YH,
+            2026-08-27). It is the same person's fact, so it is the same
+            card — the customer, everywhere their goods go, and who to ring
+            if nobody answers on the day. It loses its fold with its border:
+            three fields do not need hiding, and a collapsed card cannot
+            show an unsaved change without the force-open machinery that
+            existed only because it was collapsible. */}
+        {emergencyEnabled && (
+          <>
+            <SubHead>Emergency contact</SubHead>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3" data-pos-field="emergency">
+              <Input id="so-emergency-name" label="Name" value={draft.emergency_name}
+                onChange={(e) => setField("emergency_name", e.target.value)} />
+              <Input id="so-emergency-phone" label="Phone" value={draft.emergency_phone}
+                onChange={(e) => setField("emergency_phone", e.target.value)} />
+              {/* The relationship is a picker with a free-text escape: an
+                  imported or hand-typed word that is not on the list must survive
+                  being looked at, so it stays in the text box. */}
+              <Input id="so-emergency-relationship" label="Relationship"
+                list="so-emergency-relationships"
+                value={draft.emergency_relationship}
+                onChange={(e) => setField("emergency_relationship", e.target.value)} />
+              <datalist id="so-emergency-relationships">
+                {EMERGENCY_RELATIONSHIPS.map((r) => <option key={r} value={r} />)}
+              </datalist>
+            </div>
+            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <CustomFields fields={tab("emergency").custom} values={draft.custom} onChange={setCustom} />
+            </div>
+          </>
+        )}
+      </Block>
+
+      {/* ⑥ MONEY — read-only forever (ownership Law B). */}
+      <Block title="Money">
+        <div className="flex flex-wrap items-end gap-x-8 gap-y-3">
+          <div>
+            <div className="text-label text-base-500">Total</div>
+            <div className="text-title text-base-900" data-testid="money-total">
+              {money.known && money.total != null ? <Money value={money.total} /> : "No price yet"}
+            </div>
+          </div>
+          <div>
+            <div className="text-label text-base-500">Paid</div>
+            <div className="text-strong text-base-700" data-testid="money-paid">
+              <Money value={money.paid} />
+            </div>
+          </div>
+          {/* ⭐ THE CUSTOMER-MONEY WORD IS `Outstanding` (CLAUDE.md §7 — what the
+              CUSTOMER owes HQ), and it is the LOUDEST thing in the block: the
+              most-read number on the page (ui/MASTER.md §6.4 ⑤), red while any
+              of it is still owed (owner ruling 2026-08-15). */}
+          <div>
+            <div className="text-label text-base-500">Outstanding</div>
+            <div
+              className={`text-page ${money.known && money.outstanding > 0 ? "text-danger" : "text-base-900"}`}
+              data-testid="money-outstanding"
+            >
+              {!money.known ? "No price yet" : money.outstanding > 0 ? <Money value={money.outstanding} /> : "Paid in full"}
+            </div>
+          </div>
+        </div>
+        {/* ⭐ A DOOR, NEVER A DUPLICATE (ownership Law C). Sales Order
+            SUMMARISES money and may never gain a form for it — so the one thing
+            it adds is the way OUT, to the desk that owns collection, already
+            scoped to this order. Read-only: it navigates, it writes nothing. */}
+        {!isNew && order && (
+          <div className="mt-3 border-t border-kit-slate-5 pt-3">
+            <button
+              type="button"
+              data-testid="workspace-open-payments"
+              className="text-meta font-medium text-kit-blue-11 underline-offset-2 hover:underline"
+              onClick={() => navigate(`/operation?tab=payments&so=${order.so}`)}
+            >
+              Open this order in Payments
+            </button>
+          </div>
+        )}
+        {/* 0362 (owner ruling 2026-08-19) — the black-and-white door that lets
+            an owing order deliver COD. Sales Order OWNS this record; raising
+            and deciding are ITS doors, not a money form (Law B untouched). */}
+        {!isNew && order && (
+          <PaymentApprovalBlock
+            orderId={order.id}
+            outstanding={money.known ? money.outstanding : 0}
+          />
+        )}
       </Block>
 
       {/* ② ORDER INFO */}
@@ -2279,130 +2371,29 @@ export default function SalesOrderWorkspace() {
             )}
           </>
         )}
-      </Block>
-
-      {/* ③ AMEND DELIVERY DATE
-          Collapsed unless an amendment is actually live. The block order is
-          LOCKED (MASTER.md, SALES ORDER OBJECT PAGE V2) and does not move —
-          what changes is only how much of it is open at once, which no ruling
-          governs. A pending amendment is real news, so it stays expanded. */}
-      {!isNew && mode === "object" && orderId && (
-        <Block
-          title="Amend delivery date"
-          /* The `note` beside the title already says `creates a Revision ·
-             needs approval`, and it is governed copy. The subtitle underneath
-             said the same thing in a longer sentence (YH, 2026-08-27). */
-          note="creates a Revision · needs approval"
-          summary={
-            liveAmendment
-              ? "Amendment pending approval"
-              : "Delivery date unchanged — open to request a new one"
-          }
-          forceOpen={Boolean(liveAmendment)}
-        >
-          <SalesOrderAmendDeliveryDate
-            orderId={orderId}
-            currentDeliveryDate={order?.delivery_date ?? null}
-            liveAmendment={liveAmendment}
-          />
-        </Block>
-      )}
-
-      {/* ④ EMERGENCY CONTACT */}
-      {emergencyEnabled && (
-        <Block
-          title="Emergency contact"
-          /* ⛔ THE NOTE IS RETIRED (YH, 2026-08-27). It was governed copy
-             (COPY-STANDARD + the 2026-08-15 ruling), so both are overwritten
-             with this decision rather than quietly contradicted. `Emergency
-             contact` needs no explaining, and the collapsed summary already
-             says whether one is recorded. */
-          summary={
-            draft.emergency_name.trim() || draft.emergency_phone.trim()
-              ? `${draft.emergency_name.trim() || "No name"} · ${draft.emergency_phone.trim() || "no phone"}`
-              : "No emergency contact recorded"
-          }
-          /* Never hide a change the save bar is counting. */
-          forceOpen={changedFields.some((k) => k.startsWith("emergency_"))}
-        >
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3" data-pos-field="emergency">
-            <Input id="so-emergency-name" label="Name" value={draft.emergency_name}
-              onChange={(e) => setField("emergency_name", e.target.value)} />
-            <Input id="so-emergency-phone" label="Phone" value={draft.emergency_phone}
-              onChange={(e) => setField("emergency_phone", e.target.value)} />
-            {/* The relationship is a picker with a free-text escape: an
-                imported or hand-typed word that is not on the list must survive
-                being looked at, so it stays in the text box. */}
-            <Input id="so-emergency-relationship" label="Relationship"
-              list="so-emergency-relationships"
-              value={draft.emergency_relationship}
-              onChange={(e) => setField("emergency_relationship", e.target.value)} />
-            <datalist id="so-emergency-relationships">
-              {EMERGENCY_RELATIONSHIPS.map((r) => <option key={r} value={r} />)}
-            </datalist>
-          </div>
-          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <CustomFields fields={tab("emergency").custom} values={draft.custom} onChange={setCustom} />
-          </div>
-        </Block>
-      )}
-
-
-      {/* ⑥ MONEY — read-only forever (ownership Law B). */}
-      <Block title="Money">
-        <div className="flex flex-wrap items-end gap-x-8 gap-y-3">
-          <div>
-            <div className="text-label text-base-500">Total</div>
-            <div className="text-title text-base-900" data-testid="money-total">
-              {money.known && money.total != null ? <Money value={money.total} /> : "No price yet"}
-            </div>
-          </div>
-          <div>
-            <div className="text-label text-base-500">Paid</div>
-            <div className="text-strong text-base-700" data-testid="money-paid">
-              <Money value={money.paid} />
-            </div>
-          </div>
-          {/* ⭐ THE CUSTOMER-MONEY WORD IS `Outstanding` (CLAUDE.md §7 — what the
-              CUSTOMER owes HQ), and it is the LOUDEST thing in the block: the
-              most-read number on the page (ui/MASTER.md §6.4 ⑤), red while any
-              of it is still owed (owner ruling 2026-08-15). */}
-          <div>
-            <div className="text-label text-base-500">Outstanding</div>
-            <div
-              className={`text-page ${money.known && money.outstanding > 0 ? "text-danger" : "text-base-900"}`}
-              data-testid="money-outstanding"
-            >
-              {!money.known ? "No price yet" : money.outstanding > 0 ? <Money value={money.outstanding} /> : "Paid in full"}
-            </div>
-          </div>
-        </div>
-        {/* ⭐ A DOOR, NEVER A DUPLICATE (ownership Law C). Sales Order
-            SUMMARISES money and may never gain a form for it — so the one thing
-            it adds is the way OUT, to the desk that owns collection, already
-            scoped to this order. Read-only: it navigates, it writes nothing. */}
-        {!isNew && order && (
-          <div className="mt-3 border-t border-kit-slate-5 pt-3">
-            <button
-              type="button"
-              data-testid="workspace-open-payments"
-              className="text-meta font-medium text-kit-blue-11 underline-offset-2 hover:underline"
-              onClick={() => navigate(`/operation?tab=payments&so=${order.so}`)}
-            >
-              Open this order in Payments
-            </button>
+        {/* ⭐ Merged from the retired `Amend delivery date` card (YH,
+            2026-08-27). The dates this order runs on and the governed way
+            to move the promised one are one subject, and they were two
+            cards. The three fields and their machinery are untouched —
+            `creates a Revision · needs approval` is governed copy and now
+            rides the subsection heading. A LIVE amendment is still real
+            news, but nothing hides it any more: the section is always on
+            screen, which is what the fold's `forceOpen` was for. */}
+        {!isNew && mode === "object" && orderId && (
+          <div className="mt-4 border-t border-kit-slate-5 pt-3">
+            <SubHead note="creates a Revision · needs approval">Amend delivery date</SubHead>
+            <SalesOrderAmendDeliveryDate
+              orderId={orderId}
+              currentDeliveryDate={order?.delivery_date ?? null}
+              liveAmendment={liveAmendment}
+            />
           </div>
         )}
-        {/* 0362 (owner ruling 2026-08-19) — the black-and-white door that lets
-            an owing order deliver COD. Sales Order OWNS this record; raising
-            and deciding are ITS doors, not a money form (Law B untouched). */}
-        {!isNew && order && (
-          <PaymentApprovalBlock
-            orderId={order.id}
-            outstanding={money.known ? money.outstanding : 0}
-          />
-        )}
       </Block>
+
+
+
+
 
 
       {/* ⑧ GOODS — the six-column truth §0.1 locks. It is not a form: Unit ID
