@@ -336,7 +336,12 @@ describe("Sales Order object template contract", () => {
     /* The stored column stays ONE text column — the codec is shared with the
        POS so a legacy string round-trips untouched. */
     expect(workspace).not.toContain('label="Emergency contact"');
-    expect(workspace).toContain("Used only if we cannot reach the customer on delivery day");
+    /* ⛔ The section's NOTE is retired (YH, 2026-08-27) — this used to assert
+       the sentence was present. What the ruling protected was the THREE
+       FIELDS over one column, which is asserted above and below; the note was
+       a separate 2026-08-15 decision and it has been overwritten in both
+       COPY-STANDARD and MASTER. Asserted absent so it cannot drift back. */
+    expect(workspace).not.toContain("Used only if we cannot reach the customer on delivery day");
   });
 
   it("keeps the document address and the editable parts as one fact", () => {
