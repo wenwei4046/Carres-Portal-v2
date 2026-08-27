@@ -5,7 +5,7 @@
 **Page:** SO Batch Purchase
 **Surface:** Left filter rail only
 **Sequence:** 02-C
-**Status:** IN PROGRESS
+**Status:** COMPLETE — production-verified 2026-08-27
 **Owner approved:** 27 Aug 2026
 **Lane:** BUILD / DELIVERY
 **Depends on:** Purchasing Card 02-A and completed Card 02-B
@@ -241,3 +241,63 @@ merge and deployment. Stop only for: an unexpected migration · a genuine author
 contradiction · destructive or materially broader scope. After production verification,
 update the Card and authoritative MASTER/COPY documents with final truth and report the live
 result.
+
+---
+
+## Completion evidence — 2026-08-27
+
+- **PR:** [#940](https://github.com/wenwei4046/Carres-Portal-v2/pull/940), built in a
+  dedicated worktree from `main` `d064297f`, merged to `main` as
+  `0f421277cb8fec6ad032b76edf26020b04d7cd25`; CI `verify` green (14m03s). **No migration** —
+  none was needed, none was manufactured (403 filenames validated, 0 changes).
+- **Authority persisted before code** (`654d516d` inside the PR):
+  `docs/purchasing/MASTER.md` §9.1 (the five-section rail law, readable-shell geometry,
+  cross-updating unique-SO counts), the `docs/COPY-STANDARD.md` rail block (five headings,
+  the `days` wording, the no-checkbox and never-truncate rules), `docs/ui/MASTER.md`
+  (LOCAL FILTER RAIL — READABLE SHELL, locked), and `docs/03-page-patterns.md` — whose SO
+  Batch example was also two cards stale and now records the 02-B ten-column grid.
+- **The model:** `SoBatchRailFilter` (one slot per section) + `soBatchRailFacts` +
+  `soBatchRailModel` in `packages/shared/src/so-batch-purchase.ts` — every count is unique
+  Sales Orders computed under the OTHER sections' selections, so the printed number predicts
+  the click; fixed rows print zero rather than hiding it; the selected supplier survives at
+  `0`. Product reads only the Catalog category on the Register's own lines (`oE`, a SKU
+  whose TEXT screams mattress but whose category is absent, is proven uncounted). Supplier
+  rides `soBatchOrderSupplierNames` — the exact projection the right Register's `Supplier`
+  column prints, now shared so the two cannot drift. Wording changed at the source
+  (`purchase-demands.ts`): `Not enough production days` · `Production days not set`; the
+  wire state keys kept their spellings.
+- **The shell:** `FilterRail` / `FilterRailGroup` / `FilterRailRow` join
+  `workspace-rail.tsx` — 240px · 12px padding · 8px heading gap · 20px group gap · 36px
+  minimum row (9px + one 18px `text-body` line + 9px), labels `break-words`, never
+  `truncate`, count right-aligned on the first line. The legacy 200px `RailGroup`/`RailItem`
+  pair survives untouched underneath its four other governed pages; they migrate in their
+  own cards.
+- **Gates:** 8,706 tests green (shared 2,709 · api 2,499 · web 3,498, including 10 new
+  shared rail-model proofs and 14 new register rail proofs), typecheck, lint, `check:v4`,
+  `ci:migrations`, production build (the dev preview entry proven absent from `dist`),
+  `git diff --check` — all clean.
+- **Walk** (`docs/evidence/purchasing-02c-rail/`, the real component + seeded payload at
+  1440px and 1130px, original-size captures delivered to the owner): the complete five-section
+  rail; `Not enough production days` whole on its 36px row (DOM-measured: rail 240px at both
+  widths, full label text, 0 rail checkboxes, 13 grid checkboxes); the combined
+  `All not ordered + Mattress + Hooka` result (7 rows, three blue NavRow selections,
+  Bedframe/Sofa/setup counts honestly at 0, unmatched suppliers dropped); clearing every
+  filter returning all 12 records, Ordered included; `?setup=0` removing the whole
+  `SETUP TO FIX` section; the Register horizontally scrolling under the sticky `SO No` at
+  1130px; and the retired 200px truncating rail (`Not enough producti…`) reconstructed
+  beside the new one.
+- **Production:** deploy run 33064330629 SUCCEEDED; `scripts/verify-production.mjs`
+  converged all five governed surfaces (carres-portal Pages · carres-pos Pages · ERP
+  canonical · POS canonical · API Worker `/health`) on the exact merge SHA. The served ERP
+  bundle (`index-DAoYVoPb.js`, fetched and counted): `Not enough production days` ·
+  `Production days not set` · `PRODUCT` · `All products` · `SUPPLIER` · `All suppliers` ·
+  `All not ordered` all present; `Not enough production time` · `Production time not set`
+  both **0**.
+- The authenticated production walk on live data remains the owner's, per the standing
+  owner-only acceptance law; the SHA, bundle counts and seeded-component walk above are the
+  engineering proof.
+
+```text
+PURCHASING CARD 02-C COMPLETE
+Production SHA: 0f421277cb8fec6ad032b76edf26020b04d7cd25
+```
