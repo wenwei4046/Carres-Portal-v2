@@ -2,9 +2,10 @@
 
 **Module:** Sales Orders · **Object views:** Revisions + History
 **Owner authority:** `docs/orders/MASTER.md` + `docs/ui/MASTER.md` — owner-approved / locked 2026-08-27
-**Status:** EXECUTED · SHIPPED — implementation merged as `d14614a3` and verified on the
-authenticated production UI, 2026-08-27. **NOT YET `PRODUCTION-VERIFIED`:** §9's five-second staff
-walk and the true ~920px viewport reading are still owed — see §11.
+**Status:** EXECUTED · SHIPPED — implementation merged as `d14614a3`, walk-fix `e16a8e88`
+(PR #932 · migration 0390), both verified on the authenticated production UI at 1440px and a true
+~909px viewport, 2026-08-27. **NOT YET `PRODUCTION-VERIFIED`:** the one remaining item is §9's
+five-second staff walk by a human operation staff member — see §11.6.
 **Lane:** BUILD / DELIVERY
 **Base:** `origin/main` at `375d8c8a5143730f315233d52e0397ce04531a45`, plus the approved Blueprint commit `b8046992`
 
@@ -405,13 +406,20 @@ PR:                         #931 — https://github.com/wenwei4046/Carres-Portal
 CI:                         run 33040824230, verify SUCCESS on 6a99cf55
 Merge SHA:                  d14614a3aa5bd2825898d3e17e19ece464050395
 Deployment run:             33041528057, Deploy production SUCCESS on d14614a3
-Production SHA:             d14614a3 on all five canonical surfaces
-Migration 0387 verification: proved by behaviour on SO-1329 (see below)
-Authenticated orders used:  SO-1329 (post-0387) · SO-1327 (pre-0387) · SO-1318 (6 revisions)
-1440px acceptance:          PASS, measured at a 1475px viewport
-~920px acceptance:          PROXY PASS — true viewport reading OWED
-Five-second staff walk:     OWED — needs a human reader
-Defects opened:             one 🟡, out of this Card's boundary (see below)
+Walk-fix commit:            2b6bf0bc (PR #932) — migration 0390 + the actor staff door
+Walk-fix CI · merge:        verify SUCCESS · merged as e16a8e888a8ab275944b2eba6becc38e5979f0cf
+Walk-fix deployment run:    33045791208, Deploy production SUCCESS on e16a8e88
+Production SHA:             e16a8e88 verified on erp.carresofficial.com and the API Worker
+Migration 0387 verification: trigger + function live and matching the committed SQL, and
+                            proved by behaviour on SO-1329 (see below)
+Migration 0390 verification: definer function live, anon/public revoked, zero rows without an
+                            internal JWT; owner approved the apply in-session
+Authenticated orders used:  SO-1329 (post-0387) · SO-1327 (pre-0387) · SO-1318 (6 revisions) ·
+                            SO-1319 (4 revisions, walked as an OPERATION reader)
+1440px acceptance:          PASS (two independent walks: ~1475px and 1440×900)
+~920px acceptance:          PASS at a true 909px viewport (window.innerWidth measured)
+Five-second staff walk:     OWED — needs a human operation reader (§11.6)
+Defects opened:             one 🟡 out of boundary (§11.4) · one 🔴 in boundary, FIXED (§11.7)
 ```
 
 ## 11.1 · Repository gates, re-run on the merged SHA
@@ -477,17 +485,20 @@ it never appends a role.
 
 **Absent from every screen read:** `Unknown user` · `0% deposit` · bare `online`.
 
-## 11.3 · The ~920px reading is a proxy, and here is exactly why
+## 11.3 · The ~920px reading — now a true viewport measurement
 
-`SalesOrderLedger.tsx` contains no breakpoint class, and its panel is a plain
-`mx-auto max-w-5xl` — nothing between 920px and 1475px changes the record's layout. Narrowing that
-panel to 676px (the width it takes at a ~920px viewport) kept the three ranks vertically stacked at
-13/12/11, wrapped inside the record, with no clipped element and no page horizontal scroll.
+A second authenticated session resized the signed-in Chrome window and measured
+`window.innerWidth = 909`. At that viewport, on production SHA `e16a8e88`:
 
-**That is a container measurement, not a viewport measurement, and it is recorded as one.** The
-signed-in Chrome window was maximised; the extension cannot shrink a maximised window and its page
-zoom is unavailable, so a true ~920px viewport could not be reached from this session. Re-read it
-at a real 920px window before this line is upgraded.
+- **SO-1319 History** kept the three ranks vertically stacked at 13/12/11; the long address
+  Before → After line wrapped inside its record; `document.documentElement.scrollWidth` did not
+  exceed `clientWidth` — no page horizontal scroll.
+- **SO-1329** read exactly `Order created / principal · Principal · Thu, 27 Aug 12:30 /
+  No deposit · Online order` (History) and `Original order / Rev 1 · Current / Recorded by
+  principal · Thu, 27 Aug 12:30` (Revisions), with no clipping.
+
+This supersedes the earlier container-only proxy measurement, which is kept below it in Git
+history rather than here.
 
 ## 11.4 · Defect found during acceptance — NOT fixed here, and that is deliberate
 
@@ -517,6 +528,28 @@ forbids this Card from changing Order page editing law. It needs its own Card.
 ## 11.6 · What is still owed before `PRODUCTION-VERIFIED`
 
 1. The §9 five-second staff walk, by an operation staff member who did not build the screen.
-2. One reading of Revisions and History at a true ~920px viewport.
+   Hand any of SO-1329 / SO-1319 / SO-1318 to a staff member cold and ask the four questions.
 
-Until both land, `Status` stays `EXECUTED · SHIPPED`.
+The ~920px viewport reading landed (§11.3). Until the human walk lands, `Status` stays
+`EXECUTED · SHIPPED`.
+
+## 11.7 · Defect found by the operation-reader walk — FIXED in the same delivery
+
+🔴 **A recorded principal actor rendered as `Actor was not recorded` to an operation reader.**
+The first acceptance pass was signed in as principal, whose JWT reads every `app_users` row, so
+every name resolved and the gap was invisible. A second pass signed in as OPERATION read SO-1329 —
+actor recorded by 0387, a principal account — and the record declared an audit-data defect that was
+not true: 0235's peers policy shows an operation JWT only operation-role rows, so the name lookup
+came back empty and `actor_kind` honestly fell to `missing`.
+
+The fix is migration `0390_a_reader_may_name_an_internal_actor.sql` (PR #932): a SECURITY DEFINER
+`actor_display_names(uuid[])` returning exactly `(id, name)`, only for internal-staff rows
+(principal · operation · finance · bd · hr · warehouse), only to operation/principal JWTs, with
+anon/public execute revoked — the smallest door that satisfies §4's "resolve the real display name
+from the authoritative identity source" for every internal reader. Dealer-side rows are
+deliberately excluded so `salespersons` keeps answering the sales-side name. The shared resolver
+now reads its staff half through that door and fails open when the function is absent. After the
+fix deployed (`e16a8e88`), the same operation session read SO-1329 as
+`principal · Principal · Thu, 27 Aug 12:30` and SO-1319's Revisions as `Recorded by principal` /
+`Recorded by Operations` — the recorded account names, resolved for the reader the ledger exists
+to inform.

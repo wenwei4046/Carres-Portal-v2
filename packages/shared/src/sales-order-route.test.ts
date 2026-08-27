@@ -185,7 +185,7 @@ describe("goods forks", () => {
       ownerKey: "purchasing",
       label: "Issue PO",
       context: {
-        detail: "B1201S · King · 2 Units · Carres Warehouse · Customer Delivery: 2026-09-24",
+        detail: "B1201S · King · 2 Units · Carres Warehouse · Requested Delivery Date: 2026-09-24",
       },
     });
     /* The steps behind it are a path the work has not walked — dashed, not absent. */
@@ -258,7 +258,7 @@ describe("CURRENT", () => {
       ownerKey: "purchasing",
       label: "Confirm ready date",
       context: {
-        detail: "PO-2048 · 2 Units · Carres Warehouse · Customer Delivery: 2026-09-24",
+        detail: "PO-2048 · 2 Units · Carres Warehouse · Requested Delivery Date: 2026-09-24",
       },
     });
     /* A node nobody has reached carries no instruction. */

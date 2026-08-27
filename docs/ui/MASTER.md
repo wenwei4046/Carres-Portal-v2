@@ -1054,8 +1054,8 @@ compact destination header / work toolbar
 breathing gap
 
 ┌─ light bordered Register ──────────────────────────────────────────────┐
-│ ▸ | SO No | Ordered | Customer Delivery | Customer | Delivery         │
-│   | Location | PO No | DO No                                          │
+│ ▸ | SO No | Ordered | Requested Delivery Date | Customer |             │
+│   | Delivery Location | Showroom | PO No | DO No                       │
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -1149,12 +1149,12 @@ breathing gap
   fixed by PR #788 and merged as `ebc8fb5d`. Deploy run `31790978222` repeated the authoritative
   gates and proved exact SHA `ebc8fb5d` in production. At normal desktop width the Register keeps
   the seven governed columns, page-header New Sales Order action, utility-only grid toolbar,
-  interaction-blue selection, amber missing Customer Delivery, location summaries, the approved
+  interaction-blue selection, amber missing Requested Delivery Date, location summaries, the approved
   six-column goods mini-table and filtered quantity footer with no permanent Reset layout. The
   persistent Object Header and `Order · Revisions · History · Order Route` navigation were verified
   across View and Edit. Order is read-first at document width; PDF remains behind Print; Revisions
   and History are separate views; Order Route shows per-goods `CURRENT` and a secondary Still owed
-  list. Edit keeps Customer Delivery read-only, retains the existing Proceed date writer, maps only
+  list. Edit keeps Requested Delivery Date read-only, retains the existing Proceed date writer, maps only
   existing address/access fields, and aligns Customer with Sales ownership beneath a full-width
   edit-scope notice. The same Object Route and Edit compositions remained usable with My Work open.
   This supersedes the earlier acceptance note's live PDF-canvas statement and closes the Sales Order
@@ -1163,7 +1163,7 @@ breathing gap
   review reopened the preceding closure. The final correction is PR #795, merged as
   `759d49efaee6c643bd9d8e1840cb991dee2b7015`; complete CI run `31804608716` passed and production
   deploy run `31805501074` converged that exact SHA. Authenticated normal and medium-desktop
-  acceptance proved the fact-first missing Customer Delivery presentation, concise locality,
+  acceptance proved the fact-first missing Requested Delivery Date presentation, concise locality,
   unchanged six-column goods mini-table, single-destination quantity suppression, equal Register
   and Object goods truth, the approved `Edit operational details | Order context` composition,
   governed Sales ownership, edit controls and URL state confined to Order Edit, safe dirty-navigation
@@ -1196,14 +1196,14 @@ its own tools, and nothing that is not needed is on screen.*
 │  ⊕ New Sales Order                        🔍    ⤓ Export ▾    ▥    │  45
 └────────────────────────────────────────────────────────────────────┘
      make a new thing  ←                      → how I look at this page
-┌────────────────────────────────────────────────────────────────────┐
-│ ▸ │ SO No   │ Ordered     │ Customer Delivery  │ Customer          │  36
-├───┼─────────┼─────────────┼────────────────────┼───────────────────┤
-│ ▸ │ SO-1319 │ Wed, 12 Aug │ Thu, 24 Sep 26     │ LIM KUAN YANG     │  38
-│ ▸ │ SO-1318 │ Tue, 11 Aug │ Customer not sure  │ CARD-1            │  38
-├───┴─────────┴─────────────┴────────────────────┴───────────────────┤
-│ 77 orders · Mattress 66 · Bedframe 36 · Sofa 15 · Pillow 44        │  32
-└────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│ ▸ │ SO No   │ Ordered     │ Requested Delivery Date │ Customer          │  36
+├───┼─────────┼─────────────┼─────────────────────────┼───────────────────┤
+│ ▸ │ SO-1319 │ Wed, 12 Aug │ Thu, 24 Sep 26          │ LIM KUAN YANG     │  38
+│ ▸ │ SO-1318 │ Tue, 11 Aug │ Customer not sure       │ CARD-1            │  38
+├───┼─────────┼─────────────┼─────────────────────────┼───────────────────┤
+│ 77 orders · Mattress 66 · Bedframe 36 · Sofa 15 · Pillow 44             │  32
+└─────────────────────────────────────────────────────────────────────────┘
    ── 8px ──
 ```
 

@@ -48,7 +48,7 @@ export const PURCHASE_DEMAND_WORDS = {
   colSku: "SKU",
   colSo: "SO No",
   colCustomer: "Customer",
-  colCustomerDelivery: "Customer Delivery",
+  colCustomerDelivery: "Requested Delivery Date",
   colSupplier: "Supplier",
   colQtyNeeded: "Qty Needed",
   colReadyStock: "Ready Stock",
@@ -337,7 +337,7 @@ const ACTION_COMPLETION_FACT: Record<PurchaseDemandState, string> = {
   safety_days_low: BUY_COMPLETION_FACT,
   safety_days_none: BUY_COMPLETION_FACT,
   not_enough_production_time: BUY_COMPLETION_FACT,
-  no_customer_date: "Customer Delivery exists",
+  no_customer_date: "Requested Delivery Date exists",
   no_sku: "Approved SKU exists",
   no_supplier: "Approved supplier relationship exists",
   no_production_days: "Governed supplier/category days exist",
@@ -763,44 +763,6 @@ export const purchaseDemandsResponseSchema = z.object({
 
 export type PurchaseDemandsResponse = z.infer<typeof purchaseDemandsResponseSchema>;
 
-/**
- * THE SO BATCH PURCHASE READ (Card §7.1).
- *
- * The rows plus the four facts the buying journey needs and the Register alone
- * never did: where goods may be sent, which of those is the standing default,
- * who currently holds PO Duty, who is covering it today, and whether THIS reader
- * may issue. `mayIssue` is a convenience — the API and the creation RPC both
- * refuse an unauthorised issue whatever the browser believes (Card §6; 0379).
- */
-export const soBatchPurchaseResponseSchema = z.object({
-  today: z.string(),
-  rows: z.array(purchaseDemandRowSchema),
-  destinations: z.array(
-    z.object({
-      id: z.string(),
-      name: z.string(),
-      isDefault: z.boolean(),
-      active: z.boolean(),
-    }),
-  ),
-  defaultDestinationId: z.string().nullable(),
-  /** The month's normal holder. `Team Work` groups by this person. */
-  currentPoDuty: z.object({ userId: z.string(), name: z.string() }).nullable(),
-  /**
-   * ⭐ 0379 — the dated buddy cover who may act TODAY, when one is set. It is a
-   * separate fact from the holder on purpose: the duty stays where management
-   * put it, and the audit must still say who actually pressed Issue PO.
-   */
-  actingPoDuty: z.object({ userId: z.string(), name: z.string() }).nullable(),
-  mayIssue: z.boolean(),
-  /** Who may collect from a factory, for the documents that need one. */
-  procurementPartners: z.array(z.object({ id: z.string(), name: z.string() })),
-  /**
-   * Card 02-A — the governed Safety days value (`order_by_buffer_days`), so
-   * the safety-band words follow the one setting instead of a hard-coded 14.
-   * The browser only PRINTS it; the arithmetic stays on the server.
-   */
-  safetyDays: z.number().int(),
-});
-
-export type SoBatchPurchaseResponse = z.infer<typeof soBatchPurchaseResponseSchema>;
+/* THE SO BATCH PURCHASE READ (`soBatchPurchaseResponseSchema`) moved to
+   `so-batch-purchase.ts` with Card 02-B: the response now carries the order
+   Register rows that file defines, and the import must not cycle. */

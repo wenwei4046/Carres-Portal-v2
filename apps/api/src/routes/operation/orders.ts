@@ -118,15 +118,18 @@ function mapPipelineV2Error(error: { code?: string; message?: string; details?: 
  * this function is that arithmetic, extracted from the detail route where it
  * was born (2026-08-24) so the Revisions read cannot drift from it.
  *
- * TWO SOURCES, BECAUSE ONE CANNOT SEE EVERYONE. 0235 lets an operation JWT
- * read app_users rows whose role IS 'operation' — deliberately, so staff can
- * see colleagues without reading every dealer account. But the actor on a
- * sales order is very often a SALESPERSON, whose app_users row is role
- * 'dealer' and therefore invisible there. `salespersons` carries `user_id`
- * and is readable by any internal role (0002 `salespersons_scoped_read`), so
- * it answers exactly the half app_users cannot. app_users wins where both
- * answer: it is the account; the salesperson row is the sales-side profile of
- * the same person.
+ * TWO SOURCES, BECAUSE ONE CANNOT SEE EVERYONE. The internal-staff half is
+ * `actor_display_names` (0390) — a narrow definer door returning exactly
+ * (id, name) for principal/operation/finance/bd/hr/warehouse accounts. The
+ * production walk of SO-1329 proved why a plain `app_users` read is not
+ * enough: 0235's peers policy shows an operation JWT only operation-role
+ * rows, so a PRINCIPAL actor rendered as an audit defect on the very order
+ * that recorded her. The sales-side half is `salespersons` (0002
+ * `salespersons_scoped_read`), which carries `user_id` and the salesperson's
+ * own display name. The staff door wins where both answer: it is the
+ * account; the salesperson row is the sales-side profile of the same person
+ * — and the door deliberately returns NO dealer-side rows, so that rule
+ * cannot print a shop login name over the person's own.
  *
  * BOUNDED: each distinct id is asked for once, however many events or
  * revisions it authored. FAILS OPEN: a read error or an unresolved id leaves
@@ -139,7 +142,7 @@ async function resolveActorNames(sb: any, ids: ReadonlyArray<string | null | und
   const byId = new Map<string, string>();
   if (distinct.length === 0) return byId;
   const [staffRes, sellerRes] = await Promise.all([
-    sb.from("app_users").select("id, name").in("id", distinct),
+    sb.rpc("actor_display_names", { p_ids: distinct }),
     sb.from("salespersons").select("user_id, name").in("user_id", distinct),
   ]);
   for (const r of (staffRes.data ?? []) as Array<{ id: string; name: string | null }>) {

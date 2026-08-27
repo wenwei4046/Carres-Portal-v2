@@ -584,19 +584,25 @@ SETUP TO FIX              ← the whole section renders only when its count is a
   Production time not set
 ```
 
-- Counts are uncovered SO buying lines, never documents or notifications. A zero count prints no
-  number. Rows use the governed `NavRow` active treatment; every filter toggles and clears
-  completely under the shared local-rail law.
+- Counts are UNIQUE Sales Orders with outstanding eligible buying demand (Card 02-B, owner
+  ruling 2026-08-27) — never documents, notifications or leaf lines, and never a fully Ordered
+  or fully Ready-Stock-covered order. A zero count prints no number. Rows use the governed
+  `NavRow` active treatment; every filter toggles and clears completely under the shared
+  local-rail law.
+- The DEFAULT no-filter Register shows every proceeded record, Ordered ones included.
+  `All not ordered` is a real outstanding-only filter: active, it narrows to Sales Orders with
+  outstanding eligible demand and excludes fully Ordered records; toggled off, the whole
+  permanent Register returns.
 - Every timing row remains orderable. `Can order early`, `1–13 safety days left`,
   `No safety days left` and `Not enough production time` express timing risk, never `Cannot buy`.
   Order By is a planned date, never an unlock date.
 - `Production time not set` is the only normal setup blocker on this surface. It belongs to
   Purchasing Settings, and its lines are not selectable until the Supplier × Category production
   time exists.
-- Fully covered / `Buy = 0` lines do not remain in SO Batch Purchase; they are found through
-  Purchase Orders, Stock and Order Route. After a PO is issued, its covered quantity leaves this
-  page; if the PO is cancelled and the quantity is still required, the demand returns
-  automatically.
+- Fully covered / `Buy = 0` DEMAND leaves the buying selection — it is not offered a tick, and
+  the leaf listing drops it — but the SALES ORDER'S ROW never leaves (Card 02-B). If a PO is
+  cancelled and the quantity is still required, the selectable demand returns automatically by
+  recomputation; nothing is stored.
 - A line whose customer date, SKU or supplier is unexpectedly missing fails safely at its owning
   boundary (Sales / Catalog). It is named on its own row; it never becomes a permanent Purchasing
   rail facet and is never silently defaulted.
@@ -614,8 +620,8 @@ work week and holidays. The one server planning engine owns the arithmetic — b
 no working-day arithmetic, and Safety days are subtracted exactly once:
 
 ```text
-Customer Delivery − 14 Safety days                             = Goods Must Arrive
-Goods Must Arrive − Supplier × Category production working days = Order By
+Requested Delivery Date − 14 Safety days                         = Goods Must Arrive
+Goods Must Arrive − Supplier × Category production working days  = Order By
 ```
 
 Timing classification, derived by the same engine:
@@ -624,8 +630,8 @@ Timing classification, derived by the same engine:
 today < Order By                                                   → Can order early
 today = Order By                                                   → 14 safety days left
 today > Order By · completion lands 1–13 working days early        → 1–13 safety days left
-expected production completion = Customer Delivery                 → No safety days left
-expected production completion > Customer Delivery                 → Not enough production time
+expected production completion = Requested Delivery Date            → No safety days left
+expected production completion > Requested Delivery Date            → Not enough production time
 ```
 
 `Order By` stays fixed for a demand unless an authoritative source fact changes; `Safety days
@@ -633,16 +639,49 @@ left` changes as working days pass. The Settings row reads
 `Safety days · 14 working days` with the line `Extra time allowed for delays.` — the one existing
 governed setting and engine field, never a second Safety-days field or arithmetic.
 
-**Columns:** Source SO, Required For, SKU/configuration, Required, Stock, Open PO, Buy, Supplier,
-Deliver To, Goods Must Arrive, Work.
-**Journey:** choose ready lines → group by supplier → change/split destination if exceptional →
-50/50 check grouped POs → send PDFs.
+**THE PERMANENT ORDER REGISTER — APPROVED / LOCKED, owner ruling 2026-08-27 (Card 02-B).**
+The right Register shows **one row per proceeded physical-goods Sales Order**
+(`orders.status = 'proceed_order'`; `place` is not proceeded; Service-only orders stay outside
+Purchasing), and the row never leaves when a purchase order is issued — the page is both the
+buying surface and the permanent purchasing audit register.
+
+**Columns, exactly and in this order:** Status · Proceed Date · PO No · SO No · Customer ·
+Delivery Location · Requested Delivery Date · Supplier · Deliver To · PO Delivery Date.
+`Delivery Location` sits immediately after `Customer`; `SO No` is the identity and stays sticky
+during horizontal scrolling. Retired as Register columns, never to return: `Source SO` ·
+`Required For` · `SKU / configuration` · `Required` · `Stock` · `Open PO` · `Buy` ·
+`Goods Must Arrive` · `Work` · `Action` — their FACTS survive off-screen (`goodsMustArrive`
+keeps feeding the rail and Work Engine; structured actions keep feeding central Work).
+
+- **Status is derived, never stored:** blank · `Partial` · `Ordered`, from the quantity that
+  genuinely requires purchasing (demanded minus Ready-Stock coverage) against the quantity
+  covered by a NON-CANCELLED purchase order whose CURRENT PDF version has confirmed-sent
+  evidence (`po_sends.kind = 'confirmed_sent'` at `COALESCE(purchase_orders.version, 1)`).
+  `external_open` never counts; supplier silence changes nothing; a numbered but unsent PO shows
+  under `PO No` with blank Status; a new unsent revision invalidates older-version completeness;
+  received lineage with valid evidence stays `Ordered`; a fully Ready-Stock-covered order stays
+  visible, blank and unselectable.
+- **Visible PO attribution comes ONLY from `po_line_sources`** — never `purchase_orders.so`,
+  `so_refs`, or a global SKU/supplier/customer match. `PO Delivery Date` is
+  `purchase_orders.eta_date`, the official supplier-facing date — never `expected_ready_date`,
+  never the internal `Goods Must Arrive`, never an "if ordered today" estimate.
+- **Deterministic summaries:** one value prints itself; several print `2 POs` · `2 suppliers` ·
+  `Multiple`, with the exact item-to-PO/supplier/destination/date mapping in the expansion.
+- **Selection:** the parent checkbox is ALL of the order's eligible uncovered child demand;
+  a Partial order selects only its uncovered remainder; Ordered and fully Ready-Stock rows refuse
+  the tick; part-selected children render the checkbox indeterminate; the header checkbox covers
+  visible eligible demand only. The issue contract remains the leaf `SoBatchSelection[]`.
+
+**Journey:** choose ready orders/lines → group by supplier → change/split destination if
+exceptional → 50/50 check grouped POs → send PDFs.
 **Object/placement:** the row expand is **`GoodsMiniTable`**, the ONE child table Sales Orders and
-Delivery draw (owner ruling 2026-08-15; corrected onto this page 2026-08-24). It says only what the
-ROW cannot: the parts of a matched set, which purchase order already covers them, where a split
-sends each unit, and that no Unit is minted before Issue PO. It never re-prints Required · Stock ·
-Open PO · Buy — those are columns. Batch Purchase owns no duplicate demand editor and no second
-mini-table.
+Delivery draw (owner ruling 2026-08-15; corrected onto this page 2026-08-24; widened with the
+optional `Covered by` · `Supplier` · `PO Delivery Date` columns 2026-08-27 — siblings that do not
+ask render byte-identically). It says only what the ROW cannot: per item line, what covers it
+(`Ready Stock` · the exact PO numbers · `Not ordered yet`), the Unit ID where one is allocated
+(read through the Sales Order expansion door), the exact supplier/`Deliver To`/`PO Delivery Date`
+mapping, and the arrangement editor for lines still being bought. Batch Purchase owns no
+duplicate demand editor and no second mini-table.
 **Exceptions:** cancelled/changed SO, stock becomes available, supplier missing, supplier date too
 late, price changed, split destination.
 **Connections:** Sales Orders, Stock, Delivery calendar, Catalog, PO.

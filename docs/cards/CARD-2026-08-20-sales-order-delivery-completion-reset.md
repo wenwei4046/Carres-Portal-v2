@@ -82,18 +82,18 @@ Order header instead of inventing another shell.
 ### Sales Orders Register
 
 ```
-┌────────────── 232px rail ──────────────┬──────────────────────────────────────────────────────────┐
-│ CARRES                            [◀]  │ Sales Orders                         Jump to…   🔔  ?  ⚙ │ 50
-│                                        ├──────────────────────────────────────────────────────────┤
-│  Dashboard                             │ + New Sales Order                             🔍  ⤓  ▥ │ 45
-│  Work                                  ├──────────────────────────────────────────────────────────┤
-│  Issue Tracker                         │ ▸ │ SO No │ Ordered │ Customer Delivery │ Customer │ …  │
-│                                        │───┼───────┼─────────┼───────────────────┼──────────┼────│
-│ ▾  Sales                               │ ▸ │ 1319  │ 12 Aug  │ 24 Sep            │ LIM…     │ …  │
-│    ├─▌ Sales Orders                    │ ▸ │ 1318  │ 11 Aug  │ Customer not sure  │ CARD-1   │ …  │
-│    └─  Old Orders (temporary)          ├──────────────────────────────────────────────────────────┤
-│ ▸  Purchasing                          │ 77 orders · Mattress 66 · Bedframe 36 · …                  │ 32
-│ ▸  Delivery                            └──────────────────────────────────────────────────────────┘
+┌────────────── 232px rail ──────────────┬─────────────────────────────────────────────────────────────────┐
+│ CARRES                            [◀]  │ Sales Orders                         Jump to…   🔔  ?  ⚙        │ 50
+│                                        ├─────────────────────────────────────────────────────────────────┤
+│  Dashboard                             │ + New Sales Order                             🔍  ⤓  ▥        │ 45
+│  Work                                  ├─────────────────────────────────────────────────────────────────┤
+│  Issue Tracker                         │ ▸ │ SO No │ Ordered │ Requested Delivery Date   │ Customer │ …  │
+│                                        │───┼───────┼─────────┼───────────────────────────┼──────────┼────│
+│ ▾  Sales                               │ ▸ │ 1319  │ 12 Aug  │ 24 Sep                    │ LIM…     │ …  │
+│    ├─▌ Sales Orders                    │ ▸ │ 1318  │ 11 Aug  │ Customer not sure         │ CARD-1   │ …  │
+│    └─  Old Orders (temporary)          ├─────────────────────────────────────────────────────────────────┤
+│ ▸  Purchasing                          │ 77 orders · Mattress 66 · Bedframe 36 · …                         │ 32
+│ ▸  Delivery                            └─────────────────────────────────────────────────────────────────┘
 │ ▸  Warehouse
 │ ▸  Customer Care
 │ ▸  Master Data
@@ -220,7 +220,7 @@ due rule · completion fact. The system resolves the person automatically.
 
 | Trigger / action | Governing owner rule | Person source | Completion fact |
 |---|---|---|---|
-| Ask for the customer's delivery date | Responsible salesperson | Sales ownership on the SO | Customer Delivery exists |
+| Ask for the customer's delivery date | Responsible salesperson | Sales ownership on the SO | Requested Delivery Date exists |
 | Issue PO / supplier commitment | PO Duty | monthly PO-duty roster + active cover | PO / standing supplier promise exists |
 | Check in goods | GRN Duty | governed GRN-duty roster + active cover | posted Receiving Session |
 | Assign logistics | Delivery Duty | Delivery roster + active cover | logistics partner recorded |
@@ -301,7 +301,7 @@ The Order Route still answers **why no DO yet**. This object block answers
 Keep the approved eight default columns:
 
 ```
-DO No · DO date · SO No · Customer · Customer Delivery · Delivery date · Delivery Location · Status
+DO No · DO date · SO No · Customer · Requested Delivery Date · Delivery date · Delivery Location · Status
 ```
 
 Keep: search · filters · column chooser · export · governed date formatting ·

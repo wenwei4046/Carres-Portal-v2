@@ -6052,7 +6052,7 @@ export interface DeliveryOrderRow {
     customer_name: string | null;
     customer_address_city?: string | null;
     customer_address_state?: string | null;
-    /** The SO's customer promise — the register's `Customer Delivery` column
+    /** The SO's customer promise — the register's `Requested Delivery Date` column
      *  (owner column ruling 2026-08-18). */
     delivery_date?: string | null;
     delivery_date_tbd?: boolean | null;

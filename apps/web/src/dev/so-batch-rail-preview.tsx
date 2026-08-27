@@ -25,6 +25,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   soBatchAction,
   type PurchaseDemandRow,
+  type SoBatchOrderRow,
   type SoBatchPurchaseResponse,
 } from "@carres/shared";
 import SoBatchRegister from "@/pages/operation/so-batch/SoBatchRegister";
@@ -186,9 +187,129 @@ const rows: PurchaseDemandRow[] = [
     : []),
 ];
 
+/* ── Card 02-B — the parent grain the Register draws ─────────────────────────
+ *
+ * One order row per seeded leaf order, plus the walk's own stories: a fully
+ * Ordered order across TWO documents, a numbered-but-unsent PO with blank
+ * Status, and a fully Ready-Stock-covered order that stays visible. Real
+ * repository supplier names throughout.
+ */
+const CITIES: Array<[string, string]> = [
+  ["Petaling Jaya", "Selangor"],
+  ["Klang", "Selangor"],
+  ["Kuala Lumpur", "Kuala Lumpur"],
+  ["Shah Alam", "Selangor"],
+  ["Subang Jaya", "Selangor"],
+  ["Kajang", "Selangor"],
+  ["Seremban", "Negeri Sembilan"],
+  ["Ipoh", "Perak"],
+];
+const registerRows: SoBatchOrderRow[] = rows.map((r, i) => ({
+  orderId: r.orderId,
+  so: r.so,
+  customer: r.customer,
+  /* BOB's Partly order — 2 of 3 already on a sent PO. */
+  status: r.skus.includes("PART-K") ? "partial" : "blank",
+  proceedDate: `2026-08-${String(18 + (i % 8)).padStart(2, "0")}`,
+  requestedDeliveryDate: r.customerDelivery,
+  deliveryCity: CITIES[i % CITIES.length]![0],
+  deliveryState: CITIES[i % CITIES.length]![1],
+  pos: r.poNumbers.map((poId) => ({
+    poId,
+    status: "open" as const,
+    supplierId: r.supplierId,
+    supplierName: r.supplier,
+    destinationId: KLANG,
+    etaDate: "2026-09-15",
+    sentCurrentVersion: true,
+  })),
+  lines: r.lineIds.map((lineId, j) => ({
+    orderLineId: lineId,
+    sku: r.skus[j] ?? r.skus[0] ?? r.item,
+    qty: r.skus.includes("PART-K") ? 3 : r.qtyNeeded,
+    stockTaken: 0,
+    item: r.item,
+    variant: r.variant,
+    category: r.category,
+    pos: r.poNumbers.map((poId) => ({ poId, qty: 2 })),
+  })),
+  outstandingSuppliers: r.supplier ? [r.supplier] : [],
+}));
+registerRows.push(
+  {
+    orderId: "o90",
+    so: 1450,
+    customer: "LIM KUAN YANG",
+    status: "ordered",
+    proceedDate: "2026-08-14",
+    requestedDeliveryDate: "2026-09-25",
+    deliveryCity: "Cheras",
+    deliveryState: "Kuala Lumpur",
+    pos: [
+      { poId: "PO-20260818-1042", status: "received", supplierId: "s-hooka",
+        supplierName: "Nice Future", destinationId: KLANG,
+        etaDate: "2026-09-18", sentCurrentVersion: true },
+      { poId: "PO-20260819-2210", status: "open", supplierId: "s-ohana",
+        supplierName: "Ohana", destinationId: BULOH,
+        etaDate: "2026-09-22", sentCurrentVersion: true },
+    ],
+    lines: [
+      { orderLineId: "l901", sku: "B1201S-K", qty: 1, stockTaken: 0,
+        item: "Booqit", variant: "King", category: "mattress",
+        pos: [{ poId: "PO-20260818-1042", qty: 1 }] },
+      { orderLineId: "l902", sku: "H1401S-Q", qty: 1, stockTaken: 0,
+        item: "Haven", variant: "Queen", category: "mattress",
+        pos: [{ poId: "PO-20260819-2210", qty: 1 }] },
+    ],
+    outstandingSuppliers: [],
+  },
+  {
+    orderId: "o91",
+    so: 1447,
+    customer: "NURUL AIN",
+    status: "blank",
+    proceedDate: "2026-08-25",
+    requestedDeliveryDate: "2026-10-02",
+    deliveryCity: "Puchong",
+    deliveryState: "Selangor",
+    /* Numbered this morning, PDF not yet confirmed sent — PO No shows,
+       Status stays blank. */
+    pos: [
+      { poId: "PO-20260902-3301", status: "open", supplierId: "s-hooka",
+        supplierName: "Nice Future", destinationId: KLANG,
+        etaDate: null, sentCurrentVersion: false },
+    ],
+    lines: [
+      { orderLineId: "l911", sku: "B1201S-Q", qty: 2, stockTaken: 0,
+        item: "Booqit", variant: "Queen", category: "mattress",
+        pos: [{ poId: "PO-20260902-3301", qty: 2 }] },
+    ],
+    outstandingSuppliers: [],
+  },
+  {
+    orderId: "o92",
+    so: 1444,
+    customer: "CHONG WEI",
+    status: "blank",
+    proceedDate: "2026-08-26",
+    requestedDeliveryDate: "2026-09-12",
+    deliveryCity: "Ampang",
+    deliveryState: "Selangor",
+    pos: [],
+    /* Every unit already drawn from Ready Stock — visible, blank,
+       unselectable, explained in the expansion. */
+    lines: [
+      { orderLineId: "l921", sku: "B1201S-K", qty: 1, stockTaken: 1,
+        item: "Booqit", variant: "King", category: "mattress", pos: [] },
+    ],
+    outstandingSuppliers: [],
+  },
+);
+
 const data: SoBatchPurchaseResponse = {
   today: "2026-09-02",
   rows,
+  registerRows,
   destinations: [
     { id: KLANG, name: "Carres Klang", isDefault: true, active: true },
     { id: BULOH, name: "AL Sungai Buloh", isDefault: false, active: true },

@@ -113,7 +113,7 @@ describe("DeliveryOrdersRegister", () => {
       "DO date",
       "SO No",
       "Customer",
-      "Customer Delivery",
+      "Requested Delivery Date",
       "Delivery date",
       "Delivery Location",
       "Status",
@@ -135,7 +135,7 @@ describe("DeliveryOrdersRegister", () => {
     expect(screen.getByText("SO-1322")).toBeTruthy();
     // capitalize-up only: an all-caps name survives unchanged
     expect(screen.getByText("IT WALK SLICE2 AUTO")).toBeTruthy();
-    // DO date (issued) · Customer Delivery (the SO promise) · Delivery date (the trip)
+    // DO date (issued) · Requested Delivery Date (the SO promise) · Delivery date (the trip)
     expect(screen.getAllByText(new RegExp(fmtDate("2026-08-18"))).length).toBeGreaterThan(0);
     expect(screen.getAllByText(new RegExp(fmtDate("2026-08-25"))).length).toBeGreaterThan(0);
     expect(screen.getAllByText(new RegExp(fmtDate("2026-08-20"))).length).toBeGreaterThan(0);

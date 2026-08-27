@@ -38,7 +38,7 @@
  * here, rendered from the SAME `order_entry_config` contract the POS renders
  * from (0219) and the same shared choice lists — so the two surfaces cannot
  * drift into two different forms for one record. Goods, price and
- * `Customer Delivery` are the exception, and they are the whole point: those
+ * `Requested Delivery Date` are the exception, and they are the whole point: those
  * are what the customer agreed to, so they leave through the amendment lane.
  */
 // design-standard: not-a-list-page — this is a DOCUMENT workspace. Its
@@ -2105,7 +2105,7 @@ export default function SalesOrderWorkspace() {
           <Fact label="Ordered" value={isNew ? "Today" : fmtDate(order?.placed_at ?? null)} />
           {mode === "create" ? (
             <div data-pos-field="deliveryDate">
-              <DatePicker id="so-promised" label="Customer Delivery" value={draft.delivery_date}
+              <DatePicker id="so-promised" label="Requested Delivery Date" value={draft.delivery_date}
                 hint={earliestPromise ? `Earliest ${fmtDate(earliestPromise)} — production lead` : undefined}
                 error={
                   draft.delivery_date && earliestPromise && draft.delivery_date < earliestPromise
@@ -2116,7 +2116,7 @@ export default function SalesOrderWorkspace() {
             </div>
           ) : (
             <div data-pos-field="deliveryDate">
-              <Fact label="Customer Delivery" value={
+              <Fact label="Requested Delivery Date" value={
                 promisedWord(mode, viewedRevision, order) === "No delivery date" ? (
                   <span data-attention="warning" className="inline-flex rounded-control bg-kit-amber-3 px-1.5 py-0.5 font-medium text-kit-amber-11">No delivery date</span>
                 ) : promisedWord(mode, viewedRevision, order)
@@ -2501,7 +2501,7 @@ export default function SalesOrderWorkspace() {
         ) : null}
       />
 
-      {/* The amend trio, opened from beside `Customer Delivery`. The governed
+      {/* The amend trio, opened from beside `Requested Delivery Date`. The governed
           note is the modal's DESCRIPTION — the first thing read on opening,
           rather than a footnote beside the button that commits it. */}
       {!isNew && mode === "object" && orderId && (

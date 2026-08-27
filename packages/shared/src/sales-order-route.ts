@@ -621,7 +621,7 @@ function purchaseChain(
         ownerKey: "purchasing",
         label: "Confirm ready date",
         context: {
-          detail: `${po.id} · ${units(slice.qty)} · ${destination ?? "Carres Warehouse"} · ${dated("Customer Delivery", customerDelivery) ?? "Customer Delivery date not recorded"}`,
+          detail: `${po.id} · ${units(slice.qty)} · ${destination ?? "Carres Warehouse"} · ${dated("Requested Delivery Date", customerDelivery) ?? "Requested Delivery Date not recorded"}`,
         },
       },
       door: open(po.id, poHref(po.id)),
@@ -642,7 +642,7 @@ function purchaseChain(
         ownerKey: "receiving",
         label: "Check in",
         context: {
-          detail: `${po.id} · ${units(slice.qty)} · ${destination ?? "Carres Warehouse"} · ${dated("Factory ready", po.expectedReadyDate) ?? dated("Customer Delivery", customerDelivery) ?? "Arrival date not recorded"}`,
+          detail: `${po.id} · ${units(slice.qty)} · ${destination ?? "Carres Warehouse"} · ${dated("Factory ready", po.expectedReadyDate) ?? dated("Requested Delivery Date", customerDelivery) ?? "Arrival date not recorded"}`,
         },
       },
       door: record ? open(record.recordNo, receivingHref(record.id)) : null,
@@ -669,7 +669,7 @@ function unassignedChain(
         ownerKey: "purchasing",
         label: "Issue PO",
         context: {
-          detail: `${line.label} · ${units(qty)} · ${destination ?? "Carres Warehouse"} · ${dated("Customer Delivery", customerDelivery) ?? "Customer Delivery date not recorded"}`,
+          detail: `${line.label} · ${units(qty)} · ${destination ?? "Carres Warehouse"} · ${dated("Requested Delivery Date", customerDelivery) ?? "Requested Delivery Date not recorded"}`,
         },
       },
       door: open("Purchasing", purchasingHref),
@@ -712,7 +712,7 @@ function stockDraft(
       ownerKey: "stock",
       label: "Create the Units",
       context: {
-        detail: `${line.label} · ${units(Math.max(0, line.committedQty - readyQty))} · ${destination ?? "Carres Warehouse"} · ${dated("Customer Delivery", customerDelivery) ?? "Customer Delivery date not recorded"}`,
+        detail: `${line.label} · ${units(Math.max(0, line.committedQty - readyQty))} · ${destination ?? "Carres Warehouse"} · ${dated("Requested Delivery Date", customerDelivery) ?? "Requested Delivery Date not recorded"}`,
       },
     },
     door: open("Stock", stockHref),
@@ -735,7 +735,7 @@ function logisticsDraft(input: SalesOrderRouteInput): NodeDraft {
       ownerKey: "delivery",
       label: "Assign logistics",
       context: {
-        detail: dated("Customer Delivery", input.order.deliveryDate) ?? "Customer Delivery date not recorded",
+        detail: dated("Requested Delivery Date", input.order.deliveryDate) ?? "Requested Delivery Date not recorded",
       },
     },
     door: open("Delivery", deliveryHref(input.order.id)),
@@ -757,7 +757,7 @@ function deliveryDateDraft(input: SalesOrderRouteInput): NodeDraft {
       ownerKey: "sales",
       label: "Confirm delivery date",
       context: {
-        detail: dated("Customer Delivery", input.order.deliveryDate) ?? "Customer Delivery date not recorded",
+        detail: dated("Requested Delivery Date", input.order.deliveryDate) ?? "Requested Delivery Date not recorded",
       },
     },
     door: open("Delivery", deliveryHref(input.order.id)),
@@ -778,7 +778,7 @@ function moneyDraft(input: SalesOrderRouteInput): NodeDraft {
     ownerKey: "payment",
     label: "Collect",
     context: {
-      detail: dated("Collect before Customer Delivery", input.order.deliveryDate) ?? "Collection date not recorded",
+      detail: dated("Collect before Requested Delivery Date", input.order.deliveryDate) ?? "Collection date not recorded",
     },
   };
   if (!input.money.known) {

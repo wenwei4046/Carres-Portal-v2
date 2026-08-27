@@ -323,7 +323,7 @@ Apply the governed Register Template:
 - `To collect` and `All` scopes.
 - Useful facts: collection due/late, goods ready/waiting/late, money state, region and PIC.
 - Core columns: Customer · Order · Current Action · Outstanding · Collection Due · Promise to Pay ·
-  Goods · Customer Delivery · Last Contact.
+  Goods · Requested Delivery Date · Last Contact.
 - Footer: visible count, exact outstanding total and separate `No price yet` count.
 - Expansion/detail: obligation breakdown, timeline, documents, contact brief and one posting form.
 

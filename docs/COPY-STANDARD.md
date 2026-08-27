@@ -634,11 +634,13 @@ sidebar page. Existing implementation constants do not override these approved p
 | Page | No page — use `SO Batch Purchase` or the source object |
 | Search | `Search Sales Order, customer, SKU or supplier…` |
 | Rail headings | `TO ORDER` · `ORDER TIMING` · `SETUP TO FIX` |
-| Empty state | `Nothing needs buying.` |
-| Columns | `Item · Description` · `Variant` · `Category` · `SKU` · `SO No` · `Customer` · `Customer Delivery` · `Supplier` · `Qty Needed` · `Ready Stock` · `On PO` · `To Buy` · `Coverage` |
+| Empty state | `No proceeded Sales Orders.` |
+| Register columns (Card 02-B, 2026-08-27 — exactly, in this order) | `Status` · `Proceed Date` · `PO No` · `SO No` · `Customer` · `Delivery Location` · `Requested Delivery Date` · `Supplier` · `Deliver To` · `PO Delivery Date` |
+| The Status words | blank · `Partial` · `Ordered` — and nothing else. Never `Ready Stock` · `Ready to buy` · `Cannot buy` · `No buying needed` · `Posted` · `Sent` · `Not sent` · `Covered` |
+| A parent cell over several values | one value prints itself; several print `2 POs` · `2 suppliers` · `Multiple` — the exact mapping lives in the expansion |
 
-**The rail — owner correction 2026-08-26.** Three headings, and there is no fourth. `SETUP TO FIX`
-renders only when its count is above zero:
+**The rail — owner correction 2026-08-26; counting corrected 2026-08-27 (Card 02-B).** Three
+headings, and there is no fourth. `SETUP TO FIX` renders only when its count is above zero:
 
 | Heading | Rail rows |
 |---|---|
@@ -646,11 +648,14 @@ renders only when its count is above zero:
 | `ORDER TIMING` | `Can order early` · `14 safety days left` · `1–13 safety days left` · `No safety days left` · `Not enough production time` |
 | `SETUP TO FIX` | `Production time not set` |
 
-Counts are uncovered SO buying lines, never documents or notifications; a zero count prints no
-number. Every `ORDER TIMING` row stays orderable — the words say timing risk, never `Cannot buy`,
+Counts are UNIQUE Sales Orders with outstanding eligible buying demand, never documents,
+notifications or leaf lines — a fully Ordered or fully Ready-Stock-covered order is never counted
+as not ordered; a zero count prints no number. The default no-filter Register shows every
+proceeded record; `All not ordered` is a real outstanding-only filter that excludes fully Ordered
+records. Every `ORDER TIMING` row stays orderable — the words say timing risk, never `Cannot buy`,
 and Order By is a planned date, never an unlock date. `Production time not set` lines are not
-selectable until the Supplier × Category production time exists. Fully covered / `Buy = 0` lines
-do not appear on this page at all.
+selectable until the Supplier × Category production time exists. Fully covered / `Buy = 0` DEMAND
+is never selectable, but the Sales Order's own row is permanent and never leaves the Register.
 
 **The row facts.** Line 1 is the FACT; line 2 is the FIX, in the imperative. A line the owning
 boundary (Sales / Catalog) unexpectedly let through without its customer date, SKU or supplier is
@@ -658,7 +663,7 @@ NAMED on its own row — it is never silently defaulted and never a rail facet:
 
 | Fact (line 1) | Fix (line 2) |
 |---|---|
-| `Customer delivery date is missing` | `Ask customer for a delivery date` |
+| `Requested delivery date is missing` | `Ask the customer which date they want` |
 | `SKU not found` | `Add this item to the SKU catalog` |
 | `Supplier not assigned` | `Check the supplier for {model}` |
 | `Production days are missing` | `Add production days for {supplier} · {category}` |
@@ -1266,6 +1271,7 @@ it is in the wrong element.
 
 `Chase` · `POD` / `Proof of Delivery` · `Unscheduled` · `Not booked` · `need booking` ·
 `Pending` · `Processing` · `In Progress` · `At Risk` · `Attention` ·
+`Customer Delivery` · `Deliver By` · `Promised Delivery` · `Customer 1st Requested Delivery` **as a name for the customer date** (retired 2026-08-27 — the word is `Requested Delivery Date`) ·
 `Inventory` · `Movements` · `Recovery` **in the delay sense** (staff say "this order going to
 delay" — the word on screen is `Delay planning`)
 
@@ -1348,7 +1354,10 @@ Information Architecture and live in [`ERP-ARCHITECTURE.md`](ERP-ARCHITECTURE.md
 | An SO edit because the RECORD was wrong — the customer's agreement never changed | **Staff correction** | Amendment · Fix · Data fix · Edit (as a cause word) — the two cause words come from the SO V2 Card 1 spec (owner, 2026-08-11) and are the structured `change_type` on every contractual revision |
 | An SO edit because the CUSTOMER asked for something different | **Customer change** | Amendment · Change request (that is the pending ASK, not the applied change) · Revision (that is the record it mints) |
 | A fulfilment-side substitution/recovery that does not create a new customer transaction | **Fulfilment replacement** | Customer change · Staff correction · Cancel and reorder |
-| Register date promised/requested for the customer | **Customer Delivery** | Promised · Delivery date (as this register header) · Current |
+| The date the customer is asking Carres to deliver on | **`Requested Delivery Date`** | **`Customer Delivery`** · **`Deliver By`** · **`Promised Delivery`** · **`Customer 1st Requested Delivery`** — all four RETIRED 2026-08-27 and banned from reuse · `Delivery Window` (that word belongs to Delivery) · `Promised` · `Current` |
+| The delivery day Logistics and the customer agreed | **`Confirmed Delivery`** | Logistic delivery date · Final delivery date · Deliver by · Booked date — Delivery owns this word and this ruling does not rename it |
+| The time range Logistics and the customer agreed | **`Confirmed Time`** | Slot · Time window · Delivery window (that is the half-day/full-day fact) |
+| The goods actually reached the customer | **`Delivered`** | Completed · Closed · Done |
 | Register column of what the customer still owes | **Outstanding** | Balance — re-ruled 2026-08-15; `balance` is the goods word, two rows above |
 | Register column naming the selling showroom | **Showroom** | Outlet · Branch · Store |
 | Register destination summary | **Delivery Location** | Address · Location (ambiguous) · Ship-to |
@@ -1421,7 +1430,7 @@ rewording.
 
 Two rules refuse an order at entry, and each refusal names what is wrong and exactly how to fix it
 (the Error pattern above). **`(TBD)`, `Confirm later` and `For Further Notice` are RETIRED** — a
-new Sales Order always carries a real Customer Delivery date.
+new Sales Order always carries a real `Requested Delivery Date`.
 
 | Meaning | Use exactly | Do NOT use |
 |---|---|---|

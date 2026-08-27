@@ -64,7 +64,7 @@ export const PO_WORK_STATE_LABEL: Record<PoWorkState, string> = {
  */
 export const PO_STATE_ACTION_WORD = {
   // `Goods Arrival`, never `Goods Arriving At` (Jess, 2026-08-03): `At` adds
-  // no information, and the column beside it is `Customer Delivery` — the two
+  // no information, and the column beside it is `Requested Delivery Date` — the two
   // dates are the same kind of fact and now read as a pair. It is also the
   // word `ORDERS-WORKING-FLOW.md` already uses (`Waiting Goods Arrival`), so
   // Purchasing stops speaking its own dialect.
@@ -114,7 +114,7 @@ export const PO_DELAY_REASONS = [
  * How the goods' arrival stands against what we promised the CUSTOMER
  * (Jess, 2026-08-03).
  *
- * The register put `Customer Delivery` and `Goods Arrival` side by side and
+ * The register put `Requested Delivery Date` and `Goods Arrival` side by side and
  * left the subtraction to the operator's head. Measured on the live 19 POs:
  * EIGHT were already landing after the customer's date, two on the very day,
  * and the page said nothing — and most of those arrival dates are still our

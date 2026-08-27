@@ -52,7 +52,7 @@ export default function SalesOrderAmendDeliveryDate({
   /** The order's open amendment, if any — this block yields to it. */
   liveAmendment: SalesOrderAmendment | null;
   /** ⭐ Called after a proposal is recorded (YH, 2026-08-27). The three fields
-   *  live in a MODAL now, opened from beside `Customer Delivery`, and a modal
+   *  live in a MODAL now, opened from beside `Requested Delivery Date`, and a modal
    *  that stays open over a form it has already submitted reads as a failure.
    *  Optional, so the component still stands alone. */
   onDone?: () => void;

@@ -30,7 +30,7 @@ import { conciseLocality } from "./sales-order-columns";
  * A register finds documents. It shows NO owner, NO avatar and NO action
  * sentence — work lives in My Work / Team Work. The columns are the owner's
  * ruled eight (2026-08-18): DO No · DO date · SO No · Customer ·
- * Customer Delivery · Delivery date · Delivery Location · Status — with
+ * Requested Delivery Date · Delivery date · Delivery Location · Status — with
  * `Created` and the rest available in the chooser, off by default. DO No and
  * SO No are mono links (DO No opens the document, SO No the source order).
  * Status is the ONE shared arithmetic (`deliveryOrderStatusOf`) over the void
@@ -211,11 +211,11 @@ export default function DeliveryOrdersRegister() {
         filterValue: (r) => r.customer,
       },
       {
-        /* `Customer Delivery` = the date promised to the customer, from the
+        /* `Requested Delivery Date` = the date promised to the customer, from the
            SO — the same fact and label as the Sales Orders register. */
         key: "customer_delivery",
-        label: "Customer Delivery",
-        width: 148,
+        label: "Requested Delivery Date",
+        width: 192,
         sortable: true,
         chooserGroup: "Dates",
         filterType: "date",
