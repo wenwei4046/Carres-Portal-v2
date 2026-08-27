@@ -80,6 +80,7 @@ import { getCities, getPostcodes, MY_STATES } from "@/data/malaysia-postcodes";
 import EmptyState from "@/components/kit/EmptyState";
 import Input from "@/components/kit/Input";
 import Loading from "@/components/kit/Loading";
+import Modal from "@/components/kit/Modal";
 import Select from "@/components/kit/Select";
 import Money from "@/components/Money";
 import { apiFetch, ApiError } from "@/lib/api";
@@ -946,6 +947,7 @@ export default function SalesOrderWorkspace() {
   /* Bumped by `More actions → Propose a change to the customer`. A counter, not
      a boolean, so the menu item still works after the modal was cancelled. */
   const [amendSignal, setAmendSignal] = useState(0);
+  const [amendDateOpen, setAmendDateOpen] = useState(false);
   const [objectView, setObjectView] = useState<ObjectView>(showRoute ? "Order Route" : "Order");
 
   /* ⛔ `?edit=1` IS RETIRED — owner ruling 2026-08-15. A bookmark, a browser
@@ -1846,12 +1848,11 @@ export default function SalesOrderWorkspace() {
       mode === "create"
         ? draft.lines.reduce((n, l) => n + l.qty, 0)
         : (detailQ.data?.lines ?? []).reduce((n, l) => n + l.qty, 0);
-    /* `null` = the salesperson named no count, which MEANS every item
-       (0104's column comment). A keyed count is clamped to what exists. */
-    const items =
-      draft.delivery_stair_items == null
-        ? itemsTotal
-        : Math.max(0, Math.min(itemsTotal, draft.delivery_stair_items));
+    /* ⭐ UNSET MEANS NONE — owner ruling 2026-08-27 (YH). It used to mean
+       EVERY item (0104's column comment), so an order nobody was asked about
+       carried the maximum fee. The same rule now runs in `order-totals.ts` and
+       in the POS panel, so all three agree. */
+    const items = Math.max(0, Math.min(itemsTotal, draft.delivery_stair_items ?? 0));
     const floors = Math.max(0, draft.delivery_floor - cfg.freeUpToFloor);
     return {
       cfg,
@@ -1929,7 +1930,11 @@ export default function SalesOrderWorkspace() {
           ) : undefined
         }
       >
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {/* ⭐ THREE ACROSS (YH, 2026-08-27) — the six identity fields were two
+            per row, which made the card six rows tall for facts that are one
+            line each. At three they land as exactly two rows: who they are,
+            then who they are demographically. */}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <div data-pos-field="name">
             <Input id="so-name" label="Full name" required value={draft.customer_name}
               onChange={(e) => setField("customer_name", e.target.value)} />
@@ -1975,7 +1980,11 @@ export default function SalesOrderWorkspace() {
             simply stopped being a separate card two sections away from the
             customer it belongs to. */}
         <SubHead>Delivery address</SubHead>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2" data-pos-field="address">
+        {/* ⭐ FOUR TRACKS (YH, 2026-08-27). The two address lines take two
+            tracks each, so they still read as full-width pairs — and STATE ·
+            CITY · POSTCODE · BUILDING TYPE then land on ONE row instead of
+            two-and-a-bit. Same fields, same cascade, three rows fewer. */}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-4" data-pos-field="address">
           {/* ⭐ THE ESCAPE HATCH ONLY APPEARS WHEN IT IS NEEDED (YH,
               2026-08-26). `Address not given yet` is the answer to a MISSING
               address; on an order that already carries one it is a permanent
@@ -1985,18 +1994,22 @@ export default function SalesOrderWorkspace() {
               read. The FIELD is untouched: `customer_address_unknown` still
               round-trips, and the POS still asks the same question. */}
           {(addressIsBlank || draft.customer_address_unknown) && (
-            <div className="sm:col-span-2">
+            <div className="sm:col-span-4">
               <Checkbox id="so-address-unknown" label="Address not given yet"
                 checked={draft.customer_address_unknown}
                 onCheckedChange={(v) => setField("customer_address_unknown", v)} />
             </div>
           )}
-          <Input id="so-line1" label="Address line 1" value={draft.customer_address_line1}
-            disabled={draft.customer_address_unknown}
-            onChange={(e) => setField("customer_address_line1", e.target.value)} />
-          <Input id="so-line2" label="Address line 2" value={draft.customer_address_line2}
-            disabled={draft.customer_address_unknown}
-            onChange={(e) => setField("customer_address_line2", e.target.value)} />
+          <div className="sm:col-span-2">
+            <Input id="so-line1" label="Address line 1" value={draft.customer_address_line1}
+              disabled={draft.customer_address_unknown}
+              onChange={(e) => setField("customer_address_line1", e.target.value)} />
+          </div>
+          <div className="sm:col-span-2">
+            <Input id="so-line2" label="Address line 2" value={draft.customer_address_line2}
+              disabled={draft.customer_address_unknown}
+              onChange={(e) => setField("customer_address_line2", e.target.value)} />
+          </div>
           {/* THE MALAYSIA CASCADE — state picks city picks postcode, the same
               three questions in the same order the POS asks them.
               (`@/data/malaysia-postcodes`, one dataset, no second copy.)
@@ -2048,14 +2061,14 @@ export default function SalesOrderWorkspace() {
             onValueChange={(v) => setField("building_type", v)}
             options={BUILDING_TYPE_OPTIONS.map((b) => ({ value: b, label: b }))} />
         </div>
-        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2" data-pos-field="billing">
-          <div className="sm:col-span-2">
+        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-4" data-pos-field="billing">
+          <div className="sm:col-span-4">
             <Checkbox id="so-billing-same" label="Billing address same as delivery"
               checked={draft.customer_billing_same}
               onCheckedChange={(v) => setField("customer_billing_same", v)} />
           </div>
           {!draft.customer_billing_same && (
-            <div className="sm:col-span-2">
+            <div className="sm:col-span-4">
               <Input id="so-billing" label="Billing address" value={draft.customer_billing}
                 onChange={(e) => setField("customer_billing", e.target.value)} />
             </div>
@@ -2177,6 +2190,32 @@ export default function SalesOrderWorkspace() {
                   <span data-attention="warning" className="inline-flex rounded-control bg-kit-amber-3 px-1.5 py-0.5 font-medium text-kit-amber-11">No delivery date</span>
                 ) : promisedWord(mode, viewedRevision, order)
               } />
+              {/* ⭐ THE DOOR SITS BESIDE THE DATE IT MOVES (YH, 2026-08-27).
+                  The three amend fields were a whole section — first a card,
+                  then a merged subsection — standing open on every order for an
+                  act that happens rarely. They are a MODAL now, opened from the
+                  fact they change, which is where somebody looking at a wrong
+                  date already has their eye.
+                  A LIVE proposal is truth and is NOT hidden behind the modal:
+                  it prints here, under the date it is waiting to move. */}
+              {!isNew && mode === "object" && orderId && (
+                liveAmendment ? (
+                  <p className="mt-1 text-meta text-base-600" data-testid="amend-date-waiting">
+                    {liveAmendment.stale
+                      ? "A proposal on this order is out of date."
+                      : "A proposal is waiting for management."}
+                  </p>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setAmendDateOpen(true)}
+                    data-testid="amend-date-open"
+                    className="mt-1 text-meta font-medium text-kit-blue-11 underline-offset-2 hover:underline"
+                  >
+                    Amend delivery date
+                  </button>
+                )
+              )}
             </div>
           )}
           {/* ⭐ PROCEED DATE IS READ-ONLY ONCE THE ORDER EXISTS (Jess,
@@ -2245,12 +2284,8 @@ export default function SalesOrderWorkspace() {
               until somebody types: this shows the derived default, it never
               writes one. */}
           <Input id="so-stair-items" label="Items needing stair carry" type="number" min={0}
-            hint={draft.delivery_stair_items == null ? "Every item, unless you say otherwise" : undefined}
-            value={
-              draft.delivery_stair_items == null
-                ? String(stair?.itemsTotal ?? 0)
-                : String(draft.delivery_stair_items)
-            }
+            hint={stair ? `0 to ${stair.itemsTotal}` : undefined}
+            value={String(draft.delivery_stair_items ?? 0)}
             onChange={(e) =>
               setField(
                 "delivery_stair_items",
@@ -2371,24 +2406,7 @@ export default function SalesOrderWorkspace() {
             )}
           </>
         )}
-        {/* ⭐ Merged from the retired `Amend delivery date` card (YH,
-            2026-08-27). The dates this order runs on and the governed way
-            to move the promised one are one subject, and they were two
-            cards. The three fields and their machinery are untouched —
-            `creates a Revision · needs approval` is governed copy and now
-            rides the subsection heading. A LIVE amendment is still real
-            news, but nothing hides it any more: the section is always on
-            screen, which is what the fold's `forceOpen` was for. */}
-        {!isNew && mode === "object" && orderId && (
-          <div className="mt-4 border-t border-kit-slate-5 pt-3">
-            <SubHead note="creates a Revision · needs approval">Amend delivery date</SubHead>
-            <SalesOrderAmendDeliveryDate
-              orderId={orderId}
-              currentDeliveryDate={order?.delivery_date ?? null}
-              liveAmendment={liveAmendment}
-            />
-          </div>
-        )}
+
       </Block>
 
 
@@ -2551,6 +2569,25 @@ export default function SalesOrderWorkspace() {
           </nav>
         ) : null}
       />
+
+      {/* The amend trio, opened from beside `Customer Delivery`. The governed
+          note is the modal's DESCRIPTION — the first thing read on opening,
+          rather than a footnote beside the button that commits it. */}
+      {!isNew && mode === "object" && orderId && (
+        <Modal
+          open={amendDateOpen}
+          onOpenChange={setAmendDateOpen}
+          title="Amend delivery date"
+          description="creates a Revision · needs approval"
+        >
+          <SalesOrderAmendDeliveryDate
+            orderId={orderId}
+            currentDeliveryDate={order?.delivery_date ?? null}
+            liveAmendment={liveAmendment}
+            onDone={() => setAmendDateOpen(false)}
+          />
+        </Modal>
+      )}
 
       {order && (
         <CancelSalesOrderDialog

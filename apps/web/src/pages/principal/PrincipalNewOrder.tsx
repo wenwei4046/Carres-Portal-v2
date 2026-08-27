@@ -690,11 +690,13 @@ export default function PrincipalNewOrder() {
                 Lift access
               </label>
             </Field>
-            <Field label="Stair items" hint="Empty = all items">
+            {/* Unset is NONE since 2026-08-27, so the hint no longer promises
+                "all items" and the box carries the 0 it means. */}
+            <Field label="Stair items">
               <input
                 type="number"
                 min={0}
-                value={draft.delivery.stairItems ?? ""}
+                value={draft.delivery.stairItems ?? 0}
                 onChange={(e) =>
                   setDelivery({
                     stairItems:

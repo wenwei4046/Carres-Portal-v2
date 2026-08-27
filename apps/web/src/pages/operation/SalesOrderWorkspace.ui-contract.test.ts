@@ -237,20 +237,37 @@ describe("Sales Order object template contract", () => {
       "Goods",
       "What this change started elsewhere",
     ]);
-    /* Both merged sections survive as named subsections… */
+    /* `Emergency contact` survives as a named subsection of CUSTOMER… */
     expect(workspace).toContain("<SubHead>Emergency contact</SubHead>");
-    expect(workspace).toContain(
-      '<SubHead note="creates a Revision · needs approval">Amend delivery date</SubHead>',
-    );
-    /* …and neither is a card any more. */
     expect(workspace).not.toContain('title="Emergency contact"');
-    expect(workspace).not.toContain('title="Amend delivery date"');
-    /* The fields and the machinery came across untouched. */
     expect(workspace).toContain("so-emergency-name");
-    expect(workspace).toContain("<SalesOrderAmendDeliveryDate");
-    /* The gate on the emergency section is still the 0219 config, not a
-       hardcoded always-on. */
+    /* …and it is still gated on the 0219 config, not hardcoded on. */
     expect(workspace).toContain("{emergencyEnabled && (");
+  });
+
+  /* ⭐ THE AMEND TRIO IS A MODAL, OPENED FROM THE DATE IT MOVES — YH,
+     2026-08-27. It has now been a card, then a merged subsection, and neither
+     earned standing space: three fields open on every order for an act that
+     happens rarely.
+
+     Two things this pins beyond the move. The governed note travelled to the
+     modal's DESCRIPTION rather than being dropped — it is read on opening now,
+     not as a footnote beside the button that commits it. And a LIVE proposal
+     is NOT behind the modal: a pending amendment is truth, so it prints beside
+     the date it is waiting to move, where somebody reading that date sees it. */
+  it("opens the amend trio from beside Customer Delivery, and never hides a live one", () => {
+    expect(workspace).toContain('data-testid="amend-date-open"');
+    expect(workspace).toContain("setAmendDateOpen(true)");
+    expect(workspace).toContain('title="Amend delivery date"');
+    expect(workspace).toContain('description="creates a Revision · needs approval"');
+    expect(workspace).toContain("<SalesOrderAmendDeliveryDate");
+    /* The modal closes itself once the proposal is recorded. */
+    expect(workspace).toContain("onDone={() => setAmendDateOpen(false)}");
+    expect(amendDate).toContain("onDone?.()");
+    /* A pending proposal is stated in the CARD, not behind the door. */
+    expect(workspace).toContain('data-testid="amend-date-waiting"');
+    /* And no standing section survives on the card. */
+    expect(workspace).not.toContain("<SubHead>Amend delivery date</SubHead>");
   });
 
   /* ⭐ THE STANDING FACT SITS BESIDE THE CARD'S NAME (Jess, 2026-08-26) —

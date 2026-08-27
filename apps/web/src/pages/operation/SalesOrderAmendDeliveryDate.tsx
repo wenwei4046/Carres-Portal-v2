@@ -45,11 +45,17 @@ export default function SalesOrderAmendDeliveryDate({
   orderId,
   currentDeliveryDate,
   liveAmendment,
+  onDone,
 }: {
   orderId: string;
   currentDeliveryDate: string | null;
   /** The order's open amendment, if any — this block yields to it. */
   liveAmendment: SalesOrderAmendment | null;
+  /** ⭐ Called after a proposal is recorded (YH, 2026-08-27). The three fields
+   *  live in a MODAL now, opened from beside `Customer Delivery`, and a modal
+   *  that stays open over a form it has already submitted reads as a failure.
+   *  Optional, so the component still stands alone. */
+  onDone?: () => void;
 }) {
   const [askedOn, setAskedOn] = useState<string | null>(null);
   const [newDate, setNewDate] = useState<string | null>(null);
@@ -61,6 +67,7 @@ export default function SalesOrderAmendDeliveryDate({
       setAskedOn(null);
       setNewDate(null);
       setReason("");
+      onDone?.();
     },
     onError: (e) => toast.error(e.message),
   });
@@ -108,8 +115,10 @@ export default function SalesOrderAmendDeliveryDate({
         value={reason}
         onChange={(e) => setReason(e.target.value)}
       />
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-meta text-base-600">creates a Revision · needs approval</p>
+      {/* The `creates a Revision · needs approval` line moved to the modal's
+          description (YH, 2026-08-27) — it is the first thing read on opening,
+          rather than a footnote beside the button that commits it. */}
+      <div className="flex flex-wrap items-center justify-end gap-2">
         <Button
           size="sm"
           variant="neutral"

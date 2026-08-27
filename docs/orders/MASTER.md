@@ -273,9 +273,17 @@ explanation came off once the fields they explained stopped being editable:
   fields directly above it.
 - `Floor` carries its own ceiling — **`Floor (Max is 3rd Floor)`** — instead of a hint underneath
   that read as advice rather than as the limit the input enforces.
-- `Items needing stair carry` states its blank in the cell: an untouched field reads **`All {n}
-  items`**. The rule `Empty = every item` no longer has to be held in the reader's head. The wire
-  value is unchanged — NULL still means every item (0104).
+- `Items needing stair carry` carries a number, never a blank.
+
+**⭐ AN UNSET STAIR-CARRY COUNT CHARGES NOTHING — OWNER RULING 2026-08-27 (YH), A PRICING DECISION.**
+It used to mean EVERY item: an order where nobody was asked how many pieces needed carrying was
+charged the maximum stair fee. It now means NONE — somebody says how many before the customer is
+charged. Applied in `order-totals.ts` (`floorSurcharge` + `draftTotals`), the POS panel and the
+object page **together**, so a quote and an order can never disagree about the money.
+🟡 Any order whose count was never set now computes RM 0 stair carry where it previously computed a
+full one. That is the ruling, not a side effect.
+⛔ Migration `0104`'s column comment still reads *NULL = auto = every item*. A committed migration
+may not be edited (red line 6) — **this section is the current meaning.**
 - **`Address not given yet` appears only while there is no address**, or while it is already
   ticked. On an order that carries one, a permanent tickbox whose only power is to discard it is a
   hazard, not a field.
