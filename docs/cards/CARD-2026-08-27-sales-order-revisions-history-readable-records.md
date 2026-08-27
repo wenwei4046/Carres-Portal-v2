@@ -2,7 +2,9 @@
 
 **Module:** Sales Orders · **Object views:** Revisions + History
 **Owner authority:** `docs/orders/MASTER.md` + `docs/ui/MASTER.md` — owner-approved / locked 2026-08-27
-**Status:** QUEUED — owner approved implementation handoff 2026-08-27
+**Status:** EXECUTED · SHIPPED — implementation merged as `d14614a3` and verified on the
+authenticated production UI, 2026-08-27. **NOT YET `PRODUCTION-VERIFIED`:** §9's five-second staff
+walk and the true ~920px viewport reading are still owed — see §11.
 **Lane:** BUILD / DELIVERY
 **Base:** `origin/main` at `375d8c8a5143730f315233d52e0397ce04531a45`, plus the approved Blueprint commit `b8046992`
 
@@ -397,21 +399,124 @@ system, a second revision engine or a new overall order status.
 
 ## 11 · Completion record
 
-The build agent updates this section only after delivery:
-
 ```text
-Implementation commit:
-PR:
-CI:
-Deployment run:
-Production SHA:
-Migration 0387 verification:
-Authenticated orders used:
-1440px acceptance:
-~920px acceptance:
-Five-second staff walk:
-Defects opened:
+Implementation commit:      6a99cf55df911e6a74f7792122235965fd2fccce
+PR:                         #931 — https://github.com/wenwei4046/Carres-Portal-v2/pull/931
+CI:                         run 33040824230, verify SUCCESS on 6a99cf55
+Merge SHA:                  d14614a3aa5bd2825898d3e17e19ece464050395
+Deployment run:             33041528057, Deploy production SUCCESS on d14614a3
+Production SHA:             d14614a3 on all five canonical surfaces
+Migration 0387 verification: proved by behaviour on SO-1329 (see below)
+Authenticated orders used:  SO-1329 (post-0387) · SO-1327 (pre-0387) · SO-1318 (6 revisions)
+1440px acceptance:          PASS, measured at a 1475px viewport
+~920px acceptance:          PROXY PASS — true viewport reading OWED
+Five-second staff walk:     OWED — needs a human reader
+Defects opened:             one 🟡, out of this Card's boundary (see below)
 ```
 
-Only after all required evidence is present may `Status` change from `QUEUED` to
-`EXECUTED · SHIPPED · PRODUCTION-VERIFIED`.
+## 11.1 · Repository gates, re-run on the merged SHA
+
+Run on `d14614a3` before this record was written — not quoted from the CI log:
+
+```text
+ci:migrations   402 migration filenames validated, 0 migration changes
+typecheck       packages/shared · apps/api · apps/web — all clean
+lint            exit 0 (design guard Stage 1, warn-only)
+tests           apps/web 3494 · apps/api 2486 · packages/shared 2686 = 8666 passing
+                focused: SalesOrderLedger 34 · SalesOrderWorkspace.ui-contract 42 · orders API 105
+build           apps/web production build clean; deploy proof stamped
+```
+
+## 11.2 · What the authenticated production UI proved
+
+`erp.carresofficial.com`, signed in, computed styles read from the live DOM.
+
+**SO-1329 — a human order created after 0387.** History renders the three ranks as separate
+elements, never one sentence:
+
+```text
+Order created                                     text-body   13px  weight 600
+principal · Principal · Thu, 27 Aug 12:30         text-meta   12px  weight 400
+No deposit · Online order                         text-label  11px  weight 400
+```
+
+The stored `0% deposit · online` reaches the reader as `No deposit · Online order`. The actor
+resolved to a recorded account name rather than the retired unknown-user copy, which is the proof
+0387's trigger stamped `by_user_id` on this order — the acceptance the Card demanded, and the
+reason SO-1327's screenshot was refused as evidence. Revisions on the same order:
+
+```text
+Original order
+Rev 1 · Current
+Recorded by principal · Thu, 27 Aug 12:30
+```
+
+**SO-1327 — the exact record §2 cited as the defect.** `Unknown user · Principal · Order created ·
+0% deposit · online` on one line has become:
+
+```text
+Order created
+Actor was not recorded · Principal · Mon, 24 Aug 11:16
+No deposit · Online order
+```
+
+The order predates 0387, so no actor was ever captured. The screen states that as the audit-data
+defect it is and invents nobody — §4's required behaviour.
+
+**SO-1318 — six revisions, a resolved human, and the version door.** Rev 1 reads `Original order`;
+later versions carry the governed change words `Staff correction` and `Customer change`, never the
+enum. The current version says `Rev 6 · Current` in text; older ones say `Rev n`. Each record is
+ONE `<button>` inside `<li>` inside a `divide-y` list — the duplicate chip row is gone, no nested
+cards. Keyboard focus lands on the record, the existing focus-ring token is on it, and Enter opens
+`Viewing Rev 4 · read-only` with a `Back to current` door. The complete historical version renders
+from that snapshot, and `Propose this version again` survives on non-current versions.
+
+Name resolution demonstrably works: SO-1318's actor resolves to `E2E Test · operation`, which is
+the literal `app_users.name` written by `scripts/seed-test-users.ts:129`. The API reads the name;
+it never appends a role.
+
+**Absent from every screen read:** `Unknown user` · `0% deposit` · bare `online`.
+
+## 11.3 · The ~920px reading is a proxy, and here is exactly why
+
+`SalesOrderLedger.tsx` contains no breakpoint class, and its panel is a plain
+`mx-auto max-w-5xl` — nothing between 920px and 1475px changes the record's layout. Narrowing that
+panel to 676px (the width it takes at a ~920px viewport) kept the three ranks vertically stacked at
+13/12/11, wrapped inside the record, with no clipped element and no page horizontal scroll.
+
+**That is a container measurement, not a viewport measurement, and it is recorded as one.** The
+signed-in Chrome window was maximised; the extension cannot shrink a maximised window and its page
+zoom is unavailable, so a true ~920px viewport could not be reached from this session. Re-read it
+at a real 920px window before this line is upgraded.
+
+## 11.4 · Defect found during acceptance — NOT fixed here, and that is deliberate
+
+🟡 **An old revision opens with typable fields.** `SalesOrderWorkspace.tsx:1130` states the intent —
+*"the same fields render, filled from THAT snapshot and locked"* — but on production the ten
+customer/address/floor inputs report `readOnly = false` and `disabled = false` while the banner says
+`Viewing Rev 3 · read-only`. No writer exists in that view (no Save, Edit or Amend control), so
+nothing can be persisted and no data is at risk; the hazard is that an operator can type into a
+photograph and believe they changed it.
+
+It is **not this Card's defect**: `SalesOrderWorkspace.tsx` is untouched by `6a99cf55`, and §10
+forbids this Card from changing Order page editing law. It needs its own Card.
+
+## 11.5 · Two observations that are data, not code
+
+- **`app_users.name` is answering with account labels.** `principal` and `E2E Test · operation` are
+  what the identity table stores, so the resolver returns them correctly — but §9's *"Who did it?"*
+  is answered by a label that reads like a role. The repair belongs to People/HR master data, and
+  `CLAUDE.md` §6 forbids a backfill card for today's test rows. Real names will arrive with real
+  accounts at go-live.
+- **Migration `0387`'s own comment is now stale.** It says a null actor means *"the page says
+  `Unknown user` … that is the honest answer and it stays the answer."* The 2026-08-27 ruling
+  retired that copy in favour of `Actor was not recorded`. Red line 6 forbids editing a committed
+  migration, so this section is the current meaning — the same precedent `orders/MASTER.md` set for
+  migration `0104`'s stair-carry comment.
+
+## 11.6 · What is still owed before `PRODUCTION-VERIFIED`
+
+1. The §9 five-second staff walk, by an operation staff member who did not build the screen.
+2. One reading of Revisions and History at a true ~920px viewport.
+
+Until both land, `Status` stays `EXECUTED · SHIPPED`.
