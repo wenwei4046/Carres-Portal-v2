@@ -51,14 +51,30 @@ export function floorSurchargeRaw(
   return flights * cfg.perFloorPerItem * totalQty;
 }
 
+/**
+ * ⭐ UNSET MEANS NONE — owner ruling 2026-08-27 (YH), and it is a PRICING
+ * decision, not a formatting one.
+ *
+ * `delivery.stairItems` is the count of items that need carrying up. It used
+ * to read: NULL = "nobody overrode it" = EVERY item, which is what 0104
+ * documented and what the code did on both surfaces. So an order where nobody
+ * was asked the question was charged the maximum stair fee.
+ *
+ * It now reads: NULL = NONE. Somebody has to say how many items need carrying
+ * before the customer is charged for carrying them.
+ *
+ * 🟡 WHAT THIS COSTS, said plainly: any order whose count was never set now
+ * computes a stair fee of RM 0 where it previously computed a full one. That
+ * is the ruling, not a side effect. It is applied HERE rather than on one
+ * screen precisely so the POS quote and the office page cannot disagree about
+ * the money — the fault we spent 2026-08-26 removing.
+ *
+ * ⛔ Migration 0104's column comment still says NULL = auto = every item. A
+ * committed migration may not be edited (red line 6); the current meaning
+ * lives in `docs/orders/MASTER.md`.
+ */
 export function floorSurcharge(order: Order, cfg: FloorConfigDto): number {
-  // delivery.stairItems is the dealer-picked count of items that need stair
-  // carry. Null = legacy / dealer didn't override → fall back to all items
-  // (current behavior pre-0104). Clamped ≥ 0 for safety.
-  const count =
-    order.delivery.stairItems == null
-      ? totalItems(order)
-      : Math.max(0, order.delivery.stairItems);
+  const count = Math.max(0, order.delivery.stairItems ?? 0);
   return floorSurchargeRaw(order.delivery.floor, order.delivery.hasLift, count, cfg);
 }
 
@@ -170,10 +186,10 @@ export function draftTotals(draft: DraftTotalsInput, catalog: CatalogResponse): 
   const lineSub = draft.lines.reduce((s, l) => s + l.unitPrice * l.qty, 0);
   const addonSub = draft.addons.reduce((s, a) => s + a.unitPrice * a.qty, 0);
   const itemsTotal = draft.lines.reduce((s, l) => s + l.qty, 0);
-  const stairItems =
-    draft.delivery.stairItems == null
-      ? itemsTotal
-      : Math.max(0, Math.min(itemsTotal, draft.delivery.stairItems));
+  /* Unset = NONE (owner ruling 2026-08-27) — the same rule `floorSurcharge`
+     applies to a saved order, so the wizard preview and the order detail
+     cannot quote two different stair fees. */
+  const stairItems = Math.max(0, Math.min(itemsTotal, draft.delivery.stairItems ?? 0));
   const stair = floorSurchargeRaw(
     draft.delivery.floor,
     draft.delivery.hasLift,

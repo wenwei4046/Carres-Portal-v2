@@ -147,7 +147,10 @@ describe("draftTotals — the ONE grand total every POS surface shows", () => {
       {
         lines: [{ ...matLine, qty: 1, unitPrice: 2000 }],
         addons: [{ qty: 2, unitPrice: 80 }],
-        delivery: { floor: 3, hasLift: false, stairItems: null },
+        /* `stairItems` is STATED — unset means NONE since the 2026-08-27
+           ruling, so a null here would zero the stair leg and stop this test
+           checking the grand total it is named for. */
+        delivery: { floor: 3, hasLift: false, stairItems: 1 },
       },
       catalog,
     );
@@ -165,8 +168,13 @@ describe("draftTotals — the ONE grand total every POS surface shows", () => {
         { lines, addons: [], delivery: { floor: 3, hasLift: false, stairItems } },
         baseCatalog(),
       ).stair;
-    expect(pick(null)).toBe(300); // all 3 units
+    /* ⭐ `null` USED TO MEAN ALL 3 UNITS and now means none — owner ruling
+       2026-08-27 (YH). Somebody has to say how many pieces need carrying
+       before the customer is charged for carrying them. The clamp above it is
+       untouched, which is what the rest of this test is for. */
+    expect(pick(null)).toBe(0); // nobody said → nothing charged
     expect(pick(1)).toBe(100); // dealer charged only 1 unit
+    expect(pick(3)).toBe(300); // all 3 units, stated
     expect(pick(99)).toBe(300); // clamped to the 3 units in the cart
   });
 
@@ -175,7 +183,7 @@ describe("draftTotals — the ONE grand total every POS surface shows", () => {
       {
         lines: [{ ...matLine, qty: 1, unitPrice: 500 }],
         addons: [{ qty: 2, unitPrice: 80 }],
-        delivery: { floor: 3, hasLift: false, stairItems: null },
+        delivery: { floor: 3, hasLift: false, stairItems: 1 },
       },
       baseCatalog({ deliveryFeeConfig: undefined }),
     );

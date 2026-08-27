@@ -27,15 +27,20 @@ export default function StairCarryFields({
     setDelivery({ floor: Math.max(1, Math.min(MAX_DELIVERY_FLOOR, next)) });
   }
   function bumpStairItems(delta: number, maxItems: number) {
-    const current = draft.delivery.stairItems ?? maxItems;
+    /* `?? 0` follows the 2026-08-27 ruling — unset is NONE, so `+` from an
+       untouched stepper goes to 1, not to maxItems + 1. */
+    const current = draft.delivery.stairItems ?? 0;
     setDelivery({ stairItems: Math.max(0, Math.min(maxItems, current + delta)) });
   }
 
   const itemsTotal = draft.lines.reduce((s, l) => s + l.qty, 0);
-  const stairItemsEffective =
-    draft.delivery.stairItems == null
-      ? itemsTotal
-      : Math.max(0, Math.min(itemsTotal, draft.delivery.stairItems));
+  /* ⭐ UNSET MEANS NONE — owner ruling 2026-08-27 (YH). This read `null =>
+     itemsTotal`, so a dealer who never touched the stepper quoted the maximum
+     stair fee. Somebody now has to say how many items need carrying before the
+     customer is charged for carrying them. The same rule runs in
+     `order-totals.ts` for a saved order, so this quote and the office page
+     cannot disagree about the money. */
+  const stairItemsEffective = Math.max(0, Math.min(itemsTotal, draft.delivery.stairItems ?? 0));
   const stair = floorSurchargeRaw(
     draft.delivery.floor,
     draft.delivery.hasLift,
