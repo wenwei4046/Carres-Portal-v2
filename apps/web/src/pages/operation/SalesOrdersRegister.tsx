@@ -816,9 +816,25 @@ function RegisterResultSummary({
     : filtered.length === total
       ? `${filtered.length} ${orderWord}`
       : `${filtered.length} of ${total} orders`;
-  const parts = FOOTER_WORDS.filter((label) => (counts.get(label) ?? 0) > 0).map(
-    (label) => `${label} ${counts.get(label)}`,
-  );
+  /* ⛔ `Other goods` IS COUNTED AND NOT PRINTED — YH, 2026-08-27.
+     This OVERWRITES `COPY-STANDARD.md`'s "never dropped from the count", which
+     ruled the word must always appear.
+
+     What the word actually reports is a CATALOG GAP: a line nothing recognises,
+     because its SKU has no catalog row (or its category has no word here — a
+     `guarantee` item is catalogued correctly and still lands in this bucket,
+     since the footer's vocabulary has five of the catalog's six categories).
+     Neither is a fact about the customer's goods, which is what the rest of
+     this tally is, and neither is actionable from a register footer.
+
+     🟡 THE HONEST COST, stated rather than hidden: the printed numbers no
+     longer add up to the order's item count. The bucket is still computed —
+     `footerWord` is untouched and the count is still available to anything
+     that asks — so this is a display decision, reversible by deleting one
+     line, and it destroys no data. */
+  const parts = FOOTER_WORDS.filter(
+    (label) => label !== "Other goods" && (counts.get(label) ?? 0) > 0,
+  ).map((label) => `${label} ${counts.get(label)}`);
   /* One unwrapped line by law (REGISTER STATUS FOOTER), so a long tally on a
      narrow window truncates instead of pushing a second row into the frame —
      and the full sentence rides the title. */

@@ -472,7 +472,19 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     /* `M.P/QUEEN` IS positively recognised as a protector — the governed word
        prints and the sheet's abbreviation never does. */
     expect(footer).toHaveTextContent("Mattress protector 2");
-    expect(footer).toHaveTextContent("Other goods 5");
+    /* ⛔ `Other goods` IS NO LONGER PRINTED — YH, 2026-08-27. This line used
+       to read `toHaveTextContent("Other goods 5")`.
+
+       What the 2026-08-15 ruling protected was that an unrecognised line is
+       never SILENTLY DROPPED BY THE CLASSIFIER into some other word, and that
+       survives untouched — see the negative control below, which is now the
+       load-bearing test of the pair. What changed is only whether the bucket is
+       PRINTED; `footerWord` still computes it.
+
+       🟡 The honest cost is asserted rather than hidden: those 5 legs are
+       counted and not shown, so the printed numbers no longer sum to the
+       order's item count. */
+    expect(footer).not.toHaveTextContent("Other goods");
     expect(footer).not.toHaveTextContent("M.P");
     expect(footer).not.toHaveTextContent("Leg");
   });
@@ -557,16 +569,35 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     expect(footer).not.toHaveTextContent("Other goods");
   });
 
-  it("NEGATIVE CONTROL: a line nothing recognises is STILL `Other goods` - the word keeps its meaning", () => {
-    // The fix must not launder unclassified goods into a category. This
-    // number is a real data-quality signal and has to survive.
+  /* ⭐ THIS IS NOW THE LOAD-BEARING HALF (YH, 2026-08-27).
+     While `Other goods` printed, a laundered line was merely mislabelled and
+     visible. Now that the word is hidden, laundering would be INVISIBLE — an
+     unrecognised line quietly inflating `Accessory` or `Mattress` with nobody
+     able to see it. So the assertion inverts with the ruling: an unrecognised
+     line must reach NO printed category at all. */
+  it("NEGATIVE CONTROL: a line nothing recognises is laundered into no category", () => {
     listHookState.data = {
       orders: [
         order({ order_lines: [{ sku: "Leg 4\"", qty: 5, unit_price: 20, category: null }] }),
       ],
     };
     mount();
-    expect(screen.getByTestId("grid-footer")).toHaveTextContent("Other goods 5");
+    const footer = screen.getByTestId("grid-footer");
+    for (const word of [
+      "Mattress",
+      "Bedframe",
+      "Sofa",
+      "Pillow",
+      "Topper",
+      "Footrest",
+      "Accessory",
+      "Service",
+      "Other goods",
+    ]) {
+      expect(footer, `an unrecognised line reached \`${word}\``).not.toHaveTextContent(word);
+    }
+    /* The order itself still counts — only its unnameable goods go unprinted. */
+    expect(footer).toHaveTextContent("1 order");
   });
 
   it("an OLDER Worker that sends no category behaves exactly as before", () => {

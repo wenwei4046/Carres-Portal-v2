@@ -1070,8 +1070,9 @@ the amendment machinery, the goods truth and the Order Route architecture are un
 - **The emergency contact is THREE validated fields** — name · phone · relationship — over the one
   `customer_emergency` text column. The three-fields-⇄-one-column codec lives in
   `packages/shared/src/sales-order-form.ts` and is the same one the POS composes with, so a legacy
-  or hand-typed string round-trips character for character when nobody edits it. The section note
-  is `Used only if we cannot reach the customer on delivery day`.
+  or hand-typed string round-trips character for character when nobody edits it. ⛔ The section note
+  `Used only if we cannot reach the customer on delivery day` is RETIRED (YH, 2026-08-27) — the
+  section carries no note.
 - **Stored data is never normalised, repaired or back-filled by this ruling.** Migration `0354`
   widens what the writer may correct; it rewrites no value and asserts no row count.
 - **The writer widened to the portal's remaining questions.** `sales_order_save_revision` now

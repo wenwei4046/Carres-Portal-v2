@@ -2138,9 +2138,27 @@ export default function SalesOrderWorkspace() {
               for is on screen. Still null on the wire — 0104's column comment
               rules that NULL means every item, and a number is never invented
               here to avoid a blank. */}
+          {/* ⭐ THE CELL ALWAYS CARRIES A NUMBER (YH, 2026-08-27) — "no ask
+              then put a default value, rather than leaving it blank".
+              The default shown is the POS's OWN default for the same unset
+              field: every item on the order. The POS has never printed a blank
+              here, so an office cell that did was the two surfaces disagreeing
+              about one field again.
+
+              ⛔ NOT ZERO, and that is the one place this departs from the
+              literal ask. 0104 rules NULL = "dealer left it auto" = every
+              item, and the fee MULTIPLIES by that count — defaulting the box
+              to 0 would quietly reprice every stair-carry order to RM 0 while
+              looking like a formatting change. The STORED value stays null
+              until somebody types: this shows the derived default, it never
+              writes one. */}
           <Input id="so-stair-items" label="Items needing stair carry" type="number" min={0}
-            placeholder={stair ? `All ${stair.itemsTotal} item${stair.itemsTotal === 1 ? "" : "s"}` : "All items"}
-            value={draft.delivery_stair_items == null ? "" : String(draft.delivery_stair_items)}
+            hint={draft.delivery_stair_items == null ? "Every item, unless you say otherwise" : undefined}
+            value={
+              draft.delivery_stair_items == null
+                ? String(stair?.itemsTotal ?? 0)
+                : String(draft.delivery_stair_items)
+            }
             onChange={(e) =>
               setField(
                 "delivery_stair_items",
@@ -2271,8 +2289,10 @@ export default function SalesOrderWorkspace() {
       {!isNew && mode === "object" && orderId && (
         <Block
           title="Amend delivery date"
+          /* The `note` beside the title already says `creates a Revision ·
+             needs approval`, and it is governed copy. The subtitle underneath
+             said the same thing in a longer sentence (YH, 2026-08-27). */
           note="creates a Revision · needs approval"
-          subtitle="Move the date the customer was promised. Needs approval before it counts."
           summary={
             liveAmendment
               ? "Amendment pending approval"
@@ -2292,7 +2312,11 @@ export default function SalesOrderWorkspace() {
       {emergencyEnabled && (
         <Block
           title="Emergency contact"
-          note="Used only if we cannot reach the customer on delivery day"
+          /* ⛔ THE NOTE IS RETIRED (YH, 2026-08-27). It was governed copy
+             (COPY-STANDARD + the 2026-08-15 ruling), so both are overwritten
+             with this decision rather than quietly contradicted. `Emergency
+             contact` needs no explaining, and the collapsed summary already
+             says whether one is recorded. */
           summary={
             draft.emergency_name.trim() || draft.emergency_phone.trim()
               ? `${draft.emergency_name.trim() || "No name"} · ${draft.emergency_phone.trim() || "no phone"}`
