@@ -127,7 +127,6 @@ import SalesOrderRoute from "./SalesOrderRoute";
 import SalesOrderTabs from "./SalesOrderTabs";
 import { lineName } from "./sales-order-facts";
 import { lineConfigBits } from "../dealer/new-order/special-addons-picker";
-import { copySalesOrderDraft } from "./sales-order-copy";
 
 /* pdf.js worker ships inside the package — nothing fetched from a CDN. */
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
@@ -939,7 +938,6 @@ export default function SalesOrderWorkspace() {
   const [params, setParams] = useSearchParams();
   const isNew = location.pathname.endsWith("/so/new");
   const showRoute = params.get("route") === "1" && !isNew;
-  const copyFrom = isNew ? params.get("copyFrom") : null;
   const [viewRev, setViewRev] = useState<number | null>(null);
   const [amendmentSeed, setAmendmentSeed] = useState<AmendmentProposal | null>(null);
   const [cancelOpen, setCancelOpen] = useState(false);
@@ -965,7 +963,7 @@ export default function SalesOrderWorkspace() {
     );
   }, [params, setParams]);
 
-  const detailQ = useOperationOrder(isNew ? copyFrom : (orderId ?? null));
+  const detailQ = useOperationOrder(isNew ? null : (orderId ?? null));
   /* ── THE CREATE DOOR ASKS THE CATALOG (2026-08-21) ───────────────────────
    * Until now this door took a SKU as free text: a typo produced a line no
    * stock, PO or readiness engine could recognise, and creation still
@@ -1065,57 +1063,6 @@ export default function SalesOrderWorkspace() {
   const detailLines = detailQ.data?.lines ?? [];
   useEffect(() => {
     if (isNew) {
-      if (copyFrom) {
-        const seed = `copy:${copyFrom}`;
-        if (!order || draftSeed === seed) return;
-        const copied = copySalesOrderDraft({
-          order: {
-            id: order.id,
-            so: order.so,
-            customer_name: order.customer_name,
-            customer_phone: order.customer_phone,
-            customer_email: (order as { customer_email?: string | null }).customer_email,
-            customer_address: order.customer_address,
-            customer_address_line1:
-              (order as { customer_address_line1?: string | null }).customer_address_line1,
-            customer_address_line2:
-              (order as { customer_address_line2?: string | null }).customer_address_line2,
-            customer_address_city:
-              (order as { customer_address_city?: string | null }).customer_address_city,
-            customer_address_state:
-              (order as { customer_address_state?: string | null }).customer_address_state,
-            customer_address_postcode:
-              (order as { customer_address_postcode?: string | null }).customer_address_postcode,
-            customer_emergency: order.customer_emergency,
-            customer_billing: order.customer_billing,
-            dealer_id: order.dealer_id,
-            outlet_id: order.outlet_id,
-            salesperson_id: order.salesperson_id,
-            delivery_floor: (order as { delivery_floor?: number }).delivery_floor,
-            delivery_has_lift: (order as { delivery_has_lift?: boolean }).delivery_has_lift,
-          },
-          lines: detailLines.map((line) => ({
-            id: line.id,
-            sku: line.sku,
-            qty: line.qty,
-            unit_price: line.unit_price,
-            ...(line.attrs ? { attrs: line.attrs } : {}),
-          })),
-        });
-        const emergency = parseEmergencyContact(copied.customer_emergency);
-        const next: Draft = {
-          ...EMPTY_DRAFT,
-          ...copied,
-          emergency_name: emergency.name,
-          emergency_phone: emergency.phone,
-          emergency_relationship: emergency.relationship,
-          lines: copied.lines.map((line) => ({ ...line, key: nextKey() })),
-        };
-        setDraft(next);
-        setBaseline(next);
-        setDraftSeed(seed);
-        return;
-      }
       if (draftSeed !== "new") {
         const next = {
           ...EMPTY_DRAFT,
@@ -1205,7 +1152,6 @@ export default function SalesOrderWorkspace() {
     isNew,
     order,
     orderId,
-    copyFrom,
     detailLines,
     draftSeed,
     detailQ.dataUpdatedAt,
@@ -1730,14 +1676,6 @@ export default function SalesOrderWorkspace() {
                 authoritative create form; the object page reaches the SAME
                 route rather than growing a second copy path (Law C: a door,
                 never a duplicate). */}
-            <button
-              type="button"
-              onClick={() => navigate(`/operation/orders/so/new?copyFrom=${orderId}`)}
-              data-testid="workspace-copy-so"
-              className="w-full rounded-control px-2 py-1.5 text-left text-meta text-base-700 hover:bg-hovertint"
-            >
-              Copy to new Sales Order
-            </button>
             {/* A problem is RARE and it leaves this object for Service — it
                 belongs with the other rare acts, not as a permanent card on a
                 page the operator reads every day (owner ruling 2026-08-15). */}
@@ -1891,13 +1829,6 @@ export default function SalesOrderWorkspace() {
         <div className="px-1">
           <span className="rounded-full bg-base-900 px-2 py-0.5 text-label font-semibold text-white">
             Viewing Rev {viewedRevision.revision} · read-only
-          </span>
-        </div>
-      )}
-      {mode === "create" && copyFrom && order && (
-        <div className="px-1">
-          <span className="rounded-full bg-kit-blue-3 px-2 py-0.5 text-label font-semibold text-kit-blue-11">
-            Copied from SO-{order.so} · review before creating
           </span>
         </div>
       )}
@@ -2682,16 +2613,16 @@ export default function SalesOrderWorkspace() {
            its own and the PAGE does not; below 1024px they stack, form first,
            and the page scrolls normally. */
         <div className="min-h-0 flex-1 overflow-auto bg-kit-slate-3 lg:overflow-hidden">
-          {(!isNew || copyFrom) && detailQ.isLoading && (
+          {!isNew && detailQ.isLoading && (
             <div className="px-4 py-4">
-              <Loading label={copyFrom ? "Preparing the copied draft" : "Opening the sales order"} />
+              <Loading label="Opening the sales order" />
             </div>
           )}
-          {(!isNew || copyFrom) && !detailQ.isLoading && detailQ.isError && (
+          {!isNew && !detailQ.isLoading && detailQ.isError && (
             <div className="px-4 py-4">
               <div className="rounded-card border border-kit-slate-5 bg-white">
                 <EmptyState
-                  title={copyFrom ? "This Sales Order could not be copied" : "This sales order could not be opened"}
+                  title="This sales order could not be opened"
                   detail={(detailQ.error as Error | undefined)?.message}
                   action={
                     <Button variant="neutral" onClick={() => void detailQ.refetch()}>
@@ -2703,7 +2634,7 @@ export default function SalesOrderWorkspace() {
             </div>
           )}
 
-          {(isNew && !copyFrom || order) && (
+          {(isNew || order) && (
             <div className="flex h-full min-h-0 flex-col lg:flex-row" data-testid="object-two-panes">
               <div className="flex min-h-0 min-w-0 flex-col lg:w-1/2 lg:overflow-hidden">
                 <div className="min-h-0 flex-1 px-4 py-4 lg:overflow-auto">{form}</div>

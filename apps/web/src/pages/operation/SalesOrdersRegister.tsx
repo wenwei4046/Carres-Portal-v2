@@ -573,10 +573,6 @@ export default function SalesOrdersRegister() {
          label loses no capability. If Carres later wants a real preview act,
          it is a BUILD, not a restoration of this line. */
       { label: "Print PDF", onClick: () => void openSalesOrderPdf(r.id, r.so) },
-      {
-        label: "Copy to new Sales Order",
-        onClick: () => navigate(`/operation/orders/so/new?copyFrom=${r.id}`),
-      },
       /* The MASTER's locked menu ends with the one destructive entry, alone
          below a divider so it is never reached by a slipped click. */
       { divider: true },

@@ -495,10 +495,12 @@ describe("Sales Order object template contract", () => {
 
   /* ── ACTIONS ───────────────────────────────────────────────────────────── */
 
-  it("carries Copy, Report a problem and Cancel in More actions, and no Problems card", () => {
-    expect(workspace).toContain("Copy to new Sales Order");
-    /* The SAME route the register's context menu opens (Law C). */
-    expect(workspace).toContain("/operation/orders/so/new?copyFrom=");
+  /* Copy is RETIRED (Jess, 2026-08-28) — it dropped line configuration and
+     handed Purchasing an un-autofillable PO. The assertion is inverted rather
+     than dropped, so a quiet re-introduction fails here. */
+  it("carries Report a problem and Cancel in More actions, no Copy, and no Problems card", () => {
+    expect(workspace).not.toContain("Copy to new Sales Order");
+    expect(workspace).not.toContain("/operation/orders/so/new?copyFrom=");
     expect(workspace).toContain('data-testid="workspace-report-problem"');
     expect(workspace).toContain("Report a problem");
     expect(workspace).toContain("Cancel SO");

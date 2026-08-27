@@ -4941,10 +4941,22 @@ View
 Print
 ────────
 Issue Delivery Order
-Copy to new Sales Order
 ────────
 Cancel SO
 ```
+
+**`Copy to new Sales Order` IS RETIRED — owner ruling (Jess, 2026-08-28, relayed by YH),
+overwriting the Loo 2026-08-11 line above.** Jess called the act dangerous, and the code says why:
+`copySalesOrderDraft` dropped each line's `attrs` — the fabric and colour a sofa is configured
+with — even though migration `0374` opened that slot on the create door specifically so
+configuration would cross, and two code comments claimed it did. The consequence was not a
+visible failure but a quiet wrong one: a copied configured order reached Purchasing as a PO that
+could not autofill. Both doors are removed (register row menu, and the object page's
+`More actions`), and the `?copyFrom=` route branch with them — a door nobody can see is still a
+door if the URL still works. **If Carres wants copy back it is a BUILD with its own card**, and
+that card must answer what a copied promo line means, whether configuration crosses, and whether
+a cancelled order may be copied — the three questions `§11` required and no document ever
+answered.
 
 **`Preview` IS RETIRED — owner ruling (YH, 2026-08-28), overwriting the Loo 2026-08-11 line
 above.** The locked menu had meant `Preview` and `Print` as two acts: a governed document
@@ -4962,7 +4974,7 @@ and interaction treatment. Each item routes to the Carres-owned capability rathe
 foreign business rules inside the grid: `Edit` opens the full Sales Order Workspace in edit intent;
 `View` opens the owned read view; `Print` uses the
 governed Sales Order document output; `Issue Delivery Order` hands off to the Delivery-owned issue
-flow; `Copy to new Sales Order` starts a new draft from the governed copy boundary; and `Cancel SO`
+flow; and `Cancel SO`
 uses the owned cancellation gate and destructive confirmation. The implementation cards must
 define the unresolved permission, eligibility, copy-boundary and cancellation rules before those
 new capabilities can write business data. Right-click is a desktop shortcut: it does not remove

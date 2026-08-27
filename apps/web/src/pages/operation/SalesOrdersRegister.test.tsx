@@ -905,14 +905,27 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
   });
 });
 
-describe("Copy to new Sales Order", () => {
-  it("opens the authoritative create workspace with the source order as a draft seed", () => {
+/* COPY IS RETIRED — Jess, 2026-08-28, relayed by YH.
+ *
+ * This block used to prove the copy door opened the authoritative create
+ * workspace with the source order as a seed. That behaviour is GONE, and the
+ * reason is not tidiness: a copied order silently dropped each line’s
+ * configuration (fabric, colour), so Purchasing received a PO it could not
+ * autofill — a quiet wrong order rather than a visible failure. Jess called
+ * the act dangerous and it is not retained.
+ *
+ * The pin is rewritten to its SURVIVING invariant rather than deleted: the
+ * register offers no copy act, and no hand-typed `?copyFrom=` URL is minted
+ * from here. If copy ever returns it needs a card, a configuration answer and
+ * a new test — not the quiet return of this one.
+ */
+describe("Copy to new Sales Order — retired", () => {
+  it("offers no copy act on the row menu", () => {
     mount();
     fireEvent.contextMenu(screen.getByTestId("grid-parent-row"));
-    fireEvent.click(screen.getByRole("button", { name: "Copy to new Sales Order" }));
-    expect(screen.getByTestId("location")).toHaveTextContent(
-      "/operation/orders/so/new?copyFrom=00000000-0000-0000-0000-00000000cafe",
-    );
+    // The menu still renders — so this is a real absence, not an empty query.
+    expect(screen.getByRole("button", { name: "Cancel SO" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Copy to new Sales Order" })).toBeNull();
   });
 });
 
@@ -940,7 +953,6 @@ describe("Cancel SO", () => {
           "View",
           "Edit",
           "Print PDF",
-          "Copy to new Sales Order",
           "Cancel SO",
         ].includes(t ?? ""),
       );
