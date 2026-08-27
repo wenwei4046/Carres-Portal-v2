@@ -80,14 +80,14 @@ describe("A left-pane block shows less at once, and never less than the truth", 
    */
   it("force-opens while it holds an unsaved change, and REFUSES to close", () => {
     render(
-      <Block title="Amend delivery date" summary="No amendment open" forceOpen>
+      <Block title="Change delivery date" summary="No amendment open" forceOpen>
         <p>the amend trio</p>
       </Block>,
     );
     expect(screen.getByText("the amend trio")).toBeTruthy();
-    expect(screen.queryByTestId("block-expand-Amend delivery date")).toBeNull();
+    expect(screen.queryByTestId("block-expand-Change delivery date")).toBeNull();
 
-    const collapse = screen.getByTestId("block-collapse-Amend delivery date") as HTMLButtonElement;
+    const collapse = screen.getByTestId("block-collapse-Change delivery date") as HTMLButtonElement;
     expect(collapse.disabled).toBe(true);
     /* It does not merely fail silently — it says WHY it will not close. */
     expect(collapse.textContent).toContain("Unsaved changes here");

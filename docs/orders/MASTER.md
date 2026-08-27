@@ -1231,10 +1231,16 @@ the amendment machinery, the goods truth and the Order Route architecture are un
   holds, and while one is open this block submits nothing. `Amend date (from customer)` is a
   column (`sales_order_amendments.customer_asked_on`, 0354), not a substring of the reason: a
   change phoned in on Monday and typed on Thursday is a Monday request.
-- **The MONEY block is read-only and weighted** — Total large · Paid medium · **Outstanding
-  loudest, red whenever any of it is still owed**. This is an explicit owner ruling and it
-  overrides `docs/ui/MASTER.md` §6.4 challenge C1's narrower "only when genuinely late". The
-  existing `Open this order in Payments` door is unchanged.
+- **The MONEY block is read-only, and its three amounts are ONE SIZE** — Total · Paid ·
+  **Outstanding, red whenever any of it is still owed**. The red is the 2026-08-15 owner ruling
+  and it stands; it overrides `docs/ui/MASTER.md` §6.4 challenge C1's narrower "only when
+  genuinely late". **The `Total large · Paid medium · Outstanding loudest` half of that ruling
+  is RETIRED (YH, 2026-08-28).** It never reached the amounts: `<Money>` renders every value at
+  its `row` tone, so all three digits were always the same size and only their CONTAINERS
+  differed — three line-heights under `items-end`, which is why the three numbers never sat on
+  one line. Weighting that only moves the box around the number is not weighting. Colour does
+  the separating now, which is the half that was always visible.
+  The existing `Open this order in Payments` door is unchanged.
 - **`SALES OWNERSHIP` is read-only for Operation — no button.** A management-authorised role
   (principal or HR, the same lane GATE 3 lets decide it) sees the one door, worded
   **`Change salesperson`** (⛔ the `— needs approval` suffix ruled here on 2026-08-15 was retired

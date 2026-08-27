@@ -1692,7 +1692,7 @@ export default function SalesOrderWorkspace() {
                 contractual change is rarer than reading an order, and this is
                 where this page already keeps its rare acts. The strip is gone;
                 the capability — items, unit price, instalment months — is not,
-                and `Amend delivery date` still handles the date on the card. */}
+                and `Change delivery date` still handles the date on the card. */}
             <button
               type="button"
               onClick={() => setAmendSignal((n) => n + 1)}
@@ -2041,10 +2041,20 @@ export default function SalesOrderWorkspace() {
 
       {/* ⑥ MONEY — read-only forever (ownership Law B). */}
       <Block title="Money">
-        <div className="flex flex-wrap items-end gap-x-8 gap-y-3">
+        {/* ⭐ THREE AMOUNTS, ONE SIZE (YH, 2026-08-28 — overwrites the
+            2026-08-15 `Total large · Paid medium · Outstanding loudest`
+            weighting). The weighting never reached the numerals anyway:
+            `<Money>` renders every amount at its `row` tone, so all three
+            digits were ALREADY 13px and only the CONTAINERS differed. Three
+            different container sizes meant three different line-heights, so
+            under `items-end` the three amounts did not sit on one line —
+            which is what read as "alignment wrong". One size on all three
+            fixes the alignment and the fallback strings at the same time.
+            Colour still separates them: Outstanding is red while owed. */}
+        <div className="flex flex-wrap items-baseline gap-x-8 gap-y-3">
           <div>
             <div className="text-label text-base-500">Total</div>
-            <div className="text-title text-base-900" data-testid="money-total">
+            <div className="text-strong text-base-900" data-testid="money-total">
               {money.known && money.total != null ? <Money value={money.total} /> : "No price yet"}
             </div>
           </div>
@@ -2055,13 +2065,14 @@ export default function SalesOrderWorkspace() {
             </div>
           </div>
           {/* ⭐ THE CUSTOMER-MONEY WORD IS `Outstanding` (CLAUDE.md §7 — what the
-              CUSTOMER owes HQ), and it is the LOUDEST thing in the block: the
-              most-read number on the page (ui/MASTER.md §6.4 ⑤), red while any
-              of it is still owed (owner ruling 2026-08-15). */}
+              CUSTOMER owes HQ). It is the most-read number on the page
+              (ui/MASTER.md §6.4 ⑤) and stays RED while any of it is owed
+              (owner ruling 2026-08-15) — the colour carries that on its own,
+              at the same size as its two neighbours. */}
           <div>
             <div className="text-label text-base-500">Outstanding</div>
             <div
-              className={`text-page ${money.known && money.outstanding > 0 ? "text-danger" : "text-base-900"}`}
+              className={`text-strong ${money.known && money.outstanding > 0 ? "text-danger" : "text-base-900"}`}
               data-testid="money-outstanding"
             >
               {!money.known ? "No price yet" : money.outstanding > 0 ? <Money value={money.outstanding} /> : "Paid in full"}
@@ -2143,7 +2154,7 @@ export default function SalesOrderWorkspace() {
                     data-testid="amend-date-open"
                     className="mt-1 text-meta font-medium text-kit-blue-11 underline-offset-2 hover:underline"
                   >
-                    Amend delivery date
+                    Change delivery date
                   </button>
                 )
               )}
@@ -2508,7 +2519,7 @@ export default function SalesOrderWorkspace() {
         <Modal
           open={amendDateOpen}
           onOpenChange={setAmendDateOpen}
-          title="Amend delivery date"
+          title="Change delivery date"
           description="creates a Revision · needs approval"
         >
           <SalesOrderAmendDeliveryDate

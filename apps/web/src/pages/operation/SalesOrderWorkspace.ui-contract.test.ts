@@ -219,7 +219,7 @@ describe("Sales Order object template contract", () => {
      the conditional work card), and the order changed: MONEY rose above
      ORDER INFO, directly under CUSTOMER.
 
-     `Emergency contact` and `Amend delivery date` were the last two collapsible
+     `Emergency contact` and `Change delivery date` were the last two collapsible
      cards. Merged, they lose the fold with the border — which also retires the
      `forceOpen` machinery that existed ONLY because they could be collapsed: a
      section that is always on screen cannot hide an unsaved change or a live
@@ -258,7 +258,7 @@ describe("Sales Order object template contract", () => {
   it("opens the amend trio from beside Requested Delivery Date, and never hides a live one", () => {
     expect(workspace).toContain('data-testid="amend-date-open"');
     expect(workspace).toContain("setAmendDateOpen(true)");
-    expect(workspace).toContain('title="Amend delivery date"');
+    expect(workspace).toContain('title="Change delivery date"');
     expect(workspace).toContain('description="creates a Revision · needs approval"');
     expect(workspace).toContain("<SalesOrderAmendDeliveryDate");
     /* The modal closes itself once the proposal is recorded. */
@@ -267,7 +267,7 @@ describe("Sales Order object template contract", () => {
     /* A pending proposal is stated in the CARD, not behind the door. */
     expect(workspace).toContain('data-testid="amend-date-waiting"');
     /* And no standing section survives on the card. */
-    expect(workspace).not.toContain("<SubHead>Amend delivery date</SubHead>");
+    expect(workspace).not.toContain("<SubHead>Change delivery date</SubHead>");
   });
 
   /* ⭐ THE STANDING FACT SITS BESIDE THE CARD'S NAME (Jess, 2026-08-26) —
@@ -436,9 +436,9 @@ describe("Sales Order object template contract", () => {
   });
 
   it("opens the amend trio with exactly three fields, through the governed lane", () => {
-    expect(amendDate).toContain("Amend date (from customer)");
-    expect(amendDate).toContain("Amended delivery date");
-    expect(amendDate).toContain('label="Amend reason"');
+    expect(amendDate).toContain("Requested date (from customer)");
+    expect(amendDate).toContain("New delivery date");
+    expect(amendDate).toContain('label="Reason for change"');
     expect(amendDate).toContain("required");
     expect(amendDate).toContain("useSubmitSalesOrderAmendment");
     expect(amendDate).toContain("customerAskedOn");
@@ -457,7 +457,7 @@ describe("Sales Order object template contract", () => {
 
      The strip is gone from `Order info`; the CAPABILITY is not, and that is
      what this pins. The modal is the only way to change items, unit price or
-     instalment months anywhere on the Sales Order — `Amend delivery date`
+     instalment months anywhere on the Sales Order — `Change delivery date`
      submits a date and nothing else — so a later "remove the button" would
      silently retire three capabilities. It must fail here first. */
   it("opens the amendment from More actions, and keeps no idle strip on the card", () => {
@@ -517,14 +517,22 @@ describe("Sales Order object template contract", () => {
     expect(workspace).not.toContain("Collect $");
   });
 
-  it("weights the money block Total · Paid · Outstanding, red while owed", () => {
+  /* THE PIN MOVED, NOT THE FACT (YH, 2026-08-28). This used to assert the
+     2026-08-15 weighting — Total large · Paid medium · Outstanding loudest.
+     That weighting never reached the amounts: `<Money>` renders each at its
+     `row` tone, so the three digits were always the same size and only the
+     containers differed, which is exactly why the three numbers did not line
+     up. The surviving invariant is what the block is FOR — three named money
+     facts, one size, and red while any is owed. */
+  it("shows Total · Paid · Outstanding at ONE size, red while owed", () => {
     expect(workspace).toContain('data-testid="money-total"');
     expect(workspace).toContain('data-testid="money-paid"');
     expect(workspace).toContain('data-testid="money-outstanding"');
-    /* Total large · Paid medium · Outstanding loudest (§6.4 ⑤ + owner ruling
-       2026-08-15: red while any of it is still owed). */
-    expect(workspace).toContain('className="text-title text-base-900" data-testid="money-total"');
+    expect(workspace).toContain('className="text-strong text-base-900" data-testid="money-total"');
     expect(workspace).toContain('className="text-strong text-base-700" data-testid="money-paid"');
+    expect(workspace).toContain('`text-strong ${money.known && money.outstanding > 0');
+    // The retired sizes may not come back on any of the three.
+    expect(workspace).not.toContain('className="text-title text-base-900" data-testid="money-total"');
     expect(workspace).toContain('money.known && money.outstanding > 0 ? "text-danger"');
     expect(workspace).not.toContain('label="Balance"');
   });
