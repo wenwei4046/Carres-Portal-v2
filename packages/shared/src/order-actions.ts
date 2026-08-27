@@ -465,6 +465,10 @@ const DISPLAY_RANK: Record<OrderActionKey, number> = {
   // blocks, and the loan collection is the run's own remaining act.
   collect_loan_item: 12,
   resolve_payment_exception: 49,
+  // §0.1 Action Owner Engine row 1 (composed 2026-08-27) — the missing
+  // customer promise. Rung 2's own family (the customer must be asked);
+  // ranked after the two delay acts it can never co-occur with.
+  ask_delivery_date: 21,
   // FACTS, never raised as actions; ranked only so the map stays total.
   done: 90,
   delivering: 91,

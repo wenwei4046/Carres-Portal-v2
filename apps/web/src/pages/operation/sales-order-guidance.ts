@@ -80,7 +80,7 @@ export function missingDeliveryDateGuidance(input: {
   const owner = input.salesperson?.trim() || "Sales";
   const phone = input.phone?.trim() || "Phone not recorded";
   const ask = "Ask which delivery date the customer agrees to.";
-  const record = "Record the agreed Requested Delivery Date date.";
+  const record = "Record the agreed Requested Delivery Date.";
   return {
     problem: "No delivery date",
     detail: `${owner} · ${input.customer} · ${phone}\n${ask}\n${record}`,
