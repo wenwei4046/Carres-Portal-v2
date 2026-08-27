@@ -13,8 +13,10 @@
  * queries. It writes nothing, and it holds no rules of its own:
  *
  *   WHAT is open   ← `openActionsOf` — the same signal mapping the Orders list runs
- *   WHO + WHEN     ← Card 9's `workItemsForOrder` (PIC · one clock per key ·
- *                    working-days-late over a due that never moves)
+ *   WHO + WHEN     ← Card 9's `workItemsForOrder` — the owner resolved per
+ *                    RULE (§0.1 Action Owner Engine, 2026-08-27: PO-duty
+ *                    holder · salesperson · PIC) · one clock per key ·
+ *                    working-days-late over a due that never moves
  *
  * OVERDUE is `workingDaysLate > 0` — Card 9's own arithmetic, not a second
  * comparison against today. One derived fact, one arithmetic (ERP-ARCHITECTURE
@@ -34,6 +36,7 @@ import { personLabel } from "@/lib/staff-avatar";
 import {
   useDeliveryPartners,
   useOperationOrders,
+  useOperationPoDuty,
   useOperationStaff,
   useOperationStock,
   usePurchasingSettings,
@@ -52,6 +55,9 @@ export interface WorkRow extends WorkItem {
   /** The party-named row line — the SAME words the Orders list prints. */
   line: string;
   customer: string | null;
+  /** The RESOLVED owner's account id (§0.1 Action Owner Engine, 2026-08-27):
+   *  the PO-duty holder for Purchasing's work, else the PIC. Null for a named
+   *  non-account owner (a salesperson) and for a duty word. */
   ownerId: string | null;
 }
 
@@ -76,6 +82,10 @@ export function useOpenWorkSet(): OpenWorkSet {
   const stockQ = useOperationStock();
   const partnersQ = useDeliveryPartners();
   const settingsQ = usePurchasingSettings();
+  // §0.1 Action Owner Engine (2026-08-27) — Purchasing's order-track work
+  // resolves to the month's PO-duty holder. Fails soft exactly as the duty
+  // hook always has: dormant layer → no holder → the duty word stands.
+  const poDutyQ = useOperationPoDuty();
 
   const orders = useMemo(() => ordersQ.data?.orders ?? [], [ordersQ.data]);
   const staff = useMemo(() => staffQ.data?.staff ?? [], [staffQ.data]);
@@ -101,6 +111,15 @@ export function useOpenWorkSet(): OpenWorkSet {
     return m;
   }, [stockQ.data]);
 
+  const poDuty = useMemo(() => {
+    const holder = poDutyQ.data?.holder;
+    if (!holder) return null;
+    return {
+      userId: holder.userId,
+      name: personLabel(holder.name, holder.email),
+    };
+  }, [poDutyQ.data]);
+
   const holidayOpts = useMemo(() => ({ holidays: myHolidaySet() }), []);
   const queueLeads = useMemo(
     () => (settingsQ.data ? deliveryQueueLeads(settingsQ.data) : undefined),
@@ -116,8 +135,9 @@ export function useOpenWorkSet(): OpenWorkSet {
       const ovl = ovlOf(o);
       const ownerId = ownerOf(o);
       const ownerMember = ownerId ? staffById.get(ownerId) : undefined;
-      // Blueprint card §7 — the two composed Work facts + the Assign-logistics
-      // due anchor (the EARLIEST PO's issue day; stock-source: the order day).
+      // The composed Work facts (blueprint card §7 + §0.1 row 1) + the
+      // Assign-logistics due anchor (the EARLIEST PO's issue day;
+      // stock-source: the order day).
       const poIssueDays = (o.order_supplier_threads ?? [])
         .map((t) => t.purchase_orders?.placed_at ?? null)
         .filter((d): d is string => Boolean(d))
@@ -128,6 +148,16 @@ export function useOpenWorkSet(): OpenWorkSet {
           orderId: o.id,
           so: o.so,
           picName: ownerMember ? personLabel(ownerMember.name, ownerMember.email) : null,
+          picUserId: ownerId,
+          poDuty,
+          salespersonName: o.salespersons?.name ?? null,
+          // §0.1 row 1 — the 3 nobody asked, never the 8 who answered "not
+          // yet" (owner ruling 2026-08-15), and never a finished order.
+          askDeliveryDate:
+            !o.delivery_date &&
+            !o.delivery_date_tbd &&
+            o.status !== "delivered" &&
+            !o.delivered_at,
           promisedDateIso: o.delivery_date_tbd ? null : o.delivery_date ?? null,
           confirmedDateIso: ovl?.confirmed_date ?? null,
           deliveredAtIso: o.delivered_at ?? null,
@@ -161,14 +191,17 @@ export function useOpenWorkSet(): OpenWorkSet {
              item is composed, so the Work row, the Quick Rail peek and the
              action sentence above all name the customer identically. */
           customer: displayCustomerName(o.customer_name) ?? null,
-          ownerId,
+          /* The RESOLVED owner's account (2026-08-27) — the PO-duty holder
+             for Purchasing's work, else the PIC; never the PIC borrowed for
+             another rule's item. */
+          ownerId: it.ownerUserId,
         });
       }
     }
     return out;
   }, [
     orders, availableBySku, staffById, partnerNameById,
-    holidayOpts, queueLeads, today,
+    holidayOpts, queueLeads, today, poDuty,
   ]);
 
   return {

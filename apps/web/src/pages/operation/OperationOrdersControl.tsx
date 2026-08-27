@@ -963,17 +963,14 @@ export function moneyOf(o: operationOrderListRow): OrderMoney {
 export function orderActionSignalsOf(
   o: operationOrderListRow,
   stock: StockInfo,
-  lines: { sku: string; qty: number }[],
+  /* Unread since D8 removed the per-category window that was its only use.
+     The parameter stays so the four wrappers keep one positional signature;
+     it dies when the ladder leaves this temporary page. */
+  _lines: { sku: string; qty: number }[],
+  /** Purchasing's governed `Safety days`. `null` until the settings land. */
+  safetyDays: number | null = null,
 ): OrderActionSignals {
   const se = stockEtaOf(o);
-  // The stock-arrival window: MS/BF = deadline−7d, sofa = −5d. Still a flat
-  // per-category number — the supplier master holds production time as free
-  // text, so nothing can compute a real one yet (ORDERS-WORKING-FLOW §3).
-  const hasMsbf = lines.some((l) => {
-    const c = lineCategory(l.sku);
-    return c === "mattress" || c === "bedframe";
-  });
-  const hasSofa = lines.some((l) => lineCategory(l.sku) === "sofa");
   const money = moneyOf(o);
   return {
     completed: controlTabOf(o) === "completed",
@@ -985,7 +982,22 @@ export function orderActionSignalsOf(
     stockEtaIso: se.etaIso,
     promisedDateIso: o.delivery_date_tbd ? null : o.delivery_date ?? null,
     daysToDue: daysToDue(o),
-    stockWindowDays: hasMsbf ? 7 : hasSofa ? 5 : 7,
+    // ⭐ D8 — THE WINDOW IS PURCHASING'S NUMBER, AND THIS MODULE STOPS HOLDING
+    // ONE. It used to read `hasMsbf ? 7 : hasSofa ? 5 : 7`, and the comment
+    // above it explained why: "the supplier master holds production time as
+    // free text, so nothing can compute a real one yet". Migration `0303`
+    // (2026-07-28) removed that blocker — `purchasing_settings` now carries
+    // `order_by_buffer_days` as one governed, manager-editable value, which
+    // Purchasing's own reads already call `safetyDays`
+    // (`purchase-demands.ts:407`, `:611`) and `purchasing/MASTER.md:650`
+    // ruled visible as `Safety days` on 2026-08-26. Two arithmetics for one
+    // derived fact is Law D, so the second one goes.
+    //
+    // The per-CATEGORY fork went with it, and that is a second fix: it asked
+    // `lineCategory()` — the keyword parser `carry-forwards.md` records as
+    // display-only — to decide a business threshold. That was a third caller
+    // filtering on a guess.
+    stockWindowDays: safetyDays,
     hasLogistics: !!(o.delivery_partners?.name || o.ops_assigned_logistic),
     bookingConfirmed: bookingConfirmedOf(o),
     confirmedDateIso: ovlOf(o)?.confirmed_date ?? null,
@@ -1025,8 +1037,9 @@ export function openActionsOf(
   o: operationOrderListRow,
   stock: StockInfo,
   lines: { sku: string; qty: number }[],
+  safetyDays: number | null = null,
 ): OrderOpenAction[] {
-  return orderActionsInDisplayOrder(orderActionSignalsOf(o, stock, lines));
+  return orderActionsInDisplayOrder(orderActionSignalsOf(o, stock, lines, safetyDays));
 }
 
 /** One action, one word — the label is never typed here. */
@@ -1046,8 +1059,9 @@ export function nextActionOf(
   o: operationOrderListRow,
   stock: StockInfo,
   lines: { sku: string; qty: number }[],
+  safetyDays: number | null = null,
 ): NextAction {
-  const s = orderActionSignalsOf(o, stock, lines);
+  const s = orderActionSignalsOf(o, stock, lines, safetyDays);
   const top = displayOrderAction(openOrderActions(s));
   if (!top) return act(orderIsDelivering(s) ? "delivering" : "done", "neutral");
   return top.locked
@@ -1060,18 +1074,20 @@ function oldOrdersOpenActionsOf(
   o: operationOrderListRow,
   stock: StockInfo,
   lines: { sku: string; qty: number }[],
+  safetyDays: number | null = null,
 ): OrderOpenAction[] {
-  return openActionsOf(o, stock, lines).filter((action) => action.key !== "issue_po");
+  return openActionsOf(o, stock, lines, safetyDays).filter((action) => action.key !== "issue_po");
 }
 
 function oldOrdersNextActionOf(
   o: operationOrderListRow,
   stock: StockInfo,
   lines: { sku: string; qty: number }[],
+  safetyDays: number | null = null,
 ): NextAction {
-  const top = displayOrderAction(oldOrdersOpenActionsOf(o, stock, lines));
+  const top = displayOrderAction(oldOrdersOpenActionsOf(o, stock, lines, safetyDays));
   if (top) return top.locked ? act(top.key, top.tone, true) : act(top.key, top.tone);
-  const signals = orderActionSignalsOf(o, stock, lines);
+  const signals = orderActionSignalsOf(o, stock, lines, safetyDays);
   return act(orderIsDelivering(signals) ? "delivering" : "done", "neutral");
 }
 
@@ -2264,6 +2280,10 @@ export default function OperationOrdersControl({ onImport }: Props) {
   // page changes.
   const purchasingSettingsQ = usePurchasingSettings();
   const purchasingSettings = purchasingSettingsQ.data ?? null;
+  /* D8 — the ready-date window is Purchasing's `Safety days`, read here and
+     handed to the ladder. `null` until the settings land, which keeps the
+     ready-date call amber rather than escalating it on a guess. */
+  const safetyDays = purchasingSettings?.orderByBufferDays ?? null;
   // PO duty (0236, Jess 人分单货合买): this month's PO controller — gates the
   // bulk-bar Raise PO (holder + management only), badges the TEAM row, and
   // powers the Mon/Thu PO-day banner. Fails soft: old Worker / pre-0236 DB →
@@ -2486,7 +2506,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
   // NEXT-verb counts over OPEN orders — the C-vocab QUEUES rows read these,
   // so queue numbers equal the NEXT column by construction.
   const nextVerbOf = (o: operationOrderListRow) =>
-    oldOrdersNextActionOf(o, stockReadiness(o, availableBySku), o.order_lines ?? []).label;
+    oldOrdersNextActionOf(o, stockReadiness(o, availableBySku), o.order_lines ?? [], safetyDays).label;
   /* S2.1 — everything a sort value needs that the order row does not carry.
      Each entry is the SAME helper the matching cell renders from, so a sorted
      column can never disagree with what it is showing. */
@@ -2496,7 +2516,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
       partnerName,
       staffById,
       nextVerbOf: (o) =>
-        oldOrdersNextActionOf(o, stockReadiness(o, availableBySku), o.order_lines ?? []).label,
+        oldOrdersNextActionOf(o, stockReadiness(o, availableBySku), o.order_lines ?? [], safetyDays).label,
     }),
     [availableBySku, partnerName, staffById],
   );
@@ -2526,11 +2546,11 @@ export default function OperationOrdersControl({ onImport }: Props) {
     // order is worth — that is "we do not know", never "settled".
     const money = moneyOf(o);
     const holdAmount = money.known ? money.outstanding : null;
-    const na = oldOrdersNextActionOf(o, stock, o.order_lines ?? []);
+    const na = oldOrdersNextActionOf(o, stock, o.order_lines ?? [], safetyDays);
     // ONE signals object for the whole strip: the open actions AND their C6
     // checklists read it, so a step can never be measured against a different
     // reading of the order than the action it belongs to.
-    const actionSignals = orderActionSignalsOf(o, stock, o.order_lines ?? []);
+    const actionSignals = orderActionSignalsOf(o, stock, o.order_lines ?? [], safetyDays);
     const sid = primarySupplierId(o, skuMeta, suppliers);
     // C3 — the drawer is the ONE surface that prints the delivering FACT in
     // full (`Delivering 27 Jul · 12pm–3pm`). The Orders row and the Delivery
@@ -3383,6 +3403,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
   const gridRows: OrdersGridRow[] = shown.map((o) => {
     const lines = o.order_lines ?? [];
     return {
+      safetyDays,
       o,
       lines,
       tasks: orderTasks(o),
@@ -5251,6 +5272,9 @@ function OwnerChip({
 interface OrdersGridRow {
   o: operationOrderListRow;
   lines: { sku: string; qty: number }[];
+  /** D8 — Purchasing's governed `Safety days`, carried on the row so the cell
+   *  reads the same number the ladder did. `null` until the settings land. */
+  safetyDays: number | null;
   /** Open follow-up ops_tasks for this order (#2) — drives the ⚑ cell. */
   tasks: OpsTask[];
   stock: StockInfo;
@@ -5593,7 +5617,7 @@ function NextActionCell({
    *  queue word, not the row line: the handler branches on it. */
   onNextAction: (verb: string) => void;
 }) {
-  const { o, stock, lines, logi, completed, supplierName } = row;
+  const { o, stock, lines, logi, completed, supplierName, safetyDays } = row;
   // Delivered = closed → Actions is a next-action column, and a closed order
   // has no action, so the cell is BLANK (Jess 2026-07-19: STATUS already says
   // "Delivered"; a "Done" pill is redundant — and would be wrong if a 2nd
@@ -5604,8 +5628,8 @@ function NextActionCell({
   // is its own track and it SURVIVES delivery (ORDERS-WORKING-FLOW §3).
   // Old Orders may still show Purchasing facts, but it no longer presents a
   // Purchasing action. Choose the first remaining action from the same engine.
-  const visibleOpen = oldOrdersOpenActionsOf(o, stock, lines);
-  const na = oldOrdersNextActionOf(o, stock, lines);
+  const visibleOpen = oldOrdersOpenActionsOf(o, stock, lines, safetyDays);
+  const na = oldOrdersNextActionOf(o, stock, lines, safetyDays);
   if (!na.label) return null;
   if (completed && na.key === "done") return null;
   const m = moneyOf(o);

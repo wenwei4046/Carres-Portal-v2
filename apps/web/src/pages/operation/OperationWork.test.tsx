@@ -32,6 +32,7 @@ let partnersState: { data: DeliveryPartnersListResponse | undefined };
 let stockState: { data: operationStockResponse | undefined };
 let staffState: { data: OpsStaffListResponse | undefined; isLoading: boolean };
 let settingsState: { data: undefined };
+let poDutyState: { data: { month: string; holder: { userId: string; email: string; name: string | null; assignedBy: string | null } | null } | undefined };
 let authState: { role: string; email: string | null };
 
 vi.mock("@/lib/queries", async () => {
@@ -43,6 +44,7 @@ vi.mock("@/lib/queries", async () => {
     useOperationStock: () => stockState,
     useOperationStaff: () => staffState,
     usePurchasingSettings: () => settingsState,
+    useOperationPoDuty: () => poDutyState,
   };
 });
 
@@ -144,6 +146,7 @@ beforeEach(() => {
   stockState = { data: undefined };
   staffState = { data: STAFF, isLoading: false };
   settingsState = { data: undefined };
+  poDutyState = { data: undefined };
   authState = { role: "operation", email: "sha@carres.co" };
   vi.useFakeTimers();
   vi.setSystemTime(new Date(`${TODAY}T09:00:00`));
@@ -285,5 +288,86 @@ describe("OperationWork — the rail deep-links into a person's work", () => {
     // the 2026-08-14 `open · overdue` tally is SUPERSEDED by the card
     expect(shell.textContent).not.toMatch(/\d+ open\b/);
     expect(shell.textContent).not.toMatch(/\d+ overdue\b/);
+  });
+});
+
+/**
+ * THE ACTION OWNER ENGINE RESOLUTION (§0.1, built 2026-08-27).
+ *
+ * The registry's structured Owner Rules resolve per action: Purchasing's
+ * order-track work lands on the month's PO-duty holder, the missing customer
+ * promise on the responsible salesperson (a name without an ops account), and
+ * the PIC keeps only what is truthfully the relationship owner's.
+ */
+describe("OperationWork — owners resolve per RULE, not per order", () => {
+  const unorderedRow = (over: Partial<operationOrderListRow> = {}) =>
+    makeRow({
+      id: "u",
+      so: 1301,
+      operation_stage: "placed",
+      order_lines: [{ sku: "B1201S-K", qty: 1 }],
+      ...over,
+    });
+
+  it("`Issue PO` lands in the PO-duty holder's My Work — the PIC never sees it as theirs", () => {
+    poDutyState = {
+      data: {
+        month: "2026-07",
+        holder: { userId: OTHER_UID, email: "yj@carres.co", name: "Yu Jun", assignedBy: null },
+      },
+    };
+    listState.data = { orders: [unorderedRow()] }; // PIC = Shasha (signed in)
+    wrap(<OperationWork />);
+    // My Work (Shasha, the PIC): the purchasing act is NOT here…
+    expect(screen.queryByTestId("work-row-SO-1301-issue_po")).toBeNull();
+    // …it is in the duty holder's Team group.
+    fireEvent.click(screen.getByTestId("work-view-team"));
+    const yuJun = screen.getByTestId(`work-owner-group-${OTHER_UID}`);
+    expect(yuJun.querySelector('[data-testid="work-row-SO-1301-issue_po"]')).toBeTruthy();
+  });
+
+  it("a dormant duty layer groups the purchasing act under the duty word — never the PIC borrowed", () => {
+    poDutyState = { data: undefined };
+    listState.data = { orders: [unorderedRow()] };
+    wrap(<OperationWork />, "/operation?tab=work&scope=team");
+    const duty = screen.getByTestId("work-owner-group-duty:Purchasing");
+    expect(duty).toHaveTextContent("Purchasing");
+    expect(duty.querySelector('[data-testid="work-row-SO-1301-issue_po"]')).toBeTruthy();
+  });
+
+  it("a never-asked missing date groups under the SALESPERSON'S NAME — a person, not a duty word", () => {
+    listState.data = {
+      orders: [
+        makeRow({
+          id: "n",
+          so: 1302,
+          delivery_date: null,
+          delivery_date_tbd: false,
+          salespersons: { name: "Mei Ling" },
+        }),
+      ],
+    };
+    wrap(<OperationWork />, "/operation?tab=work&scope=team");
+    const group = screen.getByTestId("work-owner-group-person:Mei Ling");
+    expect(group).toHaveTextContent("Mei Ling");
+    expect(
+      group.querySelector('[data-testid="work-row-SO-1302-ask_delivery_date"]'),
+    ).toBeTruthy();
+  });
+
+  it("the 8 who answered `not yet` raise NO ask item (owner ruling 2026-08-15)", () => {
+    listState.data = {
+      orders: [
+        makeRow({
+          id: "t",
+          so: 1303,
+          delivery_date: null,
+          delivery_date_tbd: true,
+          salespersons: { name: "Mei Ling" },
+        }),
+      ],
+    };
+    wrap(<OperationWork />, "/operation?tab=work&scope=team");
+    expect(screen.queryByTestId("work-row-SO-1303-ask_delivery_date")).toBeNull();
   });
 });

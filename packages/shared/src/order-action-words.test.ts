@@ -31,6 +31,9 @@ const EVERY_KEY: OrderActionKey[] = [
   "upload_delivery_photo",
   "delivering",
   "collect",
+  // §0.1 Action Owner Engine row 1 (composed 2026-08-27) — the missing
+  // customer promise, the salesperson's work
+  "ask_delivery_date",
   // the blueprint card's two composed Work acts (owner-approved 2026-08-16)
   "collect_loan_item",
   "resolve_payment_exception",

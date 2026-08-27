@@ -336,7 +336,7 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
       [
         "Shasha · Kimmy · 019-3478913",
         "Ask which delivery date the customer agrees to.",
-        "Record the agreed Requested Delivery Date date.",
+        "Record the agreed Requested Delivery Date.",
       ].join("\n"),
     );
     expect(screen.queryByText("No date yet")).not.toBeInTheDocument();
