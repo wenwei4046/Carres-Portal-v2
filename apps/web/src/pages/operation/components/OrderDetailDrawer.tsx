@@ -163,7 +163,7 @@ import ServiceNoteModal from "./ServiceNoteModal";
 import GenerateInvoiceOverlay from "./GenerateInvoiceOverlay";
 import DownloadSalesOrderButton from "@/components/DownloadSalesOrderButton";
 import DownloadInvoiceButton from "@/components/DownloadInvoiceButton";
-import { type OperationStage } from "./StageChip";
+import { displayStageOf, type OperationStage } from "./StageChip";
 import DispatchModal from "./DispatchModal";
 import DOAttachModal from "./DOAttachModal";
 import AbandonOrderModal from "./AbandonOrderModal";
@@ -1404,20 +1404,11 @@ function DrawerBody({
         u.reservedRef === soRef &&
         stockMatchKey(u.sku) === stockMatchKey(sku),
     )?.id ?? null;
-  // Pipeline v2 (C1): widen stage derivation to honor 'place' status + the
-  // new placed/confirmed enum values without falling through to a
-  // bogus in_production default.
-  const stage: OperationStage = (() => {
-    // AutoCount-imported orders arrive ALREADY proceeded — they carry a PO, so
-    // they are NEVER "placed / waiting for the dealer to push" (Jess 2026-07-02,
-    // project-order-lifecycle-flow: "the 'waiting for dealer' copy is WRONG for
-    // these"). Only a native dealer/POS order sits at 'placed'.
-    const autocount = order.source_system === "autocount";
-    if (order.status === "place" && !autocount) return "placed";
-    if (order.operation_stage) return order.operation_stage as OperationStage;
-    if (order.status === "delivered") return "delivered";
-    return "in_production";
-  })();
+  /* D3 — the DISPLAY stage, spelt once in `StageChip`. This was a local IIFE
+     carrying Jess's 2026-07-02 AutoCount ruling; the list needs the RAW slot for
+     its tab routing, so the two questions now have two names instead of one
+     name written twice. */
+  const stage: OperationStage = displayStageOf(order);
   // Line-sum of the order (native/priced orders). AutoCount imports carry no line
   // prices → grandTotal is 0 and Total falls back to the keyed balance (see the
   // Money block below). hasLineTotal drives whether Total is auto (read-only) or
