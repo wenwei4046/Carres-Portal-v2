@@ -527,7 +527,10 @@ function ActionCell({
         e.stopPropagation();
         onReceive();
       }}
-      data-testid={`receive-po-${po.id}`}
+      /* D11 - the hatch and the primary `Check in` button used to share
+         `receive-po-<id>`, so a test could only tell two different affordances
+         apart by their WORDS. Two controls, two handles. */
+      data-testid={`direct-receive-${po.id}`}
     >
       Direct receive →
     </button>
