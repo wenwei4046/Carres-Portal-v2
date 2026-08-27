@@ -175,10 +175,15 @@ No deposit · Online order
 - **History** remains the append-only event ledger. Line 1 states the event in Primary School
   Standard English; line 2 names the actor, role and actual time; line 3 states only the important
   result. A simple event without extra detail uses two lines.
-- `Unknown user` is not an acceptable final state. Resolve the real actor from the authoritative
-  identity record, or say `System` only when the portal truly performed the event. A missing actor
-  link is an audit-data defect; the UI does not conceal it by flattening role and fields beside the
-  word `Unknown`.
+- **STAFF IDENTITY LAW — OWNER RULING 2026-08-27 (Jess).** `Who did it?` is answered by a person,
+  never a permission. Every staff member uses an individual authenticated account; `Principal`,
+  `Operation` and `Finance` are roles, not names; every Sales Order write stores the individual
+  `user_id`, and these views resolve it to the real display name from the authoritative identity
+  source — never a hardcoded mapping, never a role dressed as a person. `System` only when the
+  event's own facts prove automation. An actor that cannot be recovered — including a write from
+  a shared role-labeled login — says `Staff identity not recorded`. The full ruling, approved and
+  forbidden displays live in `ui/MASTER.md` § HISTORY + REVISION THREE-RANK RECORD GRAMMAR;
+  the account/governance work is `docs/cards/CARD-2026-08-27-individual-staff-identity.md`.
 - `0% deposit · online` is raw-field copy. The employee-facing result is `No deposit · Online
   order` when those are the authoritative facts.
 
