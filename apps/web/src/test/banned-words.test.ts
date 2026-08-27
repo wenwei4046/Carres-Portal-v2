@@ -54,7 +54,9 @@ describe("no banned word reaches the screen (C12 · portal-wide)", () => {
   describe("SO Batch Purchase", () => {
     itSaysNoBannedWord(
       join(PAGES, "operation", "so-batch", "SoBatchRegister.tsx"),
-      { minStrings: 40, expectString: "Not counted yet" },
+      /* Card 02-B — `Not counted yet` left with the retired Stock column; the
+         coverage absence is the string the file is now known to contain. */
+      { minStrings: 40, expectString: "Not ordered yet" },
     );
     itSaysNoBannedWord(
       join(PAGES, "operation", "so-batch", "SoBatchIssueWorkspace.tsx"),

@@ -17,10 +17,12 @@ import {
   purchaseDemandTimingOf,
   purchaseDemandsResponseSchema,
   soBatchAction,
-  soBatchPurchaseResponseSchema,
   type PurchaseDemandRow,
   type PurchaseDemandState,
 } from "./purchase-demands";
+/* The SO Batch read moved with Card 02-B: the response now carries the order
+   Register rows that file defines. */
+import { soBatchPurchaseResponseSchema } from "./so-batch-purchase";
 
 function row(over: Partial<PurchaseDemandRow> = {}): PurchaseDemandRow {
   return {
@@ -641,6 +643,7 @@ describe("the SO Batch response carries destinations, duty and permission", () =
     const parsed = soBatchPurchaseResponseSchema.parse({
       today: "2026-08-22",
       rows: [],
+      registerRows: [],
       destinations: [
         { id: "d1", name: "Carres Klang", isDefault: true, active: true },
       ],
@@ -666,6 +669,7 @@ describe("the SO Batch response carries destinations, duty and permission", () =
     const parsed = soBatchPurchaseResponseSchema.parse({
       today: "2026-08-22",
       rows: [],
+      registerRows: [],
       destinations: [],
       defaultDestinationId: null,
       currentPoDuty: null,

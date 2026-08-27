@@ -634,11 +634,13 @@ sidebar page. Existing implementation constants do not override these approved p
 | Page | No page — use `SO Batch Purchase` or the source object |
 | Search | `Search Sales Order, customer, SKU or supplier…` |
 | Rail headings | `TO ORDER` · `ORDER TIMING` · `SETUP TO FIX` |
-| Empty state | `Nothing needs buying.` |
-| Columns | `Item · Description` · `Variant` · `Category` · `SKU` · `SO No` · `Customer` · `Requested Delivery Date` · `Supplier` · `Qty Needed` · `Ready Stock` · `On PO` · `To Buy` · `Coverage` |
+| Empty state | `No proceeded Sales Orders.` |
+| Register columns (Card 02-B, 2026-08-27 — exactly, in this order) | `Status` · `Proceed Date` · `PO No` · `SO No` · `Customer` · `Delivery Location` · `Requested Delivery Date` · `Supplier` · `Deliver To` · `PO Delivery Date` |
+| The Status words | blank · `Partial` · `Ordered` — and nothing else. Never `Ready Stock` · `Ready to buy` · `Cannot buy` · `No buying needed` · `Posted` · `Sent` · `Not sent` · `Covered` |
+| A parent cell over several values | one value prints itself; several print `2 POs` · `2 suppliers` · `Multiple` — the exact mapping lives in the expansion |
 
-**The rail — owner correction 2026-08-26.** Three headings, and there is no fourth. `SETUP TO FIX`
-renders only when its count is above zero:
+**The rail — owner correction 2026-08-26; counting corrected 2026-08-27 (Card 02-B).** Three
+headings, and there is no fourth. `SETUP TO FIX` renders only when its count is above zero:
 
 | Heading | Rail rows |
 |---|---|
@@ -646,11 +648,14 @@ renders only when its count is above zero:
 | `ORDER TIMING` | `Can order early` · `14 safety days left` · `1–13 safety days left` · `No safety days left` · `Not enough production time` |
 | `SETUP TO FIX` | `Production time not set` |
 
-Counts are uncovered SO buying lines, never documents or notifications; a zero count prints no
-number. Every `ORDER TIMING` row stays orderable — the words say timing risk, never `Cannot buy`,
+Counts are UNIQUE Sales Orders with outstanding eligible buying demand, never documents,
+notifications or leaf lines — a fully Ordered or fully Ready-Stock-covered order is never counted
+as not ordered; a zero count prints no number. The default no-filter Register shows every
+proceeded record; `All not ordered` is a real outstanding-only filter that excludes fully Ordered
+records. Every `ORDER TIMING` row stays orderable — the words say timing risk, never `Cannot buy`,
 and Order By is a planned date, never an unlock date. `Production time not set` lines are not
-selectable until the Supplier × Category production time exists. Fully covered / `Buy = 0` lines
-do not appear on this page at all.
+selectable until the Supplier × Category production time exists. Fully covered / `Buy = 0` DEMAND
+is never selectable, but the Sales Order's own row is permanent and never leaves the Register.
 
 **The row facts.** Line 1 is the FACT; line 2 is the FIX, in the imperative. A line the owning
 boundary (Sales / Catalog) unexpectedly let through without its customer date, SKU or supplier is

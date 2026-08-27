@@ -228,3 +228,70 @@ describe("the optional Covered by column", () => {
     expect(headers).toEqual(["Category", "Unit ID", "Covered by", "Deliver To", "SKU", "Qty", "Item"]);
   });
 });
+
+/**
+ * ⭐ CARD 02-B — the exact-mapping columns, optional like everything else.
+ * A sibling register that asks for nothing renders byte-identically; the
+ * buying Register asks and gets `Supplier` and `PO Delivery Date` as fixed
+ * columns BEFORE `Item`, which stays last (law ①).
+ */
+describe("Card 02-B · optional Supplier and PO Delivery Date", () => {
+  it("absent by default — Sales Orders and Delivery keep their ruled layout", () => {
+    render(<GoodsMiniTable label="Goods on SO-1303" lines={[goodsLine()]} />);
+    const headers = screen.getAllByRole("columnheader").map((h) => h.textContent);
+    expect(headers).toEqual(["Category", "Unit ID", "Deliver To", "SKU", "Qty", "Item"]);
+  });
+
+  it("present when asked, before Item, with values and quiet absences", () => {
+    render(
+      <GoodsMiniTable
+        label="Goods on SO-1303"
+        showCoveredBy
+        showSupplier
+        showPoDeliveryDate
+        lines={[
+          {
+            ...goodsLine(),
+            coveredBy: ["PO-20260820-1111"],
+            coveredByAbsence: "Not ordered yet",
+            supplier: "Nice Future",
+            poDeliveryDate: "Fri, 18 Sep",
+          },
+          {
+            ...goodsLine(),
+            key: "second",
+            sku: "B1201S-Q",
+            coveredBy: [],
+            coveredByAbsence: "Not ordered yet",
+            supplierAbsence: "—",
+            poDeliveryDateAbsence: "—",
+          },
+        ]}
+      />,
+    );
+    const headers = screen.getAllByRole("columnheader").map((h) => h.textContent);
+    expect(headers).toEqual([
+      "Category", "Unit ID", "Covered by", "Deliver To", "SKU", "Qty",
+      "Supplier", "PO Delivery Date", "Item",
+    ]);
+    expect(screen.getByText("Nice Future")).toBeInTheDocument();
+    expect(screen.getByText("Fri, 18 Sep")).toBeInTheDocument();
+  });
+
+  it("an editable Deliver To node renders instead of the printed strings", () => {
+    render(
+      <GoodsMiniTable
+        label="Goods on SO-1303"
+        lines={[
+          {
+            ...goodsLine(),
+            deliverTo: ["never printed"],
+            deliverToNode: <select data-testid="the-editor" />,
+          },
+        ]}
+      />,
+    );
+    expect(screen.getByTestId("the-editor")).toBeInTheDocument();
+    expect(screen.queryByText("never printed")).not.toBeInTheDocument();
+  });
+});

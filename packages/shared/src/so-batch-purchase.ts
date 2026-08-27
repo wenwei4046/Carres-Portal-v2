@@ -1,9 +1,11 @@
 import { z } from "zod";
 import { isOnePoPerOrder } from "./to-order";
 import type { ProductCategory } from "./db-types";
+import type { IsoDate } from "./working-days";
 import {
   PURCHASE_DEMAND_TIMING_STATES,
   isPurchaseDemandTimingState,
+  purchaseDemandRowSchema,
   type PurchaseDemandRow,
   type PurchaseDemandState,
 } from "./purchase-demands";
@@ -47,22 +49,36 @@ import {
 export const SO_BATCH_PURCHASE_WORDS = {
   destination: "SO Batch Purchase",
   search: "Search Sales Order, customer, SKU or supplier…",
-  empty: "Nothing needs buying.",
-  /** What the footer's bare numbers count. */
-  footerUnit: "buying lines",
+  empty: "No proceeded Sales Orders.",
+  /** What the footer's bare numbers count — the Register's own row grain. */
+  footerUnit: "Sales Orders",
 
-  /** Column heads, in the approved order (`docs/purchasing/MASTER.md` §9.1). */
-  colSourceSo: "Source SO",
-  colRequiredFor: "Required For",
-  colSku: "SKU / configuration",
-  colRequired: "Required",
-  colStock: "Stock",
-  colOpenPo: "Open PO",
-  buy: "Buy",
+  /**
+   * Column heads, in the approved order (Card 02-B, owner ruling 2026-08-27;
+   * `docs/purchasing/MASTER.md` §9.1). One row per proceeded Sales Order —
+   * `Delivery Location` sits immediately after `Customer`, and the retired
+   * heads (`Source SO` · `Required For` · `SKU / configuration` · `Required` ·
+   * `Stock` · `Open PO` · `Buy` · `Goods Must Arrive` · `Work`) never return
+   * as Register columns. Their FACTS survive off-screen: `goodsMustArrive`
+   * keeps feeding the left rail and the Work Engine.
+   */
+  colStatus: "Status",
+  colProceedDate: "Proceed Date",
+  colPoNo: "PO No",
+  colSoNo: "SO No",
+  colCustomer: "Customer",
+  colDeliveryLocation: "Delivery Location",
+  colRequestedDelivery: "Requested Delivery Date",
   colSupplier: "Supplier",
   deliverTo: "Deliver To",
-  goodsMustArrive: "Goods Must Arrive",
-  colWork: "Work",
+  colPoDeliveryDate: "PO Delivery Date",
+
+  /**
+   * The deterministic compact summaries a parent cell prints when one Sales
+   * Order genuinely carries more than one value — the exact mapping lives in
+   * the expansion, never in the cell.
+   */
+  multiple: "Multiple",
 
   /* THE ROW INSPECTOR HAS NO WORDS OF ITS OWN (owner correction 2026-08-24).
      It draws `GoodsMiniTable`, the child table Sales Orders and Delivery draw,
@@ -104,6 +120,244 @@ export const SO_BATCH_RAIL = {
     states: ["no_production_days"] as readonly PurchaseDemandState[],
   },
 } as const;
+
+// ─── The Register row — one proceeded Sales Order (Card 02-B) ────────────────
+
+/**
+ * THE PERMANENT PURCHASING REGISTER (Card 02-B, owner ruling 2026-08-27;
+ * `docs/purchasing/MASTER.md` §9.1).
+ *
+ * The right Register shows ONE ROW PER PROCEEDED PHYSICAL-GOODS SALES ORDER,
+ * and the row never leaves when a purchase order is issued — the page is both
+ * the buying surface and the permanent purchasing audit register. The leaf
+ * demand rows (`PurchaseDemandRow`) remain the ONLY selection and issue
+ * contract; the order row is presentation and aggregation over them plus the
+ * authoritative PO lineage.
+ *
+ * ── STATUS IS DERIVED, NEVER STORED ─────────────────────────────────────────
+ *
+ * Three visible values — blank · `Partial` · `Ordered` — derived from exactly
+ * two server quantities:
+ *
+ *   buyingRequiredQty   units that genuinely require purchasing
+ *                       (demanded minus Ready-Stock coverage)
+ *   sentCoveredQty      units of that requirement covered by a NON-CANCELLED
+ *                       purchase order whose CURRENT PDF version has
+ *                       confirmed-sent evidence (`po_sends.kind =
+ *                       'confirmed_sent'` at `COALESCE(version, 1)`)
+ *
+ * `external_open` never counts. Supplier silence changes nothing. A numbered
+ * but unsent PO leaves Status blank while appearing under `PO No`. A new
+ * revision without its own confirmed send invalidates older-version
+ * completeness. A Sales Order covered entirely by Ready Stock has nothing that
+ * requires purchasing, so it is blank — visible, and unselectable.
+ */
+export type SoBatchOrderStatus = "blank" | "partial" | "ordered";
+
+/** The visible Status words. Blank is BLANK — never `No buying needed`. */
+export const SO_BATCH_ORDER_STATUS_WORDS: Record<SoBatchOrderStatus, string> = {
+  blank: "",
+  partial: "Partial",
+  ordered: "Ordered",
+};
+
+export function soBatchOrderStatusOf(f: {
+  buyingRequiredQty: number;
+  sentCoveredQty: number;
+}): SoBatchOrderStatus {
+  if (f.buyingRequiredQty <= 0) return "blank";
+  if (f.sentCoveredQty <= 0) return "blank";
+  if (f.sentCoveredQty >= f.buyingRequiredQty) return "ordered";
+  return "partial";
+}
+
+/** One linked purchase order, through `po_line_sources` lineage ONLY. */
+export interface SoBatchOrderPoFact {
+  /** The PO number — `purchase_orders.id`. */
+  poId: string;
+  /** Cancelled POs never reach this list at all. */
+  status: "open" | "received";
+  supplierId: string | null;
+  supplierName: string | null;
+  /** The destination the ISSUED document actually carries. */
+  destinationId: string | null;
+  /** `purchase_orders.eta_date` — the official supplier-facing date. */
+  etaDate: IsoDate | null;
+  /** TRUE = the current PDF version has confirmed-sent evidence. */
+  sentCurrentVersion: boolean;
+}
+
+/**
+ * One procurable customer line of the order, with its Ready-Stock coverage and
+ * its exact PO lineage — the expansion's mapping truth. Quantities are SKU
+ * units throughout, the same unit `po_line_sources.qty` speaks.
+ */
+export interface SoBatchOrderLineFact {
+  orderLineId: string;
+  sku: string;
+  /** What the customer ordered on this line. */
+  qty: number;
+  /** Units already covered by Ready Stock (the pool ledger's own number). */
+  stockTaken: number;
+  item: string;
+  variant: string | null;
+  category: ProductCategory | null;
+  /** Exact lineage: which POs cover this line, and how many units each. */
+  pos: Array<{ poId: string; qty: number }>;
+}
+
+/** One right-Register row: one proceeded physical-goods Sales Order. */
+export interface SoBatchOrderRow {
+  orderId: string;
+  so: number | null;
+  customer: string | null;
+  status: SoBatchOrderStatus;
+  /** `orders.proceed_date` — the day Operations received the order. */
+  proceedDate: IsoDate | null;
+  /** `orders.delivery_date` — the customer's current request. */
+  requestedDeliveryDate: IsoDate | null;
+  /** The customer's delivery locality, formatted by the shared web rule. */
+  deliveryCity: string | null;
+  deliveryState: string | null;
+  /** Non-cancelled lineage POs, sorted by PO number. */
+  pos: SoBatchOrderPoFact[];
+  lines: SoBatchOrderLineFact[];
+  /** Suppliers resolved for the OUTSTANDING demand — the pre-issue answer. */
+  outstandingSuppliers: string[];
+}
+
+export const soBatchOrderRowSchema = z.object({
+  orderId: z.string(),
+  so: z.number().nullable(),
+  customer: z.string().nullable(),
+  status: z.enum(["blank", "partial", "ordered"]),
+  proceedDate: z.string().nullable(),
+  requestedDeliveryDate: z.string().nullable(),
+  deliveryCity: z.string().nullable(),
+  deliveryState: z.string().nullable(),
+  pos: z.array(
+    z.object({
+      poId: z.string(),
+      status: z.enum(["open", "received"]),
+      supplierId: z.string().nullable(),
+      supplierName: z.string().nullable(),
+      destinationId: z.string().nullable(),
+      etaDate: z.string().nullable(),
+      sentCurrentVersion: z.boolean(),
+    }),
+  ),
+  lines: z.array(
+    z.object({
+      orderLineId: z.string(),
+      sku: z.string(),
+      qty: z.number(),
+      stockTaken: z.number(),
+      item: z.string(),
+      variant: z.string().nullable(),
+      category: z
+        .enum(["mattress", "bedframe", "sofa", "accessory", "service", "guarantee"])
+        .nullable(),
+      pos: z.array(z.object({ poId: z.string(), qty: z.number() })),
+    }),
+  ),
+  outstandingSuppliers: z.array(z.string()),
+});
+
+/**
+ * A parent cell's deterministic answer over a set of values. `none` prints the
+ * grid's own `—`; `one` prints the value; `many` prints a compact summary —
+ * `2 POs`, `2 suppliers`, `Multiple` — and the exact mapping lives in the
+ * expansion. Values are deduplicated and sorted so two refreshes cannot
+ * summarise one Sales Order two ways.
+ */
+export type SoBatchCellSummary =
+  | { kind: "none" }
+  | { kind: "one"; value: string }
+  | { kind: "many"; count: number; values: string[] };
+
+export function soBatchCellSummary(values: readonly (string | null)[]): SoBatchCellSummary {
+  const distinct = [...new Set(values.filter((v): v is string => v != null && v !== ""))].sort(
+    (a, b) => a.localeCompare(b),
+  );
+  if (distinct.length === 0) return { kind: "none" };
+  if (distinct.length === 1) return { kind: "one", value: distinct[0]! };
+  return { kind: "many", count: distinct.length, values: distinct };
+}
+
+/**
+ * THE PARENT SELECTION LAW (Card 02-B §6). The parent checkbox represents ALL
+ * eligible uncovered child demand under its Sales Order:
+ *
+ *   no eligible child   → unselectable (Ordered, or fully Ready-Stock covered)
+ *   all selected        → checked
+ *   some selected       → indeterminate
+ *
+ * `eligible` is `isSelectableForBuying` over the SAME leaf rows the issue
+ * journey consumes — there is no second eligibility rule.
+ */
+export function soBatchOrderSelection(f: {
+  eligibleIds: readonly string[];
+  selectedIds: ReadonlySet<string>;
+}): { selectable: boolean; checked: boolean; indeterminate: boolean } {
+  const selectable = f.eligibleIds.length > 0;
+  const on = f.eligibleIds.filter((id) => f.selectedIds.has(id)).length;
+  return {
+    selectable,
+    checked: selectable && on === f.eligibleIds.length,
+    indeterminate: on > 0 && on < f.eligibleIds.length,
+  };
+}
+
+// ─── The wire: the SO Batch Purchase read ────────────────────────────────────
+
+/**
+ * THE SO BATCH PURCHASE READ (Card 02 §7.1; Card 02-B §8).
+ *
+ * `rows` remains the authoritative leaf truth — expansion, coverage,
+ * destination allocation, selection and Issue PO all run on it, unchanged.
+ * `registerRows` is ADDITIVE: the parent presentation and aggregation, one row
+ * per proceeded Sales Order, composed by the same one server read.
+ *
+ * The rest: where goods may be sent, which of those is the standing default,
+ * who currently holds PO Duty, who is covering it today, and whether THIS
+ * reader may issue. `mayIssue` is a convenience — the API and the creation RPC
+ * both refuse an unauthorised issue whatever the browser believes (Card §6;
+ * 0379).
+ */
+export const soBatchPurchaseResponseSchema = z.object({
+  today: z.string(),
+  rows: z.array(purchaseDemandRowSchema),
+  /** Card 02-B — one row per proceeded physical-goods Sales Order. */
+  registerRows: z.array(soBatchOrderRowSchema),
+  destinations: z.array(
+    z.object({
+      id: z.string(),
+      name: z.string(),
+      isDefault: z.boolean(),
+      active: z.boolean(),
+    }),
+  ),
+  defaultDestinationId: z.string().nullable(),
+  /** The month's normal holder. `Team Work` groups by this person. */
+  currentPoDuty: z.object({ userId: z.string(), name: z.string() }).nullable(),
+  /**
+   * ⭐ 0379 — the dated buddy cover who may act TODAY, when one is set. It is a
+   * separate fact from the holder on purpose: the duty stays where management
+   * put it, and the audit must still say who actually pressed Issue PO.
+   */
+  actingPoDuty: z.object({ userId: z.string(), name: z.string() }).nullable(),
+  mayIssue: z.boolean(),
+  /** Who may collect from a factory, for the documents that need one. */
+  procurementPartners: z.array(z.object({ id: z.string(), name: z.string() })),
+  /**
+   * Card 02-A — the governed Safety days value (`order_by_buffer_days`), so
+   * the safety-band words follow the one setting instead of a hard-coded 14.
+   * The browser only PRINTS it; the arithmetic stays on the server.
+   */
+  safetyDays: z.number().int(),
+});
+
+export type SoBatchPurchaseResponse = z.infer<typeof soBatchPurchaseResponseSchema>;
 
 // ─── Destinations ────────────────────────────────────────────────────────────
 

@@ -5,7 +5,7 @@ import { dirname, join } from "node:path";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import type { SoBatchPurchaseResponse } from "@carres/shared";
+import type { SoBatchOrderRow, SoBatchPurchaseResponse } from "@carres/shared";
 import { soBatchAction } from "@carres/shared";
 
 const navigate = vi.fn();
@@ -40,6 +40,27 @@ import OperationToOrder from "./OperationToOrder";
 
 const KLANG = "11111111-1111-4111-8111-111111111111";
 const HERE = dirname(fileURLToPath(import.meta.url));
+
+/** The o1 order row — Card 02-B: the parent grain the Register draws. */
+function orderRow(over: Partial<SoBatchOrderRow> = {}): SoBatchOrderRow {
+  return {
+    orderId: "o1",
+    so: 1318,
+    customer: "Kimmy",
+    status: "blank",
+    proceedDate: "2026-08-20",
+    requestedDeliveryDate: "2026-08-28",
+    deliveryCity: "Petaling Jaya",
+    deliveryState: "Selangor",
+    pos: [],
+    lines: [
+      { orderLineId: "l1", sku: "B1201S-K", qty: 2, stockTaken: 0,
+        item: "Booqit", variant: "King", category: "mattress", pos: [] },
+    ],
+    outstandingSuppliers: ["Hooka"],
+    ...over,
+  };
+}
 
 function payload(over: Partial<SoBatchPurchaseResponse> = {}): SoBatchPurchaseResponse {
   const base = {
@@ -87,6 +108,7 @@ function payload(over: Partial<SoBatchPurchaseResponse> = {}): SoBatchPurchaseRe
         }),
       },
     ],
+    registerRows: [orderRow()],
     destinations: [{ id: KLANG, name: "Carres Klang", isDefault: true, active: true }],
     defaultDestinationId: KLANG,
     currentPoDuty: { userId: "u1", name: "Yee Jean" },
@@ -141,7 +163,7 @@ describe("the page reads the ONE projection and draws the Register", () => {
     // The five timing rows; `SETUP TO FIX` hides while its count is zero.
     expect(rail.querySelectorAll("[data-testid^='so-batch-state-']")).toHaveLength(5);
     expect(rail.textContent).not.toContain("SETUP TO FIX");
-    expect(await screen.findByTestId("so-batch-row-build::o1::b1")).toBeInTheDocument();
+    expect(await screen.findByTestId("so-batch-row-o1")).toBeInTheDocument();
   });
 
   it("a payload that is not an SO Batch read is an ERROR, never an empty list", async () => {
@@ -149,7 +171,7 @@ describe("the page reads the ONE projection and draws the Register", () => {
     apiFetch.mockResolvedValue({ ok: true });
     renderPage();
     await screen.findByText("The buying list could not be loaded");
-    expect(screen.queryByText("Nothing needs buying.")).not.toBeInTheDocument();
+    expect(screen.queryByText("No proceeded Sales Orders.")).not.toBeInTheDocument();
   });
 
   it("a read that fails says so and offers the retry — it does not show an empty list", async () => {
@@ -164,9 +186,9 @@ describe("the whole journey — tick, arrange, issue, prove it arrived", () => {
   it("walks from a ticked line to confirmed supplier evidence", async () => {
     apiFetch.mockResolvedValue(payload());
     renderPage();
-    await screen.findByTestId("so-batch-row-build::o1::b1");
+    await screen.findByTestId("so-batch-row-o1");
 
-    fireEvent.click(screen.getByTestId("so-batch-select-build::o1::b1"));
+    fireEvent.click(screen.getByTestId("so-batch-select-o1"));
     expect(screen.getByTestId("so-batch-selection-bar")).toHaveTextContent(
       "1 selected · 2 units · Issue 1 PO",
     );
@@ -208,17 +230,41 @@ describe("the whole journey — tick, arrange, issue, prove it arrived", () => {
         ? Promise.resolve({ ok: true })
         : path.includes("print-data")
           ? Promise.resolve({ po_number: "PO-2041", po_id: "PO-2041", version: 1, lines: [] })
-          : Promise.resolve(payload({ rows: [] })),
+          : /* Card 02-B — the buy leaves the LEAF listing, but the Sales
+               Order's row is PERMANENT: it comes back Ordered, with its PO. */
+            Promise.resolve(
+              payload({
+                rows: [],
+                registerRows: [
+                  orderRow({
+                    status: "ordered",
+                    pos: [
+                      { poId: "PO-2041", status: "open", supplierId: "s-hooka",
+                        supplierName: "Hooka", destinationId: KLANG,
+                        etaDate: "2026-09-18", sentCurrentVersion: true },
+                    ],
+                    lines: [
+                      { orderLineId: "l1", sku: "B1201S-K", qty: 2, stockTaken: 0,
+                        item: "Booqit", variant: "King", category: "mattress",
+                        pos: [{ poId: "PO-2041", qty: 2 }] },
+                    ],
+                    outstandingSuppliers: [],
+                  }),
+                ],
+              }),
+            ),
     );
     fireEvent.change(screen.getByTestId("so-batch-evidence-recipient"), {
       target: { value: "Hooka Purchasing Group" },
     });
     fireEvent.click(screen.getByTestId("so-batch-evidence-confirm"));
-    // Confirmed → back to buying, and the Register re-reads the server.
+    // Confirmed → back to buying, and the Register re-reads the server. The
+    // ordered Sales Order REMAINS — one permanent row, now reading `Ordered`.
     await waitFor(() => expect(screen.getByTestId("so-batch-page")).toBeInTheDocument());
     await waitFor(() =>
-      expect(screen.getByText("Nothing needs buying.")).toBeInTheDocument(),
+      expect(screen.getByTestId("so-batch-status-o1")).toHaveTextContent("Ordered"),
     );
+    expect(screen.getByTestId("so-batch-po-link-o1")).toHaveTextContent("PO-2041");
   });
 
   it("the confirmation declares the version the RENDERED document reported", async () => {
@@ -239,8 +285,8 @@ describe("the whole journey — tick, arrange, issue, prove it arrived", () => {
           : Promise.resolve(payload()),
     );
     renderPage();
-    await screen.findByTestId("so-batch-row-build::o1::b1");
-    fireEvent.click(screen.getByTestId("so-batch-select-build::o1::b1"));
+    await screen.findByTestId("so-batch-row-o1");
+    fireEvent.click(screen.getByTestId("so-batch-select-o1"));
     fireEvent.click(screen.getByTestId("so-batch-issue"));
     await screen.findByTestId("so-batch-issue-workspace");
     fireEvent.click(screen.getByTestId("so-batch-issue-create"));
@@ -264,8 +310,8 @@ describe("the whole journey — tick, arrange, issue, prove it arrived", () => {
   it("Back to buying keeps the selection and creates nothing", async () => {
     apiFetch.mockResolvedValue(payload());
     renderPage();
-    await screen.findByTestId("so-batch-row-build::o1::b1");
-    fireEvent.click(screen.getByTestId("so-batch-select-build::o1::b1"));
+    await screen.findByTestId("so-batch-row-o1");
+    fireEvent.click(screen.getByTestId("so-batch-select-o1"));
     fireEvent.click(screen.getByTestId("so-batch-issue"));
     await screen.findByTestId("so-batch-issue-workspace");
     apiFetch.mockClear();

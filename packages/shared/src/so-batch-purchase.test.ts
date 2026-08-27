@@ -2,6 +2,10 @@ import { describe, it, expect } from "vitest";
 import {
   SO_BATCH_PURCHASE_WORDS as W,
   SO_BATCH_RAIL,
+  SO_BATCH_ORDER_STATUS_WORDS,
+  soBatchOrderStatusOf,
+  soBatchCellSummary,
+  soBatchOrderSelection,
   defaultAllocations,
   setDestination,
   splitAllocation,
@@ -110,11 +114,52 @@ describe("the rail — owner correction 2026-08-26", () => {
 
   it("the page's own words are the governed ones", () => {
     expect(W.search).toBe("Search Sales Order, customer, SKU or supplier…");
-    expect(W.empty).toBe("Nothing needs buying.");
-    expect(W.footerUnit).toBe("buying lines");
+    expect(W.empty).toBe("No proceeded Sales Orders.");
+    expect(W.footerUnit).toBe("Sales Orders");
     expect(W.deliverTo).toBe("Deliver To");
-    expect(W.goodsMustArrive).toBe("Goods Must Arrive");
-    expect(W.buy).toBe("Buy");
+    expect(W.multiple).toBe("Multiple");
+  });
+
+  it("Card 02-B — the ten business column heads, in the approved order exactly", () => {
+    expect([
+      W.colStatus,
+      W.colProceedDate,
+      W.colPoNo,
+      W.colSoNo,
+      W.colCustomer,
+      W.colDeliveryLocation,
+      W.colRequestedDelivery,
+      W.colSupplier,
+      W.deliverTo,
+      W.colPoDeliveryDate,
+    ]).toEqual([
+      "Status",
+      "Proceed Date",
+      "PO No",
+      "SO No",
+      "Customer",
+      "Delivery Location",
+      "Requested Delivery Date",
+      "Supplier",
+      "Deliver To",
+      "PO Delivery Date",
+    ]);
+  });
+
+  it("the retired column heads left the dictionary and never come back", () => {
+    const words = Object.values(W).join(" | ");
+    for (const gone of [
+      "Source SO",
+      "Required For",
+      "SKU / configuration",
+      "Open PO",
+      "Goods Must Arrive",
+    ]) {
+      expect(words, gone).not.toContain(gone);
+    }
+    expect(W).not.toHaveProperty("buy");
+    expect(W).not.toHaveProperty("colWork");
+    expect(W).not.toHaveProperty("goodsMustArrive");
   });
 
   it("no banned or retired Purchasing word is spelt anywhere in the dictionary or the rail", () => {
@@ -557,5 +602,92 @@ describe("composeDocumentLines", () => {
       { build: single("b1", "M-KING", 1, null), orderId: "o1", so: 1, qty: 1 },
     ]);
     expect(res.ok && res.lines[0]!.cost).toBeNull();
+  });
+});
+
+// ─── Card 02-B — one row per proceeded Sales Order ───────────────────────────
+
+describe("soBatchOrderStatusOf — blank · Partial · Ordered, derived and never stored", () => {
+  it("nothing requiring purchasing is blank — a fully Ready-Stock order stays quiet", () => {
+    expect(soBatchOrderStatusOf({ buyingRequiredQty: 0, sentCoveredQty: 0 })).toBe("blank");
+  });
+
+  it("no current-version confirmed-sent coverage is blank — a numbered unsent PO completes nothing", () => {
+    expect(soBatchOrderStatusOf({ buyingRequiredQty: 5, sentCoveredQty: 0 })).toBe("blank");
+  });
+
+  it("some but not all covered is Partial", () => {
+    expect(soBatchOrderStatusOf({ buyingRequiredQty: 5, sentCoveredQty: 2 })).toBe("partial");
+  });
+
+  it("everything covered is Ordered", () => {
+    expect(soBatchOrderStatusOf({ buyingRequiredQty: 5, sentCoveredQty: 5 })).toBe("ordered");
+  });
+
+  it("the visible words are blank · Partial · Ordered — never a retired status word", () => {
+    expect(SO_BATCH_ORDER_STATUS_WORDS.blank).toBe("");
+    expect(SO_BATCH_ORDER_STATUS_WORDS.partial).toBe("Partial");
+    expect(SO_BATCH_ORDER_STATUS_WORDS.ordered).toBe("Ordered");
+    const spelt = Object.values(SO_BATCH_ORDER_STATUS_WORDS).join(" | ");
+    for (const banned of [
+      "Ready Stock",
+      "Ready to buy",
+      "Cannot buy",
+      "No buying needed",
+      "Posted",
+      "Sent",
+      "Not sent",
+      "Covered",
+    ]) {
+      expect(spelt, banned).not.toContain(banned);
+    }
+  });
+});
+
+describe("soBatchCellSummary — a deterministic parent cell over many values", () => {
+  it("none · one · many, deduplicated and sorted", () => {
+    expect(soBatchCellSummary([])).toEqual({ kind: "none" });
+    expect(soBatchCellSummary([null, ""])).toEqual({ kind: "none" });
+    expect(soBatchCellSummary(["PO-1"])).toEqual({ kind: "one", value: "PO-1" });
+    expect(soBatchCellSummary(["PO-2", "PO-1", "PO-2"])).toEqual({
+      kind: "many",
+      count: 2,
+      values: ["PO-1", "PO-2"],
+    });
+  });
+
+  it("two refreshes cannot summarise one order two ways — order of input is irrelevant", () => {
+    expect(soBatchCellSummary(["b", "a"])).toEqual(soBatchCellSummary(["a", "b", "a"]));
+  });
+});
+
+describe("soBatchOrderSelection — the parent checkbox is all eligible child demand", () => {
+  it("no eligible child demand is unselectable — Ordered and fully Ready-Stock rows refuse the tick", () => {
+    expect(soBatchOrderSelection({ eligibleIds: [], selectedIds: new Set() })).toEqual({
+      selectable: false,
+      checked: false,
+      indeterminate: false,
+    });
+  });
+
+  it("all eligible children selected is checked", () => {
+    expect(
+      soBatchOrderSelection({ eligibleIds: ["a", "b"], selectedIds: new Set(["a", "b"]) }),
+    ).toEqual({ selectable: true, checked: true, indeterminate: false });
+  });
+
+  it("part of the eligible children selected is indeterminate", () => {
+    expect(
+      soBatchOrderSelection({ eligibleIds: ["a", "b"], selectedIds: new Set(["a"]) }),
+    ).toEqual({ selectable: true, checked: false, indeterminate: true });
+  });
+
+  it("a Partial order selects only its uncovered eligible remainder — covered ids never count", () => {
+    // The covered line is simply not eligible, so a tick on it cannot exist.
+    const s = soBatchOrderSelection({
+      eligibleIds: ["remainder"],
+      selectedIds: new Set(["remainder", "covered-line"]),
+    });
+    expect(s).toEqual({ selectable: true, checked: true, indeterminate: false });
   });
 });

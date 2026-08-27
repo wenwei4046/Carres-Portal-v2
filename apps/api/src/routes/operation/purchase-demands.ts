@@ -5,15 +5,25 @@ import {
   purchaseDemandQuantities,
   purchaseDemandTimingOf,
   soBatchAction,
+  soBatchOrderStatusOf,
   PURCHASE_DEMAND_OWNER_DUTY,
   type ProductCategory,
   type PurchaseDemandRow,
   type PurchaseDemandState,
   type PurchasingDestination,
+  type SoBatchOrderLineFact,
+  type SoBatchOrderPoFact,
+  type SoBatchOrderRow,
   type SoBatchPurchaseResponse,
 } from "@carres/shared";
 import { requireOperation } from "../../lib/auth-guards";
-import { loadToOrder, type RegisterOrderFact } from "../../lib/purchase-demand-read";
+import {
+  chunk,
+  loadToOrder,
+  type RegisterFacts,
+  type RegisterOrderFact,
+} from "../../lib/purchase-demand-read";
+import { mapPgError } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -47,6 +57,219 @@ import type { AppEnv } from "../../types";
  * answer, and a `0` would assert that nothing covers them — which is not known.
  */
 const purchaseDemandsRouter = new Hono<AppEnv>();
+
+/**
+ * ⭐ CARD 02-B — ONE ROW PER PROCEEDED SALES ORDER (owner ruling 2026-08-27;
+ * `docs/purchasing/MASTER.md` §9.1).
+ *
+ * The permanent purchasing Register: every `proceed_order` Sales Order with
+ * physical-goods demand stays visible after PO issue, forever. Three reads
+ * compose it, and every one of them is an AUTHORITY, never an inference:
+ *
+ *   `po_line_sources`   the ONLY visible PO attribution (0382). Never
+ *                       `purchase_orders.so`, never `so_refs`, never a global
+ *                       SKU/supplier/customer match.
+ *   `purchase_orders`   status (a cancelled PO never counts), the CURRENT
+ *                       version, the official `eta_date`, the issued
+ *                       supplier and `Deliver To`.
+ *   `po_sends`          confirmed-sent evidence AT the current version
+ *                       (0377/0378). `external_open` never counts; supplier
+ *                       silence changes nothing; an older version's send does
+ *                       not complete a new revision.
+ *
+ * Status is `soBatchOrderStatusOf` over two totals in SKU units, per order
+ * line: what genuinely requires purchasing (`qty − stockTaken`, off the
+ * engine's own pass) against what a qualifying PO's lineage covers. A
+ * numbered unsent PO therefore shows under `PO No` while Status stays blank.
+ *
+ * These reads may NOT fail soft: a Register whose lineage read silently
+ * returned nothing would print blank Status on ordered Sales Orders — a lie,
+ * not a degraded page — so an error here is the route's error.
+ */
+async function loadRegisterRows(
+  sb: ReturnType<typeof userClient>,
+  facts: RegisterFacts,
+  supplierNames: Map<string, string>,
+): Promise<
+  { ok: true; registerRows: SoBatchOrderRow[] } | { ok: false; status: number; body: unknown }
+> {
+  /* Which orders get a row: proceeded, with at least one demand line — the
+     engine's procurable lines, or a refusal the leaf Register names (a
+     `no_sku` line keeps its order visible without holding Status open). A
+     Service-only order produces neither and stays outside Purchasing. */
+  const withDemand = new Set<string>();
+  for (const l of facts.soLines) withDemand.add(l.orderId);
+  for (const l of facts.lines) withDemand.add(l.orderId);
+  const orderIds = [...facts.ordersById]
+    .filter(([id, o]) => o.status === "proceed_order" && withDemand.has(id))
+    .map(([id]) => id);
+  if (orderIds.length === 0) return { ok: true, registerRows: [] };
+
+  /* ── the lineage ──────────────────────────────────────────────────────── */
+  type LineageRow = {
+    id: string;
+    po_id: string;
+    order_id: string;
+    order_line_id: string | null;
+    qty: number;
+  };
+  const lineage = new Map<string, LineageRow>();
+  for (const batch of chunk(orderIds)) {
+    const { data, error } = await sb
+      .from("po_line_sources")
+      .select("id, po_id, order_id, order_line_id, qty")
+      .in("order_id", batch);
+    if (error) {
+      const m = mapPgError(error);
+      return { ok: false, status: m.status, body: m.body };
+    }
+    // Keyed by row id: a chunked read must never count one unit twice.
+    for (const r of (data ?? []) as LineageRow[]) lineage.set(r.id, r);
+  }
+
+  /* ── the documents behind it ──────────────────────────────────────────── */
+  const poIds = [...new Set([...lineage.values()].map((r) => r.po_id))];
+  type PoRow = {
+    id: string;
+    status: string;
+    version: number | null;
+    eta_date: string | null;
+    supplier_id: string | null;
+    destination_id: string | null;
+  };
+  const poById = new Map<string, PoRow>();
+  const sentVersions = new Set<string>();
+  for (const batch of chunk(poIds)) {
+    if (batch.length === 0) continue;
+    const [pos, sends] = await Promise.all([
+      sb
+        .from("purchase_orders")
+        .select("id, status, version, eta_date, supplier_id, destination_id")
+        .in("id", batch),
+      sb.from("po_sends").select("po_id, po_version, kind").eq("kind", "confirmed_sent").in("po_id", batch),
+    ]);
+    const err = pos.error ?? sends.error;
+    if (err) {
+      const m = mapPgError(err);
+      return { ok: false, status: m.status, body: m.body };
+    }
+    for (const p of (pos.data ?? []) as PoRow[]) poById.set(p.id, p);
+    for (const s of (sends.data ?? []) as Record<string, unknown>[]) {
+      // SQL already filtered; the guard keeps a permissive test double honest.
+      if (s.kind != null && s.kind !== "confirmed_sent") continue;
+      if (s.po_version == null) continue;
+      sentVersions.add(`${s.po_id as string}::${Number(s.po_version)}`);
+    }
+  }
+  const qualifies = (po: PoRow | undefined): po is PoRow =>
+    po != null && po.status !== "cancelled";
+  const sentCurrent = (po: PoRow): boolean =>
+    sentVersions.has(`${po.id}::${po.version ?? 1}`);
+
+  /* ── one row per order ────────────────────────────────────────────────── */
+  const linesByOrder = new Map<string, typeof facts.soLines>();
+  for (const l of facts.soLines) {
+    const arr = linesByOrder.get(l.orderId);
+    if (arr) arr.push(l);
+    else linesByOrder.set(l.orderId, [l]);
+  }
+  const lineageByOrder = new Map<string, LineageRow[]>();
+  for (const r of lineage.values()) {
+    const arr = lineageByOrder.get(r.order_id);
+    if (arr) arr.push(r);
+    else lineageByOrder.set(r.order_id, [r]);
+  }
+
+  const registerRows: SoBatchOrderRow[] = [];
+  for (const orderId of orderIds) {
+    const fact = facts.ordersById.get(orderId)!;
+    const soLines = linesByOrder.get(orderId) ?? [];
+    const orderLineage = (lineageByOrder.get(orderId) ?? []).filter((r) =>
+      qualifies(poById.get(r.po_id)),
+    );
+
+    /* Per order line: which POs, and how many units each. */
+    const lineagePerLine = new Map<string, Map<string, number>>();
+    for (const r of orderLineage) {
+      if (!r.order_line_id) continue;
+      let per = lineagePerLine.get(r.order_line_id);
+      if (!per) {
+        per = new Map();
+        lineagePerLine.set(r.order_line_id, per);
+      }
+      per.set(r.po_id, (per.get(r.po_id) ?? 0) + Math.max(0, Number(r.qty ?? 0)));
+    }
+
+    let buyingRequiredQty = 0;
+    let sentCoveredQty = 0;
+    const outstandingSupplierIds = new Set<string>();
+    const lines: SoBatchOrderLineFact[] = soLines.map((l) => {
+      const per = lineagePerLine.get(l.lineId) ?? new Map<string, number>();
+      const pos = [...per]
+        .map(([poId, qty]) => ({ poId, qty }))
+        .sort((a, b) => a.poId.localeCompare(b.poId));
+      const required = Math.max(0, l.qty - l.stockTaken);
+      const linked = pos.reduce((s, p) => s + p.qty, 0);
+      const sent = pos.reduce(
+        (s, p) => (sentCurrent(poById.get(p.poId)!) ? s + p.qty : s),
+        0,
+      );
+      buyingRequiredQty += required;
+      sentCoveredQty += Math.min(required, sent);
+      if (required > linked && l.supplierId) outstandingSupplierIds.add(l.supplierId);
+      return {
+        orderLineId: l.lineId,
+        sku: l.sku,
+        qty: l.qty,
+        stockTaken: l.stockTaken,
+        item: l.modelName ?? l.sku,
+        variant: l.variant,
+        category: (l.category as ProductCategory | null) ?? null,
+        pos,
+      };
+    });
+    lines.sort((a, b) => a.sku.localeCompare(b.sku) || a.orderLineId.localeCompare(b.orderLineId));
+
+    const pos: SoBatchOrderPoFact[] = [...new Set(orderLineage.map((r) => r.po_id))]
+      .sort((a, b) => a.localeCompare(b))
+      .map((poId) => {
+        const po = poById.get(poId)!;
+        return {
+          poId,
+          status: po.status === "received" ? "received" : "open",
+          supplierId: po.supplier_id,
+          supplierName: po.supplier_id
+            ? (supplierNames.get(po.supplier_id) ?? null)
+            : null,
+          destinationId: po.destination_id,
+          etaDate: po.eta_date?.slice(0, 10) ?? null,
+          sentCurrentVersion: sentCurrent(po),
+        };
+      });
+
+    registerRows.push({
+      orderId,
+      so: fact.so,
+      customer: fact.customer,
+      status: soBatchOrderStatusOf({ buyingRequiredQty, sentCoveredQty }),
+      proceedDate: fact.proceedDate,
+      requestedDeliveryDate: fact.delivery,
+      deliveryCity: fact.city,
+      deliveryState: fact.state,
+      pos,
+      lines,
+      outstandingSuppliers: [...outstandingSupplierIds]
+        .map((id) => supplierNames.get(id))
+        .filter((n): n is string => Boolean(n))
+        .sort((a, b) => a.localeCompare(b)),
+    });
+  }
+
+  /* Newest order first — the buying day starts at the top. Deterministic:
+     ties (and orders with no number yet) fall back to the id. */
+  registerRows.sort((a, b) => (b.so ?? -1) - (a.so ?? -1) || a.orderId.localeCompare(b.orderId));
+  return { ok: true, registerRows };
+}
 
 /** Nobody resolved → the duty word stands (`work-engine.ts`'s own law). */
 function ownerOf(
@@ -142,6 +365,10 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
       customer: null,
       delivery: null,
       salespersonId: null,
+      status: null,
+      proceedDate: null,
+      city: null,
+      state: null,
     };
 
   const rows: PurchaseDemandRow[] = [];
@@ -318,7 +545,13 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
     });
   }
 
-  /* ── 3 · where a buy may be sent ────────────────────────────────────────
+  /* ── 3 · Card 02-B — one permanent row per proceeded Sales Order ────────── */
+  const registerRes = await loadRegisterRows(sb, registerFacts, supplierNames);
+  if (!registerRes.ok) {
+    return c.json(registerRes.body as Record<string, unknown>, registerRes.status as 400);
+  }
+
+  /* ── 4 · where a buy may be sent ────────────────────────────────────────
    *
    * A CLOSED destination is still returned. History reads through this list —
    * a purchase order sent to a yard that shut last month must still be able to
@@ -358,6 +591,7 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
   const body: SoBatchPurchaseResponse = {
     today,
     rows,
+    registerRows: registerRes.registerRows,
     destinations,
     /* No default configured means NO default. Picking the first active one
        would silently make some warehouse the standing answer, and the standing

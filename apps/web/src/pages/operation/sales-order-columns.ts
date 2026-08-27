@@ -42,8 +42,12 @@ import {
   type MoneyState,
 } from "./sales-order-facts";
 
-/** The dictionary's absence words, so no caller spells them. */
-export const NOT_GIVEN = "Not given";
+/** The dictionary's absence words, so no caller spells them. `Not given` and
+ *  the locality rule moved to the neutral `@/lib/locality` with Card 02-B —
+ *  Purchasing reads them too, and a Purchasing surface may not import a Sales
+ *  page file. Re-exported so every existing caller is untouched. */
+export { NOT_GIVEN, conciseLocality } from "@/lib/locality";
+import { NOT_GIVEN, conciseLocality } from "@/lib/locality";
 export const NOT_RECORDED = "Not recorded";
 export const NO_DATE_YET = "No delivery date";
 
@@ -81,15 +85,6 @@ export function showroomShort(name: string | null | undefined): string {
  * rules how it paints.
  */
 export const MUTED_ABSENCES: ReadonlySet<string> = new Set([NOT_GIVEN, NOT_RECORDED]);
-
-export function conciseLocality(city?: string | null, state?: string | null): string {
-  const cleanCity = city?.trim() || "";
-  const cleanState = state?.trim() || "";
-  if (cleanCity && cleanState && cleanCity.localeCompare(cleanState, undefined, { sensitivity: "accent" }) === 0) {
-    return cleanCity;
-  }
-  return [cleanCity, cleanState].filter(Boolean).join(", ") || NOT_GIVEN;
-}
 
 /** One register row: the order, plus every fact already resolved to a string. */
 export interface RegisterRow {
