@@ -4,6 +4,7 @@ import {
   SO_BATCH_ORDER_STATUS_WORDS,
   SO_BATCH_PURCHASE_WORDS as W,
   SO_BATCH_RAIL,
+  SO_BATCH_RAIL_CLEAR,
   defaultAllocations,
   isSelectableForBuying,
   purchaseDemandRailWords,
@@ -11,20 +12,25 @@ import {
   setDestination,
   soBatchCellSummary,
   soBatchOrderSelection,
+  soBatchOrderSupplierNames,
+  soBatchRailFacts,
+  soBatchRailModel,
   soBatchSelectionSummary,
   type DestinationAllocation,
   type PurchaseDemandRow,
-  type PurchaseDemandState,
+  type PurchaseDemandTimingState,
   type SoBatchCellSummary,
   type SoBatchOrderRow,
+  type SoBatchProductCategory,
   type SoBatchPurchaseResponse,
+  type SoBatchRailFilter,
   type SoBatchSelection,
 } from "@carres/shared";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import { fmtDate } from "@/lib/fmt-date";
 import { conciseLocality, NOT_GIVEN } from "@/lib/locality";
 import { useSalesOrderExpansion } from "@/lib/queries";
-import { RailGroup, RailItem } from "../components/workspace-rail";
+import { FilterRail, FilterRailGroup, FilterRailRow } from "../components/workspace-rail";
 import PurchasingTabs from "../PurchasingTabs";
 import DestinationAllocationEditor from "./DestinationAllocationEditor";
 import GoodsMiniTable, {
@@ -112,73 +118,38 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
     return m;
   }, [orders, leafsByOrder]);
 
-  /* ── The rail (Card 02-A wording, Card 02-B counting) ─────────────────────
+  /* ── The rail (Card 02-C: five sections, one selection per section) ───────
    *
    * The DEFAULT no-filter view shows every proceeded record, Ordered ones
-   * included — the Register is permanent. `All not ordered` is therefore a
-   * REAL outstanding-only filter now, and every facet counts UNIQUE Sales
-   * Orders with outstanding eligible child demand, so an Ordered record can
-   * never be counted as not ordered. */
-  const [states, setStates] = useState<Set<PurchaseDemandState>>(new Set());
-  const [notOrderedOnly, setNotOrderedOnly] = useState(false);
-  const outstandingOrders = useMemo(
-    () => new Set(leafs.map((r) => r.orderId)),
-    [leafs],
+   * included — the Register is permanent. One filter per section; sections
+   * combine; every count is the SHARED model's unique-Sales-Order arithmetic,
+   * cross-updated against the other sections so the printed number predicts
+   * the rows a click would show. This file picks; it never counts. */
+  const [filter, setFilter] = useState<SoBatchRailFilter>(SO_BATCH_RAIL_CLEAR);
+  const railFacts = useMemo(() => soBatchRailFacts(orders, leafs), [orders, leafs]);
+  const rail = useMemo(() => soBatchRailModel(railFacts, filter), [railFacts, filter]);
+  const shown = useMemo(
+    () => orders.filter((o) => rail.visibleOrderIds.has(o.orderId)),
+    [orders, rail.visibleOrderIds],
   );
-  const soCounts = useMemo(() => {
-    const m = new Map<PurchaseDemandState, Set<string>>();
-    for (const r of leafs) {
-      let set = m.get(r.state);
-      if (!set) {
-        set = new Set();
-        m.set(r.state, set);
-      }
-      set.add(r.orderId);
-    }
-    return m;
-  }, [leafs]);
-  const countOf = useCallback(
-    (s: PurchaseDemandState) => soCounts.get(s)?.size ?? 0,
-    [soCounts],
-  );
-  const shown = useMemo(() => {
-    if (!notOrderedOnly && states.size === 0) return orders;
-    /* ⭐ FILTERS COMBINE WITH AND (Card 02-C, 2026-08-27). `All not ordered`
-       narrows to outstanding orders; a timing facet narrows to its band; both
-       active means BOTH must hold. An OR here quietly widened a timing facet
-       back to the whole outstanding listing the moment `All not ordered` was
-       also on — the click stopped predicting the rows. */
-    return orders.filter((o) => {
-      if (notOrderedOnly && !outstandingOrders.has(o.orderId)) return false;
-      if (states.size > 0 && ![...states].some((s) => soCounts.get(s)?.has(o.orderId))) {
-        return false;
-      }
-      return true;
-    });
-  }, [orders, notOrderedOnly, states, outstandingOrders, soCounts]);
-  const toggleState = useCallback((s: PurchaseDemandState) => {
-    setStates((prev) => {
-      const next = new Set(prev);
-      if (next.has(s)) next.delete(s);
-      else next.add(s);
-      return next;
-    });
+  const toggleTiming = useCallback((s: PurchaseDemandTimingState) => {
+    setFilter((prev) => ({ ...prev, timing: prev.timing === s ? null : s }));
+  }, []);
+  const toggleProduct = useCallback((c: SoBatchProductCategory) => {
+    setFilter((prev) => ({ ...prev, product: prev.product === c ? null : c }));
+  }, []);
+  const toggleSupplier = useCallback((name: string) => {
+    setFilter((prev) => ({ ...prev, supplier: prev.supplier === name ? null : name }));
   }, []);
   const stateWords = useMemo(() => purchaseDemandStateWords(data.safetyDays), [data.safetyDays]);
   const railWords = useMemo(() => purchaseDemandRailWords(data.safetyDays), [data.safetyDays]);
-  /* `SETUP TO FIX` renders only while its count is above zero. When the last
-     such line is fixed, its filter must not survive as an invisible narrowing
-     the operator can no longer see or clear. */
-  const setupCount = countOf("no_production_days");
+  /* `SETUP TO FIX` renders only while an affected Sales Order exists. When the
+     last such line is fixed, its filter must not survive as an invisible
+     narrowing the operator can no longer see or clear. */
   useEffect(() => {
-    if (setupCount > 0) return;
-    setStates((prev) => {
-      if (!prev.has("no_production_days")) return prev;
-      const next = new Set(prev);
-      next.delete("no_production_days");
-      return next;
-    });
-  }, [setupCount]);
+    if (rail.setupExists) return;
+    setFilter((prev) => (prev.setup ? { ...prev, setup: false } : prev));
+  }, [rail.setupExists]);
 
   /* ── The arrangement ──────────────────────────────────────────────────────
    *
@@ -299,9 +270,10 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
   }, [orders, orderSelection]);
 
   /* ── The ten approved columns ─────────────────────────────────────────── */
+  /* The SAME projection the SUPPLIER rail filters by (Card 02-C §7) — the
+     rail can never learn a supplier this column does not print. */
   const supplierSummaryOf = useCallback(
-    (o: SoBatchOrderRow) =>
-      soBatchCellSummary([...o.outstandingSuppliers, ...o.pos.map((p) => p.supplierName)]),
+    (o: SoBatchOrderRow) => soBatchCellSummary(soBatchOrderSupplierNames(o)),
     [],
   );
   const columns = useMemo<DataGridColumn<SoBatchOrderRow>[]>(
@@ -614,56 +586,97 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
     >
       <PurchasingTabs />
       <div className="flex min-h-0 flex-1 overflow-hidden">
-        <aside
-          className="flex w-[200px] min-h-0 shrink-0 flex-col gap-4 overflow-y-auto border-r border-kit-slate-5 bg-white px-3 py-3"
-          data-testid="so-batch-rail"
-        >
-          <RailGroup title={SO_BATCH_RAIL.toOrder.heading}>
-            {/* Card 02-B — a REAL outstanding-only filter now that Ordered
-                records stay in the listing. It counts unique Sales Orders
-                with outstanding eligible demand, and it toggles. */}
-            <RailItem
-              active={notOrderedOnly}
-              onClick={() => setNotOrderedOnly((v) => !v)}
+        {/* Card 02-C — the readable 240px shell. Navigation, not batch
+            selection: no rail row carries a checkbox, one filter per section,
+            sections combine, and the fixed rows print their live count, zero
+            included. */}
+        <FilterRail testId="so-batch-rail">
+          <FilterRailGroup title={SO_BATCH_RAIL.toOrder.heading}>
+            <FilterRailRow
+              active={filter.notOrderedOnly}
+              onClick={() =>
+                setFilter((prev) => ({ ...prev, notOrderedOnly: !prev.notOrderedOnly }))
+              }
               testId="so-batch-all-not-ordered"
               label={SO_BATCH_RAIL.toOrder.all}
-              count={outstandingOrders.size > 0 ? outstandingOrders.size : undefined}
-              title={`${outstandingOrders.size} ${W.footerUnit} not ordered`}
+              count={rail.notOrderedCount}
+              title={`${rail.notOrderedCount} ${W.footerUnit} not ordered`}
             />
-          </RailGroup>
-          <RailGroup title={SO_BATCH_RAIL.timing.heading}>
+          </FilterRailGroup>
+          <FilterRailGroup title={SO_BATCH_RAIL.timing.heading}>
             {SO_BATCH_RAIL.timing.states.map((s) => (
-              <RailItem
+              <FilterRailRow
                 key={s}
-                active={states.has(s)}
-                onClick={() => toggleState(s)}
+                active={filter.timing === s}
+                onClick={() => toggleTiming(s)}
                 testId={`so-batch-state-${s}`}
                 label={railWords[s] ?? ""}
-                /* A zero prints nothing: an absent queue and an empty one
-                   read the same to an operator, and only one is news. */
-                count={countOf(s) > 0 ? countOf(s) : undefined}
-                title={`${countOf(s)} ${W.footerUnit} · ${stateWords[s]}`}
+                count={rail.timingCounts[s]}
+                title={`${rail.timingCounts[s]} ${W.footerUnit} · ${stateWords[s]}`}
               />
             ))}
-          </RailGroup>
+          </FilterRailGroup>
+          <FilterRailGroup title={SO_BATCH_RAIL.product.heading}>
+            {/* The CATALOG's categories, never SKU-text inference. `All
+                products` is the section's clear — and where the uncommon
+                categories live. */}
+            <FilterRailRow
+              active={filter.product == null}
+              onClick={() => setFilter((prev) => ({ ...prev, product: null }))}
+              testId="so-batch-product-all"
+              label={SO_BATCH_RAIL.product.all}
+            />
+            {SO_BATCH_RAIL.product.categories.map((c) => (
+              <FilterRailRow
+                key={c.category}
+                active={filter.product === c.category}
+                onClick={() => toggleProduct(c.category)}
+                testId={`so-batch-product-${c.category}`}
+                label={c.word}
+                count={rail.productCounts[c.category]}
+              />
+            ))}
+          </FilterRailGroup>
+          <FilterRailGroup title={SO_BATCH_RAIL.supplier.heading}>
+            {/* Actual names from the Register's own supplier projection —
+                dynamic, alphabetical, never hardcoded. A name with no match
+                under the other filters drops off; the SELECTED name stays,
+                with its honest 0. */}
+            <FilterRailRow
+              active={filter.supplier == null}
+              onClick={() => setFilter((prev) => ({ ...prev, supplier: null }))}
+              testId="so-batch-supplier-all"
+              label={SO_BATCH_RAIL.supplier.all}
+            />
+            {rail.suppliers.map((s) => (
+              <FilterRailRow
+                key={s.name}
+                active={filter.supplier === s.name}
+                onClick={() => toggleSupplier(s.name)}
+                testId={`so-batch-supplier-${s.name}`}
+                label={s.name}
+                count={s.count}
+              />
+            ))}
+          </FilterRailGroup>
           {/* The one Purchasing-owned setup exception, and only while it
               exists — an empty exception section is noise wearing a heading. */}
-          {setupCount > 0 && (
-            <RailGroup title={SO_BATCH_RAIL.setup.heading}>
+          {rail.setupExists && (
+            <FilterRailGroup title={SO_BATCH_RAIL.setup.heading}>
               {SO_BATCH_RAIL.setup.states.map((s) => (
-                <RailItem
+                <FilterRailRow
                   key={s}
-                  active={states.has(s)}
-                  onClick={() => toggleState(s)}
+                  active={filter.setup}
+                  onClick={() => setFilter((prev) => ({ ...prev, setup: !prev.setup }))}
                   testId={`so-batch-state-${s}`}
                   label={railWords[s] ?? ""}
-                  count={countOf(s) > 0 ? countOf(s) : undefined}
-                  title={`${countOf(s)} ${W.footerUnit} · ${stateWords[s]}`}
+                  count={rail.setupCount}
+                  title={`${rail.setupCount} ${W.footerUnit} · ${stateWords[s]}`}
                 />
               ))}
-            </RailGroup>
+            </FilterRailGroup>
           )}
-        </aside>
+        </FilterRail>
 
         <div className="flex min-w-0 flex-1 flex-col p-2">
           <div className="min-h-0 flex-1" data-testid="so-batch-grid">

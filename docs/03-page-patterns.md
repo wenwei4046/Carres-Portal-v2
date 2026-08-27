@@ -226,22 +226,26 @@ cannot reach is a fact half the operators never get.
 
 ### Carres Examples
 
-**Purchasing → SO Batch Purchase** *(owner correction 2026-08-26;
+**Purchasing → SO Batch Purchase** *(owner rulings 2026-08-27, Cards 02-B and 02-C;
 `OperationToOrder.tsx` orchestrating `so-batch/SoBatchRegister.tsx`)* — the
 pattern's first page and the reference for the rest of the module.
 
 ```
-Navigator   TO ORDER (All not ordered)
-            ORDER TIMING (Can order early · 14 safety days left ·
-                          1–13 safety days left · No safety days left ·
-                          Not enough production time)
-            SETUP TO FIX (Production time not set — the whole section
-                          renders only when its count is above zero)
+Navigator   TO ORDER (All not ordered)                       ← 240px FilterRail,
+            ORDER TIMING (Can order early ·                    labels wrap, never
+                          14 safety days left ·                truncate; no
+                          1–13 safety days left ·              checkboxes; one
+                          No safety days left ·                filter per section
+                          Not enough production days)
+            PRODUCT (All products · Mattress · Bedframe · Sofa)
+            SUPPLIER (All suppliers · actual names, alphabetical)
+            SETUP TO FIX (Production days not set — the whole section
+                          renders only when at least one affected SO exists)
 Toolbar     search · filter · sort · display · export
-Grid        ☑ · Source SO · Required For · SKU/configuration · Required ·
-            Stock · Open PO · Buy · Supplier · Deliver To ·
-            Goods Must Arrive · Work
-Footer      `{n} buying lines · {n} units needed · {n} units to buy`
+Grid        ☑ · Status · Proceed Date · PO No · SO No · Customer ·
+            Delivery Location · Requested Delivery Date · Supplier ·
+            Deliver To · PO Delivery Date
+Footer      `{n} Sales Orders · {n} Partial · {n} Ordered`
 ```
 
 Business rules this example depends on, owned by

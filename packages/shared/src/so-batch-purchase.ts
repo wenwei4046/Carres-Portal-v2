@@ -8,6 +8,7 @@ import {
   purchaseDemandRowSchema,
   type PurchaseDemandRow,
   type PurchaseDemandState,
+  type PurchaseDemandTimingState,
 } from "./purchase-demands";
 
 /**
@@ -102,24 +103,219 @@ export const SO_BATCH_PURCHASE_WORDS = {
 // ─── The rail ────────────────────────────────────────────────────────────────
 
 /**
- * THE RAIL CONTRACT — owner correction 2026-08-26 (Card 02-A;
+ * THE RAIL CONTRACT — owner ruling 2026-08-27 (Card 02-C;
  * `docs/COPY-STANDARD.md` — the rail; `docs/purchasing/MASTER.md` §9.1).
  *
- * Three headings, and there is no fourth. `TO ORDER` holds the one `All not
- * ordered` row — the whole unissued listing, which is also what clearing every
- * facet shows. `ORDER TIMING` holds the five timing rows, every one of them
- * orderable. `SETUP TO FIX` holds the one Purchasing-owned setup blocker and
- * renders ONLY when its count is above zero — an exception section with
- * nothing in it is noise wearing a heading.
+ * Five sections, in this exact order. `TO ORDER` holds the one `All not
+ * ordered` outstanding-only filter. `ORDER TIMING` holds the five timing rows,
+ * every one of them orderable. `PRODUCT` holds the three Catalog categories —
+ * the CATALOG's answer, never SKU-text inference. `SUPPLIER` holds the actual
+ * supplier names the Register itself projects, alphabetical and never
+ * hardcoded. `SETUP TO FIX` holds the one Purchasing-owned setup blocker and
+ * renders ONLY while an affected Sales Order exists — an exception section
+ * with nothing in it is noise wearing a heading.
+ *
+ * The rail is NAVIGATION, not batch selection: one filter per section,
+ * sections combine, and no rail row ever grows a checkbox — the page's only
+ * checkboxes are the Register's `Issue PO` selection.
  */
 export const SO_BATCH_RAIL = {
   toOrder: { heading: "TO ORDER", all: "All not ordered" },
   timing: { heading: "ORDER TIMING", states: PURCHASE_DEMAND_TIMING_STATES },
+  product: {
+    heading: "PRODUCT",
+    all: "All products",
+    /** The approved filters, in the approved order — Catalog categories. */
+    categories: [
+      { category: "mattress", word: "Mattress" },
+      { category: "bedframe", word: "Bedframe" },
+      { category: "sofa", word: "Sofa" },
+    ],
+  },
+  supplier: { heading: "SUPPLIER", all: "All suppliers" },
   setup: {
     heading: "SETUP TO FIX",
     states: ["no_production_days"] as readonly PurchaseDemandState[],
   },
 } as const;
+
+/** The three Catalog categories the `PRODUCT` section may filter by. */
+export type SoBatchProductCategory =
+  (typeof SO_BATCH_RAIL.product.categories)[number]["category"];
+
+// ─── The rail filter — one selection per section, sections combine ───────────
+
+/**
+ * WHAT THE OPERATOR HAS PICKED (Card 02-C §8). One slot per section; `null`
+ * (or `false`) is that section's `All`. Different sections combine with AND;
+ * clearing every slot restores the complete permanent Register, Ordered
+ * records included.
+ */
+export interface SoBatchRailFilter {
+  /** `All not ordered` — the explicit outstanding-only filter. */
+  notOrderedOnly: boolean;
+  /** One `ORDER TIMING` row, or none. A second click clears it. */
+  timing: PurchaseDemandTimingState | null;
+  /** One `PRODUCT` category; `null` is `All products`. */
+  product: SoBatchProductCategory | null;
+  /** One supplier name; `null` is `All suppliers`. */
+  supplier: string | null;
+  /** The one `SETUP TO FIX` row. */
+  setup: boolean;
+}
+
+export const SO_BATCH_RAIL_CLEAR: SoBatchRailFilter = {
+  notOrderedOnly: false,
+  timing: null,
+  product: null,
+  supplier: null,
+  setup: false,
+};
+
+/**
+ * THE ONE SUPPLIER PROJECTION (Card 02-C §7). The `Supplier` column and the
+ * `SUPPLIER` rail section both ask THIS function — the resolved
+ * outstanding-demand suppliers plus the issued PO lineage suppliers — so the
+ * rail can never learn a supplier the column does not print, and there is no
+ * second browser-only supplier calculation.
+ */
+export function soBatchOrderSupplierNames(o: SoBatchOrderRow): (string | null)[] {
+  return [...o.outstandingSuppliers, ...o.pos.map((p) => p.supplierName)];
+}
+
+/**
+ * One Sales Order's rail-relevant facts, derived once from the server's own
+ * rows — the leaf states the engine computed, the Catalog categories on the
+ * order's lines (never SKU-text inference), and the Register's own supplier
+ * projection. This file combines and counts them; it derives nothing new.
+ */
+export interface SoBatchRailFacts {
+  orderId: string;
+  /** Has outstanding demand — any leaf at all. `All not ordered`'s meaning. */
+  outstanding: boolean;
+  /** Every leaf state under this order. */
+  states: ReadonlySet<PurchaseDemandState>;
+  /** The CATALOG's categories on the order's lines. */
+  categories: ReadonlySet<ProductCategory>;
+  /** `soBatchOrderSupplierNames`, deduplicated. */
+  suppliers: ReadonlySet<string>;
+}
+
+export function soBatchRailFacts(
+  orders: readonly SoBatchOrderRow[],
+  leafs: readonly PurchaseDemandRow[],
+): SoBatchRailFacts[] {
+  const statesByOrder = new Map<string, Set<PurchaseDemandState>>();
+  for (const r of leafs) {
+    let s = statesByOrder.get(r.orderId);
+    if (!s) {
+      s = new Set();
+      statesByOrder.set(r.orderId, s);
+    }
+    s.add(r.state);
+  }
+  return orders.map((o) => ({
+    orderId: o.orderId,
+    outstanding: statesByOrder.has(o.orderId),
+    states: statesByOrder.get(o.orderId) ?? new Set(),
+    categories: new Set(
+      o.lines
+        .map((l) => l.category)
+        .filter((c): c is ProductCategory => c != null),
+    ),
+    suppliers: new Set(
+      soBatchOrderSupplierNames(o).filter((s): s is string => s != null && s !== ""),
+    ),
+  }));
+}
+
+type SoBatchRailSection = "toOrder" | "timing" | "product" | "supplier" | "setup";
+
+/** Does this order pass every selected section — except, optionally, one? */
+function railMatches(
+  f: SoBatchRailFacts,
+  filter: SoBatchRailFilter,
+  except?: SoBatchRailSection,
+): boolean {
+  if (except !== "toOrder" && filter.notOrderedOnly && !f.outstanding) return false;
+  if (except !== "timing" && filter.timing != null && !f.states.has(filter.timing)) {
+    return false;
+  }
+  if (except !== "product" && filter.product != null && !f.categories.has(filter.product)) {
+    return false;
+  }
+  if (except !== "supplier" && filter.supplier != null && !f.suppliers.has(filter.supplier)) {
+    return false;
+  }
+  if (except !== "setup" && filter.setup && !f.states.has("no_production_days")) return false;
+  return true;
+}
+
+/**
+ * WHAT THE RAIL PRINTS (Card 02-C §§7–8). Every count is UNIQUE Sales Orders —
+ * never SKU quantities, demand lines, POs or notifications — and every
+ * section's counts are computed under the OTHER sections' selections, so the
+ * printed number predicts exactly the rows a click would show. The fixed rows
+ * print their live count, zero included; a supplier row exists only while it
+ * matches, except the selected supplier, which stays visible with `0`.
+ */
+export interface SoBatchRailModel {
+  /** Orders passing every selected filter — what the Register shows. */
+  visibleOrderIds: ReadonlySet<string>;
+  notOrderedCount: number;
+  timingCounts: Record<PurchaseDemandTimingState, number>;
+  productCounts: Record<SoBatchProductCategory, number>;
+  /** Actual names, alphabetical. Never hardcoded, never a placeholder. */
+  suppliers: Array<{ name: string; count: number }>;
+  setupCount: number;
+  /** Whether `SETUP TO FIX` renders at all: any affected Sales Order exists. */
+  setupExists: boolean;
+}
+
+export function soBatchRailModel(
+  facts: readonly SoBatchRailFacts[],
+  filter: SoBatchRailFilter,
+): SoBatchRailModel {
+  const count = (section: SoBatchRailSection, has: (f: SoBatchRailFacts) => boolean) =>
+    facts.filter((f) => railMatches(f, filter, section) && has(f)).length;
+
+  const timingCounts = {} as Record<PurchaseDemandTimingState, number>;
+  for (const s of PURCHASE_DEMAND_TIMING_STATES) {
+    timingCounts[s] = count("timing", (f) => f.states.has(s));
+  }
+  const productCounts = {} as Record<SoBatchProductCategory, number>;
+  for (const c of SO_BATCH_RAIL.product.categories) {
+    productCounts[c.category] = count("product", (f) => f.categories.has(c.category));
+  }
+
+  const supplierCounts = new Map<string, number>();
+  for (const f of facts) {
+    if (!railMatches(f, filter, "supplier")) continue;
+    for (const name of f.suppliers) {
+      supplierCounts.set(name, (supplierCounts.get(name) ?? 0) + 1);
+    }
+  }
+  /* The selected supplier stays visible with 0 while another section
+     temporarily removes its matches — a filter the operator cannot see is a
+     narrowing they cannot clear. */
+  if (filter.supplier != null && !supplierCounts.has(filter.supplier)) {
+    supplierCounts.set(filter.supplier, 0);
+  }
+
+  return {
+    visibleOrderIds: new Set(
+      facts.filter((f) => railMatches(f, filter)).map((f) => f.orderId),
+    ),
+    notOrderedCount: count("toOrder", (f) => f.outstanding),
+    timingCounts,
+    productCounts,
+    suppliers: [...supplierCounts]
+      .map(([name, n]) => ({ name, count: n }))
+      .sort((a, b) => a.name.localeCompare(b.name)),
+    setupCount: count("setup", (f) => f.states.has("no_production_days")),
+    setupExists: facts.some((f) => f.states.has("no_production_days")),
+  };
+}
 
 // ─── The Register row — one proceeded Sales Order (Card 02-B) ────────────────
 
