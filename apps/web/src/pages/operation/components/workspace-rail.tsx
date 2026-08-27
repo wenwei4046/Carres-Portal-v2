@@ -18,6 +18,7 @@
  * decision.
  */
 import type { ReactNode } from "react";
+import { PanelLeftClose } from "lucide-react";
 
 export function RailGroup({
   title,
@@ -115,15 +116,28 @@ export function RailItem({
 export function FilterRail({
   children,
   testId,
+  onHide,
 }: {
   children: ReactNode;
   testId?: string;
+  onHide?: () => void;
 }) {
   return (
     <aside
       data-testid={testId}
-      className="flex w-[240px] min-h-0 shrink-0 flex-col gap-5 overflow-y-auto border-r border-kit-slate-5 bg-white p-3"
+      className="relative flex w-[240px] min-h-0 shrink-0 flex-col gap-5 overflow-y-auto border-r border-kit-slate-5 bg-white p-3"
     >
+      {onHide && (
+        <button
+          type="button"
+          onClick={onHide}
+          aria-label="Hide filters"
+          title="Hide filters"
+          className="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-control border border-kit-slate-6 bg-white text-kit-slate-11 hover:bg-kit-slate-3 hover:text-kit-slate-12"
+        >
+          <PanelLeftClose size={16} strokeWidth={1.75} aria-hidden />
+        </button>
+      )}
       {children}
     </aside>
   );

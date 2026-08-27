@@ -633,6 +633,13 @@ SETUP TO FIX              ← the whole section renders only when at least one a
   the shared `FilterRail` component (`workspace-rail.tsx`). Manual Purchase later imports
   the same shell, grammar, Product authority and unique-object count rule — never
   `ORDER TIMING`, Safety-days arithmetic or the SO-specific `All not ordered` meaning.
+- **The rail may hide completely.** Its top-right `Hide filters` control uses the same governed
+  panel-left icon grammar as the Portal sidebar. While hidden it does not become a 60px icon rail;
+  the Register takes the width and its toolbar exposes `Show filters`. The choice is remembered for
+  that staff browser. This is one local-filter control, not another module-navigation control.
+- **PO Duty appears once in the Register toolbar, never in the filter rail and never repeated on
+  every order.** The avatar/name comes from the live resolved Operation roster: dated cover first,
+  otherwise the monthly holder. Selection actions use the same resolved person.
 - Fully covered / `Buy = 0` DEMAND leaves the buying selection — it is not offered a tick, and
   the leaf listing drops it — but the SALES ORDER'S ROW never leaves (Card 02-B). If a PO is
   cancelled and the quantity is still required, the selectable demand returns automatically by
@@ -679,21 +686,34 @@ The right Register shows **one row per proceeded physical-goods Sales Order**
 Purchasing), and the row never leaves when a purchase order is issued — the page is both the
 buying surface and the permanent purchasing audit register.
 
-**THE PROCEEDED-ORDER BOUNDARY — RESOLVED FROM AUTHORITY, Card 02-C, 2026-08-27.** A Sales
-Order enters SO Batch Purchase only after Sales completes `Proceed`. The boundary is drawn ONCE,
-at the one demand read (`loadToOrder`), before the engine ever sees a line — so a `place` order
-is invisible to the WHOLE surface: no planning, no netting (it cannot consume Open PO coverage
-ahead of a proceeded order), no rail count, no Register row, no selection, no Ready Stock take
-and no PO. Both write doors (`take-stock`, `issue-batch`) recompute through the same read at
-POST time; a demand naming a `place` order resolves to nothing and is refused by name, creating
-and reserving nothing. Every present and future rail count — timing, Product, Supplier — draws
-from this same proceeded-SO population. Rail filters combine with AND: `All not ordered` plus a
-timing facet shows only rows satisfying both.
+**THE PROCEEDED-ORDER BOUNDARY — APPROVED / LOCKED, owner correction 2026-08-27.** A complete
+Sales Portal final submit completes the canonical `Proceed` transition automatically in the same
+database transaction; the salesperson does not press a second button. A submitted order that is
+still missing a governed Proceed fact remains `place` and stays outside Purchasing. When payment,
+address, date or a governed correction supplies the last missing fact, the same transition is
+retried automatically. `Move to Proceed` remains only as a recovery door for legacy/raw records.
+`orders.sales_final_submitted_at` is the authoritative boundary. Raw, office, rental and imported
+orders do not receive it. Historical Portal and raw records cannot be separated truthfully from
+creator role or completeness, so legacy recovery accepts only exact IDs confirmed by Principal,
+requires a written reason, rejects office/rental/imported records and records
+History + Audit before using the canonical transition. The retry runs at the final transaction
+state, so a multi-part Sales revision cannot enter Purchasing on an intermediate total.
+
+The read boundary is still drawn ONCE, at `loadToOrder`, before the engine ever sees a line — so a
+genuine `place` order is invisible to the WHOLE surface: no planning, no netting (it cannot consume
+Open PO coverage ahead of a proceeded order), no rail count, no Register row, no selection, no
+Ready Stock take and no PO. Both write doors (`take-stock`, `issue-batch`) recompute through the
+same read at POST time; a demand naming a `place` order resolves to nothing and is refused by name,
+creating and reserving nothing. Every rail count — timing, Product, Supplier — draws from this same
+proceeded-SO population. Rail filters combine with AND: `All not ordered` plus a timing facet shows
+only rows satisfying both.
 
 **Columns, exactly and in this order:** Status · Proceed Date · PO No · SO No · Customer ·
 Delivery Location · Requested Delivery Date · Supplier · Deliver To · PO Delivery Date.
 `Delivery Location` sits immediately after `Customer`; `SO No` is the identity and stays sticky
-during horizontal scrolling. Retired as Register columns, never to return: `Source SO` ·
+during horizontal scrolling. `Proceed Date` reads `orders.proceeded_at`: the actual date Sales
+handed the complete order to Operations. It never reads `orders.proceed_date`, the planned
+production-start date. Retired as Register columns, never to return: `Source SO` ·
 `Required For` · `SKU / configuration` · `Required` · `Stock` · `Open PO` · `Buy` ·
 `Goods Must Arrive` · `Work` · `Action` — their FACTS survive off-screen (`goodsMustArrive`
 keeps feeding the rail and Work Engine; structured actions keep feeding central Work).

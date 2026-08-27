@@ -911,6 +911,7 @@ function registerTables() {
   /* o1 gains the order facts the Register prints. */
   Object.assign(orders.find((o) => o.id === "o1")!, {
     proceed_date: "2026-08-20",
+    proceeded_at: "2026-08-20T08:15:00+08:00",
     customer_address_city: "Petaling Jaya",
     customer_address_state: "Selangor",
   });
@@ -1016,7 +1017,7 @@ describe("Card 02-B · one permanent row per proceeded Sales Order", () => {
   it("carries the order facts the columns print — Proceed Date, Requested Delivery Date, locality", async () => {
     const { body } = await rowsOf(registerTables());
     const o1 = registerRow(body, "o1")!;
-    expect(o1.proceedDate).toBe("2026-08-20");
+    expect(o1.proceededAt).toBe("2026-08-20T08:15:00+08:00");
     expect(o1.requestedDeliveryDate).toBe(DELIVERY_EARLY);
     expect(o1.deliveryCity).toBe("Petaling Jaya");
     expect(o1.deliveryState).toBe("Selangor");

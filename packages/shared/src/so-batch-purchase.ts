@@ -408,8 +408,8 @@ export interface SoBatchOrderRow {
   so: number | null;
   customer: string | null;
   status: SoBatchOrderStatus;
-  /** `orders.proceed_date` — the day Operations received the order. */
-  proceedDate: IsoDate | null;
+  /** `orders.proceeded_at` — the actual Sales → Operations handoff. */
+  proceededAt: string | null;
   /** `orders.delivery_date` — the customer's current request. */
   requestedDeliveryDate: IsoDate | null;
   /** The customer's delivery locality, formatted by the shared web rule. */
@@ -427,7 +427,7 @@ export const soBatchOrderRowSchema = z.object({
   so: z.number().nullable(),
   customer: z.string().nullable(),
   status: z.enum(["blank", "partial", "ordered"]),
-  proceedDate: z.string().nullable(),
+  proceededAt: z.string().nullable(),
   requestedDeliveryDate: z.string().nullable(),
   deliveryCity: z.string().nullable(),
   deliveryState: z.string().nullable(),

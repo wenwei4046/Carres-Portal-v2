@@ -48,7 +48,7 @@ function orderRow(over: Partial<SoBatchOrderRow> = {}): SoBatchOrderRow {
     so: 1318,
     customer: "Kimmy",
     status: "blank",
-    proceedDate: "2026-08-20",
+    proceededAt: "2026-08-20T08:15:00+08:00",
     requestedDeliveryDate: "2026-08-28",
     deliveryCity: "Petaling Jaya",
     deliveryState: "Selangor",

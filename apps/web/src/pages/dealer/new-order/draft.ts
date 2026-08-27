@@ -219,12 +219,9 @@ export interface WizardDraft {
     // null = "auto = all items" (legacy behavior). Lets dealer charge for
     // partial coverage when only some of the lines go above the free floor.
     stairItems: number | null;
-    // 2026-05-10 (Loo) — "As Fast As Possible" pill on Step1. When clicked,
-    // sets date = today + 20 days and flips this flag. After successful
-    // order create, the wizard auto-fires the Proceed mutation so the order
-    // skips the manual Place→Proceed click. If Proceed conditions aren't
-    // met (e.g. insufficient deposit), we surface the error and the order
-    // stays in 'place' for the dealer to top up + manually proceed.
+    /** ⛔ RETIRED — saved-draft compatibility only. Final submit now asks the
+     *  database to complete the canonical handoff automatically whenever the
+     *  governed facts are ready; no browser-side second Proceed action. */
     asap?: boolean;
   };
   /** Step 2: products picked + addons toggled. Empty array = no products yet. */

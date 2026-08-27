@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { PanelLeftOpen } from "lucide-react";
 import {
   SO_BATCH_ORDER_STATUS_WORDS,
   SO_BATCH_PURCHASE_WORDS as W,
@@ -30,6 +31,7 @@ import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import { fmtDate } from "@/lib/fmt-date";
 import { conciseLocality, NOT_GIVEN } from "@/lib/locality";
 import { useSalesOrderExpansion } from "@/lib/queries";
+import { avatarColor, personInitials } from "@/lib/staff-avatar";
 import { FilterRail, FilterRailGroup, FilterRailRow } from "../components/workspace-rail";
 import PurchasingTabs from "../PurchasingTabs";
 import DestinationAllocationEditor from "./DestinationAllocationEditor";
@@ -69,6 +71,7 @@ import GoodsMiniTable, {
 /* v2 — Card 02-B changed the approved column set; a stale saved layout from
    the leaf-grain Register must not override the owner-approved order. */
 const STORAGE_KEY = "carres.soBatchPurchase.register.v2";
+const FILTER_RAIL_STORAGE_KEY = "carres.soBatchPurchase.filters.open";
 
 /** Governed absence — a muted sentence, never a bare dash. */
 function Absent({ children }: { children: string }) {
@@ -126,6 +129,22 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
    * cross-updated against the other sections so the printed number predicts
    * the rows a click would show. This file picks; it never counts. */
   const [filter, setFilter] = useState<SoBatchRailFilter>(SO_BATCH_RAIL_CLEAR);
+  const [filterRailOpen, setFilterRailOpen] = useState(() => {
+    try {
+      return localStorage.getItem(FILTER_RAIL_STORAGE_KEY) !== "0";
+    } catch {
+      return true;
+    }
+  });
+  const setFilterRailVisible = useCallback((open: boolean) => {
+    setFilterRailOpen(open);
+    try {
+      localStorage.setItem(FILTER_RAIL_STORAGE_KEY, open ? "1" : "0");
+    } catch {
+      // Storage may be unavailable in a locked-down browser; the live state
+      // still works for this visit.
+    }
+  }, []);
   const railFacts = useMemo(() => soBatchRailFacts(orders, leafs), [orders, leafs]);
   const rail = useMemo(() => soBatchRailModel(railFacts, filter), [railFacts, filter]);
   const shown = useMemo(
@@ -294,20 +313,20 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
         exportValue: (o) => SO_BATCH_ORDER_STATUS_WORDS[o.status],
       },
       {
-        key: "proceedDate",
+        key: "proceededAt",
         label: W.colProceedDate,
         width: 104,
         sortable: true,
         chooserGroup: "Order",
         accessor: (o) => (
           <span data-testid={`so-batch-proceed-${o.orderId}`}>
-            {o.proceedDate ? fmtDate(o.proceedDate) : null}
+            {o.proceededAt ? fmtDate(o.proceededAt) : <Absent>Not recorded</Absent>}
           </span>
         ),
-        dateValue: (o) => o.proceedDate,
+        dateValue: (o) => o.proceededAt,
         filterType: "date",
-        sortFn: (a, b) => (a.proceedDate ?? "").localeCompare(b.proceedDate ?? ""),
-        exportValue: (o) => o.proceedDate ?? "",
+        sortFn: (a, b) => (a.proceededAt ?? "").localeCompare(b.proceededAt ?? ""),
+        exportValue: (o) => o.proceededAt ?? "",
       },
       {
         key: "poNo",
@@ -590,7 +609,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
             selection: no rail row carries a checkbox, one filter per section,
             sections combine, and the fixed rows print their live count, zero
             included. */}
-        <FilterRail testId="so-batch-rail">
+        {filterRailOpen && <FilterRail testId="so-batch-rail" onHide={() => setFilterRailVisible(false)}>
           <FilterRailGroup title={SO_BATCH_RAIL.toOrder.heading}>
             <FilterRailRow
               active={filter.notOrderedOnly}
@@ -676,7 +695,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
               ))}
             </FilterRailGroup>
           )}
-        </FilterRail>
+        </FilterRail>}
 
         <div className="flex min-w-0 flex-1 flex-col p-2">
           <div className="min-h-0 flex-1" data-testid="so-batch-grid">
@@ -689,6 +708,21 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
               rowTestId={(o) => `so-batch-row-${o.orderId}`}
               exportName={W.destination}
               searchPlaceholder={W.search}
+              toolbarStart={
+                !filterRailOpen ? (
+                  <button
+                    type="button"
+                    aria-label="Show filters"
+                    title="Show filters"
+                    data-testid="so-batch-show-filters"
+                    onClick={() => setFilterRailVisible(true)}
+                    className="grid h-7 w-7 place-items-center rounded-control border border-kit-slate-6 bg-white text-kit-slate-11 hover:bg-kit-slate-3 hover:text-kit-slate-12"
+                  >
+                    <PanelLeftOpen size={16} strokeWidth={1.75} aria-hidden />
+                  </button>
+                ) : null
+              }
+              toolbarEnd={<SoBatchPoDuty data={data} />}
               isLoading={isLoading}
               emptyMessage={W.empty}
               groupBanner={false}
@@ -760,7 +794,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
                     ? `${data.actingPoDuty.name} is covering PO duty`
                     : data.currentPoDuty
                       ? `${data.currentPoDuty.name} holds PO duty`
-                      : "Nobody holds PO duty"}
+                      : "Nobody holds PO duty this month."}
                 </span>
               )}
             </div>
@@ -768,6 +802,47 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
         </div>
       </div>
     </div>
+  );
+}
+
+function SoBatchPoDuty({ data }: { data: SoBatchPurchaseResponse }) {
+  const person = data.actingPoDuty ?? data.currentPoDuty;
+  const label = data.actingPoDuty
+    ? `${data.actingPoDuty.name} is covering PO duty`
+    : data.currentPoDuty
+      ? `${data.currentPoDuty.name} holds PO duty`
+      : "Nobody holds PO duty this month.";
+
+  if (!person) {
+    return (
+      <span
+        data-testid="so-batch-po-duty"
+        aria-label={label}
+        title={label}
+        className="shrink-0 text-meta text-kit-red-11"
+      >
+        {label}
+      </span>
+    );
+  }
+
+  const colour = avatarColor(person.userId);
+  return (
+    <span
+      data-testid="so-batch-po-duty"
+      aria-label={label}
+      title={label}
+      className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-control border border-kit-slate-6 bg-white px-2 text-meta text-kit-slate-11"
+    >
+      <span
+        aria-hidden
+        className="grid h-5 w-5 place-items-center rounded-full text-label font-semibold leading-none"
+        style={{ background: colour.bg, color: colour.fg }}
+      >
+        {personInitials(person.name, person.name)}
+      </span>
+      <span>{label}</span>
+    </span>
   );
 }
 

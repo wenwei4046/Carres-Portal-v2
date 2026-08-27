@@ -102,7 +102,7 @@ function orderRow(over: Partial<SoBatchOrderRow> & { orderId: string }): SoBatch
     so: null,
     customer: null,
     status: "blank",
-    proceedDate: null,
+    proceededAt: null,
     requestedDeliveryDate: null,
     deliveryCity: null,
     deliveryState: null,
@@ -119,7 +119,7 @@ const ORDER_O1 = orderRow({
   orderId: "o1",
   so: 1318,
   customer: "Kimmy",
-  proceedDate: "2026-08-20",
+  proceededAt: "2026-08-20T08:15:00+08:00",
   requestedDeliveryDate: "2026-08-28",
   deliveryCity: "Petaling Jaya",
   deliveryState: "Selangor",
@@ -410,6 +410,13 @@ describe("one permanent row per proceeded Sales Order", () => {
     expect(screen.getByTestId("so-batch-location-o5").textContent).toBe("Not given");
   });
 
+  it("names an absent historical handoff instead of printing a blank cell", () => {
+    renderRegister({ registerRows: [orderRow({ orderId: "no-handoff", so: 1200 })] });
+    expect(screen.getByTestId("so-batch-proceed-no-handoff")).toHaveTextContent(
+      "Not recorded",
+    );
+  });
+
   it("many POs, suppliers, destinations and dates summarise deterministically", () => {
     renderRegister();
     expect(screen.getByTestId("so-batch-po-many-o5").textContent).toBe("2 POs");
@@ -539,6 +546,21 @@ describe("the rail — Card 02-A wording, Card 02-B counting", () => {
 describe("the rail — Card 02-C: five readable sections, navigation not selection", () => {
   const rail = () => screen.getByTestId("so-batch-rail");
 
+  it("hides completely, reopens from the Register toolbar, and remembers the choice", () => {
+    const first = renderRegister();
+    fireEvent.click(screen.getByRole("button", { name: "Hide filters" }));
+    expect(screen.queryByTestId("so-batch-rail")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Show filters" })).toBeInTheDocument();
+    expect(localStorage.getItem("carres.soBatchPurchase.filters.open")).toBe("0");
+
+    first.unmount();
+    renderRegister();
+    expect(screen.queryByTestId("so-batch-rail")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Show filters" }));
+    expect(screen.getByTestId("so-batch-rail")).toBeInTheDocument();
+    expect(localStorage.getItem("carres.soBatchPurchase.filters.open")).toBe("1");
+  });
+
   it("renders the five sections in the approved order, with the approved words", () => {
     renderRegister();
     const text = rail().textContent ?? "";
@@ -581,7 +603,7 @@ describe("the rail — Card 02-C: five readable sections, navigation not selecti
     renderRegister();
     expect(within(rail()).queryAllByRole("checkbox")).toHaveLength(0);
     /* Every rail row is a NavRow button with a pressed state, not a tick. */
-    for (const b of within(rail()).getAllByRole("button")) {
+    for (const b of within(rail()).getAllByRole("button").filter((el) => el.dataset.testid)) {
       expect(b).toHaveAttribute("aria-pressed");
     }
     expect(screen.getByTestId("so-batch-select-o1")).toBeInTheDocument();
@@ -841,5 +863,29 @@ describe("what this page refuses to be", () => {
       "Yee Jean holds PO duty",
     );
     expect(screen.queryByTestId("so-batch-issue")).not.toBeInTheDocument();
+  });
+
+  it("shows the real resolved PO Duty once in the Register toolbar", () => {
+    renderRegister({
+      currentPoDuty: { userId: "real-op-1", name: "Tan Qu Qu" },
+      actingPoDuty: null,
+    });
+    expect(screen.getByTestId("so-batch-po-duty")).toHaveTextContent(
+      "Tan Qu Qu holds PO duty",
+    );
+    expect(screen.getByTestId("so-batch-po-duty")).toHaveAccessibleName(
+      "Tan Qu Qu holds PO duty",
+    );
+  });
+
+  it("shows the real dated cover instead of the absent holder", () => {
+    renderRegister({
+      currentPoDuty: { userId: "real-op-1", name: "Tan Qu Qu" },
+      actingPoDuty: { userId: "real-op-2", name: "Shasha" },
+    });
+    expect(screen.getByTestId("so-batch-po-duty")).toHaveTextContent(
+      "Shasha is covering PO duty",
+    );
+    expect(screen.getByTestId("so-batch-po-duty")).not.toHaveTextContent("Tan Qu Qu");
   });
 });

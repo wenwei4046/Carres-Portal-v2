@@ -240,7 +240,7 @@ function railOrder(over: Partial<SoBatchOrderRow> & { orderId: string }): SoBatc
     so: null,
     customer: null,
     status: "blank",
-    proceedDate: null,
+    proceededAt: null,
     requestedDeliveryDate: null,
     deliveryCity: null,
     deliveryState: null,

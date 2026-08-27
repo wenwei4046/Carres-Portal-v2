@@ -1023,6 +1023,24 @@ fails OPEN for the same reason; the client gate is the primary UX and the door i
 read (ownership Law D), and `sku-categories.ts` is the ONE catalog join the lead-time floor and the
 goods gate share.
 
+### Final submit is the handoff — owner correction 2026-08-27 · APPROVED / LOCKED
+
+When the existing Proceed facts are complete, Sales Portal final submit creates the Sales Order and
+hands it to Operations automatically in one database transaction. There is no routine second
+`Move to Proceed` step. If a governed fact is still missing — for example payment is below 50% —
+the valid order stays `Placed`; the later payment, address, date or governed correction retries the
+same transition automatically. `Move to Proceed` remains only as recovery for a legacy/raw record.
+`orders.sales_final_submitted_at` is the authoritative Sales Portal final-submit fact. Raw, office,
+rental and imported orders do not receive it. Historical Portal and raw records cannot be separated
+truthfully from creator role or completeness, so legacy recovery accepts only exact IDs confirmed by
+Principal, requires a written reason, rejects office/rental/imported records and records
+History + Audit before using the canonical transition. No missing fact is manufactured. Every later
+retry runs after the transaction's final header, line and add-on state, never midway through a
+revision.
+
+`orders.proceeded_at` is the actual Sales-to-Operations handoff timestamp. It is separate from
+`orders.proceed_date`, which remains the salesperson's planned production-start date.
+
 ## REGISTER AND OBJECT COMPOSITION — OWNER RULING 2026-08-15 (Chai) · APPROVED / LOCKED
 
 From an authenticated top-to-toe production review at 1364px and 924px. Everything below is
@@ -2980,9 +2998,9 @@ is why the middle two are named as they are.
 All · Placed · Proceed · To book · Customer confirmed · Delivered
 ```
 
-- **Placed** — genuinely new, not yet triaged.
+- **Placed** — submitted but still missing a governed Proceed fact, or a legacy/raw recovery record.
 - **Proceed** — being arranged. **Includes AutoCount-imported orders** by the agreed entry rule
-  (AutoCount import → Proceed; a future salesperson order → Placed).
+  (AutoCount import → Proceed; a complete Sales Portal final submit → Proceed automatically).
 - **To book** — past placement, goods and/or the customer's date still outstanding.
 - **Customer confirmed** — stock in AND the customer confirmed a date + slot.
 - **Delivered** · **All**.

@@ -252,7 +252,7 @@ async function loadRegisterRows(
       so: fact.so,
       customer: fact.customer,
       status: soBatchOrderStatusOf({ buyingRequiredQty, sentCoveredQty }),
-      proceedDate: fact.proceedDate,
+      proceededAt: fact.proceededAt,
       requestedDeliveryDate: fact.delivery,
       deliveryCity: fact.city,
       deliveryState: fact.state,
@@ -366,7 +366,7 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
       delivery: null,
       salespersonId: null,
       status: null,
-      proceedDate: null,
+      proceededAt: null,
       city: null,
       state: null,
     };

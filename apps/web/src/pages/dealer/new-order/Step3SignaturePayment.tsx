@@ -365,7 +365,7 @@ export default function Step3SignaturePayment({ draft, onChange, catalog, onStri
       </Section>
 
       {/* ---------- Payment received ---------- */}
-      <Section title="Payment received" hint="50% required to move to Proceed Order">
+      <Section title="Payment received" hint="50% required before Operations receives the order">
         <div className="grid grid-cols-3 gap-2 mb-3">
           {(
             [
@@ -431,11 +431,13 @@ export default function Step3SignaturePayment({ draft, onChange, catalog, onStri
                 watching the wrong thing — nobody would think to chase finance. */}
             {cartModeOf(draft.lines) === "rental" ? (
               <>
-                The order sits in <strong>Place</strong> until finance approves the rental.
+                Finance approval is still needed. Operations receives this order automatically
+                after finance approves the rental.
               </>
             ) : (
               <>
-                The order sits in <strong>Place</strong> until the payment lands.
+                Payment is not received yet. Operations receives this order automatically after
+                the payment is recorded.
               </>
             )}
           </div>
@@ -450,21 +452,28 @@ export default function Step3SignaturePayment({ draft, onChange, catalog, onStri
           >
             {willProceed ? (
               <>
-                ✓ Payment ≥ 50% and all info complete — this order will be eligible for{" "}
-                <strong>Proceed</strong> immediately after submit.
+                ✓ This order is complete.
+                <br />
+                <span className="text-[11px]">
+                  Operations receives this order automatically when you submit.
+                </span>
               </>
             ) : (
               <>
-                ⚠ Order will sit in <strong>Place</strong> until{" "}
-                {[
-                  paidPct < 50 && `payment reaches 50% (now ${paidPct}%)`,
-                  paymentBlockerLabel(),
-                  draft.customer.addressUnknown && "delivery address is provided",
-                  draft.delivery.dateTbd && "delivery date is confirmed",
-                ]
-                  .filter(Boolean)
-                  .join(", ")}
-                .
+                ⚠ This order is not ready.
+                <br />
+                <span className="text-[11px]">
+                  Operations receives it when{" "}
+                  {[
+                    paidPct < 50 && `payment reaches 50% (now ${paidPct}%)`,
+                    paymentBlockerLabel(),
+                    draft.customer.addressUnknown && "delivery address is provided",
+                    draft.delivery.dateTbd && "delivery date is confirmed",
+                  ]
+                    .filter(Boolean)
+                    .join(", ")}
+                  .
+                </span>
               </>
             )}
           </div>

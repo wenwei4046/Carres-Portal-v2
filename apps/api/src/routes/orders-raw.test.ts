@@ -90,7 +90,7 @@ function makeOrderRow(overrides: Partial<Record<string, unknown>> = {}) {
 
 type RpcError = { code?: string; message?: string; details?: string };
 
-/** Minimal sb mock for the /raw path: rpc(create_order) + orders refetch +
+/** Minimal sb mock for the /raw path: rpc(create_raw_order) + orders refetch +
  *  the order_payments ledger insert (captured for assertions). */
 function buildSb(opts: { rpcError?: RpcError; fetchedRow?: unknown } = {}) {
   const rpcCalls: Array<{ name: string; payload: Record<string, unknown> }> = [];
@@ -189,7 +189,7 @@ describe("POST /api/orders/raw — internal raw creation (POS-parity)", () => {
     expect(res.status).toBe(201);
 
     const call = sb._rpcCalls[0];
-    expect(call.name).toBe("create_order");
+    expect(call.name).toBe("create_raw_order");
     const p = call.payload;
     expect(p.dealer_id).toBe(DEALER_A);
     // No POS gates: no signature, no terms, no payment method, date TBD.

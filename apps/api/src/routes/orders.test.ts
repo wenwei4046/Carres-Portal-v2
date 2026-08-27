@@ -180,7 +180,7 @@ function buildSb(
 }
 
 /**
- * Like buildSb but also stubs `.rpc('create_order', { payload })` so POST tests
+ * Like buildSb but also stubs the Sales Portal final-submit RPC so POST tests
  * can assert on what was sent and on rpc-returned errors. Use for POST flow.
  */
 /** P1 (0303) — the seeded settings singleton. `earliest_sell_days` is the ONE
@@ -286,7 +286,7 @@ type ReservedRow = {
 
 function buildSbForCreatePwp(opts: {
   rpcResult?: { id: string; so: number; placed_at: string };
-  /** Force create_order to error (to test the exit-10 rollback). */
+  /** Force the final-submit RPC to error (to test the exit-10 rollback). */
   createOrderError?: { code?: string; message?: string; details?: string };
   /** Force the claim RPC (pwp_claim_code OR pwp_claim_available_code) to return
    *  NULL (not claimable / phone mismatch / expired). */
@@ -381,7 +381,7 @@ function buildSbForCreatePwp(opts: {
     }),
     rpc: async (name: string, args: unknown) => {
       rpcCalls.push({ name, args });
-      if (name === "create_order") {
+      if (name === "create_order_from_sales_portal") {
         if (opts.createOrderError) return { data: null, error: opts.createOrderError };
         return { data: opts.rpcResult ?? null, error: null };
       }
@@ -1516,9 +1516,9 @@ describe("POST /api/orders", () => {
       env,
     );
     expect(res.status).toBe(201);
-    // ONLY create_order ran — no voucher claim / release.
+    // ONLY the governed final-submit RPC ran — no voucher claim / release.
     const rpcNames = (sb._rpcCalls as Array<{ name: string }>).map((r) => r.name);
-    expect(rpcNames).toEqual(["create_order"]);
+    expect(rpcNames).toEqual(["create_order_from_sales_portal"]);
   });
 
   // 0187 — CONFIGURED-PATH Stage B (via buildSbForCreatePwp, which returns a real
@@ -1543,8 +1543,10 @@ describe("POST /api/orders", () => {
     const names = (sb._rpcCalls as Array<{ name: string }>).map((r) => r.name);
     // The claim happens BEFORE create_order; no release on the happy path.
     expect(names).toContain("pwp_claim_code");
-    expect(names).toContain("create_order");
-    expect(names.indexOf("pwp_claim_code")).toBeLessThan(names.indexOf("create_order"));
+    expect(names).toContain("create_order_from_sales_portal");
+    expect(names.indexOf("pwp_claim_code")).toBeLessThan(
+      names.indexOf("create_order_from_sales_portal"),
+    );
     expect(names).not.toContain("pwp_release_codes");
   });
 
@@ -1591,7 +1593,7 @@ describe("POST /api/orders", () => {
     expect(j.code).toBe("pwp_code_rejected");
     const names = (sb._rpcCalls as Array<{ name: string }>).map((r) => r.name);
     // No order created (claim failed before create_order).
-    expect(names).not.toContain("create_order");
+    expect(names).not.toContain("create_order_from_sales_portal");
   });
 
   it("Confirm-pass fail-closed — a SHORT stamp releases the claim + 500", async () => {
@@ -1613,7 +1615,7 @@ describe("POST /api/orders", () => {
     expect(res.status).toBe(500);
     const names = (sb._rpcCalls as Array<{ name: string }>).map((r) => r.name);
     // create_order committed, then the short stamp → release + 500.
-    expect(names).toContain("create_order");
+    expect(names).toContain("create_order_from_sales_portal");
     expect(names).toContain("pwp_release_codes");
   });
 
@@ -1818,7 +1820,7 @@ describe("POST /api/orders", () => {
     const j = (await res.json()) as { code: string };
     expect(j.code).toBe("pwp_code_rejected");
     const names = (sb._rpcCalls as Array<{ name: string }>).map((r) => r.name);
-    expect(names).not.toContain("create_order"); // rejected before the order
+    expect(names).not.toContain("create_order_from_sales_portal"); // rejected before the order
   });
 
   it("returns 403 when dealer role JWT has no dealerId", async () => {
@@ -2011,7 +2013,11 @@ describe("POST /api/orders", () => {
       );
       expect(res.status).toBe(201);
       // RPC fired exactly once (lead-time gate passed)
-      expect(sb._rpcCalls.filter((c: { name: string }) => c.name === "create_order")).toHaveLength(1);
+      expect(
+        sb._rpcCalls.filter(
+          (c: { name: string }) => c.name === "create_order_from_sales_portal",
+        ),
+      ).toHaveLength(1);
     });
 
     /**

@@ -910,7 +910,12 @@ ordersRouter.post("/", async (c) => {
     },
     effectiveDealerId,
   );
-  const { data: created, error } = await sb.rpc("create_order", { payload });
+  // 0391 — final Sales Portal submit is the handoff. The wrapper creates the
+  // order and attempts the canonical Proceed inside one database transaction;
+  // an incomplete order stays in Place with its blocker, while a complete one
+  // reaches Purchasing without a second salesperson action. `/raw` below uses
+  // the separate, draft-capable `create_raw_order` wrapper deliberately.
+  const { data: created, error } = await sb.rpc("create_order_from_sales_portal", { payload });
   if (error) {
     // exit 10 (§4.5) — the create_order TX rolled back, so the claimed voucher
     // codes must un-claim. Placed as the FIRST line of the error block so ALL FOUR
@@ -1073,7 +1078,9 @@ ordersRouter.post("/", async (c) => {
 // recognises a raw line as a marker line, and client delivery addons are
 // dropped (those keys are server-exclusive on the POS door). The create_order
 // RPC still enforces: dealer required, ≥1 line, the sofa ↔ mattress/bed-frame
-// composition rule, and the internal-role gate (SECURITY DEFINER re-check).
+// composition rule. `create_raw_order` re-checks the internal role inside the
+// database. The old Worker retains temporary compatibility access to the
+// underlying primitive only until this Worker is verified in production.
 // ---------------------------------------------------------------------------
 
 const ORDER_RAW_CREATE_ROLES = new Set<string>(["principal", "operation"]);
@@ -1188,7 +1195,7 @@ ordersRouter.post("/raw", async (c) => {
   };
 
   const sb = userClient(c.env, auth.jwt);
-  const { data: created, error } = await sb.rpc("create_order", { payload });
+  const { data: created, error } = await sb.rpc("create_raw_order", { payload });
   if (error) {
     if (error.code === "42501" || /forbidden/i.test(error.message ?? "")) {
       throw new HTTPException(403, { message: "Forbidden" });
