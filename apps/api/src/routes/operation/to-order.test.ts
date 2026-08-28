@@ -1122,8 +1122,14 @@ describe("POST …/to-order/demand — the Source rides the wire (P15)", () => {
 
   const base = { sku: "SONIC-S", qty: 2, destinationId: DEST };
 
-  it("forwards each of the four purposes the store can record", async () => {
-    for (const p of ["ready_stock", "display", "warranty", "office"]) {
+  it("forwards each approved purpose the doors can record (Card 03, 2026-08-28)", async () => {
+    for (const p of [
+      "ready_stock",
+      "showroom_display",
+      "service_case",
+      "internal_staff_purchase",
+      "subsidiary_purchase",
+    ]) {
       const { res, calls } = await create({ ...base, purpose: p });
       expect(res.status).toBe(200);
       expect(calls[0].fn).toBe("purchasing_create_demand");
@@ -1131,13 +1137,13 @@ describe("POST …/to-order/demand — the Source rides the wire (P15)", () => {
     }
   });
 
-  it("refuses a purpose the database has no value for, before it reaches the RPC", async () => {
-    // `Other…` is a ruled WORD with no CHECK value (`spare_parts` joined the
-    // CHECK in 0359, on the Manual Purchase ruling). This proves the wire
-    // refuses what the store cannot hold, so the three lists (CHECK · function
-    // gate · shared constant) cannot drift into a fourth that only the api
-    // believes.
-    for (const p of ["other", "", "READY_STOCK"]) {
+  it("refuses a purpose the doors have no value for, before it reaches the RPC", async () => {
+    // `Other…` is a ruled WORD with no storable value, and the four retired
+    // purposes (`display` · `warranty` · `office` · `spare_parts`, Card 03)
+    // are history-only: the 0398 doors refuse them for a NEW demand, so the
+    // wire must too — the lists (door gate · shared constant · this enum)
+    // cannot drift into a fourth that only the api believes.
+    for (const p of ["other", "", "READY_STOCK", "display", "warranty", "office", "spare_parts"]) {
       const { res, calls } = await create({ ...base, purpose: p });
       expect(res.status).toBe(400);
       expect(calls).toHaveLength(0);
@@ -1161,7 +1167,7 @@ describe("POST …/to-order/demand — the Source rides the wire (P15)", () => {
      */
     const { res, calls } = await create({
       ...base,
-      purpose: "display",
+      purpose: "showroom_display",
       supplierId: "11111111-1111-1111-1111-111111111111",
       supplier: "Somebody Else",
     });

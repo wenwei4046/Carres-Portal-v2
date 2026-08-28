@@ -137,6 +137,30 @@ manualPurchaseRouter.get("/", requireOperation, async (c) => {
       return c.json(m.body, m.status);
     }
     lines = await stampReceived(sb, res.data ?? []);
+
+    /* THE CATALOG'S CATEGORY RIDES EACH LINE (Card 03 §4) — the rail's
+       `PRODUCT` section is the CATALOG's answer (`product_models.category`),
+       never SKU-text inference. Read whole and matched here, never `.in()`
+       over free-text SKUs (live rows carry a double quote — `Leg 4"` — which
+       breaks the filter; the same rule issue-costs keeps). */
+    const { data: catRows, error: catErr } = await sb
+      .from("product_skus")
+      .select("sku, product_models(category)");
+    if (catErr) {
+      const m = mapPgError(catErr);
+      return c.json(m.body, m.status);
+    }
+    const categoryBySku = new Map(
+      (catRows ?? []).map((r) => [
+        r.sku as string,
+        ((r.product_models as unknown as { category: string | null } | null)?.category ??
+          null) as string | null,
+      ]),
+    );
+    lines = lines.map((l) => ({
+      ...l,
+      category: categoryBySku.get(l.sku as string) ?? null,
+    }));
   }
 
   // Names for the columns — read through the owners' tables, never stored

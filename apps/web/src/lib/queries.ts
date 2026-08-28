@@ -4414,6 +4414,10 @@ export interface PurchaseRequestLineRow {
   /** Derived by the server from the linked PO's posted receipt (the
    *  Observation Law) — never a button anywhere. */
   received?: boolean;
+  /** The CATALOG's category for this line's SKU (`product_models.category`,
+   *  Card 03) — the rail's `PRODUCT` authority, never SKU-text inference.
+   *  `null` when Catalog has no category for the SKU. */
+  category?: string | null;
 }
 
 export interface ManualPurchaseRegisterPayload {

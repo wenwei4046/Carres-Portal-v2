@@ -36,6 +36,8 @@ import {
   DEMAND_PURPOSES,
   DEMAND_PURPOSE_DEFAULT,
   DEMAND_PURPOSE_VALUES,
+  RETIRED_DEMAND_PURPOSE_LABELS,
+  demandPurposeLabelOf,
   isDemandPurpose,
   type ToOrderLine,
   type ToOrderRow,
@@ -1211,28 +1213,62 @@ describe("P13 · the take path speaks the drawer's word", () => {
  * word the server refuses BY NAME.
  */
 describe("P15 · the Source a typed demand may carry", () => {
-  it("holds exactly the five the database can store", () => {
-    // `spare_parts` joined the CHECK in 0359 (the Manual Purchase ruling,
-    // Jess 2026-08-18); the list moved in all three places together.
+  it("holds exactly the approved five, in the approved order (Card 03, 2026-08-28)", () => {
+    // The owner-approved vocabulary; the 0398 doors admit exactly these.
     expect(DEMAND_PURPOSES.map((p) => p.value)).toEqual([
       "ready_stock",
-      "display",
-      "warranty",
-      "office",
-      "spare_parts",
+      "showroom_display",
+      "service_case",
+      "internal_staff_purchase",
+      "subsidiary_purchase",
+    ]);
+    expect(DEMAND_PURPOSES.map((p) => p.label)).toEqual([
+      "Ready Stock",
+      "Showroom Display",
+      "Service Case",
+      "Internal Staff Purchase",
+      "Subsidiary Purchase",
     ]);
   });
 
-  it("offers no word the store has no value for", () => {
+  it("offers no word the doors refuse — retired values included", () => {
     // `Other…` is a RULED WORD and deliberately not offerable — it has never
     // had a CHECK value, and inventing one would be a screen ruling on a
     // business question nobody has asked ("other" than what, recorded where?).
-    // `Spare Parts` stopped being on this list the day 0359 gave it a value.
     const labels = DEMAND_PURPOSES.map((p) => p.label);
     expect(labels).not.toContain(TO_ORDER_WORDS.reasonOther);
-    expect(labels).toContain(TO_ORDER_WORDS.reasonSpareParts);
+    // The retired four are HISTORY's words, never offered again (Card 03):
+    // an office-supplies buy was never a staff purchase.
+    for (const retired of ["Display", "Warranty", "Office", "Spare Parts"]) {
+      expect(labels).not.toContain(retired);
+    }
+    for (const retired of ["display", "warranty", "office", "spare_parts"]) {
+      expect(isDemandPurpose(retired)).toBe(false);
+    }
+    // Management folds under Internal Staff Purchase — no word of its own.
+    expect(labels).not.toContain("Management Purchase");
     // ...and the unoffered word survives, because a later card may need it.
     expect(TO_ORDER_WORDS.reasonOther).toBe("Other…");
+  });
+
+  it("history keeps its own truthful words — retired, never relabelled", () => {
+    // A pre-ruling row prints the word it was actually asked as; the label
+    // arithmetic answers for approved and retired values alike (Law D).
+    expect(RETIRED_DEMAND_PURPOSE_LABELS).toEqual({
+      display: "Display",
+      warranty: "Warranty",
+      office: "Office",
+      spare_parts: "Spare Parts",
+    });
+    expect(demandPurposeLabelOf("ready_stock")).toBe("Ready Stock");
+    expect(demandPurposeLabelOf("subsidiary_purchase")).toBe("Subsidiary Purchase");
+    expect(demandPurposeLabelOf("office")).toBe("Office");
+    expect(demandPurposeLabelOf("warranty")).toBe("Warranty");
+    // No false mapping in either direction:
+    expect(demandPurposeLabelOf("office")).not.toBe("Internal Staff Purchase");
+    expect(demandPurposeLabelOf("warranty")).not.toBe("Service Case");
+    expect(demandPurposeLabelOf("nonsense")).toBeNull();
+    expect(demandPurposeLabelOf(null)).toBeNull();
   });
 
   it("every label comes from the words module — none is spelt twice", () => {

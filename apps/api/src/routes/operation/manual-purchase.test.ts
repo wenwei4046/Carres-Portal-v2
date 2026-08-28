@@ -296,6 +296,116 @@ describe("closure §2 · the manual lane declares the price it reviewed", () => 
 });
 
 /**
+ * ⭐ CARD 03 — the register read carries the rail's facts, and the doors
+ * speak the approved purpose vocabulary (owner ruling 2026-08-28).
+ */
+describe("Card 03 · GET /purchasing/requests — the CATALOG's category rides each line", () => {
+  const REG_LINES = [
+    { id: "dddddddd-0000-0000-0000-000000000001", request_id: REQ_A, sku: "5539-2NA",
+      supplier_id: SUP, qty: 3, approved_qty: 2, issued_qty: 0, remaining_qty: 2,
+      required_by: null, remark: null, po_id: null, cancelled_at: null, cancel_reason: null },
+    // A SKU whose TEXT screams mattress but whose Catalog category is absent:
+    // the line says `category: null` — never a SKU-text inference.
+    { id: "dddddddd-0000-0000-0000-000000000009", request_id: REQ_B, sku: "MATTRESS-TEXT-9",
+      supplier_id: SUP, qty: 1, approved_qty: null, issued_qty: 0, remaining_qty: 1,
+      required_by: null, remark: null, po_id: null, cancelled_at: null, cancel_reason: null },
+  ];
+
+  function makeRegisterSb() {
+    return {
+      from: vi.fn((table: string) => {
+        switch (table) {
+          case "purchase_requests":
+            return tableStub(REQUESTS);
+          case "purchase_demands":
+            return tableStub(REG_LINES, { filterInBy: "request_id" });
+          case "product_skus":
+            return tableStub([
+              { sku: "5539-2NA", product_models: { category: "sofa" } },
+              { sku: "MATTRESS-TEXT-9", product_models: null },
+            ]);
+          case "suppliers":
+            return tableStub([{ id: SUP, name: "Hooka", kind: "own_logistics" }]);
+          default:
+            return tableStub([]);
+        }
+      }),
+      rpc: vi.fn(),
+    } as unknown as ReturnType<typeof userClient>;
+  }
+
+  it("stamps the Catalog category on each line — null when Catalog has none", async () => {
+    vi.mocked(userClient).mockReturnValue(makeRegisterSb());
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("https://api.test/api/operation/purchasing/requests", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env as never,
+      { waitUntil() {}, passThroughException() {} } as never,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      lines: Array<{ sku: string; category: string | null }>;
+    };
+    const bySku = new Map(body.lines.map((l) => [l.sku, l.category]));
+    expect(bySku.get("5539-2NA")).toBe("sofa");
+    expect(bySku.get("MATTRESS-TEXT-9")).toBeNull();
+  });
+});
+
+describe("Card 03 · the doors speak the approved purpose vocabulary", () => {
+  async function createHeader(purpose: string, rpc = vi.fn().mockResolvedValue({
+    data: { id: REQ_A, req_no: "REQ-0009", approval_required: true },
+    error: null,
+  })) {
+    vi.mocked(userClient).mockReturnValue(makeSb(rpc));
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("https://api.test/api/operation/purchasing/requests", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ purpose, destinationId: DEST, why: "we need it" }),
+      }),
+      env as never,
+      { waitUntil() {}, passThroughException() {} } as never,
+    );
+    return { res, rpc };
+  }
+
+  it("admits every approved purpose and hands it to the governed door", async () => {
+    for (const purpose of [
+      "ready_stock",
+      "showroom_display",
+      "service_case",
+      "internal_staff_purchase",
+      "subsidiary_purchase",
+    ]) {
+      const { res, rpc } = await createHeader(purpose);
+      expect(res.status).toBe(200);
+      expect(rpc).toHaveBeenCalledWith(
+        "purchasing_create_request",
+        expect.objectContaining({ p_purpose: purpose }),
+      );
+    }
+  });
+
+  it("refuses a retired value before the RPC — history is readable, not creatable", async () => {
+    for (const retired of ["display", "warranty", "office", "spare_parts"]) {
+      const { res, rpc } = await createHeader(retired);
+      expect(res.status).toBe(400);
+      expect(rpc).not.toHaveBeenCalled();
+    }
+  });
+
+  it("refuses an invented value — Management folds under Internal Staff Purchase", async () => {
+    const { res, rpc } = await createHeader("management_purchase");
+    expect(res.status).toBe(400);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+});
+
+/**
  * ⭐ THE PRICES THE OPERATOR IS ABOUT TO COMMIT TO (closure §2).
  *
  * `Issue as one PO` pulls in sibling requests whose lines are not on screen, so
