@@ -408,8 +408,8 @@ export interface SoBatchOrderRow {
   so: number | null;
   customer: string | null;
   status: SoBatchOrderStatus;
-  /** `orders.proceed_date` — the day Operations received the order. */
-  proceedDate: IsoDate | null;
+  /** `orders.proceeded_at` — the actual Sales → Operations handoff. */
+  proceededAt: string | null;
   /** `orders.delivery_date` — the customer's current request. */
   requestedDeliveryDate: IsoDate | null;
   /** The customer's delivery locality, formatted by the shared web rule. */
@@ -427,7 +427,7 @@ export const soBatchOrderRowSchema = z.object({
   so: z.number().nullable(),
   customer: z.string().nullable(),
   status: z.enum(["blank", "partial", "ordered"]),
-  proceedDate: z.string().nullable(),
+  proceededAt: z.string().nullable(),
   requestedDeliveryDate: z.string().nullable(),
   deliveryCity: z.string().nullable(),
   deliveryState: z.string().nullable(),
@@ -542,6 +542,13 @@ export const soBatchPurchaseResponseSchema = z.object({
    * put it, and the audit must still say who actually pressed Issue PO.
    */
   actingPoDuty: z.object({ userId: z.string(), name: z.string() }).nullable(),
+  /**
+   * A holder/cover ID exists, but its display name could not be resolved.
+   * This is different from there being no configured PO duty holder.
+   */
+  poDutyNameUnavailable: z.boolean(),
+  /** The authoritative duty resolver itself could not be read. */
+  poDutyUnavailable: z.boolean(),
   mayIssue: z.boolean(),
   /** Who may collect from a factory, for the documents that need one. */
   procurementPartners: z.array(z.object({ id: z.string(), name: z.string() })),

@@ -423,14 +423,15 @@ ordersRouter.get("/customer-search", async (c) => {
 });
 
 /**
- * POST /api/orders — atomic create via RPC `create_order(payload jsonb)`.
+ * POST /api/orders — atomic final submit via the governed Sales Portal wrapper.
  *
  * Flow:
  *   1. Verify caller is dealer/salesperson/internal (middleware sets c.var.auth)
  *   2. Validate camelCase input with zod
  *   3. Adapter converts → snake_case jsonb RPC payload (+ injects dealerId from JWT)
- *   4. Call RPC — atomic insert across 5 tables (orders + lines + addons +
- *      history + audit_log). If anything fails, Postgres rolls back the whole TX.
+ *   4. Call `create_order_from_sales_portal` — atomic insert across 5 tables
+ *      plus the governed Sales → Operations handoff when its facts are ready.
+ *      If anything fails, Postgres rolls back the whole TX.
  *   5. Re-fetch the inserted order with rels (same shape as GET /:id) so the
  *      client can route directly to /dealer/orders/:id without a second fetch.
  *
@@ -940,7 +941,12 @@ ordersRouter.post("/", async (c) => {
     },
     effectiveDealerId,
   );
-  const { data: created, error } = await sb.rpc("create_order", { payload });
+  // 0396 — final Sales Portal submit is the handoff. The wrapper creates the
+  // order and attempts the canonical Proceed inside one database transaction;
+  // an incomplete order stays in Place with its blocker, while a complete one
+  // reaches Purchasing without a second salesperson action. `/raw` below uses
+  // the separate, draft-capable `create_raw_order` wrapper deliberately.
+  const { data: created, error } = await sb.rpc("create_order_from_sales_portal", { payload });
   if (error) {
     // exit 10 (§4.5) — the create_order TX rolled back, so the claimed voucher
     // codes must un-claim. Placed as the FIRST line of the error block so ALL FOUR
@@ -1103,7 +1109,9 @@ ordersRouter.post("/", async (c) => {
 // recognises a raw line as a marker line, and client delivery addons are
 // dropped (those keys are server-exclusive on the POS door). The create_order
 // RPC still enforces: dealer required, ≥1 line, the sofa ↔ mattress/bed-frame
-// composition rule, and the internal-role gate (SECURITY DEFINER re-check).
+// composition rule. `create_raw_order` re-checks the internal role inside the
+// database. The old Worker retains temporary compatibility access to the
+// underlying primitive only until this Worker is verified in production.
 // ---------------------------------------------------------------------------
 
 const ORDER_RAW_CREATE_ROLES = new Set<string>(["principal", "operation"]);
@@ -1218,7 +1226,7 @@ ordersRouter.post("/raw", async (c) => {
   };
 
   const sb = userClient(c.env, auth.jwt);
-  const { data: created, error } = await sb.rpc("create_order", { payload });
+  const { data: created, error } = await sb.rpc("create_raw_order", { payload });
   if (error) {
     if (error.code === "42501" || /forbidden/i.test(error.message ?? "")) {
       throw new HTTPException(403, { message: "Forbidden" });
@@ -3219,7 +3227,7 @@ ordersRouter.post("/:id/addons/:addonId/edit", async (c) => {
   return c.json(await fetchAndShapeOrder(sb, id));
 });
 
-/** POST /api/orders/:id/addons/:addonId/remove — 0395 (YH, 2026-08-28: a
+/** POST /api/orders/:id/addons/:addonId/remove — 0396 (YH, 2026-08-28: a
  *  service picked by mistake has to be takeable back). Deliberately a SIBLING
  *  of the edit route above rather than a flag on it: removing is a different
  *  act from editing, and folding it in would have meant teaching

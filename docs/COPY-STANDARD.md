@@ -636,8 +636,14 @@ sidebar page. Existing implementation constants do not override these approved p
 | Rail headings | `TO ORDER` · `ORDER TIMING` · `PRODUCT` · `SUPPLIER` · `SETUP TO FIX` |
 | Empty state | `No proceeded Sales Orders.` |
 | Register columns (Card 02-B, 2026-08-27 — exactly, in this order) | `Status` · `Proceed Date` · `PO No` · `SO No` · `Customer` · `Delivery Location` · `Requested Delivery Date` · `Supplier` · `Deliver To` · `PO Delivery Date` |
+| `Proceed Date` on SO Batch Purchase | The actual date Sales handed the complete order to Operations (`orders.proceeded_at`). Never the planned production-start field (`orders.proceed_date`) |
 | The Status words | blank · `Partial` · `Ordered` — and nothing else. Never `Ready Stock` · `Ready to buy` · `Cannot buy` · `No buying needed` · `Posted` · `Sent` · `Not sent` · `Covered` |
 | A parent cell over several values | one value prints itself; several print `2 POs` · `2 suppliers` · `Multiple` — the exact mapping lives in the expansion |
+| Open local filter-rail control | `Hide filters` |
+| Hidden local filter-rail control | `Show filters` |
+| Monthly PO duty holder | `{name} holds PO duty` |
+| Dated PO duty cover | `{name} is covering PO duty` |
+| No monthly holder | `Nobody holds PO duty this month.` |
 
 **The rail — owner ruling 2026-08-27 (Card 02-C).** Five sections, in this order.
 `SETUP TO FIX` renders only when at least one affected Sales Order exists:
@@ -2099,9 +2105,13 @@ keys/routes keep their names. **Since CARD-2026-08-19-warehouse-rail the three
 questions are sidebar rows under the `WAREHOUSE` heading** (Warehouse Blueprint
 item 13) — the words are unchanged; only the door moved.
 
-**Aligning Purchase and Orders panels:** the Orders panel uses **Placed**
-for the pre-Proceed state (customer ordered, ETA not confirmed). The
-Purchase panel's ① stage fires AFTER Sales clicks Proceed, so it uses the governed
+**Aligning Purchase and Orders panels:** the Orders panel uses **Placed** only while a submitted
+order still lacks a governed Proceed fact, or for a legacy/raw recovery record. A complete Sales
+Portal final submit crosses Proceed automatically; a later payment, address, date or governed edit
+retries automatically at the transaction's final state when it supplies the last fact. Raw/office
+records do not receive the Sales final-submit fact. Historical recovery uses exact confirmed order
+IDs and a recorded reason; it never guesses from completeness. The Purchase panel's ① stage therefore fires
+after the canonical Proceed transition, not after a second Sales click, and uses the governed
 **Issue PO** action. `Send` is not restored as a stage or action name.
 
 ---

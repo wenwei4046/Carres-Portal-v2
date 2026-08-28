@@ -989,6 +989,13 @@ rail is never squeezed below 240px. The rail is navigation, not batch selection 
 no checkboxes. Pages still drawing the older 200px `RailGroup`/`RailItem` pair migrate to this
 shell in their own cards, not as a side effect of someone else's.
 
+**LOCAL FILTER RAIL COLLAPSE — APPROVED / LOCKED, owner ruling 2026-08-27.** The open rail carries
+one neutral `Hide filters` panel-left button. Hiding removes the whole local rail and gives its width
+to the Register; it never leaves a duplicate 60px icon strip beside the Portal navigation. The
+Register toolbar then carries `Show filters`. Reopening restores the same filters and the browser
+remembers the open/closed choice. Use the Portal sidebar's governed panel-left icon family and
+Carres control tokens, not a chevron, `X`, text link or a new visual language.
+
 **PORTAL NAVIGATION ACTIVE COLOUR — APPROVED / LOCKED.** The flame repoint applies to active
 navigation too: the current destination uses the governed blue selection treatment, never a
 red/flame active line or red rounded selection block. Flame remains the Carres brand mark;

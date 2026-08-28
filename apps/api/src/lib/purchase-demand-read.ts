@@ -156,8 +156,8 @@ export interface RegisterOrderFact {
   salespersonId: string | null;
   /** Card 02-B — `place` is not proceeded, and the order Register must know. */
   status: string | null;
-  /** The day Sales pressed Proceed and Operations received the order. */
-  proceedDate: string | null;
+  /** The actual Sales → Operations handoff timestamp. */
+  proceededAt: string | null;
   /** The customer's delivery locality, for the shared concise formatting. */
   city: string | null;
   state: string | null;
@@ -371,7 +371,7 @@ export async function loadToOrder(
       // `customer_address_city/state` are Card 02-B's Delivery Location facts,
       // read here because the row is already being fetched — the To Order
       // projection ignores them, so the workspace response is unchanged.
-      "id, so, customer_name, status, delivery_date, delivery_date_tbd, placed_at, created_at, proceed_date, salesperson_id, customer_address_city, customer_address_state",
+      "id, so, customer_name, status, delivery_date, delivery_date_tbd, placed_at, created_at, proceed_date, proceeded_at, salesperson_id, customer_address_city, customer_address_state",
     )
     /**
      * ⭐ THE PROCEEDED-ORDER BOUNDARY (Card 02-C, RESOLVED FROM AUTHORITY,
@@ -504,7 +504,7 @@ export async function loadToOrder(
         : (((o.delivery_date as string | null) ?? null)?.slice(0, 10) ?? null),
       salespersonId: (o.salesperson_id as string | null) ?? null,
       status: (o.status as string | null) ?? null,
-      proceedDate: ((o.proceed_date as string | null) ?? null)?.slice(0, 10) ?? null,
+      proceededAt: (o.proceeded_at as string | null) ?? null,
       city: (o.customer_address_city as string | null) ?? null,
       state: (o.customer_address_state as string | null) ?? null,
     });

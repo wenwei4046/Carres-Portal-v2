@@ -28,7 +28,6 @@ import {
   useOrder,
   useOutlets,
   usePrincipalDealers,
-  useProceedOrder,
   usePwpAvailableForPhone,
   useCreateRentalAgreement,
   useRentalPosPlans,
@@ -196,7 +195,6 @@ export default function DealerPos({
   const staffMember = useStaffSession((s) => s.staff);
   const clearStaffToken = useStaffSession((s) => s.clearToken);
   const createOrder = useCreateOrder();
-  const proceedOrder = useProceedOrder();
   // Loo 2026-07-26 — rent-to-own is a catalog CATEGORY now. Empty result = the
   // Rental rail simply never appears, so a store with nothing on offer sees the
   // catalog exactly as before.
@@ -456,17 +454,6 @@ export default function DealerPos({
     return maxLeadDaysFor([...cats], catalogQ.data.earliestSellDays ?? 0);
   }, [draft.lines, catalogQ.data]);
 
-  // ASAP deposit hard-gate — when ASAP is on we auto-proceed after create, and
-  // Proceed needs ≥50%; reject at submit rather than create-then-bounce.
-  const asapDepositOk = useMemo(() => {
-    if (!draft.delivery.asap) return true;
-    const lineSub = draft.lines.reduce((s, l) => s + l.unitPrice * l.qty, 0);
-    const addonSub = draft.addons.reduce((s, a) => s + a.unitPrice * a.qty, 0);
-    const totalForPct = lineSub + addonSub;
-    if (totalForPct <= 0) return false;
-    return (draft.paid / totalForPct) * 100 >= 50;
-  }, [draft]);
-
   // CATALOG (step 1) advances via the cart drawer, which gates on step2Valid
   // itself; the shell only gates the CUSTOMER → CONFIRM → submit transitions.
   // An internal operator must have picked the acting dealer before advancing.
@@ -507,8 +494,8 @@ export default function DealerPos({
     () =>
       isRentalCart
         ? step4ValidRental(draft) && rentalAgreementReady
-        : step4Valid(draft, paymentMethods) && asapDepositOk,
-    [draft, asapDepositOk, paymentMethods, isRentalCart, rentalAgreementReady],
+        : step4Valid(draft, paymentMethods),
+    [draft, paymentMethods, isRentalCart, rentalAgreementReady],
   );
 
   // Footer total (shown on step 3) — the shared draftTotals grand, so this bar,
@@ -838,16 +825,6 @@ export default function DealerPos({
 
       clearDraft();
       setSubmitted(created);
-
-      if (draft.delivery.asap) {
-        try {
-          await proceedOrder.mutateAsync(created.id);
-          toast.success(`Order SO-${created.so} auto-proceeded · ASAP`);
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : "Auto-proceed failed";
-          toast.warning(`Order created, but auto-proceed failed: ${msg}`);
-        }
-      }
     } catch (err) {
       setUploading(false);
       const msg = err instanceof Error ? err.message : "Submit failed";

@@ -364,6 +364,8 @@ function makeSb(tables: Record<string, { data: unknown; error: unknown }>) {
        reads, so a test still says who holds the duty with `ops_po_duty` and who
        covers it with `ops_po_duty_cover`. */
     if (fn === "purchasing_po_actor") {
+      const resolverError = tables.ops_po_duty?.error ?? tables.ops_po_duty_cover?.error;
+      if (resolverError) return { data: null, error: resolverError };
       const dutyData = tables.ops_po_duty?.data as
         | { user_id?: string }[]
         | { user_id?: string }
@@ -830,6 +832,35 @@ describe("who may issue", () => {
     tables.ops_po_duty = { data: [], error: null };
     const { body } = await rowsOf(tables);
     expect(body.currentPoDuty).toBeNull();
+    expect(body.poDutyNameUnavailable).toBe(false);
+    expect(body.poDutyUnavailable).toBe(false);
+    expect(body.mayIssue).toBe(false);
+  });
+
+  it("keeps the configured duty fact when the holder name cannot be read", async () => {
+    const tables = TABLES();
+    tables.app_users = {
+      data: [{ id: SALES, name: "Siew Hong", email: "sh@carres.com" }],
+      error: null,
+    };
+    const { body } = await rowsOf(tables);
+    expect(body.currentPoDuty).toBeNull();
+    expect(body.actingPoDuty).toBeNull();
+    expect(body.poDutyNameUnavailable).toBe(true);
+    expect(body.poDutyUnavailable).toBe(false);
+  });
+
+  it("does not call a failed duty resolver an empty roster", async () => {
+    const tables = TABLES();
+    tables.ops_po_duty = {
+      data: [],
+      error: { message: "duty read failed" },
+    } as unknown as (typeof tables)["ops_po_duty"];
+    const { body } = await rowsOf(tables);
+    expect(body.currentPoDuty).toBeNull();
+    expect(body.actingPoDuty).toBeNull();
+    expect(body.poDutyNameUnavailable).toBe(false);
+    expect(body.poDutyUnavailable).toBe(true);
     expect(body.mayIssue).toBe(false);
   });
 });
@@ -892,6 +923,18 @@ describe("closure §1 · the Register offers the act to whoever may act today", 
     expect(body.currentPoDuty).toBeNull();
     expect(body.actingPoDuty).toBeNull();
   });
+
+  it("keeps the effective cover fact when the cover name cannot be read", async () => {
+    const t = TABLES() as unknown as Record<string, { data: unknown; error: unknown }>;
+    t.ops_po_duty_cover = {
+      data: [{ normal_user_id: PO_HOLDER, acting_user_id: "u1" }],
+      error: null,
+    };
+    const { body } = await rowsOf(t);
+    expect(body.currentPoDuty).toEqual({ userId: PO_HOLDER, name: "Yee Jin" });
+    expect(body.actingPoDuty).toBeNull();
+    expect(body.poDutyNameUnavailable).toBe(true);
+  });
 });
 
 /**
@@ -911,6 +954,7 @@ function registerTables() {
   /* o1 gains the order facts the Register prints. */
   Object.assign(orders.find((o) => o.id === "o1")!, {
     proceed_date: "2026-08-20",
+    proceeded_at: "2026-08-20T08:15:00+08:00",
     customer_address_city: "Petaling Jaya",
     customer_address_state: "Selangor",
   });
@@ -1016,7 +1060,7 @@ describe("Card 02-B · one permanent row per proceeded Sales Order", () => {
   it("carries the order facts the columns print — Proceed Date, Requested Delivery Date, locality", async () => {
     const { body } = await rowsOf(registerTables());
     const o1 = registerRow(body, "o1")!;
-    expect(o1.proceedDate).toBe("2026-08-20");
+    expect(o1.proceededAt).toBe("2026-08-20T08:15:00+08:00");
     expect(o1.requestedDeliveryDate).toBe(DELIVERY_EARLY);
     expect(o1.deliveryCity).toBe("Petaling Jaya");
     expect(o1.deliveryState).toBe("Selangor");

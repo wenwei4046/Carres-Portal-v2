@@ -655,6 +655,8 @@ describe("the SO Batch response carries destinations, duty and permission", () =
          the holder: the duty stays where management put it, and the audit must
          still say who actually pressed Issue PO. */
       actingPoDuty: { userId: "u2", name: "Shasha" },
+      poDutyNameUnavailable: false,
+      poDutyUnavailable: false,
       mayIssue: true,
       procurementPartners: [{ id: "p1", name: "NETS" }],
       safetyDays: 14,
@@ -676,6 +678,8 @@ describe("the SO Batch response carries destinations, duty and permission", () =
       defaultDestinationId: null,
       currentPoDuty: null,
       actingPoDuty: null,
+      poDutyNameUnavailable: false,
+      poDutyUnavailable: false,
       mayIssue: false,
       procurementPartners: [],
       safetyDays: 14,
