@@ -2641,6 +2641,26 @@ export default function SalesOrderWorkspace() {
         <div className="min-h-0 flex-1 overflow-auto bg-kit-slate-3 px-4 py-4">
           <div className="mx-auto max-w-5xl rounded-card border border-kit-slate-5 bg-white p-5">
             <h2 className="mb-4 text-title font-semibold text-base-900">{objectView}</h2>
+            {/* ⭐ R-7 — A FAILED READ IS NOT AN EMPTY LEDGER. Without these two
+                guards a 403 or a 500 falls straight through to the ledger's
+                governed EMPTY sentences (`No revisions recorded` / `No history
+                recorded`), which tell the reader the order HAS no revisions —
+                a statement the screen cannot know. The Order Route branch above
+                has carried both guards all along; this one never did, so a
+                permission refusal rendered here as a fact about the order. */}
+            {detailQ.isLoading || revisionsQ.isLoading ? (
+              <Loading label={objectView === "History" ? "Opening the history" : "Opening the revisions"} />
+            ) : detailQ.isError || revisionsQ.isError ? (
+              <EmptyState
+                title={objectView === "History" ? "This history could not be opened" : "These revisions could not be opened"}
+                detail={(detailQ.error as Error | undefined)?.message ?? (revisionsQ.error as Error | undefined)?.message}
+                action={
+                  <Button variant="neutral" onClick={() => { void detailQ.refetch(); void revisionsQ.refetch(); }}>
+                    Try again
+                  </Button>
+                }
+              />
+            ) : (
             <SalesOrderLedger
               revisions={revisions}
               history={detailQ.data?.history ?? []}
@@ -2666,6 +2686,7 @@ export default function SalesOrderWorkspace() {
                 setObjectView("Order");
               }}
             />
+            )}
           </div>
         </div>
       ) : (

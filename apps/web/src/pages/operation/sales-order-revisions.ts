@@ -4,6 +4,7 @@
  * is DERIVED from the immutable snapshots (one arithmetic, Law D), never
  * stored alongside them where it could drift.
  */
+import { LIFT_OPTIONS } from "@carres/shared";
 import { fmtDate } from "@/lib/fmt-date";
 import type { SalesOrderSnapshot, SalesOrderSnapshotLine } from "@/lib/queries";
 
@@ -20,19 +21,38 @@ const HEADER_LABELS: ReadonlyArray<[key: string, label: string, isDate?: boolean
   ["customer_address_postcode", "Postcode"],
   ["customer_emergency", "Emergency contact"],
   ["customer_billing", "Billing address"],
-  ["delivery_date", "Promised delivery", true],
-  ["delivery_date_tbd", "Promised delivery TBD"],
+  ["delivery_date", "Requested Delivery Date", true],
+  ["delivery_date_tbd", "Delivery date to be confirmed"],
   ["proceed_date", "Proceed date", true],
   ["delivery_floor", "Floor"],
-  ["delivery_has_lift", "Lift"],
+  /* R-13 — 0354 widened the writer to the portal's remaining questions and
+     `sales_order_snapshot` sees every one of them, but this table never grew.
+     A save that moved ONLY these minted a revision whose diff printed NOTHING.
+     Only the three carrying a governed label are added; the rest need a word. */
+  ["customer_address_unknown", "Address not given yet"],
+  ["customer_billing_same", "Billing address same as delivery"],
+  ["delivery_stair_items", "Items needing stair carry"],
+  ["delivery_has_lift", "Lift available?"],
   ["installment_months", "Instalment plan", false, " months"],
   ["salesperson_name", "Salesperson"],
   ["outlet_name", "Showroom"],
 ];
 
-function word(v: unknown, isDate?: boolean): string {
+function word(v: unknown, isDate?: boolean, key?: string): string {
   if (v == null || v === "") return "—";
-  if (typeof v === "boolean") return v ? "Yes" : "No";
+  if (typeof v === "boolean") {
+    /* ⭐ THE LIFT ANSWER HAS TWO NAMED WORDS (COPY-STANDARD:1516). `Yes/No` is
+       banned for this fact BY NAME, because a boolean cannot say the difference
+       between *no lift* and *nobody asked* — which is the whole reason the POS
+       and the object page both moved to two named answers. Both surfaces import
+       `LIFT_OPTIONS`; neither may retype the words, so nor may this one.
+
+       Fixing the LABEL alone would have left the banned values in place: one
+       boolean branch serves every field here, so `Lift available?: Yes → No`
+       is still `Yes/No`. The per-key hook is what makes the ruling reachable. */
+    if (key === "delivery_has_lift") return v ? LIFT_OPTIONS[1] : LIFT_OPTIONS[0];
+    return v ? "Yes" : "No";
+  }
   if (isDate) return fmtDate(String(v));
   return String(v);
 }
@@ -58,8 +78,8 @@ export function describeRevisionChanges(
     const b = next.header?.[key];
     if ((a ?? null) === (b ?? null)) continue;
     /* ids move together with their names; the name row already speaks. */
-    const before = word(a, isDate);
-    const after = word(b, isDate);
+    const before = word(a, isDate, key);
+    const after = word(b, isDate, key);
     out.push(`${label}: ${before}${before === "—" ? "" : (suffix ?? "")} → ${after}${after === "—" ? "" : (suffix ?? "")}`);
   }
 

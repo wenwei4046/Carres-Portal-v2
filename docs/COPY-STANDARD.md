@@ -1659,6 +1659,15 @@ surface is how a dictionary splits.
 | Unknown promised date | **Delivery date to be confirmed** |
 | Empty immutable-version view | **No revisions recorded** |
 | Empty event-ledger view | **No history recorded** |
+| Those two views while the read is IN FLIGHT | **`Opening the revisions`** · **`Opening the history`** |
+| Those two views when the read FAILED | **`These revisions could not be opened`** · **`This history could not be opened`**, with `Try again` |
+
+⭐ **AN EMPTY SENTENCE MAY NEVER DOUBLE AS A FAILURE SENTENCE (2026-08-28).** The two rows above
+exist because the ledger had neither a loading state nor an error state, so a 403, a 500 or an
+expired token fell straight through to `No revisions recorded` — **a permission refusal rendering
+as a factual claim about the order.** `No revisions recorded` says Carres looked and found none;
+only a screen that actually got an answer may say it. The same rule binds every empty state in
+this document: if a surface can fail, its empty word is not allowed to describe the failure.
 | The drawer panel listing who to ring, one row per outside party | **Calls** | Chase Now · Actions · Follow-ups · Contacts — `Actions` is the ROW's open-action list and one word may not head two blocks (Jess 2026-07-28, PR #487); the panel's own empty state has read `0 calls to make · everything on track.` since C1, so the title is that sentence's noun, not a new word |
 
 ## The Purchase Order lifecycle words — CANONICAL HOME (Loo, 2026-07-29 · frozen by P6)
