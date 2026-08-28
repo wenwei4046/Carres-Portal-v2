@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { restampStairCarry, touchesStairInputs } from "../../lib/stair-carry-restamp";
 import { HTTPException } from "hono/http-exception";
 import type { MiddlewareHandler } from "hono";
 import { z } from "zod";
@@ -1483,6 +1484,22 @@ operationOrdersRouter.post("/:id/save", requireOperation, async (c) => {
   if (error) {
     const m = mapPipelineV2Error(error);
     return c.json(m.body, m.status);
+  }
+
+  /* 0394 — A STAIR FEE FOLLOWS THE FLOOR THAT CHANGED. This door can move
+     `delivery_floor` and `delivery_has_lift`, and the fee 0393 stamped at
+     create is priced from them. Without this, changing a floor from 1 to 3
+     left the order describing a charge its own inputs no longer produce.
+
+     Deliberately AFTER the save and deliberately non-fatal: the revision is
+     already minted, so throwing here would tell the operator their edit failed
+     when it did not. A stale fee is the state we were already in; a lost edit
+     would be new damage. */
+  if (touchesStairInputs(parsed.data.header as Record<string, unknown>)) {
+    const restamp = await restampStairCarry(sb, id);
+    if (!restamp.ok) {
+      console.error("stair carry re-stamp failed", { orderId: id, reason: restamp.reason });
+    }
   }
   return c.json(data, 201);
 });
