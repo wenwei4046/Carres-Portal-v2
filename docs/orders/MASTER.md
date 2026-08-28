@@ -287,10 +287,47 @@ with it**; what survives is the rule it existed to serve — *a door, never a du
 **PROCEED DATE IS READ-ONLY ONCE THE ORDER EXISTS.** *"Proceed date shouldn't be editable at SO
 view under operations."* **This overwrites §725-728 below**, which gave Operations a direct writer
 here. The Sales Portal asks for the production start as a REQUIRED question at the point of sale,
-so on an existing order it is a recorded answer, not a field. The CREATE door keeps the picker —
-`createOrderInput` refuses an order without one. 🟡 An imported order carrying no proceed date
-therefore has no screen that can supply one; if that appears in practice the fix is a governed
-correction door, not re-opening the field.
+so on an existing order it is a recorded answer, not a field. The CREATE door keeps the picker.
+
+**⭐ A DATE THAT WAS NEVER RECORDED IS NOT A DATE THAT IS LOCKED — OWNER RULING (YH, 2026-08-28).
+APPROVED / LOCKED.** *"Office new SO should follow [the POS] as well; and for existing SO that
+doesn't have it recorded, change it so that it can be filled in."* Two changes, and Jess's ruling
+above survives both:
+
+```
+CREATE      every door REQUIRES a proceed date — the POS already does; the OFFICE door must too
+BLANK       an existing order with NO proceed date may be filled in ONCE
+RECORDED    an order that HAS one stays read-only — unchanged, this is Jess's ruling
+```
+
+**The lock is on the ANSWER, never on the emptiness.** Filling a blank is completion; changing a
+recorded date is moving when the factory starts, and that stays shut. YH's reason for the
+fill-once bound: *"those that accept blank proceed date are most likely due to bugs from past
+versions"* — so the door exists to repair history, not to reopen a decision.
+
+⛔ **The `createOrderInput` sentence removed above was AMBIGUOUS and read as false.** There are
+**two different objects with that name**: the POS door's `createOrderInputSchema`
+(`packages/shared/src/schemas/orders.ts:325-327`, which genuinely does refuse — and
+`order-entry.ts:246` pins the field `locked · defaultRequired · not toggleable`), and the OFFICE
+door's local `createOrderInput` (`apps/api/src/routes/operation/orders.ts:1483-1499`), which
+**does not**. Measured 2026-08-28: the office door is permissive at all three of its layers — no
+`validateDraft` guard, `proceed_date` inherited `.nullable().optional()` from
+`revisionHeaderInput`, and `sales_order_create` inserts `nullif(…)::date` with no NULL check
+(`0374:115`). That is what this ruling closes.
+
+**WHAT THE DATE MEANS, since no rule computes it.** The planned production-START day, keyed by the
+salesperson at the point of sale (`0165:6-13`). There is **no derivation anywhere** — no lead-time
+arithmetic, no production calendar, no delivery-minus-lead formula. The only guidance in the
+product is prose on the POS: *"pick it deliberately (e.g. ~a month before delivery) so we don't
+reserve stock too early"* (`Step3Delivery.tsx:139-143`). The one rule enforced at every layer is
+`proceed_date <= delivery_date`. It is a planned date only and is never auto-stamped.
+
+📌 **Provenance, recorded because it was asked.** The three read-only lines above entered this file
+in ONE commit — `2515a136`, authored by `yhcominthruWork` as squashed PR #923, whose body never
+mentions proceed date. The `(Jess)` attribution is a **quoted ruling recorded by a session**, and
+those quotation marks are the whole of the provenance; no separate artefact backs it. Neither Lim,
+Chai nor Jess has ever committed a proceed-date line here. YH confirmed the ruling stands on
+2026-08-28 with the refinement above, which is what makes it binding now.
 
 **BOTH SIDES ASK EACH QUESTION THE SAME WAY.** *"Ensure both sides of filling in are the same."*
 The measured failure was the lift: the POS offered two named answers (`No lift` / `Has lift`) while
@@ -321,6 +358,51 @@ object page **together**, so a quote and an order can never disagree about the m
 full one. That is the ruling, not a side effect.
 ⛔ Migration `0104`'s column comment still reads *NULL = auto = every item*. A committed migration
 may not be edited (red line 6) — **this section is the current meaning.**
+
+**⭐⭐ STAIR CARRY IS MONEY THE CUSTOMER OWES — OWNER RULING (YH, 2026-08-28). APPROVED / LOCKED.**
+*"If stair carry requires money for it, it should be included — whether it's paid on the carry day
+or before, it still needs to be paid."*
+
+So the fee is **revenue on this sales order**, not a delivery-day cash arrangement. It belongs in
+the order's total, in what the customer owes, and in what every payment door will accept. **The
+timing of payment does not change whether it is owed.**
+
+⛔ **This settles a three-way contradiction the repo has carried since 0184.** Three files each
+state a different answer, and each is locally coherent:
+| File | Claims |
+|---|---|
+| `apps/api/src/lib/delivery-fee-recompute.ts:38-39` | stair *"folds into the order total"* — revenue |
+| `apps/api/src/routes/orders.ts:258-261` | *"a delivery-time concern, not a sales metric"* — excluded |
+| `apps/api/src/routes/stripe-checkout.ts:115-116` | *"a client-side display extra"* — not a charge at all |
+**The first is now the ruling.** The other two describe an implementation that must change; their
+comments are corrected in the same PR that changes them, never left to contradict this section.
+
+**MEASURED STATE THIS RULING OVERTURNS** (Sales Order Workspace field audit, 2026-08-28, §2 F-2):
+the fee is computed in the browser on every render from three stored inputs plus a globally
+mutable rate, and is **written down nowhere**. The customer signs a POS screen that itemises it
+twice and folds it into the headline total (`Step3SignaturePayment.tsx:271-278, :314, :123`) under
+a T&C clause promising it is *"billed on this sales order"* (`:655-657`) — while the order's own
+total is lines + addons only (`order-money.ts:100`). Every payment door caps against that lower
+figure: Stripe returns 422 `amount_exceeds_outstanding` **before Stripe is called**
+(`stripe-checkout.ts:158-168`) and `top_up_order` refuses cash identically (`0351:245-249`).
+At seeded rates a 5-item floor-3 order signs at RM 9,600 against a record that can only ever
+describe RM 9,450. **No door in the portal can collect the difference.**
+
+**THE SHAPE OF THE FIX — the pattern already exists and is not to be invented.**
+`delivery-fee-recompute.ts` computes the delivery TRIP fee server-side and appends `order_addons`
+rows (`DELIVERY` · `DELIVERY_CROSS` · `DELIVERY_ADD`, seeded `0184:112-116`). Stair carry follows
+the same road: ① seed a stair key into `addons` — the set is **not** closed, `POST /api/catalog/addons`
+(`catalog.ts:1854-1880`, gate `internalOnly`) creates one and the door is on screen at
+**Settings → Catalog → Special Add-ons**; ② have the server recompute write the per-order figure
+into `order_addons.qty` / `unit_price`, exactly as the delivery-fee rows do, since `addons.price`
+is a fixed per-key price and stair carry is computed. The total, the outstanding and every payment
+cap then include it with no further change, because they already read `order_addons`.
+⚠️ The fee must be **stamped at the order**, not re-derived: today changing
+`floor_config.per_floor_per_item` in Settings silently reprices every historic order's displayed
+stair carry. A charge the customer signed for may not move because a rate changed afterwards.
+🟡 Sequencing is the owner's, not the code's: this changes what existing orders are worth. Under
+`CLAUDE.md` §6 every row today is test data, so **no backfill is proposed** — the ruling binds new
+orders from the day it ships.
 - **`Address not given yet` appears only while there is no address**, or while it is already
   ticked. On an order that carries one, a permanent tickbox whose only power is to discard it is a
   hazard, not a field.
@@ -4538,6 +4620,32 @@ DECIDE          the configured approver ONLY — today that is Jess. The approve
 APPROVED        opens the money gate for that order's DOs
 PENDING/REFUSED keeps it shut
 ```
+
+**⭐ THE APPROVER IS THE PRINCIPAL ONLY — OWNER RULING (YH, 2026-08-28). CHANGEABLE.**
+The `delivery_payment_approver` duty above describes the *intended* shape and is **not reachable
+today**: the key was never created. `org_duties` holds exactly six seeded keys
+(`0260:30-41` + `0286:74-79`) and this is not among them; `org_position_duties.duty_key` is
+`references org_duties(key)` (`0260:46-51`) and `hr_set_position_duty` raises `duty_not_found`
+before it would insert (`0260:203-204`). A holder row is therefore impossible, the HR team screen
+shows no checkbox for it (its column list is read live from `org_duties`), and
+`delivery_payment_approver_gate()` is behaviourally **identical to `role = 'principal'`**.
+
+**This is deliberate, not a defect.** Carres has ~8 registered users and the departments that
+would hold the duty are not set up yet, so a second approver has nobody to be. The UI's
+`canDecide = role === "principal"` and the RPC gate admit exactly the same person, and they agree.
+
+⚠️ **Do not "fix" the UI to read the duty.** That was raised as a gate mismatch by the Sales Order
+Workspace field audit (2026-08-28) and **refuted on measurement** — see
+`docs/audits/SO-WORKSPACE-FIELD-AUDIT.md` §5 G-4. Reading a duty nobody can hold changes nothing
+and adds a branch that cannot be tested against a real holder.
+
+**WHEN THIS CHANGES.** The ruling is explicitly temporary and turns on Carres's org, not on the
+code. When a manager should approve COD without Jess, the order of work is: ① seed the
+`delivery_payment_approver` key into `org_duties` and add it to `DUTY_KEYS`
+(`packages/shared/src/schemas/org-duties.ts:18-29`, a closed tuple pinned by its own test);
+② grant it to a position through the HR team screen; ③ only then widen `canDecide` to read the
+duty. Steps ① and ② are owner/HR decisions; ③ is the code change, and it is the smallest of the
+three. Until ① happens, the duty branch in the RPC is correct-but-dormant and must stay.
 
 Nobody else may create, edit or delete a decision; deletion is refused by trigger and a decision
 is never re-decided (the 0355 pattern). **The database asserts the money law on the mint
