@@ -1122,8 +1122,8 @@ describe("POST …/to-order/demand — the Source rides the wire (P15)", () => {
 
   const base = { sku: "SONIC-S", qty: 2, destinationId: DEST };
 
-  it("forwards each of the four purposes the store can record", async () => {
-    for (const p of ["ready_stock", "display", "warranty", "office"]) {
+  it("forwards each of the five approved purposes (Card 03)", async () => {
+    for (const p of ["ready_stock", "display", "warranty", "internal_staff", "subsidiary"]) {
       const { res, calls } = await create({ ...base, purpose: p });
       expect(res.status).toBe(200);
       expect(calls[0].fn).toBe("purchasing_create_demand");
@@ -1131,13 +1131,14 @@ describe("POST …/to-order/demand — the Source rides the wire (P15)", () => {
     }
   });
 
-  it("refuses a purpose the database has no value for, before it reaches the RPC", async () => {
-    // `Other…` is a ruled WORD with no CHECK value (`spare_parts` joined the
-    // CHECK in 0359, on the Manual Purchase ruling). This proves the wire
-    // refuses what the store cannot hold, so the three lists (CHECK · function
-    // gate · shared constant) cannot drift into a fourth that only the api
-    // believes.
-    for (const p of ["other", "", "READY_STOCK"]) {
+  it("refuses a purpose the doors no longer offer, before it reaches the RPC", async () => {
+    // `Other…` is a ruled WORD with no CHECK value, and `office`/`spare_parts`
+    // became LEGACY in 0398 (Card 03): old rows stay readable, but a NEW write
+    // may not be born with a word the dropdown no longer offers. This proves
+    // the wire refuses what the doors refuse, so the three lists (CHECK ·
+    // function gate · shared constant) cannot drift into a fourth that only
+    // the api believes.
+    for (const p of ["other", "", "READY_STOCK", "office", "spare_parts"]) {
       const { res, calls } = await create({ ...base, purpose: p });
       expect(res.status).toBe(400);
       expect(calls).toHaveLength(0);

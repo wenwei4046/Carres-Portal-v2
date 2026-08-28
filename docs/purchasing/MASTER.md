@@ -220,8 +220,10 @@ exists.
 ### 5.2 Two input doors
 
 `SO Batch Purchase` is system demand from customer Sales Orders. `Manual Purchase` is conscious
-internal intent for Ready Stock, purchased Display, Office, Spare Parts or Emergency / Urgent Stock.
-An approved Display Request may route to Manual Purchase or Consignment Order; staff do not retype it.
+internal intent for the five approved purposes (Card 03, owner ruling 2026-08-28): `Ready Stock` ·
+`Showroom Display` · `Service Case` · `Internal Staff Purchase` · `Subsidiary Purchase`.
+Management is included under `Internal Staff Purchase`. An approved Display Request may route to
+Manual Purchase or Consignment Order; staff do not retype it.
 
 ### 5.3 One PO issue authority
 
@@ -769,9 +771,61 @@ blank `SO NO`.
 
 ### 9.2 Manual Purchase
 
-**Purpose / source:** non-SO internal buys: Ready Stock, purchased Display, Office, Spare Parts,
-Emergency / Urgent Stock.
-**Left rail:** `Details missing`, `Waiting for approval`, `Not approved`, `Ready to order`, `Ordered`.
+**Purpose / source:** non-SO internal buys, exactly five purposes (Card 03, owner ruling
+2026-08-28): `Ready Stock` · `Showroom Display` · `Service Case` · `Internal Staff Purchase` ·
+`Subsidiary Purchase`. Management is included under `Internal Staff Purchase`; there is no
+`Management Purchase`. Store tokens: `ready_stock` · `display` · `warranty` · `internal_staff` ·
+`subsidiary` (0398); `office` and `spare_parts` are LEGACY — readable on old rows with their
+truthful old label, refused for new requests, matching no purpose filter.
+
+**Left rail — APPROVED / LOCKED, owner ruling 2026-08-28 (Card 03).** The shared 240px
+`FilterRail` (Card 02-C's readable shell, grammar, Product authority and unique-object count
+rule, imported): same heading typography and spacing, blue active `NavRow`, no checkboxes,
+labels wrap and never truncate, counts right-aligned, the rail scrolls vertically and may hide
+(`Hide filters` / `Show filters`, remembered per staff browser); the Register scrolls
+horizontally when required. Four groups, in this exact order:
+
+```text
+TO ORDER
+  All not ordered          live quantity not yet fully issued to a PO
+  Need approval            awaiting the configured approver's decision
+  Ready to order           approved (or never gated) with remaining quantity for PO Duty
+
+PURCHASE PURPOSE
+  All purposes · the five approved purposes, in the approved order
+
+PRODUCT
+  All products · Mattress · Bedframe · Sofa      ← the CATALOG's category, never SKU text
+
+SUPPLIER
+  All suppliers · actual names, alphabetical      ← derived: line Catalog supplier + PO lineage
+```
+
+- Counts are UNIQUE Manual Purchase requests; each section's counts update against the other
+  selected sections. One filter per section; sections combine with AND; an `All…` row clears
+  only its own section; a second click on a selected row clears it; the fixed rows print their
+  live count, zero included; the selected supplier stays visible with `0`.
+- The default no-filter Register is the PERMANENT Manual Purchase listing, ordered history
+  included; fully ordered requests leave `All not ordered` but stay searchable through the
+  Register's own controls. The TO ORDER states ride the ONE status arithmetic
+  (`manualPurchaseStatusOf`) and the `/issue` door's own remainder
+  (`coalesce(approved_qty, qty) − issued_qty`); nothing stores a second status.
+- Supplier is derived, never selected by Operation. A missing SKU or supplier is named inside
+  the affected request and handled at its owning Catalog boundary — never a rail facet.
+- Banned on this rail, never to return: `Supplier not selected` · `No supplier` ·
+  `Not in catalog` · `Need price` · `Ordered` · `Part received` · `Received` · `Arrived` ·
+  `Cancelled` · `My drafts` · `Need correction` · `Queues` · `ORDER TIMING` · safety-days rows ·
+  the retired `Details missing` / `Not approved` queue rows.
+
+**Approval boundary (Card 03 §3).** Operation prepares and submits; it does not approve and
+does not control price. The approver is the governed `ops_manager` duty (Purchasing Settings'
+own gate) — Jess today, changeable in HR without redesigning the rail; she may approve her own
+request. The rail says `Need approval`; the Register and object print the real action owner's
+name as `{name} approves` (shared logins and robot accounts never print while a named person
+holds the duty). Price is not a rail state or filter. Approved requests continue into the
+existing governed PO Duty issuance door; Manual Purchase and SO Batch Purchase stay separate
+pages.
+
 **Columns:** Request No., Purpose, Requested By, Items/Qty, Required Date, Deliver To, Approval,
 Purchase Coverage, Work.
 **Journey:** `+ Manual Purchase` → choose plain-language purpose → enter goods/quantity/date/

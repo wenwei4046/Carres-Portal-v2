@@ -245,8 +245,17 @@ export const TO_ORDER_WORDS = {
    * failure 0322 paid for on the pool's reasons.
    */
   reasonReadyStock: "Ready Stock",
-  reasonDisplay: "Display",
-  reasonWarranty: "Warranty",
+  /* Card 03 (owner-approved vocabulary, 2026-08-28): the token `display` has
+     always meant purchased SHOWROOM display (purchasing/MASTER §7.4), and a
+     `warranty` buy is a buy for a customer Service Case — the module that owns
+     that work. TRUE relabels, not new meanings. */
+  reasonDisplay: "Showroom Display",
+  reasonWarranty: "Service Case",
+  reasonInternalStaff: "Internal Staff Purchase",
+  reasonSubsidiary: "Subsidiary Purchase",
+  /* LEGACY tokens (0323/0359), refused for NEW requests since 0398: an old row
+     keeps its truthful old label — it is never falsely mapped onto the
+     approved five (Card 03 §2). */
   reasonSpareParts: "Spare Parts",
   reasonOffice: "Office",
   reasonOther: "Other…",
@@ -483,8 +492,8 @@ export const DEMAND_PURPOSES = [
   { value: "ready_stock", label: TO_ORDER_WORDS.reasonReadyStock },
   { value: "display", label: TO_ORDER_WORDS.reasonDisplay },
   { value: "warranty", label: TO_ORDER_WORDS.reasonWarranty },
-  { value: "office", label: TO_ORDER_WORDS.reasonOffice },
-  { value: "spare_parts", label: TO_ORDER_WORDS.reasonSpareParts },
+  { value: "internal_staff", label: TO_ORDER_WORDS.reasonInternalStaff },
+  { value: "subsidiary", label: TO_ORDER_WORDS.reasonSubsidiary },
 ] as const;
 
 export type DemandPurpose = (typeof DEMAND_PURPOSES)[number]["value"];
@@ -500,6 +509,27 @@ export function isDemandPurpose(v: unknown): v is DemandPurpose {
 }
 
 /**
+ * LEGACY tokens the store still holds on rows raised before Card 03's 0398 —
+ * readable with their truthful old label, refused for new writes, and matching
+ * no `PURCHASE PURPOSE` rail filter. Never falsely mapped onto the approved
+ * five (Card 03 §2); every such row is TEST data under the clean-start law.
+ */
+export const LEGACY_DEMAND_PURPOSES = [
+  { value: "office", label: TO_ORDER_WORDS.reasonOffice },
+  { value: "spare_parts", label: TO_ORDER_WORDS.reasonSpareParts },
+] as const;
+
+/** What a stored purpose PRINTS — the five offered, then the legacy tokens. */
+export function demandPurposeLabelOf(v: string | null | undefined): string | null {
+  if (!v) return null;
+  return (
+    DEMAND_PURPOSES.find((p) => p.value === v)?.label ??
+    LEGACY_DEMAND_PURPOSES.find((p) => p.value === v)?.label ??
+    null
+  );
+}
+
+/**
  * What a PO's `purpose` (0361) prints as — the `Need for` fact on the PO
  * surfaces. `customer_sales` is the customer lane's auto-stamp; the five typed
  * purposes reuse the demand labels above (one dictionary, Law D). NULL — every
@@ -509,7 +539,7 @@ export function isDemandPurpose(v: unknown): v is DemandPurpose {
 export function poPurposeLabelOf(v: string | null | undefined): string | null {
   if (!v) return null;
   if (v === "customer_sales") return TO_ORDER_WORDS.reasonCustomerSales;
-  return DEMAND_PURPOSES.find((p) => p.value === v)?.label ?? null;
+  return demandPurposeLabelOf(v);
 }
 
 /**

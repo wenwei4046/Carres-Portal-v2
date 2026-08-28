@@ -713,10 +713,35 @@ a word this Register may use. **Retired from the SO Batch Purchase rail, never t
 | The already-have block | `WHAT WE ALREADY HAVE` — `free stock` · `already on PO` · `still needed` (the arithmetic is PRINTED, never left to the reader) |
 | The register columns | `Ref` · `Need for` · `What` · `Qty` · `Deliver to` · `Needed by` · `Raised by` · `Status` |
 | The states | `Waiting for approval` · `Waiting for the SKU` · `Ready to order` · `Ordered` · `Arrived` · `Not going ahead` — `Waiting` always names what it waits ON; `Arrived` is a FACT the system observes, never a button |
-| The purpose choices | `Ready Stock` · `Purchased Display` · `Office` · `Spare Parts` · `Emergency / Urgent Stock` |
+| The purpose choices (Card 03, owner-approved 2026-08-28) | `Ready Stock` · `Showroom Display` · `Service Case` · `Internal Staff Purchase` · `Subsidiary Purchase` — Management is included under `Internal Staff Purchase`; there is no `Management Purchase`. `Office` and `Spare Parts` are LEGACY: an old row keeps its truthful old label, and no new request may choose them |
+| The approval owner, on the Register/object beside `Waiting for approval` | `{name} approves` — the resolved `ops_manager` duty holder(s); several print `{name} or {name} approves`; nothing resolved prints nothing |
 | The number series | `MPR-YYYYMMDD-RRRR` (never `PR-` — that can be mistaken for Purchase Return) |
 | The consolidation OFFER | `Issue as one PO?` — with `Issue as one PO` · `Issue separately` both live on the same screen; an offer that cannot be declined is a gate wearing an offer's clothes |
 | The register's empty state | `No Manual Purchase yet.` |
+
+**The Manual Purchase rail — owner ruling 2026-08-28 (Card 03).** The shared 240px readable
+shell (Card 02-C's grammar, imported). Four groups, in this exact order:
+
+| Heading | Rail rows |
+|---|---|
+| `TO ORDER` | `All not ordered` · `Need approval` · `Ready to order` |
+| `PURCHASE PURPOSE` | `All purposes` · the five approved purposes above, in that order |
+| `PRODUCT` | `All products` · `Mattress` · `Bedframe` · `Sofa` |
+| `SUPPLIER` | `All suppliers` · actual supplier names, alphabetical — never hardcoded, never a placeholder |
+
+Counts are UNIQUE Manual Purchase requests; each section's counts update against the other
+selected sections; one filter per section; sections combine with AND; an `All…` row clears only
+its own section; a second click on a selected row clears it; the fixed rows print their live
+count, zero included; the selected supplier stays visible with `0`. The default no-filter
+Register is the PERMANENT listing, ordered history included; `All not ordered` = live quantity
+not yet fully issued to a PO. Product comes from the authoritative Catalog category, never SKU
+text; Supplier is derived (line Catalog supplier + issued PO lineage), never selected by
+Operation. `Hide filters` / `Show filters` reuse the governed local filter-rail words above.
+**Banned on this rail, never to return:** `Supplier not selected` · `No supplier` ·
+`Not in catalog` · `Need price` · `Ordered` · `Part received` · `Received` · `Arrived` ·
+`Cancelled` · `My drafts` · `Need correction` · `Queues` · `ORDER TIMING` · any safety-days
+row. A missing SKU or supplier is named inside the affected request and handled at its Catalog
+boundary — it never becomes a rail facet.
 
 **PO REVISIONS — the sent document's version** (CARD-2026-08-19-po-revisions, executing
 purchasing/MASTER.md §4's revision rule, Jess 2026-08-18 — *a sent PO is not overwritten, it is

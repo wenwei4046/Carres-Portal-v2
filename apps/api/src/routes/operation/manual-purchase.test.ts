@@ -15,6 +15,7 @@ vi.mock("../../lib/supabase", () => ({
 }));
 vi.mock("../../lib/duties", () => ({
   myDuties: vi.fn().mockResolvedValue([]),
+  dutyHolders: vi.fn().mockResolvedValue({}),
 }));
 vi.mock("../../lib/purchasing-settings", () => ({
   // The frozen ETA arithmetic is the SHARED function; the loader is mocked to
@@ -347,5 +348,100 @@ describe("GET /purchasing/requests/issue-costs", () => {
     const rpc = vi.fn();
     await ask(`?requestIds=${REQ_A}`, rpc);
     expect(rpc).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * ⭐ CARD 03 — THE REGISTER READ CARRIES THE RAIL'S FACTS (2026-08-28).
+ *
+ * The rail filters by the CATALOG's category (never SKU text), by the derived
+ * supplier (line supplier + issued PO lineage), and names the real approval
+ * owner — so the register read returns each of those from its owning table.
+ */
+import { dutyHolders } from "../../lib/duties";
+
+const U_JESS = "11111111-1111-1111-1111-00000000000a";
+const U_GENERIC = "11111111-1111-1111-1111-00000000000b";
+
+function makeRegisterSb() {
+  return {
+    from: vi.fn((table: string) => {
+      switch (table) {
+        case "purchase_requests":
+          return tableStub(REQUESTS, { filterInBy: "id" });
+        case "purchase_demands":
+          return tableStub(
+            [
+              { ...LINES[0], po_id: null },
+              { ...LINES[1], po_id: "PO-1" },
+            ],
+            { filterInBy: "request_id" },
+          );
+        case "product_skus":
+          return tableStub([
+            { sku: "5539-2NA", product_models: { category: "sofa" } },
+            // The second SKU is deliberately absent from the catalog read.
+          ]);
+        case "purchase_orders":
+          return tableStub([{ id: "PO-1", supplier_id: SUP }]);
+        case "suppliers":
+          return tableStub([{ id: SUP, name: "Ohana", kind: "own_logistics" }]);
+        case "purchasing_destinations":
+          return tableStub([{ id: DEST, name: "HOUZS Balakong" }]);
+        case "app_users":
+          return tableStub([
+            { id: U_JESS, name: "Jess", email: "jess@carres.com" },
+            { id: U_GENERIC, name: "Operation", email: "operation@carres.com" },
+          ]);
+        default:
+          return tableStub([]);
+      }
+    }),
+    rpc: vi.fn().mockResolvedValue({ data: [], error: null }),
+  } as unknown as ReturnType<typeof userClient>;
+}
+
+async function readRegister() {
+  vi.mocked(userClient).mockReturnValue(makeRegisterSb());
+  const jwt = await makeJwt("operation");
+  return app.fetch(
+    new Request("https://api.test/api/operation/purchasing/requests", {
+      headers: { Authorization: `Bearer ${jwt}` },
+    }),
+    env as never,
+    { waitUntil() {}, passThroughException() {} } as never,
+  );
+}
+
+describe("Card 03 · GET /purchasing/requests — the rail's derived facts", () => {
+  it("each line carries the Catalog category and the issued PO's supplier", async () => {
+    const res = await readRegister();
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      lines: Array<{ sku: string; category: string | null; po_supplier_id: string | null }>;
+    };
+    const bySku = new Map(body.lines.map((l) => [l.sku, l]));
+    expect(bySku.get("5539-2NA")).toMatchObject({ category: "sofa", po_supplier_id: null });
+    // A SKU the catalog does not hold reads null — never a guessed category —
+    // and the issued line names its PO's supplier (the lineage half).
+    expect(bySku.get("5539-CNR")).toMatchObject({ category: null, po_supplier_id: SUP });
+  });
+
+  it("names the real approval owner from the resolved ops_manager duty, generic accounts excluded", async () => {
+    vi.mocked(dutyHolders).mockResolvedValueOnce({
+      [U_JESS]: ["ops_manager"],
+      [U_GENERIC]: ["ops_manager"],
+    });
+    const res = await readRegister();
+    const body = (await res.json()) as { approvers: Array<{ id: string; name: string | null }> };
+    expect(body.approvers).toEqual([{ id: U_JESS, name: "Jess" }]);
+  });
+
+  it("falls back to the governed legacy list while the duty seat is empty", async () => {
+    // dutyHolders resolves {} (the file-level mock) — the legacy emails hold
+    // the gate, and the generic account is still excluded beside a named one.
+    const res = await readRegister();
+    const body = (await res.json()) as { approvers: Array<{ id: string; name: string | null }> };
+    expect(body.approvers).toEqual([{ id: U_JESS, name: "Jess" }]);
   });
 });

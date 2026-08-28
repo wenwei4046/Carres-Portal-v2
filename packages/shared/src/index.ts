@@ -2033,6 +2033,8 @@ export {
   DEMAND_PURPOSES,
   DEMAND_PURPOSE_DEFAULT,
   DEMAND_PURPOSE_VALUES,
+  LEGACY_DEMAND_PURPOSES,
+  demandPurposeLabelOf,
   isDemandPurpose,
   poPurposeLabelOf,
   type DemandPurpose,
@@ -2101,11 +2103,22 @@ export {
 export {
   MANUAL_PURCHASE_WORDS,
   MANUAL_PURCHASE_STATUS_WORDS,
+  // Card 03 — the shared 240px rail's model (owner-approved 2026-08-28).
+  MANUAL_PURCHASE_RAIL,
+  MANUAL_PURCHASE_RAIL_CLEAR,
+  manualPurchaseApproverLine,
+  manualPurchaseRailFactsOf,
+  manualPurchaseRailModel,
   manualPurchaseStatusOf,
   stillNeededOf,
+  type ManualPurchaseProductCategory,
+  type ManualPurchaseRailFacts,
+  type ManualPurchaseRailFilter,
+  type ManualPurchaseRailModel,
   type ManualPurchaseStatus,
   type ManualPurchaseStatusInput,
   type ManualPurchaseStatusKind,
+  type ManualPurchaseToOrderState,
 } from "./manual-purchase";
 export {
   PURCHASE_DEMAND_WORDS,

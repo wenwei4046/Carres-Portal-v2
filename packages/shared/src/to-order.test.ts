@@ -36,6 +36,8 @@ import {
   DEMAND_PURPOSES,
   DEMAND_PURPOSE_DEFAULT,
   DEMAND_PURPOSE_VALUES,
+  LEGACY_DEMAND_PURPOSES,
+  demandPurposeLabelOf,
   isDemandPurpose,
   type ToOrderLine,
   type ToOrderRow,
@@ -1211,26 +1213,47 @@ describe("P13 · the take path speaks the drawer's word", () => {
  * word the server refuses BY NAME.
  */
 describe("P15 · the Source a typed demand may carry", () => {
-  it("holds exactly the five the database can store", () => {
-    // `spare_parts` joined the CHECK in 0359 (the Manual Purchase ruling,
-    // Jess 2026-08-18); the list moved in all three places together.
+  it("holds exactly the approved five, in the approved rail order (Card 03)", () => {
+    // Owner-approved vocabulary 2026-08-28: `internal_staff` and `subsidiary`
+    // joined in 0398; `office` and `spare_parts` became LEGACY (readable,
+    // refused for new writes). The list moved in all three places together.
     expect(DEMAND_PURPOSES.map((p) => p.value)).toEqual([
       "ready_stock",
       "display",
       "warranty",
-      "office",
-      "spare_parts",
+      "internal_staff",
+      "subsidiary",
     ]);
+    expect(DEMAND_PURPOSES.map((p) => p.label)).toEqual([
+      "Ready Stock",
+      "Showroom Display",
+      "Service Case",
+      "Internal Staff Purchase",
+      "Subsidiary Purchase",
+    ]);
+    // Management is included under Internal Staff Purchase — there is no
+    // `Management Purchase` word anywhere in the dictionary.
+    expect(Object.values(TO_ORDER_WORDS)).not.toContain("Management Purchase");
   });
 
-  it("offers no word the store has no value for", () => {
+  it("offers no word the store refuses, and keeps the legacy tokens readable", () => {
     // `Other…` is a RULED WORD and deliberately not offerable — it has never
     // had a CHECK value, and inventing one would be a screen ruling on a
     // business question nobody has asked ("other" than what, recorded where?).
-    // `Spare Parts` stopped being on this list the day 0359 gave it a value.
     const labels = DEMAND_PURPOSES.map((p) => p.label);
     expect(labels).not.toContain(TO_ORDER_WORDS.reasonOther);
-    expect(labels).toContain(TO_ORDER_WORDS.reasonSpareParts);
+    // The legacy tokens left the OFFERED list in 0398 but old rows keep their
+    // truthful old label — never falsely mapped onto the approved five.
+    expect(labels).not.toContain(TO_ORDER_WORDS.reasonOffice);
+    expect(labels).not.toContain(TO_ORDER_WORDS.reasonSpareParts);
+    expect(LEGACY_DEMAND_PURPOSES.map((p) => p.value)).toEqual(["office", "spare_parts"]);
+    expect(demandPurposeLabelOf("office")).toBe("Office");
+    expect(demandPurposeLabelOf("spare_parts")).toBe("Spare Parts");
+    expect(demandPurposeLabelOf("display")).toBe("Showroom Display");
+    expect(demandPurposeLabelOf("warranty")).toBe("Service Case");
+    expect(demandPurposeLabelOf("internal_staff")).toBe("Internal Staff Purchase");
+    expect(demandPurposeLabelOf("subsidiary")).toBe("Subsidiary Purchase");
+    expect(demandPurposeLabelOf("nonsense")).toBeNull();
     // ...and the unoffered word survives, because a later card may need it.
     expect(TO_ORDER_WORDS.reasonOther).toBe("Other…");
   });

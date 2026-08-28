@@ -40,6 +40,7 @@ vi.mock("@/lib/auth", () => ({
 const KLANG = "2f181917-f4e1-42b2-9e25-d7ee6785424a";
 const REQ1 = "aaaaaaaa-0000-0000-0000-000000000001";
 const REQ2 = "aaaaaaaa-0000-0000-0000-000000000002";
+const REQ3 = "aaaaaaaa-0000-0000-0000-000000000003";
 
 const REGISTER = {
   requests: [
@@ -60,6 +61,8 @@ const REGISTER = {
       created_at: "2026-08-19T02:00:00Z",
     },
     {
+      // A LEGACY purpose (Card 03 §2): readable with its truthful old label,
+      // matching NO purpose filter — never falsely mapped onto the five.
       id: REQ2,
       req_no: "REQ-0002",
       purpose: "office",
@@ -74,6 +77,24 @@ const REGISTER = {
       refuse_reason: null,
       created_by: "u1",
       created_at: "2026-08-19T03:00:00Z",
+    },
+    {
+      // Fully ordered — the permanent listing's HISTORY row: visible by
+      // default, gone under `All not ordered`.
+      id: REQ3,
+      req_no: "REQ-0003",
+      purpose: "ready_stock",
+      destination_id: KLANG,
+      required_by: null,
+      why: "Klang floor stock ran out.",
+      approval_required: false,
+      approved_at: null,
+      approved_by: null,
+      refused_at: null,
+      refused_by: null,
+      refuse_reason: null,
+      created_by: "u1",
+      created_at: "2026-08-18T03:00:00Z",
     },
   ],
   lines: [
@@ -91,8 +112,12 @@ const REGISTER = {
       po_id: null,
       cancelled_at: null,
       cancel_reason: null,
+      category: "sofa",
+      po_supplier_id: null,
     },
     {
+      // A SKU the Catalog does not hold: category null — it joins NO product
+      // facet and names its gap inside the request, never on the rail.
       id: "l2",
       request_id: REQ2,
       sku: "OFF-CHAIR",
@@ -106,11 +131,34 @@ const REGISTER = {
       po_id: null,
       cancelled_at: null,
       cancel_reason: null,
+      category: null,
+      po_supplier_id: null,
+    },
+    {
+      id: "l3",
+      request_id: REQ3,
+      sku: "M-KING",
+      supplier_id: "s1",
+      qty: 2,
+      approved_qty: null,
+      issued_qty: 2,
+      remaining_qty: 0,
+      required_by: null,
+      remark: null,
+      po_id: "PO-2050",
+      cancelled_at: null,
+      cancel_reason: null,
+      category: "mattress",
+      po_supplier_id: "s1",
     },
   ],
   destinations: [{ id: KLANG, name: "HOUZS Balakong" }],
-  suppliers: [{ id: "s1", name: "Ohana" }],
+  suppliers: [
+    { id: "s1", name: "Ohana" },
+    { id: "s2", name: "Office Co" },
+  ],
   users: [{ id: "u1", name: "Siti" }],
+  approvers: [{ id: "u9", name: "Jess" }],
   canApprove: false,
 };
 
@@ -125,6 +173,7 @@ function seedDetail(canApprove: boolean) {
     destinations: REGISTER.destinations,
     suppliers: REGISTER.suppliers,
     users: REGISTER.users,
+    approvers: REGISTER.approvers,
     canApprove,
   };
 }
@@ -171,6 +220,9 @@ function respond(url: string): unknown {
 beforeEach(() => {
   apiFetch.mockReset();
   navigate.mockReset();
+  // The rail's Hide choice is per-browser memory — one test's hide may not
+  // leak into the next test's default.
+  localStorage.clear();
   apiFetch.mockImplementation((url: string) => Promise.resolve(respond(url)));
 });
 
@@ -227,7 +279,17 @@ describe("the register — one request per row (card §7)", () => {
   it("status derives — approval ON waits, approval OFF is ready", async () => {
     await loaded();
     expect(screen.getByText("Waiting for approval")).toBeInTheDocument();
-    expect(screen.getByText("Ready to order")).toBeInTheDocument();
+    // `Ready to order` also names a rail row now — scope to the register.
+    const grid = screen.getByTestId("register-column");
+    expect(grid.textContent).toContain("Ready to order");
+    expect(grid.textContent).toContain("Ordered");
+  });
+
+  it("names the real action owner beside Waiting for approval (Card 03 §3)", async () => {
+    await loaded();
+    expect(screen.getByTestId(`mp-approver-${REQ1}`)).toHaveTextContent("Jess approves");
+    // The decided/ready rows carry no approver line.
+    expect(screen.queryByTestId(`mp-approver-${REQ2}`)).toBeNull();
   });
 
   it("no money renders anywhere — purchasing has no money", async () => {
@@ -242,32 +304,179 @@ describe("the register — one request per row (card §7)", () => {
     );
   });
 
-  it("the rail's queue rows carry counts as work waiting, and zero prints nothing", async () => {
+});
+
+/**
+ * ⭐ CARD 03 — THE LEFT FILTER RAIL (owner-approved 2026-08-28).
+ *
+ * The shared 240px `FilterRail` shell (Card 02-C's grammar, imported), four
+ * groups in the approved order, unique-request counts, AND across sections,
+ * the banned rows absent by name — and the default Register stays the
+ * PERMANENT listing, ordered history included.
+ */
+describe("Card 03 · the left filter rail", () => {
+  const rail = () => screen.getByTestId("manual-purchase-rail");
+
+  it("is the shared 240px FilterRail shell, left of the register, with no checkboxes", async () => {
     await loaded();
-    // One request waits for approval; one is ready to order; none waits on a SKU.
-    expect(screen.getByTestId("mp-queue-waiting_approval").textContent).toContain("1");
-    expect(screen.getByTestId("mp-queue-ready_to_order").textContent).toContain("1");
-    expect(screen.getByTestId("mp-queue-waiting_sku").textContent).toBe("Check the SKU");
+    expect(rail().className).toContain("w-[240px]");
+    const grid = screen.getByTestId("register-column");
+    expect(
+      rail().compareDocumentPosition(grid) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    // Navigation, not selection: no rail row ever grows a checkbox.
+    expect(rail().querySelectorAll("input[type='checkbox']").length).toBe(0);
+    // The shell's own Hide control rides along (Card 02-C's grammar).
+    expect(rail().querySelector("[aria-label='Hide filters']")).toBeTruthy();
   });
 
-  it("a Need for facet narrows the register", async () => {
+  it("renders the four groups and their rows in the approved order", async () => {
     await loaded();
-    fireEvent.click(screen.getByTestId("mp-facet-office"));
-    expect(screen.queryByText("REQ-0001")).toBeNull();
+    const text = rail().textContent ?? "";
+    const order = [
+      "TO ORDER",
+      "All not ordered",
+      "Need approval",
+      "Ready to order",
+      "PURCHASE PURPOSE",
+      "All purposes",
+      "Ready Stock",
+      "Showroom Display",
+      "Service Case",
+      "Internal Staff Purchase",
+      "Subsidiary Purchase",
+      "PRODUCT",
+      "All products",
+      "Mattress",
+      "Bedframe",
+      "Sofa",
+      "SUPPLIER",
+      "All suppliers",
+    ];
+    let at = -1;
+    for (const word of order) {
+      const next = text.indexOf(word, at + 1);
+      expect(next, `${word} out of order`).toBeGreaterThan(at);
+      at = next;
+    }
+  });
+
+  it("renders none of the banned rows or groups", async () => {
+    await loaded();
+    const text = rail().textContent ?? "";
+    for (const banned of [
+      "Supplier not selected",
+      "No supplier",
+      "Not in catalog",
+      "Need price",
+      "Part received",
+      "Received",
+      "Arrived",
+      "Cancelled",
+      "My drafts",
+      "Need correction",
+      "Queues",
+      "ORDER TIMING",
+      "safety days",
+      "Safety days",
+    ]) {
+      expect(text).not.toContain(banned);
+    }
+    // `Ordered` survives only inside `All not ordered` — never as its own row.
+    expect(text.replace(/All not ordered/g, "")).not.toContain("Ordered");
+  });
+
+  it("the default Register keeps ordered history; All not ordered excludes it", async () => {
+    await loaded();
+    expect(screen.getByText("REQ-0003")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("mp-to-order-not_ordered"));
+    expect(screen.queryByText("REQ-0003")).toBeNull();
+    expect(screen.getByText("REQ-0001")).toBeInTheDocument();
     expect(screen.getByText("REQ-0002")).toBeInTheDocument();
+    // A second click clears the section.
+    fireEvent.click(screen.getByTestId("mp-to-order-not_ordered"));
+    expect(screen.getByText("REQ-0003")).toBeInTheDocument();
+  });
+
+  it("Need approval and Ready to order ride the derived request truth, counts as unique requests", async () => {
+    await loaded();
+    expect(screen.getByTestId("mp-to-order-not_ordered").textContent).toContain("2");
+    expect(screen.getByTestId("mp-to-order-need_approval").textContent).toContain("1");
+    expect(screen.getByTestId("mp-to-order-ready_to_order").textContent).toContain("1");
+    fireEvent.click(screen.getByTestId("mp-to-order-need_approval"));
+    expect(screen.getByText("REQ-0001")).toBeInTheDocument();
+    expect(screen.queryByText("REQ-0002")).toBeNull();
+    expect(screen.queryByText("REQ-0003")).toBeNull();
+  });
+
+  it("a purpose filter narrows; a LEGACY purpose matches no row and All purposes clears", async () => {
+    await loaded();
+    // REQ-0002 (`office`) counts under none of the five…
+    expect(screen.getByTestId("mp-purpose-display").textContent).toContain("1");
+    expect(screen.getByTestId("mp-purpose-ready_stock").textContent).toContain("1");
+    expect(screen.getByTestId("mp-purpose-internal_staff").textContent).toContain("0");
+    fireEvent.click(screen.getByTestId("mp-purpose-display"));
+    expect(screen.getByText("REQ-0001")).toBeInTheDocument();
+    expect(screen.queryByText("REQ-0002")).toBeNull();
+    // …but stays in the Register the moment its own section clears.
+    fireEvent.click(screen.getByTestId("mp-purpose-all"));
+    expect(screen.getByText("REQ-0002")).toBeInTheDocument();
+    // The row prints its truthful old label, not a false new one.
+    expect(screen.getByTestId("register-column").textContent).toContain("Office");
+  });
+
+  it("PRODUCT rides the Catalog category; an uncatalogued SKU joins no facet", async () => {
+    await loaded();
+    expect(screen.getByTestId("mp-product-sofa").textContent).toContain("1");
+    expect(screen.getByTestId("mp-product-mattress").textContent).toContain("1");
+    expect(screen.getByTestId("mp-product-bedframe").textContent).toContain("0");
+    fireEvent.click(screen.getByTestId("mp-product-sofa"));
+    expect(screen.getByText("REQ-0001")).toBeInTheDocument();
+    // REQ-0002's SKU has no Catalog category — visible under All products only.
+    expect(screen.queryByText("REQ-0002")).toBeNull();
+  });
+
+  it("SUPPLIER rows are actual derived names, alphabetical, counted per request", async () => {
+    await loaded();
+    // Office Co < Ohana; Ohana serves REQ-0001 (line) and REQ-0003 (line + PO).
+    expect(screen.getByTestId("mp-supplier-Office Co").textContent).toContain("1");
+    expect(screen.getByTestId("mp-supplier-Ohana").textContent).toContain("2");
+    const text = rail().textContent ?? "";
+    expect(text.indexOf("Office Co")).toBeLessThan(text.indexOf("Ohana"));
+  });
+
+  it("sections combine with AND", async () => {
+    await loaded();
+    fireEvent.click(screen.getByTestId("mp-to-order-not_ordered"));
+    fireEvent.click(screen.getByTestId("mp-supplier-Ohana"));
+    expect(screen.getByText("REQ-0001")).toBeInTheDocument();
+    expect(screen.queryByText("REQ-0002")).toBeNull();
+    expect(screen.queryByText("REQ-0003")).toBeNull();
+    // The supplier counts updated against the TO ORDER selection.
+    expect(screen.getByTestId("mp-supplier-Ohana").textContent).toContain("1");
+  });
+
+  it("Hide filters collapses the rail; Show filters brings it back", async () => {
+    await loaded();
+    fireEvent.click(rail().querySelector("[aria-label='Hide filters']")!);
+    expect(screen.queryByTestId("manual-purchase-rail")).toBeNull();
+    const show = screen.getByTestId("mp-show-filters");
+    fireEvent.click(show);
+    expect(screen.getByTestId("manual-purchase-rail")).toBeInTheDocument();
   });
 });
 
 describe("the create workspace — full page, never a dialog (card §3)", () => {
-  it("offers all five purposes, Spare Parts and Warranty included", () => {
+  it("offers exactly the approved five purposes (Card 03 §2)", () => {
     // The list a control may render IS the shared constant (0322's law); the
-    // Select renders from it verbatim.
+    // Select renders from it verbatim. `Office` and `Spare Parts` are LEGACY —
+    // readable on old rows, never offered for a new request.
     expect(DEMAND_PURPOSES.map((p) => p.label)).toEqual([
       "Ready Stock",
-      "Display",
-      "Warranty",
-      "Office",
-      "Spare Parts",
+      "Showroom Display",
+      "Service Case",
+      "Internal Staff Purchase",
+      "Subsidiary Purchase",
     ]);
   });
 
@@ -656,26 +865,10 @@ describe("issue and the observed arrival (slice 3)", () => {
 });
 
 /**
- * THE RAIL CORRECTIONS (CARD-2026-08-19-purchasing-rail-corrections §3 · §4,
- * Jess on production screenshots): the QUEUES + NEED FOR rail sits on the
- * LEFT at 200px like every measured purchasing sibling, and `+ New request`
- * lives in the register's control band — no empty band above the grid.
+ * `+ New request` keeps its control-band home (CARD-2026-08-19 corrections §4)
+ * — the Card 03 rail rebuild moved the FILTERS, not the create door.
  */
-describe("the rail corrections (2026-08-19)", () => {
-  it("the rail renders LEFT of the register at 200px", async () => {
-    await loaded();
-    const rail = screen.getByTestId("manual-purchase-rail");
-    const grid = screen.getByTestId("register-column");
-    expect(rail.className).toContain("w-[200px]");
-    // Document order: the rail comes BEFORE the register column.
-    expect(
-      rail.compareDocumentPosition(grid) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
-    // Same tiles, same counts — behaviour unchanged.
-    expect(screen.getByTestId("mp-queue-waiting_approval")).toBeInTheDocument();
-    expect(screen.getByTestId("mp-facet-office")).toBeInTheDocument();
-  });
-
+describe("the register's control band", () => {
   it("`+ New request` sits inside the register column's control band — no empty band", async () => {
     await loaded();
     const btn = screen.getByTestId("manual-purchase-new-request");

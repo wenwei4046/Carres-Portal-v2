@@ -4414,6 +4414,11 @@ export interface PurchaseRequestLineRow {
   /** Derived by the server from the linked PO's posted receipt (the
    *  Observation Law) — never a button anywhere. */
   received?: boolean;
+  /** Card 03 — the CATALOG's category for this SKU (never SKU-text
+   *  inference); absent from the catalog reads null and joins no facet. */
+  category?: string | null;
+  /** Card 03 — the issued PO's supplier, the rail's lineage half. */
+  po_supplier_id?: string | null;
 }
 
 export interface ManualPurchaseRegisterPayload {
@@ -4422,6 +4427,9 @@ export interface ManualPurchaseRegisterPayload {
   destinations: Array<{ id: string; name: string }>;
   suppliers: Array<{ id: string; name: string; kind?: string | null }>;
   users: Array<{ id: string; name: string | null }>;
+  /** Card 03 §3 — who actually decides `Need approval`: the resolved
+   *  `ops_manager` duty holder(s), by name. */
+  approvers: Array<{ id: string; name: string | null }>;
   /** The Settings manager gate — decides what RENDERS (money, Approve). */
   canApprove: boolean;
 }
@@ -4434,6 +4442,8 @@ export interface ManualPurchaseDetailPayload {
   destinations: Array<{ id: string; name: string }>;
   suppliers: Array<{ id: string; name: string; kind?: string | null }>;
   users: Array<{ id: string; name: string | null }>;
+  /** Card 03 §3 — the real action owner's name on the object too. */
+  approvers: Array<{ id: string; name: string | null }>;
   canApprove: boolean;
 }
 

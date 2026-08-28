@@ -2,13 +2,15 @@ import { Hono, type Context } from "hono";
 import { z } from "zod";
 import {
   DEMAND_PURPOSE_VALUES,
+  LEGACY_OPS_MANAGER_EMAILS,
   expectedArrivalOf,
+  isOpsGenericAccount,
   isOpsManager,
   PURCHASING_REFUSAL_CODES,
   purchasingRefusal,
 } from "@carres/shared";
 import { requireOperation } from "../../lib/auth-guards";
-import { myDuties } from "../../lib/duties";
+import { dutyHolders, myDuties } from "../../lib/duties";
 import { loadPurchasingSettings } from "../../lib/purchasing-settings";
 import { mapPgError } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
@@ -67,6 +69,38 @@ function refuse(
 async function canApprove(c: Context<AppEnv>): Promise<boolean> {
   const { role, email } = c.var.auth;
   return isOpsManager(role, email, await myDuties(c));
+}
+
+/**
+ * Card 03 §3 — THE REAL ACTION OWNER'S NAME. The rail says `Need approval`;
+ * the Register and object print who actually decides: the resolved
+ * `ops_manager` duty holder(s) (Purchasing Settings' own gate — Jess today,
+ * changeable in HR without redesigning the rail), falling back to the governed
+ * legacy list while the duty seat is empty. A generic account is excluded
+ * while a named person holds the duty.
+ */
+async function resolveApprovers(
+  c: Context<AppEnv>,
+  users: Array<{ id: string; name: string | null; email: string | null }>,
+): Promise<Array<{ id: string; name: string | null }>> {
+  const holders = await dutyHolders(c);
+  let approvers = users.filter((u) => (holders[u.id] ?? []).includes("ops_manager"));
+  if (approvers.length === 0) {
+    approvers = users.filter((u) =>
+      (LEGACY_OPS_MANAGER_EMAILS as readonly string[]).includes(u.email ?? ""),
+    );
+  }
+  /* A robot or shared-password account is a PERMISSION, not a person —
+     org-duties' own words: "the shared operation@ login is a manager for
+     daily surfaces". It never prints as the owner while a named person also
+     holds the gate. */
+  const isSharedLogin = (email: string | null) =>
+    (email ?? "").toLowerCase() === "operation@carres.com";
+  const named = approvers.filter(
+    (u) => !isOpsGenericAccount(u.email) && !isSharedLogin(u.email),
+  );
+  if (named.length > 0) approvers = named;
+  return approvers.map((u) => ({ id: u.id, name: u.name }));
 }
 
 /**
@@ -139,12 +173,60 @@ manualPurchaseRouter.get("/", requireOperation, async (c) => {
     lines = await stampReceived(sb, res.data ?? []);
   }
 
+  /* Card 03 — the rail's two derived facts, read at their owners:
+     · the CATALOG category per line (`product_skus → product_models`), never
+       SKU-text inference — read whole and matched here, because `sku` is free
+       text and may carry a double quote (`Leg 4"`), which breaks a PostgREST
+       `.in()` list (the same rule `/issue-costs` below keeps);
+     · the issued PO's supplier, so the rail's SUPPLIER section carries the PO
+       lineage beside the line's own Catalog-derived supplier. */
+  if (lines.length > 0) {
+    const { data: catRows, error: catErr } = await sb
+      .from("product_skus")
+      .select("sku, product_models(category)");
+    if (catErr) {
+      const m = mapPgError(catErr);
+      return c.json(m.body, m.status);
+    }
+    const categoryBySku = new Map<string, string>();
+    for (const row of (catRows ?? []) as Array<{
+      sku: string;
+      product_models: { category: string } | { category: string }[] | null;
+    }>) {
+      const pm = row.product_models;
+      const category = Array.isArray(pm) ? pm[0]?.category : pm?.category;
+      if (category) categoryBySku.set(row.sku, category);
+    }
+
+    const poIds = [...new Set(lines.map((l) => l.po_id).filter((v): v is string => v != null))];
+    const poSupplier = new Map<string, string>();
+    if (poIds.length > 0) {
+      const { data: poRows, error: poErr } = await sb
+        .from("purchase_orders")
+        .select("id, supplier_id")
+        .in("id", poIds);
+      if (poErr) {
+        const m = mapPgError(poErr);
+        return c.json(m.body, m.status);
+      }
+      for (const p of poRows ?? []) {
+        if (p.supplier_id) poSupplier.set(p.id as string, p.supplier_id as string);
+      }
+    }
+
+    lines = lines.map((l) => ({
+      ...l,
+      category: categoryBySku.get(l.sku as string) ?? null,
+      po_supplier_id: l.po_id == null ? null : (poSupplier.get(l.po_id as string) ?? null),
+    }));
+  }
+
   // Names for the columns — read through the owners' tables, never stored
   // twice (Law B: a summary is read-only).
   const [dests, sups, users] = await Promise.all([
     sb.from("purchasing_destinations").select("id, name"),
     sb.from("suppliers").select("id, name, kind"),
-    sb.from("app_users").select("id, name"),
+    sb.from("app_users").select("id, name, email"),
   ]);
   for (const r of [dests, sups, users]) {
     if (r.error) {
@@ -153,12 +235,18 @@ manualPurchaseRouter.get("/", requireOperation, async (c) => {
     }
   }
 
+  const approvers = await resolveApprovers(
+    c,
+    (users.data ?? []) as Array<{ id: string; name: string | null; email: string | null }>,
+  );
+
   return c.json({
     requests: requests ?? [],
     lines,
     destinations: dests.data ?? [],
     suppliers: sups.data ?? [],
-    users: users.data ?? [],
+    users: (users.data ?? []).map((u) => ({ id: u.id, name: u.name })),
+    approvers,
     canApprove: await canApprove(c),
   });
 });
@@ -214,8 +302,12 @@ manualPurchaseRouter.get("/detail/:id", requireOperation, async (c) => {
   const [dests, sups, users] = await Promise.all([
     sb.from("purchasing_destinations").select("id, name"),
     sb.from("suppliers").select("id, name, kind"),
-    sb.from("app_users").select("id, name"),
+    sb.from("app_users").select("id, name, email"),
   ]);
+  const approvers = await resolveApprovers(
+    c,
+    (users.data ?? []) as Array<{ id: string; name: string | null; email: string | null }>,
+  );
 
   return c.json({
     request,
@@ -227,7 +319,8 @@ manualPurchaseRouter.get("/detail/:id", requireOperation, async (c) => {
     })),
     destinations: dests.data ?? [],
     suppliers: sups.data ?? [],
-    users: users.data ?? [],
+    users: (users.data ?? []).map((u) => ({ id: u.id, name: u.name })),
+    approvers,
     canApprove: approver,
   });
 });

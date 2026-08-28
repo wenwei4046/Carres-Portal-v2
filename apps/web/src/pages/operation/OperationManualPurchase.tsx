@@ -1,19 +1,27 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   DEMAND_PURPOSES,
   DEMAND_PURPOSE_DEFAULT,
+  MANUAL_PURCHASE_RAIL,
+  MANUAL_PURCHASE_RAIL_CLEAR,
   MANUAL_PURCHASE_STATUS_WORDS,
   MANUAL_PURCHASE_WORDS as MW,
   TO_ORDER_WORDS as W,
+  demandPurposeLabelOf,
+  manualPurchaseApproverLine,
+  manualPurchaseRailFactsOf,
+  manualPurchaseRailModel,
   manualPurchaseStatusOf,
   purchasingRefusal,
   stillNeededOf,
   type DemandPickItem,
   type DemandPurpose,
+  type ManualPurchaseRailFilter,
   type ManualPurchaseStatus,
   type ManualPurchaseStatusKind,
   type OrderActionTone,
 } from "@carres/shared";
+import { PanelLeftOpen } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import Button from "@/components/kit/Button";
 import DataTable, { type Column } from "@/components/kit/DataTable";
@@ -42,6 +50,11 @@ import {
   type PurchaseRequestLineRow,
   type PurchaseRequestRow,
 } from "@/lib/queries";
+import {
+  FilterRail,
+  FilterRailGroup,
+  FilterRailRow,
+} from "./components/workspace-rail";
 import PurchasingTabs from "./PurchasingTabs";
 
 /**
@@ -88,9 +101,15 @@ interface RequestRegisterRow {
   createdAt: string;
 }
 
+/** The one purpose dictionary — the approved five plus the truthful LEGACY
+ *  labels (Card 03 §2). An unknown token prints itself rather than lying. */
 function purposeLabelOf(value: string): string {
-  return DEMAND_PURPOSES.find((p) => p.value === value)?.label ?? value;
+  return demandPurposeLabelOf(value) ?? value;
 }
+
+/** The `Hide filters` choice is remembered per staff browser (Card 02-C's
+ *  grammar, imported with the shell). */
+const FILTER_RAIL_STORAGE_KEY = "carres.manualPurchase.filterRail.v1";
 
 function buildRows(data: ManualPurchaseRegisterPayload): RequestRegisterRow[] {
   const destName = new Map(data.destinations.map((d) => [d.id, d.name]));
@@ -152,29 +171,72 @@ export default function OperationManualPurchase() {
     [q.data],
   );
 
-  /** Rail filter — a queue row or a Need for facet narrows the register. */
-  const [statusFilter, setStatusFilter] = useState<ManualPurchaseStatusKind | null>(null);
-  const [purposeFilter, setPurposeFilter] = useState<string | null>(null);
+  /* ── The rail (Card 03: four sections, one selection per section) ─────────
+   *
+   * The DEFAULT no-filter view is the permanent Manual Purchase listing,
+   * ordered history included. One filter per section; sections combine with
+   * AND; every count is the SHARED model's unique-request arithmetic,
+   * cross-updated against the other sections. This file picks; it never
+   * counts. */
+  const [filter, setFilter] = useState<ManualPurchaseRailFilter>(MANUAL_PURCHASE_RAIL_CLEAR);
+  const [filterRailOpen, setFilterRailOpen] = useState(() => {
+    try {
+      return localStorage.getItem(FILTER_RAIL_STORAGE_KEY) !== "0";
+    } catch {
+      return true;
+    }
+  });
+  const setFilterRailVisible = useCallback((open: boolean) => {
+    setFilterRailOpen(open);
+    try {
+      localStorage.setItem(FILTER_RAIL_STORAGE_KEY, open ? "1" : "0");
+    } catch {
+      // Storage may be unavailable in a locked-down browser; the live state
+      // still works for this visit.
+    }
+  }, []);
 
+  const railFacts = useMemo(() => {
+    if (!q.data) return [];
+    const supplierName = new Map(q.data.suppliers.map((s) => [s.id, s.name]));
+    const linesByReq = new Map<string, PurchaseRequestLineRow[]>();
+    for (const l of q.data.lines) {
+      const list = linesByReq.get(l.request_id) ?? [];
+      list.push(l);
+      linesByReq.set(l.request_id, list);
+    }
+    return rows.map((r) =>
+      manualPurchaseRailFactsOf({
+        requestId: r.id,
+        status: r.status.kind,
+        purpose: r.purpose,
+        lines: (linesByReq.get(r.id) ?? []).map((l) => ({
+          cancelledAt: l.cancelled_at,
+          qty: l.qty,
+          approvedQty: l.approved_qty,
+          issuedQty: l.issued_qty,
+          /* The CATALOG's category and the derived supplier names — the
+             server's own reads, never SKU-text inference or a picked name. */
+          category: l.category ?? null,
+          supplierNames: [
+            supplierName.get(l.supplier_id ?? "") ?? null,
+            supplierName.get(l.po_supplier_id ?? "") ?? null,
+          ],
+        })),
+      }),
+    );
+  }, [q.data, rows]);
+  const rail = useMemo(() => manualPurchaseRailModel(railFacts, filter), [railFacts, filter]);
   const filtered = useMemo(
-    () =>
-      rows.filter(
-        (r) =>
-          (statusFilter === null || r.status.kind === statusFilter) &&
-          (purposeFilter === null || r.purpose === purposeFilter),
-      ),
-    [rows, statusFilter, purposeFilter],
+    () => rows.filter((r) => rail.visibleRequestIds.has(r.id)),
+    [rows, rail.visibleRequestIds],
   );
 
-  const countOf = (kind: ManualPurchaseStatusKind) =>
-    rows.filter((r) => r.status.kind === kind).length;
-  /** Work waiting, never a total (rail law): decided/derived states are not
-   *  somebody's queue, so only the waiting ones carry a count. */
-  const queueRows: Array<{ label: string; kind: ManualPurchaseStatusKind; count: number }> = [
-    { label: "Approve the purchase", kind: "waiting_approval", count: countOf("waiting_approval") },
-    { label: "Issue PO", kind: "ready_to_order", count: countOf("ready_to_order") },
-    { label: "Check the SKU", kind: "waiting_sku", count: countOf("waiting_sku") },
-  ];
+  /** Card 03 §3 — the real action owner's name beside `Waiting for approval`. */
+  const approverLine = useMemo(
+    () => manualPurchaseApproverLine((q.data?.approvers ?? []).map((a) => a.name)),
+    [q.data?.approvers],
+  );
 
   const columns = useMemo<DataGridColumn<RequestRegisterRow>[]>(
     () => [
@@ -281,13 +343,23 @@ export default function OperationManualPurchase() {
                 {r.status.reasonLabel}
               </span>
             ) : null}
+            {/* Card 03 §3 — the rail says `Need approval`; the row names the
+                REAL action owner. Nothing resolved prints nothing. */}
+            {r.status.kind === "waiting_approval" && approverLine ? (
+              <span
+                className="block truncate text-label font-normal text-base-600"
+                data-testid={`mp-approver-${r.id}`}
+              >
+                {approverLine}
+              </span>
+            ) : null}
           </span>
         ),
         searchValue: (r) => r.status.label,
         filterValue: (r) => r.status.label,
       },
     ],
-    [],
+    [approverLine],
   );
 
   if (mode === "create") {
@@ -340,36 +412,137 @@ export default function OperationManualPurchase() {
     );
   }
 
+  /** One row per rail section keeps the JSX honest to the card's order. */
+  const toggleToOrder = (s: ManualPurchaseRailFilter["toOrder"]) =>
+    setFilter((prev) => ({ ...prev, toOrder: prev.toOrder === s ? null : s }));
+  const togglePurpose = (p: DemandPurpose) =>
+    setFilter((prev) => ({ ...prev, purpose: prev.purpose === p ? null : p }));
+  const toggleProduct = (c: ManualPurchaseRailFilter["product"]) =>
+    setFilter((prev) => ({ ...prev, product: prev.product === c ? null : c }));
+  const toggleSupplier = (name: string) =>
+    setFilter((prev) => ({ ...prev, supplier: prev.supplier === name ? null : name }));
+
   return (
     <div className="flex h-full min-h-0 flex-col">
       <PurchasingTabs />
-      <div className="flex min-h-0 flex-1 gap-2 p-2">
-        {/* The 200px rail sits on the LEFT, like every other purchasing page
-            (corrections card §3 — SO Batch, Receiving and Claims all measure
-            a left 200px rail; the RIGHT side is §5's supervision widgets').
-            Same tiles, same counts, same behaviour — only the side changed. */}
-        <RailAside
-          queueRows={queueRows}
-          statusFilter={statusFilter}
-          setStatusFilter={setStatusFilter}
-          purposeFilter={purposeFilter}
-          setPurposeFilter={setPurposeFilter}
-          rows={rows}
-        />
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col" data-testid="register-column">
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+        {/* Card 03 — the shared readable 240px shell (Card 02-C's grammar,
+            imported). Navigation, not selection: no rail row carries a
+            checkbox; one filter per section; sections combine with AND; an
+            `All…` row clears only its own section; the fixed rows print their
+            live count, zero included. */}
+        {filterRailOpen && (
+          <FilterRail
+            testId="manual-purchase-rail"
+            onHide={() => setFilterRailVisible(false)}
+          >
+            <FilterRailGroup title={MANUAL_PURCHASE_RAIL.toOrder.heading}>
+              {MANUAL_PURCHASE_RAIL.toOrder.rows.map((row) => (
+                <FilterRailRow
+                  key={row.state}
+                  active={filter.toOrder === row.state}
+                  onClick={() => toggleToOrder(row.state)}
+                  testId={`mp-to-order-${row.state}`}
+                  label={row.word}
+                  count={rail.toOrderCounts[row.state]}
+                />
+              ))}
+            </FilterRailGroup>
+            <FilterRailGroup title={MANUAL_PURCHASE_RAIL.purpose.heading}>
+              {/* The approved five, in the approved order. A LEGACY purpose
+                  (`office`, `spare_parts`) matches none of them and lives
+                  under `All purposes` only — never falsely mapped. */}
+              <FilterRailRow
+                active={filter.purpose == null}
+                onClick={() => setFilter((prev) => ({ ...prev, purpose: null }))}
+                testId="mp-purpose-all"
+                label={MANUAL_PURCHASE_RAIL.purpose.all}
+              />
+              {MANUAL_PURCHASE_RAIL.purpose.purposes.map((p) => (
+                <FilterRailRow
+                  key={p.value}
+                  active={filter.purpose === p.value}
+                  onClick={() => togglePurpose(p.value)}
+                  testId={`mp-purpose-${p.value}`}
+                  label={p.label}
+                  count={rail.purposeCounts[p.value]}
+                />
+              ))}
+            </FilterRailGroup>
+            <FilterRailGroup title={MANUAL_PURCHASE_RAIL.product.heading}>
+              {/* The CATALOG's categories, never SKU-text inference. */}
+              <FilterRailRow
+                active={filter.product == null}
+                onClick={() => setFilter((prev) => ({ ...prev, product: null }))}
+                testId="mp-product-all"
+                label={MANUAL_PURCHASE_RAIL.product.all}
+              />
+              {MANUAL_PURCHASE_RAIL.product.categories.map((c) => (
+                <FilterRailRow
+                  key={c.category}
+                  active={filter.product === c.category}
+                  onClick={() => toggleProduct(c.category)}
+                  testId={`mp-product-${c.category}`}
+                  label={c.word}
+                  count={rail.productCounts[c.category]}
+                />
+              ))}
+            </FilterRailGroup>
+            <FilterRailGroup title={MANUAL_PURCHASE_RAIL.supplier.heading}>
+              {/* Actual names from the derived line/PO supplier truth —
+                  dynamic, alphabetical, never hardcoded. A name with no match
+                  under the other filters drops off; the SELECTED name stays,
+                  with its honest 0. */}
+              <FilterRailRow
+                active={filter.supplier == null}
+                onClick={() => setFilter((prev) => ({ ...prev, supplier: null }))}
+                testId="mp-supplier-all"
+                label={MANUAL_PURCHASE_RAIL.supplier.all}
+              />
+              {rail.suppliers.map((s) => (
+                <FilterRailRow
+                  key={s.name}
+                  active={filter.supplier === s.name}
+                  onClick={() => toggleSupplier(s.name)}
+                  testId={`mp-supplier-${s.name}`}
+                  label={s.name}
+                  count={s.count}
+                />
+              ))}
+            </FilterRailGroup>
+          </FilterRail>
+        )}
+        <div
+          className="flex min-h-0 min-w-0 flex-1 flex-col p-2"
+          data-testid="register-column"
+        >
           <DataGrid<RequestRegisterRow>
             appearance="reference"
             /* `+ New request` is the register's PRIMARY action and lives in the
                control band (corrections §4) — a whole empty row above the grid
                was a band spent on one control. */
             toolbarStart={
-              <Button
-                variant="primary"
-                onClick={() => setMode("create")}
-                data-testid="manual-purchase-new-request"
-              >
-                {MW.newRequest}
-              </Button>
+              <>
+                {!filterRailOpen ? (
+                  <button
+                    type="button"
+                    aria-label="Show filters"
+                    title="Show filters"
+                    data-testid="mp-show-filters"
+                    onClick={() => setFilterRailVisible(true)}
+                    className="grid h-7 w-7 place-items-center rounded-control border border-kit-slate-6 bg-white text-kit-slate-11 hover:bg-kit-slate-3 hover:text-kit-slate-12"
+                  >
+                    <PanelLeftOpen size={16} strokeWidth={1.75} aria-hidden />
+                  </button>
+                ) : null}
+                <Button
+                  variant="primary"
+                  onClick={() => setMode("create")}
+                  data-testid="manual-purchase-new-request"
+                >
+                  {MW.newRequest}
+                </Button>
+              </>
             }
             rows={filtered}
             columns={columns}
@@ -403,89 +576,6 @@ export default function OperationManualPurchase() {
 
       </div>
     </div>
-  );
-}
-
-/* ── The left rail — queues above, the Need for facet below ──────────────── */
-
-function RailAside({
-  queueRows,
-  statusFilter,
-  setStatusFilter,
-  purposeFilter,
-  setPurposeFilter,
-  rows,
-}: {
-  queueRows: Array<{ label: string; kind: ManualPurchaseStatusKind; count: number }>;
-  statusFilter: ManualPurchaseStatusKind | null;
-  setStatusFilter: (v: ManualPurchaseStatusKind | null) => void;
-  purposeFilter: string | null;
-  setPurposeFilter: (v: string | null) => void;
-  rows: RequestRegisterRow[];
-}) {
-  return (
-    <aside
-      className="flex w-[200px] shrink-0 flex-col gap-4 overflow-auto"
-      data-testid="manual-purchase-rail"
-    >
-      <section>
-        <h3 className="px-2 pb-1 text-label font-semibold uppercase tracking-[0.14em] text-base-500">
-          Queues
-        </h3>
-        <div className="flex flex-col gap-0.5">
-          {queueRows.map((row) => {
-            const on = statusFilter === row.kind;
-            return (
-              <button
-                key={row.kind}
-                type="button"
-                data-testid={`mp-queue-${row.kind}`}
-                onClick={() => setStatusFilter(on ? null : row.kind)}
-                className={`flex w-full items-center gap-2 rounded px-2 py-[7px] text-left text-meta ${
-                  on
-                    ? "bg-kit-blue-3 font-semibold text-base-900"
-                    : "font-medium text-base-700 hover:bg-hovertint"
-                }`}
-              >
-                <span className="min-w-0 flex-1 truncate">{row.label}</span>
-                {row.count > 0 ? (
-                  <span className="shrink-0 tabular-nums text-base-600">{row.count}</span>
-                ) : null}
-              </button>
-            );
-          })}
-        </div>
-      </section>
-      <section>
-        <h3 className="px-2 pb-1 text-label font-semibold uppercase tracking-[0.14em] text-base-500">
-          {MW.needFor}
-        </h3>
-        <div className="flex flex-col gap-0.5">
-          {DEMAND_PURPOSES.map((p) => {
-            const on = purposeFilter === p.value;
-            const count = rows.filter((r) => r.purpose === p.value).length;
-            return (
-              <button
-                key={p.value}
-                type="button"
-                data-testid={`mp-facet-${p.value}`}
-                onClick={() => setPurposeFilter(on ? null : p.value)}
-                className={`flex w-full items-center gap-2 rounded px-2 py-[7px] text-left text-meta ${
-                  on
-                    ? "bg-kit-blue-3 font-semibold text-base-900"
-                    : "font-medium text-base-700 hover:bg-hovertint"
-                }`}
-              >
-                <span className="min-w-0 flex-1 truncate">{p.label}</span>
-                {count > 0 ? (
-                  <span className="shrink-0 tabular-nums text-base-600">{count}</span>
-                ) : null}
-              </button>
-            );
-          })}
-        </div>
-      </section>
-    </aside>
   );
 }
 
@@ -1169,6 +1259,21 @@ function RequestDetail({
           {status.reasonLabel}
         </p>
       ) : null}
+
+      {/* Card 03 §3 — the object names the REAL action owner while the
+          request waits. Nothing resolved prints nothing. */}
+      {status.kind === "waiting_approval"
+        ? (() => {
+            const line = manualPurchaseApproverLine(
+              (q.data?.approvers ?? []).map((a) => a.name),
+            );
+            return line ? (
+              <p className="text-meta text-base-700" data-testid="mp-detail-approver">
+                {line}
+              </p>
+            ) : null;
+          })()
+        : null}
 
       {/* The facts, in the card's own order. */}
       <dl className="grid max-w-[720px] grid-cols-2 gap-x-6 gap-y-2 text-body">
