@@ -517,6 +517,20 @@ describe("Sales Order object template contract", () => {
     }
   });
 
+  /* THE NEW-ORDER GOODS ROW ALIGNS AT THE TOP (YH, 2026-08-29 — reported from
+     `/operation/orders/so/new`). `items-end` bottom-aligned every cell, and
+     only SKU and Unit price carry a hint line — so Qty dropped a whole row to
+     bring its short box level with their hints, and the three labels sat at
+     three heights.
+
+     This is a SOURCE SCAN because jsdom computes no layout: a render test
+     cannot see that two boxes sit on different lines. It pins the one class
+     that decides it, which is what a later edit would flip back. */
+  it("aligns the create-mode goods row on its labels, not on its hints", () => {
+    expect(workspace).toContain("grid-cols-[1fr_84px_120px_32px] items-start");
+    expect(workspace).not.toContain("grid-cols-[1fr_84px_120px_32px] items-end");
+  });
+
   /* ── ACTIONS ───────────────────────────────────────────────────────────── */
 
   /* Copy is RETIRED (Jess, 2026-08-28) — it dropped line configuration and
