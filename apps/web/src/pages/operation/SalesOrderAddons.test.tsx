@@ -22,6 +22,7 @@ import type { AddonDto } from "@carres/shared";
 const h = vi.hoisted(() => ({
   added: [] as unknown[],
   edited: [] as unknown[],
+  removed: [] as unknown[],
   addPending: false,
 }));
 
@@ -36,6 +37,10 @@ vi.mock("@/lib/queries", () => ({
   useEditOrderAddon: () => ({
     isPending: false,
     mutate: (input: unknown) => h.edited.push(input),
+  }),
+  useRemoveOrderAddon: () => ({
+    isPending: false,
+    mutate: (input: unknown) => h.removed.push(input),
   }),
 }));
 
@@ -77,7 +82,7 @@ beforeEach(() => {
   h.addPending = false;
 });
 
-describe("SalesOrderAddons — the office may add a service, never take one away", () => {
+describe("SalesOrderAddons — the office may add a service, and take back a misclick", () => {
   it("offers the door while the order is in the place lane", () => {
     draw();
     expect(screen.getByTestId("so-addon-open")).toBeInTheDocument();
@@ -100,14 +105,35 @@ describe("SalesOrderAddons — the office may add a service, never take one away
     expect(r).toHaveTextContent("Queen");
   });
 
-  it("carries NO control that would take a service away", () => {
+  /* ⭐ THE RULING NARROWED, 2026-08-28 (YH). "A service is never removed, only
+     increased" was written to stop a DOWNSELL, and that half is untouched:
+     `downsell_blocked` is still real, so the screen still offers no way to
+     REDUCE a qty. What it did not anticipate was the opposite error — a service
+     picked by mistake, billed to a customer who never agreed to it, with no
+     path back from any surface. 0395 opens that door and this test now pins
+     both halves: no decrease, but a removal. */
+  it("offers no way to DECREASE a service, and a way to take a misclick back", () => {
     draw({ addons: [row({ qty: 2 })] });
     const r = screen.getByTestId("so-addon-row-dispose-mattress");
     const labels = [...r.querySelectorAll("button")].map((b) => b.textContent ?? "");
     expect(labels).toContain("Add one more");
-    // `downsell_blocked` lives in the database; the screen must not offer the
-    // act that it refuses.
-    expect(labels.join(" ")).not.toMatch(/remove|delete|less|−|-1/i);
+    expect(labels).toContain("Remove");
+    // The decrease is what the database refuses, and the screen still must not
+    // offer the act it refuses.
+    expect(labels.join(" ")).not.toMatch(/less|fewer|−|-1|reduce/i);
+  });
+
+  it("takes the row back through the 0395 door, and asks for no reason to undo a slip", () => {
+    draw({ addons: [row({ qty: 2 })] });
+    fireEvent.click(screen.getByTestId("so-addon-remove-dispose-mattress"));
+    /* The addon id alone — a misclick needs no explanation, and the full
+       before-image is recorded server-side either way. */
+    expect(h.removed).toEqual([{ addonId: "00000000-0000-0000-0000-0000000000a1" }]);
+  });
+
+  it("offers no Remove on a SERVER-COMPUTED fee — nobody picked it, so nobody misclicked it", () => {
+    draw({ addons: [row({ addon_key: "STAIR_CARRY", qty: 1 })] });
+    expect(screen.queryByTestId("so-addon-remove-STAIR_CARRY")).toBeNull();
   });
 
   it("`Add one more` grows the qty and repeats the size already sold", () => {

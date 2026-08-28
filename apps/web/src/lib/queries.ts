@@ -1355,6 +1355,28 @@ export function useEditOrderAddon(orderId: string) {
   });
 }
 
+/** 0395 — takes back a service picked by MISTAKE (YH, 2026-08-28). A sibling
+ *  of `useEditOrderAddon`, not a mode of it: `edit_order_addon` refuses any qty
+ *  below 1 and any decrease, so "remove" could not be expressed through it at
+ *  all. Same place lane, same gates; the up-sell law is untouched, because a
+ *  misclick and a downsell are different acts. */
+export function useRemoveOrderAddon(orderId: string) {
+  const qc = useQueryClient();
+  return useMutation<Order, ApiError, { addonId: string }>({
+    mutationFn: ({ addonId }) =>
+      apiFetch<Order>(`/api/orders/${orderId}/addons/${addonId}/remove`, {
+        method: "POST",
+      }),
+    onSuccess: async (order) => {
+      qc.setQueryData(qk.order(orderId), order);
+      await qc.invalidateQueries({ queryKey: qk.order(orderId), exact: true });
+      void qc.invalidateQueries({ queryKey: ["orders"] });
+      /* Both surfaces refresh, or they disagree — same reason as the edit hook. */
+      void qc.invalidateQueries({ queryKey: ["operation", "orders"] });
+    },
+  });
+}
+
 /**
  * useCreateStripeCheckout — POST /api/orders/:id/stripe/checkout (0223).
  * Mints a Stripe Checkout link (QR at the counter / WhatsApp) for RM<amount>.
