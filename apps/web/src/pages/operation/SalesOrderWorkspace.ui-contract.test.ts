@@ -345,6 +345,58 @@ describe("Sales Order object template contract", () => {
      The POS has refused an order without one since Phase 11.1; this door did
      not, so it could mint the one order nobody could then repair. Pinned as
      INTENT — the refusal exists and uses the ruled words — not as a line. */
+  /* ⭐ THE QUOTE INCLUDES THE CARRY, BEFORE IT IS SAVED (YH, 2026-08-28).
+     On `/so/new` there is no persisted STAIR_CARRY addon to read — 0393 stamps
+     it at birth — so the create branch adds the fee from the same memo that
+     prints the working-out. The DOUBLE-COUNT is the trap this pins: in
+     `object` mode the row IS in the addons, so adding it again there would
+     charge the carry twice on every upstairs order. */
+  it("puts the stair fee in the quote on create, and never twice on a saved order", () => {
+    const money = workspace.slice(
+      workspace.indexOf("const money = useMemo"),
+      workspace.indexOf("const cancelledLines"),
+    );
+    const createBranch = money.slice(
+      money.indexOf('if (mode === "create")'),
+      money.indexOf("const lines = detailQ.data?.lines"),
+    );
+    expect(createBranch).toContain("stair?.fee");
+    /* The object branch reads the persisted addons and adds nothing. Sliced to
+       the BODY, stopping before the dependency array — `stair?.fee` legitimately
+       appears there, and letting the slice run on would assert against the memo's
+       own deps rather than its arithmetic. */
+    const objectBranch = money.slice(
+      money.indexOf("const lines = detailQ.data?.lines"),
+      money.indexOf("  }, [mode,"),
+    );
+    expect(objectBranch).not.toContain("stair?.fee");
+    /* ONE arithmetic: the quote and its explanation read the same memo, never
+       a second copy of `floorSurchargeRaw` inside the money block. */
+    expect(money).not.toContain("floorSurchargeRaw(");
+  });
+
+  /* ⭐ THE PAPER AND THE MONEY CARD AGREE ON THE DRAFT (YH, 2026-08-28, found
+     on the screen). MONEY read RM 1,540 while the document beside it printed
+     BALANCE DUE RM 1,490 — the fee was in the card and not on the paper.
+     A SAVED order gets the row from `base.addons` (0393); a draft has no row
+     yet, so the preview synthesises the same one. */
+  it("puts the stair carry on the draft paper, and never on top of a saved row", () => {
+    const fn = workspace.slice(
+      workspace.indexOf("function draftTemplateData"),
+      workspace.indexOf("function snapshotTemplateData"),
+    );
+    /* The row is a real addon, so the customer can READ the charge they are
+       being asked to sign for — not a silent difference between two totals. */
+    expect(fn).toContain("STAIR_CARRY_ADDON_KEY");
+    expect(fn).toContain('label: "Stair carry"');
+    /* `base?.addons ??` — the saved row WINS. Adding the synthetic one on top
+       of it would print the charge twice on every upstairs order. */
+    expect(fn).toContain("base?.addons ??");
+    /* And it feeds the same subtotal every other addon feeds, so the paper's
+       BALANCE DUE cannot drift from the card again. */
+    expect(fn).toContain("addons.reduce((s, a) => s + a.line_total, 0)");
+  });
+
   it("refuses to create an office order with no proceed date", () => {
     expect(workspace).toContain("needDealer && !draft.proceed_date");
     /* COPY-STANDARD:1447 governs the words; a second spelling is how the POS
