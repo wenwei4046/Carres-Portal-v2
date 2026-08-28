@@ -88,6 +88,7 @@ import { cjkClassName } from "@/lib/cjk";
 import { composeAddress } from "@/data/malaysia-postcodes";
 import { fmtDate } from "@/lib/fmt-date";
 import { floorSurchargeRaw, stairCarryCount } from "@/lib/order-totals";
+import SalesOrderAddons from "./SalesOrderAddons";
 import { displayCustomerName } from "@/lib/customer-name";
 import { renderSalesOrderPdf } from "@/lib/pdf/render";
 import type { SalesOrderTemplateData } from "@/lib/pdf/types";
@@ -2409,7 +2410,11 @@ export default function SalesOrderWorkspace() {
           and Deliver To are Stock's and Purchasing's facts, and the document
           preview beside it never prints them. */}
       <Block title="Goods">
-        <span className="hidden" data-pos-field="orderAddons" aria-hidden="true" />
+        {/* ⭐ `orderAddons` USED TO BE A HIDDEN SPAN. It carried the
+            `data-pos-field` the POS-parity contract test string-matches, with
+            no control behind it — so the page passed a completeness test it
+            did not meet, and the office still had to ring the shop to add a
+            disposal service. The attribute now rides the real door. */}
         {mode === "create" ? (
           <div className="flex flex-col gap-2">
             {/* Every SKU the catalog holds, offered as a typeahead. A `datalist`
@@ -2506,6 +2511,18 @@ export default function SalesOrderWorkspace() {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+        {/* An OLD revision is a photograph and a draft has no order to write
+            to — the door belongs to the live object only. */}
+        {mode === "object" && orderId && (
+          <div data-pos-field="orderAddons">
+            <SalesOrderAddons
+              orderId={orderId}
+              addons={detailQ.data?.addons ?? []}
+              catalogAddons={catalogQ.data?.addons ?? []}
+              status={order?.status ?? null}
+            />
           </div>
         )}
       </Block>

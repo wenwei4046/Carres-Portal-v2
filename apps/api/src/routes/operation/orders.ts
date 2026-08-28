@@ -551,7 +551,11 @@ operationOrdersRouter.get("/:id", requireOperation, async (c) => {
     // STAGE 2 — `id` rides along so the workspace's Save can diff lines
     // by identity (update-in-place keeps attrs + source_po).
     sb.from("order_lines").select("id, sku, qty, unit_price, attrs, source_po").eq("order_id", id),
-    sb.from("order_addons").select("addon_key, qty, unit_price").eq("order_id", id),
+    /* `id` and `attrs` ride along (2026-08-29) so the office page can NAME a
+       row to adjust and print the size the customer picked. Without `id` the
+       page could show a disposal service but never point at it; without
+       `attrs` it could not say WHICH size was sold. */
+    sb.from("order_addons").select("id, addon_key, qty, unit_price, attrs").eq("order_id", id),
     sb.from("order_history").select("text, by_role, by_user_id, occurred_at, metadata").eq("order_id", id).order("occurred_at", { ascending: true }),
     sb
       .from("order_supplier_threads")
