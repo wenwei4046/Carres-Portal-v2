@@ -162,6 +162,27 @@ describe("SalesOrderAddons — the office may add a service, never take one away
     expect(sent.addons[0]!.unitPrice).toBeUndefined();
   });
 
+  it("never offers a SERVER-COMPUTED fee as a pickable service", () => {
+    /* The delivery fees and stair carry are appended by the server, which also
+       strips any client-sent copy — so offering one here is a control that
+       silently does nothing. The set is imported from `@carres/shared`; this
+       pins that the office door honours it, because the list used to be typed
+       out per-file and `STAIR_CARRY` was missed in exactly this one. */
+    draw({
+      catalogAddons: [
+        ...CATALOG,
+        { key: "STAIR_CARRY", name: "Stair carry", price: 0, active: true, sizeOptions: null },
+        { key: "DELIVERY", name: "Delivery fee", price: 0, active: true, sizeOptions: null },
+      ],
+    });
+    fireEvent.click(screen.getByTestId("so-addon-open"));
+    const opts = [...screen.getByTestId("so-addon-key").querySelectorAll("option")]
+      .map((o) => o.getAttribute("value"));
+    expect(opts).not.toContain("STAIR_CARRY");
+    expect(opts).not.toContain("DELIVERY");
+    expect(opts).toContain("assembly");
+  });
+
   it("never offers a retired service", () => {
     draw();
     fireEvent.click(screen.getByTestId("so-addon-open"));
