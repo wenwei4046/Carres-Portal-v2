@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   MANUAL_PURCHASE_RAIL,
   MANUAL_PURCHASE_RAIL_CLEAR,
+  manualPurchaseApproverLine,
   manualPurchaseRailFacts,
   manualPurchaseRailModel,
   manualPurchaseStatusOf,
@@ -339,5 +340,14 @@ describe("Card 03 · the rail model", () => {
     expect(m.purposeCounts.service_case).toBe(0);
     expect(m.productCounts.sofa).toBe(0);
     expect(m.suppliers).toEqual([]);
+  });
+});
+
+describe("Card 03 §3 · the approval owner's sentence", () => {
+  it("names one holder, joins several with `or`, and prints nothing for nobody", () => {
+    expect(manualPurchaseApproverLine(["Jess"])).toBe("Jess approves");
+    expect(manualPurchaseApproverLine(["Jess", "YJ"])).toBe("Jess or YJ approves");
+    expect(manualPurchaseApproverLine([])).toBeNull();
+    expect(manualPurchaseApproverLine([null, "", "  "])).toBeNull();
   });
 });

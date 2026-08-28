@@ -4,7 +4,7 @@
 **Module:** Purchasing · **Sequence:** 03
 **Page:** Manual Purchase
 **Surface:** Left filter rail + the purpose vocabulary it filters by
-**Status:** IN BUILD — owner approved 2026-08-28
+**Status:** EXECUTED — PR #973 `4c8aa6d5` + the §13 repair/completion PR; vocabulary live via migration 0399
 **Lane:** BUILD / DELIVERY
 **Depends on:** Purchasing Card 02-C (the shared 240px `FilterRail` shell)
 **Expected migration:** ONE — `0398` (purpose vocabulary; next free number across tracker,
@@ -228,3 +228,28 @@ their own future cards; this Card neither builds nor blocks them.
 One production vertical slice from latest `main`: implement → full release gate → PR → CI →
 merge → deploy → production verification → overwrite `docs/purchasing/MASTER.md` §9.2 and
 the COPY-STANDARD Manual Purchase block with the final truth → close this Card.
+
+---
+
+## 13 · Execution addendum — the collision, the repair, the approval owner (2026-08-28)
+
+Two build lanes executed this Card in parallel and collided on migration 0398:
+
+- PR #973 (merged `4c8aa6d5`) shipped the rail and this vocabulary with
+  `0398_a_purchase_names_the_approved_purpose.sql` — MERGED BUT NEVER APPLIED.
+- The second lane had already applied a differently-spelt vocabulary as
+  `0398_the_five_purposes_a_purchase_may_serve` (tracker 14:34 UTC) — its text survives as
+  `0398a_…` in the repo, and its two switch rows (`internal_staff`, `subsidiary`) survive as
+  documented inert artifacts.
+
+**The repair is migration 0399 (APPLIED + VERIFIED):** it re-emits the CHECKs and all four
+doors with THIS Card's canonical tokens (`ready_stock` · `showroom_display` · `service_case`
+· `internal_staff_purchase` · `subsidiary_purchase`; the four retired values readable on
+history only), so the deployed application and the database speak one vocabulary again.
+`0398_a_purchase_names_the_approved_purpose.sql` is superseded by 0399 and must never be
+applied — its approval-switch CHECK would fail against the collision's inert rows.
+
+**§4's approval-owner naming is now BUILT** (it shipped in #973 as law only): the register
+row and the object print `{name} approves` beside `Waiting for approval` — the resolved
+`ops_manager` duty holder(s), legacy-list fallback while the seat is empty, robot and
+shared-password logins excluded while a named person holds the duty.

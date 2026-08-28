@@ -158,6 +158,7 @@ const REGISTER = {
     { id: "s3", name: "Hooka" },
   ],
   users: [{ id: "u1", name: "Siti" }],
+  approvers: [{ id: "u9", name: "Jess" }],
   canApprove: false,
 };
 
@@ -172,6 +173,7 @@ function seedDetail(canApprove: boolean) {
     destinations: REGISTER.destinations,
     suppliers: REGISTER.suppliers,
     users: REGISTER.users,
+    approvers: REGISTER.approvers,
     canApprove,
   };
 }
@@ -1049,5 +1051,39 @@ describe("closure §2 · the issue declares the transaction cost it showed", () 
     const err = await screen.findByTestId("mp-issue-error");
     expect(err).toHaveTextContent("You do not hold PO duty today.");
     expect(err).toHaveTextContent("Ask Shasha to issue this purchase order.");
+  });
+});
+
+
+/**
+ * ⭐ CARD 03 §3 — THE ROW AND THE OBJECT NAME THE REAL APPROVAL OWNER.
+ * The rail says `Need approval`; beside `Waiting for approval` the resolved
+ * `ops_manager` holder's name prints as the governed sentence.
+ */
+describe("Card 03 §3 · the approval owner's name", () => {
+  it("the waiting row prints `Jess approves`; decided rows print nothing", async () => {
+    await loaded();
+    expect(screen.getByTestId(`mp-approver-${REQ1}`)).toHaveTextContent("Jess approves");
+    expect(screen.queryByTestId(`mp-approver-${REQ2}`)).toBeNull();
+  });
+
+  it("the object detail names the owner while the request waits", async () => {
+    seedDetail(false);
+    await loaded();
+    fireEvent.click(screen.getByText("REQ-0001", { selector: "button" }));
+    await screen.findByTestId("mp-detail");
+    expect(screen.getByTestId("mp-detail-approver")).toHaveTextContent("Jess approves");
+  });
+
+  it("no approver resolved prints nothing — an absent name is honest", async () => {
+    apiFetch.mockImplementation((url: string) => {
+      if (url.includes("/purchasing/requests/detail/")) return Promise.resolve(DETAIL);
+      if (url.includes("/purchasing/requests")) {
+        return Promise.resolve({ ...REGISTER, approvers: [] });
+      }
+      return Promise.resolve(respond(url));
+    });
+    await loaded();
+    expect(screen.queryByTestId(`mp-approver-${REQ1}`)).toBeNull();
   });
 });

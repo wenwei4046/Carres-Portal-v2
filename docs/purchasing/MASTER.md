@@ -840,12 +840,21 @@ SUPPLIER
   rows. A missing SKU or supplier is named inside the affected request and handled through
   its owning Catalog boundary; it never becomes a permanent rail facet. Price is not a rail
   state or filter.
-- The rail says `Need approval`; the Register/object shows the real action owner's name.
+- The rail says `Need approval`; the Register/object shows the real action owner's name —
+  the governed sentence `{name} approves` beside `Waiting for approval`, naming the resolved
+  `ops_manager` duty holder(s); a robot or shared-password login never prints while a named
+  person holds the duty; nothing resolved prints nothing.
   The approver is the configured Purchasing Settings manager gate — Jess today, changeable
   without redesigning this rail; Jess may approve a purchase for herself. Operation
   prepares and submits; it does not approve and does not control price. Approved requests
   continue into the one governed PO Duty issuance door; Manual Purchase and SO Batch
   Purchase remain separate doors.
+- **The vocabulary's applied door authority is migration 0399** (2026-08-28): two Card-03
+  build lanes collided on 0398, and the intermediate `0398a` apply left two inert
+  `purchasing_purpose_approval` rows (`internal_staff`, `subsidiary`) that 0399 documents
+  and tolerates; the repo's `0398_a_purchase_names_the_approved_purpose.sql` is superseded
+  by 0399 and must never be applied. The vocabulary itself is unchanged from the owner
+  ruling above.
 
 **Columns:** Request No., Purpose, Requested By, Items/Qty, Required Date, Deliver To, Approval,
 Purchase Coverage, Work.

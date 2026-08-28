@@ -8,6 +8,7 @@ import {
   MANUAL_PURCHASE_WORDS as MW,
   TO_ORDER_WORDS as W,
   demandPurposeLabelOf,
+  manualPurchaseApproverLine,
   manualPurchaseRailFacts,
   manualPurchaseRailModel,
   manualPurchaseStatusOf,
@@ -184,6 +185,12 @@ export default function OperationManualPurchase() {
     [q.data],
   );
 
+  /** Card 03 §3 — the real action owner's name beside `Waiting for approval`. */
+  const approverLine = useMemo(
+    () => manualPurchaseApproverLine((q.data?.approvers ?? []).map((a) => a.name)),
+    [q.data?.approvers],
+  );
+
   /**
    * THE RAIL FILTER (Card 03) — one slot per section; sections combine with
    * AND; the empty filter is the permanent Register, ordered history
@@ -341,13 +348,23 @@ export default function OperationManualPurchase() {
                 {r.status.reasonLabel}
               </span>
             ) : null}
+            {/* Card 03 §3 — the rail says `Need approval`; the row names the
+                REAL action owner. Nothing resolved prints nothing. */}
+            {r.status.kind === "waiting_approval" && approverLine ? (
+              <span
+                className="block truncate text-label font-normal text-base-600"
+                data-testid={`mp-approver-${r.id}`}
+              >
+                {approverLine}
+              </span>
+            ) : null}
           </span>
         ),
         searchValue: (r) => r.status.label,
         filterValue: (r) => r.status.label,
       },
     ],
-    [],
+    [approverLine],
   );
 
   if (mode === "create") {
@@ -1259,6 +1276,21 @@ function RequestDetail({
           {status.reasonLabel}
         </p>
       ) : null}
+
+      {/* Card 03 §3 — the object names the REAL action owner while the
+          request waits. Nothing resolved prints nothing. */}
+      {status.kind === "waiting_approval"
+        ? (() => {
+            const line = manualPurchaseApproverLine(
+              (q.data?.approvers ?? []).map((a) => a.name),
+            );
+            return line ? (
+              <p className="text-meta text-base-700" data-testid="mp-detail-approver">
+                {line}
+              </p>
+            ) : null;
+          })()
+        : null}
 
       {/* The facts, in the card's own order. */}
       <dl className="grid max-w-[720px] grid-cols-2 gap-x-6 gap-y-2 text-body">
