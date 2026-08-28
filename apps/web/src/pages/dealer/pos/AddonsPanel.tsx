@@ -1,5 +1,6 @@
 import { Plus, X, Minus } from "lucide-react";
 import type { AddonDto } from "@carres/shared";
+import { SERVER_EXCLUSIVE_ADDON_KEYS } from "@carres/shared";
 import { rm } from "@/lib/format-currency";
 import {
   addonRequiresSize,
@@ -10,13 +11,21 @@ import {
   type WizardDraft,
 } from "../new-order/draft";
 
-/** 0184 — the delivery-fee addon keys are SERVER-EXCLUSIVE: the Hono order
- *  recompute appends them itself and STRIPS any client-sent copy, so offering
- *  them in a POS picker would be a silent no-op. Filter them out everywhere
- *  the POS renders a selectable add-on list. */
-const SERVER_EXCLUSIVE_ADDON_KEYS = new Set(["DELIVERY", "DELIVERY_CROSS", "DELIVERY_ADD"]);
-
-/** The add-ons a POS operator may actually pick: active + not server-owned. */
+/**
+ * The add-ons a POS operator may actually pick: active + not server-owned.
+ *
+ * ⛔ THE SERVER-EXCLUSIVE SET IS IMPORTED, NEVER RE-TYPED. These fees are
+ * COMPUTED and appended by the Hono recompute, which STRIPS any client-sent
+ * copy — so offering one in a picker is a control that silently does nothing.
+ *
+ * This list used to be spelled out here, and that was the FOURTH copy of it:
+ * three more sat on the server (`POST /api/orders`, `POST /api/orders/raw`, the
+ * add-lines pricer). When `STAIR_CARRY` joined the set on 2026-08-29 the three
+ * server copies were unified and THIS one was missed — so `Stair carry` would
+ * have appeared as a pickable service in the POS and on the office Sales Order
+ * page the moment its key was seeded. One imported set, and there is no fifth
+ * place for the next computed fee to be forgotten.
+ */
 export function offerableAddons(addons: AddonDto[]): AddonDto[] {
   return addons.filter((a) => a.active && !SERVER_EXCLUSIVE_ADDON_KEYS.has(a.key));
 }
