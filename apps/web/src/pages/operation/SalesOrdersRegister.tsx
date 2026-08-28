@@ -564,12 +564,15 @@ export default function SalesOrdersRegister() {
     (r: RegisterRow): DataGridContextMenuItem[] => [
       { label: "View", onClick: () => openWorkspace(r) },
       { label: "Edit", onClick: () => openWorkspace(r) },
-      { label: "Preview PDF", onClick: () => void openSalesOrderPdf(r.id, r.so) },
+      /* ONE ACT, ONE NAME (YH, 2026-08-28). `Preview PDF` sat here calling
+         `openSalesOrderPdf(r.id, r.so)` — byte-identical to the line below
+         it. Two menu rows, one behaviour, so the reader was asked to choose
+         between names that could not differ. The MASTER's locked menu had
+         meant them as separate acts (a preview door and a document output);
+         the implementation never built the first. Retiring the duplicate
+         label loses no capability. If Carres later wants a real preview act,
+         it is a BUILD, not a restoration of this line. */
       { label: "Print PDF", onClick: () => void openSalesOrderPdf(r.id, r.so) },
-      {
-        label: "Copy to new Sales Order",
-        onClick: () => navigate(`/operation/orders/so/new?copyFrom=${r.id}`),
-      },
       /* The MASTER's locked menu ends with the one destructive entry, alone
          below a divider so it is never reached by a slipped click. */
       { divider: true },

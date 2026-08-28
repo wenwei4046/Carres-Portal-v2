@@ -241,11 +241,13 @@ describe("OhanaSofaTab — pickup-flight sup_status branches (v3-S2.2)", () => {
   // their words — `Check in` (the primary) vs `Direct receive →` (the hatch) —
   // because they share one testid.
   //
-  // 🟡 REPORTED, NOT FIXED — that shared testid is the reason this took a
-  // measurement instead of a glance. `receive-po-<id>` names two different
-  // controls with two different meanings; a test cannot tell them apart by
-  // handle, only by word. Renaming one reaches the component, and the S2 card
-  // rules components DO NOT TOUCH, so it is written down here instead.
+  // ✅ FIXED 2026-08-28 (D11). The shared testid is gone: the hatch is
+  // `direct-receive-<id>` and the primary keeps `receive-po-<id>`, so a test
+  // can now tell them apart by HANDLE. It stayed open this long for a boundary
+  // reason, not a technical one — renaming reaches the component and the S2
+  // card ruled components DO NOT TOUCH, so it was written down here instead.
+  // The helpers below still match by word, which is now a second, independent
+  // way of saying the same thing rather than the only way.
   // ─────────────────────────────────────────────────────────────────────────
   const CHECK_IN = purchasingActionButton("check_in");
 

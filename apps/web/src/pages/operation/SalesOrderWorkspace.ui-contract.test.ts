@@ -219,7 +219,7 @@ describe("Sales Order object template contract", () => {
      the conditional work card), and the order changed: MONEY rose above
      ORDER INFO, directly under CUSTOMER.
 
-     `Emergency contact` and `Amend delivery date` were the last two collapsible
+     `Emergency contact` and `Change delivery date` were the last two collapsible
      cards. Merged, they lose the fold with the border — which also retires the
      `forceOpen` machinery that existed ONLY because they could be collapsed: a
      section that is always on screen cannot hide an unsaved change or a live
@@ -258,7 +258,7 @@ describe("Sales Order object template contract", () => {
   it("opens the amend trio from beside Requested Delivery Date, and never hides a live one", () => {
     expect(workspace).toContain('data-testid="amend-date-open"');
     expect(workspace).toContain("setAmendDateOpen(true)");
-    expect(workspace).toContain('title="Amend delivery date"');
+    expect(workspace).toContain('title="Change delivery date"');
     expect(workspace).toContain('description="creates a Revision · needs approval"');
     expect(workspace).toContain("<SalesOrderAmendDeliveryDate");
     /* The modal closes itself once the proposal is recorded. */
@@ -267,7 +267,7 @@ describe("Sales Order object template contract", () => {
     /* A pending proposal is stated in the CARD, not behind the door. */
     expect(workspace).toContain('data-testid="amend-date-waiting"');
     /* And no standing section survives on the card. */
-    expect(workspace).not.toContain("<SubHead>Amend delivery date</SubHead>");
+    expect(workspace).not.toContain("<SubHead>Change delivery date</SubHead>");
   });
 
   /* ⭐ THE STANDING FACT SITS BESIDE THE CARD'S NAME (Jess, 2026-08-26) —
@@ -311,21 +311,45 @@ describe("Sales Order object template contract", () => {
     expect(workspace).not.toMatch(/freeUpToFloor\s*[:=]\s*\d/);
   });
 
-  /* ⭐ PROCEED DATE IS READ-ONLY ON AN EXISTING ORDER (Jess, 2026-08-26).
-     This OVERWRITES `docs/orders/MASTER.md`:725-728, which gave Operations a
-     direct writer. CREATE keeps the picker — `createOrderInput` refuses an
-     order without a proceed date, so the office could not key one otherwise. */
-  it("records the proceed date on an existing order instead of offering it", () => {
+  /* ⭐ PROCEED DATE IS READ-ONLY ON AN EXISTING ORDER (Jess, 2026-08-26),
+     REFINED 2026-08-28 (YH): a date that was never RECORDED is not a date that
+     is LOCKED. The lock is on the ANSWER, never on the emptiness.
+
+     The two assertions below are the same INTENT this test has always pinned —
+     a recorded proceed date is a Fact, and the field still has a control — and
+     they are unchanged. What is replaced is the third: `mode === "create" ?`
+     was a SPELLING of "only create offers the picker", and that sentence is no
+     longer the rule. The invariant that survives is stated directly instead. */
+  it("records a proceed date it HAS, and offers one it never recorded", () => {
     const field = workspace.slice(
       workspace.indexOf('data-pos-field="proceedDate"'),
       workspace.indexOf('data-pos-field="stairCarry"'),
     );
-    expect(field).toContain('mode === "create" ?');
+    /* A recorded date is a photograph, on every mode that is not create. */
     expect(field).toContain('<Fact label="Proceed date"');
     expect(field).toContain('<DatePicker id="so-proceed"');
+    /* The correction door, and the one thing that makes it safe: the test is
+       the SAVED value. Reading `draft` would lock the control the instant a
+       date was picked, before the operator could correct a mis-click. */
+    expect(field).toContain('!baseline.proceed_date');
+    expect(field).not.toContain("!draft.proceed_date ?");
+    /* It opens for an existing order, never for an old revision — `oldrev` is
+       a photograph and carries no lane. */
+    expect(field).toContain('mode === "object"');
     /* The builtin still has a control on the page — the completeness test below
        walks the POS registry and would not accept the field simply vanishing. */
     expect(workspace).toContain('id="so-proceed"');
+  });
+
+  /* ⭐ THE OFFICE DOOR NAMES THE PRODUCTION START (YH, 2026-08-28).
+     The POS has refused an order without one since Phase 11.1; this door did
+     not, so it could mint the one order nobody could then repair. Pinned as
+     INTENT — the refusal exists and uses the ruled words — not as a line. */
+  it("refuses to create an office order with no proceed date", () => {
+    expect(workspace).toContain("needDealer && !draft.proceed_date");
+    /* COPY-STANDARD:1447 governs the words; a second spelling is how the POS
+       ended up with two of them. */
+    expect(workspace).toContain("Proceed date — pick the day production should start");
   });
 
   it("puts no toolbar on or above the paper", () => {
@@ -436,9 +460,9 @@ describe("Sales Order object template contract", () => {
   });
 
   it("opens the amend trio with exactly three fields, through the governed lane", () => {
-    expect(amendDate).toContain("Amend date (from customer)");
-    expect(amendDate).toContain("Amended delivery date");
-    expect(amendDate).toContain('label="Amend reason"');
+    expect(amendDate).toContain("Requested date (from customer)");
+    expect(amendDate).toContain("New delivery date");
+    expect(amendDate).toContain('label="Reason for change"');
     expect(amendDate).toContain("required");
     expect(amendDate).toContain("useSubmitSalesOrderAmendment");
     expect(amendDate).toContain("customerAskedOn");
@@ -457,7 +481,7 @@ describe("Sales Order object template contract", () => {
 
      The strip is gone from `Order info`; the CAPABILITY is not, and that is
      what this pins. The modal is the only way to change items, unit price or
-     instalment months anywhere on the Sales Order — `Amend delivery date`
+     instalment months anywhere on the Sales Order — `Change delivery date`
      submits a date and nothing else — so a later "remove the button" would
      silently retire three capabilities. It must fail here first. */
   it("opens the amendment from More actions, and keeps no idle strip on the card", () => {
@@ -493,12 +517,28 @@ describe("Sales Order object template contract", () => {
     }
   });
 
+  /* THE NEW-ORDER GOODS ROW ALIGNS AT THE TOP (YH, 2026-08-29 — reported from
+     `/operation/orders/so/new`). `items-end` bottom-aligned every cell, and
+     only SKU and Unit price carry a hint line — so Qty dropped a whole row to
+     bring its short box level with their hints, and the three labels sat at
+     three heights.
+
+     This is a SOURCE SCAN because jsdom computes no layout: a render test
+     cannot see that two boxes sit on different lines. It pins the one class
+     that decides it, which is what a later edit would flip back. */
+  it("aligns the create-mode goods row on its labels, not on its hints", () => {
+    expect(workspace).toContain("grid-cols-[1fr_84px_120px_32px] items-start");
+    expect(workspace).not.toContain("grid-cols-[1fr_84px_120px_32px] items-end");
+  });
+
   /* ── ACTIONS ───────────────────────────────────────────────────────────── */
 
-  it("carries Copy, Report a problem and Cancel in More actions, and no Problems card", () => {
-    expect(workspace).toContain("Copy to new Sales Order");
-    /* The SAME route the register's context menu opens (Law C). */
-    expect(workspace).toContain("/operation/orders/so/new?copyFrom=");
+  /* Copy is RETIRED (Jess, 2026-08-28) — it dropped line configuration and
+     handed Purchasing an un-autofillable PO. The assertion is inverted rather
+     than dropped, so a quiet re-introduction fails here. */
+  it("carries Report a problem and Cancel in More actions, no Copy, and no Problems card", () => {
+    expect(workspace).not.toContain("Copy to new Sales Order");
+    expect(workspace).not.toContain("/operation/orders/so/new?copyFrom=");
     expect(workspace).toContain('data-testid="workspace-report-problem"');
     expect(workspace).toContain("Report a problem");
     expect(workspace).toContain("Cancel SO");
@@ -515,14 +555,22 @@ describe("Sales Order object template contract", () => {
     expect(workspace).not.toContain("Collect $");
   });
 
-  it("weights the money block Total · Paid · Outstanding, red while owed", () => {
+  /* THE PIN MOVED, NOT THE FACT (YH, 2026-08-28). This used to assert the
+     2026-08-15 weighting — Total large · Paid medium · Outstanding loudest.
+     That weighting never reached the amounts: `<Money>` renders each at its
+     `row` tone, so the three digits were always the same size and only the
+     containers differed, which is exactly why the three numbers did not line
+     up. The surviving invariant is what the block is FOR — three named money
+     facts, one size, and red while any is owed. */
+  it("shows Total · Paid · Outstanding at ONE size, red while owed", () => {
     expect(workspace).toContain('data-testid="money-total"');
     expect(workspace).toContain('data-testid="money-paid"');
     expect(workspace).toContain('data-testid="money-outstanding"');
-    /* Total large · Paid medium · Outstanding loudest (§6.4 ⑤ + owner ruling
-       2026-08-15: red while any of it is still owed). */
-    expect(workspace).toContain('className="text-title text-base-900" data-testid="money-total"');
+    expect(workspace).toContain('className="text-strong text-base-900" data-testid="money-total"');
     expect(workspace).toContain('className="text-strong text-base-700" data-testid="money-paid"');
+    expect(workspace).toContain('`text-strong ${money.known && money.outstanding > 0');
+    // The retired sizes may not come back on any of the three.
+    expect(workspace).not.toContain('className="text-title text-base-900" data-testid="money-total"');
     expect(workspace).toContain('money.known && money.outstanding > 0 ? "text-danger"');
     expect(workspace).not.toContain('label="Balance"');
   });

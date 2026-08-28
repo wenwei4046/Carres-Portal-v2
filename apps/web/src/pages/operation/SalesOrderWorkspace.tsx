@@ -87,7 +87,8 @@ import { apiFetch, ApiError } from "@/lib/api";
 import { cjkClassName } from "@/lib/cjk";
 import { composeAddress } from "@/data/malaysia-postcodes";
 import { fmtDate } from "@/lib/fmt-date";
-import { floorSurchargeRaw } from "@/lib/order-totals";
+import { floorSurchargeRaw, stairCarryCount } from "@/lib/order-totals";
+import SalesOrderAddons from "./SalesOrderAddons";
 import { displayCustomerName } from "@/lib/customer-name";
 import { renderSalesOrderPdf } from "@/lib/pdf/render";
 import type { SalesOrderTemplateData } from "@/lib/pdf/types";
@@ -127,7 +128,6 @@ import SalesOrderRoute from "./SalesOrderRoute";
 import SalesOrderTabs from "./SalesOrderTabs";
 import { lineName } from "./sales-order-facts";
 import { lineConfigBits } from "../dealer/new-order/special-addons-picker";
-import { copySalesOrderDraft } from "./sales-order-copy";
 
 /* pdf.js worker ships inside the package — nothing fetched from a CDN. */
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
@@ -611,14 +611,31 @@ export function Block({
   return (
     <section className="rounded-card border border-kit-slate-5 bg-white px-4 py-3" data-block={title}>
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-l-2 border-base-300 pl-2">
-        {/* ⭐ A CARD TITLE WEARS THE CARD-TITLE TOKEN (2026-08-24).
+        {/* ⭐ A CARD TITLE WEARS THE CARD-TITLE TOKEN (2026-08-24) IN THE MONO
+            FACE (YH, 2026-08-28).
+
             `01-design-tokens.md` §1 assigns `text-strong` to "card title ·
-            field-group heading" and `text-label` to "field labels, micro-labels,
-            pill text". This heading wore `text-label` — an 11px uppercase
-            micro-label doing a section's job, which is exactly why the sections
-            did not read as sections. Restoring the documented token is the fix;
-            uppercase goes with it, because 15px shouting is a different defect. */}
-        <h2 id={headingId} className="text-strong text-base-900">
+            field-group heading". That token STAYS — the 2026-08-24 fix was that
+            this heading wore `text-label`, an 11px micro-label doing a section's
+            job, and the size is what made sections stop reading as sections.
+
+            What changes is the FACE. The kit loads exactly one UI family, so a
+            heading could only differ from its fields by weight — which is not
+            enough separation on a card holding three sub-sections. `font-mono`
+            is already in this app: every RM figure renders in it, so this is a
+            face the operator reads daily rather than a new one, and nothing
+            else on a form card is monospaced. No token is added.
+
+            ⚠ THIS OVERRIDES the 2026-08-24 note that uppercase "is a different
+            defect". That note was written about 15px SANS uppercase. Mono
+            uppercase with tracking reads as a label rather than as shouting,
+            which is what a section name is. **Falsifier:** if an operator reads
+            these headings as shouting, drop `uppercase tracking-[0.08em]` and
+            keep the face — one class, no other change. */}
+        <h2
+          id={headingId}
+          className="font-mono text-strong uppercase tracking-[0.08em] text-base-900"
+        >
           {title}
         </h2>
         {headerSlot}
@@ -939,7 +956,6 @@ export default function SalesOrderWorkspace() {
   const [params, setParams] = useSearchParams();
   const isNew = location.pathname.endsWith("/so/new");
   const showRoute = params.get("route") === "1" && !isNew;
-  const copyFrom = isNew ? params.get("copyFrom") : null;
   const [viewRev, setViewRev] = useState<number | null>(null);
   const [amendmentSeed, setAmendmentSeed] = useState<AmendmentProposal | null>(null);
   const [cancelOpen, setCancelOpen] = useState(false);
@@ -965,7 +981,7 @@ export default function SalesOrderWorkspace() {
     );
   }, [params, setParams]);
 
-  const detailQ = useOperationOrder(isNew ? copyFrom : (orderId ?? null));
+  const detailQ = useOperationOrder(isNew ? null : (orderId ?? null));
   /* ── THE CREATE DOOR ASKS THE CATALOG (2026-08-21) ───────────────────────
    * Until now this door took a SKU as free text: a typo produced a line no
    * stock, PO or readiness engine could recognise, and creation still
@@ -1065,57 +1081,6 @@ export default function SalesOrderWorkspace() {
   const detailLines = detailQ.data?.lines ?? [];
   useEffect(() => {
     if (isNew) {
-      if (copyFrom) {
-        const seed = `copy:${copyFrom}`;
-        if (!order || draftSeed === seed) return;
-        const copied = copySalesOrderDraft({
-          order: {
-            id: order.id,
-            so: order.so,
-            customer_name: order.customer_name,
-            customer_phone: order.customer_phone,
-            customer_email: (order as { customer_email?: string | null }).customer_email,
-            customer_address: order.customer_address,
-            customer_address_line1:
-              (order as { customer_address_line1?: string | null }).customer_address_line1,
-            customer_address_line2:
-              (order as { customer_address_line2?: string | null }).customer_address_line2,
-            customer_address_city:
-              (order as { customer_address_city?: string | null }).customer_address_city,
-            customer_address_state:
-              (order as { customer_address_state?: string | null }).customer_address_state,
-            customer_address_postcode:
-              (order as { customer_address_postcode?: string | null }).customer_address_postcode,
-            customer_emergency: order.customer_emergency,
-            customer_billing: order.customer_billing,
-            dealer_id: order.dealer_id,
-            outlet_id: order.outlet_id,
-            salesperson_id: order.salesperson_id,
-            delivery_floor: (order as { delivery_floor?: number }).delivery_floor,
-            delivery_has_lift: (order as { delivery_has_lift?: boolean }).delivery_has_lift,
-          },
-          lines: detailLines.map((line) => ({
-            id: line.id,
-            sku: line.sku,
-            qty: line.qty,
-            unit_price: line.unit_price,
-            ...(line.attrs ? { attrs: line.attrs } : {}),
-          })),
-        });
-        const emergency = parseEmergencyContact(copied.customer_emergency);
-        const next: Draft = {
-          ...EMPTY_DRAFT,
-          ...copied,
-          emergency_name: emergency.name,
-          emergency_phone: emergency.phone,
-          emergency_relationship: emergency.relationship,
-          lines: copied.lines.map((line) => ({ ...line, key: nextKey() })),
-        };
-        setDraft(next);
-        setBaseline(next);
-        setDraftSeed(seed);
-        return;
-      }
       if (draftSeed !== "new") {
         const next = {
           ...EMPTY_DRAFT,
@@ -1205,7 +1170,6 @@ export default function SalesOrderWorkspace() {
     isNew,
     order,
     orderId,
-    copyFrom,
     detailLines,
     draftSeed,
     detailQ.dataUpdatedAt,
@@ -1403,6 +1367,14 @@ export default function SalesOrderWorkspace() {
      * now refuses it too, with the same arithmetic rather than a second one. */
     if (draft.delivery_date && earliestPromise && draft.delivery_date < earliestPromise) {
       return `Delivery is too soon — the earliest this cart can be promised is ${fmtDate(earliestPromise)}`;
+    }
+    /* ⭐ THE OFFICE DOOR NAMES THE PRODUCTION START (YH, 2026-08-28).
+       The POS has refused an order without one since Phase 11.1; this door did
+       not, so it could mint the one thing nobody can then repair — an order
+       whose Proceed date renders read-only as `Not recorded` forever.
+       `createOrderInput` and `sales_order_create` (0391) refuse it again. */
+    if (needDealer && !draft.proceed_date) {
+      return "Proceed date — pick the day production should start";
     }
     if (draft.proceed_date && draft.delivery_date && draft.proceed_date > draft.delivery_date) {
       return "The proceed date is after the delivery date";
@@ -1730,14 +1702,6 @@ export default function SalesOrderWorkspace() {
                 authoritative create form; the object page reaches the SAME
                 route rather than growing a second copy path (Law C: a door,
                 never a duplicate). */}
-            <button
-              type="button"
-              onClick={() => navigate(`/operation/orders/so/new?copyFrom=${orderId}`)}
-              data-testid="workspace-copy-so"
-              className="w-full rounded-control px-2 py-1.5 text-left text-meta text-base-700 hover:bg-hovertint"
-            >
-              Copy to new Sales Order
-            </button>
             {/* A problem is RARE and it leaves this object for Service — it
                 belongs with the other rare acts, not as a permanent card on a
                 page the operator reads every day (owner ruling 2026-08-15). */}
@@ -1754,7 +1718,7 @@ export default function SalesOrderWorkspace() {
                 contractual change is rarer than reading an order, and this is
                 where this page already keeps its rare acts. The strip is gone;
                 the capability — items, unit price, instalment months — is not,
-                and `Amend delivery date` still handles the date on the card. */}
+                and `Change delivery date` still handles the date on the card. */}
             <button
               type="button"
               onClick={() => setAmendSignal((n) => n + 1)}
@@ -1852,7 +1816,7 @@ export default function SalesOrderWorkspace() {
        EVERY item (0104's column comment), so an order nobody was asked about
        carried the maximum fee. The same rule now runs in `order-totals.ts` and
        in the POS panel, so all three agree. */
-    const items = Math.max(0, Math.min(itemsTotal, draft.delivery_stair_items ?? 0));
+    const items = stairCarryCount(itemsTotal, draft.delivery_stair_items);
     const floors = Math.max(0, draft.delivery_floor - cfg.freeUpToFloor);
     return {
       cfg,
@@ -1891,13 +1855,6 @@ export default function SalesOrderWorkspace() {
         <div className="px-1">
           <span className="rounded-full bg-base-900 px-2 py-0.5 text-label font-semibold text-white">
             Viewing Rev {viewedRevision.revision} · read-only
-          </span>
-        </div>
-      )}
-      {mode === "create" && copyFrom && order && (
-        <div className="px-1">
-          <span className="rounded-full bg-kit-blue-3 px-2 py-0.5 text-label font-semibold text-kit-blue-11">
-            Copied from SO-{order.so} · review before creating
           </span>
         </div>
       )}
@@ -2110,10 +2067,20 @@ export default function SalesOrderWorkspace() {
 
       {/* ⑥ MONEY — read-only forever (ownership Law B). */}
       <Block title="Money">
-        <div className="flex flex-wrap items-end gap-x-8 gap-y-3">
+        {/* ⭐ THREE AMOUNTS, ONE SIZE (YH, 2026-08-28 — overwrites the
+            2026-08-15 `Total large · Paid medium · Outstanding loudest`
+            weighting). The weighting never reached the numerals anyway:
+            `<Money>` renders every amount at its `row` tone, so all three
+            digits were ALREADY 13px and only the CONTAINERS differed. Three
+            different container sizes meant three different line-heights, so
+            under `items-end` the three amounts did not sit on one line —
+            which is what read as "alignment wrong". One size on all three
+            fixes the alignment and the fallback strings at the same time.
+            Colour still separates them: Outstanding is red while owed. */}
+        <div className="flex flex-wrap items-baseline gap-x-8 gap-y-3">
           <div>
             <div className="text-label text-base-500">Total</div>
-            <div className="text-title text-base-900" data-testid="money-total">
+            <div className="text-strong text-base-900" data-testid="money-total">
               {money.known && money.total != null ? <Money value={money.total} /> : "No price yet"}
             </div>
           </div>
@@ -2124,13 +2091,14 @@ export default function SalesOrderWorkspace() {
             </div>
           </div>
           {/* ⭐ THE CUSTOMER-MONEY WORD IS `Outstanding` (CLAUDE.md §7 — what the
-              CUSTOMER owes HQ), and it is the LOUDEST thing in the block: the
-              most-read number on the page (ui/MASTER.md §6.4 ⑤), red while any
-              of it is still owed (owner ruling 2026-08-15). */}
+              CUSTOMER owes HQ). It is the most-read number on the page
+              (ui/MASTER.md §6.4 ⑤) and stays RED while any of it is owed
+              (owner ruling 2026-08-15) — the colour carries that on its own,
+              at the same size as its two neighbours. */}
           <div>
             <div className="text-label text-base-500">Outstanding</div>
             <div
-              className={`text-page ${money.known && money.outstanding > 0 ? "text-danger" : "text-base-900"}`}
+              className={`text-strong ${money.known && money.outstanding > 0 ? "text-danger" : "text-base-900"}`}
               data-testid="money-outstanding"
             >
               {!money.known ? "No price yet" : money.outstanding > 0 ? <Money value={money.outstanding} /> : "Paid in full"}
@@ -2212,7 +2180,7 @@ export default function SalesOrderWorkspace() {
                     data-testid="amend-date-open"
                     className="mt-1 text-meta font-medium text-kit-blue-11 underline-offset-2 hover:underline"
                   >
-                    Amend delivery date
+                    Change delivery date
                   </button>
                 )
               )}
@@ -2227,9 +2195,33 @@ export default function SalesOrderWorkspace() {
               it silently moved when the factory may start.
               CREATE still owns the picker: `createOrderInput` refuses an order
               without one, so keying a new SO here must still be able to set it. */}
+          {/* ⭐ A DATE THAT WAS NEVER RECORDED IS NOT A DATE THAT IS LOCKED
+              (YH, 2026-08-28). Jess's ruling stands untouched — a proceed date
+              that EXISTS is a recorded answer and stays a `Fact`, because
+              moving it moves when the factory may start. But an order that
+              never carried one is not a locked answer, it is a MISSING one,
+              and locking a blank is how the office door's own orphans became
+              unfixable. So the picker returns for exactly that case.
+
+              THE TEST IS `baseline`, NEVER `draft`. `baseline` is what the
+              database holds; `draft` is what is on screen. Reading `draft`
+              would swap the field back to a `Fact` the instant a date was
+              picked — the operator would watch their own answer lock before
+              they had saved it, with no way to correct a mis-click. Reading
+              the saved value keeps the control open for the whole edit and
+              locks on the next load, which is when the answer is real.
+
+              `sales_order_save_revision` (0391) enforces the same rule: a
+              blank may be filled, a recorded date may not be moved or cleared.
+              This control is the door, not the lock. */}
           <div data-pos-field="proceedDate">
-            {mode === "create" ? (
+            {mode === "create" || (mode === "object" && !baseline.proceed_date) ? (
               <DatePicker id="so-proceed" label="Proceed date" value={draft.proceed_date}
+                hint={
+                  mode === "object"
+                    ? "Never recorded — fill it in once, then it locks"
+                    : undefined
+                }
                 error={
                   draft.proceed_date && draft.delivery_date && draft.proceed_date > draft.delivery_date
                     ? "After the delivery date"
@@ -2418,7 +2410,11 @@ export default function SalesOrderWorkspace() {
           and Deliver To are Stock's and Purchasing's facts, and the document
           preview beside it never prints them. */}
       <Block title="Goods">
-        <span className="hidden" data-pos-field="orderAddons" aria-hidden="true" />
+        {/* ⭐ `orderAddons` USED TO BE A HIDDEN SPAN. It carried the
+            `data-pos-field` the POS-parity contract test string-matches, with
+            no control behind it — so the page passed a completeness test it
+            did not meet, and the office still had to ring the shop to add a
+            disposal service. The attribute now rides the real door. */}
         {mode === "create" ? (
           <div className="flex flex-col gap-2">
             {/* Every SKU the catalog holds, offered as a typeahead. A `datalist`
@@ -2435,7 +2431,17 @@ export default function SalesOrderWorkspace() {
               const known = catalogBySku.get(l.sku.trim());
               const priceHint = catalogPriceHint(known, l.unit_price);
               return (
-              <div key={l.key} className="grid grid-cols-[1fr_84px_120px_32px] items-end gap-2">
+              /* ⭐ THE ROW ALIGNS AT THE TOP (YH, 2026-08-29 — measured on
+                 `/operation/orders/so/new`). It was `items-end`, so every cell
+                 aligned on its BOTTOM. SKU and Unit price each carry a hint
+                 line (`Cody · Super King`, `Catalog RM 1090.00`) and Qty does
+                 not — so Qty was pushed a whole row down to bring its short box
+                 level with their hints, and the three labels sat at three
+                 heights. `FieldFrame` gives every field the same 18px above its
+                 control (an 11px/14px label plus `gap-1`), so aligning at the
+                 START lines up all three labels AND all three inputs, and lets
+                 the hints hang below where they belong. */
+              <div key={l.key} className="grid grid-cols-[1fr_84px_120px_32px] items-start gap-2">
                 <Input id={`so-sku-${l.key}`} label="SKU" value={l.sku}
                   list="so-sku-catalog"
                   hint={known ? known.label : l.sku.trim() ? "Not in catalog" : undefined}
@@ -2451,14 +2457,22 @@ export default function SalesOrderWorkspace() {
                   value={String(l.unit_price)}
                   hint={priceHint}
                   onChange={(e) => setLine(l.key, { unit_price: Math.max(0, Number(e.target.value) || 0) })} />
-                <button
-                  type="button"
-                  aria-label="Remove line"
-                  className="mb-1 grid h-8 w-8 place-items-center rounded-control text-base-500 hover:bg-hovertint hover:text-base-900"
-                  onClick={() => setDraft((d) => ({ ...d, lines: d.lines.filter((x) => x.key !== l.key) }))}
-                >
-                  <Trash2 size={14} />
-                </button>
+                {/* The button has no label of its own, so it would ride up to
+                    the label row. It borrows `FieldFrame`’s own shape — a
+                    `gap-1` column under a label-height spacer — rather than a
+                    hard-coded 18px offset, so it still lands on the inputs if
+                    the label token ever changes. */}
+                <div className="flex flex-col gap-1">
+                  <span className="text-label" aria-hidden="true">&nbsp;</span>
+                  <button
+                    type="button"
+                    aria-label="Remove line"
+                    className="grid h-8 w-8 place-items-center rounded-control text-base-500 hover:bg-hovertint hover:text-base-900"
+                    onClick={() => setDraft((d) => ({ ...d, lines: d.lines.filter((x) => x.key !== l.key) }))}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
               </div>
               );
             })}
@@ -2515,6 +2529,18 @@ export default function SalesOrderWorkspace() {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+        {/* An OLD revision is a photograph and a draft has no order to write
+            to — the door belongs to the live object only. */}
+        {mode === "object" && orderId && (
+          <div data-pos-field="orderAddons">
+            <SalesOrderAddons
+              orderId={orderId}
+              addons={detailQ.data?.addons ?? []}
+              catalogAddons={catalogQ.data?.addons ?? []}
+              status={order?.status ?? null}
+            />
           </div>
         )}
       </Block>
@@ -2577,7 +2603,7 @@ export default function SalesOrderWorkspace() {
         <Modal
           open={amendDateOpen}
           onOpenChange={setAmendDateOpen}
-          title="Amend delivery date"
+          title="Change delivery date"
           description="creates a Revision · needs approval"
         >
           <SalesOrderAmendDeliveryDate
@@ -2682,16 +2708,16 @@ export default function SalesOrderWorkspace() {
            its own and the PAGE does not; below 1024px they stack, form first,
            and the page scrolls normally. */
         <div className="min-h-0 flex-1 overflow-auto bg-kit-slate-3 lg:overflow-hidden">
-          {(!isNew || copyFrom) && detailQ.isLoading && (
+          {!isNew && detailQ.isLoading && (
             <div className="px-4 py-4">
-              <Loading label={copyFrom ? "Preparing the copied draft" : "Opening the sales order"} />
+              <Loading label="Opening the sales order" />
             </div>
           )}
-          {(!isNew || copyFrom) && !detailQ.isLoading && detailQ.isError && (
+          {!isNew && !detailQ.isLoading && detailQ.isError && (
             <div className="px-4 py-4">
               <div className="rounded-card border border-kit-slate-5 bg-white">
                 <EmptyState
-                  title={copyFrom ? "This Sales Order could not be copied" : "This sales order could not be opened"}
+                  title="This sales order could not be opened"
                   detail={(detailQ.error as Error | undefined)?.message}
                   action={
                     <Button variant="neutral" onClick={() => void detailQ.refetch()}>
@@ -2703,7 +2729,7 @@ export default function SalesOrderWorkspace() {
             </div>
           )}
 
-          {(isNew && !copyFrom || order) && (
+          {(isNew || order) && (
             <div className="flex h-full min-h-0 flex-col lg:flex-row" data-testid="object-two-panes">
               <div className="flex min-h-0 min-w-0 flex-col lg:w-1/2 lg:overflow-hidden">
                 <div className="min-h-0 flex-1 px-4 py-4 lg:overflow-auto">{form}</div>

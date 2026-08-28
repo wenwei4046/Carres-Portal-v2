@@ -33,48 +33,25 @@ export function totalItems(order: Order): number {
   return (order.lines ?? []).reduce((s, l) => s + l.qty, 0);
 }
 
-/**
- * Raw stair-carry calculation — exported so the wizard's Step 2 (which holds
- * a pre-Order draft, not an Order) can call the same formula without
- * constructing a fake Order. Single source of truth: change this function and
- * both the wizard preview and the order-detail page update together.
- */
-export function floorSurchargeRaw(
-  floor: number,
-  hasLift: boolean,
-  totalQty: number,
-  cfg: FloorConfigDto,
-): number {
-  if (hasLift) return 0;
-  if (floor <= cfg.freeUpToFloor) return 0;
-  const flights = floor - cfg.freeUpToFloor;
-  return flights * cfg.perFloorPerItem * totalQty;
-}
+/* ⭐ THE STAIR ARITHMETIC MOVED TO `@carres/shared` (2026-08-29).
 
-/**
- * ⭐ UNSET MEANS NONE — owner ruling 2026-08-27 (YH), and it is a PRICING
- * decision, not a formatting one.
- *
- * `delivery.stairItems` is the count of items that need carrying up. It used
- * to read: NULL = "nobody overrode it" = EVERY item, which is what 0104
- * documented and what the code did on both surfaces. So an order where nobody
- * was asked the question was charged the maximum stair fee.
- *
- * It now reads: NULL = NONE. Somebody has to say how many items need carrying
- * before the customer is charged for carrying them.
- *
- * 🟡 WHAT THIS COSTS, said plainly: any order whose count was never set now
- * computes a stair fee of RM 0 where it previously computed a full one. That
- * is the ruling, not a side effect. It is applied HERE rather than on one
- * screen precisely so the POS quote and the office page cannot disagree about
- * the money — the fault we spent 2026-08-26 removing.
- *
- * ⛔ Migration 0104's column comment still says NULL = auto = every item. A
- * committed migration may not be edited (red line 6); the current meaning
- * lives in `docs/orders/MASTER.md`.
- */
+   It was defined here, and `apps/web` is a place the Worker cannot import
+   from — so the fee the customer signed for was computed in the browser on
+   every render and never written down. The server now stamps it onto the
+   order as an `order_addons` row, which it can only do if it can run the
+   same function.
+
+   Re-exported rather than re-imported at each call site: every existing
+   caller keeps its import, and there is still ONE implementation.
+
+   Imported AND re-exported: this file still uses both itself, and a bare
+   `export ... from` would not bind them locally. */
+import { floorSurchargeRaw, stairCarryCount } from "@carres/shared";
+export { floorSurchargeRaw, stairCarryCount };
+
 export function floorSurcharge(order: Order, cfg: FloorConfigDto): number {
-  const count = Math.max(0, order.delivery.stairItems ?? 0);
+  const itemsTotal = (order.lines ?? []).reduce((n, l) => n + l.qty, 0);
+  const count = stairCarryCount(itemsTotal, order.delivery.stairItems);
   return floorSurchargeRaw(order.delivery.floor, order.delivery.hasLift, count, cfg);
 }
 
@@ -189,7 +166,7 @@ export function draftTotals(draft: DraftTotalsInput, catalog: CatalogResponse): 
   /* Unset = NONE (owner ruling 2026-08-27) — the same rule `floorSurcharge`
      applies to a saved order, so the wizard preview and the order detail
      cannot quote two different stair fees. */
-  const stairItems = Math.max(0, Math.min(itemsTotal, draft.delivery.stairItems ?? 0));
+  const stairItems = stairCarryCount(itemsTotal, draft.delivery.stairItems);
   const stair = floorSurchargeRaw(
     draft.delivery.floor,
     draft.delivery.hasLift,

@@ -1134,6 +1134,12 @@ export function useUnproceedOrder(
       qc.setQueryData(qk.order(orderId), order);
       await qc.invalidateQueries({ queryKey: qk.order(orderId), exact: true });
       void qc.invalidateQueries({ queryKey: ["orders"] });
+      /* THE OFFICE READS THE SAME ORDER THROUGH ITS OWN KEY (2026-08-29).
+         Add-ons are now written from `/operation/orders/so/:id` as well as
+         from the POS, and both surfaces must show the change at once — a
+         shared writer that refreshes one caller’s cache and not the other’s
+         is how two screens start disagreeing about what was sold. */
+      void qc.invalidateQueries({ queryKey: ["operation", "orders"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
   });
@@ -1342,6 +1348,9 @@ export function useEditOrderAddon(orderId: string) {
       qc.setQueryData(qk.order(orderId), order);
       await qc.invalidateQueries({ queryKey: qk.order(orderId), exact: true });
       void qc.invalidateQueries({ queryKey: ["orders"] });
+      /* The office reads this order through its own key — see
+         `useAddOrderLines`. Both surfaces refresh, or they disagree. */
+      void qc.invalidateQueries({ queryKey: ["operation", "orders"] });
     },
   });
 }
@@ -3187,9 +3196,14 @@ export interface operationOrderDetailLine {
   category?: string | null;
 }
 export interface operationOrderDetailAddon {
+  /** The row’s own id — what `POST /orders/:id/addons/:addonId/edit` needs. */
+  id: string;
   addon_key: string;
   qty: number;
   unit_price: number;
+  /** 0242 — the per-unit size picks for a sized service (dispose-mattress,
+   *  dispose-bedframe …). `null` for a service that has no size list. */
+  attrs: { sizes?: string[]; size?: string } | null;
 }
 export interface operationOrderDetailHistoryRow {
   text: string;
@@ -5417,7 +5431,7 @@ export function useDecideSalesOrderAmendment(
 export interface SubmitAmendmentInput {
   proposed: AmendmentProposal;
   reason: string;
-  /** 0354 — `Amend date (from customer)`. Omitted by the goods proposal. */
+  /** 0354 — `Requested date (from customer)`. Omitted by the goods proposal. */
   customerAskedOn?: string | null;
 }
 

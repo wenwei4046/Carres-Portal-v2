@@ -35,7 +35,7 @@ import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { storageBlock } from "../../lib/storage-gate";
 import { userClient } from "../../lib/supabase";
 
-import { skuCategories } from "../../lib/sku-categories";
+import { skuCategories, storageSkuCategories } from "../../lib/sku-categories";
 import type { AppEnv } from "../../types";
 
 /**
@@ -551,7 +551,11 @@ operationOrdersRouter.get("/:id", requireOperation, async (c) => {
     // STAGE 2 — `id` rides along so the workspace's Save can diff lines
     // by identity (update-in-place keeps attrs + source_po).
     sb.from("order_lines").select("id, sku, qty, unit_price, attrs, source_po").eq("order_id", id),
-    sb.from("order_addons").select("addon_key, qty, unit_price").eq("order_id", id),
+    /* `id` and `attrs` ride along (2026-08-29) so the office page can NAME a
+       row to adjust and print the size the customer picked. Without `id` the
+       page could show a disposal service but never point at it; without
+       `attrs` it could not say WHICH size was sold. */
+    sb.from("order_addons").select("id, addon_key, qty, unit_price, attrs").eq("order_id", id),
     sb.from("order_history").select("text, by_role, by_user_id, occurred_at, metadata").eq("order_id", id).order("occurred_at", { ascending: true }),
     sb
       .from("order_supplier_threads")
@@ -1213,6 +1217,11 @@ operationOrdersRouter.get("/:id/completion", requireOperation, async (c) => {
     : (ord.ops_order_control as Record<string, unknown> | null);
   const price = (x: { qty: number; unit_price?: number | string | null }) =>
     Number(x.unit_price ?? 0) * Number(x.qty ?? 0);
+  // CARD-2026-08-28 - the CATALOG owns which rate applies. This handler is
+  // NOT the detail endpoint, so it cannot borrow that one's `categoryBySku`;
+  // it takes its own bounded read through the same one shared reader. A SKU
+  // the catalog does not hold falls back to the parser, per line.
+  const storageCats = await storageSkuCategories(sb, lines.map((l) => String(l.sku)));
   const hold = storageHold({
     storageFrom:
       ((ctrl?.extension_original_date as string | null) ??
@@ -1222,6 +1231,7 @@ operationOrdersRouter.get("/:id/completion", requireOperation, async (c) => {
     importedMsbf: (ctrl?.storage_fee_msbf as number | string | null) ?? null,
     importedSof: (ctrl?.storage_fee_sof as number | string | null) ?? null,
     skus: lines.map((l) => String(l.sku)),
+    categories: storageCats,
     asOf: new Date().toISOString().slice(0, 10),
     collectedAt: (ctrl?.storage_collected_at as string | null) ?? null,
     waiverStatus: (ctrl?.storage_waiver_status as string | null) ?? null,
@@ -1493,6 +1503,36 @@ const createOrderInput = z.object({
       // A birth NAMES the parties; `sales_order_create` derives channel from
       // whether an outlet is given. Only the EDIT door lost these to 0329.
       outlet_id: z.string().uuid().nullable().optional(),
+      /**
+       * 0391 — the office door names the production start, as the POS door
+       * already did (owner ruling YH, 2026-08-28).
+       *
+       * ⭐ TIGHTENED HERE, NOT ON `revisionHeaderInput`. The same object is
+       * reused by the EDIT door above, where `.nullable().optional()` is
+       * exactly what Jess's read-only ruling wants left alone — a save that
+       * only fixes a phone number must not be forced to restate a date it is
+       * not allowed to change. A birth and a correction ask different things
+       * of the same field, so only the birth is narrowed.
+       *
+       * The MASTER long read "`createOrderInput` refuses an order without
+       * one". That was true of the POS's `createOrderInputSchema` and never
+       * of THIS object, which merely shares its name — so the office could
+       * mint an order the object page then renders read-only as
+       * `Not recorded` forever. `sales_order_create` refuses it again on its
+       * own side (0391), because one layer is not a guard.
+       */
+      /* ⛔ THE MESSAGE RIDES `required_error`, NOT ONLY `.regex()`. A regex
+         message fires only when a STRING fails the pattern; an ABSENT field
+         reports Zod's own `"Required"` — which is the commonest case here and
+         the one an operator actually meets. Carrying the ruled sentence on all
+         three arms is what makes the refusal teach instead of merely refuse
+         (COPY-STANDARD rule 6). Caught by the test, not by reading. */
+      proceed_date: z
+        .string({
+          required_error: "Proceed date — pick the day production should start",
+          invalid_type_error: "Proceed date — pick the day production should start",
+        })
+        .regex(/^\d{4}-\d{2}-\d{2}$/, "Proceed date — pick the day production should start"),
     })
     .strict(),
   lines: z.array(revisionLineInput.omit({ id: true })).min(1, "An order needs at least one item"),

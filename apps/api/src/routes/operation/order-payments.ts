@@ -17,6 +17,7 @@ import {
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
+import { storageSkuCategories } from "../../lib/sku-categories";
 
 /**
  * Order payment LEDGER (balance job — Jess 2026-06-26 "complete all the balance
@@ -444,13 +445,18 @@ async function storageFeeOf(
     ]);
     const ctrl = ctrlRes?.data ?? null;
     if (!ctrl) return null;
+    // CARD-2026-08-28 - the CATALOG owns which rate applies. One bounded read;
+    // a SKU the catalog does not hold falls back to the parser, per line.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const storageSkus = (linesRes?.data ?? []).map((l: any) => String(l.sku));
+    const storageCats = await storageSkuCategories(sb, storageSkus);
     return storageHold({
       storageFrom: ctrl.storage_from ?? null,
       override: ctrl.storage_fee_override ?? null,
       importedMsbf: ctrl.storage_fee_msbf ?? null,
       importedSof: ctrl.storage_fee_sof ?? null,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      skus: (linesRes?.data ?? []).map((l: any) => String(l.sku)),
+      skus: storageSkus,
+      categories: storageCats,
       asOf: new Date().toISOString().slice(0, 10),
       collectedAt: ctrl.storage_collected_at ?? null,
       waiverStatus: ctrl.storage_waiver_status ?? null,

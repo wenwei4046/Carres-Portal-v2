@@ -235,6 +235,12 @@ function buildSbForCreate(opts: {
           error: null,
         };
       }
+      /* 0393 — the stair-carry recompute asks for the rate, but ONLY when a fee
+         could apply (no lift AND a count > 0). Fixtures written before this key
+         take the short-circuit and never reach here. Seeded values, 0184’s. */
+      if (currentTable === "floor_config") {
+        return { data: { free_up_to_floor: 2, per_floor_per_item: 50 }, error: null };
+      }
       return { data: opts.fetchedRow ?? null, error: null };
     },
   };
@@ -359,7 +365,16 @@ function buildSbForCreatePwp(opts: {
         }
         return chain;
       },
-      maybeSingle: async () => ({ data: opts.fetchedRow ?? null, error: null }),
+      maybeSingle: async () => {
+        /* 0393 — the stair-carry recompute reads the seeded rate. It only asks
+           when a fee could apply (no lift AND a count > 0), so every fixture
+           written before this key still takes the short-circuit and never
+           reaches here. Seeded values, matching 0184’s. */
+        if (table === "floor_config") {
+          return { data: { free_up_to_floor: 2, per_floor_per_item: 50 }, error: null };
+        }
+        return { data: opts.fetchedRow ?? null, error: null };
+      },
       // 2026-08-24: `order` was TERMINAL here, resolving an empty list. The
       // active-rule read now goes through the ONE ordered door
       // (readActivePwpRules) as .eq().order().order(), so a terminal stub
@@ -1258,6 +1273,78 @@ describe("POST /api/orders", () => {
 
     // Then re-fetched the order by id
     expect(sb._eqs).toContainEqual(["id", NEW_ORDER_ID]);
+  });
+
+  /* STAIR CARRY REACHES THE ORDER (owner ruling YH, 2026-08-28; migration 0393).
+
+     The fee was computed in the browser and written down nowhere, so the
+     customer signed a total the order could not describe and every payment door
+     capped below it. These pin the two halves of the fix at the route: a
+     chargeable order carries the row into the RPC, and a client may not send
+     one itself. */
+  it("stamps a STAIR_CARRY addon onto a chargeable order", async () => {
+    const sb = buildSbForCreate({
+      rpcResult: { id: NEW_ORDER_ID, so: 1252, placed_at: "2026-05-02T10:00:00Z" },
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    await app.fetch(
+      new Request("http://t/api/orders", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(
+          validCreateBody({
+            // 1 item, floor 3, no lift, 1 needing carry, at the seeded rate:
+            // (3 − 2) flight × RM50 × 1 item = RM50.
+            delivery: {
+              date: "2026-06-01",
+              proceedDate: "2026-05-15",
+              dateTbd: false,
+              floor: 3,
+              hasLift: false,
+              stairItems: 1,
+            },
+          }),
+        ),
+      }),
+      env,
+    );
+    const payload = sb._rpcCalls[0]!.payload as { addons: Array<Record<string, unknown>> };
+    expect(payload.addons).toContainEqual(
+      expect.objectContaining({ addon_key: "STAIR_CARRY", qty: 1, unit_price: 50 }),
+    );
+  });
+
+  it("refuses a client-sent STAIR_CARRY — the charge is the server’s alone", async () => {
+    const sb = buildSbForCreate({
+      rpcResult: { id: NEW_ORDER_ID, so: 1253, placed_at: "2026-05-02T10:00:00Z" },
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    await app.fetch(
+      new Request("http://t/api/orders", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(
+          validCreateBody({
+            // A lift means no charge — so a row here could ONLY have come from
+            // the client, and it must not survive.
+            delivery: {
+              date: "2026-06-01",
+              proceedDate: "2026-05-15",
+              dateTbd: false,
+              floor: 3,
+              hasLift: true,
+              stairItems: 3,
+            },
+            addons: [{ addonKey: "STAIR_CARRY", qty: 1, unitPrice: 9999, attrs: null }],
+          }),
+        ),
+      }),
+      env,
+    );
+    const payload = sb._rpcCalls[0]!.payload as { addons: Array<Record<string, unknown>> };
+    expect(payload.addons).toHaveLength(0);
   });
 
   it("returns 400 on invalid payload (missing required field)", async () => {

@@ -295,10 +295,17 @@ export default function Step3SignaturePayment({ draft, onChange, catalog, onStri
           {deliveryPreview && deliveryPreview.base > 0 && (
             <div className="flex justify-between px-3.5 py-2.5 border-t border-base-100 text-base-600">
               <span className="text-[13px]">
+                {/* ONE NAME FOR THE CHARGE (YH, 2026-08-28). This line used to
+                    rename itself — `Cross-category follow-up delivery` ·
+                    `Special delivery fee` · `Delivery fee` — so the same charge
+                    wore a different word depending on config the salesperson
+                    cannot see. Every row now opens with `Delivery fee` and puts
+                    the REASON after a separator, the way stair carry already
+                    qualifies itself with `(with lift)`. */}
                 + {deliveryPreview.isFollowup
-                  ? "Cross-category follow-up delivery"
+                  ? "Delivery fee · follow-up order"
                   : deliveryPreview.isSpecial
-                    ? "Special delivery fee"
+                    ? "Delivery fee · special rate"
                     : "Delivery fee"}
               </span>
               <span className="font-mono text-[13px]">RM {deliveryPreview.base.toLocaleString()}</span>
@@ -306,13 +313,13 @@ export default function Step3SignaturePayment({ draft, onChange, catalog, onStri
           )}
           {deliveryPreview && deliveryPreview.crossCategory > 0 && (
             <div className="flex justify-between px-3.5 py-2.5 border-t border-base-100 text-base-600">
-              <span className="text-[13px]">+ Cross-category delivery</span>
+              <span className="text-[13px]">+ Delivery fee · extra category</span>
               <span className="font-mono text-[13px]">RM {deliveryPreview.crossCategory.toLocaleString()}</span>
             </div>
           )}
           {deliveryPreview && deliveryPreview.additional > 0 && (
             <div className="flex justify-between px-3.5 py-2.5 border-t border-base-100 text-base-600">
-              <span className="text-[13px]">+ Additional delivery fee</span>
+              <span className="text-[13px]">+ Delivery fee · added by store</span>
               <span className="font-mono text-[13px]">RM {deliveryPreview.additional.toLocaleString()}</span>
             </div>
           )}
@@ -333,9 +340,9 @@ export default function Step3SignaturePayment({ draft, onChange, catalog, onStri
       </Section>
 
       {/* ---------- Delivery fee (0184) ---------- */}
-      <Section title="Delivery fee" hint="Server-priced — these two are operator inputs">
+      <Section title="Delivery fee" hint="Head office sets the rate — you can add to it here">
         <div className="rounded border border-base-200 bg-white p-4 flex flex-col gap-3.5">
-          <FieldLabel label="Additional delivery fee (optional)">
+          <FieldLabel label="Add to the delivery fee (optional)">
             <div className="flex items-center gap-2.5">
               <span className="font-mono text-[13px] text-base-500">RM</span>
               <input
@@ -356,11 +363,11 @@ export default function Step3SignaturePayment({ draft, onChange, catalog, onStri
               />
             </div>
             <div className="text-[11px] text-base-500 mt-1.5">
-              A free-form fee agreed at handover (e.g. remote area). Added on top of the
-              base trip fee.
+              A fee you agreed with the customer — a remote area, for example.
+              It is added on top of the delivery fee above.
             </div>
           </FieldLabel>
-          <FieldLabel label="Previous SO — cross-category link (optional)">
+          <FieldLabel label="Earlier order this delivery follows (optional)">
             <input
               type="text"
               value={draft.crossCategorySourceSo ?? ""}
@@ -371,9 +378,9 @@ export default function Step3SignaturePayment({ draft, onChange, catalog, onStri
               data-testid="step3-cross-category-so"
             />
             <div className="text-[11px] text-base-500 mt-1.5">
-              If this order delivers as a follow-up to the customer's earlier SO (the base
-              fee was already paid there), enter that SO so only the reduced cross-category
-              rate applies. The server validates it before booking.
+              If this delivery follows an earlier order from the same customer, enter that
+              SO number. The delivery fee was already charged there, so this order is
+              charged the lower rate. We check the number before the order is booked.
             </div>
           </FieldLabel>
         </div>

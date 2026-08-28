@@ -261,7 +261,15 @@ export default function CustomerStep({
         (c.addressLine1.trim().length >= 5 &&
           !!c.addressState &&
           !!c.addressCity &&
-          !!c.addressPostcode);
+          !!c.addressPostcode &&
+          /* Building type is Jess’s 2026-08-21 requirement and it lives in
+             `step1FirstIssue` inside this same `!addressUnknown` branch. This
+             mirror was written before that rule and never caught up, so the
+             field wore a `*`, refused nothing here, and stopped the sale two
+             sub-steps later at CONFIRM — far from the box that was empty.
+             A required mark that does not refuse teaches the operator that
+             the mark means nothing. */
+          !!c.buildingType);
       // 2026-07-19 (Loo) — billing keys in with the SAME MY cascade as
       // delivery, so its gate mirrors the delivery rules field-for-field.
       const billingOk =

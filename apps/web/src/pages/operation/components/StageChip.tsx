@@ -49,6 +49,58 @@ const STAGE_PILL: Record<OperationStage, string> = {
   delivered: "pill-confirmed",
 };
 
+/**
+ * TWO QUESTIONS, ONE SPELLING EACH (D3, docs/orders/MASTER.md 12).
+ *
+ * 12 called these "two spellings of one derivation". They are not. They are two
+ * DIFFERENT questions that were each spelt once, in different files, with
+ * nothing naming the difference - which is why the duplication looked
+ * accidental and why merging them breaks the list.
+ *
+ *   stageOf         WHERE IS THIS ORDER IN THE PIPELINE?
+ *                   Raw. `place` is a real slot, and `controlTabOf` depends on
+ *                   an imported order reaching it so the fall-through can route
+ *                   the row to `proceed` ("confirmed OR autocount-placed").
+ *
+ *   displayStageOf  WHAT DO WE TELL THE OPERATOR?
+ *                   Applies Jess's 2026-07-02 ruling: an AutoCount import
+ *                   arrived ALREADY proceeded and carries a PO, so it is never
+ *                   "placed / waiting for the dealer to push" - that copy is
+ *                   WRONG for these. Only a native order sits at `placed`.
+ *
+ * They live here because both readers already import `OperationStage` from this
+ * file, and could not import from each other: the Orders control imports the
+ * drawer, so a drawer-to-control import is a cycle. That cycle is why the rule
+ * was written twice; putting it beside its own type removes the reason.
+ *
+ * Structurally typed on purpose - the list row and the drawer's order object
+ * are different shapes and this needs three fields from either.
+ */
+export function stageOf(o: {
+  status?: string | null;
+  operation_stage?: string | null;
+}): OperationStage {
+  if (o.status === "place") return "placed";
+  if (o.operation_stage) return o.operation_stage as OperationStage;
+  if (o.status === "delivered") return "delivered";
+  return "in_production";
+}
+
+/** The stage an operator is shown. See the note above `stageOf`. */
+export function displayStageOf(o: {
+  status?: string | null;
+  operation_stage?: string | null;
+  source_system?: string | null;
+}): OperationStage {
+  if (o.status === "place" && o.source_system === "autocount") {
+    /* Only the `placed` answer is overridden. `delivered` is unreachable here
+       (the status is already `place`), so the branch is the import's real stage
+       or the in-production default - never a second copy of the whole ladder. */
+    return (o.operation_stage as OperationStage | null) ?? "in_production";
+  }
+  return stageOf(o);
+}
+
 export function stageLabel(stage: OperationStage): string {
   return STAGE_LABEL[stage];
 }

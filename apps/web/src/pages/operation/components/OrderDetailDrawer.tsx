@@ -1,6 +1,5 @@
 import {
   type ReactNode,
-  type MutableRefObject,
   Fragment,
   useEffect,
   useRef,
@@ -142,7 +141,6 @@ import { useAuth } from "@/lib/auth";
 import { Modal } from "./Modal";
 import { SectionCard, SectionBand } from "@/components/SectionPanel";
 import Btn from "@/components/Btn";
-import GuaranteeCoverStrip from "@/components/GuaranteeCoverStrip";
 import Money from "@/components/Money";
 import { fieldCls } from "@/components/Field";
 import BookingSpine from "./BookingSpine";
@@ -163,7 +161,7 @@ import ServiceNoteModal from "./ServiceNoteModal";
 import GenerateInvoiceOverlay from "./GenerateInvoiceOverlay";
 import DownloadSalesOrderButton from "@/components/DownloadSalesOrderButton";
 import DownloadInvoiceButton from "@/components/DownloadInvoiceButton";
-import { type OperationStage } from "./StageChip";
+import { displayStageOf, type OperationStage } from "./StageChip";
 import DispatchModal from "./DispatchModal";
 import DOAttachModal from "./DOAttachModal";
 import AbandonOrderModal from "./AbandonOrderModal";
@@ -1404,20 +1402,11 @@ function DrawerBody({
         u.reservedRef === soRef &&
         stockMatchKey(u.sku) === stockMatchKey(sku),
     )?.id ?? null;
-  // Pipeline v2 (C1): widen stage derivation to honor 'place' status + the
-  // new placed/confirmed enum values without falling through to a
-  // bogus in_production default.
-  const stage: OperationStage = (() => {
-    // AutoCount-imported orders arrive ALREADY proceeded — they carry a PO, so
-    // they are NEVER "placed / waiting for the dealer to push" (Jess 2026-07-02,
-    // project-order-lifecycle-flow: "the 'waiting for dealer' copy is WRONG for
-    // these"). Only a native dealer/POS order sits at 'placed'.
-    const autocount = order.source_system === "autocount";
-    if (order.status === "place" && !autocount) return "placed";
-    if (order.operation_stage) return order.operation_stage as OperationStage;
-    if (order.status === "delivered") return "delivered";
-    return "in_production";
-  })();
+  /* D3 — the DISPLAY stage, spelt once in `StageChip`. This was a local IIFE
+     carrying Jess's 2026-07-02 AutoCount ruling; the list needs the RAW slot for
+     its tab routing, so the two questions now have two names instead of one
+     name written twice. */
+  const stage: OperationStage = displayStageOf(order);
   // Line-sum of the order (native/priced orders). AutoCount imports carry no line
   // prices → grandTotal is 0 and Total falls back to the keyed balance (see the
   // Money block below). hasLineTotal drives whether Total is auto (read-only) or
@@ -1507,11 +1496,19 @@ function DrawerBody({
     if (po.eta_date)
       for (const pl of po.lines)
         if (!poEtaBySku.has(pl.sku)) poEtaBySku.set(pl.sku, po.eta_date);
+  /* CARD-2026-08-28 - STORAGE SCOPE ASKS THE CATALOG.
+     These two decided which storage RATE applies, and they asked
+     `lineCategory` - the keyword parser `carry-forwards.md` records as
+     display-only. That made the Storage tab a SECOND wrong answer beside the
+     server's prefix parser: two functions, two rules, and nothing forcing the
+     screen and the delivery gate to agree about whether an order was even in
+     scope. `resolvedCategory` is already imported here and the lines already
+     carry the catalog's `category` (D9, 2026-08-20) - nobody was asking. */
   const hasMsbf = lines.some((l) => {
-    const c = lineCategory(l.sku);
+    const c = resolvedCategory(l.sku, l.category);
     return c === "mattress" || c === "bedframe";
   });
-  const hasSof = lines.some((l) => lineCategory(l.sku) === "sofa");
+  const hasSof = lines.some((l) => resolvedCategory(l.sku, l.category) === "sofa");
   // Contact-by basis (Jess): operation must reach the customer N days BEFORE the
   // deadline to confirm stock + timing. N = ops_order_control.contact_by_days
   // (default 3, editable per order); a daily cron (migration 0197) drops the
@@ -1668,16 +1665,10 @@ function DrawerBody({
   const keyedBalance = form.draft.balance.trim()
     ? Number(form.draft.balance)
     : form.control?.balance ?? null;
-  const money = orderMoney({
-    lineSum: hasLineTotal ? grandTotal : 0,
-    paid: order.paid,
-    controlBalance: keyedBalance,
-  });
-  const collected = money.paid;
-  const orderTotal = money.total ?? 0;
-  const totalSet = money.known;
-  const moneyOutstanding = money.goodsOwing;
-  const balanceOwing = money.owing;
+  /* D4 - the money rule is asked ONCE, and it is asked below, after the storage
+     figures exist. It used to run here on the goods alone, which left the
+     storage half to a second arithmetic further down and put two different
+     "outstanding" numbers on one screen. See the call site. */
   // ── AUTO storage (Jess 2026-07-18): the machine counts, nobody clicks.
   // Anchor = (supplier late ? latest goods ETA : deadline) + 7d — a
   // supplier-late stretch never bills the customer. A manual From date
@@ -1726,9 +1717,6 @@ function DrawerBody({
   const storageFee =
     Number(form.control?.storage_fee_msbf ?? 0) +
     Number(form.control?.storage_fee_sof ?? 0);
-  // "hold" = red block (ETA−1 uncollected) · "warn" = amber reminder · null = ok.
-  const balanceGate = balanceOwing ? (pastLastCall ? "hold" : "warn") : null;
-  const storageGate = storageOwing ? (pastLastCall ? "hold" : "warn") : null;
   // ── Balance v3 invoice math (2026-07-17) — the Balance tab reads as an
   // INVOICE: CHARGES (goods + the storage fee) − PAYMENTS (all kinds) =
   // Balance due. The storage FEE flows in as one charge line; the Storage tab
@@ -1756,9 +1744,58 @@ function DrawerBody({
     .reduce((s, p) => s + Number(p.amount || 0), 0);
   /** The newest payment that still stands — what `Print receipt` means. */
   const latestLivePayment = ledger.find(isLivePayment) ?? null;
+  /* D4 - ONE MONEY RULE, ASKED ONCE, WITH EVERYTHING IT NEEDS.
+     The goods half already came through `orderMoney`; the storage half was a
+     second arithmetic right here - `invoiceTotal - collectedAll`, clamped as
+     one figure - and it drove the payment dial and the "still owes ... before
+     delivery" step while the money sticker three lines away showed the shared
+     rule's goods-only number. Two "outstanding" figures on one screen, and one
+     of them captioned `holding delivery`.
+
+     `orderMoney` already took `storageOwing` and `storageReleased` and already
+     returned `outstanding` / `holding` / `holds`; nobody was passing them. This
+     is a migration, not a design - the capability was already there.
+
+     TWO THINGS THE MOVE CHANGES ON PURPOSE:
+     - A RELEASED FEE IS STILL OWED. C9 rules that a manager release drops the
+       HOLD and not the debt, so the amount is computed from what has actually
+       been COLLECTED and the waiver is passed separately. The boolean
+       `storageOwing` above folds the two together and would have zeroed a
+       waived fee out of the invoice.
+     - OVERPAID GOODS NO LONGER OFFSET A STORAGE FEE. The retired line clamped
+       goods and storage together, so an overpayment silently paid down a fee
+       only a manager may waive (ERP-ARCHITECTURE 6.1). The shared rule clamps
+       goods on their own and adds storage, which is what the delivery gate and
+       the Orders row have always used. */
+  const storageOwingAmount =
+    storageIncurred && !form.control?.storage_collected_at
+      ? Math.max(0, storageCharge - storageCollected)
+      : 0;
+  const storageReleased = form.control?.storage_waiver_status === "approved";
+  const money = orderMoney({
+    lineSum: hasLineTotal ? grandTotal : 0,
+    paid: order.paid,
+    controlBalance: keyedBalance,
+    storageOwing: storageOwingAmount,
+    storageReleased,
+  });
+  const collected = money.paid;
+  const orderTotal = money.total ?? 0;
+  const totalSet = money.known;
+  const moneyOutstanding = money.goodsOwing;
+  /* GOODS only, and deliberately so: storage has its own `storageGate`, and
+     `balanceOwing || storageOwing` below proves the two were always meant to
+     be separate. `money.owing` now counts storage as well, so reading it here
+     would make both gates fire on one fee. `goodsOwing` is exactly what this
+     flag meant before the storage half joined the call. */
+  const balanceOwing = money.goodsOwing > 0;
+  // "hold" = red block (ETA−1 uncollected) · "warn" = amber reminder · null = ok.
+  const balanceGate = balanceOwing ? (pastLastCall ? "hold" : "warn") : null;
+  const storageGate = storageOwing ? (pastLastCall ? "hold" : "warn") : null;
   const invoiceTotal = orderTotal + storageCharge;
   const collectedAll = collected + storageCollected;
-  const balanceDue = totalSet ? Math.max(0, invoiceTotal - collectedAll) : 0;
+  /** Everything still owed - the shared rule's number, not a second sum. */
+  const balanceDue = money.outstanding;
   // Collect-by = delivery − 7d (the date collectByLabel shows) — past it and
   // still owing ⇒ the dial family reads Overdue.
   const collectByPast =
@@ -4852,160 +4889,6 @@ function CustomerIdentityCard({
 }
 
 /**
- * Customer block of the Order section — read-only, with an inline Edit on a
- * Place order so operation can correct a customer's name / phone / address
- * before the order proceeds (typo, customer moved, etc.). Saves via
- * `useUpdateOrder` → PATCH /api/orders/:id; the `update_order` RPC 422s on any
- * non-Place order, so the Edit affordance only shows for status 'place' (which
- * is every real AutoCount order). Validates with the SAME shared zod schema the
- * API uses. (Jess 2026-06-25, #4 drawer edit.)
- */
-
-export function OrderCustomerCard({
-  order,
-  startEditRef,
-}: {
-  order: {
-    id: string;
-    status: string;
-    customer_name: string | null;
-    customer_phone: string | null;
-    customer_address: string | null;
-    placed_at?: string | null;
-  };
-  /** Lets an outside control (the panel ⋮) open this card's safe-edit mode. */
-  startEditRef?: MutableRefObject<(() => void) | null>;
-}) {
-  const qc = useQueryClient();
-  const [editing, setEditing] = useState(false);
-  const [name, setName] = useState(order.customer_name ?? "");
-  const [phone, setPhone] = useState(order.customer_phone ?? "");
-  const [address, setAddress] = useState(order.customer_address ?? "");
-  const [err, setErr] = useState<string | null>(null);
-
-  const update = useUpdateOrder(order.id, {
-    onSuccess: () => {
-      setEditing(false);
-      toast.success("Customer details updated");
-      // useUpdateOrder invalidates the dealer order keys; the drawer reads the
-      // operation detail under a different key, so refresh that one too.
-      void qc.invalidateQueries({ queryKey: qk.operation.order(order.id) });
-    },
-    onError: (e) => setErr(e.message),
-  });
-
-  function start() {
-    setName(order.customer_name ?? "");
-    setPhone(order.customer_phone ?? "");
-    setAddress(order.customer_address ?? "");
-    setErr(null);
-    setEditing(true);
-  }
-
-  // Expose `start` to the panel ⋮ (Edit details) — kept current each render.
-  useEffect(() => {
-    if (startEditRef) startEditRef.current = start;
-  });
-
-  function save() {
-    setErr(null);
-    // Only send fields the user actually changed — the RPC updates by presence.
-    const customer: Record<string, unknown> = {};
-    if (name.trim() !== (order.customer_name ?? "")) customer.name = name.trim();
-    if (phone.trim() !== (order.customer_phone ?? "")) customer.phone = phone.trim();
-    if (address.trim() !== (order.customer_address ?? ""))
-      customer.address = address.trim() || null;
-    if (Object.keys(customer).length === 0) {
-      setEditing(false);
-      return;
-    }
-    const parsed = updateOrderInputSchema.safeParse({ customer });
-    if (!parsed.success) {
-      setErr(parsed.error.issues[0]?.message ?? "Invalid input");
-      return;
-    }
-    update.mutate(parsed.data);
-  }
-
-  if (editing) {
-    const field =
-      "mt-0.5 w-full px-2 py-1.5 border border-base-200 rounded text-body bg-white outline-none focus:border-base-700";
-    return (
-      <div className="space-y-2">
-        <label className="block">
-          <span className="text-meta text-base-500">Customer name</span>
-          <input value={name} onChange={(e) => setName(e.target.value)} className={field} />
-        </label>
-        <label className="block">
-          <span className="text-meta text-base-500">Phone</span>
-          <input
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            inputMode="tel"
-            className={field}
-          />
-        </label>
-        <label className="block">
-          <span className="text-meta text-base-500">Address</span>
-          <textarea
-            value={address}
-            onChange={(e) => setAddress(e.target.value)}
-            rows={2}
-            className={`${field} resize-none`}
-          />
-        </label>
-        {err && <p className="text-meta text-danger">{err}</p>}
-        <div className="flex items-center justify-end gap-2">
-          <button
-            type="button"
-            onClick={() => setEditing(false)}
-            disabled={update.isPending}
-            className="btn-ghost text-meta"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={save}
-            disabled={update.isPending}
-            className="btn-primary text-meta"
-          >
-            {update.isPending ? "Saving…" : "Save"}
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // Compact read-mode (Jess 4-col): label-above-value rows, no bordered table;
-  // click Edit to change (place-status only). Ordered date anchored to the
-  // card bottom so the column aligns with its siblings.
-  return (
-    <div className="flex flex-col h-full text-meta">
-      <CompactField label="Name">
-        <span className={`font-medium ${cjkClassName(order.customer_name)}`}>
-          {order.customer_name || <span className="text-base-400">—</span>}
-        </span>
-      </CompactField>
-      <CompactField label="Phone">
-        {order.customer_phone || <span className="text-base-400">—</span>}
-      </CompactField>
-      <CompactField label="Address">
-        <span className="leading-snug text-base-600">
-          {order.customer_address || <span className="text-base-400">—</span>}
-        </span>
-      </CompactField>
-      {/* Edit moved to the panel ⋮ (Jess 2026-07-11 — every panel's actions live in
-          its header ⋮; the redundant inline button is gone). Read-only by default;
-          the ⋮ "Edit details" opens the safe Save / Cancel mode. */}
-      {/* 0261-0263 — "did this customer buy a guarantee". Renders nothing when
-          they didn't, so pre-guarantee orders look untouched. */}
-      <GuaranteeCoverStrip orderId={order.id} />
-    </div>
-  );
-}
-
-/**
  * Build a wa.me link from a MY customer phone (weak-English staff want one tap to
  * message the customer). Takes the FIRST number if the field lists several
  * ("014-… | 012-…"), strips non-digits, and normalises a local `0…` to `60…`.
@@ -5023,16 +4906,6 @@ export function waLink(phone: string | null | undefined): string | null {
     d = `60${d}`;
   }
   return `https://wa.me/${d}`;
-}
-
-/** Compact label-left / value-right read row (Jess: match the clean mockup). */
-function CompactField({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="flex items-baseline justify-between gap-3 py-[3px] border-b border-base-100/70 last:border-b-0">
-      <span className="text-meta text-base-400 shrink-0">{label}</span>
-      <span className="min-w-0 text-right text-base-900">{children}</span>
-    </div>
-  );
 }
 
 /** Grounded-card KV row — the Loan-card language, STANDARD kit tokens (label

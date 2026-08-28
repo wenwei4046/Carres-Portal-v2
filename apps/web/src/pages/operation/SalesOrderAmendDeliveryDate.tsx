@@ -7,9 +7,9 @@
  * amendment lane —
  *
  * ```
- * Amend date (from customer)   the day the customer ASKED. Not today.
- * Amended delivery date        what the promise becomes IF it is approved.
- * Amend reason *               mandatory. Six months later it is the only
+ * Requested date (from customer)  the day the customer ASKED. Not today.
+ * New delivery date            what the promise becomes IF it is approved.
+ * Reason for change *          mandatory. Six months later it is the only
  *                              answer to "why did the promise move".
  * ```
  *
@@ -90,14 +90,14 @@ export default function SalesOrderAmendDeliveryDate({
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <DatePicker
           id="so-amend-asked-on"
-          label="Amend date (from customer)"
+          label="Requested date (from customer)"
           hint="The day the customer asked"
           value={askedOn}
           onChange={setAskedOn}
         />
         <DatePicker
           id="so-amend-new-date"
-          label="Amended delivery date"
+          label="New delivery date"
           hint={
             currentDeliveryDate
               ? `Promised today — ${fmtDate(currentDeliveryDate)}`
@@ -109,7 +109,7 @@ export default function SalesOrderAmendDeliveryDate({
       </div>
       <Textarea
         id="so-amend-reason"
-        label="Amend reason"
+        label="Reason for change"
         required
         rows={2}
         value={reason}

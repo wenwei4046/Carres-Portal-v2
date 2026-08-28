@@ -287,10 +287,47 @@ with it**; what survives is the rule it existed to serve — *a door, never a du
 **PROCEED DATE IS READ-ONLY ONCE THE ORDER EXISTS.** *"Proceed date shouldn't be editable at SO
 view under operations."* **This overwrites §725-728 below**, which gave Operations a direct writer
 here. The Sales Portal asks for the production start as a REQUIRED question at the point of sale,
-so on an existing order it is a recorded answer, not a field. The CREATE door keeps the picker —
-`createOrderInput` refuses an order without one. 🟡 An imported order carrying no proceed date
-therefore has no screen that can supply one; if that appears in practice the fix is a governed
-correction door, not re-opening the field.
+so on an existing order it is a recorded answer, not a field. The CREATE door keeps the picker.
+
+**⭐ A DATE THAT WAS NEVER RECORDED IS NOT A DATE THAT IS LOCKED — OWNER RULING (YH, 2026-08-28).
+APPROVED / LOCKED.** *"Office new SO should follow [the POS] as well; and for existing SO that
+doesn't have it recorded, change it so that it can be filled in."* Two changes, and Jess's ruling
+above survives both:
+
+```
+CREATE      every door REQUIRES a proceed date — the POS already does; the OFFICE door must too
+BLANK       an existing order with NO proceed date may be filled in ONCE
+RECORDED    an order that HAS one stays read-only — unchanged, this is Jess's ruling
+```
+
+**The lock is on the ANSWER, never on the emptiness.** Filling a blank is completion; changing a
+recorded date is moving when the factory starts, and that stays shut. YH's reason for the
+fill-once bound: *"those that accept blank proceed date are most likely due to bugs from past
+versions"* — so the door exists to repair history, not to reopen a decision.
+
+⛔ **The `createOrderInput` sentence removed above was AMBIGUOUS and read as false.** There are
+**two different objects with that name**: the POS door's `createOrderInputSchema`
+(`packages/shared/src/schemas/orders.ts:325-327`, which genuinely does refuse — and
+`order-entry.ts:246` pins the field `locked · defaultRequired · not toggleable`), and the OFFICE
+door's local `createOrderInput` (`apps/api/src/routes/operation/orders.ts:1483-1499`), which
+**does not**. Measured 2026-08-28: the office door is permissive at all three of its layers — no
+`validateDraft` guard, `proceed_date` inherited `.nullable().optional()` from
+`revisionHeaderInput`, and `sales_order_create` inserts `nullif(…)::date` with no NULL check
+(`0374:115`). That is what this ruling closes.
+
+**WHAT THE DATE MEANS, since no rule computes it.** The planned production-START day, keyed by the
+salesperson at the point of sale (`0165:6-13`). There is **no derivation anywhere** — no lead-time
+arithmetic, no production calendar, no delivery-minus-lead formula. The only guidance in the
+product is prose on the POS: *"pick it deliberately (e.g. ~a month before delivery) so we don't
+reserve stock too early"* (`Step3Delivery.tsx:139-143`). The one rule enforced at every layer is
+`proceed_date <= delivery_date`. It is a planned date only and is never auto-stamped.
+
+📌 **Provenance, recorded because it was asked.** The three read-only lines above entered this file
+in ONE commit — `2515a136`, authored by `yhcominthruWork` as squashed PR #923, whose body never
+mentions proceed date. The `(Jess)` attribution is a **quoted ruling recorded by a session**, and
+those quotation marks are the whole of the provenance; no separate artefact backs it. Neither Lim,
+Chai nor Jess has ever committed a proceed-date line here. YH confirmed the ruling stands on
+2026-08-28 with the refinement above, which is what makes it binding now.
 
 **BOTH SIDES ASK EACH QUESTION THE SAME WAY.** *"Ensure both sides of filling in are the same."*
 The measured failure was the lift: the POS offered two named answers (`No lift` / `Has lift`) while
@@ -321,6 +358,51 @@ object page **together**, so a quote and an order can never disagree about the m
 full one. That is the ruling, not a side effect.
 ⛔ Migration `0104`'s column comment still reads *NULL = auto = every item*. A committed migration
 may not be edited (red line 6) — **this section is the current meaning.**
+
+**⭐⭐ STAIR CARRY IS MONEY THE CUSTOMER OWES — OWNER RULING (YH, 2026-08-28). APPROVED / LOCKED.**
+*"If stair carry requires money for it, it should be included — whether it's paid on the carry day
+or before, it still needs to be paid."*
+
+So the fee is **revenue on this sales order**, not a delivery-day cash arrangement. It belongs in
+the order's total, in what the customer owes, and in what every payment door will accept. **The
+timing of payment does not change whether it is owed.**
+
+⛔ **This settles a three-way contradiction the repo has carried since 0184.** Three files each
+state a different answer, and each is locally coherent:
+| File | Claims |
+|---|---|
+| `apps/api/src/lib/delivery-fee-recompute.ts:38-39` | stair *"folds into the order total"* — revenue |
+| `apps/api/src/routes/orders.ts:258-261` | *"a delivery-time concern, not a sales metric"* — excluded |
+| `apps/api/src/routes/stripe-checkout.ts:115-116` | *"a client-side display extra"* — not a charge at all |
+**The first is now the ruling.** The other two describe an implementation that must change; their
+comments are corrected in the same PR that changes them, never left to contradict this section.
+
+**MEASURED STATE THIS RULING OVERTURNS** (Sales Order Workspace field audit, 2026-08-28, §2 F-2):
+the fee is computed in the browser on every render from three stored inputs plus a globally
+mutable rate, and is **written down nowhere**. The customer signs a POS screen that itemises it
+twice and folds it into the headline total (`Step3SignaturePayment.tsx:271-278, :314, :123`) under
+a T&C clause promising it is *"billed on this sales order"* (`:655-657`) — while the order's own
+total is lines + addons only (`order-money.ts:100`). Every payment door caps against that lower
+figure: Stripe returns 422 `amount_exceeds_outstanding` **before Stripe is called**
+(`stripe-checkout.ts:158-168`) and `top_up_order` refuses cash identically (`0351:245-249`).
+At seeded rates a 5-item floor-3 order signs at RM 9,600 against a record that can only ever
+describe RM 9,450. **No door in the portal can collect the difference.**
+
+**THE SHAPE OF THE FIX — the pattern already exists and is not to be invented.**
+`delivery-fee-recompute.ts` computes the delivery TRIP fee server-side and appends `order_addons`
+rows (`DELIVERY` · `DELIVERY_CROSS` · `DELIVERY_ADD`, seeded `0184:112-116`). Stair carry follows
+the same road: ① seed a stair key into `addons` — the set is **not** closed, `POST /api/catalog/addons`
+(`catalog.ts:1854-1880`, gate `internalOnly`) creates one and the door is on screen at
+**Settings → Catalog → Special Add-ons**; ② have the server recompute write the per-order figure
+into `order_addons.qty` / `unit_price`, exactly as the delivery-fee rows do, since `addons.price`
+is a fixed per-key price and stair carry is computed. The total, the outstanding and every payment
+cap then include it with no further change, because they already read `order_addons`.
+⚠️ The fee must be **stamped at the order**, not re-derived: today changing
+`floor_config.per_floor_per_item` in Settings silently reprices every historic order's displayed
+stair carry. A charge the customer signed for may not move because a rate changed afterwards.
+🟡 Sequencing is the owner's, not the code's: this changes what existing orders are worth. Under
+`CLAUDE.md` §6 every row today is test data, so **no backfill is proposed** — the ruling binds new
+orders from the day it ships.
 - **`Address not given yet` appears only while there is no address**, or while it is already
   ticked. On an order that carries one, a permanent tickbox whose only power is to discard it is a
   hazard, not a field.
@@ -1254,10 +1336,16 @@ the amendment machinery, the goods truth and the Order Route architecture are un
   holds, and while one is open this block submits nothing. `Amend date (from customer)` is a
   column (`sales_order_amendments.customer_asked_on`, 0354), not a substring of the reason: a
   change phoned in on Monday and typed on Thursday is a Monday request.
-- **The MONEY block is read-only and weighted** — Total large · Paid medium · **Outstanding
-  loudest, red whenever any of it is still owed**. This is an explicit owner ruling and it
-  overrides `docs/ui/MASTER.md` §6.4 challenge C1's narrower "only when genuinely late". The
-  existing `Open this order in Payments` door is unchanged.
+- **The MONEY block is read-only, and its three amounts are ONE SIZE** — Total · Paid ·
+  **Outstanding, red whenever any of it is still owed**. The red is the 2026-08-15 owner ruling
+  and it stands; it overrides `docs/ui/MASTER.md` §6.4 challenge C1's narrower "only when
+  genuinely late". **The `Total large · Paid medium · Outstanding loudest` half of that ruling
+  is RETIRED (YH, 2026-08-28).** It never reached the amounts: `<Money>` renders every value at
+  its `row` tone, so all three digits were always the same size and only their CONTAINERS
+  differed — three line-heights under `items-end`, which is why the three numbers never sat on
+  one line. Weighting that only moves the box around the number is not weighting. Colour does
+  the separating now, which is the half that was always visible.
+  The existing `Open this order in Payments` door is unchanged.
 - **`SALES OWNERSHIP` is read-only for Operation — no button.** A management-authorised role
   (principal or HR, the same lane GATE 3 lets decide it) sees the one door, worded
   **`Change salesperson`** (⛔ the `— needs approval` suffix ruled here on 2026-08-15 was retired
@@ -4551,6 +4639,32 @@ APPROVED        opens the money gate for that order's DOs
 PENDING/REFUSED keeps it shut
 ```
 
+**⭐ THE APPROVER IS THE PRINCIPAL ONLY — OWNER RULING (YH, 2026-08-28). CHANGEABLE.**
+The `delivery_payment_approver` duty above describes the *intended* shape and is **not reachable
+today**: the key was never created. `org_duties` holds exactly six seeded keys
+(`0260:30-41` + `0286:74-79`) and this is not among them; `org_position_duties.duty_key` is
+`references org_duties(key)` (`0260:46-51`) and `hr_set_position_duty` raises `duty_not_found`
+before it would insert (`0260:203-204`). A holder row is therefore impossible, the HR team screen
+shows no checkbox for it (its column list is read live from `org_duties`), and
+`delivery_payment_approver_gate()` is behaviourally **identical to `role = 'principal'`**.
+
+**This is deliberate, not a defect.** Carres has ~8 registered users and the departments that
+would hold the duty are not set up yet, so a second approver has nobody to be. The UI's
+`canDecide = role === "principal"` and the RPC gate admit exactly the same person, and they agree.
+
+⚠️ **Do not "fix" the UI to read the duty.** That was raised as a gate mismatch by the Sales Order
+Workspace field audit (2026-08-28) and **refuted on measurement** — see
+`docs/audits/SO-WORKSPACE-FIELD-AUDIT.md` §5 G-4. Reading a duty nobody can hold changes nothing
+and adds a branch that cannot be tested against a real holder.
+
+**WHEN THIS CHANGES.** The ruling is explicitly temporary and turns on Carres's org, not on the
+code. When a manager should approve COD without Jess, the order of work is: ① seed the
+`delivery_payment_approver` key into `org_duties` and add it to `DUTY_KEYS`
+(`packages/shared/src/schemas/org-duties.ts:18-29`, a closed tuple pinned by its own test);
+② grant it to a position through the HR team screen; ③ only then widen `canDecide` to read the
+duty. Steps ① and ② are owner/HR decisions; ③ is the code change, and it is the smallest of the
+three. Until ① happens, the duty branch in the RPC is correct-but-dormant and must stay.
+
 Nobody else may create, edit or delete a decision; deletion is refused by trigger and a decision
 is never re-decided (the 0355 pattern). **The database asserts the money law on the mint
 itself** (0362's `BEFORE INSERT` trigger on `ops_delivery_orders`): no document can be born for
@@ -5072,23 +5186,43 @@ right-click menu follows the approved 2990 Sales Orders action set and order exa
 ```
 Edit
 View
-Preview
 Print
 ────────
 Issue Delivery Order
-Copy to new Sales Order
 ────────
 Cancel SO
 ```
+
+**`Copy to new Sales Order` IS RETIRED — owner ruling (Jess, 2026-08-28, relayed by YH),
+overwriting the Loo 2026-08-11 line above.** Jess called the act dangerous, and the code says why:
+`copySalesOrderDraft` dropped each line's `attrs` — the fabric and colour a sofa is configured
+with — even though migration `0374` opened that slot on the create door specifically so
+configuration would cross, and two code comments claimed it did. The consequence was not a
+visible failure but a quiet wrong one: a copied configured order reached Purchasing as a PO that
+could not autofill. Both doors are removed (register row menu, and the object page's
+`More actions`), and the `?copyFrom=` route branch with them — a door nobody can see is still a
+door if the URL still works. **If Carres wants copy back it is a BUILD with its own card**, and
+that card must answer what a copied promo line means, whether configuration crosses, and whether
+a cancelled order may be copied — the three questions `§11` required and no document ever
+answered.
+
+**`Preview` IS RETIRED — owner ruling (YH, 2026-08-28), overwriting the Loo 2026-08-11 line
+above.** The locked menu had meant `Preview` and `Print` as two acts: a governed document
+preview, and the governed document output. Only the second was ever built. Both rows shipped
+calling `openSalesOrderPdf(r.id, r.so)` with the same arguments, so the menu asked the reader to
+choose between two names for one behaviour — the shape ERP-ARCHITECTURE ownership law C
+(*a door, never a duplicate*) exists to stop. The duplicate label is removed and the act is named
+once. **No capability was lost, because none was ever built behind the first name.** A real
+preview act, if Carres wants one, is a BUILD with its own card — not a restoration of this row.
 
 This is a Sales Orders module exception, not a Register Template requirement for every module.
 The menu copies the reference action inventory and ordering; Carres frozen tokens, typography,
 spacing, hover/current treatment, permissions and confirmation components still govern its visual
 and interaction treatment. Each item routes to the Carres-owned capability rather than executing
 foreign business rules inside the grid: `Edit` opens the full Sales Order Workspace in edit intent;
-`View` opens the owned read view; `Preview` opens the governed document preview; `Print` uses the
+`View` opens the owned read view; `Print` uses the
 governed Sales Order document output; `Issue Delivery Order` hands off to the Delivery-owned issue
-flow; `Copy to new Sales Order` starts a new draft from the governed copy boundary; and `Cancel SO`
+flow; and `Cancel SO`
 uses the owned cancellation gate and destructive confirmation. The implementation cards must
 define the unresolved permission, eligibility, copy-boundary and cancellation rules before those
 new capabilities can write business data. Right-click is a desktop shortcut: it does not remove
@@ -5113,12 +5247,12 @@ the normal discoverable doors already governed for Edit, output or View Flow.
 |---|---|---|
 | ~~**D1**~~ | ✅ **FIXED 2026-08-06** — the list reads both PO sources through one shared helper. See §5.1 |
 | ~~**D2**~~ | ✅ **FIXED 2026-08-06** — the door, the hook, the route and its suite are deleted; a guard asserts the route now 404s. See §9.5 |
-| **D3** 🟡 | **The drawer computes `stage` a SECOND time** (its own IIFE at line ~1469) instead of importing the list's exported `stageOf`. Two spellings of one derivation, in two files. | read |
-| **D4** 🟡 | **The drawer computes money a second way for its own header.** The list hands down `holdAmount` from the shared `orderMoney`, and the drawer separately fetches `order_payments` for `Collected` — the one ledger the shared rule refuses to read. **The drawer's Collected and the row's Outstanding can disagree.** | read |
+| ~~**D3**~~ | ✅ **FIXED 2026-08-28 — and it was never "two spellings of one derivation".** It was **two questions**, each spelt once, in two files, with nothing naming the difference. `stageOf` answers *where is this order in the pipeline* — and `place` is a real slot there, because `controlTabOf` ends `return "proceed"; // confirmed OR autocount-placed`, so an imported row has to REACH `placed` for that fall-through to route it. The drawer's copy answered *what do we tell the operator*, applying Jess's 2026-07-02 ruling that an AutoCount import arrived already proceeded and is never "waiting for the dealer to push". **Merging them is the obvious move and it is wrong:** tried first, it moved imported rows out of `proceed` and six control tests caught it. The two questions now carry two names — `stageOf` and `displayStageOf` — one spelling each, in `components/StageChip.tsx` beside the type both surfaces already import. **That module is the home because the cycle was the cause:** the control imports the drawer, so the drawer could never import the rule back, which is why it was written twice. Eight tests hold both rules, including one pinning the single case they differ on so it cannot be tidied away. | fixed |
+| ~~**D4**~~ | ✅ **FIXED 2026-08-27 — one money rule, asked once. And the audit was pointing at the wrong half.** What it described — *"the drawer separately fetches `order_payments` for Collected"* — had already been corrected on 2026-07-27 by C5, ten days before this row was written; the drawer's own comment carries the production receipt (SO-1209 read *RM 7,248 outstanding · HOLD DELIVERY* while `orders.paid` said paid in full). **What actually survived was worse:** the goods half came through the shared `orderMoney` while the storage half was re-derived locally as `invoiceTotal - collectedAll`, so the screen carried TWO `outstanding` figures — the money sticker showing the shared rule's goods-only number, the payment dial showing the local goods+storage one — and they disagreed on every order with a fee owing, with one of them captioned `holding delivery`. **No invention was needed:** `orderMoney` already took `storageOwing` and `storageReleased` and already returned `outstanding` / `holding` / `holds`; nobody passed them. **Two deliberate behaviour changes, both recorded at the call site:** a manager-released fee is now still OWED and merely stops HOLDING (C9's rule, which the local boolean folded away), and overpaid goods no longer silently offset a storage fee only a manager may waive (`ERP-ARCHITECTURE.md` §6.1). Four source-scan tests hold it, including one asserting the rule is called exactly once. | fixed |
 | **D5** 🟡 | **Carrier rules are edited from one order's drawer.** | §9.5 |
 | **D6** 🟡 | **`Issues module coming — needs the ops_issues table`** is a live tooltip on the Actions menu. A promise about the product on an operator's screen. | panel titles |
 | **D7** 🟡 | **The `deliver_today` checklist is empty by ruling**, so an operator expanding the day's own action sees nothing. Correct by the rule (*nobody records "goods loaded"*), and worth knowing before somebody calls it a bug. | `order-action-checklist.ts` |
 | ~~**D8**~~ | ✅ **FIXED 2026-08-27 — Orders stopped holding Purchasing's number.** `orderActionSignalsOf` read `hasMsbf ? 7 : hasSofa ? 5 : 7`, and its own comment said why: *"the supplier master holds production time as free text, so nothing can compute a real one yet"*. **Migration `0303` removed that blocker on 2026-07-28** — `purchasing_settings.order_by_buffer_days` is one governed, manager-editable value, which Purchasing's own reads already call `safetyDays` (`purchase-demands.ts:407`, `:611`) and `purchasing/MASTER.md:650` ruled visible as **`Safety days`** on 2026-08-26. Two arithmetics for one derived fact is Law D, so the ladder now takes the number as a parameter and `OperationOrdersControl` hands it Purchasing's. **The per-category fork went with it, and that is the second half:** it asked `lineCategory()` — the keyword parser `carry-forwards.md` records as display-only — to decide a business threshold, making it a third caller filtering on a guess. **`null` is not a default:** a window nobody has answered leaves the ready-date call amber rather than escalating it on an invented deadline. Two tests that pinned the old constants are rewritten to the governed contract; `lines` is now unread by the signals builder and marked so. | fixed |
 | ~~**D9**~~ | ✅ **FIXED 2026-08-08** — `lineClass` answers `unknown` where it used to answer `acc`, and `acc` is now earned by an accessory word instead of by elimination. **20 orders that could never fail a stock check → 0**, with **zero** lines re-classified into anything else. Two follow-ups named and left open on purpose: delete the `lineCategory` display fold, and name the sixteen SKUs alongside migration 0148. See the D9 block above |
-| **D10** 🟡 | **Two dead surfaces are still compiled into the bundle, and both had live test suites.** `OperationOrders.tsx` (450 lines, the 6-column kanban) is imported by **nothing** — §3 records that the list merged it away — and `OrderCustomerCard` (in the drawer) is exported, rendered nowhere, and superseded by `CustomerIdentityCard` (Jess 2026-07-17 rev 4). **Purchasing's own C1 ruling applies to the second one:** its `startEditRef` door has no caller, so the safe-edit mode is unreachable, **and the `status === 'place'` gate that used to guard it is gone from the component** — whoever re-mounts it inherits an editor with no gate. | `grep` — the only non-test reference to each is its own declaration |
-| **D11** ⚪ | **`receive-po-<id>` names TWO different controls** in `ProcurementTabContent` — the primary `Check in` button and the always-available `Direct receive →` escape hatch. A test cannot tell them apart by handle, only by word. | read |
+| ~~**D10**~~ | ✅ **RETIRED 2026-08-28, on the owner's explicit instruction** (red line 5 — the files were not deleted until asked for by name). **Half of it was already done:** `OperationOrders.tsx`, the 450-line kanban, no longer exists. What survived was a dead ISLAND the audit never named — `OrderColumn.tsx` had zero importers and `OrderCard.tsx` was imported only by `OrderColumn`, both orphaned when the kanban went. `OrderCustomerCard` was not a file at all: an exported component inside `OrderDetailDrawer.tsx` whose only importer was its own test. Its comment promised *"the Edit affordance only shows for status 'place'"* and the component carried no such check — unreachable, and fail-safe at the server (`update_order` 422s on a non-Place order), so no data was ever at risk. **Deleting it revealed more dead code, which is the point:** `CompactField` was its private helper and went with it, and two imports went stale. `GuaranteeCoverStrip` was NOT deleted — only the drawer's import of it; `PosOrderDetail.tsx` renders it. Precedent: the Cancel SO closeout deleted `CancelOrderDialog` for this exact shape. | fixed |
+| ~~**D11**~~ | ✅ **FIXED 2026-08-28 — two controls, two handles.** `receive-po-<id>` named BOTH the primary `Check in` button and the always-available `Direct receive →` escape hatch, so a test could only tell two different affordances apart by their WORDS. The hatch is now `direct-receive-<id>`; the primary keeps `receive-po-<id>`. **It stayed open for a boundary reason, not a technical one** — `OhanaSofaTab.test.tsx` recorded it as *REPORTED, NOT FIXED* because *"renaming one reaches the component, and the S2 card rules components DO NOT TOUCH"*; that note is corrected in the same change. The suite that previously had to accept *either* control now asserts the hatch is present **and the primary is not**, which is the fact the shared handle could never express. Procurement suites 43 pass. | fixed |
