@@ -1,5 +1,5 @@
 -- =============================================================================
--- 0391_sales_final_submit_is_the_handoff.sql
+-- 0392_sales_final_submit_is_the_handoff.sql
 -- SALES → PURCHASING · completing the Sales Order is the handoff
 -- =============================================================================
 --
