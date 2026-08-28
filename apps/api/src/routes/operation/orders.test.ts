@@ -798,7 +798,7 @@ describe("GET /api/operation/orders/:id", () => {
     });
 
     it("⭐ names a principal actor for an operation reader — the SO-1329 walk defect", async () => {
-      /* The production walk found `Actor was not recorded · Principal` on an
+      /* The production walk found `Staff identity not recorded · Principal` on an
          order whose actor WAS recorded — the reader's JWT simply could not
          see a principal-role row. The 0390 door answers for every internal
          staff role, so the record now names her. */

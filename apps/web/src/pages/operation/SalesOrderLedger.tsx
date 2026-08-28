@@ -79,7 +79,7 @@ export function historyActorWords(event: HistoryEvent): string {
   if (kind === "system") {
     return `System · ${when}`;
   }
-  return ["Actor was not recorded", role, when].filter(Boolean).join(" · ");
+  return ["Staff identity not recorded", role, when].filter(Boolean).join(" · ");
 }
 
 /**
@@ -107,9 +107,11 @@ const HISTORY_FIELD_WORDS: Record<string, string> = {
   outlet_id: "Showroom",
   dealer_id: "Dealer",
   installment_months: "Instalment months",
+  customer_address_unknown: "Address not given yet",
+  customer_billing_same: "Billing address same as delivery",
   delivery_floor: "Delivery floor",
-  delivery_has_lift: "Lift available",
-  delivery_stair_items: "Stair-carry items",
+  delivery_has_lift: "Lift available?",
+  delivery_stair_items: "Items needing stair carry",
   lines: "Goods",
   addons: "Services",
 };
@@ -245,7 +247,7 @@ export function revisionRecordWords(
       ? `Recorded by ${name} · ${when}`
       : kind === "system"
         ? `Recorded by System · ${when}`
-        : `Actor was not recorded · ${when}`;
+        : `Staff identity not recorded · ${when}`;
   const detail = [recorded];
   if (r.note && r.note.trim()) detail.push(r.note.trim());
   return { title, identity, detail };

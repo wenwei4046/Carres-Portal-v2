@@ -29,7 +29,7 @@ describe("describeRevisionChanges — + added · − removed · old → new", ()
       snap({ header: { customer_name: "Kimmy", delivery_date: "2026-09-05", delivery_floor: 1 } }),
     );
     expect(out).toEqual([
-      `Promised delivery: ${fmtDate("2026-08-30")} → ${fmtDate("2026-09-05")}`,
+      `Requested Delivery Date: ${fmtDate("2026-08-30")} → ${fmtDate("2026-09-05")}`,
     ]);
   });
 
