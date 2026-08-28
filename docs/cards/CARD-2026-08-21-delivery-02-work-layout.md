@@ -2,8 +2,28 @@
 
 **Module:** Delivery · **Sequence:** 02
 **Owner ruling:** Jess, 2026-08-21 · **CORRECTED by Jess, 2026-08-24**
-**Status:** CARD 02 executed (PR #887 `d1fc2d2a` + #888 `875c008d`).
-**CARD 02-A — the correction — IN PROGRESS.**
+**Status:** EXECUTED — CARD 02 (PR #887 `d1fc2d2a` + #888 `875c008d`) and
+CARD 02-A, the 2026-08-24 correction (PR #902 `4b5dfb09` + walk fixes PR #905
+`76656cec`), merged, deployed, production-verified. Migration **0386** applied
+and reconciled (born 0379; renumbered behind the purchasing lane's tracker).
+
+**The production proof (2026-08-24, `76656cec`, authenticated):** counts match
+SQL exactly (91 open orders → 80 pass the entry rule, 29 without a partner);
+`Overdue` + seven near-term days at zero; the corrected column order; zero
+`Created` anywhere; one selected row offers both actions, two offer Assign
+only, toolbar replaced in place; the coverage intersection offered exactly
+{AL} for a KV+Kelantan selection; grey chevron titled `Show delivery items`.
+The WRITE path was exercised end-to-end on live data: Save Delivery recorded
+NETS + Thu, 27 Aug (toast, DB row, `assigned` event with actor, the rail
+recounting 80→79 / NETS 45 / `Delivery confirmed`), a reasonless partner
+change was REFUSED `409 change_needs_reason`, and the reasoned change wrote
+`changed NETS→AL · wrong_coverage` — an ordered append-only history.
+
+**The walk found two more defects, both fixed in #905:** the Edit Delivery
+route existed and `isUrlDriven` did not include it, so the URL drew an empty
+main pane (a component test cannot see this; three OperationApp tests now
+mount the URL) · the Assign partner select's placeholder borrowed the reason's
+word.
 
 ---
 
