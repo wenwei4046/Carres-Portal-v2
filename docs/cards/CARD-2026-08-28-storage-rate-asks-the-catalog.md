@@ -3,7 +3,8 @@
 **Module:** Payment / Money In (owns the FEE) · **Surface:** the shared storage arithmetic and its
 four server call sites, plus the drawer's Storage tab
 **Owner authority:** `docs/ERP-ARCHITECTURE.md` §6.1 — **FROZEN 2026-08-06**, and §3.1 · D9
-**Status:** QUEUED — implements a frozen ruling; no open owner decision
+**Status:** BUILT — all five tasks implemented 2026-08-28; awaiting CI, merge, deploy and
+authenticated production acceptance (§10)
 **Lane:** BUILD / DELIVERY
 **Base:** `origin/main` at `4519a985c3bb01a175d91bdd5862eba186e89bfa`
 
@@ -205,6 +206,23 @@ look like a new charge rather than a repaired one.
 
 Bounded by two facts: storage never accrues unless an operator explicitly turns it on, and every row
 in the database today is test data (`CLAUDE.md` §6).
+
+## 9.1 · Found while building — the gate could have been opened by a catalog hiccup
+
+⛔ **`storageBlock` fails OPEN by design.** Its whole body sits in a `try/catch` whose comment says
+so: *"a gate-lookup hiccup must not block dispatch."* Asking the catalog put a NEW call inside that
+try, and a throw there would not have degraded the RATE — it would have **released goods whose fee
+is unpaid**.
+
+It surfaced because `storage-gate.test.ts`'s fixture serves no `product_skus`, so the read blew up
+and three gate tests flipped from blocking to open. A fixture that happened to stub that table would
+have hidden it.
+
+The fix is `storageSkuCategories` in `sku-categories.ts` — the storage callers ask through a wrapper
+whose only possible answer is a map. An empty map means "no catalog answer", which every caller
+already reads as the SKU-string parser. **A catalog outage costs the fee its accuracy; it never costs
+the gate its authority.** Two tests hold it: a real catalogued mattress now blocks, and a catalog
+read that blows up still blocks.
 
 ## 10 · Completion record
 

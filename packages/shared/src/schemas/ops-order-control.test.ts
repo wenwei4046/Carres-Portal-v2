@@ -116,6 +116,74 @@ describe("storageCategoryForSku", () => {
   });
 });
 
+/**
+ * CARD-2026-08-28 - THE RATE ASKS THE CATALOG.
+ *
+ * The prefix parser above is wrong for every real SKU. Measured 2026-08-28
+ * against production shapes: B1201S-K, B1201S, MODEL-C, ESS-PILLOW, B2003-Q,
+ * SF-3STR, NF-MATT-K and OH-BF-Q ALL return "other", so no rate applies and
+ * the fee computes RM 0 against a live RM150/month + RM200 table. `B1201S-K`
+ * is the same SKU docs/orders/MASTER.md records as a production-verified
+ * MATTRESS - it reads correctly everywhere the catalog is asked.
+ *
+ * ERP-ARCHITECTURE 6.1 (FROZEN 2026-08-06) rules that Money In's arithmetic
+ * asks the CATALOG. These lock that.
+ */
+describe("storageCategoryForSku - the catalog answers, the parser only fills in", () => {
+  it("a catalogued mattress or bed frame bills at the MS/BF rate", () => {
+    expect(storageCategoryForSku("B1201S-K", "mattress")).toBe("msbf");
+    expect(storageCategoryForSku("NF-MATT-K", "mattress")).toBe("msbf");
+    expect(storageCategoryForSku("OH-BF-Q", "bedframe")).toBe("msbf");
+  });
+
+  it("a catalogued sofa bills at the SOF rate", () => {
+    expect(storageCategoryForSku("SF-3STR", "sofa")).toBe("sof");
+    expect(storageCategoryForSku("MODEL-C", "sofa")).toBe("sof");
+  });
+
+  it("a catalogued accessory is out of scope", () => {
+    expect(storageCategoryForSku("ESS-PILLOW", "pillow")).toBe("other");
+  });
+
+  it("the CATALOG wins over the SKU string, both ways", () => {
+    // The prefix would say msbf; the catalog says this is an accessory.
+    expect(storageCategoryForSku("MS-PROTECTOR", "accessory")).toBe("other");
+    // The prefix would say other; the catalog says mattress. This is the
+    // measured defect - every real SKU is this case.
+    expect(storageCategoryForSku("B2003-Q", "mattress")).toBe("msbf");
+  });
+
+  it("no catalog answer falls back to the parser, and says so by behaviour", () => {
+    // null = asked, catalog silent. undefined = nobody asked (version skew).
+    // Both keep today's behaviour rather than dropping a line out of scope.
+    expect(storageCategoryForSku("MS1001", null)).toBe("msbf");
+    expect(storageCategoryForSku("MS1001", undefined)).toBe("msbf");
+    expect(storageCategoryForSku("B1201S-K", null)).toBe("other");
+  });
+});
+
+describe("orderStorageScope - with the catalog", () => {
+  it("real production SKUs come into scope once the catalog is asked", () => {
+    const skus = ["B1201S-K", "ESS-PILLOW"];
+    // Today, without categories: nothing is in scope. That is the defect.
+    expect(orderStorageScope(skus)).toEqual({ hasMsbf: false, hasSof: false });
+    // With the catalog: the mattress is in scope and the pillow is not.
+    const cats = new Map([
+      ["B1201S-K", "mattress"],
+      ["ESS-PILLOW", "pillow"],
+    ]);
+    expect(orderStorageScope(skus, cats)).toEqual({ hasMsbf: true, hasSof: false });
+  });
+
+  it("a SKU absent from the catalog still falls back to the parser", () => {
+    const cats = new Map([["B1201S-K", "mattress"]]);
+    expect(orderStorageScope(["B1201S-K", "MS1001"], cats)).toEqual({
+      hasMsbf: true,
+      hasSof: false,
+    });
+  });
+});
+
 describe("orderStorageScope", () => {
   it("flags msbf and sof independently across the line set", () => {
     expect(orderStorageScope(["MS1", "PILLOW"])).toEqual({ hasMsbf: true, hasSof: false });
