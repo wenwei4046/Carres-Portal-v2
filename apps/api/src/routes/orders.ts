@@ -941,7 +941,7 @@ ordersRouter.post("/", async (c) => {
     },
     effectiveDealerId,
   );
-  // 0395 — final Sales Portal submit is the handoff. The wrapper creates the
+  // 0396 — final Sales Portal submit is the handoff. The wrapper creates the
   // order and attempts the canonical Proceed inside one database transaction;
   // an incomplete order stays in Place with its blocker, while a complete one
   // reaches Purchasing without a second salesperson action. `/raw` below uses
@@ -3227,7 +3227,7 @@ ordersRouter.post("/:id/addons/:addonId/edit", async (c) => {
   return c.json(await fetchAndShapeOrder(sb, id));
 });
 
-/** POST /api/orders/:id/addons/:addonId/remove — 0395 (YH, 2026-08-28: a
+/** POST /api/orders/:id/addons/:addonId/remove — 0396 (YH, 2026-08-28: a
  *  service picked by mistake has to be takeable back). Deliberately a SIBLING
  *  of the edit route above rather than a flag on it: removing is a different
  *  act from editing, and folding it in would have meant teaching

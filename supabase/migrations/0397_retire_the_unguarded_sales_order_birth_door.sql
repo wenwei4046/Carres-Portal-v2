@@ -1,9 +1,9 @@
--- 0396_retire_the_unguarded_sales_order_birth_door.sql
+-- 0397_retire_the_unguarded_sales_order_birth_door.sql
 --
 -- Apply only AFTER the Worker containing `create_order_from_sales_portal` and
 -- `create_raw_order` is deployed and its production SHA is verified.
 --
--- 0395 deliberately keeps this primitive callable during the database-first
+-- 0396 deliberately keeps this primitive callable during the database-first
 -- compatibility window so the old Worker can still accept an order. Once the
 -- new Worker is live, every governed entry has its own wrapper and an
 -- authenticated browser must no longer be able to create a marker-less order
@@ -11,7 +11,7 @@
 
 begin;
 
--- 0395 shipped the exact-ID recovery door before its first production use.
+-- 0396 shipped the exact-ID recovery door before its first production use.
 -- Keep that original body as a non-callable implementation, then put a small
 -- status gate in front of it: a cancelled or otherwise closed record must
 -- never be reported as having proceeded merely because it already has the
@@ -68,9 +68,9 @@ revoke execute on function public.create_order(jsonb)
   from public, anon, authenticated;
 
 comment on function public.create_order(jsonb) is
-  'Internal birth primitive. Call create_order_from_sales_portal or create_raw_order; authenticated clients have no direct execute grant (0396).';
+  'Internal birth primitive. Call create_order_from_sales_portal or create_raw_order; authenticated clients have no direct execute grant (0397).';
 
 comment on function public.recover_legacy_sales_final_submits(uuid[],text) is
-  'Principal-only exact-ID legacy recovery. Accepts only Place or Proceed Sales Orders and delegates to the locked 0395 implementation. 0396.';
+  'Principal-only exact-ID legacy recovery. Accepts only Place or Proceed Sales Orders and delegates to the locked 0396 implementation. 0397.';
 
 commit;

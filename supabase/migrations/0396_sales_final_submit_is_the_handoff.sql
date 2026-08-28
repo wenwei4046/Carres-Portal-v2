@@ -1,5 +1,5 @@
 -- =============================================================================
--- 0395_sales_final_submit_is_the_handoff.sql
+-- 0396_sales_final_submit_is_the_handoff.sql
 -- SALES → PURCHASING · completing the Sales Order is the handoff
 -- =============================================================================
 --
@@ -33,11 +33,11 @@ alter table public.orders
 
 comment on column public.orders.proceeded_at is
   'Actual Sales-to-Operations handoff timestamp. Stamped when status enters '
-  'proceed_order; cleared only by governed un-proceed back to place. 0395.';
+  'proceed_order; cleared only by governed un-proceed back to place. 0396.';
 
 comment on column public.orders.sales_final_submitted_at is
   'Authoritative Sales Portal final-submit timestamp. NULL for raw, office, '
-  'rental and imported orders. Automatic handoff retries require this fact. 0395.';
+  'rental and imported orders. Automatic handoff retries require this fact. 0396.';
 
 -- Stamp every status door once: the canonical RPC, rental approval, imports,
 -- and any future governed writer all receive the same handoff evidence.
@@ -286,7 +286,7 @@ revoke all on function public.proceed_order(uuid) from public, anon;
 grant execute on function public.proceed_order(uuid) to authenticated;
 
 -- `create_order` is the old production Worker's current door. Keep its existing
--- grant during the database-first compatibility window: 0395 must be safe while
+-- grant during the database-first compatibility window: 0396 must be safe while
 -- the old Worker is still serving requests. After the new Worker is deployed
 -- and its exact SHA is verified, a separate next-number migration retires this
 -- primitive. The new source below never calls it directly from an API route.
@@ -561,7 +561,7 @@ comment on function public.recover_legacy_sales_final_submits(uuid[],text) is
   'Temporary Principal-only recovery for exact confirmed legacy Sales Portal '
   'order IDs. Rejects imported, office and rental orders, records one recovery '
   'fact, then delegates handoff to _sales_order_proceed. Retire after the '
-  'historical backlog is closed. 0395.';
+  'historical backlog is closed. 0396.';
 
 revoke all on function public.recover_legacy_sales_final_submits(uuid[],text)
   from public, anon, authenticated, service_role;
