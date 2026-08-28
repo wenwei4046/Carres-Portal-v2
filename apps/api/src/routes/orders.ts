@@ -48,6 +48,7 @@ import { recomputeAndExplodeSofaBuildLines } from "../lib/sofa-recompute";
 import { recomputeOptionPickLines } from "../lib/option-picks-recompute";
 import { recomputeSpecialAddonLines } from "../lib/special-addons-recompute";
 import { recomputeStairCarry } from "../lib/stair-carry-recompute";
+import { restampStairCarry, touchesStairInputs } from "../lib/stair-carry-restamp";
 import { SERVER_EXCLUSIVE_ADDON_KEYS } from "@carres/shared";
 import { recomputeDeliveryFee } from "../lib/delivery-fee-recompute";
 import { validateFreeItemClaims, resolveDefaultFreeGiftLines } from "../lib/free-gift-resolve";
@@ -3842,6 +3843,23 @@ ordersRouter.patch("/:id", async (c) => {
       );
     }
     throw new HTTPException(500, { message: rpcError.message });
+  }
+
+  /* 0394 — A STAIR FEE FOLLOWS THE FLOOR THAT CHANGED. `update_order` writes
+     delivery_floor / delivery_has_lift / delivery_stair_items, and the fee 0393
+     stamped at create is priced from exactly those three. Without this the POS
+     could move a floor and leave the order describing a charge its own inputs
+     no longer produce — the same defect as never writing the fee at all, one
+     edit later.
+
+     Non-fatal on purpose: the update already succeeded, so failing here would
+     report a lost edit that was not lost. The response is re-fetched below, so
+     a successful re-stamp is visible to the caller immediately. */
+  if (touchesStairInputs(flat as Record<string, unknown>)) {
+    const restamp = await restampStairCarry(sb, id);
+    if (!restamp.ok) {
+      console.error("stair carry re-stamp failed", { orderId: id, reason: restamp.reason });
+    }
   }
 
   return c.json(await fetchAndShapeOrder(sb, id));
