@@ -790,7 +790,11 @@ blank `SO NO`.
 `Ready Stock` · `Showroom Display` · `Service Case` · `Internal Staff Purchase` ·
 `Subsidiary Purchase`.
 
-**Left rail — APPROVED / LOCKED, owner ruling 2026-08-28 (Card 03).** The shared 240px
+**Left rail — APPROVED / LOCKED, owner ruling 2026-08-28 (Card 03); BUILT, PR #973,
+production-verified on `4c8aa6d5` 2026-08-28.** Migration `0398` (the vocabulary's CHECKs
+and door gates) is committed; its production apply follows the governed ENGINEERING §5 path
+and, until it runs, the live doors still refuse the four new purpose values by name while
+`Ready Stock` requests store normally. The shared 240px
 `FilterRail` shell Card 02-C built — same group-heading typography and spacing, same blue
 `NavRow` active treatment, no checkboxes, labels wrap and never truncate, counts visible and
 right-aligned, rail scrolls vertically, Register scrolls horizontally when narrow and the

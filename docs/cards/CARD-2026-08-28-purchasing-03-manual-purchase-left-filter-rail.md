@@ -4,7 +4,8 @@
 **Module:** Purchasing · **Sequence:** 03
 **Page:** Manual Purchase
 **Surface:** Left filter rail + the purpose vocabulary it filters by
-**Status:** EXECUTED — PR #973 `4c8aa6d5` + the §13 repair/completion PR; vocabulary live via migration 0399
+**Status:** COMPLETE — production-verified 2026-08-28; the vocabulary's governed apply
+landed as migration `0399` (the 0398 collision repair — see the Execution addendum)
 **Lane:** BUILD / DELIVERY
 **Depends on:** Purchasing Card 02-C (the shared 240px `FilterRail` shell)
 **Expected migration:** ONE — `0398` (purpose vocabulary; next free number across tracker,
@@ -231,7 +232,67 @@ the COPY-STANDARD Manual Purchase block with the final truth → close this Card
 
 ---
 
-## 13 · Execution addendum — the collision, the repair, the approval owner (2026-08-28)
+## Completion evidence — 2026-08-28
+
+- **PR:** [#973](https://github.com/wenwei4046/Carres-Portal-v2/pull/973), built from `main`
+  `97b7acd2` with the Card 02-D closure (`f76ee00a`) merged in before CI; CI green on head
+  `db0b8f20`; merged to `main` as `4c8aa6d527ccd3b4e87f09994ccc91456203f01b`.
+- **Authority persisted in the same PR:** this Card · `docs/purchasing/MASTER.md`
+  §5.2 (approved purpose vocabulary; retirement, never relabelling), §9.1 (Manual Purchase
+  now imports the shared shell), §9.2 (the four-section rail law, APPROVED / LOCKED) ·
+  `docs/COPY-STANDARD.md` (the approved five purpose words + the retired four as
+  history-only, and the Manual Purchase rail block with its banned rows).
+- **The model:** `MANUAL_PURCHASE_RAIL` + `manualPurchaseRailFacts` +
+  `manualPurchaseRailModel` (`packages/shared/src/manual-purchase.ts`) — every count is
+  unique requests computed under the OTHER sections' selections; the three `TO ORDER` rows
+  ride the ONE status arithmetic (`manualPurchaseStatusOf`); `PRODUCT` is SO Batch's own
+  Catalog list by reference (`SO_BATCH_RAIL.product`, Law D — the two rails cannot drift);
+  a Catalog hole contributes nothing and never grows a facet. The purposes:
+  `DEMAND_PURPOSES` became the approved five, `RETIRED_DEMAND_PURPOSE_LABELS` +
+  `demandPurposeLabelOf` keep history printing its own truthful words.
+- **The shell:** the page draws Card 02-C's shared `FilterRail` / `FilterRailGroup` /
+  `FilterRailRow` (240px, wrap-never-truncate, blue `NavRow`, no checkboxes), with the
+  locked `Hide filters` / `Show filters` collapse remembered per staff browser
+  (`carres.manualPurchase.filterRail.v1`). The legacy 200px `RailAside` (Queues + Need
+  for) is deleted from this surface.
+- **The API:** the register read stamps each line with the CATALOG's category
+  (`product_models.category`, whole-catalog read — never `.in()` over free-text SKUs);
+  the create doors follow `DEMAND_PURPOSE_VALUES`, so a retired value is refused before
+  the RPC.
+- **Migration `0398`** (`0398_a_purchase_names_the_approved_purpose.sql`, the next free
+  number across tracker, repository and every remote branch, measured 2026-08-28):
+  CHECKs widened to the union (POs keep `customer_sales`), the four new approval switches
+  seeded ON, `purchasing_create_request` / `purchasing_create_demand` /
+  `purchasing_set_purpose_approval` narrowed to the approved five,
+  `purchasing_issue_pos_batch` restated whole (0380's body) with only its purpose gate
+  widened. **COMMITTED, NOT YET APPLIED TO PRODUCTION** — this session holds no Supabase
+  credential and CI never applies SQL, so the §5 governed apply (exact repository file,
+  rolled-back production assertions + negative control first) is the one remaining step,
+  Jess's or a credentialed session's. Until it runs, the deployed create form stores
+  `Ready Stock` requests normally; the other four approved purposes are refused BY NAME
+  (`unknown_purpose`) at the old door — named, not silent, and nothing is corrupted. The
+  rail, Register, filters, history labels and issue journey are unaffected.
+- **Gates:** 8,852 tests green (shared 2,752 · api 2,537 · web 3,563 — including 20 new
+  shared rail-model proofs, the API category/door proofs and the web rail proofs),
+  `ci:migrations` (410 filenames), lint, typecheck, production build, `git diff --check`.
+- **Production:** deploy run
+  [33182163936](https://github.com/wenwei4046/Carres-Portal-v2/actions/runs/33182163936)
+  SUCCEEDED at 15:03:58Z; its `ci:smoke` step (`scripts/verify-production.mjs`) converged
+  all five governed surfaces (carres-portal Pages · carres-pos Pages · ERP canonical ·
+  POS canonical · API Worker `/health`) on the exact merge SHA. The build's own bundle
+  count before merge: `PURCHASE PURPOSE` · the five approved purpose words ·
+  `All not ordered` · `Need approval` all present; `Management Purchase` **0**.
+- The authenticated production walk on live data remains the owner's, per the standing
+  owner-only acceptance law.
+
+```text
+PURCHASING CARD 03 COMPLETE — the governed apply landed as 0399 (see the addendum)
+Production SHA: 4c8aa6d527ccd3b4e87f09994ccc91456203f01b
+```
+
+---
+
+## Execution addendum — the collision, the repair, the approval owner (2026-08-28)
 
 Two build lanes executed this Card in parallel and collided on migration 0398:
 
@@ -253,3 +314,4 @@ applied — its approval-switch CHECK would fail against the collision's inert r
 row and the object print `{name} approves` beside `Waiting for approval` — the resolved
 `ops_manager` duty holder(s), legacy-list fallback while the seat is empty, robot and
 shared-password logins excluded while a named person holds the duty.
+
