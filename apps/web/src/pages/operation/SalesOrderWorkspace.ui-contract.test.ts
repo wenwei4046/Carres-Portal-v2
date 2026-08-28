@@ -311,21 +311,45 @@ describe("Sales Order object template contract", () => {
     expect(workspace).not.toMatch(/freeUpToFloor\s*[:=]\s*\d/);
   });
 
-  /* ⭐ PROCEED DATE IS READ-ONLY ON AN EXISTING ORDER (Jess, 2026-08-26).
-     This OVERWRITES `docs/orders/MASTER.md`:725-728, which gave Operations a
-     direct writer. CREATE keeps the picker — `createOrderInput` refuses an
-     order without a proceed date, so the office could not key one otherwise. */
-  it("records the proceed date on an existing order instead of offering it", () => {
+  /* ⭐ PROCEED DATE IS READ-ONLY ON AN EXISTING ORDER (Jess, 2026-08-26),
+     REFINED 2026-08-28 (YH): a date that was never RECORDED is not a date that
+     is LOCKED. The lock is on the ANSWER, never on the emptiness.
+
+     The two assertions below are the same INTENT this test has always pinned —
+     a recorded proceed date is a Fact, and the field still has a control — and
+     they are unchanged. What is replaced is the third: `mode === "create" ?`
+     was a SPELLING of "only create offers the picker", and that sentence is no
+     longer the rule. The invariant that survives is stated directly instead. */
+  it("records a proceed date it HAS, and offers one it never recorded", () => {
     const field = workspace.slice(
       workspace.indexOf('data-pos-field="proceedDate"'),
       workspace.indexOf('data-pos-field="stairCarry"'),
     );
-    expect(field).toContain('mode === "create" ?');
+    /* A recorded date is a photograph, on every mode that is not create. */
     expect(field).toContain('<Fact label="Proceed date"');
     expect(field).toContain('<DatePicker id="so-proceed"');
+    /* The correction door, and the one thing that makes it safe: the test is
+       the SAVED value. Reading `draft` would lock the control the instant a
+       date was picked, before the operator could correct a mis-click. */
+    expect(field).toContain('!baseline.proceed_date');
+    expect(field).not.toContain("!draft.proceed_date ?");
+    /* It opens for an existing order, never for an old revision — `oldrev` is
+       a photograph and carries no lane. */
+    expect(field).toContain('mode === "object"');
     /* The builtin still has a control on the page — the completeness test below
        walks the POS registry and would not accept the field simply vanishing. */
     expect(workspace).toContain('id="so-proceed"');
+  });
+
+  /* ⭐ THE OFFICE DOOR NAMES THE PRODUCTION START (YH, 2026-08-28).
+     The POS has refused an order without one since Phase 11.1; this door did
+     not, so it could mint the one order nobody could then repair. Pinned as
+     INTENT — the refusal exists and uses the ruled words — not as a line. */
+  it("refuses to create an office order with no proceed date", () => {
+    expect(workspace).toContain("needDealer && !draft.proceed_date");
+    /* COPY-STANDARD:1447 governs the words; a second spelling is how the POS
+       ended up with two of them. */
+    expect(workspace).toContain("Proceed date — pick the day production should start");
   });
 
   it("puts no toolbar on or above the paper", () => {
