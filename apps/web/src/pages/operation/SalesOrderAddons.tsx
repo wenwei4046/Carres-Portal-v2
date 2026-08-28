@@ -1,3 +1,4 @@
+import { SERVER_EXCLUSIVE_ADDON_KEYS } from "@carres/shared";
 import { useMemo, useState } from "react";
 import { Plus } from "lucide-react";
 import type { AddonDto } from "@carres/shared";
@@ -7,7 +8,7 @@ import {
   addonSizeOptions,
   type DraftAddon,
 } from "../dealer/new-order/draft";
-import { useAddOrderLines, useEditOrderAddon } from "@/lib/queries";
+import { useAddOrderLines, useEditOrderAddon, useRemoveOrderAddon } from "@/lib/queries";
 import type { operationOrderDetailAddon } from "@/lib/queries";
 import { rm } from "@/lib/format-currency";
 import Button from "@/components/kit/Button";
@@ -93,6 +94,7 @@ export default function SalesOrderAddons({
     onError: (e) => setError(e.message),
   });
   const editAddon = useEditOrderAddon(orderId);
+  const removeAddon = useRemoveOrderAddon(orderId);
 
   const inPlaceLane = status === "place";
   const chosen = pickKey ? byKey.get(pickKey) : undefined;
@@ -176,9 +178,17 @@ export default function SalesOrderAddons({
                     ×{a.qty} · {rm(a.unit_price * a.qty)}
                   </span>
                   {inPlaceLane && (
-                    /* No minus, and no delete. `edit_order_addon` refuses a
-                       decrease as `downsell_blocked`; a control that always
-                       fails is worse than no control. */
+                    /* ⭐ NO MINUS, BUT A REMOVE (YH, 2026-08-28).
+                       `edit_order_addon` still refuses a DECREASE as
+                       `downsell_blocked`, so there is no minus — a control that
+                       always fails is worse than no control, and that rule is
+                       unchanged.
+
+                       Taking the row back entirely is a different act. It is
+                       not a downsell; it is undoing a pick that should never
+                       have happened, and before 0395 there was no path to it
+                       from any surface — the only correction for a misclicked
+                       service was cancelling the whole order. */
                     <button
                       type="button"
                       data-testid={`so-addon-more-${a.addon_key}`}
@@ -187,6 +197,23 @@ export default function SalesOrderAddons({
                       className="rounded-control px-2 py-0.5 text-meta text-kit-blue-11 hover:bg-hovertint disabled:opacity-50"
                     >
                       Add one more
+                    </button>
+                  )}
+                  {inPlaceLane && !SERVER_EXCLUSIVE_ADDON_KEYS.has(a.addon_key) && (
+                    /* Hidden on the four SERVER-EXCLUSIVE keys — the delivery
+                       trio and the stair carry are computed from the order's
+                       own facts, so nobody picked them and nobody can misclick
+                       them. The RPC refuses those rows too; this just does not
+                       offer a door that would 422. `Remove` is the ruled word
+                       (COPY-STANDARD:926). */
+                    <button
+                      type="button"
+                      data-testid={`so-addon-remove-${a.addon_key}`}
+                      disabled={removeAddon.isPending}
+                      onClick={() => removeAddon.mutate({ addonId: a.id })}
+                      className="rounded-control px-2 py-0.5 text-meta text-danger hover:bg-hovertint disabled:opacity-50"
+                    >
+                      Remove
                     </button>
                   )}
                 </span>

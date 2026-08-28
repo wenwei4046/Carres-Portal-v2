@@ -3227,6 +3227,40 @@ ordersRouter.post("/:id/addons/:addonId/edit", async (c) => {
   return c.json(await fetchAndShapeOrder(sb, id));
 });
 
+/** POST /api/orders/:id/addons/:addonId/remove — 0395 (YH, 2026-08-28: a
+ *  service picked by mistake has to be takeable back). Deliberately a SIBLING
+ *  of the edit route above rather than a flag on it: removing is a different
+ *  act from editing, and folding it in would have meant teaching
+ *  `edit_order_addon` to accept a qty it spent 0258 refusing.
+ *
+ *  The RPC is the authority — same place gate, same cross-dealer check, same
+ *  refusal on the four system-computed keys. The up-sell law in
+ *  `edit_order_addon` is untouched: this door corrects a slip, it does not open
+ *  a downsell. */
+ordersRouter.post("/:id/addons/:addonId/remove", async (c) => {
+  const auth = c.var.auth;
+  const idCheck = z.string().uuid().safeParse(c.req.param("id"));
+  const addonCheck = z.string().uuid().safeParse(c.req.param("addonId"));
+  if (!idCheck.success || !addonCheck.success) {
+    throw new HTTPException(404, { message: "Not found" });
+  }
+  const id = idCheck.data;
+  if (!ORDER_MUTATE_ROLES.has(auth.role)) {
+    throw new HTTPException(403, { message: "Role cannot mutate orders" });
+  }
+  if ((auth.role === "dealer" || auth.role === "salesperson" || auth.role === "showroom") && !auth.dealerId) {
+    throw new HTTPException(403, { message: "Dealer scope missing on JWT" });
+  }
+  const sb = userClient(c.env, auth.jwt);
+  const { error: rpcError } = await sb.rpc("remove_order_addon", {
+    p_order_id: id,
+    p_addon_id: addonCheck.data,
+  });
+  const errRes = addLinesRpcError(c, rpcError, "remove_addon_blocked");
+  if (errRes) return errRes;
+  return c.json(await fetchAndShapeOrder(sb, id));
+});
+
 /** GET /api/orders/:id/change-requests — RLS-scoped list (dealer own /
  *  internal all), newest first. Powers the POS pending banner + ops panel. */
 ordersRouter.get("/:id/change-requests", async (c) => {
