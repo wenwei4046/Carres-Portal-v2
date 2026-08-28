@@ -14,16 +14,22 @@ import { recomputeStairCarry } from "./stair-carry-recompute";
  *   · a config read that fails REFUSES, never silently prices at zero
  */
 
-/** The two columns the recompute reads, at the seeded rates. */
+/** The rate row, plus the `addons` key lookup the FK guard makes. `keySeeded`
+ *  false models a database where migration 0393 has not been applied yet — the
+ *  state production was actually in on 2026-08-29. */
 function sb(
   row: { free_up_to_floor: number; per_floor_per_item: number } | null,
   error: { message: string } | null = null,
+  keySeeded = true,
 ) {
   return {
-    from: () => ({
+    from: (table: string) => ({
       select: () => ({
         eq: () => ({
-          maybeSingle: async () => ({ data: row, error }),
+          maybeSingle: async () =>
+            table === "addons"
+              ? { data: keySeeded ? { key: "STAIR_CARRY" } : null, error: null }
+              : { data: row, error },
         }),
       }),
     }),
@@ -111,6 +117,24 @@ describe("recomputeStairCarry — the fee the customer signed for, stamped", () 
       stairItems: 3,
     });
     expect(missing.status).toBe("server_error");
+  });
+
+  it("CHARGES NOTHING rather than failing the sale when the key is not seeded", async () => {
+    /* Found in production 2026-08-29. `order_addons.addon_key` is FK’d to
+       `addons(key)`, migrations here are applied BY HAND, and the code reached
+       production before 0393 did — so every stair-carry order died on
+       `order_addons_addon_key_fkey`, because the create is one transaction and
+       the FK aborted all of it.
+
+       A missing fee is the state Carres was already in and the backfill
+       recovers it. A shop that cannot take an order is not recoverable. */
+    const r = await recomputeStairCarry(sb(SEEDED, null, false), FIVE_ITEMS, {
+      floor: 3,
+      hasLift: false,
+      stairItems: 3,
+    });
+    expect(r.status).toBe("ok");
+    expect(r.status === "ok" && r.addons).toEqual([]);
   });
 
   it("stays dormant on a zero rate — totals byte-identical, as 0184 does", async () => {
