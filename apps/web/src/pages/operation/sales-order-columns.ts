@@ -29,6 +29,8 @@
  *   No price yet / Paid in full                     the money states
  *   No date yet    a promise with no date on it
  */
+import { parseEmergencyContact } from "@carres/shared";
+
 import { fmtDate } from "@/lib/fmt-date";
 import { displayCustomerName } from "@/lib/customer-name";
 import type { DeliveryOrderRow, operationOrderListRow } from "@/lib/queries";
@@ -104,6 +106,13 @@ export interface RegisterRow {
   total: MoneyState;
   paid: MoneyState;
   balance: MoneyState;
+  /* ONE COLUMN, THREE FACTS - so the register prints THREE cells.
+     `customer_emergency` stores name, phone and relationship joined with a
+     dot. The Sales Order page has always split them into three validated
+     fields; the register printed the joined string raw, which is the
+     dot-separated schema dump COPY-STANDARD bans. Parsed ONCE here, at the
+     row, for the same reason `customer` is cased once here. */
+  emergency: { name: string; phone: string; relationship: string };
   needle: string;
   phoneDigits: string;
 }
@@ -136,6 +145,7 @@ export function buildRegisterRow(
      * `RM 0`. */
     paid: { kind: "amount", value: money.paid },
     balance: outstandingState(money),
+    emergency: parseEmergencyContact(o.customer_emergency),
     needle: searchHaystack(o),
     phoneDigits: digits(phone),
   };
@@ -279,8 +289,19 @@ export const REGISTER_FIELDS: readonly RegisterField[] = [
     text: (r) => r.o.customer_address_postcode || NOT_GIVEN },
   { key: "building_type", label: "Building type", width: "130px", group: "Customer",
     text: (r) => r.o.building_type || NOT_GIVEN },
-  { key: "emergency", label: "Emergency contact", width: "200px", group: "Customer",
-    text: (r) => r.o.customer_emergency || NOT_GIVEN },
+  /* THREE FACTS, THREE COLUMNS. `RegisterField.text` is "the ONE string:
+     printed, filtered, sorted and exported", so a cell cannot carry a second
+     line - and it should not: an operator filtering by relationship or sorting
+     by emergency phone could do neither while all three shared one cell.
+     A legacy/imported string that `composeEmergencyContact` never wrote lands
+     wholly in `name` (see `parseEmergencyContact`), so nothing is lost and the
+     other two read `Not given`. */
+  { key: "emergency", label: "Emergency contact", width: "150px", group: "Customer",
+    text: (r) => r.emergency.name || NOT_GIVEN },
+  { key: "emergency_phone", label: "Emergency phone", width: "150px", group: "Customer",
+    text: (r) => r.emergency.phone || NOT_GIVEN },
+  { key: "emergency_relationship", label: "Emergency relationship", width: "180px", group: "Customer",
+    text: (r) => r.emergency.relationship || NOT_GIVEN },
   { key: "billing", label: "Billing address", width: "220px", group: "Customer",
     text: (r) => r.o.customer_billing || NOT_GIVEN },
 

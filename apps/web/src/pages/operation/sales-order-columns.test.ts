@@ -218,3 +218,55 @@ describe("POS parity columns — the register can show what the till asked", () 
     expect(byKey("stair_items").text(r)).toBe("0");
   });
 });
+
+/**
+ * ONE STORED COLUMN, THREE PRINTED CELLS.
+ *
+ * `customer_emergency` joins name, phone and relationship into one string. The
+ * register printed that string raw, so a cell read `mei . 019-7378283 . Spouse`
+ * - the dot-separated schema dump COPY-STANDARD bans, and three facts an
+ * operator could neither filter nor sort apart.
+ *
+ * `RegisterField.text` is the ONE string that is printed, filtered, sorted AND
+ * exported, so a second line is not available and would not help: three facts
+ * want three columns.
+ */
+describe("Emergency contact is three columns, not one crammed cell", () => {
+  const byKey = (k: string) => REGISTER_FIELDS.find((f) => f.key === k)!;
+  const withEmergency = (v: string | null) =>
+    buildRegisterRow(order({ customer_emergency: v }));
+
+  it("splits a composed value into name, phone and relationship", () => {
+    const r = withEmergency("mei · 019-7378283 · Spouse");
+    expect(byKey("emergency").text(r)).toBe("mei");
+    expect(byKey("emergency_phone").text(r)).toBe("019-7378283");
+    expect(byKey("emergency_relationship").text(r)).toBe("Spouse");
+  });
+
+  it("no cell still carries the joined string", () => {
+    const r = withEmergency("mei · 019-7378283 · Spouse");
+    for (const key of ["emergency", "emergency_phone", "emergency_relationship"]) {
+      expect(byKey(key).text(r)).not.toContain("019-7378283 · Spouse");
+    }
+  });
+
+  it("an absent contact reads as words in all three", () => {
+    const r = withEmergency(null);
+    expect(byKey("emergency").text(r)).toBe("Not given");
+    expect(byKey("emergency_phone").text(r)).toBe("Not given");
+    expect(byKey("emergency_relationship").text(r)).toBe("Not given");
+  });
+
+  it("a legacy string nobody composed is kept WHOLE, never chopped", () => {
+    // `parseEmergencyContact` puts anything it did not write into `name`, so an
+    // imported note survives intact instead of losing its tail to a split.
+    const r = withEmergency("call the son first, he answers");
+    expect(byKey("emergency").text(r)).toBe("call the son first, he answers");
+    expect(byKey("emergency_phone").text(r)).toBe("Not given");
+  });
+
+  it("a relationship containing the separator keeps its tail", () => {
+    const r = withEmergency("Ali · 012-3456789 · Friend · from work");
+    expect(byKey("emergency_relationship").text(r)).toBe("Friend · from work");
+  });
+});
