@@ -1382,7 +1382,7 @@ export default function SalesOrderWorkspace() {
      * hang off it (Jess, 2026-08-21: it must be filled, delivery needs it).
      * An unknown address cannot demand one; a known address must say. */
     if (!draft.customer_address_unknown && !draft.building_type) {
-      return "Building type is required — pick what kind of building the delivery goes to";
+      return "Fill in the building type first — a condominium can only take a half-day delivery.";
     }
     return null;
   };
@@ -2010,7 +2010,7 @@ export default function SalesOrderWorkspace() {
           <Select id="so-building-type" label="Building type" required
             error={
               !draft.customer_address_unknown && !draft.building_type
-                ? "Required for delivery"
+                ? "Fill in the building type first — a condominium can only take a half-day delivery."
                 : undefined
             }
             value={draft.building_type || undefined}
@@ -2138,7 +2138,7 @@ export default function SalesOrderWorkspace() {
           a read-only date is the "reduce descriptions" Jess asked for. */}
       <Block title="Order info">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <Fact label="Ordered" value={isNew ? "Today" : fmtDate(order?.placed_at ?? null)} />
+          <Fact label="Ordered" value={isNew ? fmtDate(new Date().toISOString().slice(0, 10)) : fmtDate(order?.placed_at ?? null)} />
           {mode === "create" ? (
             <div data-pos-field="deliveryDate">
               <DatePicker id="so-promised" label="Requested Delivery Date" value={draft.delivery_date}
@@ -2444,7 +2444,7 @@ export default function SalesOrderWorkspace() {
                   onChange={(e) => setLine(l.key, { unit_price: Math.max(0, Number(e.target.value) || 0) })} />
                 <button
                   type="button"
-                  aria-label="Remove line"
+                  aria-label="Remove"
                   className="mb-1 grid h-8 w-8 place-items-center rounded-control text-base-500 hover:bg-hovertint hover:text-base-900"
                   onClick={() => setDraft((d) => ({ ...d, lines: d.lines.filter((x) => x.key !== l.key) }))}
                 >
@@ -2456,7 +2456,7 @@ export default function SalesOrderWorkspace() {
             <div>
               <Button size="sm" variant="neutral"
                 onClick={() => setDraft((d) => ({ ...d, lines: [...d.lines, { key: nextKey(), sku: "", qty: 1, unit_price: 0 }] }))}>
-                <Plus size={14} /> Add item
+                <Plus size={14} /> Add line
               </Button>
             </div>
           </div>
@@ -2972,10 +2972,17 @@ export function skuEditPatch(
  *                       Kept because 975 live units have no catalog row.
  *
  * ⚠️ **Do not "simplify" ④ into `resolvedCategory`.** That helper returns
- * `CoreCat | "acc"` — it folds `unknown` INTO `acc`, which would silently
- * retire the ruled word `Other goods` and print `ACCESSORY` over goods nothing
- * recognised. That is the D9 lie this function exists to stop telling.
- * `lineClass` is three-valued on purpose.
+ * `CoreCat | "acc"` — it folds `unknown` INTO `acc`, which would print
+ * `ACCESSORY` over goods nothing recognised. That is the D9 lie this function
+ * exists to stop telling. `lineClass` is three-valued on purpose.
+ *
+ * ⛔ THE `unknown` WORD IS `Not in catalog` (COPY-STANDARD:1082), and this
+ * comment used to call `Other goods` "the ruled word". It is the opposite:
+ * :1082 lists `Other goods` in the Do NOT use column for exactly this fact,
+ * *"and above all never folded into `Accessory`"*. The screen already printed
+ * `Not in catalog` as the SKU hint three hundred lines above, so one fact was
+ * wearing two spellings on one card. The three-valued shape is what the
+ * warning above is really protecting; the word it named was wrong.
  */
 export function categoryWord(line: {
   sku: string;
@@ -2988,7 +2995,7 @@ export function categoryWord(line: {
   const fromCatalog = typeof line.category === "string" ? line.category.trim() : "";
   const fromSku = line.sku.includes(":") ? line.sku.split(":", 1)[0] : "";
   const classified = lineClass(line.sku);
-  const fallback = classified === "acc" ? "Accessory" : classified === "unknown" ? "Other goods" : classified;
+  const fallback = classified === "acc" ? "Accessory" : classified === "unknown" ? "Not in catalog" : classified;
   return (fromAttrs || fromCatalog || fromSku || fallback).replace(/[_-]+/g, " ").toUpperCase();
 }
 
