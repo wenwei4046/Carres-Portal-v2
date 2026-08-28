@@ -1368,6 +1368,14 @@ export default function SalesOrderWorkspace() {
     if (draft.delivery_date && earliestPromise && draft.delivery_date < earliestPromise) {
       return `Delivery is too soon — the earliest this cart can be promised is ${fmtDate(earliestPromise)}`;
     }
+    /* ⭐ THE OFFICE DOOR NAMES THE PRODUCTION START (YH, 2026-08-28).
+       The POS has refused an order without one since Phase 11.1; this door did
+       not, so it could mint the one thing nobody can then repair — an order
+       whose Proceed date renders read-only as `Not recorded` forever.
+       `createOrderInput` and `sales_order_create` (0391) refuse it again. */
+    if (needDealer && !draft.proceed_date) {
+      return "Proceed date — pick the day production should start";
+    }
     if (draft.proceed_date && draft.delivery_date && draft.proceed_date > draft.delivery_date) {
       return "The proceed date is after the delivery date";
     }
@@ -2187,9 +2195,33 @@ export default function SalesOrderWorkspace() {
               it silently moved when the factory may start.
               CREATE still owns the picker: `createOrderInput` refuses an order
               without one, so keying a new SO here must still be able to set it. */}
+          {/* ⭐ A DATE THAT WAS NEVER RECORDED IS NOT A DATE THAT IS LOCKED
+              (YH, 2026-08-28). Jess's ruling stands untouched — a proceed date
+              that EXISTS is a recorded answer and stays a `Fact`, because
+              moving it moves when the factory may start. But an order that
+              never carried one is not a locked answer, it is a MISSING one,
+              and locking a blank is how the office door's own orphans became
+              unfixable. So the picker returns for exactly that case.
+
+              THE TEST IS `baseline`, NEVER `draft`. `baseline` is what the
+              database holds; `draft` is what is on screen. Reading `draft`
+              would swap the field back to a `Fact` the instant a date was
+              picked — the operator would watch their own answer lock before
+              they had saved it, with no way to correct a mis-click. Reading
+              the saved value keeps the control open for the whole edit and
+              locks on the next load, which is when the answer is real.
+
+              `sales_order_save_revision` (0391) enforces the same rule: a
+              blank may be filled, a recorded date may not be moved or cleared.
+              This control is the door, not the lock. */}
           <div data-pos-field="proceedDate">
-            {mode === "create" ? (
+            {mode === "create" || (mode === "object" && !baseline.proceed_date) ? (
               <DatePicker id="so-proceed" label="Proceed date" value={draft.proceed_date}
+                hint={
+                  mode === "object"
+                    ? "Never recorded — fill it in once, then it locks"
+                    : undefined
+                }
                 error={
                   draft.proceed_date && draft.delivery_date && draft.proceed_date > draft.delivery_date
                     ? "After the delivery date"

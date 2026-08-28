@@ -2555,6 +2555,11 @@ describe("POST /api/operation/orders (create)", () => {
             dealer_id: "00000000-0000-0000-0000-0000000000d1",
             // orders_salesperson_required (0296) — the door demands it too.
             salesperson_id: "00000000-0000-0000-0000-0000000000a1",
+            // 0391 — the office door names the production start, as the POS
+            // door already did. This fixture gained the field rather than the
+            // rule being relaxed: this test's intent is the DEALER refusal, and
+            // a payload that is invalid for an unrelated reason cannot prove it.
+            proceed_date: "2026-09-01",
           },
           lines: [{ sku: "B1201S-K", qty: 1, unit_price: 2499 }],
         }),
@@ -2578,6 +2583,69 @@ describe("POST /api/operation/orders (create)", () => {
     );
     expect(bad.status).toBe(422);
     expect(rpc).not.toHaveBeenCalled();
+  });
+
+  /**
+   * ⭐ THE OFFICE DOOR NAMES THE PRODUCTION START — owner ruling YH, 2026-08-28.
+   *
+   * The MASTER long read "`createOrderInput` refuses an order without one".
+   * TWO different objects carry that name: the POS door's
+   * `createOrderInputSchema` does refuse, and this local one did not. So the
+   * office could mint the single order nobody can repair — `proceed_date` is
+   * read-only on an existing order, so a NULL one had no screen that could
+   * supply it.
+   *
+   * The RPC refuses it again on its own side (0391); one layer is not a guard.
+   */
+  it("refuses an order with no proceed date, before the database", async () => {
+    const rpc = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("http://t/api/operation/orders", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          header: {
+            customer_name: "Walk-in",
+            dealer_id: "00000000-0000-0000-0000-0000000000d1",
+            salesperson_id: "00000000-0000-0000-0000-0000000000a1",
+            // every other field valid — ONLY the proceed date is absent
+          },
+          lines: [{ sku: "B1201S-K", qty: 1, unit_price: 2499 }],
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    /* COPY-STANDARD:1447 governs the words. A second spelling is exactly how
+       the POS ended up with two of them. */
+    expect(await res.json()).toMatchObject({
+      message: "Proceed date — pick the day production should start",
+    });
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  /* The EDIT door is deliberately untouched: `revisionHeaderInput` keeps
+     proceed_date nullable-optional, because a save that only fixes a phone
+     number must not be forced to restate a date it may not change. Narrowing
+     the shared object would have broken every ordinary correction. */
+  it("leaves the edit door's proceed_date optional", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: { revision: 4, changed: ["customer_phone"] }, error: null });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("http://t/api/operation/orders/00000000-0000-0000-0000-000000000b01/save", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ header: { customer_phone: "012-3456789" } }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    expect(rpc).toHaveBeenCalled();
   });
 });
 

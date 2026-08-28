@@ -323,7 +323,12 @@ export const createOrderInputSchema = z.object({
     ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["delivery", "date"], message: "Delivery date is required. Ask the customer for the date before you save the order." });
   }
   if (!data.delivery.proceedDate) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["delivery", "proceedDate"], message: "Proceed date is required. Choose the day production should start." });
+    // ONE SPELLING (YH, 2026-08-28). This read "Proceed date is required.
+    // Choose the day production should start." — a second wording for the same
+    // refusal `draft.ts:611` already made in the ruled words, so the POS said
+    // one thing and its own schema said another. COPY-STANDARD:1447 governs it;
+    // the office door (0391) uses the same sentence, so all three agree.
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["delivery", "proceedDate"], message: "Proceed date — pick the day production should start" });
   }
   if (data.delivery.date && data.delivery.proceedDate && data.delivery.proceedDate > data.delivery.date) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["delivery", "proceedDate"], message: "proceed date must be on or before the delivery date" });

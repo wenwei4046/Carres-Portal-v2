@@ -1503,6 +1503,36 @@ const createOrderInput = z.object({
       // A birth NAMES the parties; `sales_order_create` derives channel from
       // whether an outlet is given. Only the EDIT door lost these to 0329.
       outlet_id: z.string().uuid().nullable().optional(),
+      /**
+       * 0391 — the office door names the production start, as the POS door
+       * already did (owner ruling YH, 2026-08-28).
+       *
+       * ⭐ TIGHTENED HERE, NOT ON `revisionHeaderInput`. The same object is
+       * reused by the EDIT door above, where `.nullable().optional()` is
+       * exactly what Jess's read-only ruling wants left alone — a save that
+       * only fixes a phone number must not be forced to restate a date it is
+       * not allowed to change. A birth and a correction ask different things
+       * of the same field, so only the birth is narrowed.
+       *
+       * The MASTER long read "`createOrderInput` refuses an order without
+       * one". That was true of the POS's `createOrderInputSchema` and never
+       * of THIS object, which merely shares its name — so the office could
+       * mint an order the object page then renders read-only as
+       * `Not recorded` forever. `sales_order_create` refuses it again on its
+       * own side (0391), because one layer is not a guard.
+       */
+      /* ⛔ THE MESSAGE RIDES `required_error`, NOT ONLY `.regex()`. A regex
+         message fires only when a STRING fails the pattern; an ABSENT field
+         reports Zod's own `"Required"` — which is the commonest case here and
+         the one an operator actually meets. Carrying the ruled sentence on all
+         three arms is what makes the refusal teach instead of merely refuse
+         (COPY-STANDARD rule 6). Caught by the test, not by reading. */
+      proceed_date: z
+        .string({
+          required_error: "Proceed date — pick the day production should start",
+          invalid_type_error: "Proceed date — pick the day production should start",
+        })
+        .regex(/^\d{4}-\d{2}-\d{2}$/, "Proceed date — pick the day production should start"),
     })
     .strict(),
   lines: z.array(revisionLineInput.omit({ id: true })).min(1, "An order needs at least one item"),
