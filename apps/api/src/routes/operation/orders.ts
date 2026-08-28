@@ -35,7 +35,7 @@ import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { storageBlock } from "../../lib/storage-gate";
 import { userClient } from "../../lib/supabase";
 
-import { skuCategories } from "../../lib/sku-categories";
+import { skuCategories, storageSkuCategories } from "../../lib/sku-categories";
 import type { AppEnv } from "../../types";
 
 /**
@@ -1213,6 +1213,11 @@ operationOrdersRouter.get("/:id/completion", requireOperation, async (c) => {
     : (ord.ops_order_control as Record<string, unknown> | null);
   const price = (x: { qty: number; unit_price?: number | string | null }) =>
     Number(x.unit_price ?? 0) * Number(x.qty ?? 0);
+  // CARD-2026-08-28 - the CATALOG owns which rate applies. This handler is
+  // NOT the detail endpoint, so it cannot borrow that one's `categoryBySku`;
+  // it takes its own bounded read through the same one shared reader. A SKU
+  // the catalog does not hold falls back to the parser, per line.
+  const storageCats = await storageSkuCategories(sb, lines.map((l) => String(l.sku)));
   const hold = storageHold({
     storageFrom:
       ((ctrl?.extension_original_date as string | null) ??
@@ -1222,6 +1227,7 @@ operationOrdersRouter.get("/:id/completion", requireOperation, async (c) => {
     importedMsbf: (ctrl?.storage_fee_msbf as number | string | null) ?? null,
     importedSof: (ctrl?.storage_fee_sof as number | string | null) ?? null,
     skus: lines.map((l) => String(l.sku)),
+    categories: storageCats,
     asOf: new Date().toISOString().slice(0, 10),
     collectedAt: (ctrl?.storage_collected_at as string | null) ?? null,
     waiverStatus: (ctrl?.storage_waiver_status as string | null) ?? null,

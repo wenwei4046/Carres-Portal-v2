@@ -638,7 +638,45 @@ export interface ReceiveLineResult {
  *  delivery gate all categorise a line the SAME way (one definition, three
  *  consumers). */
 export type StorageCategory = "msbf" | "sof" | "other";
-export function storageCategoryForSku(sku: string): StorageCategory {
+
+/**
+ * The CATALOG's answer, mapped onto storage scope. `product_models.category` is
+ * the one owner of "what kind of product is this?" (ERP-ARCHITECTURE 3.1), and
+ * a catalogued NON-core product is a real answer - out of scope - not a miss.
+ */
+function storageScopeOfCatalogCategory(category: string): StorageCategory {
+  const c = category.trim().toLowerCase();
+  if (c === "mattress" || c === "bedframe") return "msbf";
+  if (c === "sofa") return "sof";
+  return "other";
+}
+
+/**
+ * CARD-2026-08-28 - THE RATE ASKS THE CATALOG (ERP-ARCHITECTURE 6.1, FROZEN
+ * 2026-08-06: "Money In's arithmetic asks the CATALOG").
+ *
+ * `category` is `product_models.category`, resolved by the caller through the
+ * one shared reader (`apps/api/src/lib/sku-categories.ts`). Pass it and the
+ * catalog decides. Leave it out and the prefix parser below decides, exactly as
+ * before.
+ *
+ * WHY THE PARSER SURVIVES, AND WHAT KILLS IT. Measured 2026-08-28, the parser
+ * is wrong for every real SKU - B1201S-K, B1201S, MODEL-C, ESS-PILLOW, B2003-Q,
+ * SF-3STR, NF-MATT-K and OH-BF-Q all return "other", so the fee computed RM 0
+ * against a live RM150/month + RM200 table. It stays only because a SKU the
+ * catalog does not hold must not silently drop OUT of scope: `null` means
+ * "asked, catalog silent" and `undefined` means "nobody asked" (an older
+ * Worker), and both keep the old answer rather than inventing a better-looking
+ * one. It dies with the uncatalogued bucket, the same exit condition
+ * `resolvedCategory` already carries - not before.
+ */
+export function storageCategoryForSku(
+  sku: string,
+  category?: string | null,
+): StorageCategory {
+  if (category != null && category.trim() !== "") {
+    return storageScopeOfCatalogCategory(category);
+  }
   const s = sku.trim().toLowerCase();
   if (
     s.startsWith("mattress:") ||
@@ -651,15 +689,20 @@ export function storageCategoryForSku(sku: string): StorageCategory {
   return "other";
 }
 
-/** Whether an order's lines pull in the MS/BF and/or Sofa storage rate. */
-export function orderStorageScope(skus: ReadonlyArray<string>): {
+/** Whether an order's lines pull in the MS/BF and/or Sofa storage rate.
+ *  `categories` is the catalog answer per SKU; a SKU absent from the map falls
+ *  back to the parser, one line at a time (CARD-2026-08-28). */
+export function orderStorageScope(
+  skus: ReadonlyArray<string>,
+  categories?: ReadonlyMap<string, string> | null,
+): {
   hasMsbf: boolean;
   hasSof: boolean;
 } {
   let hasMsbf = false;
   let hasSof = false;
   for (const sku of skus) {
-    const cat = storageCategoryForSku(sku);
+    const cat = storageCategoryForSku(sku, categories?.get(sku));
     if (cat === "msbf") hasMsbf = true;
     else if (cat === "sof") hasSof = true;
   }
@@ -683,6 +726,8 @@ export function computeOrderStorage(opts: {
   storageFrom: string | null;
   override: number | null;
   skus: ReadonlyArray<string>;
+  /** Catalog category per SKU (CARD-2026-08-28). Absent = parser fallback. */
+  categories?: ReadonlyMap<string, string> | null;
   asOf: string;
 }): {
   hasMsbf: boolean;
@@ -691,7 +736,7 @@ export function computeOrderStorage(opts: {
   amount: number;
   due: boolean;
 } {
-  const { hasMsbf, hasSof } = orderStorageScope(opts.skus);
+  const { hasMsbf, hasSof } = orderStorageScope(opts.skus, opts.categories);
   // No ETA fallback — storage is owed only when the operator set storageFrom.
   const fee = computeStorageFee({
     startDate: opts.storageFrom,

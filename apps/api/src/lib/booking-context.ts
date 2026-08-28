@@ -7,6 +7,7 @@ import {
   type DeliveryGroupKey,
 } from "@carres/shared";
 import { mapPgError } from "./route-helpers";
+import { storageSkuCategories } from "./sku-categories";
 
 /**
  * The order's booking facts + the ONE goods/money reading of it.
@@ -104,12 +105,16 @@ export async function loadBookingContext(
   // the ladder and the dispatch gate also ask. A manager's release lifts the
   // HOLD and leaves the fee owed, which is why the gate reads `holding`.
   const ctrl = (controlRes.data ?? null) as Record<string, unknown> | null;
+  // CARD-2026-08-28 - the CATALOG owns which rate applies. One bounded read;
+  // a SKU the catalog does not hold falls back to the parser, per line.
+  const storageCats = await storageSkuCategories(sb, lines.map((l) => l.sku));
   const hold = storageHold({
     storageFrom: (ctrl?.storage_from as string | null) ?? null,
     override: (ctrl?.storage_fee_override as number | string | null) ?? null,
     importedMsbf: (ctrl?.storage_fee_msbf as number | string | null) ?? null,
     importedSof: (ctrl?.storage_fee_sof as number | string | null) ?? null,
     skus: lines.map((l) => l.sku),
+    categories: storageCats,
     asOf: new Date().toISOString().slice(0, 10),
     collectedAt: (ctrl?.storage_collected_at as string | null) ?? null,
     waiverStatus: (ctrl?.storage_waiver_status as string | null) ?? null,
