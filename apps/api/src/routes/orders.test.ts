@@ -241,6 +241,12 @@ function buildSbForCreate(opts: {
       if (currentTable === "floor_config") {
         return { data: { free_up_to_floor: 2, per_floor_per_item: 50 }, error: null };
       }
+      /* 0393 — the FK guard checks the key exists before the row can reference
+         it, because production ran the code before the migration. A seeded
+         database is the normal case, so the fixture answers as one. */
+      if (currentTable === "addons") {
+        return { data: { key: "STAIR_CARRY" }, error: null };
+      }
       return { data: opts.fetchedRow ?? null, error: null };
     },
   };

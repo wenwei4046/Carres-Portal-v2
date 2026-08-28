@@ -1577,6 +1577,30 @@ operationOrdersRouter.post("/", requireOperation, async (c) => {
     const m = mapPipelineV2Error(error);
     return c.json(m.body, m.status);
   }
+
+  /* 0393/0394 — STAIR CARRY ON AN OFFICE-BORN ORDER. Reported from
+     `/operation/orders/so/new`: the fee showed on the form and reached neither
+     the SO nor MONEY.
+
+     The POS door appends the fee into `create_order`’s payload, but
+     `sales_order_create` (0374) takes only a header and lines — it has no addon
+     parameter at all, so there is nothing to append TO. Rather than widen a
+     locked birth RPC, the order is stamped immediately after it exists, through
+     the SAME 0394 door the edit path uses. One writer, two callers.
+
+     Non-fatal for the same reason as the edit path: the order is already born
+     and its Rev 1 minted, so failing here would report a lost create that was
+     not lost. */
+  const createdId = (data as { id?: string } | null)?.id;
+  if (createdId) {
+    const stamped = await restampStairCarry(sb, createdId);
+    if (!stamped.ok) {
+      console.error("stair carry stamp failed on office create", {
+        orderId: createdId,
+        reason: stamped.reason,
+      });
+    }
+  }
   return c.json(data, 201);
 });
 
