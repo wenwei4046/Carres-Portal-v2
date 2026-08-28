@@ -941,7 +941,7 @@ ordersRouter.post("/", async (c) => {
     },
     effectiveDealerId,
   );
-  // 0391 — final Sales Portal submit is the handoff. The wrapper creates the
+  // 0395 — final Sales Portal submit is the handoff. The wrapper creates the
   // order and attempts the canonical Proceed inside one database transaction;
   // an incomplete order stays in Place with its blocker, while a complete one
   // reaches Purchasing without a second salesperson action. `/raw` below uses

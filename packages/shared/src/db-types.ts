@@ -730,10 +730,10 @@ export interface OrderRow {
   // ("Proceed") date. Pairs with delivery_date via delivery_date_tbd
   // (both-or-neither). NULL when TBD. Must be <= delivery_date.
   proceed_date: string | null;
-  // 0391 — actual Sales → Operations handoff timestamp. Optional until the
+  // 0395 — actual Sales → Operations handoff timestamp. Optional until the
   // generated/live schema catches up in every test fixture.
   proceeded_at?: string | null;
-  // 0391 — authoritative Sales Portal final-submit fact. NULL for raw,
+  // 0395 — authoritative Sales Portal final-submit fact. NULL for raw,
   // office, rental and imported records; legacy recovery requires exact IDs.
   sales_final_submitted_at?: string | null;
   delivery_floor: number;
