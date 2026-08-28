@@ -2,6 +2,17 @@ export const SHARED_VERSION = "0.0.0" as const;
 
 export * from "./issue-tracker";
 
+/* Stair carry — moved out of `apps/web` 2026-08-29 so the SERVER can stamp
+   the fee onto the order. The Worker cannot import from the web app, which
+   is why the fee the customer signed for was written down nowhere. */
+export {
+  floorSurchargeRaw,
+  stairCarryCount,
+  stairCarryFee,
+  STAIR_CARRY_ADDON_KEY,
+  SERVER_EXCLUSIVE_ADDON_KEYS,
+} from "./stair-carry";
+
 export {
   resolveSalesOrderRoute,
   NODE_W as ROUTE_NODE_W,

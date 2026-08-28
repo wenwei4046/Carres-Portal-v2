@@ -88,6 +88,7 @@ import { cjkClassName } from "@/lib/cjk";
 import { composeAddress } from "@/data/malaysia-postcodes";
 import { fmtDate } from "@/lib/fmt-date";
 import { floorSurchargeRaw, stairCarryCount } from "@/lib/order-totals";
+import SalesOrderAddons from "./SalesOrderAddons";
 import { displayCustomerName } from "@/lib/customer-name";
 import { renderSalesOrderPdf } from "@/lib/pdf/render";
 import type { SalesOrderTemplateData } from "@/lib/pdf/types";
@@ -2409,7 +2410,11 @@ export default function SalesOrderWorkspace() {
           and Deliver To are Stock's and Purchasing's facts, and the document
           preview beside it never prints them. */}
       <Block title="Goods">
-        <span className="hidden" data-pos-field="orderAddons" aria-hidden="true" />
+        {/* ⭐ `orderAddons` USED TO BE A HIDDEN SPAN. It carried the
+            `data-pos-field` the POS-parity contract test string-matches, with
+            no control behind it — so the page passed a completeness test it
+            did not meet, and the office still had to ring the shop to add a
+            disposal service. The attribute now rides the real door. */}
         {mode === "create" ? (
           <div className="flex flex-col gap-2">
             {/* Every SKU the catalog holds, offered as a typeahead. A `datalist`
@@ -2426,7 +2431,17 @@ export default function SalesOrderWorkspace() {
               const known = catalogBySku.get(l.sku.trim());
               const priceHint = catalogPriceHint(known, l.unit_price);
               return (
-              <div key={l.key} className="grid grid-cols-[1fr_84px_120px_32px] items-end gap-2">
+              /* ⭐ THE ROW ALIGNS AT THE TOP (YH, 2026-08-29 — measured on
+                 `/operation/orders/so/new`). It was `items-end`, so every cell
+                 aligned on its BOTTOM. SKU and Unit price each carry a hint
+                 line (`Cody · Super King`, `Catalog RM 1090.00`) and Qty does
+                 not — so Qty was pushed a whole row down to bring its short box
+                 level with their hints, and the three labels sat at three
+                 heights. `FieldFrame` gives every field the same 18px above its
+                 control (an 11px/14px label plus `gap-1`), so aligning at the
+                 START lines up all three labels AND all three inputs, and lets
+                 the hints hang below where they belong. */
+              <div key={l.key} className="grid grid-cols-[1fr_84px_120px_32px] items-start gap-2">
                 <Input id={`so-sku-${l.key}`} label="SKU" value={l.sku}
                   list="so-sku-catalog"
                   hint={known ? known.label : l.sku.trim() ? "Not in catalog" : undefined}
@@ -2442,14 +2457,22 @@ export default function SalesOrderWorkspace() {
                   value={String(l.unit_price)}
                   hint={priceHint}
                   onChange={(e) => setLine(l.key, { unit_price: Math.max(0, Number(e.target.value) || 0) })} />
-                <button
-                  type="button"
-                  aria-label="Remove"
-                  className="mb-1 grid h-8 w-8 place-items-center rounded-control text-base-500 hover:bg-hovertint hover:text-base-900"
-                  onClick={() => setDraft((d) => ({ ...d, lines: d.lines.filter((x) => x.key !== l.key) }))}
-                >
-                  <Trash2 size={14} />
-                </button>
+                {/* The button has no label of its own, so it would ride up to
+                    the label row. It borrows `FieldFrame`’s own shape — a
+                    `gap-1` column under a label-height spacer — rather than a
+                    hard-coded 18px offset, so it still lands on the inputs if
+                    the label token ever changes. */}
+                <div className="flex flex-col gap-1">
+                  <span className="text-label" aria-hidden="true">&nbsp;</span>
+                  <button
+                    type="button"
+                    aria-label="Remove"
+                    className="grid h-8 w-8 place-items-center rounded-control text-base-500 hover:bg-hovertint hover:text-base-900"
+                    onClick={() => setDraft((d) => ({ ...d, lines: d.lines.filter((x) => x.key !== l.key) }))}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
               </div>
               );
             })}
@@ -2506,6 +2529,18 @@ export default function SalesOrderWorkspace() {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+        {/* An OLD revision is a photograph and a draft has no order to write
+            to — the door belongs to the live object only. */}
+        {mode === "object" && orderId && (
+          <div data-pos-field="orderAddons">
+            <SalesOrderAddons
+              orderId={orderId}
+              addons={detailQ.data?.addons ?? []}
+              catalogAddons={catalogQ.data?.addons ?? []}
+              status={order?.status ?? null}
+            />
           </div>
         )}
       </Block>

@@ -1433,6 +1433,7 @@ rewording.
 | Delivery release is clear | **`Ready for delivery`** | All done · Released · Complete |
 | A required purchasing document does not exist | **`No Purchase Order yet`** | PO: — · Waiting Purchasing |
 | A route document door | **`Open {document number}`** | an unexplained ↗ · View document · Go to document |
+| The register's emergency-contact columns | **`Emergency contact`** (the NAME) · **`Emergency phone`** · **`Emergency relationship`** — three columns, three words (YH, 2026-08-28) | one `Emergency contact` column printing `name · phone · relationship`. `customer_emergency` stores the three joined, and the register printed the join raw — a dot-separated schema dump this file bans, and three facts nobody could filter or sort apart. `RegisterField.text` is one string that is printed, filtered, sorted AND exported, so a cell cannot carry a second line; three facts take three columns. The object page's own `Name` · `Phone` · `Relationship` labels stay as they are — they sit under an `Emergency contact` heading that supplies the subject, and a bare `Phone` column header would collide with the customer's own |
 
 ### The Sales Order entry-gate words (owner ruling 2026-08-15)
 

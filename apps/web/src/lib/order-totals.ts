@@ -33,70 +33,21 @@ export function totalItems(order: Order): number {
   return (order.lines ?? []).reduce((s, l) => s + l.qty, 0);
 }
 
-/**
- * Raw stair-carry calculation — exported so the wizard's Step 2 (which holds
- * a pre-Order draft, not an Order) can call the same formula without
- * constructing a fake Order. Single source of truth: change this function and
- * both the wizard preview and the order-detail page update together.
- */
-export function floorSurchargeRaw(
-  floor: number,
-  hasLift: boolean,
-  totalQty: number,
-  cfg: FloorConfigDto,
-): number {
-  if (hasLift) return 0;
-  if (floor <= cfg.freeUpToFloor) return 0;
-  const flights = floor - cfg.freeUpToFloor;
-  return flights * cfg.perFloorPerItem * totalQty;
-}
+/* ⭐ THE STAIR ARITHMETIC MOVED TO `@carres/shared` (2026-08-29).
 
-/**
- * ⭐ UNSET MEANS NONE — owner ruling 2026-08-27 (YH), and it is a PRICING
- * decision, not a formatting one.
- *
- * `delivery.stairItems` is the count of items that need carrying up. It used
- * to read: NULL = "nobody overrode it" = EVERY item, which is what 0104
- * documented and what the code did on both surfaces. So an order where nobody
- * was asked the question was charged the maximum stair fee.
- *
- * It now reads: NULL = NONE. Somebody has to say how many items need carrying
- * before the customer is charged for carrying them.
- *
- * 🟡 WHAT THIS COSTS, said plainly: any order whose count was never set now
- * computes a stair fee of RM 0 where it previously computed a full one. That
- * is the ruling, not a side effect. It is applied HERE rather than on one
- * screen precisely so the POS quote and the office page cannot disagree about
- * the money — the fault we spent 2026-08-26 removing.
- *
- * ⛔ Migration 0104's column comment still says NULL = auto = every item. A
- * committed migration may not be edited (red line 6); the current meaning
- * lives in `docs/orders/MASTER.md`.
- */
-/**
- * HOW MANY ITEMS ARE ACTUALLY CHARGED FOR CARRYING — the ONE clamp
- * (ownership Law D, one derived fact one arithmetic).
- *
- * The rule is two-sided and always was: never below zero, and **never above
- * the number of items on the order**. You cannot carry more sofas up the
- * stairs than the customer bought.
- *
- * It was written out by hand in four places and one of them — `floorSurcharge`
- * below — had only the lower half. `delivery_stair_items` is a free number
- * input, the API takes `z.number().int().min(0)` with no max, and the column
- * has no CHECK, so a typed `99` on a three-item order reached the saved-order
- * path and priced ninety-nine carries. The office page showed the fee for
- * three and the POS order detail showed the fee for ninety-nine, for one order.
- *
- * Both neighbouring comments claimed the surfaces already agreed. They did not,
- * because agreement was four copies of a rule rather than one. It is one now.
- */
-export function stairCarryCount(
-  itemsTotal: number,
-  stairItems: number | null | undefined,
-): number {
-  return Math.max(0, Math.min(itemsTotal, stairItems ?? 0));
-}
+   It was defined here, and `apps/web` is a place the Worker cannot import
+   from — so the fee the customer signed for was computed in the browser on
+   every render and never written down. The server now stamps it onto the
+   order as an `order_addons` row, which it can only do if it can run the
+   same function.
+
+   Re-exported rather than re-imported at each call site: every existing
+   caller keeps its import, and there is still ONE implementation.
+
+   Imported AND re-exported: this file still uses both itself, and a bare
+   `export ... from` would not bind them locally. */
+import { floorSurchargeRaw, stairCarryCount } from "@carres/shared";
+export { floorSurchargeRaw, stairCarryCount };
 
 export function floorSurcharge(order: Order, cfg: FloorConfigDto): number {
   const itemsTotal = (order.lines ?? []).reduce((n, l) => n + l.qty, 0);

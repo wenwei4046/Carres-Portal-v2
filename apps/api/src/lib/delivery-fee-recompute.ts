@@ -36,6 +36,9 @@ import { embedCategory, resolveSkuInfo, type SkuInfo } from "./rule-line-input";
  * addons(key)). Only components > 0 produce an addon.
  *
  * The floor STAIR surcharge (floor_config) is a DIFFERENT charge and is KEPT —
+ * and since 0393 it rides its own `STAIR_CARRY` addon row on this same road,
+ * so this file's long-standing claim that it "folds into the order total" is
+ * finally true rather than merely intended —
  * the delivery trip fee is ADDITIVE; both fold into the order total.
  *
  * DORMANT: `delivery_fee_config` seeds base_fee=0 / cross_category_fee=0, so
