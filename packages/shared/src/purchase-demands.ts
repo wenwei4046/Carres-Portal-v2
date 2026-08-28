@@ -133,7 +133,10 @@ export function purchaseDemandStateWords(
     safety_days_full: `${safetyDays} safety days left`,
     safety_days_low: `1–${Math.max(safetyDays - 1, 1)} safety days left`,
     safety_days_none: "No safety days left",
-    not_enough_production_time: "Not enough production time",
+    /* Card 02-C (owner ruling 2026-08-27): `days`, never `time` — the same
+       unit the arithmetic itself counts in. The state KEY keeps its wire
+       spelling; only the visible words changed. */
+    not_enough_production_time: "Not enough production days",
     no_customer_date: "Customer delivery date is missing",
     no_sku: "SKU not found",
     no_supplier: "Supplier not assigned",
@@ -157,7 +160,7 @@ export function purchaseDemandRailWords(
     safety_days_low: words.safety_days_low,
     safety_days_none: words.safety_days_none,
     not_enough_production_time: words.not_enough_production_time,
-    no_production_days: "Production time not set",
+    no_production_days: "Production days not set",
   };
 }
 

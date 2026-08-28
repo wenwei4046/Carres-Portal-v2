@@ -373,12 +373,28 @@ export async function loadToOrder(
       // projection ignores them, so the workspace response is unchanged.
       "id, so, customer_name, status, delivery_date, delivery_date_tbd, placed_at, created_at, proceed_date, salesperson_id, customer_address_city, customer_address_state",
     )
-    .in("status", ["place", "proceed_order"]);
+    /**
+     * ⭐ THE PROCEEDED-ORDER BOUNDARY (Card 02-C, RESOLVED FROM AUTHORITY,
+     * 2026-08-27). A Sales Order enters SO Batch Purchase only after Sales
+     * completes `Proceed` — a `place` order is INVISIBLE to Purchasing: no
+     * planning, no netting, no rail count, no Register row, no selection, no
+     * Ready Stock take and no PO. Filtering it HERE — before the engine ever
+     * sees a line — is what makes that one boundary: a `place` order cannot
+     * consume Open PO coverage ahead of a proceeded one, and both write doors
+     * (`take-stock`, `issue-batch`) recompute through this read at POST time,
+     * so a demand id naming a `place` order resolves to nothing and is refused
+     * by name. Until 2026-08-27 this read admitted `place` too, which let the
+     * rail count orders Purchasing could not legitimately buy.
+     */
+    .eq("status", "proceed_order");
   if (orderErr) {
     const m = mapPgError(orderErr);
     return { ok: false, status: m.status, body: m.body };
   }
-  const orders = orderRows ?? [];
+  /* The same rule enforced in code: the SQL narrows production, and this line
+     keeps the boundary true under any permissive read (a test double that
+     ignores filters must not be able to smuggle a `place` order in). */
+  const orders = (orderRows ?? []).filter((o) => o.status === "proceed_order");
   const orderById = new Map(orders.map((o) => [o.id as string, o]));
   const orderIds = orders.map((o) => o.id as string);
 

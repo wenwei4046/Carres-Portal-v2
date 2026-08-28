@@ -106,9 +106,16 @@ export interface OrderActionSignals {
   promisedDateIso: string | null;
   /** Days from today to the promised date; negative = past. Null = no date. */
   daysToDue: number | null;
-  /** Days before the promised date that a missing ready date turns red
-   *  (mattress / bed frame 7, sofa 5 — the live window). */
-  stockWindowDays: number;
+  /** Working days kept back between goods arriving and the customer's date —
+   *  PURCHASING'S `Safety days`, never a number this module holds (D8, Law D).
+   *  It is one governed value in `purchasing_settings.order_by_buffer_days`,
+   *  manager-editable, and Purchasing's own reads already call it `safetyDays`.
+   *
+   *  `null` means the settings have not landed yet, and it is not a synonym for
+   *  a default: a window nobody has answered may not escalate the ready-date
+   *  call to `danger`. Under-warning on a slow read is recoverable; crying wolf
+   *  on an invented deadline teaches operators to ignore the colour. */
+  stockWindowDays: number | null;
   /** A logistics company has been chosen. */
   hasLogistics: boolean;
   /** D1/0277 — the CUSTOMER confirmed, not the logistics company's word. */
@@ -230,8 +237,10 @@ function goodsAction(s: OrderActionSignals): OrderOpenAction | null {
     if (s.delayDecision === "new_date" && !newDateArranged(s))
       return action("arrange_new_delivery_date", "goods", "danger");
   }
-  // Red once inside the arrival window and the date still has not landed.
-  const inWindow = s.daysToDue !== null && s.daysToDue < s.stockWindowDays;
+  // Red once inside the arrival window and the date still has not landed. An
+  // unanswered window (null) stays amber — see the field's own note.
+  const inWindow =
+    s.daysToDue !== null && s.stockWindowDays !== null && s.daysToDue < s.stockWindowDays;
   return action("confirm_ready_date", "goods", inWindow ? "danger" : "warning");
 }
 
@@ -465,6 +474,10 @@ const DISPLAY_RANK: Record<OrderActionKey, number> = {
   // blocks, and the loan collection is the run's own remaining act.
   collect_loan_item: 12,
   resolve_payment_exception: 49,
+  // §0.1 Action Owner Engine row 1 (composed 2026-08-27) — the missing
+  // customer promise. Rung 2's own family (the customer must be asked);
+  // ranked after the two delay acts it can never co-occur with.
+  ask_delivery_date: 21,
   // FACTS, never raised as actions; ranked only so the map stays total.
   done: 90,
   delivering: 91,

@@ -4,8 +4,10 @@
 **Owner authority:** `docs/orders/MASTER.md` + `docs/ui/MASTER.md` — owner-approved / locked 2026-08-27
 **Status:** EXECUTED · SHIPPED — implementation merged as `d14614a3`, walk-fix `e16a8e88`
 (PR #932 · migration 0390), both verified on the authenticated production UI at 1440px and a true
-~909px viewport, 2026-08-27. **NOT YET `PRODUCTION-VERIFIED`:** the one remaining item is §9's
-five-second staff walk by a human operation staff member — see §11.6.
+~909px viewport, 2026-08-27. **NOT `PRODUCTION-VERIFIED`:** the §9 five-second walk RAN and
+FAILED on `Who did it?` (Jess, 2026-08-27) — an identity-model defect, ruled into the Staff
+Identity Law and queued as `CARD-2026-08-27-individual-staff-identity.md`. See §11.6 for what
+must land before this status may change.
 **Lane:** BUILD / DELIVERY
 **Base:** `origin/main` at `375d8c8a5143730f315233d52e0397ce04531a45`, plus the approved Blueprint commit `b8046992`
 
@@ -418,7 +420,8 @@ Authenticated orders used:  SO-1329 (post-0387) · SO-1327 (pre-0387) · SO-1318
                             SO-1319 (4 revisions, walked as an OPERATION reader)
 1440px acceptance:          PASS (two independent walks: ~1475px and 1440×900)
 ~920px acceptance:          PASS at a true 909px viewport (window.innerWidth measured)
-Five-second staff walk:     OWED — needs a human operation reader (§11.6)
+Five-second staff walk:     FAILED 2026-08-27 (Jess) on `Who did it?` — identity-model
+                            defect, ruled and queued as its own card (§11.6)
 Defects opened:             one 🟡 out of boundary (§11.4) · one 🔴 in boundary, FIXED (§11.7)
 ```
 
@@ -525,13 +528,25 @@ forbids this Card from changing Order page editing law. It needs its own Card.
   migration, so this section is the current meaning — the same precedent `orders/MASTER.md` set for
   migration `0104`'s stair-carry comment.
 
-## 11.6 · What is still owed before `PRODUCTION-VERIFIED`
+## 11.6 · The five-second walk RAN and FAILED — owner ruling, 2026-08-27
 
-1. The §9 five-second staff walk, by an operation staff member who did not build the screen.
-   Hand any of SO-1329 / SO-1319 / SO-1318 to a staff member cold and ask the four questions.
+The walk was reviewed by Jess (COO) on 2026-08-27 against production SO-1329 and SO-1319.
+**Result: FAIL on `Who did it?`.** The three-line hierarchy passed; the actor line read
+`principal · Principal` and `Recorded by principal` — a role/account label, not a person. Jess
+ruled it an **identity-model defect, not a UI wording defect**: the pipeline (0387 stamp → 0390
+resolve → three ranks) is correct, and the account it truthfully names is itself a role.
 
-The ~920px viewport reading landed (§11.3). Until the human walk lands, `Status` stays
-`EXECUTED · SHIPPED`.
+The ruling is now law in `ui/MASTER.md` § HISTORY + REVISION THREE-RANK RECORD GRAMMAR (Staff
+Identity Law) and `orders/MASTER.md`; the account/governance work is
+`docs/cards/CARD-2026-08-27-individual-staff-identity.md`. It also supersedes this delivery's
+missing-actor words: `Actor was not recorded` becomes **`Staff identity not recorded`** when that
+card executes.
+
+**Before `PRODUCTION-VERIFIED`:** the identity card runs, a FRESH order event and revision are
+recorded under an individual Principal account, and the cold five-second walk is repeated by an
+operation staff member on those fresh records — passing only when the reader can name the real
+person. Until then, `Status` stays `EXECUTED · SHIPPED`. The ~920px viewport reading landed
+(§11.3) and is not owed.
 
 ## 11.7 · Defect found by the operation-reader walk — FIXED in the same delivery
 

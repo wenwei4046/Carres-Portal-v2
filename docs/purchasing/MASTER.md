@@ -566,8 +566,9 @@ cover changes who sees today's work while preserving normal owner and cover evid
 
 **Purpose / source:** system-generated uncovered SO lines only; no `+ New`.
 
-**Left rail — APPROVED / LOCKED, owner correction 2026-08-26.** The rail shows only unissued
-buying demand, order timing, remaining Safety days and the one Purchasing-owned setup exception:
+**Left rail — APPROVED / LOCKED, owner ruling 2026-08-27 (Card 02-C).** The rail answers, for
+an inexperienced operator: when should each order be placed, which product category, which
+actual supplier — with every label fully readable. Five sections, in this exact order:
 
 ```text
 TO ORDER
@@ -578,27 +579,60 @@ ORDER TIMING
   14 safety days left
   1–13 safety days left
   No safety days left
-  Not enough production time
+  Not enough production days
 
-SETUP TO FIX              ← the whole section renders only when its count is above zero
-  Production time not set
+PRODUCT
+  All products
+  Mattress
+  Bedframe
+  Sofa
+
+SUPPLIER
+  All suppliers
+  [actual supplier names, alphabetical — never hardcoded]
+
+SETUP TO FIX              ← the whole section renders only when at least one affected SO exists
+  Production days not set
 ```
 
-- Counts are UNIQUE Sales Orders with outstanding eligible buying demand (Card 02-B, owner
-  ruling 2026-08-27) — never documents, notifications or leaf lines, and never a fully Ordered
-  or fully Ready-Stock-covered order. A zero count prints no number. Rows use the governed
-  `NavRow` active treatment; every filter toggles and clears completely under the shared
-  local-rail law.
-- The DEFAULT no-filter Register shows every proceeded record, Ordered ones included.
-  `All not ordered` is a real outstanding-only filter: active, it narrows to Sales Orders with
-  outstanding eligible demand and excludes fully Ordered records; toggled off, the whole
-  permanent Register returns.
+- **The rail is navigation, not batch selection.** No checkboxes in the rail — rows use the
+  governed `NavRow` active treatment; the only checkboxes on the page are the Register's own
+  `Issue PO` selection. One filter may be selected per section; filters from different
+  sections combine; clicking a selected timing row again clears it; `All products` and
+  `All suppliers` clear their sections; clearing every filter restores the complete permanent
+  Register, Ordered records included. `All not ordered` remains the explicit
+  outstanding-only filter.
+- **Counts are UNIQUE Sales Orders** — never documents, notifications, leaf lines, SKU
+  quantities or PO counts. Each section's counts update against the other selected sections,
+  so the printed number predicts the resulting SO rows. The fixed rows (`All not ordered`,
+  the five timing rows, the three product rows, the setup row) print their live count,
+  zero included. A supplier appears only while it has a matching SO under the other active
+  filters — except the currently selected supplier, which stays visible with `0`.
+- **Product comes from the authoritative Catalog category** — never SKU text, model name,
+  description, supplier, or a browser-only mapping. A multi-category Sales Order counts once
+  under every matching category and still appears once in the Register. Records outside the
+  three categories remain visible under `All products` and never silently leave the
+  permanent Register.
+- **Supplier uses the same projection as the Register's `Supplier` column** — the resolved
+  outstanding-demand supplier plus the issued PO lineage supplier
+  (`soBatchOrderSupplierNames`), no second browser-only supplier calculation. Actual names
+  only, alphabetical. There is no `No supplier` filter: an unexpectedly missing supplier
+  fails at Catalog authority and is not a normal purchasing category.
 - Every timing row remains orderable. `Can order early`, `1–13 safety days left`,
-  `No safety days left` and `Not enough production time` express timing risk, never `Cannot buy`.
-  Order By is a planned date, never an unlock date.
-- `Production time not set` is the only normal setup blocker on this surface. It belongs to
-  Purchasing Settings, and its lines are not selectable until the Supplier × Category production
-  time exists.
+  `No safety days left` and `Not enough production days` express timing risk, never
+  `Cannot buy`. Order By is a planned date, never an unlock date.
+- `Production days not set` is the only normal setup blocker on this surface. It belongs to
+  Purchasing Settings, and its lines are not selectable until the Supplier × Category
+  production days exist.
+- **The readable rail shell (Card 02-C):** 240px wide · 12px outer padding · 8px heading →
+  first row · 20px between groups · 36px minimum row · a wrapped label takes its natural
+  height (≥ 48px) in the same body font. A governed label is never truncated and never
+  hidden behind a tooltip; the count stays visible and right-aligned; the rail scrolls
+  vertically as supplier names grow; at narrow desktop widths the Register scrolls
+  horizontally and the rail is never squeezed below 240px. The shell/group/row grammar is
+  the shared `FilterRail` component (`workspace-rail.tsx`). Manual Purchase later imports
+  the same shell, grammar, Product authority and unique-object count rule — never
+  `ORDER TIMING`, Safety-days arithmetic or the SO-specific `All not ordered` meaning.
 - Fully covered / `Buy = 0` DEMAND leaves the buying selection — it is not offered a tick, and
   the leaf listing drops it — but the SALES ORDER'S ROW never leaves (Card 02-B). If a PO is
   cancelled and the quantity is still required, the selectable demand returns automatically by
@@ -631,7 +665,7 @@ today < Order By                                                   → Can order
 today = Order By                                                   → 14 safety days left
 today > Order By · completion lands 1–13 working days early        → 1–13 safety days left
 expected production completion = Requested Delivery Date            → No safety days left
-expected production completion > Requested Delivery Date            → Not enough production time
+expected production completion > Requested Delivery Date            → Not enough production days
 ```
 
 `Order By` stays fixed for a demand unless an authoritative source fact changes; `Safety days
@@ -644,6 +678,17 @@ The right Register shows **one row per proceeded physical-goods Sales Order**
 (`orders.status = 'proceed_order'`; `place` is not proceeded; Service-only orders stay outside
 Purchasing), and the row never leaves when a purchase order is issued — the page is both the
 buying surface and the permanent purchasing audit register.
+
+**THE PROCEEDED-ORDER BOUNDARY — RESOLVED FROM AUTHORITY, Card 02-C, 2026-08-27.** A Sales
+Order enters SO Batch Purchase only after Sales completes `Proceed`. The boundary is drawn ONCE,
+at the one demand read (`loadToOrder`), before the engine ever sees a line — so a `place` order
+is invisible to the WHOLE surface: no planning, no netting (it cannot consume Open PO coverage
+ahead of a proceeded order), no rail count, no Register row, no selection, no Ready Stock take
+and no PO. Both write doors (`take-stock`, `issue-batch`) recompute through the same read at
+POST time; a demand naming a `place` order resolves to nothing and is refused by name, creating
+and reserving nothing. Every present and future rail count — timing, Product, Supplier — draws
+from this same proceeded-SO population. Rail filters combine with AND: `All not ordered` plus a
+timing facet shows only rows satisfying both.
 
 **Columns, exactly and in this order:** Status · Proceed Date · PO No · SO No · Customer ·
 Delivery Location · Requested Delivery Date · Supplier · Deliver To · PO Delivery Date.

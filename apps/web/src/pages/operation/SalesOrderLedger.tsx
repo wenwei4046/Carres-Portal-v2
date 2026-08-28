@@ -101,7 +101,7 @@ const HISTORY_FIELD_WORDS: Record<string, string> = {
   customer_billing: "Billing address",
   customer_emergency: "Emergency contact",
   delivery_date: "Requested Delivery Date",
-  delivery_date_tbd: "Requested Delivery Date date",
+  delivery_date_tbd: "Delivery date to be confirmed",
   proceed_date: "Proceed date",
   salesperson_id: "Salesperson",
   outlet_id: "Showroom",

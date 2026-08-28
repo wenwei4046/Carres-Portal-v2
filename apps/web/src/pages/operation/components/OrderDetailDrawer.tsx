@@ -163,7 +163,7 @@ import ServiceNoteModal from "./ServiceNoteModal";
 import GenerateInvoiceOverlay from "./GenerateInvoiceOverlay";
 import DownloadSalesOrderButton from "@/components/DownloadSalesOrderButton";
 import DownloadInvoiceButton from "@/components/DownloadInvoiceButton";
-import { type OperationStage } from "./StageChip";
+import { displayStageOf, type OperationStage } from "./StageChip";
 import DispatchModal from "./DispatchModal";
 import DOAttachModal from "./DOAttachModal";
 import AbandonOrderModal from "./AbandonOrderModal";
@@ -1404,20 +1404,11 @@ function DrawerBody({
         u.reservedRef === soRef &&
         stockMatchKey(u.sku) === stockMatchKey(sku),
     )?.id ?? null;
-  // Pipeline v2 (C1): widen stage derivation to honor 'place' status + the
-  // new placed/confirmed enum values without falling through to a
-  // bogus in_production default.
-  const stage: OperationStage = (() => {
-    // AutoCount-imported orders arrive ALREADY proceeded — they carry a PO, so
-    // they are NEVER "placed / waiting for the dealer to push" (Jess 2026-07-02,
-    // project-order-lifecycle-flow: "the 'waiting for dealer' copy is WRONG for
-    // these"). Only a native dealer/POS order sits at 'placed'.
-    const autocount = order.source_system === "autocount";
-    if (order.status === "place" && !autocount) return "placed";
-    if (order.operation_stage) return order.operation_stage as OperationStage;
-    if (order.status === "delivered") return "delivered";
-    return "in_production";
-  })();
+  /* D3 — the DISPLAY stage, spelt once in `StageChip`. This was a local IIFE
+     carrying Jess's 2026-07-02 AutoCount ruling; the list needs the RAW slot for
+     its tab routing, so the two questions now have two names instead of one
+     name written twice. */
+  const stage: OperationStage = displayStageOf(order);
   // Line-sum of the order (native/priced orders). AutoCount imports carry no line
   // prices → grandTotal is 0 and Total falls back to the keyed balance (see the
   // Money block below). hasLineTotal drives whether Total is auto (read-only) or
@@ -1668,16 +1659,10 @@ function DrawerBody({
   const keyedBalance = form.draft.balance.trim()
     ? Number(form.draft.balance)
     : form.control?.balance ?? null;
-  const money = orderMoney({
-    lineSum: hasLineTotal ? grandTotal : 0,
-    paid: order.paid,
-    controlBalance: keyedBalance,
-  });
-  const collected = money.paid;
-  const orderTotal = money.total ?? 0;
-  const totalSet = money.known;
-  const moneyOutstanding = money.goodsOwing;
-  const balanceOwing = money.owing;
+  /* D4 - the money rule is asked ONCE, and it is asked below, after the storage
+     figures exist. It used to run here on the goods alone, which left the
+     storage half to a second arithmetic further down and put two different
+     "outstanding" numbers on one screen. See the call site. */
   // ── AUTO storage (Jess 2026-07-18): the machine counts, nobody clicks.
   // Anchor = (supplier late ? latest goods ETA : deadline) + 7d — a
   // supplier-late stretch never bills the customer. A manual From date
@@ -1726,9 +1711,6 @@ function DrawerBody({
   const storageFee =
     Number(form.control?.storage_fee_msbf ?? 0) +
     Number(form.control?.storage_fee_sof ?? 0);
-  // "hold" = red block (ETA−1 uncollected) · "warn" = amber reminder · null = ok.
-  const balanceGate = balanceOwing ? (pastLastCall ? "hold" : "warn") : null;
-  const storageGate = storageOwing ? (pastLastCall ? "hold" : "warn") : null;
   // ── Balance v3 invoice math (2026-07-17) — the Balance tab reads as an
   // INVOICE: CHARGES (goods + the storage fee) − PAYMENTS (all kinds) =
   // Balance due. The storage FEE flows in as one charge line; the Storage tab
@@ -1756,9 +1738,58 @@ function DrawerBody({
     .reduce((s, p) => s + Number(p.amount || 0), 0);
   /** The newest payment that still stands — what `Print receipt` means. */
   const latestLivePayment = ledger.find(isLivePayment) ?? null;
+  /* D4 - ONE MONEY RULE, ASKED ONCE, WITH EVERYTHING IT NEEDS.
+     The goods half already came through `orderMoney`; the storage half was a
+     second arithmetic right here - `invoiceTotal - collectedAll`, clamped as
+     one figure - and it drove the payment dial and the "still owes ... before
+     delivery" step while the money sticker three lines away showed the shared
+     rule's goods-only number. Two "outstanding" figures on one screen, and one
+     of them captioned `holding delivery`.
+
+     `orderMoney` already took `storageOwing` and `storageReleased` and already
+     returned `outstanding` / `holding` / `holds`; nobody was passing them. This
+     is a migration, not a design - the capability was already there.
+
+     TWO THINGS THE MOVE CHANGES ON PURPOSE:
+     - A RELEASED FEE IS STILL OWED. C9 rules that a manager release drops the
+       HOLD and not the debt, so the amount is computed from what has actually
+       been COLLECTED and the waiver is passed separately. The boolean
+       `storageOwing` above folds the two together and would have zeroed a
+       waived fee out of the invoice.
+     - OVERPAID GOODS NO LONGER OFFSET A STORAGE FEE. The retired line clamped
+       goods and storage together, so an overpayment silently paid down a fee
+       only a manager may waive (ERP-ARCHITECTURE 6.1). The shared rule clamps
+       goods on their own and adds storage, which is what the delivery gate and
+       the Orders row have always used. */
+  const storageOwingAmount =
+    storageIncurred && !form.control?.storage_collected_at
+      ? Math.max(0, storageCharge - storageCollected)
+      : 0;
+  const storageReleased = form.control?.storage_waiver_status === "approved";
+  const money = orderMoney({
+    lineSum: hasLineTotal ? grandTotal : 0,
+    paid: order.paid,
+    controlBalance: keyedBalance,
+    storageOwing: storageOwingAmount,
+    storageReleased,
+  });
+  const collected = money.paid;
+  const orderTotal = money.total ?? 0;
+  const totalSet = money.known;
+  const moneyOutstanding = money.goodsOwing;
+  /* GOODS only, and deliberately so: storage has its own `storageGate`, and
+     `balanceOwing || storageOwing` below proves the two were always meant to
+     be separate. `money.owing` now counts storage as well, so reading it here
+     would make both gates fire on one fee. `goodsOwing` is exactly what this
+     flag meant before the storage half joined the call. */
+  const balanceOwing = money.goodsOwing > 0;
+  // "hold" = red block (ETA−1 uncollected) · "warn" = amber reminder · null = ok.
+  const balanceGate = balanceOwing ? (pastLastCall ? "hold" : "warn") : null;
+  const storageGate = storageOwing ? (pastLastCall ? "hold" : "warn") : null;
   const invoiceTotal = orderTotal + storageCharge;
   const collectedAll = collected + storageCollected;
-  const balanceDue = totalSet ? Math.max(0, invoiceTotal - collectedAll) : 0;
+  /** Everything still owed - the shared rule's number, not a second sum. */
+  const balanceDue = money.outstanding;
   // Collect-by = delivery − 7d (the date collectByLabel shows) — past it and
   // still owing ⇒ the dial family reads Overdue.
   const collectByPast =

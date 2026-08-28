@@ -5,7 +5,7 @@
 **Page:** SO Batch Purchase
 **Surface:** Right Register only
 **Sequence:** 02-B
-**Status:** IN DELIVERY — owner commissioned 2026-08-27
+**Status:** COMPLETE — production-verified 2026-08-27
 **Lane:** BUILD / DELIVERY
 **Depends on:** Purchasing Card 02 and production-verified Card 02-A
 **Base:** Latest `origin/main`
@@ -156,6 +156,38 @@ and no duplicated Work or internal arrival calculation on the Register.
 
 ---
 
-## Completion evidence
+## Completion evidence — 2026-08-27
 
-_To be filled at delivery._
+- **PR:** [#936](https://github.com/wenwei4046/Carres-Portal-v2/pull/936), merged to `main` as
+  `4a03c61c7fc54a3603a6bac91bcd9daade571679`; CI `verify` green (9m04s). No migration — none was
+  needed, none was manufactured.
+- **Gates:** 8,682 tests green across the monorepo (shared 2,699 · api 2,499 · web 3,484,
+  including the ~60 new Card 02-B proofs), typecheck, lint, `ci:migrations` (403 filenames),
+  production build, `git diff --check` clean.
+- **Production:** `scripts/verify-production.mjs` converged all five governed surfaces
+  (carres-portal Pages · carres-pos Pages · ERP canonical · POS canonical · API Worker `/health`)
+  on the exact merge SHA. The served ERP bundle (`index-CI4e382T.js`) carries the new register:
+  `carres.soBatchPurchase.register.v2`, `Delivery Location`, `PO Delivery Date`.
+- **Walk:** the dev preview entry (`so-batch-rail-preview.html`, real components + seeded payload)
+  at 1440px and 1130px, original-size captures delivered to the owner: the ten columns in the
+  approved order with `Delivery Location` immediately after `Customer`; blank · `Partial` ·
+  `Ordered`; a numbered-but-unsent PO under `PO No` with blank Status; an Ordered order still
+  present with its `2 POs · 2 suppliers · Multiple` summaries and the exact per-item
+  PO/supplier/destination/date mapping in the shared `GoodsMiniTable` expansion; Ready Stock
+  coverage explained in expansion; Partial-row selection taking only the uncovered remainder;
+  header selection covering visible eligible demand only; `All not ordered` excluding Ordered
+  records and toggling back to the whole permanent Register; `SO No` pinned beside the gutter
+  under horizontal scroll at 1130px; the untouched 50/50 Issue PO workspace.
+- **Walk findings fixed before merge:** column widths trimmed to content, and the footer stopped
+  printing a second, status-derived number behind the rail's own `not ordered` phrase — one
+  phrase, one arithmetic.
+- **Authority:** `docs/purchasing/MASTER.md` §9.1 and the `docs/COPY-STANDARD.md` SO Batch block
+  were overwritten with the permanent-register law in the same PR.
+- The authenticated production walk on live data remains the owner's, per the standing
+  owner-only acceptance law; the SHA, bundle and seeded-component walk above are the
+  engineering proof.
+
+```text
+PURCHASING CARD 02-B COMPLETE
+Production SHA: 4a03c61c7fc54a3603a6bac91bcd9daade571679
+```

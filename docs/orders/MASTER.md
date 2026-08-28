@@ -175,10 +175,15 @@ No deposit · Online order
 - **History** remains the append-only event ledger. Line 1 states the event in Primary School
   Standard English; line 2 names the actor, role and actual time; line 3 states only the important
   result. A simple event without extra detail uses two lines.
-- `Unknown user` is not an acceptable final state. Resolve the real actor from the authoritative
-  identity record, or say `System` only when the portal truly performed the event. A missing actor
-  link is an audit-data defect; the UI does not conceal it by flattening role and fields beside the
-  word `Unknown`.
+- **STAFF IDENTITY LAW — OWNER RULING 2026-08-27 (Jess).** `Who did it?` is answered by a person,
+  never a permission. Every staff member uses an individual authenticated account; `Principal`,
+  `Operation` and `Finance` are roles, not names; every Sales Order write stores the individual
+  `user_id`, and these views resolve it to the real display name from the authoritative identity
+  source — never a hardcoded mapping, never a role dressed as a person. `System` only when the
+  event's own facts prove automation. An actor that cannot be recovered — including a write from
+  a shared role-labeled login — says `Staff identity not recorded`. The full ruling, approved and
+  forbidden displays live in `ui/MASTER.md` § HISTORY + REVISION THREE-RANK RECORD GRAMMAR;
+  the account/governance work is `docs/cards/CARD-2026-08-27-individual-staff-identity.md`.
 - `0% deposit · online` is raw-field copy. The employee-facing result is `No deposit · Online
   order` when those are the authoritative facts.
 
@@ -1284,7 +1289,7 @@ gate proves the code does what its tests say; only the walk proves it does what 
 ## Guided operations and Service Case boundary — CLOSED / PRODUCTION-VERIFIED 2026-08-14
 
 - ⭐ **RE-RULED 2026-08-18 (owner): the fact is said ONCE per surface, and never as a lecture.**
-  A missing Requested Delivery Date date prints the amber fact (`No delivery date`) with no action
+  A missing Requested Delivery Date prints the amber fact (`No delivery date`) with no action
   clause in the Register cell — **a register lists documents; actions live in My Work /
   Team Work / the Order Route.** The SO object page's seven-answer guidance banner
   (Why · Who must act · Who to contact · What to ask · What to use · What to record · What
@@ -2868,11 +2873,38 @@ work resolves to the responsible salesperson; Purchasing, Receiving, Payment and
 resolves through those modules' governed duty/ownership rules. Owner identity is displayed
 structurally and is not repeated inside every action sentence.
 
-**APPROVED TARGET / NOT BUILT — 2026-08-14.** The current shipped order work composition still
-uses the Sales Order PIC for its order-track items and its registry does not yet carry separate
-Owner Rule and Display Owner fields. This documentation ruling does not change ERP code. A later
-BUILD/DELIVERY scope must migrate the registry and Work surfaces, preserve the existing completion
-facts and clocks, and production-verify roster/cover resolution plus the two-line presentation.
+**BUILT 2026-08-27 — the Action Owner Engine resolution.** The Card 9 registry
+(`packages/shared/src/work-engine.ts`) now carries a **structured `ownerRule` beside the prose**
+(`po_duty · salesperson · order_pic · payment_duty · delivery_duty · finance_duty · system`, plus
+the cross-module rules' own precise keys `grn_duty · claim_month_po_duty` recorded for the later
+feed wiring), and `workItemsForOrder` resolves the person per RULE instead of borrowing the PIC:
+
+- **Purchasing's order-track work (`Issue PO` · `Confirm ready date`) lands on the month's
+  PO-duty holder** (`ops_po_duty`, the one rostered duty that exists) — in the holder's My Work,
+  their Team group and their Quick Rail counts. A dormant duty layer leaves the duty word
+  `Purchasing` standing; the PIC is never borrowed for Purchasing's work.
+- **The missing customer promise composes `Ask for the delivery date` for the responsible
+  salesperson** (§0.1 row 1) — a NAME from Sales ownership grouped as a person in Team Work, not
+  an ops account; the fallback duty word is `Sales`, exactly as the register's hover guidance
+  falls back. Composed only for the rows nobody asked (`delivery_date` null AND
+  `delivery_date_tbd` false — the 3, never the 8; owner ruling 2026-08-15) on an unfinished
+  order. The ladder never raises it, so no register cell or drawer headline changed.
+- **The PIC keeps what is truthfully the relationship owner's** — delay decision, logistics
+  choice and calls (ACTION-FLOW Law 4 rung 2: the conversation is logistics', the closable ACTION
+  is ours, and a partner has no login), today's run and its photo.
+- **`collect` records `payment_duty` as its rule** (payment/MASTER §5); no payment-duty roster
+  exists yet, so the PIC stands as governed COVER — money never sits unowned (the 2026-08-19
+  incident is why). When a payment-duty roster exists, only the resolver changes.
+- Completion facts, clocks, the two-line presentation and the duty-word honest-gap rule
+  (`Delivery staff` · `Finance`) are unchanged. `WorkItem` gained `ownerUserId` so My Work
+  filters on the RESOLVED account, and Team Work groups by account, then named person, then duty
+  word.
+
+**Measured boundaries, reported not hidden:** no delivery-staff, finance or payment-duty roster
+fact exists (0363 records none; HR duty keys carry none), so those rules resolve to duty words or
+the PIC-as-cover exactly as written above. The `assigned Partner` half of the booking rule stays
+unresolved on purpose — a company without a login cannot close portal work. Buddy-cover beyond
+what `/api/operation/po-duty` already applies is not re-derived here.
 
 **How the PIC is decided** (LIVE, migrations 0232 + 0235;
 `ops_order_control.assigned_staff / assigned_by / assigned_at` + `ops_staff_settings`):
@@ -5089,12 +5121,12 @@ the normal discoverable doors already governed for Edit, output or View Flow.
 |---|---|---|
 | ~~**D1**~~ | ✅ **FIXED 2026-08-06** — the list reads both PO sources through one shared helper. See §5.1 |
 | ~~**D2**~~ | ✅ **FIXED 2026-08-06** — the door, the hook, the route and its suite are deleted; a guard asserts the route now 404s. See §9.5 |
-| **D3** 🟡 | **The drawer computes `stage` a SECOND time** (its own IIFE at line ~1469) instead of importing the list's exported `stageOf`. Two spellings of one derivation, in two files. | read |
-| **D4** 🟡 | **The drawer computes money a second way for its own header.** The list hands down `holdAmount` from the shared `orderMoney`, and the drawer separately fetches `order_payments` for `Collected` — the one ledger the shared rule refuses to read. **The drawer's Collected and the row's Outstanding can disagree.** | read |
+| ~~**D3**~~ | ✅ **FIXED 2026-08-28 — and it was never "two spellings of one derivation".** It was **two questions**, each spelt once, in two files, with nothing naming the difference. `stageOf` answers *where is this order in the pipeline* — and `place` is a real slot there, because `controlTabOf` ends `return "proceed"; // confirmed OR autocount-placed`, so an imported row has to REACH `placed` for that fall-through to route it. The drawer's copy answered *what do we tell the operator*, applying Jess's 2026-07-02 ruling that an AutoCount import arrived already proceeded and is never "waiting for the dealer to push". **Merging them is the obvious move and it is wrong:** tried first, it moved imported rows out of `proceed` and six control tests caught it. The two questions now carry two names — `stageOf` and `displayStageOf` — one spelling each, in `components/StageChip.tsx` beside the type both surfaces already import. **That module is the home because the cycle was the cause:** the control imports the drawer, so the drawer could never import the rule back, which is why it was written twice. Eight tests hold both rules, including one pinning the single case they differ on so it cannot be tidied away. | fixed |
+| ~~**D4**~~ | ✅ **FIXED 2026-08-27 — one money rule, asked once. And the audit was pointing at the wrong half.** What it described — *"the drawer separately fetches `order_payments` for Collected"* — had already been corrected on 2026-07-27 by C5, ten days before this row was written; the drawer's own comment carries the production receipt (SO-1209 read *RM 7,248 outstanding · HOLD DELIVERY* while `orders.paid` said paid in full). **What actually survived was worse:** the goods half came through the shared `orderMoney` while the storage half was re-derived locally as `invoiceTotal - collectedAll`, so the screen carried TWO `outstanding` figures — the money sticker showing the shared rule's goods-only number, the payment dial showing the local goods+storage one — and they disagreed on every order with a fee owing, with one of them captioned `holding delivery`. **No invention was needed:** `orderMoney` already took `storageOwing` and `storageReleased` and already returned `outstanding` / `holding` / `holds`; nobody passed them. **Two deliberate behaviour changes, both recorded at the call site:** a manager-released fee is now still OWED and merely stops HOLDING (C9's rule, which the local boolean folded away), and overpaid goods no longer silently offset a storage fee only a manager may waive (`ERP-ARCHITECTURE.md` §6.1). Four source-scan tests hold it, including one asserting the rule is called exactly once. | fixed |
 | **D5** 🟡 | **Carrier rules are edited from one order's drawer.** | §9.5 |
 | **D6** 🟡 | **`Issues module coming — needs the ops_issues table`** is a live tooltip on the Actions menu. A promise about the product on an operator's screen. | panel titles |
 | **D7** 🟡 | **The `deliver_today` checklist is empty by ruling**, so an operator expanding the day's own action sees nothing. Correct by the rule (*nobody records "goods loaded"*), and worth knowing before somebody calls it a bug. | `order-action-checklist.ts` |
-| **D8** ⚪ | **`stockWindowDays` is still a flat 7 / 5** in `orderActionSignalsOf`, while Purchasing's real production numbers are 7 · 7 · **14** and manager-editable. The Orders ladder therefore turns the ready-date call red on a sofa **nine days later** than Purchasing's own window says it should. | read + Purchasing §2.3 |
+| ~~**D8**~~ | ✅ **FIXED 2026-08-27 — Orders stopped holding Purchasing's number.** `orderActionSignalsOf` read `hasMsbf ? 7 : hasSofa ? 5 : 7`, and its own comment said why: *"the supplier master holds production time as free text, so nothing can compute a real one yet"*. **Migration `0303` removed that blocker on 2026-07-28** — `purchasing_settings.order_by_buffer_days` is one governed, manager-editable value, which Purchasing's own reads already call `safetyDays` (`purchase-demands.ts:407`, `:611`) and `purchasing/MASTER.md:650` ruled visible as **`Safety days`** on 2026-08-26. Two arithmetics for one derived fact is Law D, so the ladder now takes the number as a parameter and `OperationOrdersControl` hands it Purchasing's. **The per-category fork went with it, and that is the second half:** it asked `lineCategory()` — the keyword parser `carry-forwards.md` records as display-only — to decide a business threshold, making it a third caller filtering on a guess. **`null` is not a default:** a window nobody has answered leaves the ready-date call amber rather than escalating it on an invented deadline. Two tests that pinned the old constants are rewritten to the governed contract; `lines` is now unread by the signals builder and marked so. | fixed |
 | ~~**D9**~~ | ✅ **FIXED 2026-08-08** — `lineClass` answers `unknown` where it used to answer `acc`, and `acc` is now earned by an accessory word instead of by elimination. **20 orders that could never fail a stock check → 0**, with **zero** lines re-classified into anything else. Two follow-ups named and left open on purpose: delete the `lineCategory` display fold, and name the sixteen SKUs alongside migration 0148. See the D9 block above |
 | **D10** 🟡 | **Two dead surfaces are still compiled into the bundle, and both had live test suites.** `OperationOrders.tsx` (450 lines, the 6-column kanban) is imported by **nothing** — §3 records that the list merged it away — and `OrderCustomerCard` (in the drawer) is exported, rendered nowhere, and superseded by `CustomerIdentityCard` (Jess 2026-07-17 rev 4). **Purchasing's own C1 ruling applies to the second one:** its `startEditRef` door has no caller, so the safe-edit mode is unreachable, **and the `status === 'place'` gate that used to guard it is gone from the component** — whoever re-mounts it inherits an editor with no gate. | `grep` — the only non-test reference to each is its own declaration |
-| **D11** ⚪ | **`receive-po-<id>` names TWO different controls** in `ProcurementTabContent` — the primary `Check in` button and the always-available `Direct receive →` escape hatch. A test cannot tell them apart by handle, only by word. | read |
+| ~~**D11**~~ | ✅ **FIXED 2026-08-28 — two controls, two handles.** `receive-po-<id>` named BOTH the primary `Check in` button and the always-available `Direct receive →` escape hatch, so a test could only tell two different affordances apart by their WORDS. The hatch is now `direct-receive-<id>`; the primary keeps `receive-po-<id>`. **It stayed open for a boundary reason, not a technical one** — `OhanaSofaTab.test.tsx` recorded it as *REPORTED, NOT FIXED* because *"renaming one reaches the component, and the S2 card rules components DO NOT TOUCH"*; that note is corrected in the same change. The suite that previously had to accept *either* control now asserts the hatch is present **and the primary is not**, which is the fact the shared handle could never express. Procurement suites 43 pass. | fixed |
