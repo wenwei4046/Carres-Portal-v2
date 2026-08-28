@@ -38,14 +38,14 @@
  * here, rendered from the SAME `order_entry_config` contract the POS renders
  * from (0219) and the same shared choice lists — so the two surfaces cannot
  * drift into two different forms for one record. Goods, price and
- * `Customer Delivery` are the exception, and they are the whole point: those
+ * `Requested Delivery Date` are the exception, and they are the whole point: those
  * are what the customer agreed to, so they leave through the amendment lane.
  */
 // design-standard: not-a-list-page — this is a DOCUMENT workspace. Its
 // tables are the order's own line block: fixed rows, no sort, no selection.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Plus, Printer, Trash2, X } from "lucide-react";
-import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import * as pdfjs from "pdfjs-dist";
 import { toast } from "sonner";
@@ -55,8 +55,8 @@ import {
   CUSTOMER_GENDER_OPTIONS,
   CUSTOMER_RACE_OPTIONS,
   deliveryReasonLabel,
-  displayGuaranteeId,
   EMERGENCY_RELATIONSHIPS,
+  LIFT_OPTIONS,
   lineClass,
   MAX_DELIVERY_FLOOR,
   maxLeadDaysFor,
@@ -80,12 +80,14 @@ import { getCities, getPostcodes, MY_STATES } from "@/data/malaysia-postcodes";
 import EmptyState from "@/components/kit/EmptyState";
 import Input from "@/components/kit/Input";
 import Loading from "@/components/kit/Loading";
+import Modal from "@/components/kit/Modal";
 import Select from "@/components/kit/Select";
 import Money from "@/components/Money";
 import { apiFetch, ApiError } from "@/lib/api";
 import { cjkClassName } from "@/lib/cjk";
 import { composeAddress } from "@/data/malaysia-postcodes";
 import { fmtDate } from "@/lib/fmt-date";
+import { floorSurchargeRaw, stairCarryCount } from "@/lib/order-totals";
 import { displayCustomerName } from "@/lib/customer-name";
 import { renderSalesOrderPdf } from "@/lib/pdf/render";
 import type { SalesOrderTemplateData } from "@/lib/pdf/types";
@@ -95,7 +97,6 @@ import {
   useCreateSalesOrder,
   useCustomerTypeProbe,
   useDecidePaymentApproval,
-  useDeliveryOrdersRegister,
   useDeliveryPaymentApprovals,
   useRequestPaymentApproval,
   useOperationDealersRef,
@@ -103,8 +104,6 @@ import {
   useOperationPoDuty,
   useOrderEntryConfig,
   useOrderCorrectionWork,
-  useOrderGuarantees,
-  useOrderPayments,
   useOrderServiceCases,
   useOutlets,
   useSalesOrderAmendment,
@@ -123,13 +122,11 @@ import CorrectionWorkList from "./CorrectionWorkList";
 import SalesOrderAmendDeliveryDate from "./SalesOrderAmendDeliveryDate";
 import SalesOrderAmendment from "./SalesOrderAmendment";
 import SalesOrderAttribution from "./SalesOrderAttribution";
-import SalesOrderDeliveryOrdersBlock from "./SalesOrderDeliveryOrdersBlock";
 import SalesOrderLedger from "./SalesOrderLedger";
 import SalesOrderRoute from "./SalesOrderRoute";
 import SalesOrderTabs from "./SalesOrderTabs";
 import { lineName } from "./sales-order-facts";
 import { lineConfigBits } from "../dealer/new-order/special-addons-picker";
-import { copySalesOrderDraft } from "./sales-order-copy";
 
 /* pdf.js worker ships inside the package — nothing fetched from a CDN. */
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
@@ -566,9 +563,10 @@ function draftFromSnapshot(snap: SalesOrderSnapshot): Draft {
  * spend the accent eight times and leave nothing to mark the current thing.
  * The tab underline above already holds the screen's one accent.
  */
-function Block({
+export function Block({
   title,
   note,
+  headerSlot,
   subtitle,
   summary,
   forceOpen,
@@ -576,6 +574,12 @@ function Block({
 }: {
   title: string;
   note?: string;
+  /** ⭐ A STANDING FACT ABOUT THE WHOLE CARD BELONGS BESIDE ITS NAME
+   *  (Jess, 2026-08-26). `note` is prose; this slot takes a rendered chip, so a
+   *  fact the reader wants BEFORE reading the fields — is this a new customer or
+   *  one we already have — is answered by the heading rather than by a row eight
+   *  fields down. It is a fact, never a control: nothing in here writes. */
+  headerSlot?: React.ReactNode;
   /** ⭐ WHAT THIS BLOCK IS FOR, in the operator's words (2026-08-24).
    *
    *  Jess's objective is that someone who does not know ERP can work this page
@@ -606,13 +610,38 @@ function Block({
   return (
     <section className="rounded-card border border-kit-slate-5 bg-white px-4 py-3" data-block={title}>
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-l-2 border-base-300 pl-2">
-        <h2 id={headingId} className="text-label font-semibold tracking-wide text-base-700 uppercase">
+        {/* ⭐ A CARD TITLE WEARS THE CARD-TITLE TOKEN (2026-08-24) IN THE MONO
+            FACE (YH, 2026-08-28).
+
+            `01-design-tokens.md` §1 assigns `text-strong` to "card title ·
+            field-group heading". That token STAYS — the 2026-08-24 fix was that
+            this heading wore `text-label`, an 11px micro-label doing a section's
+            job, and the size is what made sections stop reading as sections.
+
+            What changes is the FACE. The kit loads exactly one UI family, so a
+            heading could only differ from its fields by weight — which is not
+            enough separation on a card holding three sub-sections. `font-mono`
+            is already in this app: every RM figure renders in it, so this is a
+            face the operator reads daily rather than a new one, and nothing
+            else on a form card is monospaced. No token is added.
+
+            ⚠ THIS OVERRIDES the 2026-08-24 note that uppercase "is a different
+            defect". That note was written about 15px SANS uppercase. Mono
+            uppercase with tracking reads as a label rather than as shouting,
+            which is what a section name is. **Falsifier:** if an operator reads
+            these headings as shouting, drop `uppercase tracking-[0.08em]` and
+            keep the face — one class, no other change. */}
+        <h2
+          id={headingId}
+          className="font-mono text-strong uppercase tracking-[0.08em] text-base-900"
+        >
           {title}
         </h2>
-        {note && <span className="text-label font-normal text-base-600">{note}</span>}
+        {headerSlot}
+        {note && <span className="text-meta font-normal text-base-600">{note}</span>}
       </div>
       {subtitle && (
-        <p className="mt-1 pl-2 text-label font-normal text-base-500" data-testid={`block-subtitle-${title}`}>
+        <p className="mt-1 pl-2 text-meta font-normal text-base-500" data-testid={`block-subtitle-${title}`}>
           {subtitle}
         </p>
       )}
@@ -652,6 +681,35 @@ function Block({
         </>
       )}
     </section>
+  );
+}
+
+/**
+ * A named division INSIDE a card — the merge law's other half (Jess, 2026-08-26).
+ *
+ * Jess asked for fewer, fuller cards: `DELIVERY ADDRESS` joins `CUSTOMER`,
+ * `SALES OWNERSHIP` joins `ORDER INFO`. Merging must not cost the reader the
+ * name of what they are looking at, and it may not cost the WORD either —
+ * `Sales ownership` is locked (COPY-STANDARD:1427 governs its door, and
+ * MASTER.md's block order names the section). So the section keeps its exact
+ * word and loses only its border, its own 24px gap and its second heading rule.
+ *
+ * Deliberately quieter than a card title: `text-label` against the card's
+ * `text-strong`, so one card still reads as one thing.
+ */
+function SubHead({ children, note }: { children: React.ReactNode; note?: string }) {
+  return (
+    <p
+      className="mb-2 mt-4 flex flex-wrap items-baseline gap-x-2 text-label font-semibold text-base-600 first:mt-0"
+      data-testid={`subhead-${String(children).replace(/\s+/g, "-").toLowerCase()}`}
+    >
+      {children}
+      {/* The card-level `note` slot, one level down. `creates a Revision ·
+          needs approval` is governed copy that used to ride a Block title; the
+          merge moved the heading, so it moves with it rather than being
+          reworded or dropped. */}
+      {note && <span className="font-normal text-base-500">{note}</span>}
+    </p>
   );
 }
 
@@ -828,69 +886,6 @@ function Fact({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
-function RelatedDocumentLine({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="grid gap-1 border-t border-kit-slate-5 py-2 first:border-t-0 first:pt-0 last:pb-0 sm:grid-cols-[132px_1fr]">
-      <div className="text-label font-medium text-base-500">{label}</div>
-      <div className="min-w-0 text-body text-base-900">{children}</div>
-    </div>
-  );
-}
-
-function DocumentLinks({
-  documents,
-}: {
-  documents: ReadonlyArray<{ id: string; label: string; href: string }>;
-}) {
-  if (documents.length === 0) return <span className="text-base-500">—</span>;
-  return (
-    <span className="flex flex-wrap gap-x-3 gap-y-1">
-      {documents.map((document) => (
-        <Link
-          key={document.id}
-          to={document.href}
-          className="font-mono text-meta font-semibold text-kit-blue-11 underline-offset-2 hover:underline"
-        >
-          {document.label}
-        </Link>
-      ))}
-    </span>
-  );
-}
-
-function RelatedDocumentsValue({
-  documents,
-  loading,
-  error,
-  retry,
-}: {
-  documents: ReadonlyArray<{ id: string; label: string; href: string }>;
-  loading?: boolean;
-  error?: boolean;
-  retry?: () => unknown;
-}) {
-  if (loading) return <span className="text-base-500">Loading…</span>;
-  if (error) {
-    return (
-      <span className="inline-flex flex-wrap items-center gap-2 text-kit-red-11">
-        Documents could not be loaded
-        {retry ? (
-          <button type="button" className="font-medium underline" onClick={() => void retry()}>
-            Try again
-          </button>
-        ) : null}
-      </span>
-    );
-  }
-  return <DocumentLinks documents={documents} />;
-}
-
 /** The 0219 custom fields of one tab, rendered from the SAME contract the POS
  *  renders from. An operator who adds a field in Settings gets it on both
  *  surfaces or on neither. */
@@ -960,11 +955,14 @@ export default function SalesOrderWorkspace() {
   const [params, setParams] = useSearchParams();
   const isNew = location.pathname.endsWith("/so/new");
   const showRoute = params.get("route") === "1" && !isNew;
-  const copyFrom = isNew ? params.get("copyFrom") : null;
   const [viewRev, setViewRev] = useState<number | null>(null);
   const [amendmentSeed, setAmendmentSeed] = useState<AmendmentProposal | null>(null);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [problemOpen, setProblemOpen] = useState(false);
+  /* Bumped by `More actions → Propose a change to the customer`. A counter, not
+     a boolean, so the menu item still works after the modal was cancelled. */
+  const [amendSignal, setAmendSignal] = useState(0);
+  const [amendDateOpen, setAmendDateOpen] = useState(false);
   const [objectView, setObjectView] = useState<ObjectView>(showRoute ? "Order Route" : "Order");
 
   /* ⛔ `?edit=1` IS RETIRED — owner ruling 2026-08-15. A bookmark, a browser
@@ -982,22 +980,28 @@ export default function SalesOrderWorkspace() {
     );
   }, [params, setParams]);
 
-  const detailQ = useOperationOrder(isNew ? copyFrom : (orderId ?? null));
+  const detailQ = useOperationOrder(isNew ? null : (orderId ?? null));
   /* ── THE CREATE DOOR ASKS THE CATALOG (2026-08-21) ───────────────────────
    * Until now this door took a SKU as free text: a typo produced a line no
    * stock, PO or readiness engine could recognise, and creation still
    * succeeded. The POS never had that hole because it only ever offers SKUs
    * the catalog holds.
    *
-   * Fetched ONLY in create mode — the document view has no SKU field, and the
-   * bundle is the same 5-minute-cached response the POS already pulls, so an
-   * operator who walks POS → Ops pays for it once.
+   * The bundle is the same 5-minute-cached response the POS and both catalog
+   * pages already pull, so an operator who walks POS → Ops pays for it once.
    *
    * `admin: true` is deliberate: the office door must be able to write a line
    * for a SKU that is not on sale at POS (a discontinued model still being
    * fulfilled, a service line), and the admin bundle is the one that carries
-   * them. */
-  const catalogQ = useCatalog({ admin: true, enabled: isNew });
+   * them.
+   *
+   * ⭐ NOW FETCHED IN EVERY MODE (Jess, 2026-08-26). It used to be create-only,
+   * because the document view has no SKU field. The stair-carry working-out
+   * the POS shows needs `floorConfig`, which ships inside this bundle and
+   * nowhere else — and the same change that added it removed three whole
+   * queries from this page (Delivery Orders, Payments, Guarantees), so the
+   * Order tab still makes fewer round trips than it did before. */
+  const catalogQ = useCatalog({ admin: true });
   /** sku → what the CATALOG says it is. The one lookup both new fields read,
    *  so the name hint and the price hint can never disagree (Law D). */
   const catalogBySku = useMemo(() => {
@@ -1018,10 +1022,6 @@ export default function SalesOrderWorkspace() {
   const revisionsQ = useSalesOrderRevisions(isNew ? null : (orderId ?? null));
   const goodsTruthQ = useSalesOrderExpansion(isNew ? "" : (orderId ?? ""));
   const amendmentQ = useSalesOrderAmendment(isNew ? null : (orderId ?? null));
-  const deliveryOrdersQ = useDeliveryOrdersRegister({
-    orderId: isNew ? undefined : orderId,
-    enabled: !isNew && Boolean(orderId),
-  });
   /* 3.4 · what this sales order's changes have raised for other modules. The
    * workspace SHOWS it and cannot close it — the module that raised the work
    * does not tick it off. */
@@ -1034,10 +1034,6 @@ export default function SalesOrderWorkspace() {
   /* LINKED PROBLEMS needs the case's own translated status word, and Service
      owns that translation. The route facts carry only open/closed. */
   const serviceCasesQ = useOrderServiceCases(isNew ? "" : (orderId ?? ""), {
-    enabled: !isNew && Boolean(orderId),
-  });
-  const paymentsQ = useOrderPayments(isNew ? null : (orderId ?? null));
-  const guaranteesQ = useOrderGuarantees(isNew ? "" : (orderId ?? ""), {
     enabled: !isNew && Boolean(orderId),
   });
   const baseQ = useQuery({
@@ -1084,57 +1080,6 @@ export default function SalesOrderWorkspace() {
   const detailLines = detailQ.data?.lines ?? [];
   useEffect(() => {
     if (isNew) {
-      if (copyFrom) {
-        const seed = `copy:${copyFrom}`;
-        if (!order || draftSeed === seed) return;
-        const copied = copySalesOrderDraft({
-          order: {
-            id: order.id,
-            so: order.so,
-            customer_name: order.customer_name,
-            customer_phone: order.customer_phone,
-            customer_email: (order as { customer_email?: string | null }).customer_email,
-            customer_address: order.customer_address,
-            customer_address_line1:
-              (order as { customer_address_line1?: string | null }).customer_address_line1,
-            customer_address_line2:
-              (order as { customer_address_line2?: string | null }).customer_address_line2,
-            customer_address_city:
-              (order as { customer_address_city?: string | null }).customer_address_city,
-            customer_address_state:
-              (order as { customer_address_state?: string | null }).customer_address_state,
-            customer_address_postcode:
-              (order as { customer_address_postcode?: string | null }).customer_address_postcode,
-            customer_emergency: order.customer_emergency,
-            customer_billing: order.customer_billing,
-            dealer_id: order.dealer_id,
-            outlet_id: order.outlet_id,
-            salesperson_id: order.salesperson_id,
-            delivery_floor: (order as { delivery_floor?: number }).delivery_floor,
-            delivery_has_lift: (order as { delivery_has_lift?: boolean }).delivery_has_lift,
-          },
-          lines: detailLines.map((line) => ({
-            id: line.id,
-            sku: line.sku,
-            qty: line.qty,
-            unit_price: line.unit_price,
-            ...(line.attrs ? { attrs: line.attrs } : {}),
-          })),
-        });
-        const emergency = parseEmergencyContact(copied.customer_emergency);
-        const next: Draft = {
-          ...EMPTY_DRAFT,
-          ...copied,
-          emergency_name: emergency.name,
-          emergency_phone: emergency.phone,
-          emergency_relationship: emergency.relationship,
-          lines: copied.lines.map((line) => ({ ...line, key: nextKey() })),
-        };
-        setDraft(next);
-        setBaseline(next);
-        setDraftSeed(seed);
-        return;
-      }
       if (draftSeed !== "new") {
         const next = {
           ...EMPTY_DRAFT,
@@ -1224,7 +1169,6 @@ export default function SalesOrderWorkspace() {
     isNew,
     order,
     orderId,
-    copyFrom,
     detailLines,
     draftSeed,
     detailQ.dataUpdatedAt,
@@ -1738,59 +1682,6 @@ export default function SalesOrderWorkspace() {
           ? "Existing customer"
           : "New customer";
 
-  const relatedDocuments = useMemo(() => {
-    const pos = (detailQ.data?.pos ?? []).map((po) => ({
-      id: po.id,
-      label: po.id,
-      href: `/operation/procurement?po=${encodeURIComponent(po.id)}`,
-    }));
-    const receiving = (routeFactsQ.data?.receiving ?? []).map((session) => ({
-      id: session.id,
-      label: receivingRecordNo({
-        id: session.id,
-        goods_received_at: session.goods_received_at ?? undefined,
-        submitted_at: session.submitted_at,
-      }),
-      href: `/operation?tab=receiving&receipt=${encodeURIComponent(session.id)}`,
-    }));
-    const unitIds = [...new Set((goodsTruthQ.data?.lines ?? []).flatMap((line) => line.unitIds))];
-    const stock = unitIds.map((unitId) => ({
-      id: unitId,
-      label: unitId,
-      href: `/operation?tab=stock-onhand&q=${encodeURIComponent(unitId)}`,
-    }));
-    const deliveryOrders = (deliveryOrdersQ.data?.deliveryOrders ?? []).map((deliveryOrder) => ({
-      id: deliveryOrder.id,
-      label: deliveryOrder.do_number,
-      href: `/operation/delivery-orders/${encodeURIComponent(deliveryOrder.do_number)}`,
-    }));
-    const payments = (paymentsQ.data?.payments ?? []).map((payment, index) => ({
-      id: payment.id,
-      label: payment.receipt_no ?? `Payment ${index + 1}`,
-      href: `/operation?tab=payments&so=${order?.so ?? ""}`,
-    }));
-    const cases = (serviceCasesQ.data?.items ?? []).map((serviceCase) => ({
-      id: serviceCase.id,
-      label: serviceCase.caseNo,
-      href: `/operation?tab=service-notes&case=${encodeURIComponent(serviceCase.id)}`,
-    }));
-    const guarantees = (guaranteesQ.data?.items ?? []).map((guarantee) => ({
-      id: guarantee.id,
-      label: displayGuaranteeId(guarantee) ?? guarantee.guaranteeLabel ?? guarantee.guaranteeSku,
-      href: `/operation?tab=guarantees&q=${encodeURIComponent(displayGuaranteeId(guarantee) ?? guarantee.guaranteeSku)}`,
-    }));
-    return { pos, receiving, stock, deliveryOrders, payments, cases, guarantees };
-  }, [
-    detailQ.data?.pos,
-    routeFactsQ.data?.receiving,
-    goodsTruthQ.data?.lines,
-    deliveryOrdersQ.data?.deliveryOrders,
-    paymentsQ.data?.payments,
-    serviceCasesQ.data?.items,
-    guaranteesQ.data?.items,
-    order?.so,
-  ]);
-
   const headerRight = (
     <span className="flex items-center gap-2">
       {mode === "object" && objectView === "Order" && !showRoute && order && order.status !== "cancelled" && (
@@ -1802,14 +1693,6 @@ export default function SalesOrderWorkspace() {
                 authoritative create form; the object page reaches the SAME
                 route rather than growing a second copy path (Law C: a door,
                 never a duplicate). */}
-            <button
-              type="button"
-              onClick={() => navigate(`/operation/orders/so/new?copyFrom=${orderId}`)}
-              data-testid="workspace-copy-so"
-              className="w-full rounded-control px-2 py-1.5 text-left text-meta text-base-700 hover:bg-hovertint"
-            >
-              Copy to new Sales Order
-            </button>
             {/* A problem is RARE and it leaves this object for Service — it
                 belongs with the other rare acts, not as a permanent card on a
                 page the operator reads every day (owner ruling 2026-08-15). */}
@@ -1820,6 +1703,20 @@ export default function SalesOrderWorkspace() {
               className="w-full rounded-control px-2 py-1.5 text-left text-meta text-base-700 hover:bg-hovertint"
             >
               Report a problem
+            </button>
+            {/* ⭐ THE AMENDMENT DOOR MADE THE SAME JOURNEY (YH, 2026-08-26).
+                It was a standing strip at the foot of `Order info`; proposing a
+                contractual change is rarer than reading an order, and this is
+                where this page already keeps its rare acts. The strip is gone;
+                the capability — items, unit price, instalment months — is not,
+                and `Change delivery date` still handles the date on the card. */}
+            <button
+              type="button"
+              onClick={() => setAmendSignal((n) => n + 1)}
+              data-testid="workspace-propose-change"
+              className="w-full rounded-control px-2 py-1.5 text-left text-meta text-base-700 hover:bg-hovertint"
+            >
+              Propose a change to the customer
             </button>
             <button type="button" onClick={() => setCancelOpen(true)} data-testid="workspace-cancel-so" className="w-full rounded-control px-2 py-1.5 text-left text-meta text-danger hover:bg-hovertint">Cancel SO</button>
           </div>
@@ -1875,6 +1772,60 @@ export default function SalesOrderWorkspace() {
   const customerBuiltins = tab("customer").builtins;
   const emergencyEnabled = tab("emergency").builtins["emergency"]?.enabled !== false;
 
+  /* Is there an address on this order AT ALL? Any one structured part counts,
+     and so does an imported one-string address (AutoCount rows carry the whole
+     thing in `customer_address` with every part null) — otherwise every legacy
+     order would claim to have no address and be offered the tickbox that
+     erases it. */
+  const addressIsBlank =
+    !draft.customer_address_line1.trim() &&
+    !draft.customer_address_line2.trim() &&
+    !draft.customer_address_state &&
+    !draft.customer_address_city &&
+    !draft.customer_address_postcode &&
+    !(order?.customer_address ?? "").trim();
+
+  /* ⭐ THE STAIR CARRY, SHOWN THE WAY THE POS SHOWS IT (Jess, 2026-08-26).
+   *
+   * The office keyed `Floor`, `Items needing stair carry` and the lift answer
+   * and was told nothing back, while the POS printed the whole working-out —
+   * `3 of 5 items × 2 floors above 2F × RM50 = RM300`. Same three inputs, one
+   * surface explaining them and one not.
+   *
+   * ⛔ THE ARITHMETIC IS IMPORTED, NEVER RE-TYPED (ownership Law D — one
+   * derived fact, ONE arithmetic). `floorSurchargeRaw` is the same function the
+   * POS panel and the order totals call; a second copy here is exactly how the
+   * two surfaces would start disagreeing about money. */
+  const stair = useMemo(() => {
+    const cfg = catalogQ.data?.floorConfig;
+    if (!cfg) return null;
+    const itemsTotal =
+      mode === "create"
+        ? draft.lines.reduce((n, l) => n + l.qty, 0)
+        : (detailQ.data?.lines ?? []).reduce((n, l) => n + l.qty, 0);
+    /* ⭐ UNSET MEANS NONE — owner ruling 2026-08-27 (YH). It used to mean
+       EVERY item (0104's column comment), so an order nobody was asked about
+       carried the maximum fee. The same rule now runs in `order-totals.ts` and
+       in the POS panel, so all three agree. */
+    const items = stairCarryCount(itemsTotal, draft.delivery_stair_items);
+    const floors = Math.max(0, draft.delivery_floor - cfg.freeUpToFloor);
+    return {
+      cfg,
+      itemsTotal,
+      items,
+      floors,
+      fee: floorSurchargeRaw(draft.delivery_floor, draft.delivery_has_lift, items, cfg),
+    };
+  }, [
+    catalogQ.data?.floorConfig,
+    mode,
+    draft.lines,
+    draft.delivery_stair_items,
+    draft.delivery_floor,
+    draft.delivery_has_lift,
+    detailQ.data?.lines,
+  ]);
+
   /* ── THE LEFT PANE ─────────────────────────────────────────────────────── */
   const form = (
     /* A `fieldset` because the browser's own disabled-descendants rule is the
@@ -1886,18 +1837,15 @@ export default function SalesOrderWorkspace() {
       data-testid="sales-order-workspace"
       id="sales-order-workspace"
     >
-    <div className="flex flex-col gap-3">
+    {/* §3 of the token table names 24px "between blocks · card padding" and 12px
+        "standard gap". The left pane stacked eight sections at the standard gap,
+        so neighbouring cards sat as close as two fields inside one card — the
+        second half of why the sections did not separate. */}
+    <div className="flex flex-col gap-6">
       {mode === "oldrev" && viewedRevision && (
         <div className="px-1">
           <span className="rounded-full bg-base-900 px-2 py-0.5 text-label font-semibold text-white">
             Viewing Rev {viewedRevision.revision} · read-only
-          </span>
-        </div>
-      )}
-      {mode === "create" && copyFrom && order && (
-        <div className="px-1">
-          <span className="rounded-full bg-kit-blue-3 px-2 py-0.5 text-label font-semibold text-kit-blue-11">
-            Copied from SO-{order.so} · review before creating
           </span>
         </div>
       )}
@@ -1907,9 +1855,34 @@ export default function SalesOrderWorkspace() {
         </div>
       )}
 
-      {/* ① CUSTOMER */}
-      <Block title="Customer">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      {/* ① CUSTOMER — now the whole customer, address included (Jess,
+          2026-08-26). `Delivery address` was its own card between `Emergency
+          contact` and `Money`; a reader looking up "where does this go" had to
+          pass two unrelated sections to find it. It is the same party's fact,
+          so it is the same card, under its own locked name. */}
+      <Block
+        title="Customer"
+        headerSlot={
+          customerBuiltins["customerType"]?.enabled !== false ? (
+            <span data-pos-field="customerType">
+              {/* NEUTRAL, not the accent. `01-design-tokens.md` §2.2 spends blue
+                  once per screen and the tab underline already holds it — and a
+                  new customer is news, not a warning, so amber is wrong too. */}
+              <span
+                className="inline-flex rounded-full bg-kit-slate-3 px-2 py-0.5 text-label font-semibold text-base-700"
+                data-testid="customer-type-chip"
+              >
+                {customerTypeWord}
+              </span>
+            </span>
+          ) : undefined
+        }
+      >
+        {/* ⭐ THREE ACROSS (YH, 2026-08-27) — the six identity fields were two
+            per row, which made the card six rows tall for facts that are one
+            line each. At three they land as exactly two rows: who they are,
+            then who they are demographically. */}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <div data-pos-field="name">
             <Input id="so-name" label="Full name" required value={draft.customer_name}
               onChange={(e) => setField("customer_name", e.target.value)} />
@@ -1923,11 +1896,6 @@ export default function SalesOrderWorkspace() {
               <Input id="so-email" label="Email" required={customerBuiltins["email"]?.required}
                 value={draft.customer_email}
                 onChange={(e) => setField("customer_email", e.target.value)} />
-            </div>
-          )}
-          {customerBuiltins["customerType"]?.enabled !== false && (
-            <div data-pos-field="customerType">
-              <Fact label="Customer type (auto)" value={customerTypeWord} />
             </div>
           )}
           {customerBuiltins["race"]?.enabled !== false && (
@@ -1955,169 +1923,41 @@ export default function SalesOrderWorkspace() {
           )}
           <CustomFields fields={tab("customer").custom} values={draft.custom} onChange={setCustom} />
         </div>
-      </Block>
-
-      {/* ② ORDER INFO */}
-      <Block
-        title="Order info"
-        subtitle="The dates this order runs on. Proceed date is when production may start."
-      >
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <Fact label="Ordered" value={isNew ? "Today" : fmtDate(order?.placed_at ?? null)} />
-          {mode === "create" ? (
-            <div data-pos-field="deliveryDate">
-              <DatePicker id="so-promised" label="Customer Delivery" value={draft.delivery_date}
-                hint={earliestPromise ? `Earliest ${fmtDate(earliestPromise)} — production lead` : undefined}
-                error={
-                  draft.delivery_date && earliestPromise && draft.delivery_date < earliestPromise
-                    ? `Too soon — earliest is ${fmtDate(earliestPromise)}`
-                    : undefined
-                }
-                onChange={(iso) => setField("delivery_date", iso)} />
-            </div>
-          ) : (
-            <div data-pos-field="deliveryDate">
-              <Fact label="Customer Delivery" value={
-                promisedWord(mode, viewedRevision, order) === "No delivery date" ? (
-                  <span data-attention="warning" className="inline-flex rounded-control bg-kit-amber-3 px-1.5 py-0.5 font-medium text-kit-amber-11">No delivery date</span>
-                ) : promisedWord(mode, viewedRevision, order)
-              } />
+        {/* Merged from the retired `Delivery address` card (Jess,
+            2026-08-26). Same fields, same ids, same one-address fact — it
+            simply stopped being a separate card two sections away from the
+            customer it belongs to. */}
+        <SubHead>Delivery address</SubHead>
+        {/* ⭐ FOUR TRACKS (YH, 2026-08-27). The two address lines take two
+            tracks each, so they still read as full-width pairs — and STATE ·
+            CITY · POSTCODE · BUILDING TYPE then land on ONE row instead of
+            two-and-a-bit. Same fields, same cascade, three rows fewer. */}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-4" data-pos-field="address">
+          {/* ⭐ THE ESCAPE HATCH ONLY APPEARS WHEN IT IS NEEDED (YH,
+              2026-08-26). `Address not given yet` is the answer to a MISSING
+              address; on an order that already carries one it is a permanent
+              tickbox whose only power is to throw that address away. It shows
+              while the address is blank, and while it is already ticked (so it
+              can be unticked) — and disappears once there is an address to
+              read. The FIELD is untouched: `customer_address_unknown` still
+              round-trips, and the POS still asks the same question. */}
+          {(addressIsBlank || draft.customer_address_unknown) && (
+            <div className="sm:col-span-4">
+              <Checkbox id="so-address-unknown" label="Address not given yet"
+                checked={draft.customer_address_unknown}
+                onCheckedChange={(v) => setField("customer_address_unknown", v)} />
             </div>
           )}
-          <div data-pos-field="proceedDate">
-            <DatePicker id="so-proceed" label="Proceed date" value={draft.proceed_date}
-              error={
-                draft.proceed_date && draft.delivery_date && draft.proceed_date > draft.delivery_date
-                  ? "After the delivery date"
-                  : undefined
-              }
-              onChange={(iso) => setField("proceed_date", iso)} />
-          </div>
-          <div data-pos-field="stairCarry">
-            {/* Carres does not stair-carry above floor 3 (MAX_DELIVERY_FLOOR).
-                The POS has clamped this since the wizard was written; this door
-                accepted any number, so an office-keyed order could promise a
-                carry nobody performs. */}
-            <Input id="so-floor" label="Floor" type="number" min={0} max={MAX_DELIVERY_FLOOR}
-              hint={`Stair carry up to floor ${MAX_DELIVERY_FLOOR}`}
-              value={String(draft.delivery_floor)}
-              onChange={(e) =>
-                setField(
-                  "delivery_floor",
-                  Math.min(MAX_DELIVERY_FLOOR, Math.max(0, Number(e.target.value) || 0)),
-                )
-              } />
-          </div>
-          <Input id="so-stair-items" label="Items needing stair carry" type="number" min={0}
-            hint="Empty = every item"
-            value={draft.delivery_stair_items == null ? "" : String(draft.delivery_stair_items)}
-            onChange={(e) =>
-              setField(
-                "delivery_stair_items",
-                e.target.value === "" ? null : Math.max(0, Number(e.target.value) || 0),
-              )
-            } />
-          <div className="self-end pb-2">
-            <Checkbox id="so-lift" label="Lift available"
-              checked={draft.delivery_has_lift}
-              onCheckedChange={(v) => setField("delivery_has_lift", v)} />
-          </div>
-          <CustomFields fields={tab("target").custom} values={draft.custom} onChange={setCustom} />
-        </div>
-        {/* THE ONE DOOR for goods, price and the promised date. */}
-        {!isNew && mode === "object" && orderId && (
-          <div className="mt-3 border-t border-kit-slate-5 pt-3">
-            <SalesOrderAmendment
-              orderId={orderId}
-              currentLines={(detailQ.data?.lines ?? []).map((l) => ({
-                id: l.id,
-                sku: l.sku,
-                qty: l.qty,
-                unit_price: Number(l.unit_price),
-              }))}
-              currentDeliveryDate={order?.delivery_date ?? null}
-              currentDeliveryDateTbd={order?.delivery_date_tbd ?? false}
-              currentInstallmentMonths={(order as { installment_months?: number | null } | undefined)?.installment_months ?? null}
-              proposalSeed={amendmentSeed}
-            />
-          </div>
-        )}
-      </Block>
-
-      {/* ③ AMEND DELIVERY DATE
-          Collapsed unless an amendment is actually live. The block order is
-          LOCKED (MASTER.md, SALES ORDER OBJECT PAGE V2) and does not move —
-          what changes is only how much of it is open at once, which no ruling
-          governs. A pending amendment is real news, so it stays expanded. */}
-      {!isNew && mode === "object" && orderId && (
-        <Block
-          title="Amend delivery date"
-          note="creates a Revision · needs approval"
-          subtitle="Move the date the customer was promised. Needs approval before it counts."
-          summary={
-            liveAmendment
-              ? "Amendment pending approval"
-              : "Delivery date unchanged — open to request a new one"
-          }
-          forceOpen={Boolean(liveAmendment)}
-        >
-          <SalesOrderAmendDeliveryDate
-            orderId={orderId}
-            currentDeliveryDate={order?.delivery_date ?? null}
-            liveAmendment={liveAmendment}
-          />
-        </Block>
-      )}
-
-      {/* ④ EMERGENCY CONTACT */}
-      {emergencyEnabled && (
-        <Block
-          title="Emergency contact"
-          note="Used only if we cannot reach the customer on delivery day"
-          summary={
-            draft.emergency_name.trim() || draft.emergency_phone.trim()
-              ? `${draft.emergency_name.trim() || "No name"} · ${draft.emergency_phone.trim() || "no phone"}`
-              : "No emergency contact recorded"
-          }
-          /* Never hide a change the save bar is counting. */
-          forceOpen={changedFields.some((k) => k.startsWith("emergency_"))}
-        >
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3" data-pos-field="emergency">
-            <Input id="so-emergency-name" label="Name" value={draft.emergency_name}
-              onChange={(e) => setField("emergency_name", e.target.value)} />
-            <Input id="so-emergency-phone" label="Phone" value={draft.emergency_phone}
-              onChange={(e) => setField("emergency_phone", e.target.value)} />
-            {/* The relationship is a picker with a free-text escape: an
-                imported or hand-typed word that is not on the list must survive
-                being looked at, so it stays in the text box. */}
-            <Input id="so-emergency-relationship" label="Relationship"
-              list="so-emergency-relationships"
-              value={draft.emergency_relationship}
-              onChange={(e) => setField("emergency_relationship", e.target.value)} />
-            <datalist id="so-emergency-relationships">
-              {EMERGENCY_RELATIONSHIPS.map((r) => <option key={r} value={r} />)}
-            </datalist>
-          </div>
-          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <CustomFields fields={tab("emergency").custom} values={draft.custom} onChange={setCustom} />
-          </div>
-        </Block>
-      )}
-
-      {/* ⑤ DELIVERY ADDRESS */}
-      <Block title="Delivery address">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2" data-pos-field="address">
           <div className="sm:col-span-2">
-            <Checkbox id="so-address-unknown" label="Address not given yet"
-              checked={draft.customer_address_unknown}
-              onCheckedChange={(v) => setField("customer_address_unknown", v)} />
+            <Input id="so-line1" label="Address line 1" value={draft.customer_address_line1}
+              disabled={draft.customer_address_unknown}
+              onChange={(e) => setField("customer_address_line1", e.target.value)} />
           </div>
-          <Input id="so-line1" label="Address line 1" value={draft.customer_address_line1}
-            disabled={draft.customer_address_unknown}
-            onChange={(e) => setField("customer_address_line1", e.target.value)} />
-          <Input id="so-line2" label="Address line 2" value={draft.customer_address_line2}
-            disabled={draft.customer_address_unknown}
-            onChange={(e) => setField("customer_address_line2", e.target.value)} />
+          <div className="sm:col-span-2">
+            <Input id="so-line2" label="Address line 2" value={draft.customer_address_line2}
+              disabled={draft.customer_address_unknown}
+              onChange={(e) => setField("customer_address_line2", e.target.value)} />
+          </div>
           {/* THE MALAYSIA CASCADE — state picks city picks postcode, the same
               three questions in the same order the POS asks them.
               (`@/data/malaysia-postcodes`, one dataset, no second copy.)
@@ -2169,28 +2009,69 @@ export default function SalesOrderWorkspace() {
             onValueChange={(v) => setField("building_type", v)}
             options={BUILDING_TYPE_OPTIONS.map((b) => ({ value: b, label: b }))} />
         </div>
-        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2" data-pos-field="billing">
-          <div className="sm:col-span-2">
+        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-4" data-pos-field="billing">
+          <div className="sm:col-span-4">
             <Checkbox id="so-billing-same" label="Billing address same as delivery"
               checked={draft.customer_billing_same}
               onCheckedChange={(v) => setField("customer_billing_same", v)} />
           </div>
           {!draft.customer_billing_same && (
-            <div className="sm:col-span-2">
+            <div className="sm:col-span-4">
               <Input id="so-billing" label="Billing address" value={draft.customer_billing}
                 onChange={(e) => setField("customer_billing", e.target.value)} />
             </div>
           )}
           <CustomFields fields={tab("address").custom} values={draft.custom} onChange={setCustom} />
         </div>
+        {/* ⭐ Merged from the retired `Emergency contact` card (YH,
+            2026-08-27). It is the same person's fact, so it is the same
+            card — the customer, everywhere their goods go, and who to ring
+            if nobody answers on the day. It loses its fold with its border:
+            three fields do not need hiding, and a collapsed card cannot
+            show an unsaved change without the force-open machinery that
+            existed only because it was collapsible. */}
+        {emergencyEnabled && (
+          <>
+            <SubHead>Emergency contact</SubHead>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3" data-pos-field="emergency">
+              <Input id="so-emergency-name" label="Name" value={draft.emergency_name}
+                onChange={(e) => setField("emergency_name", e.target.value)} />
+              <Input id="so-emergency-phone" label="Phone" value={draft.emergency_phone}
+                onChange={(e) => setField("emergency_phone", e.target.value)} />
+              {/* The relationship is a picker with a free-text escape: an
+                  imported or hand-typed word that is not on the list must survive
+                  being looked at, so it stays in the text box. */}
+              <Input id="so-emergency-relationship" label="Relationship"
+                list="so-emergency-relationships"
+                value={draft.emergency_relationship}
+                onChange={(e) => setField("emergency_relationship", e.target.value)} />
+              <datalist id="so-emergency-relationships">
+                {EMERGENCY_RELATIONSHIPS.map((r) => <option key={r} value={r} />)}
+              </datalist>
+            </div>
+            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <CustomFields fields={tab("emergency").custom} values={draft.custom} onChange={setCustom} />
+            </div>
+          </>
+        )}
       </Block>
 
       {/* ⑥ MONEY — read-only forever (ownership Law B). */}
       <Block title="Money">
-        <div className="flex flex-wrap items-end gap-x-8 gap-y-3">
+        {/* ⭐ THREE AMOUNTS, ONE SIZE (YH, 2026-08-28 — overwrites the
+            2026-08-15 `Total large · Paid medium · Outstanding loudest`
+            weighting). The weighting never reached the numerals anyway:
+            `<Money>` renders every amount at its `row` tone, so all three
+            digits were ALREADY 13px and only the CONTAINERS differed. Three
+            different container sizes meant three different line-heights, so
+            under `items-end` the three amounts did not sit on one line —
+            which is what read as "alignment wrong". One size on all three
+            fixes the alignment and the fallback strings at the same time.
+            Colour still separates them: Outstanding is red while owed. */}
+        <div className="flex flex-wrap items-baseline gap-x-8 gap-y-3">
           <div>
             <div className="text-label text-base-500">Total</div>
-            <div className="text-title text-base-900" data-testid="money-total">
+            <div className="text-strong text-base-900" data-testid="money-total">
               {money.known && money.total != null ? <Money value={money.total} /> : "No price yet"}
             </div>
           </div>
@@ -2201,13 +2082,14 @@ export default function SalesOrderWorkspace() {
             </div>
           </div>
           {/* ⭐ THE CUSTOMER-MONEY WORD IS `Outstanding` (CLAUDE.md §7 — what the
-              CUSTOMER owes HQ), and it is the LOUDEST thing in the block: the
-              most-read number on the page (ui/MASTER.md §6.4 ⑤), red while any
-              of it is still owed (owner ruling 2026-08-15). */}
+              CUSTOMER owes HQ). It is the most-read number on the page
+              (ui/MASTER.md §6.4 ⑤) and stays RED while any of it is owed
+              (owner ruling 2026-08-15) — the colour carries that on its own,
+              at the same size as its two neighbours. */}
           <div>
             <div className="text-label text-base-500">Outstanding</div>
             <div
-              className={`text-page ${money.known && money.outstanding > 0 ? "text-danger" : "text-base-900"}`}
+              className={`text-strong ${money.known && money.outstanding > 0 ? "text-danger" : "text-base-900"}`}
               data-testid="money-outstanding"
             >
               {!money.known ? "No price yet" : money.outstanding > 0 ? <Money value={money.outstanding} /> : "Paid in full"}
@@ -2241,18 +2123,197 @@ export default function SalesOrderWorkspace() {
         )}
       </Block>
 
-      {/* ⑦ SALES OWNERSHIP */}
-      {/* The TITLE is locked — COPY-STANDARD:1395 rules this exact wording and
-          MASTER.md's block order names `SALES OWNERSHIP`. The audit's proposed
-          rename to "Sales assignment" is not available, and COPY-STANDARD's own
-          "Do NOT use" column already rejected the same shape ("Request
-          ownership change"). So the confusion is answered the only way that is
-          both legal and better: the locked word stays, and a subtitle says what
-          it means. */}
-      <Block
-        title="Sales ownership"
-        subtitle="Who sold it — the dealer, the showroom and the salesperson credited."
-      >
+      {/* ② ORDER INFO */}
+      {/* No subtitle (YH, 2026-08-26). The 2026-08-24 teaching line explained
+          what `Proceed date` meant while it was an editable box the office had
+          to reason about. It is a recorded fact now, and a sentence explaining
+          a read-only date is the "reduce descriptions" Jess asked for. */}
+      <Block title="Order info">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <Fact label="Ordered" value={isNew ? "Today" : fmtDate(order?.placed_at ?? null)} />
+          {mode === "create" ? (
+            <div data-pos-field="deliveryDate">
+              <DatePicker id="so-promised" label="Requested Delivery Date" value={draft.delivery_date}
+                hint={earliestPromise ? `Earliest ${fmtDate(earliestPromise)} — production lead` : undefined}
+                error={
+                  draft.delivery_date && earliestPromise && draft.delivery_date < earliestPromise
+                    ? `Too soon — earliest is ${fmtDate(earliestPromise)}`
+                    : undefined
+                }
+                onChange={(iso) => setField("delivery_date", iso)} />
+            </div>
+          ) : (
+            <div data-pos-field="deliveryDate">
+              <Fact label="Requested Delivery Date" value={
+                promisedWord(mode, viewedRevision, order) === "No delivery date" ? (
+                  <span data-attention="warning" className="inline-flex rounded-control bg-kit-amber-3 px-1.5 py-0.5 font-medium text-kit-amber-11">No delivery date</span>
+                ) : promisedWord(mode, viewedRevision, order)
+              } />
+              {/* ⭐ THE DOOR SITS BESIDE THE DATE IT MOVES (YH, 2026-08-27).
+                  The three amend fields were a whole section — first a card,
+                  then a merged subsection — standing open on every order for an
+                  act that happens rarely. They are a MODAL now, opened from the
+                  fact they change, which is where somebody looking at a wrong
+                  date already has their eye.
+                  A LIVE proposal is truth and is NOT hidden behind the modal:
+                  it prints here, under the date it is waiting to move. */}
+              {!isNew && mode === "object" && orderId && (
+                liveAmendment ? (
+                  <p className="mt-1 text-meta text-base-600" data-testid="amend-date-waiting">
+                    {liveAmendment.stale
+                      ? "A proposal on this order is out of date."
+                      : "A proposal is waiting for management."}
+                  </p>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setAmendDateOpen(true)}
+                    data-testid="amend-date-open"
+                    className="mt-1 text-meta font-medium text-kit-blue-11 underline-offset-2 hover:underline"
+                  >
+                    Change delivery date
+                  </button>
+                )
+              )}
+            </div>
+          )}
+          {/* ⭐ PROCEED DATE IS READ-ONLY ONCE THE ORDER EXISTS (Jess,
+              2026-08-26). This OVERWRITES `docs/orders/MASTER.md` §725-728,
+              which gave Operations a direct writer here. The portal asks for
+              the production start as a REQUIRED question at the point of sale
+              (`Proceed date · production start *`), so on an existing order it
+              is a recorded answer, not a field — and an office edit that moved
+              it silently moved when the factory may start.
+              CREATE still owns the picker: `createOrderInput` refuses an order
+              without one, so keying a new SO here must still be able to set it. */}
+          <div data-pos-field="proceedDate">
+            {mode === "create" ? (
+              <DatePicker id="so-proceed" label="Proceed date" value={draft.proceed_date}
+                error={
+                  draft.proceed_date && draft.delivery_date && draft.proceed_date > draft.delivery_date
+                    ? "After the delivery date"
+                    : undefined
+                }
+                onChange={(iso) => setField("proceed_date", iso)} />
+            ) : (
+              <span id="so-proceed">
+                <Fact label="Proceed date" value={fmtDate(draft.proceed_date) || "Not recorded"} />
+              </span>
+            )}
+          </div>
+          <div data-pos-field="stairCarry">
+            {/* Carres does not stair-carry above floor 3 (MAX_DELIVERY_FLOOR).
+                The POS has clamped this since the wizard was written; this door
+                accepted any number, so an office-keyed order could promise a
+                carry nobody performs. */}
+            {/* The ceiling rides the LABEL (YH, 2026-08-26) — it was a hint
+                under the box, which reads as advice rather than as the limit
+                the input actually enforces. One statement, in the field's own
+                name, and the separate hint line goes with it. */}
+            <Input id="so-floor" label={`Floor (Max is ${MAX_DELIVERY_FLOOR}rd Floor)`}
+              type="number" min={0} max={MAX_DELIVERY_FLOOR}
+              value={String(draft.delivery_floor)}
+              onChange={(e) =>
+                setField(
+                  "delivery_floor",
+                  Math.min(MAX_DELIVERY_FLOOR, Math.max(0, Number(e.target.value) || 0)),
+                )
+              } />
+          </div>
+          {/* ⭐ THE BLANK SAYS WHAT IT MEANS (YH, 2026-08-26). This was a bare
+              number box with `Empty = every item` underneath it — a rule the
+              reader had to hold in their head to interpret an empty cell. The
+              answer now sits IN the cell: an untouched field reads `All 5
+              items`, so nothing has to be remembered and the count it stands
+              for is on screen. Still null on the wire — 0104's column comment
+              rules that NULL means every item, and a number is never invented
+              here to avoid a blank. */}
+          {/* ⭐ THE CELL ALWAYS CARRIES A NUMBER (YH, 2026-08-27) — "no ask
+              then put a default value, rather than leaving it blank".
+              The default shown is the POS's OWN default for the same unset
+              field: every item on the order. The POS has never printed a blank
+              here, so an office cell that did was the two surfaces disagreeing
+              about one field again.
+
+              ⛔ NOT ZERO, and that is the one place this departs from the
+              literal ask. 0104 rules NULL = "dealer left it auto" = every
+              item, and the fee MULTIPLIES by that count — defaulting the box
+              to 0 would quietly reprice every stair-carry order to RM 0 while
+              looking like a formatting change. The STORED value stays null
+              until somebody types: this shows the derived default, it never
+              writes one. */}
+          <Input id="so-stair-items" label="Items needing stair carry" type="number" min={0}
+            hint={stair ? `0 to ${stair.itemsTotal}` : undefined}
+            value={String(draft.delivery_stair_items ?? 0)}
+            onChange={(e) =>
+              setField(
+                "delivery_stair_items",
+                e.target.value === "" ? null : Math.max(0, Number(e.target.value) || 0),
+              )
+            } />
+          {/* ⭐ THE SAME QUESTION, ASKED THE SAME WAY ON BOTH SIDES (Jess,
+              2026-08-26). The POS asks `Lift available?` and offers two named
+              answers — `No lift` / `Has lift` (`pos/StairCarryFields.tsx`).
+              Operations asked the same fact as a bare tickbox, so an unticked
+              box meant BOTH "no lift" and "nobody said", and the two surfaces
+              did not tally. Two named options, the POS's exact words, and a
+              blank that still reads as a blank. */}
+          <Select id="so-lift" label="Lift available?"
+            value={draft.delivery_has_lift ? "Has lift" : "No lift"}
+            onValueChange={(v) => setField("delivery_has_lift", v === "Has lift")}
+            options={LIFT_OPTIONS.map((o) => ({ value: o, label: o }))} />
+        </div>
+        {/* The three fields above, added up out loud — the POS's own sentence
+            (`pos/StairCarryFields.tsx`), so the office reads the number the
+            salesperson quoted instead of re-deriving it.
+            ⭐ ONLY WHEN THERE IS A CHARGE (YH, 2026-08-26). It used to narrate
+            the zero too — "No stair carry — floor 1 is within the free 2F" —
+            which is a sentence saying nothing happened, printed on the majority
+            of orders. The fields above already state the floor and the lift; a
+            line that only repeats them back is the noise Jess asked to cut. */}
+        {stair && stair.fee > 0 && (
+          <p className="mt-2 text-meta text-base-500" data-testid="so-stair-working">
+            {stair.items} of {stair.itemsTotal} item{stair.itemsTotal === 1 ? "" : "s"} ×{" "}
+            {stair.floors} floor{stair.floors === 1 ? "" : "s"} above {stair.cfg.freeUpToFloor}F ×{" "}
+            <Money value={stair.cfg.perFloorPerItem} /> ={" "}
+            <span className="font-semibold text-base-900">
+              <Money value={stair.fee} />
+            </span>
+          </p>
+        )}
+        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <CustomFields fields={tab("target").custom} values={draft.custom} onChange={setCustom} />
+        </div>
+        {/* THE ONE DOOR for goods, price and the promised date — opened from
+            `More actions` since 2026-08-26. The component still MOUNTS here
+            because a LIVE proposal is truth and belongs on the card, and
+            because the modal it owns has to exist to be opened at all. The
+            rule + padding therefore appear only when there is a live panel to
+            separate; with nothing pending this renders an empty, invisible
+            div rather than a bordered strip with no content in it. */}
+        {!isNew && mode === "object" && orderId && (
+          <div className={liveAmendment ? "mt-3 border-t border-kit-slate-5 pt-3" : ""}>
+            <SalesOrderAmendment
+              orderId={orderId}
+              currentLines={(detailQ.data?.lines ?? []).map((l) => ({
+                id: l.id,
+                sku: l.sku,
+                qty: l.qty,
+                unit_price: Number(l.unit_price),
+              }))}
+              currentDeliveryDate={order?.delivery_date ?? null}
+              currentDeliveryDateTbd={order?.delivery_date_tbd ?? false}
+              currentInstallmentMonths={(order as { installment_months?: number | null } | undefined)?.installment_months ?? null}
+              proposalSeed={amendmentSeed}
+              openSignal={amendSignal}
+              inlineTrigger={false}
+            />
+          </div>
+        )}
+        {/* Merged from the retired `Sales ownership` card (Jess,
+            2026-08-26). The WORD is locked, so it survives as the
+            subsection's name; only the card border is gone. */}
+        <SubHead>Sales ownership</SubHead>
         {mode === "create" ? (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <Select id="so-dealer" label="Dealer"
@@ -2304,7 +2365,13 @@ export default function SalesOrderWorkspace() {
             )}
           </>
         )}
+
       </Block>
+
+
+
+
+
 
       {/* ⑧ GOODS — the six-column truth §0.1 locks. It is not a form: Unit ID
           and Deliver To are Stock's and Purchasing's facts, and the document
@@ -2411,103 +2478,7 @@ export default function SalesOrderWorkspace() {
         )}
       </Block>
 
-      {/* Delivery owns the journey. Sales shows the customer promise and the
-          recorded carrying facts, then offers one door into Delivery. */}
-      {!isNew && mode !== "oldrev" && (
-        <Block title="Delivery Journey">
-          {routeFactsQ.isLoading ? (
-            <Loading label="Loading the delivery journey" />
-          ) : routeFactsQ.isError ? (
-            <div className="rounded-control bg-kit-red-3 px-3 py-2 text-label text-kit-red-11">
-              Delivery facts could not be loaded
-              <button type="button" className="ml-2 font-medium underline" onClick={() => void routeFactsQ.refetch()}>
-                Try again
-              </button>
-            </div>
-          ) : (
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Fact
-                label="Customer promise"
-                value={order?.delivery_date ? fmtDate(order.delivery_date) : "Date not recorded"}
-              />
-              <Fact
-                label="Logistics partner"
-                value={routeFactsQ.data?.brief.assignedLogistics?.partnerName ?? "Not chosen yet"}
-              />
-              <Fact
-                label="Delivery appointment"
-                value={
-                  routeFactsQ.data?.brief.appointment
-                    ? `${fmtDate(routeFactsQ.data.brief.appointment.dateIso)} · ${routeFactsQ.data.brief.appointment.slot}`
-                    : "Date and slot not confirmed"
-                }
-              />
-            </div>
-          )}
-          {deliveryOrdersQ.data ? (
-            <div className="mt-3 border-t border-kit-slate-5 pt-3">
-              <p className="mb-2 text-label font-semibold uppercase tracking-wide text-base-600">
-                Delivery Orders
-              </p>
-              <SalesOrderDeliveryOrdersBlock payload={deliveryOrdersQ.data} />
-            </div>
-          ) : deliveryOrdersQ.isError ? (
-            <div className="mt-3 rounded-control bg-kit-red-3 px-3 py-2 text-label text-kit-red-11">
-              Delivery Orders could not be loaded
-              <button type="button" className="ml-2 font-medium underline" onClick={() => void deliveryOrdersQ.refetch()}>
-                Try again
-              </button>
-            </div>
-          ) : (
-            <div className="mt-3"><Loading label="Loading Delivery Orders" /></div>
-          )}
-          <button
-            type="button"
-            className="mt-3 text-meta font-medium text-kit-blue-11 underline-offset-2 hover:underline"
-            onClick={() => openObjectView("Order Route")}
-          >
-            Open Order Route →
-          </button>
-        </Block>
-      )}
 
-      {/* This is the Sales Order's document index. It reads every owning
-          module and never creates, edits or closes another module's record.
-
-          NOT COLLAPSED, deliberately. The obvious candidate — seven rows of
-          links most reads never open — is the one card whose completeness is
-          MECHANICALLY PINNED: `SalesOrderWorkspace.ui-contract.test.ts` asserts
-          "a complete read-only Related Documents index" by matching this exact
-          source line. Collapsing it broke that test, which is the enforcement
-          of a locked ruling doing its job. Reopening it needs an owner ruling,
-          not a build decision. */}
-      {!isNew && mode !== "oldrev" && (
-        <Block title="Related Documents">
-          <div data-testid="sales-order-related-documents">
-            <RelatedDocumentLine label="Purchase Orders">
-              <DocumentLinks documents={relatedDocuments.pos} />
-            </RelatedDocumentLine>
-            <RelatedDocumentLine label="Receiving Sessions">
-              <RelatedDocumentsValue documents={relatedDocuments.receiving} loading={routeFactsQ.isLoading} error={routeFactsQ.isError} retry={routeFactsQ.refetch} />
-            </RelatedDocumentLine>
-            <RelatedDocumentLine label="Stock Units">
-              <RelatedDocumentsValue documents={relatedDocuments.stock} loading={goodsTruthQ.isLoading} error={goodsTruthQ.isError} retry={goodsTruthQ.refetch} />
-            </RelatedDocumentLine>
-            <RelatedDocumentLine label="Delivery Orders">
-              <RelatedDocumentsValue documents={relatedDocuments.deliveryOrders} loading={deliveryOrdersQ.isLoading} error={deliveryOrdersQ.isError} retry={deliveryOrdersQ.refetch} />
-            </RelatedDocumentLine>
-            <RelatedDocumentLine label="Payments">
-              <RelatedDocumentsValue documents={relatedDocuments.payments} loading={paymentsQ.isLoading} error={paymentsQ.isError} retry={paymentsQ.refetch} />
-            </RelatedDocumentLine>
-            <RelatedDocumentLine label="Service Cases">
-              <RelatedDocumentsValue documents={relatedDocuments.cases} loading={serviceCasesQ.isLoading} error={serviceCasesQ.isError} retry={serviceCasesQ.refetch} />
-            </RelatedDocumentLine>
-            <RelatedDocumentLine label="Guarantees">
-              <RelatedDocumentsValue documents={relatedDocuments.guarantees} loading={guaranteesQ.isLoading} error={guaranteesQ.isError} retry={guaranteesQ.refetch} />
-            </RelatedDocumentLine>
-          </div>
-        </Block>
-      )}
 
       {/* ⑨ WHAT THIS CHANGE STARTED ELSEWHERE — 3.4. Shown only when there IS
           work: a section that says "nothing" on every order is a section the
@@ -2557,6 +2528,25 @@ export default function SalesOrderWorkspace() {
           </nav>
         ) : null}
       />
+
+      {/* The amend trio, opened from beside `Requested Delivery Date`. The governed
+          note is the modal's DESCRIPTION — the first thing read on opening,
+          rather than a footnote beside the button that commits it. */}
+      {!isNew && mode === "object" && orderId && (
+        <Modal
+          open={amendDateOpen}
+          onOpenChange={setAmendDateOpen}
+          title="Change delivery date"
+          description="creates a Revision · needs approval"
+        >
+          <SalesOrderAmendDeliveryDate
+            orderId={orderId}
+            currentDeliveryDate={order?.delivery_date ?? null}
+            liveAmendment={liveAmendment}
+            onDone={() => setAmendDateOpen(false)}
+          />
+        </Modal>
+      )}
 
       {order && (
         <CancelSalesOrderDialog
@@ -2651,16 +2641,16 @@ export default function SalesOrderWorkspace() {
            its own and the PAGE does not; below 1024px they stack, form first,
            and the page scrolls normally. */
         <div className="min-h-0 flex-1 overflow-auto bg-kit-slate-3 lg:overflow-hidden">
-          {(!isNew || copyFrom) && detailQ.isLoading && (
+          {!isNew && detailQ.isLoading && (
             <div className="px-4 py-4">
-              <Loading label={copyFrom ? "Preparing the copied draft" : "Opening the sales order"} />
+              <Loading label="Opening the sales order" />
             </div>
           )}
-          {(!isNew || copyFrom) && !detailQ.isLoading && detailQ.isError && (
+          {!isNew && !detailQ.isLoading && detailQ.isError && (
             <div className="px-4 py-4">
               <div className="rounded-card border border-kit-slate-5 bg-white">
                 <EmptyState
-                  title={copyFrom ? "This Sales Order could not be copied" : "This sales order could not be opened"}
+                  title="This sales order could not be opened"
                   detail={(detailQ.error as Error | undefined)?.message}
                   action={
                     <Button variant="neutral" onClick={() => void detailQ.refetch()}>
@@ -2672,7 +2662,7 @@ export default function SalesOrderWorkspace() {
             </div>
           )}
 
-          {(isNew && !copyFrom || order) && (
+          {(isNew || order) && (
             <div className="flex h-full min-h-0 flex-col lg:flex-row" data-testid="object-two-panes">
               <div className="flex min-h-0 min-w-0 flex-col lg:w-1/2 lg:overflow-hidden">
                 <div className="min-h-0 flex-1 px-4 py-4 lg:overflow-auto">{form}</div>

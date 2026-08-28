@@ -738,7 +738,7 @@ export default function DealerPos({
         },
         delivery: {
           /* ⛔ Owner ruling 2026-08-15 — a new Sales Order always carries a
-             real Customer Delivery date. `step3DateValid` has already refused
+             real Requested Delivery Date date. `step3DateValid` has already refused
              an empty one, and the create door refuses `dateTbd` outright. */
           date: draft.delivery.date,
           proceedDate: draft.delivery.proceedDate || null,

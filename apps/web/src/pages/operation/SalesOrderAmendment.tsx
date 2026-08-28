@@ -55,6 +55,8 @@ export default function SalesOrderAmendment({
   currentDeliveryDateTbd = false,
   currentInstallmentMonths = null,
   proposalSeed,
+  openSignal,
+  inlineTrigger = true,
 }: {
   orderId: string;
   /** The order's lines today — the proposal starts as a copy of them. */
@@ -63,6 +65,15 @@ export default function SalesOrderAmendment({
   currentDeliveryDateTbd?: boolean;
   currentInstallmentMonths?: number | null;
   proposalSeed?: AmendmentProposal | null;
+  /** ⭐ OPENED FROM `More actions` (YH, 2026-08-26). Bump this number to start
+   *  a proposal from outside — the counter, rather than a boolean, is what lets
+   *  the same menu item work a second time after the modal was cancelled. */
+  openSignal?: number;
+  /** When false the idle strip renders NOTHING: a rare act does not hold
+   *  permanent space on the card, it lives in `More actions`. The LIVE
+   *  proposal panel is unaffected either way — a pending amendment is truth,
+   *  not an action, and truth stays on the page. */
+  inlineTrigger?: boolean;
 }) {
   const liveQ = useSalesOrderAmendment(orderId);
   const amendment = liveQ.data?.amendment ?? null;
@@ -107,6 +118,15 @@ export default function SalesOrderAmendment({
     // A seed is an explicit user action; current facts are intentionally captured at that moment.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [proposalSeed]);
+
+  /* `More actions → Propose a change to the customer`. Guarded on > 0 so the
+     first render never opens it, and keyed on the counter so a cancelled
+     modal can be reopened from the same menu item. */
+  useEffect(() => {
+    if (openSignal && openSignal > 0) startProposal();
+    // Same reason as the seed above — the facts are captured at the click.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openSignal]);
 
   const changed = lines.some((l, i) => {
     const was = currentLines[i];
@@ -199,15 +219,31 @@ export default function SalesOrderAmendment({
           )}
         </div>
       ) : (
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-meta text-base-500">
-            Items, price and the promised date are what the customer agreed to — they change by
-            proposal, not by editing.
-          </p>
-          <Button size="sm" variant="neutral" onClick={() => startProposal()} data-testid="amendment-open-form">
-            Propose a change to the customer
-          </Button>
-        </div>
+        /* ⭐ THE IDLE STRIP IS GONE FROM THE CARD — YH, 2026-08-26.
+           It was a standing sentence ("Items, price and the promised date are
+           what the customer agreed to…") beside a button, on every order,
+           forever. The sentence explained why some fields opened and others did
+           not, back when those three sat beside editable boxes; they are
+           read-only facts now, so it explained a distinction the screen no
+           longer draws.
+
+           The DOOR did not go with it — it MOVED, to `More actions`, which is
+           the precedent this page already set: `Report a problem` made exactly
+           this journey on 2026-08-15 and its permanent card was deleted in the
+           same breath. Proposing an amendment is rarer than reading an order,
+           and rare acts do not hold permanent space.
+
+           That matters because this modal is the ONLY way to change ITEMS,
+           UNIT PRICE and INSTALMENT MONTHS anywhere on the Sales Order —
+           `Change delivery date` submits a date and nothing else. Deleting the
+           button outright would have retired three capabilities silently. */
+        inlineTrigger ? (
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <Button size="sm" variant="neutral" onClick={() => startProposal()} data-testid="amendment-open-form">
+              Propose a change to the customer
+            </Button>
+          </div>
+        ) : null
       )}
 
       <Modal

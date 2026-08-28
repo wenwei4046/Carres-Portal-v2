@@ -63,7 +63,7 @@ const DOCUMENTS: SoBatchDocument[] = [
         qty: 3,
         goodsMustArrive: "2026-09-02",
         issueRef: { proposalKey: "s-hooka::mattress", buildKey: "b1" },
-        costs: [{ sku: "B1201S-K", unitCost: 880 }],
+        parts: [{ sku: "B1201S-K", qty: 3, unitCost: 880 }],
       },
       {
         demandId: "build::o2::b2",
@@ -75,7 +75,7 @@ const DOCUMENTS: SoBatchDocument[] = [
         qty: 1,
         goodsMustArrive: "2026-09-04",
         issueRef: { proposalKey: "s-hooka::mattress", buildKey: "b2" },
-        costs: [{ sku: "B1201S-Q", unitCost: 760 }],
+        parts: [{ sku: "B1201S-Q", qty: 1, unitCost: 760 }],
       },
     ],
   },
@@ -99,10 +99,10 @@ const DOCUMENTS: SoBatchDocument[] = [
         qty: 1,
         goodsMustArrive: "2026-09-18",
         issueRef: { proposalKey: "s-ohana::sofa", buildKey: "b3" },
-        costs: [
-          { sku: "5539-1B(LHF)", unitCost: 1200 },
-          { sku: "5539-CNR", unitCost: 900 },
-          { sku: "5539-2A(RHF)", unitCost: 1150 },
+        parts: [
+          { sku: "5539-1B(LHF)", qty: 1, unitCost: 1200 },
+          { sku: "5539-CNR", qty: 2, unitCost: 900 },
+          { sku: "5539-2A(RHF)", qty: 1, unitCost: 1150 },
         ],
       },
     ],

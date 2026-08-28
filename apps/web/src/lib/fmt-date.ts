@@ -115,10 +115,17 @@ function carriesYear(fullYear: number, mode: YearMode | undefined): boolean {
  */
 export function fmtDate(
   iso: string | null | undefined,
-  opts?: { time?: boolean; year?: YearMode },
+  opts?: { time?: boolean; year?: YearMode; timeOnly?: boolean },
 ): string {
   const p = parts(iso);
   if (!p) return "—";
+  /* ⭐ THE CLOCK ALONE (2026-08-25) — for a list already grouped under a date
+     heading, where repeating the day on every row makes the reader re-parse the
+     same string to find the one boundary that matters. It is an OPTION on the
+     one date function rather than a second helper: COPY-STANDARD is explicit
+     that a second date spelling is a defect, and a private `hh:mm` beside a
+     caller is exactly that. Absent, every existing caller is byte-identical. */
+  if (opts?.timeOnly) return `${p.hh}:${p.mm}`;
   const head = carriesYear(p.full, opts?.year)
     ? `${p.dow}, ${p.day} ${p.mon} ${p.yr}`
     : `${p.dow}, ${p.day} ${p.mon}`;

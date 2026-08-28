@@ -564,12 +564,15 @@ export default function SalesOrdersRegister() {
     (r: RegisterRow): DataGridContextMenuItem[] => [
       { label: "View", onClick: () => openWorkspace(r) },
       { label: "Edit", onClick: () => openWorkspace(r) },
-      { label: "Preview PDF", onClick: () => void openSalesOrderPdf(r.id, r.so) },
+      /* ONE ACT, ONE NAME (YH, 2026-08-28). `Preview PDF` sat here calling
+         `openSalesOrderPdf(r.id, r.so)` — byte-identical to the line below
+         it. Two menu rows, one behaviour, so the reader was asked to choose
+         between names that could not differ. The MASTER's locked menu had
+         meant them as separate acts (a preview door and a document output);
+         the implementation never built the first. Retiring the duplicate
+         label loses no capability. If Carres later wants a real preview act,
+         it is a BUILD, not a restoration of this line. */
       { label: "Print PDF", onClick: () => void openSalesOrderPdf(r.id, r.so) },
-      {
-        label: "Copy to new Sales Order",
-        onClick: () => navigate(`/operation/orders/so/new?copyFrom=${r.id}`),
-      },
       /* The MASTER's locked menu ends with the one destructive entry, alone
          below a divider so it is never reached by a slipped click. */
       { divider: true },
@@ -816,9 +819,25 @@ function RegisterResultSummary({
     : filtered.length === total
       ? `${filtered.length} ${orderWord}`
       : `${filtered.length} of ${total} orders`;
-  const parts = FOOTER_WORDS.filter((label) => (counts.get(label) ?? 0) > 0).map(
-    (label) => `${label} ${counts.get(label)}`,
-  );
+  /* ⛔ `Other goods` IS COUNTED AND NOT PRINTED — YH, 2026-08-27.
+     This OVERWRITES `COPY-STANDARD.md`'s "never dropped from the count", which
+     ruled the word must always appear.
+
+     What the word actually reports is a CATALOG GAP: a line nothing recognises,
+     because its SKU has no catalog row (or its category has no word here — a
+     `guarantee` item is catalogued correctly and still lands in this bucket,
+     since the footer's vocabulary has five of the catalog's six categories).
+     Neither is a fact about the customer's goods, which is what the rest of
+     this tally is, and neither is actionable from a register footer.
+
+     🟡 THE HONEST COST, stated rather than hidden: the printed numbers no
+     longer add up to the order's item count. The bucket is still computed —
+     `footerWord` is untouched and the count is still available to anything
+     that asks — so this is a display decision, reversible by deleting one
+     line, and it destroys no data. */
+  const parts = FOOTER_WORDS.filter(
+    (label) => label !== "Other goods" && (counts.get(label) ?? 0) > 0,
+  ).map((label) => `${label} ${counts.get(label)}`);
   /* One unwrapped line by law (REGISTER STATUS FOOTER), so a long tally on a
      narrow window truncates instead of pushing a second row into the frame —
      and the full sentence rides the title. */

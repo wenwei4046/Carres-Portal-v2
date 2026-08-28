@@ -154,11 +154,50 @@ export interface RegisterOrderFact {
   delivery: string | null;
   /** Who owns the customer conversation (`orders.salesperson_id`). */
   salespersonId: string | null;
+  /** Card 02-B — `place` is not proceeded, and the order Register must know. */
+  status: string | null;
+  /** The day Sales pressed Proceed and Operations received the order. */
+  proceedDate: string | null;
+  /** The customer's delivery locality, for the shared concise formatting. */
+  city: string | null;
+  state: string | null;
+}
+
+/**
+ * Card 02-B — ONE record per PROCURABLE customer demand line, whatever its
+ * blocker or coverage, in SKU units throughout.
+ *
+ * The order Register's Status compares *what genuinely requires purchasing*
+ * against the confirmed-sent PO lineage, and neither the carried builds nor
+ * the refusals alone can answer it: a build's numbers change UNIT on a
+ * modular set, a covered line leaves the leaf rows entirely, and the lineage
+ * speaks order lines. These facts are pushed in the SAME pass the engine
+ * already runs — `qty` is the customer's original line quantity and
+ * `stockTaken` the pool ledger's own draw, recomposed from the very values
+ * the netting just produced (net + taken), never a second arithmetic.
+ *
+ * A `no_sku` line is deliberately ABSENT: Catalog has not established it as
+ * goods, so it may not hold a Sales Order's Status open forever.
+ */
+export interface SoRegisterLineFact {
+  lineId: string;
+  orderId: string;
+  sku: string;
+  /** What the customer ordered on this line, SKU units. */
+  qty: number;
+  /** Units already committed out of ready stock for this line. */
+  stockTaken: number;
+  modelName: string | null;
+  variant: string | null;
+  category: string | null;
+  supplierId: string | null;
 }
 
 export interface RegisterFacts {
   lines: RegisterDemandLine[];
   ordersById: Map<string, RegisterOrderFact>;
+  /** Card 02-B — every procurable customer demand line, coverage included. */
+  soLines: SoRegisterLineFact[];
 }
 
 export type Loaded = {
@@ -329,14 +368,33 @@ export async function loadToOrder(
       // date (card §4); it is read here rather than in a second query because
       // the row is already being fetched. Nothing in the To Order projection
       // reads it, so the workspace response is unchanged.
-      "id, so, customer_name, status, delivery_date, delivery_date_tbd, placed_at, created_at, proceed_date, salesperson_id",
+      // `customer_address_city/state` are Card 02-B's Delivery Location facts,
+      // read here because the row is already being fetched — the To Order
+      // projection ignores them, so the workspace response is unchanged.
+      "id, so, customer_name, status, delivery_date, delivery_date_tbd, placed_at, created_at, proceed_date, salesperson_id, customer_address_city, customer_address_state",
     )
-    .in("status", ["place", "proceed_order"]);
+    /**
+     * ⭐ THE PROCEEDED-ORDER BOUNDARY (Card 02-C, RESOLVED FROM AUTHORITY,
+     * 2026-08-27). A Sales Order enters SO Batch Purchase only after Sales
+     * completes `Proceed` — a `place` order is INVISIBLE to Purchasing: no
+     * planning, no netting, no rail count, no Register row, no selection, no
+     * Ready Stock take and no PO. Filtering it HERE — before the engine ever
+     * sees a line — is what makes that one boundary: a `place` order cannot
+     * consume Open PO coverage ahead of a proceeded one, and both write doors
+     * (`take-stock`, `issue-batch`) recompute through this read at POST time,
+     * so a demand id naming a `place` order resolves to nothing and is refused
+     * by name. Until 2026-08-27 this read admitted `place` too, which let the
+     * rail count orders Purchasing could not legitimately buy.
+     */
+    .eq("status", "proceed_order");
   if (orderErr) {
     const m = mapPgError(orderErr);
     return { ok: false, status: m.status, body: m.body };
   }
-  const orders = orderRows ?? [];
+  /* The same rule enforced in code: the SQL narrows production, and this line
+     keeps the boundary true under any permissive read (a test double that
+     ignores filters must not be able to smuggle a `place` order in). */
+  const orders = (orderRows ?? []).filter((o) => o.status === "proceed_order");
   const orderById = new Map(orders.map((o) => [o.id as string, o]));
   const orderIds = orders.map((o) => o.id as string);
 
@@ -355,7 +413,7 @@ export async function loadToOrder(
         stockWarehouse: null,
         stockQtyById: new Map(),
         supplierNames: new Map(),
-        registerFacts: { lines: [], ordersById: new Map() },
+        registerFacts: { lines: [], ordersById: new Map(), soLines: [] },
       },
     };
   }
@@ -445,8 +503,14 @@ export async function loadToOrder(
         ? null
         : (((o.delivery_date as string | null) ?? null)?.slice(0, 10) ?? null),
       salespersonId: (o.salesperson_id as string | null) ?? null,
+      status: (o.status as string | null) ?? null,
+      proceedDate: ((o.proceed_date as string | null) ?? null)?.slice(0, 10) ?? null,
+      city: (o.customer_address_city as string | null) ?? null,
+      state: (o.customer_address_state as string | null) ?? null,
     });
   }
+  /** Card 02-B — the procurable-line facts the order Register's Status runs on. */
+  const soLines: SoRegisterLineFact[] = [];
   /** P10 — a typed demand's own `issued_qty`, the ceiling on what the ledger
    *  may be read as having taken for it. */
   const issuedByLine = new Map<string, number>();
@@ -519,6 +583,19 @@ export async function loadToOrder(
           supplierId: null,
           takenFromStock: 0,
         });
+        // A supplier-less line still genuinely requires purchasing — it holds
+        // its Sales Order's Status open (Card 02-B).
+        soLines.push({
+          lineId: l.id as string,
+          orderId: l.order_id as string,
+          sku: l.sku as string,
+          qty: Number(l.qty ?? 0),
+          stockTaken: 0,
+          modelName: c.modelName,
+          variant: c.variant,
+          category,
+          supplierId: null,
+        });
       }
       continue;
     }
@@ -555,6 +632,17 @@ export async function loadToOrder(
         category,
         supplierId,
         takenFromStock: 0,
+      });
+      soLines.push({
+        lineId: l.id as string,
+        orderId: l.order_id as string,
+        sku: l.sku as string,
+        qty: Number(l.qty ?? 0),
+        stockTaken: 0,
+        modelName: c.modelName,
+        variant: c.variant,
+        category,
+        supplierId,
       });
       continue;
     }
@@ -759,6 +847,24 @@ export async function loadToOrder(
         supplierId: l.supplierId,
         takenFromStock: l.takenFromStock ?? 0,
       });
+    /* Card 02-B — the SAME line, recomposed from the values the netting just
+       produced: the customer's original quantity is the net remainder plus the
+       units the ledger drew. Recorded for EVERY carried line, covered ones
+       included — a Sales Order the stock fully covers must still be able to
+       explain itself on the permanent Register. */
+    if (!l.readyStock) {
+      soLines.push({
+        lineId: l.lineId,
+        orderId: l.orderId,
+        sku: l.sku,
+        qty: l.qty + (l.takenFromStock ?? 0),
+        stockTaken: l.takenFromStock ?? 0,
+        modelName: l.modelName,
+        variant: l.variant,
+        category: l.category,
+        supplierId: l.supplierId,
+      });
+    }
   }
 
   const today = todayIso();
@@ -809,7 +915,7 @@ export async function loadToOrder(
       supplierNames: new Map(
         (supRows ?? []).map((s) => [s.id as string, (s.name as string) ?? ""]),
       ),
-      registerFacts: { lines: registerLines, ordersById: registerOrders },
+      registerFacts: { lines: registerLines, ordersById: registerOrders, soLines },
     },
   };
 }

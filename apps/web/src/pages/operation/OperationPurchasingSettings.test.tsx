@@ -150,11 +150,19 @@ describe("Purchasing → Settings", () => {
 
   it("saves one of the single numbers by key", async () => {
     render(wrap(<OperationPurchasingSettings />));
-    fireEvent.change(screen.getByTestId("order-by-buffer"), { target: { value: "10" } });
-    fireEvent.click(screen.getByTestId("order-by-buffer-save"));
+    fireEvent.change(screen.getByTestId("safety-days"), { target: { value: "10" } });
+    fireEvent.click(screen.getByTestId("safety-days-save"));
     await waitFor(() =>
       expect(setNumber).toHaveBeenCalledWith({ key: "order_by_buffer_days", value: 10 }),
     );
+  });
+
+  it("the buffer wears its approved name — `Safety days`, never `buffer` (Card 02-A)", () => {
+    render(wrap(<OperationPurchasingSettings />));
+    const text = document.body.textContent ?? "";
+    expect(text).toContain("Safety days");
+    expect(text).toContain("Extra time allowed for delays.");
+    expect(text.toLowerCase()).not.toContain("buffer");
   });
 
   it("a reader who may not edit sees the numbers and no Save", () => {
@@ -184,7 +192,7 @@ describe("Purchasing → Settings", () => {
     }
     // And the words that MUST be there, spelt as the standards spell them.
     expect(text).toContain("Production working days");
-    expect(text).toContain("Order-by buffer");
+    expect(text).toContain("Safety days");
     expect(text).toContain("PO days");
     expect(text).toContain("Supplier work week");
     expect(text).toContain("Earliest date a store may sell");

@@ -535,7 +535,7 @@ Purchasing                                               ▾
 │  SHOWROOM                                              ▸
 ```
 
-This is navigation only. The 200px `STATUS / WORK TO DO` rail belongs inside an individual Work
+This is navigation only. A page's own local filter rail belongs inside an individual Work
 Surface and never becomes a second module sidebar. A Purchasing Listing follows the Sales Orders
 Register shell; its compact Destination Header shows the current page word once, at the same
 size/weight, without a leading icon or `Purchasing ·` prefix. Formal Object Detail alone may use
@@ -683,6 +683,57 @@ directory only and said so.*
 - Missing optional facts render the governed neutral empty value. A missing required fact that
   opens work renders the fact/problem plus its action; bare `Not given` or `Not recorded` must not
   impersonate an actionable warning.
+
+### HISTORY + REVISION THREE-RANK RECORD GRAMMAR — OWNER-APPROVED / LOCKED 2026-08-27
+
+History and Revisions are not database dumps. They are employee-facing records that must answer,
+in five seconds: **what happened · who did it · when · what important result was recorded.** A
+developer who knows the schema is not the acceptance reader; a new operator is.
+
+- Use **up to three visual lines**, in this fixed reading order. Omit an inapplicable third line;
+  never render an empty line merely to preserve height.
+  1. **What happened** — `text-body` (13), semibold, primary text.
+  2. **Who and when** — `text-meta` (12), regular, secondary text. Use structured actor identity:
+     real staff name + role + actual `fmtDate()` date/time.
+  3. **Important result/detail** — `text-label` (11) at `font-normal`, quieter but accessible.
+- Do not concatenate actor, role, action and raw fields into one sentence separated by dots. That
+  makes a schema-literate developer do the hierarchy work in their head and leaves a new operator
+  without a reading path.
+- **STAFF IDENTITY LAW — OWNER RULING 2026-08-27 (Jess), after the failed five-second walk.**
+  `Who did it?` is answered by a PERSON, never a permission. The first cold read failed on
+  `principal · Principal` — a role/account label repeated twice — and the ruling that closed it:
+  1. Every staff member uses an **individual authenticated account**. `Principal`, `Operation`
+     and `Finance` are permission roles, never staff names, and a shared role-labeled login is
+     not an actor.
+  2. Every Sales Order write stores the authenticated individual `user_id`; Revisions and
+     History resolve that id to the staff member's **real display name** from the authoritative
+     identity source. The UI never hardcodes an account→person mapping and never translates a
+     role into a person.
+  3. Approved display: `Jess · Principal · Thu, 27 Aug 12:30` · `Recorded by Jess · Thu, 27 Aug
+     12:30`. Forbidden display: `principal · Principal` · `Recorded by principal` ·
+     `Unknown user`.
+  4. `System` appears only when the event's own authoritative facts prove the portal, a
+     scheduled job or database automation acted — never inferred from a missing id.
+  5. An old record whose individual actor cannot be recovered — including one written by a
+     shared role login — says **`Staff identity not recorded`**. A person is never invented.
+- A Revision uses the same ranks but remains a complete-version door, not an event. Rev 1 says
+  `Original order`; a later approved/applied Revision names the governed change. Selecting a
+  Revision opens the complete read-only version and its document truth.
+
+```text
+Order created
+Jess · Principal · Mon, 24 Aug 11:16
+No deposit · Online order
+
+Original order
+Rev 1 · Current
+Recorded by Jess · Mon, 24 Aug 11:16
+```
+
+**Acceptance.** Give the record to a staff member who did not build the screen. Within five
+seconds they must answer what happened, who did it, when, and the important result. Failure to
+answer any applicable question means the record fails UI acceptance even when every stored field
+is technically present.
 
 ### ERP SHELL V1 — OWNER RULING 2026-08-13
 
@@ -926,6 +977,18 @@ uses the governed Carres `NavRow` treatment: `rounded-control`; `blue-3` selecti
 straight 2px `blue-9` line inset on the left; slate hover for inactive rows. It is not a bordered
 card, not a module tab, not a foreign reference colour and not a newly invented rail variant.
 
+**LOCAL FILTER RAIL — READABLE SHELL — APPROVED / LOCKED, owner ruling 2026-08-27 (Purchasing
+Card 02-C).** The page-owned filter rail's shell, group and row grammar is the shared
+`FilterRail` / `FilterRailGroup` / `FilterRailRow` component (`workspace-rail.tsx`): 240px
+wide · 12px outer padding · 8px heading → first row · 20px between groups · 36px minimum row.
+A governed filter label is NEVER truncated and never hidden behind a hover or tooltip — it
+wraps onto a second line in the same body font at its natural height (≥ 48px), with the count
+still visible and right-aligned. The rail scrolls vertically as rows grow; it keeps its border
+against the Register; at narrower desktop widths the Register scrolls horizontally and the
+rail is never squeezed below 240px. The rail is navigation, not batch selection — it carries
+no checkboxes. Pages still drawing the older 200px `RailGroup`/`RailItem` pair migrate to this
+shell in their own cards, not as a side effect of someone else's.
+
 **PORTAL NAVIGATION ACTIVE COLOUR — APPROVED / LOCKED.** The flame repoint applies to active
 navigation too: the current destination uses the governed blue selection treatment, never a
 red/flame active line or red rounded selection block. Flame remains the Carres brand mark;
@@ -1015,14 +1078,18 @@ compact destination header / work toolbar
 
 breathing gap
 
-┌─ light bordered Register ──────────────────────────────────────────────┐
-│ ▸ | SO No | Ordered | Customer Delivery | Customer | Delivery         │
-│   | Location | PO No | DO No                                          │
-└────────────────────────────────────────────────────────────────────────┘
+  ▸ | SO No | Ordered | Requested Delivery Date | Customer |
+    | Delivery Location | Showroom | PO No | DO No
 ```
 
+- **NO OUTER FRAME — owner ruling 2026-08-27 (Jess), overwriting this section's earlier "light
+  bordered Register".** The page is the header and the table listing; a border wrapping the Work
+  Toolbar, grid and status footer read as a box around the whole page and is deleted. The toolbar
+  band, the table header rule and the fixed footer give all the structure. This is Register
+  template grammar (`register/DataGrid` `appearance="reference"`), so every Register on the
+  engine inherits it — the frame does not survive page by page.
 - Sales Orders is a truth Register, not Work and not a dashboard. No KPI-card preamble, no
-  borderless Linear-style continuous slab, and no giant card around the page.
+  giant card around the page.
 - The seven business columns above are the governed default and exact order. `▸` is chrome.
   There is no overall `Current`/status column. Content sets predetermined usable widths; staff do
   not resize to repair the default. Optional columns may cause grid-owned horizontal overflow and
@@ -1111,12 +1178,12 @@ breathing gap
   fixed by PR #788 and merged as `ebc8fb5d`. Deploy run `31790978222` repeated the authoritative
   gates and proved exact SHA `ebc8fb5d` in production. At normal desktop width the Register keeps
   the seven governed columns, page-header New Sales Order action, utility-only grid toolbar,
-  interaction-blue selection, amber missing Customer Delivery, location summaries, the approved
+  interaction-blue selection, amber missing Requested Delivery Date, location summaries, the approved
   six-column goods mini-table and filtered quantity footer with no permanent Reset layout. The
   persistent Object Header and `Order · Revisions · History · Order Route` navigation were verified
   across View and Edit. Order is read-first at document width; PDF remains behind Print; Revisions
   and History are separate views; Order Route shows per-goods `CURRENT` and a secondary Still owed
-  list. Edit keeps Customer Delivery read-only, retains the existing Proceed date writer, maps only
+  list. Edit keeps Requested Delivery Date read-only, retains the existing Proceed date writer, maps only
   existing address/access fields, and aligns Customer with Sales ownership beneath a full-width
   edit-scope notice. The same Object Route and Edit compositions remained usable with My Work open.
   This supersedes the earlier acceptance note's live PDF-canvas statement and closes the Sales Order
@@ -1125,7 +1192,7 @@ breathing gap
   review reopened the preceding closure. The final correction is PR #795, merged as
   `759d49efaee6c643bd9d8e1840cb991dee2b7015`; complete CI run `31804608716` passed and production
   deploy run `31805501074` converged that exact SHA. Authenticated normal and medium-desktop
-  acceptance proved the fact-first missing Customer Delivery presentation, concise locality,
+  acceptance proved the fact-first missing Requested Delivery Date presentation, concise locality,
   unchanged six-column goods mini-table, single-destination quantity suppression, equal Register
   and Object goods truth, the approved `Edit operational details | Order context` composition,
   governed Sales ownership, edit controls and URL state confined to Order Edit, safe dirty-navigation
@@ -1158,14 +1225,14 @@ its own tools, and nothing that is not needed is on screen.*
 │  ⊕ New Sales Order                        🔍    ⤓ Export ▾    ▥    │  45
 └────────────────────────────────────────────────────────────────────┘
      make a new thing  ←                      → how I look at this page
-┌────────────────────────────────────────────────────────────────────┐
-│ ▸ │ SO No   │ Ordered     │ Customer Delivery  │ Customer          │  36
-├───┼─────────┼─────────────┼────────────────────┼───────────────────┤
-│ ▸ │ SO-1319 │ Wed, 12 Aug │ Thu, 24 Sep 26     │ LIM KUAN YANG     │  38
-│ ▸ │ SO-1318 │ Tue, 11 Aug │ Customer not sure  │ CARD-1            │  38
-├───┴─────────┴─────────────┴────────────────────┴───────────────────┤
-│ 77 orders · Mattress 66 · Bedframe 36 · Sofa 15 · Pillow 44        │  32
-└────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│ ▸ │ SO No   │ Ordered     │ Requested Delivery Date │ Customer          │  36
+├───┼─────────┼─────────────┼─────────────────────────┼───────────────────┤
+│ ▸ │ SO-1319 │ Wed, 12 Aug │ Thu, 24 Sep 26          │ LIM KUAN YANG     │  38
+│ ▸ │ SO-1318 │ Tue, 11 Aug │ Customer not sure       │ CARD-1            │  38
+├───┼─────────┼─────────────┼─────────────────────────┼───────────────────┤
+│ 77 orders · Mattress 66 · Bedframe 36 · Sofa 15 · Pillow 44             │  32
+└─────────────────────────────────────────────────────────────────────────┘
    ── 8px ──
 ```
 

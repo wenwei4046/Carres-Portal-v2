@@ -1,7 +1,8 @@
 import { z } from "zod";
-import type { IsoDate } from "./working-days";
+import { countWorkingDays, type IsoDate } from "./working-days";
 import type { ProductCategory } from "./db-types";
 import { isOnePoPerOrder, categoryLabel } from "./to-order";
+import { PURCHASING_OFFICE_OFF_DAYS } from "./purchasing-supplier-calls";
 
 /**
  * PURCHASE DEMANDS — the customer-demand REGISTER
@@ -36,8 +37,6 @@ import { isOnePoPerOrder, categoryLabel } from "./to-order";
 export const PURCHASE_DEMAND_WORDS = {
   page: "Purchase Demands",
   search: "Search purchase demands…",
-  railHeading: "Work to do",
-  railAll: "All demands",
   /** What the rail's bare numbers count. */
   footerUnit: "demand lines",
   openBatch: "Open SO Batch Purchase",
@@ -49,7 +48,7 @@ export const PURCHASE_DEMAND_WORDS = {
   colSku: "SKU",
   colSo: "SO No",
   colCustomer: "Customer",
-  colCustomerDelivery: "Customer Delivery",
+  colCustomerDelivery: "Requested Delivery Date",
   colSupplier: "Supplier",
   colQtyNeeded: "Qty Needed",
   colReadyStock: "Ready Stock",
@@ -64,61 +63,106 @@ export const PURCHASE_DEMAND_WORDS = {
   coverageNone: "Nothing covers it yet",
 } as const;
 
-// ─── The six states ──────────────────────────────────────────────────────────
+// ─── The states — owner correction 2026-08-26 ────────────────────────────────
 
 /**
- * The six derived states a customer demand line can be in, once the Catalog
- * category has positively INCLUDED it. A positively non-procurable category
- * (Service, accessory, guarantee) never becomes a row at all.
+ * THE ORDER TIMING CATEGORIES (Card 02-A; `docs/purchasing/MASTER.md` §9.1).
+ *
+ * Every one of them is ORDERABLE — the words say timing risk, never
+ * `Cannot buy`, and Order By is a planned date, not an unlock date. They are
+ * derived from the one server planning engine (`purchaseDemandTimingOf`
+ * below, over the engine's own dates); there is no stored status.
  */
-export type PurchaseDemandState =
-  | "ready_to_buy"
+export type PurchaseDemandTimingState =
+  | "can_order_early"
+  | "safety_days_full"
+  | "safety_days_low"
+  | "safety_days_none"
+  | "not_enough_production_time";
+
+/**
+ * The blockers. `no_production_days` is the ONE Purchasing-owned setup facet
+ * (`SETUP TO FIX`); the other three belong to Sales/Catalog and are named on
+ * their own rows, never as Purchasing rail facets.
+ */
+export type PurchaseDemandBlockerState =
   | "no_customer_date"
   | "no_sku"
   | "no_supplier"
-  | "no_production_days"
-  | "covered";
+  | "no_production_days";
 
-/**
- * Rail order, and the PRECEDENCE order of the derivation below.
- *
- * `covered` outranks `no_customer_date` on purpose: a line an open purchase
- * order already covers has nothing left to buy, so the missing date is not
- * stopping a purchase and printing it as a blocker would send somebody to fix
- * a thing that blocks nothing.
- */
+export type PurchaseDemandState = PurchaseDemandTimingState | PurchaseDemandBlockerState;
+
+/** The approved rail order of the `ORDER TIMING` section. */
+export const PURCHASE_DEMAND_TIMING_STATES: readonly PurchaseDemandTimingState[] = [
+  "can_order_early",
+  "safety_days_full",
+  "safety_days_low",
+  "safety_days_none",
+  "not_enough_production_time",
+] as const;
+
 export const PURCHASE_DEMAND_STATES: readonly PurchaseDemandState[] = [
-  "ready_to_buy",
+  ...PURCHASE_DEMAND_TIMING_STATES,
   "no_customer_date",
   "no_sku",
   "no_supplier",
   "no_production_days",
-  "covered",
 ] as const;
 
-/** The FACT line — line 1 of the governed two-line treatment. */
-export const PURCHASE_DEMAND_STATE_WORDS: Record<PurchaseDemandState, string> = {
-  ready_to_buy: "Ready to buy",
-  no_customer_date: "Customer delivery date is missing",
-  no_sku: "SKU not found",
-  no_supplier: "Supplier not assigned",
-  no_production_days: "Production days are missing",
-  covered: "Covered — no buying needed",
-};
+export function isPurchaseDemandTimingState(v: unknown): v is PurchaseDemandTimingState {
+  return (
+    typeof v === "string" &&
+    (PURCHASE_DEMAND_TIMING_STATES as readonly string[]).includes(v)
+  );
+}
 
 /**
- * The RAIL word — the same fact, short enough for a 200px rail. The rail names
- * concrete facts; it may never say `Today`, `Needs attention`, `Follow up`,
- * `Pending` or `Waiting` (card §4).
+ * The FACT line — line 1 of the governed two-line treatment.
+ *
+ * A FUNCTION of the governed Safety days value, not a constant: the two
+ * safety-band words carry the number (`14 safety days left`), and a screen
+ * that hard-coded 14 would lie the day the setting moved. The visible term is
+ * `Safety days`; `buffer` never reaches a screen.
  */
-export const PURCHASE_DEMAND_RAIL_WORDS: Record<PurchaseDemandState, string> = {
-  ready_to_buy: "Ready to buy",
-  no_customer_date: "No customer date",
-  no_sku: "No SKU",
-  no_supplier: "No supplier",
-  no_production_days: "No production days",
-  covered: "Covered",
-};
+export function purchaseDemandStateWords(
+  safetyDays: number,
+): Record<PurchaseDemandState, string> {
+  return {
+    can_order_early: "Can order early",
+    safety_days_full: `${safetyDays} safety days left`,
+    safety_days_low: `1–${Math.max(safetyDays - 1, 1)} safety days left`,
+    safety_days_none: "No safety days left",
+    /* Card 02-C (owner ruling 2026-08-27): `days`, never `time` — the same
+       unit the arithmetic itself counts in. The state KEY keeps its wire
+       spelling; only the visible words changed. */
+    not_enough_production_time: "Not enough production days",
+    no_customer_date: "Customer delivery date is missing",
+    no_sku: "SKU not found",
+    no_supplier: "Supplier not assigned",
+    no_production_days: "Production days are missing",
+  };
+}
+
+/**
+ * The RAIL facets — the timing rows plus the one Purchasing-owned setup row.
+ * A state absent here is a row fact, not a facet: a line Sales/Catalog let
+ * through without its date, SKU or supplier is named on its row and fails
+ * safely at its owning boundary (Card 02-A §5).
+ */
+export function purchaseDemandRailWords(
+  safetyDays: number,
+): Partial<Record<PurchaseDemandState, string>> {
+  const words = purchaseDemandStateWords(safetyDays);
+  return {
+    can_order_early: words.can_order_early,
+    safety_days_full: words.safety_days_full,
+    safety_days_low: words.safety_days_low,
+    safety_days_none: words.safety_days_none,
+    not_enough_production_time: words.not_enough_production_time,
+    no_production_days: "Production days not set",
+  };
+}
 
 /**
  * The OWNER RULE per blocker (card §4). A name resolves where a stored fact
@@ -126,12 +170,15 @@ export const PURCHASE_DEMAND_RAIL_WORDS: Record<PurchaseDemandState, string> = {
  * law (`work-engine.ts` `ownerDuty`), never a hand-picked person.
  */
 export const PURCHASE_DEMAND_OWNER_DUTY: Record<PurchaseDemandState, string | null> = {
-  ready_to_buy: null,
+  can_order_early: null,
+  safety_days_full: null,
+  safety_days_low: null,
+  safety_days_none: null,
+  not_enough_production_time: null,
   no_customer_date: "Responsible Salesperson",
   no_sku: "PO duty",
   no_supplier: "PO duty",
   no_production_days: "Purchasing Settings",
-  covered: null,
 };
 
 export function isPurchaseDemandState(v: unknown): v is PurchaseDemandState {
@@ -213,7 +260,18 @@ export interface PurchaseDemandRow {
    * It is the CATALOG's number, carried for display and for the unchanged-cost
    * comparison. The server re-reads it at issue and refuses a stale one.
    */
-  costs: Array<{ sku: string; unitCost: number | null }>;
+  /**
+   * ⭐ THE PARTS INSIDE THIS BUYING LINE — one entry per SKU.
+   *
+   * A row is one BUILD, and a build can be a matched set: a sofa is one row and
+   * three module codes. The row itself can only name the set, so this is where
+   * the modules live — the expand lists them, and the issue surface prices them.
+   *
+   * It was called `costs` and carried only the price, so the expand had no
+   * quantity to print and re-stated the row's own numbers instead. One list,
+   * three facts (Law D): what it is, how many, what Catalog charges.
+   */
+  parts: Array<{ sku: string; qty: number; unitCost: number | null }>;
   /**
    * Whether this supplier's goods are collected from the factory. A
    * factory-pickup document needs a procurement partner before it can be
@@ -239,7 +297,7 @@ export interface PurchaseDemandRow {
  * roster changes or cover moves the work.
  */
 export interface SoBatchPurchaseAction {
-  trigger: Exclude<PurchaseDemandState, "covered">;
+  trigger: PurchaseDemandState;
   /** The RULE that finds the owner — never the person, who may be absent. */
   ownerRule: string;
   ownerId: string | null;
@@ -255,9 +313,15 @@ export interface SoBatchPurchaseAction {
   cover: { normalOwnerId: string | null; actingOwnerId: string | null } | null;
 }
 
-/** The owner RULE per trigger (`docs/purchasing/MASTER.md` §§5.3, 9.1). */
-const ACTION_OWNER_RULE: Record<Exclude<PurchaseDemandState, "covered">, string> = {
-  ready_to_buy: "Current PO Duty",
+/** The owner RULE per trigger (`docs/purchasing/MASTER.md` §§5.3, 9.1). Every
+ *  timing state is the buy itself, so they all resolve to Current PO Duty. */
+const BUY_OWNER_RULE = "Current PO Duty";
+const ACTION_OWNER_RULE: Record<PurchaseDemandState, string> = {
+  can_order_early: BUY_OWNER_RULE,
+  safety_days_full: BUY_OWNER_RULE,
+  safety_days_low: BUY_OWNER_RULE,
+  safety_days_none: BUY_OWNER_RULE,
+  not_enough_production_time: BUY_OWNER_RULE,
   no_customer_date: "Responsible Salesperson",
   no_sku: "Catalog/Master Data through Current PO Duty",
   no_supplier: "Current PO Duty",
@@ -269,9 +333,14 @@ const ACTION_OWNER_RULE: Record<Exclude<PurchaseDemandState, "covered">, string>
  * OBSERVE — a date exists, a relationship exists, a document reached a
  * supplier. None of them is a person saying they are done.
  */
-const ACTION_COMPLETION_FACT: Record<Exclude<PurchaseDemandState, "covered">, string> = {
-  ready_to_buy: "Current PO version reached supplier with evidence",
-  no_customer_date: "Customer Delivery exists",
+const BUY_COMPLETION_FACT = "Current PO version reached supplier with evidence";
+const ACTION_COMPLETION_FACT: Record<PurchaseDemandState, string> = {
+  can_order_early: BUY_COMPLETION_FACT,
+  safety_days_full: BUY_COMPLETION_FACT,
+  safety_days_low: BUY_COMPLETION_FACT,
+  safety_days_none: BUY_COMPLETION_FACT,
+  not_enough_production_time: BUY_COMPLETION_FACT,
+  no_customer_date: "Requested Delivery Date exists",
   no_sku: "Approved SKU exists",
   no_supplier: "Approved supplier relationship exists",
   no_production_days: "Governed supplier/category days exist",
@@ -282,8 +351,9 @@ const ACTION_COMPLETION_FACT: Record<Exclude<PurchaseDemandState, "covered">, st
  *
  * The four blocker sentences are `purchaseDemandHelpLine`'s, reused rather than
  * respelt — two spellings of one instruction is how a Register and a Work
- * queue start telling an operator different things. `ready_to_buy` gets its own
- * sentence because it is not a blocker being fixed; it is the buy itself.
+ * queue start telling an operator different things. Every timing state gets the
+ * same buying sentence, because it is not a blocker being fixed; it is the buy
+ * itself, at whatever timing risk the state names.
  */
 export function soBatchAction(f: {
   state: PurchaseDemandState;
@@ -297,19 +367,19 @@ export function soBatchAction(f: {
   dueDate: IsoDate | null;
   cover?: { normalOwnerId: string | null; actingOwnerId: string | null } | null;
 }): SoBatchPurchaseAction | null {
-  if (f.state === "covered") return null;
   const trigger = f.state;
-  const act =
-    trigger === "ready_to_buy"
-      ? `Issue PO to ${f.supplier ?? "the supplier"}`
-      : purchaseDemandHelpLine({
-          state: trigger,
-          item: f.item,
-          supplier: f.supplier,
-          category: f.category,
-        });
+  const act = isPurchaseDemandTimingState(trigger)
+    ? `Issue PO to ${f.supplier ?? "the supplier"}`
+    : purchaseDemandHelpLine({
+        state: trigger,
+        item: f.item,
+        supplier: f.supplier,
+        category: f.category,
+      });
   if (!act) return null;
-  const duty = PURCHASE_DEMAND_OWNER_DUTY[trigger] ?? (trigger === "ready_to_buy" ? "PO duty" : null);
+  const duty =
+    PURCHASE_DEMAND_OWNER_DUTY[trigger] ??
+    (isPurchaseDemandTimingState(trigger) ? "PO duty" : null);
   return {
     trigger,
     ownerRule: ACTION_OWNER_RULE[trigger],
@@ -330,33 +400,75 @@ export function soBatchAction(f: {
 
 // ─── The derivation ──────────────────────────────────────────────────────────
 
-/** The facts a state is derived from. Nothing else may decide it. */
-export interface PurchaseDemandStateInput {
+/** The facts a blocker is derived from. Nothing else may decide it. */
+export interface PurchaseDemandBlockerInput {
   /** FALSE = the SKU is absent from Catalog. */
   inCatalog: boolean;
   /** FALSE = the SKU is a real Catalog product nobody has mapped a supplier to. */
   hasSupplier: boolean;
   /** FALSE = this supplier × category pair has no production days set. */
   hasProductionDays: boolean;
-  /** TRUE = every unit is already covered (open PO, or already drawn stock). */
-  fullyCovered: boolean;
   /** FALSE = the customer order has no agreed delivery day. */
   hasCustomerDate: boolean;
 }
 
 /**
- * THE ONE derivation. Precedence runs top to bottom, and it mirrors the ORDER
- * IN WHICH THE ENGINE ITSELF REFUSES a line: Catalog cannot classify it →
- * nobody has mapped a supplier → the pair has no production days → nothing is
- * left to buy → the customer has no date → it can be bought.
+ * THE ONE blocker derivation. Precedence runs top to bottom, and it mirrors
+ * the ORDER IN WHICH THE ENGINE ITSELF REFUSES a line: Catalog cannot
+ * classify it → nobody has mapped a supplier → the pair has no production
+ * days → the customer has no date. `null` = nothing blocks the line; it is
+ * classified by `purchaseDemandTimingOf` instead.
+ *
+ * `covered` is not here any more: a fully covered / `Buy = 0` line does not
+ * remain in SO Batch Purchase at all (Card 02-A §3) — it is found through
+ * Purchase Orders, Stock and Order Route.
  */
-export function purchaseDemandStateOf(f: PurchaseDemandStateInput): PurchaseDemandState {
+export function purchaseDemandBlockerOf(
+  f: PurchaseDemandBlockerInput,
+): PurchaseDemandBlockerState | null {
   if (!f.inCatalog) return "no_sku";
   if (!f.hasSupplier) return "no_supplier";
   if (!f.hasProductionDays) return "no_production_days";
-  if (f.fullyCovered) return "covered";
   if (!f.hasCustomerDate) return "no_customer_date";
-  return "ready_to_buy";
+  return null;
+}
+
+/** The engine dates an unblocked line is classified from. */
+export interface PurchaseDemandTimingInput {
+  today: IsoDate;
+  /** The engine's Order By (`raiseBy`) — a planned date, never an unlock date. */
+  orderBy: IsoDate | null;
+  /** The engine's expected production completion if ordered today. */
+  readyIfOrderedToday: IsoDate;
+  customerDelivery: IsoDate;
+  /** The governed Safety days value (`order_by_buffer_days`). */
+  safetyDays: number;
+  /** Malaysian public holidays — the same set the engine planned with. */
+  holidays: ReadonlySet<string>;
+}
+
+/**
+ * THE TIMING CLASSIFICATION (Card 02-A §4). The dates are the ENGINE's —
+ * `raiseBy` and `promiseIfOrderedToday` off the same bundle that produced
+ * `Goods Must Arrive` — and this function only compares them, so Safety days
+ * are never subtracted twice. Safety days left are counted on the governed
+ * OFFICE working calendar, because arranging a delivery is office work
+ * (`docs/ACTION-FLOW-STANDARD.md` Law 2A).
+ */
+export function purchaseDemandTimingOf(
+  f: PurchaseDemandTimingInput,
+): PurchaseDemandTimingState {
+  if (f.orderBy != null && f.today < f.orderBy) return "can_order_early";
+  if (f.orderBy != null && f.today === f.orderBy) return "safety_days_full";
+  if (f.readyIfOrderedToday > f.customerDelivery) return "not_enough_production_time";
+  const left = countWorkingDays(f.readyIfOrderedToday, f.customerDelivery, {
+    offDays: PURCHASING_OFFICE_OFF_DAYS,
+    holidays: f.holidays,
+  });
+  if (left === 0) return "safety_days_none";
+  if (left > f.safetyDays) return "can_order_early";
+  if (left === f.safetyDays) return "safety_days_full";
+  return "safety_days_low";
 }
 
 /**
@@ -546,14 +658,9 @@ export function filterPurchaseDemands(
 export function purchaseDemandStateCounts(
   rows: readonly PurchaseDemandRow[],
 ): Record<PurchaseDemandState, number> {
-  const counts = {
-    ready_to_buy: 0,
-    no_customer_date: 0,
-    no_sku: 0,
-    no_supplier: 0,
-    no_production_days: 0,
-    covered: 0,
-  } satisfies Record<PurchaseDemandState, number>;
+  const counts = Object.fromEntries(
+    PURCHASE_DEMAND_STATES.map((s) => [s, 0]),
+  ) as Record<PurchaseDemandState, number>;
   for (const r of rows) counts[r.state] += 1;
   return counts;
 }
@@ -581,22 +688,19 @@ export function purchaseDemandFooter(
 // ─── The wire ────────────────────────────────────────────────────────────────
 
 export const purchaseDemandStateSchema = z.enum([
-  "ready_to_buy",
+  "can_order_early",
+  "safety_days_full",
+  "safety_days_low",
+  "safety_days_none",
+  "not_enough_production_time",
   "no_customer_date",
   "no_sku",
   "no_supplier",
   "no_production_days",
-  "covered",
 ]);
 
 export const soBatchPurchaseActionSchema = z.object({
-  trigger: z.enum([
-    "ready_to_buy",
-    "no_customer_date",
-    "no_sku",
-    "no_supplier",
-    "no_production_days",
-  ]),
+  trigger: purchaseDemandStateSchema,
   ownerRule: z.string(),
   ownerId: z.string().nullable(),
   ownerName: z.string().nullable(),
@@ -647,7 +751,7 @@ export const purchaseDemandRowSchema = z.object({
     .object({ proposalKey: z.string(), buildKey: z.string() })
     .nullable(),
   action: soBatchPurchaseActionSchema.nullable(),
-  costs: z.array(z.object({ sku: z.string(), unitCost: z.number().nullable() })),
+  parts: z.array(z.object({ sku: z.string(), qty: z.number(), unitCost: z.number().nullable() })),
   supplierKind: z.enum(["own_logistics", "factory_pickup"]).nullable(),
   ownerName: z.string().nullable(),
   ownerDuty: z.string().nullable(),
@@ -662,38 +766,6 @@ export const purchaseDemandsResponseSchema = z.object({
 
 export type PurchaseDemandsResponse = z.infer<typeof purchaseDemandsResponseSchema>;
 
-/**
- * THE SO BATCH PURCHASE READ (Card §7.1).
- *
- * The rows plus the four facts the buying journey needs and the Register alone
- * never did: where goods may be sent, which of those is the standing default,
- * who currently holds PO Duty, who is covering it today, and whether THIS reader
- * may issue. `mayIssue` is a convenience — the API and the creation RPC both
- * refuse an unauthorised issue whatever the browser believes (Card §6; 0379).
- */
-export const soBatchPurchaseResponseSchema = z.object({
-  today: z.string(),
-  rows: z.array(purchaseDemandRowSchema),
-  destinations: z.array(
-    z.object({
-      id: z.string(),
-      name: z.string(),
-      isDefault: z.boolean(),
-      active: z.boolean(),
-    }),
-  ),
-  defaultDestinationId: z.string().nullable(),
-  /** The month's normal holder. `Team Work` groups by this person. */
-  currentPoDuty: z.object({ userId: z.string(), name: z.string() }).nullable(),
-  /**
-   * ⭐ 0379 — the dated buddy cover who may act TODAY, when one is set. It is a
-   * separate fact from the holder on purpose: the duty stays where management
-   * put it, and the audit must still say who actually pressed Issue PO.
-   */
-  actingPoDuty: z.object({ userId: z.string(), name: z.string() }).nullable(),
-  mayIssue: z.boolean(),
-  /** Who may collect from a factory, for the documents that need one. */
-  procurementPartners: z.array(z.object({ id: z.string(), name: z.string() })),
-});
-
-export type SoBatchPurchaseResponse = z.infer<typeof soBatchPurchaseResponseSchema>;
+/* THE SO BATCH PURCHASE READ (`soBatchPurchaseResponseSchema`) moved to
+   `so-batch-purchase.ts` with Card 02-B: the response now carries the order
+   Register rows that file defines, and the import must not cycle. */

@@ -77,6 +77,32 @@ const CHILD_COLUMNS = [
   { key: "item", label: "Item", width: null },
 ] as const;
 
+/**
+ * ⭐ `Covered by` — THE BUYING PAGE'S OWN COLUMN (Card 02 follow-up, 2026-08-24).
+ *
+ * Optional, exactly like `selection` and for the same reason (law ④): a page
+ * that BUYS has to say what ALREADY covers a line, and a truth register does
+ * not. Sales Orders and Delivery pass neither and render byte-identically to
+ * what they rendered before.
+ *
+ * It sits beside `Unit ID` because the two answer one question — *what exists
+ * for this line already* — an allocated Unit, or an open purchase order. It is
+ * a fixed column and it is not last, because law ① keeps `Item` last.
+ */
+const COVERED_BY_COLUMN = { key: "coveredBy", label: "Covered by", width: 168 } as const;
+
+/**
+ * ⭐ `Supplier` · `PO Delivery Date` — CARD 02-B's exact-mapping columns
+ * (owner ruling 2026-08-27). Optional, exactly like `Covered by` and for the
+ * same reason: when one Sales Order spans two purchase orders, the parent row
+ * can only summarise (`2 suppliers` · `Multiple`), so the child box is where
+ * the exact item-to-PO/supplier/date mapping lives. Both are fixed columns
+ * inserted BEFORE `Item` — law ① keeps `Item` last and flexible. Sales Orders
+ * and Delivery pass neither and render byte-identically.
+ */
+const SUPPLIER_COLUMN = { key: "supplier", label: "Supplier", width: 140 } as const;
+const PO_DATE_COLUMN = { key: "poDeliveryDate", label: "PO Delivery Date", width: 150 } as const;
+
 /** ☑ is chrome, so it is narrow and it is not one of the six ruled columns. */
 const SELECT_WIDTH = 36;
 
@@ -100,6 +126,22 @@ export interface GoodsMiniLine {
   unitAbsence: string;
   deliverTo: string[];
   deliverToAbsence: string;
+  /**
+   * Card 02-B — a line whose destination is still being ARRANGED renders its
+   * own editable control instead of the printed strings. The page owns the
+   * control (the existing `DestinationAllocationEditor`); this box only gives
+   * it the cell. Absent = the strings render exactly as before.
+   */
+  deliverToNode?: ReactNode;
+  /** One printed line each. Read only when the table is asked for the column. */
+  coveredBy?: string[];
+  /** The governed word for a line nothing covers yet. */
+  coveredByAbsence?: string;
+  /** Card 02-B — read only when the table is asked for the column. */
+  supplier?: string;
+  supplierAbsence?: string;
+  poDeliveryDate?: string;
+  poDeliveryDateAbsence?: string;
   sku: string;
   qty: number;
   item: string;
@@ -194,14 +236,37 @@ export default function GoodsMiniTable({
   label,
   lines,
   selection,
+  showCoveredBy = false,
+  showSupplier = false,
+  showPoDeliveryDate = false,
 }: {
   /** The table's accessible name — `Goods on SO-1303`. */
   label: string;
   lines: GoodsMiniLine[];
   /** Present only on a page that buys from these lines. */
   selection?: GoodsMiniTableSelection;
+  /** A page that BUYS asks for `Covered by`; a truth register does not. */
+  showCoveredBy?: boolean;
+  /** Card 02-B — the exact-mapping columns the buying Register asks for. */
+  showSupplier?: boolean;
+  showPoDeliveryDate?: boolean;
 }) {
-  const minWidth = FIXED_TOTAL + ITEM_FLOOR + (selection ? SELECT_WIDTH : 0);
+  /* The six ruled columns, plus the buying page's own — `Covered by` after
+     `Unit ID`, the mapping columns before `Item`, never after it (law ①). */
+  type Column = { key: string; label: string; width: number | null };
+  const columns: Column[] = showCoveredBy
+    ? [CHILD_COLUMNS[0], CHILD_COLUMNS[1], COVERED_BY_COLUMN, ...CHILD_COLUMNS.slice(2)]
+    : [...CHILD_COLUMNS];
+  const itemAt = columns.length - 1;
+  if (showPoDeliveryDate) columns.splice(itemAt, 0, PO_DATE_COLUMN);
+  if (showSupplier) columns.splice(itemAt, 0, SUPPLIER_COLUMN);
+  const minWidth =
+    FIXED_TOTAL +
+    ITEM_FLOOR +
+    (selection ? SELECT_WIDTH : 0) +
+    (showCoveredBy ? COVERED_BY_COLUMN.width : 0) +
+    (showSupplier ? SUPPLIER_COLUMN.width : 0) +
+    (showPoDeliveryDate ? PO_DATE_COLUMN.width : 0);
   return (
     /* ⭐ A BOX, NOT A CONTINUATION OF THE SHEET — owner correction 2026-08-15.
        The first shipped version fused it into the grid: two rules and nothing
@@ -223,7 +288,7 @@ export default function GoodsMiniTable({
       >
         <colgroup>
           {selection ? <col style={{ width: SELECT_WIDTH }} /> : null}
-          {CHILD_COLUMNS.map((c) => (
+          {columns.map((c) => (
             <col key={c.key} style={c.width ? { width: c.width } : undefined} />
           ))}
         </colgroup>
@@ -235,7 +300,7 @@ export default function GoodsMiniTable({
             {/* THE HEADER ROW CARRIES NO CHECKBOX (owner ruling). Select-all is
                 the PARENT row's box — one whole-order switch, not two. */}
             {selection ? <th className="px-2 py-1.5" aria-label="Select goods line" /> : null}
-            {CHILD_COLUMNS.map((c) => (
+            {columns.map((c) => (
               <th
                 key={c.key}
                 scope="col"
@@ -276,26 +341,58 @@ export default function GoodsMiniTable({
                   )}
                 </td>
               ) : null}
-              {/* ONE ink for every value. `Category` used to be its own
-                  colour as well as its own size — two ways of saying it
-                  outranks `SKU`, which it does not. */}
+              {/* ONE ink for every value — and ONE FACE (Jess, 2026-08-27:
+                  "why all the font type different"). `font-mono` fell back to
+                  the browser's monospace stack, so Unit ID, PO and SKU wore a
+                  different typeface than the row they sit in. Carres has no
+                  mono face — the register engine itself aliases --font-mono
+                  to Inter — so an identifier is plain body text here too. */}
               <td className="px-2 py-2">{line.category}</td>
-              <td className="px-2 py-2 font-mono">
+              <td className="px-2 py-2">
                 {line.unitIds.length ? (
                   line.unitIds.map((id) => <div key={id}>{id}</div>)
                 ) : (
                   <Absence>{line.unitAbsence}</Absence>
                 )}
               </td>
+              {showCoveredBy ? (
+                <td className="px-2 py-2">
+                  {line.coveredBy?.length ? (
+                    line.coveredBy.map((po) => <div key={po}>{po}</div>)
+                  ) : (
+                    <Absence>{line.coveredByAbsence ?? "—"}</Absence>
+                  )}
+                </td>
+              ) : null}
               <td className="px-2 py-2">
-                {line.deliverTo.length ? (
+                {line.deliverToNode != null ? (
+                  line.deliverToNode
+                ) : line.deliverTo.length ? (
                   line.deliverTo.map((d) => <div key={d}>{d}</div>)
                 ) : (
                   <Absence>{line.deliverToAbsence}</Absence>
                 )}
               </td>
-              <td className="px-2 py-2 font-mono">{line.sku}</td>
+              <td className="px-2 py-2">{line.sku}</td>
               <td className="px-2 py-2 tabular-nums">{line.qty}</td>
+              {showSupplier ? (
+                <td className="px-2 py-2">
+                  {line.supplier ? (
+                    line.supplier
+                  ) : (
+                    <Absence>{line.supplierAbsence ?? "—"}</Absence>
+                  )}
+                </td>
+              ) : null}
+              {showPoDeliveryDate ? (
+                <td className="px-2 py-2">
+                  {line.poDeliveryDate ? (
+                    line.poDeliveryDate
+                  ) : (
+                    <Absence>{line.poDeliveryDateAbsence ?? "—"}</Absence>
+                  )}
+                </td>
+              ) : null}
               <td className="px-2 py-2">
                 <div className="font-medium text-base-900">{line.item}</div>
                 {line.itemDetail ? (

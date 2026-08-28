@@ -49,6 +49,12 @@ export type OrderActionKey =
   | "upload_delivery_photo"
   | "delivering"
   | "collect"
+  // §0.1 Action Owner Engine row 1 (owner ruling 2026-08-20, composed
+  // 2026-08-27) — the missing customer promise is the salesperson's work.
+  // Raised by the Work feed's composition only, never by the ladder, so no
+  // register row or drawer headline changes (owner ruling 2026-08-18: the
+  // register states the amber fact alone; the ACTION lives in Work).
+  | "ask_delivery_date"
   // The blueprint card's two NEW acts (owner-approved 2026-08-16, §7):
   // the loan comes back on the delivery day, and Finance resolves the one
   // thing money can do to a delivery.
@@ -275,6 +281,20 @@ const WORDS: readonly OrderActionWord[] = [
       if (!date) return "Delivering";
       return slot ? `Delivering ${date} · ${slot}` : `Delivering ${date}`;
     },
+    button: null,
+    done: null,
+  },
+  {
+    // §0.1 Action Owner Engine row 1 — the missing customer promise, the
+    // salesperson's work. `Ask` is a governed verb (COPY-STANDARD § action
+    // naming); the line names the customer the way every other line names
+    // its party, and stays clear of the retired `agree` vocabulary (C8).
+    // The register hover's fuller guidance sentence is unchanged. No button:
+    // no Work surface renders a closing control for it — the governed date
+    // door (ConfirmDateModal) closes the fact.
+    key: "ask_delivery_date",
+    queue: "Ask for the delivery date",
+    line: (p) => `Ask ${party(p.customer, "customer")} for the delivery date`,
     button: null,
     done: null,
   },

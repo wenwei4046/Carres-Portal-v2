@@ -97,6 +97,22 @@ describe("WORK_RULES — five parts, or no entry", () => {
     }
   });
 
+  it("every rule carries its STRUCTURED Owner Rule (§0.1, built 2026-08-27)", () => {
+    for (const r of WORK_RULES) {
+      expect(r.ownerRule.length).toBeGreaterThan(0);
+    }
+    // The approved table's decisive rows, pinned so a refactor cannot
+    // silently hand Purchasing's work back to the PIC:
+    const byKey = new Map(WORK_RULES.map((r) => [r.key, r]));
+    expect(byKey.get("issue_po")!.ownerRule).toBe("po_duty");
+    expect(byKey.get("confirm_ready_date")!.ownerRule).toBe("po_duty");
+    expect(byKey.get("ask_delivery_date")!.ownerRule).toBe("salesperson");
+    expect(byKey.get("collect")!.ownerRule).toBe("payment_duty");
+    expect(byKey.get("issue_delivery_order")!.ownerRule).toBe("system");
+    expect(byKey.get("collect_loan_item")!.ownerRule).toBe("delivery_duty");
+    expect(byKey.get("resolve_payment_exception")!.ownerRule).toBe("finance_duty");
+  });
+
   it("every action key the ORDER engine can raise has a registry entry", () => {
     // The raisable keys, straight from the engine's own vocabulary.
     const raisable = [
@@ -119,6 +135,93 @@ describe("WORK_RULES — five parts, or no entry", () => {
     for (const r of MODULE_WORK_RULES) {
       expect(r.owner).toMatch(/duty|holder/i);
     }
+  });
+});
+
+describe("the Action Owner Engine resolution (§0.1, built 2026-08-27)", () => {
+  const duty = { userId: "u-duty", name: "Yu Jun" };
+
+  it("Purchasing's order-track work lands on the PO-duty holder, never the PIC", () => {
+    const open = openOrderActions({
+      ...baseSignals,
+      goodsReady: false,
+      goodsUnordered: true,
+    });
+    const items = workItemsForOrder(open, { ...ctx, picUserId: "u-pic", poDuty: duty }, "2026-08-11", HOLS);
+    const po = items.find((i) => i.ruleKey === "issue_po")!;
+    expect(po.ownerName).toBe("Yu Jun");
+    expect(po.ownerUserId).toBe("u-duty");
+    expect(po.ownerDuty).toBeUndefined();
+  });
+
+  it("a dormant duty layer leaves the duty word standing — the PIC is never borrowed for Purchasing's work", () => {
+    const open = openOrderActions({
+      ...baseSignals,
+      goodsReady: false,
+      goodsUnordered: true,
+    });
+    const items = workItemsForOrder(open, { ...ctx, picUserId: "u-pic", poDuty: null }, "2026-08-11", HOLS);
+    const po = items.find((i) => i.ruleKey === "issue_po")!;
+    expect(po.ownerName).toBeNull();
+    expect(po.ownerUserId).toBeNull();
+    expect(po.ownerDuty).toBe("Purchasing");
+  });
+
+  it("collect stays with the PIC as governed cover — money never sits unowned (payment_duty, no roster yet)", () => {
+    const open = openOrderActions({
+      ...baseSignals,
+      hasLogistics: true,
+      bookingConfirmed: true,
+      confirmedDateIso: "2026-08-20",
+      deliveryOrderIssued: false,
+      moneyOwing: true,
+    });
+    const items = workItemsForOrder(
+      open,
+      { ...ctx, picUserId: "u-pic", poDuty: duty, confirmedDateIso: "2026-08-20" },
+      "2026-08-11",
+      HOLS,
+    );
+    const collect = items.find((i) => i.ruleKey === "collect")!;
+    expect(collect.ownerName).toBe("Shasha");
+    expect(collect.ownerUserId).toBe("u-pic");
+    expect(collect.ownerDuty).toBeUndefined();
+  });
+
+  it("the missing customer promise composes `Ask for the delivery date` — the salesperson's work, a name without an account", () => {
+    const items = workItemsForOrder(
+      [],
+      { ...ctx, promisedDateIso: null, askDeliveryDate: true, salespersonName: "Mei Ling" },
+      "2026-08-11",
+      HOLS,
+    );
+    const ask = items.find((i) => i.ruleKey === "ask_delivery_date")!;
+    expect(ask).toBeTruthy();
+    expect(ask.action).toBe("Ask for the delivery date");
+    expect(ask.ownerName).toBe("Mei Ling");
+    expect(ask.ownerUserId).toBeNull(); // not an ops account — a person group by name
+    expect(ask.tone).toBe("warning"); // the register's amber fact, same rows
+    expect(ask.dueIso).toBeNull(); // nothing anchors it — never late
+    expect(ask.workingDaysLate).toBe(0);
+  });
+
+  it("no salesperson recorded → the duty word `Sales` stands, exactly as the hover guidance falls back", () => {
+    const items = workItemsForOrder(
+      [],
+      { ...ctx, promisedDateIso: null, askDeliveryDate: true, salespersonName: null },
+      "2026-08-11",
+      HOLS,
+    );
+    const ask = items.find((i) => i.ruleKey === "ask_delivery_date")!;
+    expect(ask.ownerName).toBeNull();
+    expect(ask.ownerDuty).toBe("Sales");
+  });
+
+  it("it does not compose when the fact does not hold — the 8 who answered `not yet` are not work", () => {
+    // The CALLER answers askDeliveryDate from delivery_date_tbd (the 8 vs the
+    // 3, owner ruling 2026-08-15); false means no item, whatever else is open.
+    const items = workItemsForOrder([], { ...ctx, promisedDateIso: null }, "2026-08-11", HOLS);
+    expect(items.find((i) => i.ruleKey === "ask_delivery_date")).toBeUndefined();
   });
 });
 
@@ -228,6 +331,7 @@ describe("workItemsForOrder — WHO + ACTION + actual working day", () => {
       orderId: "o",
       action: "Assign logistics",
       ownerName: "Shasha",
+      ownerUserId: "u-pic",
       tone: "info",
       locked: false,
       broken: false,

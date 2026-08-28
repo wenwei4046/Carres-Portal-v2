@@ -565,13 +565,168 @@ cover changes who sees today's work while preserving normal owner and cover evid
 ### 9.1 SO Batch Purchase
 
 **Purpose / source:** system-generated uncovered SO lines only; no `+ New`.
-**Left rail:** `Ready to buy`, `Customer date missing`, `SKU missing`, `Supplier missing`, `Production days missing`, `Covered — no purchase`.
-**Columns:** Source SO, Required For, SKU/configuration, Required, Stock, Open PO, Buy, Supplier,
-Deliver To, Goods Must Arrive, Work.
-**Journey:** choose ready lines → group by supplier → change/split destination if exceptional →
-50/50 check grouped POs → send PDFs.
-**Object/placement:** row inspector explains demand arithmetic and source; Batch Purchase owns no
-duplicate demand editor.
+
+**Left rail — APPROVED / LOCKED, owner ruling 2026-08-27 (Card 02-C).** The rail answers, for
+an inexperienced operator: when should each order be placed, which product category, which
+actual supplier — with every label fully readable. Five sections, in this exact order:
+
+```text
+TO ORDER
+  All not ordered
+
+ORDER TIMING
+  Can order early
+  14 safety days left
+  1–13 safety days left
+  No safety days left
+  Not enough production days
+
+PRODUCT
+  All products
+  Mattress
+  Bedframe
+  Sofa
+
+SUPPLIER
+  All suppliers
+  [actual supplier names, alphabetical — never hardcoded]
+
+SETUP TO FIX              ← the whole section renders only when at least one affected SO exists
+  Production days not set
+```
+
+- **The rail is navigation, not batch selection.** No checkboxes in the rail — rows use the
+  governed `NavRow` active treatment; the only checkboxes on the page are the Register's own
+  `Issue PO` selection. One filter may be selected per section; filters from different
+  sections combine; clicking a selected timing row again clears it; `All products` and
+  `All suppliers` clear their sections; clearing every filter restores the complete permanent
+  Register, Ordered records included. `All not ordered` remains the explicit
+  outstanding-only filter.
+- **Counts are UNIQUE Sales Orders** — never documents, notifications, leaf lines, SKU
+  quantities or PO counts. Each section's counts update against the other selected sections,
+  so the printed number predicts the resulting SO rows. The fixed rows (`All not ordered`,
+  the five timing rows, the three product rows, the setup row) print their live count,
+  zero included. A supplier appears only while it has a matching SO under the other active
+  filters — except the currently selected supplier, which stays visible with `0`.
+- **Product comes from the authoritative Catalog category** — never SKU text, model name,
+  description, supplier, or a browser-only mapping. A multi-category Sales Order counts once
+  under every matching category and still appears once in the Register. Records outside the
+  three categories remain visible under `All products` and never silently leave the
+  permanent Register.
+- **Supplier uses the same projection as the Register's `Supplier` column** — the resolved
+  outstanding-demand supplier plus the issued PO lineage supplier
+  (`soBatchOrderSupplierNames`), no second browser-only supplier calculation. Actual names
+  only, alphabetical. There is no `No supplier` filter: an unexpectedly missing supplier
+  fails at Catalog authority and is not a normal purchasing category.
+- Every timing row remains orderable. `Can order early`, `1–13 safety days left`,
+  `No safety days left` and `Not enough production days` express timing risk, never
+  `Cannot buy`. Order By is a planned date, never an unlock date.
+- `Production days not set` is the only normal setup blocker on this surface. It belongs to
+  Purchasing Settings, and its lines are not selectable until the Supplier × Category
+  production days exist.
+- **The readable rail shell (Card 02-C):** 240px wide · 12px outer padding · 8px heading →
+  first row · 20px between groups · 36px minimum row · a wrapped label takes its natural
+  height (≥ 48px) in the same body font. A governed label is never truncated and never
+  hidden behind a tooltip; the count stays visible and right-aligned; the rail scrolls
+  vertically as supplier names grow; at narrow desktop widths the Register scrolls
+  horizontally and the rail is never squeezed below 240px. The shell/group/row grammar is
+  the shared `FilterRail` component (`workspace-rail.tsx`). Manual Purchase later imports
+  the same shell, grammar, Product authority and unique-object count rule — never
+  `ORDER TIMING`, Safety-days arithmetic or the SO-specific `All not ordered` meaning.
+- Fully covered / `Buy = 0` DEMAND leaves the buying selection — it is not offered a tick, and
+  the leaf listing drops it — but the SALES ORDER'S ROW never leaves (Card 02-B). If a PO is
+  cancelled and the quantity is still required, the selectable demand returns automatically by
+  recomputation; nothing is stored.
+- A line whose customer date, SKU or supplier is unexpectedly missing fails safely at its owning
+  boundary (Sales / Catalog). It is named on its own row; it never becomes a permanent Purchasing
+  rail facet and is never silently defaulted.
+- Every category derives from the one server planning engine. There is no second stored status.
+- Retired rail words, never to return on this surface: `Ready to buy` · `Covered` ·
+  `No customer date` · `No SKU` · `No supplier` · `No production days` · `BUYING RECORDS` ·
+  `WORK TO DO` · `All lines` · `No buying needed` · `Cannot buy` — alongside the standing bans
+  `Today` · `Tomorrow` · `Overdue` · `Follow Up` · `Needs Attention` · `Priority` · `Pending` ·
+  `Waiting` · `Next Action` · `Buffer`.
+
+**Safety days — APPROVED 2026-08-26.** The visible term is `Safety days`; `buffer` never reaches
+a screen. `Safety days = 14 working days` on the governed Office working calendar and holidays;
+`Production working days` is the existing Supplier × Category setting on the supplier's configured
+work week and holidays. The one server planning engine owns the arithmetic — browser code performs
+no working-day arithmetic, and Safety days are subtracted exactly once:
+
+```text
+Requested Delivery Date − 14 Safety days                         = Goods Must Arrive
+Goods Must Arrive − Supplier × Category production working days  = Order By
+```
+
+Timing classification, derived by the same engine:
+
+```text
+today < Order By                                                   → Can order early
+today = Order By                                                   → 14 safety days left
+today > Order By · completion lands 1–13 working days early        → 1–13 safety days left
+expected production completion = Requested Delivery Date            → No safety days left
+expected production completion > Requested Delivery Date            → Not enough production days
+```
+
+`Order By` stays fixed for a demand unless an authoritative source fact changes; `Safety days
+left` changes as working days pass. The Settings row reads
+`Safety days · 14 working days` with the line `Extra time allowed for delays.` — the one existing
+governed setting and engine field, never a second Safety-days field or arithmetic.
+
+**THE PERMANENT ORDER REGISTER — APPROVED / LOCKED, owner ruling 2026-08-27 (Card 02-B).**
+The right Register shows **one row per proceeded physical-goods Sales Order**
+(`orders.status = 'proceed_order'`; `place` is not proceeded; Service-only orders stay outside
+Purchasing), and the row never leaves when a purchase order is issued — the page is both the
+buying surface and the permanent purchasing audit register.
+
+**THE PROCEEDED-ORDER BOUNDARY — RESOLVED FROM AUTHORITY, Card 02-C, 2026-08-27.** A Sales
+Order enters SO Batch Purchase only after Sales completes `Proceed`. The boundary is drawn ONCE,
+at the one demand read (`loadToOrder`), before the engine ever sees a line — so a `place` order
+is invisible to the WHOLE surface: no planning, no netting (it cannot consume Open PO coverage
+ahead of a proceeded order), no rail count, no Register row, no selection, no Ready Stock take
+and no PO. Both write doors (`take-stock`, `issue-batch`) recompute through the same read at
+POST time; a demand naming a `place` order resolves to nothing and is refused by name, creating
+and reserving nothing. Every present and future rail count — timing, Product, Supplier — draws
+from this same proceeded-SO population. Rail filters combine with AND: `All not ordered` plus a
+timing facet shows only rows satisfying both.
+
+**Columns, exactly and in this order:** Status · Proceed Date · PO No · SO No · Customer ·
+Delivery Location · Requested Delivery Date · Supplier · Deliver To · PO Delivery Date.
+`Delivery Location` sits immediately after `Customer`; `SO No` is the identity and stays sticky
+during horizontal scrolling. Retired as Register columns, never to return: `Source SO` ·
+`Required For` · `SKU / configuration` · `Required` · `Stock` · `Open PO` · `Buy` ·
+`Goods Must Arrive` · `Work` · `Action` — their FACTS survive off-screen (`goodsMustArrive`
+keeps feeding the rail and Work Engine; structured actions keep feeding central Work).
+
+- **Status is derived, never stored:** blank · `Partial` · `Ordered`, from the quantity that
+  genuinely requires purchasing (demanded minus Ready-Stock coverage) against the quantity
+  covered by a NON-CANCELLED purchase order whose CURRENT PDF version has confirmed-sent
+  evidence (`po_sends.kind = 'confirmed_sent'` at `COALESCE(purchase_orders.version, 1)`).
+  `external_open` never counts; supplier silence changes nothing; a numbered but unsent PO shows
+  under `PO No` with blank Status; a new unsent revision invalidates older-version completeness;
+  received lineage with valid evidence stays `Ordered`; a fully Ready-Stock-covered order stays
+  visible, blank and unselectable.
+- **Visible PO attribution comes ONLY from `po_line_sources`** — never `purchase_orders.so`,
+  `so_refs`, or a global SKU/supplier/customer match. `PO Delivery Date` is
+  `purchase_orders.eta_date`, the official supplier-facing date — never `expected_ready_date`,
+  never the internal `Goods Must Arrive`, never an "if ordered today" estimate.
+- **Deterministic summaries:** one value prints itself; several print `2 POs` · `2 suppliers` ·
+  `Multiple`, with the exact item-to-PO/supplier/destination/date mapping in the expansion.
+- **Selection:** the parent checkbox is ALL of the order's eligible uncovered child demand;
+  a Partial order selects only its uncovered remainder; Ordered and fully Ready-Stock rows refuse
+  the tick; part-selected children render the checkbox indeterminate; the header checkbox covers
+  visible eligible demand only. The issue contract remains the leaf `SoBatchSelection[]`.
+
+**Journey:** choose ready orders/lines → group by supplier → change/split destination if
+exceptional → 50/50 check grouped POs → send PDFs.
+**Object/placement:** the row expand is **`GoodsMiniTable`**, the ONE child table Sales Orders and
+Delivery draw (owner ruling 2026-08-15; corrected onto this page 2026-08-24; widened with the
+optional `Covered by` · `Supplier` · `PO Delivery Date` columns 2026-08-27 — siblings that do not
+ask render byte-identically). It says only what the ROW cannot: per item line, what covers it
+(`Ready Stock` · the exact PO numbers · `Not ordered yet`), the Unit ID where one is allocated
+(read through the Sales Order expansion door), the exact supplier/`Deliver To`/`PO Delivery Date`
+mapping, and the arrangement editor for lines still being bought. Batch Purchase owns no
+duplicate demand editor and no second mini-table.
 **Exceptions:** cancelled/changed SO, stock becomes available, supplier missing, supplier date too
 late, price changed, split destination.
 **Connections:** Sales Orders, Stock, Delivery calendar, Catalog, PO.

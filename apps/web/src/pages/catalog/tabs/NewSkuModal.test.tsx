@@ -23,12 +23,14 @@ import NewSkuModal from "./NewSkuModal";
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 let mockRole: string | null = "principal";
+let mockSuppliers: { id: string; name: string; slug?: string }[] = [];
 vi.mock("@/lib/auth", () => ({
   useAuth: (selector: (s: { role: string | null }) => unknown) =>
     selector({ role: mockRole }),
 }));
 
 const mockCreateModelMutateAsync = vi.fn();
+const mockCreateSupplierMutateAsync = vi.fn();
 const mockCreateSkuMutateAsync = vi.fn();
 const mockOfferMutateAsync = vi.fn();
 const mockGenerateSkusMutateAsync = vi.fn();
@@ -38,8 +40,19 @@ vi.mock("@/lib/queries", () => ({
   /* 2026-08-24 - the supplier picker/filter/column reads the roster through
    * this hook; one named supplier is enough to pin the render path. */
   useOperationSuppliers: () => ({
-    data: { suppliers: [{ id: "00000000-0000-4000-8000-0000000000s1".replace("s","a"), name: "Hookka" }] },
+    /* A MUTABLE roster, because the real hook is invalidated by the create
+       mutation and refetches. A frozen list would make the picker look broken
+       in a test while working in production. */
+    data: { suppliers: mockSuppliers },
     isLoading: false,
+  }),
+  /* 2026-08-24 - the FIRST supplier-creation door the portal has ever had.
+   * Principal-only, so the panel simply does not render for anyone the
+   * `suppliers_principal_write` policy (0002) would refuse. */
+  useCreateSupplier: () => ({
+    mutate: vi.fn(),
+    mutateAsync: mockCreateSupplierMutateAsync,
+    isPending: false,
   }),
   useCreateCatalogModel: () => ({
     mutate: vi.fn(),
@@ -107,6 +120,17 @@ function openSofa() {
 
 beforeEach(() => {
   mockRole = "principal";
+  mockSuppliers = [
+    { id: "00000000-0000-4000-8000-0000000000a1", name: "Hookka" },
+    /* The RENAMED row — production's Ohana still carries the `hookka`-family
+       slug from 0032 while wearing a name that derives a different one. */
+    { id: "sup-ohana", name: "Ohana", slug: "hookka-manufacturing" },
+  ];
+  mockCreateSupplierMutateAsync.mockReset().mockImplementation(async () => {
+    const supplier = { id: "sup-new", name: "Hookka Two" };
+    mockSuppliers = [...mockSuppliers, supplier];
+    return { supplier };
+  });
   mockCreateModelMutateAsync.mockReset().mockResolvedValue({ model: { id: "m-new" } });
   mockCreateSkuMutateAsync.mockReset().mockResolvedValue({});
   mockOfferMutateAsync.mockReset().mockResolvedValue({ offered: 2, failed: [] });
@@ -138,7 +162,7 @@ describe("NewSkuModal — sofa compartment picker", () => {
     expect(screen.queryByTestId("new-sku-price")).not.toBeInTheDocument();
     expect(screen.queryByTestId("new-sku-cost")).not.toBeInTheDocument();
 
-    expect(screen.getByText("Create model + 2 SKUs")).toBeInTheDocument();
+    expect(screen.getByText("Create Sofa model + 2 SKUs")).toBeInTheDocument();
   });
 
   it("None deselects everything and falls back to the classic flat-SKU flow", () => {
@@ -148,10 +172,10 @@ describe("NewSkuModal — sofa compartment picker", () => {
     fireEvent.click(screen.getByTestId("new-sku-comps-none"));
     expect(screen.getByTestId("new-sku-comp-1A(LHF)")).toHaveAttribute("aria-pressed", "false");
     expect(screen.getByTestId("new-sku-variant")).toBeInTheDocument();
-    expect(screen.getByText("Create product + SKU")).toBeInTheDocument();
+    expect(screen.getByText("Create Sofa product + SKU")).toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId("new-sku-comps-all"));
-    expect(screen.getByText("Create model + 2 SKUs")).toBeInTheDocument();
+    expect(screen.getByText("Create Sofa model + 2 SKUs")).toBeInTheDocument();
   });
 
   it("submit creates the model (sofa_mode 'custom') then offers each ticked compartment — no single-SKU insert", async () => {
@@ -159,7 +183,7 @@ describe("NewSkuModal — sofa compartment picker", () => {
     render(<NewSkuModal models={MODELS} sofaCompartments={POOL} onClose={onClose} />);
     openSofa();
     fireEvent.change(screen.getByTestId("new-sku-name"), { target: { value: "Angsa" } });
-    fireEvent.click(screen.getByText("Create model + 2 SKUs"));
+    fireEvent.click(screen.getByText("Create Sofa model + 2 SKUs"));
 
     await waitFor(() => expect(onClose).toHaveBeenCalled());
     expect(mockCreateModelMutateAsync).toHaveBeenCalledWith({
@@ -184,7 +208,7 @@ describe("NewSkuModal — sofa compartment picker", () => {
     fireEvent.change(screen.getByTestId("new-sku-name"), { target: { value: "Angsa" } });
     fireEvent.click(screen.getByTestId("new-sku-comp-1NA")); // untick c2
     mockOfferMutateAsync.mockResolvedValue({ offered: 1, failed: [] });
-    fireEvent.click(screen.getByText("Create model + 1 SKU"));
+    fireEvent.click(screen.getByText("Create Sofa model + 1 SKU"));
 
     await waitFor(() => expect(onClose).toHaveBeenCalled());
     expect(mockOfferMutateAsync).toHaveBeenCalledWith({
@@ -204,7 +228,7 @@ describe("NewSkuModal — sofa compartment picker", () => {
     render(<NewSkuModal models={MODELS} sofaCompartments={POOL} onClose={onClose} />);
     openSofa();
     fireEvent.change(screen.getByTestId("new-sku-name"), { target: { value: "Angsa" } });
-    fireEvent.click(screen.getByText("Create model + 2 SKUs"));
+    fireEvent.click(screen.getByText("Create Sofa model + 2 SKUs"));
 
     // Failure: stays open, model identity locked, only c2 still selected.
     await waitFor(() =>
@@ -218,7 +242,7 @@ describe("NewSkuModal — sofa compartment picker", () => {
     expect(screen.getByTestId("new-sku-category")).toBeDisabled();
 
     // Retry: NO second model insert; offers only the failed compartment.
-    fireEvent.click(screen.getByText("Create model + 1 SKU"));
+    fireEvent.click(screen.getByText("Create Sofa model + 1 SKU"));
     await waitFor(() => expect(onClose).toHaveBeenCalled());
     expect(mockCreateModelMutateAsync).toHaveBeenCalledTimes(1);
     expect(mockOfferMutateAsync).toHaveBeenLastCalledWith({
@@ -233,7 +257,7 @@ describe("NewSkuModal — sofa compartment picker", () => {
     openSofa();
     expect(screen.queryByTestId("new-sku-compartments")).not.toBeInTheDocument();
     expect(screen.getByTestId("new-sku-variant")).toBeInTheDocument();
-    expect(screen.getByText("Create product + SKU")).toBeInTheDocument();
+    expect(screen.getByText("Create Sofa product + SKU")).toBeInTheDocument();
   });
 
   it("non-sofa categories keep the classic flow untouched", () => {
@@ -249,7 +273,7 @@ describe("NewSkuModal — sofa compartment picker", () => {
     expect(screen.getByTestId("new-sku-compartments")).toBeInTheDocument();
     expect(screen.getByText(/No compartments in the pool yet/)).toBeInTheDocument();
     expect(screen.getByTestId("new-sku-variant")).toBeInTheDocument();
-    expect(screen.getByText("Create product + SKU")).toBeInTheDocument();
+    expect(screen.getByText("Create Sofa product + SKU")).toBeInTheDocument();
   });
 });
 
@@ -271,7 +295,7 @@ describe("NewSkuModal — mattress/bedframe size chips", () => {
     expect(screen.queryByTestId("new-sku-cost")).not.toBeInTheDocument();
     // the one price field that seeds every generated SKU stays (principal)
     expect(screen.getByTestId("new-sku-price")).toBeInTheDocument();
-    expect(screen.getByText("Create model + 3 SKUs")).toBeInTheDocument();
+    expect(screen.getByText("Create Mattress model + 3 SKUs")).toBeInTheDocument();
   });
 
   it("bedframe reads the bedframe_size pool; category switch re-defaults the selection", () => {
@@ -280,7 +304,7 @@ describe("NewSkuModal — mattress/bedframe size chips", () => {
     fireEvent.change(screen.getByTestId("new-sku-category"), { target: { value: "bedframe" } });
     expect(screen.getByTestId("new-sku-size-K")).toHaveAttribute("aria-pressed", "true");
     expect(screen.queryByTestId("new-sku-size-S")).not.toBeInTheDocument(); // mattress-only value
-    expect(screen.getByText("Create model + 1 SKU")).toBeInTheDocument();
+    expect(screen.getByText("Create Bedframe model + 1 SKU")).toBeInTheDocument();
   });
 
   it("submit creates the model (sizes seed allowed_options) + generate-skus with the ticked sizes + price", async () => {
@@ -289,7 +313,7 @@ describe("NewSkuModal — mattress/bedframe size chips", () => {
     fireEvent.change(screen.getByTestId("new-sku-name"), { target: { value: "Lumi FirmCare" } });
     fireEvent.click(screen.getByTestId("new-sku-size-Q")); // untick Q → S + K remain
     fireEvent.change(screen.getByTestId("new-sku-price"), { target: { value: "1990" } });
-    fireEvent.click(screen.getByText("Create model + 2 SKUs"));
+    fireEvent.click(screen.getByText("Create Mattress model + 2 SKUs"));
 
     await waitFor(() => expect(onClose).toHaveBeenCalled());
     expect(mockCreateModelMutateAsync).toHaveBeenCalledWith({
@@ -313,7 +337,7 @@ describe("NewSkuModal — mattress/bedframe size chips", () => {
     expect(screen.queryByTestId("new-sku-price")).not.toBeInTheDocument();
     expect(screen.getByTestId("new-sku-price-lock-hint")).toBeInTheDocument();
     fireEvent.change(screen.getByTestId("new-sku-name"), { target: { value: "Lumi FirmCare" } });
-    fireEvent.click(screen.getByText("Create model + 3 SKUs"));
+    fireEvent.click(screen.getByText("Create Mattress model + 3 SKUs"));
     await waitFor(() => expect(onClose).toHaveBeenCalled());
     expect(mockGenerateSkusMutateAsync).toHaveBeenCalledWith({
       modelId: "m-new",
@@ -325,7 +349,7 @@ describe("NewSkuModal — mattress/bedframe size chips", () => {
     render(<NewSkuModal models={MODELS} optionPools={SIZE_POOLS} onClose={vi.fn()} />);
     fireEvent.click(screen.getByTestId("new-sku-sizes-none"));
     expect(screen.getByTestId("new-sku-variant")).toBeInTheDocument();
-    expect(screen.getByText("Create product + SKU")).toBeInTheDocument();
+    expect(screen.getByText("Create Mattress product + SKU")).toBeInTheDocument();
   });
 
   it("accessory/service categories never show the size chips", () => {
@@ -421,7 +445,7 @@ describe("NewSkuModal — accessory/service: no variant axis", () => {
       target: { value: "Memory Foam Pillow" },
     });
     fireEvent.change(screen.getByTestId("new-sku-price"), { target: { value: "99" } });
-    fireEvent.click(screen.getByText("Create product + SKU"));
+    fireEvent.click(screen.getByText("Create Accessory product + SKU"));
 
     await waitFor(() => expect(onClose).toHaveBeenCalled());
     expect(mockCreateModelMutateAsync).toHaveBeenCalledWith({
@@ -453,7 +477,7 @@ describe("NewSkuModal — accessory/service: no variant axis", () => {
     // …then flip to accessory and create.
     fireEvent.change(screen.getByTestId("new-sku-category"), { target: { value: "accessory" } });
     fireEvent.change(screen.getByTestId("new-sku-name"), { target: { value: "Bolster" } });
-    fireEvent.click(screen.getByText("Create product + SKU"));
+    fireEvent.click(screen.getByText("Create Accessory product + SKU"));
 
     await waitFor(() => expect(onClose).toHaveBeenCalled());
     expect(mockCreateSkuMutateAsync).toHaveBeenCalledWith(
@@ -649,7 +673,7 @@ describe("NewSkuModal — supplier override on bulk-generate flows", () => {
     fireEvent.change(screen.getByTestId("new-sku-name"), { target: { value: "Lumi FirmCare" } });
     expect(screen.getByTestId("new-sku-supplier")).toBeInTheDocument();
     fireEvent.change(screen.getByTestId("new-sku-supplier"), { target: { value: HOOKKA_ID } });
-    fireEvent.click(screen.getByText("Create model + 3 SKUs"));
+    fireEvent.click(screen.getByText("Create Mattress model + 3 SKUs"));
 
     await waitFor(() => expect(onClose).toHaveBeenCalled());
     expect(mockGenerateSkusMutateAsync).toHaveBeenCalledWith(
@@ -663,7 +687,7 @@ describe("NewSkuModal — supplier override on bulk-generate flows", () => {
     const onClose = vi.fn();
     render(<NewSkuModal models={MODELS} optionPools={SIZE_POOLS} onClose={onClose} />);
     fireEvent.change(screen.getByTestId("new-sku-name"), { target: { value: "Lumi FirmCare" } });
-    fireEvent.click(screen.getByText("Create model + 3 SKUs"));
+    fireEvent.click(screen.getByText("Create Mattress model + 3 SKUs"));
     await waitFor(() => expect(onClose).toHaveBeenCalled());
     const call = mockGenerateSkusMutateAsync.mock.calls[0][0];
     expect(call.input.supplierId).toBeUndefined();
@@ -682,7 +706,7 @@ describe("NewSkuModal — supplier override on bulk-generate flows", () => {
     fireEvent.change(screen.getByTestId("new-sku-name"), { target: { value: "Booqit" } });
     expect(screen.getByTestId("new-sku-supplier")).toBeInTheDocument();
     fireEvent.change(screen.getByTestId("new-sku-supplier"), { target: { value: HOOKKA_ID } });
-    fireEvent.click(screen.getByText("Create model + 2 SKUs"));
+    fireEvent.click(screen.getByText("Create Sofa model + 2 SKUs"));
 
     await waitFor(() => expect(onClose).toHaveBeenCalled());
     expect(mockOfferMutateAsync).toHaveBeenCalledWith(
@@ -697,7 +721,7 @@ describe("NewSkuModal — supplier override on bulk-generate flows", () => {
     );
     fireEvent.change(screen.getByTestId("new-sku-category"), { target: { value: "sofa" } });
     fireEvent.change(screen.getByTestId("new-sku-name"), { target: { value: "Booqit" } });
-    fireEvent.click(screen.getByText("Create model + 1 SKU"));
+    fireEvent.click(screen.getByText("Create Sofa model + 1 SKU"));
     await waitFor(() => expect(onClose).toHaveBeenCalled());
     const call = mockOfferMutateAsync.mock.calls[0][0];
     expect(call.supplierId).toBeUndefined();
@@ -750,5 +774,349 @@ describe("NewSkuModal — same-name models are disambiguated in the picker", () 
     // Neither collides WITHIN its own category, so neither is suffixed.
     expect(labels).toContain("Sofa Booqit");
     expect(labels).toContain("Accessory Booqit");
+  });
+});
+
+/**
+ * ⭐ THE SUPPLIER'S OWN CODE ON A BULK BATCH (2026-08-24).
+ *
+ * A quotation names the SUPPLIER's code and never Carres' SKU — it is the only
+ * string a keyer can match a factory's paperwork against. The classic
+ * single-SKU flow has had a code box since 0375; the two BULK flows had the
+ * supplier PICKER but no code, so a batch of sofa compartments or mattress
+ * sizes could name its factory and not one of its part numbers.
+ *
+ * One box defaults the batch, any piece overrides it. The override is keyed by
+ * what the SUBMIT sends — compartmentId for the compartment lane, the canonical
+ * size NAME for the size lane — because a key the server cannot recognise would
+ * drop the code silently rather than loudly.
+ */
+describe("NewSkuModal — the supplier's own code on a bulk batch", () => {
+  it("gives the compartment flow a batch box and one box per ticked piece", () => {
+    render(<NewSkuModal models={MODELS} sofaCompartments={POOL} onClose={vi.fn()} />);
+    openSofa();
+    expect(screen.getByTestId("new-sku-supplier-code-batch")).toBeInTheDocument();
+    // Both live compartments start ticked; the retired one is not offered.
+    expect(screen.getByTestId("new-sku-supplier-code-piece-c1")).toBeInTheDocument();
+    expect(screen.getByTestId("new-sku-supplier-code-piece-c2")).toBeInTheDocument();
+    expect(screen.queryByTestId("new-sku-supplier-code-piece-c-off")).not.toBeInTheDocument();
+  });
+
+  it("drops a piece's box the moment that piece is unticked", () => {
+    /* A code typed against a compartment then unticked must not travel — the
+       submit builds its map from the SELECTED ids, and the box disappearing is
+       what tells the keyer that. */
+    render(<NewSkuModal models={MODELS} sofaCompartments={POOL} onClose={vi.fn()} />);
+    openSofa();
+    fireEvent.change(screen.getByTestId("new-sku-supplier-code-piece-c2"), {
+      target: { value: "HK-1NA" },
+    });
+    fireEvent.click(screen.getByTestId("new-sku-comp-1NA"));
+    expect(screen.queryByTestId("new-sku-supplier-code-piece-c2")).not.toBeInTheDocument();
+  });
+
+  it("⭐ sends the batch code to every compartment, and the override to just one", async () => {
+    const onClose = vi.fn();
+    render(<NewSkuModal models={MODELS} sofaCompartments={POOL} onClose={onClose} />);
+    openSofa();
+    fireEvent.change(screen.getByTestId("new-sku-name"), { target: { value: "Angsa" } });
+    fireEvent.change(screen.getByTestId("new-sku-supplier-code"), {
+      target: { value: "  HK-390  " },
+    });
+    fireEvent.change(screen.getByTestId("new-sku-supplier-code-piece-c2"), {
+      target: { value: "HK-390-1NA" },
+    });
+    fireEvent.click(screen.getByText("Create Sofa model + 2 SKUs"));
+
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    /* The compartment lane sends ONE code per request, so the batch default is
+       resolved HERE — each PUT carries the single code that piece ends up with,
+       trimmed. */
+    expect(mockOfferMutateAsync).toHaveBeenCalledWith({
+      modelId: "m-new",
+      compartmentIds: ["c1", "c2"],
+      supplierCodes: { c1: "HK-390", c2: "HK-390-1NA" },
+    });
+  });
+
+  it("sends NOTHING extra when no code was typed", async () => {
+    /* The payload stays byte-identical to what it sent before this field
+       existed — an empty map is a key the server would have to interpret. */
+    const onClose = vi.fn();
+    render(<NewSkuModal models={MODELS} sofaCompartments={POOL} onClose={onClose} />);
+    openSofa();
+    fireEvent.change(screen.getByTestId("new-sku-name"), { target: { value: "Angsa" } });
+    fireEvent.click(screen.getByText("Create Sofa model + 2 SKUs"));
+
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    const payload = mockOfferMutateAsync.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(payload).not.toHaveProperty("supplierCodes");
+  });
+
+  it("⭐ keys the size flow's override by the CANONICAL NAME the submit sends", async () => {
+    const onClose = vi.fn();
+    render(<NewSkuModal models={MODELS} optionPools={SIZE_POOLS} onClose={onClose} />);
+    fireEvent.change(screen.getByTestId("new-sku-name"), { target: { value: "Lumi FirmCare" } });
+    fireEvent.change(screen.getByTestId("new-sku-supplier-code"), { target: { value: "LM-100" } });
+    /* The pool VALUE is `K`; the variant sent is `King`. The box is keyed by
+       the name for exactly that reason — a map keyed `K` would never match. */
+    fireEvent.change(screen.getByTestId("new-sku-supplier-code-piece-King"), {
+      target: { value: "LM-100-K" },
+    });
+    fireEvent.click(screen.getByText("Create Mattress model + 3 SKUs"));
+
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    const call = mockGenerateSkusMutateAsync.mock.calls[0]?.[0] as {
+      input: { supplierCode?: string; supplierCodes?: Record<string, string> };
+    };
+    // Batch default and the one override both ride the SAME request; the
+    // server resolves per-variant → batch → NULL.
+    expect(call.input.supplierCode).toBe("LM-100");
+    expect(call.input.supplierCodes).toEqual({ King: "LM-100-K" });
+  });
+});
+
+/**
+ * ⭐ MEETING A NEW SUPPLIER MID-CATALOG (2026-08-24).
+ *
+ * The portal had NO supplier-creation door anywhere — no route, no screen — so
+ * a keyer who reached a factory nobody had entered yet had to stop, open the
+ * SQL editor (or find someone who could) and come back to a modal they had
+ * already lost. The point of putting the door HERE is that the half-written SKU
+ * survives being interrupted by a supplier.
+ *
+ * Purchasing still owns the record. This is a door, not a second home for it.
+ */
+describe("NewSkuModal — adding a supplier without losing the SKU", () => {
+  it("offers the door, and pre-ticks the category being keyed", () => {
+    render(<NewSkuModal models={MODELS} sofaCompartments={POOL} onClose={vi.fn()} />);
+    openSofa();
+    fireEvent.click(screen.getByTestId("new-sku-supplier-add-open"));
+    /* The category is the one fact this modal already knows and the answer nine
+       times out of ten — asking it again would be asking the keyer to repeat
+       themselves. */
+    expect(screen.getByTestId("new-sku-supplier-add-cat-sofa")).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.getByTestId("new-sku-supplier-add-cat-mattress")).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+  });
+
+  it("⭐ never shows the door to a role the policy would refuse", () => {
+    /* `suppliers_principal_write` (0002) is principal-only and the route
+       enforces it. A button that always refuses teaches the operator to ignore
+       refusals, so it simply is not drawn. */
+    mockRole = "operation";
+    render(<NewSkuModal models={MODELS} optionPools={SIZE_POOLS} onClose={vi.fn()} />);
+    expect(screen.queryByTestId("new-sku-supplier-add-open")).not.toBeInTheDocument();
+  });
+
+  it("refuses to submit a name too short to be a name", () => {
+    render(<NewSkuModal models={MODELS} optionPools={SIZE_POOLS} onClose={vi.fn()} />);
+    fireEvent.click(screen.getByTestId("new-sku-supplier-add-open"));
+    const save = screen.getByTestId("new-sku-supplier-add-save") as HTMLButtonElement;
+    expect(save.disabled).toBe(true);
+    fireEvent.change(screen.getByTestId("new-sku-supplier-add-name"), { target: { value: "H" } });
+    expect(save.disabled).toBe(true);
+    fireEvent.change(screen.getByTestId("new-sku-supplier-add-name"), {
+      target: { value: "Hookka Two" },
+    });
+    expect(save.disabled).toBe(false);
+  });
+
+  it("⭐ selects the new supplier the moment it exists, and closes the panel", async () => {
+    render(<NewSkuModal models={MODELS} optionPools={SIZE_POOLS} onClose={vi.fn()} />);
+    fireEvent.click(screen.getByTestId("new-sku-supplier-add-open"));
+    fireEvent.change(screen.getByTestId("new-sku-supplier-add-name"), {
+      target: { value: "  Hookka Two  " },
+    });
+    fireEvent.click(screen.getByTestId("new-sku-supplier-add-save"));
+
+    await waitFor(() =>
+      expect(mockCreateSupplierMutateAsync).toHaveBeenCalledWith({
+        name: "Hookka Two",
+        kind: "factory_pickup",
+        catCovered: ["mattress"],
+      }),
+    );
+    /* The keyer asked for this supplier BECAUSE they are writing its SKU right
+       now — making them find it in the list again would be the modal forgetting
+       what it was just told. */
+    await waitFor(() =>
+      expect((screen.getByTestId("new-sku-supplier") as HTMLSelectElement).value).toBe("sup-new"),
+    );
+    expect(screen.queryByTestId("new-sku-supplier-add")).not.toBeInTheDocument();
+  });
+
+  it("keeps the panel open when the server refuses, so the typing is not lost", async () => {
+    mockCreateSupplierMutateAsync.mockRejectedValueOnce(new Error("already a supplier"));
+    render(<NewSkuModal models={MODELS} optionPools={SIZE_POOLS} onClose={vi.fn()} />);
+    fireEvent.click(screen.getByTestId("new-sku-supplier-add-open"));
+    fireEvent.change(screen.getByTestId("new-sku-supplier-add-name"), {
+      target: { value: "Hookka Two" },
+    });
+    fireEvent.click(screen.getByTestId("new-sku-supplier-add-save"));
+
+    await waitFor(() => expect(mockCreateSupplierMutateAsync).toHaveBeenCalled());
+    // Still open, still holding what was typed — a refusal is not a reason to
+    // throw the keyer's work away.
+    expect(screen.getByTestId("new-sku-supplier-add")).toBeInTheDocument();
+    expect((screen.getByTestId("new-sku-supplier-add-name") as HTMLInputElement).value).toBe(
+      "Hookka Two",
+    );
+  });
+});
+
+/**
+ * ⭐ THE DUPLICATE-SUPPLIER DEAD END (2026-08-25).
+ *
+ * Reported from production: adding a supplier for a Cody bedframe produced
+ * "Ohana is already a supplier — pick it from the list instead of adding it
+ * twice." The server was RIGHT; the door was wrong, in two ways.
+ *
+ * 1. Cancelling the panel left the previous name in the box, so reopening it
+ *    later submitted a supplier the keyer had not typed and could not see.
+ * 2. The refusal arrived as a red toast after a round-trip and left the form
+ *    to be dismantled by hand — correct, and a dead end.
+ */
+describe("NewSkuModal — a duplicate supplier is caught early and is not a dead end", () => {
+  it("⭐ forgets the last name when the panel is reopened", () => {
+    render(<NewSkuModal models={MODELS} optionPools={SIZE_POOLS} onClose={vi.fn()} />);
+    fireEvent.click(screen.getByTestId("new-sku-supplier-add-open"));
+    fireEvent.change(screen.getByTestId("new-sku-supplier-add-name"), {
+      target: { value: "Ohana" },
+    });
+    fireEvent.click(screen.getByTestId("new-sku-supplier-add-cancel"));
+
+    fireEvent.click(screen.getByTestId("new-sku-supplier-add-open"));
+    expect((screen.getByTestId("new-sku-supplier-add-name") as HTMLInputElement).value).toBe("");
+  });
+
+  it("⭐ names the existing supplier while typing, and refuses to submit", () => {
+    render(<NewSkuModal models={MODELS} optionPools={SIZE_POOLS} onClose={vi.fn()} />);
+    fireEvent.click(screen.getByTestId("new-sku-supplier-add-open"));
+    /* A DIFFERENT spelling of a supplier already in the roster. The match is on
+       the derived slug — the same function the server derives it with — so it
+       collides here exactly as it would collide in the database. */
+    fireEvent.change(screen.getByTestId("new-sku-supplier-add-name"), {
+      target: { value: "hookka" },
+    });
+    expect(screen.getByTestId("new-sku-supplier-add-duplicate").textContent).toContain(
+      "Hookka is already a supplier",
+    );
+    expect((screen.getByTestId("new-sku-supplier-add-save") as HTMLButtonElement).disabled).toBe(
+      true,
+    );
+    expect(mockCreateSupplierMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it("⭐ finishes what the keyer meant — one click selects the existing supplier", () => {
+    render(<NewSkuModal models={MODELS} optionPools={SIZE_POOLS} onClose={vi.fn()} />);
+    fireEvent.click(screen.getByTestId("new-sku-supplier-add-open"));
+    fireEvent.change(screen.getByTestId("new-sku-supplier-add-name"), {
+      target: { value: "HoOKkA" },
+    });
+    fireEvent.click(screen.getByTestId("new-sku-supplier-add-use-existing"));
+
+    /* Refusing without doing the obvious next thing is what made the server's
+       message a dead end: the supplier they wanted is now simply chosen. */
+    expect((screen.getByTestId("new-sku-supplier") as HTMLSelectElement).value).toBe(
+      "00000000-0000-4000-8000-0000000000a1",
+    );
+    expect(screen.queryByTestId("new-sku-supplier-add")).not.toBeInTheDocument();
+  });
+
+  it("⭐ catches a RENAMED supplier by its stored slug, not its name's", () => {
+    /* Reproduced in production: typing "Hookka Manufacturing" while the row is
+       NAMED Ohana. Deriving from names says no match; the server refuses on the
+       stored slug — the inline check must agree with the server or the dead
+       end returns. */
+    render(<NewSkuModal models={MODELS} optionPools={SIZE_POOLS} onClose={vi.fn()} />);
+    fireEvent.click(screen.getByTestId("new-sku-supplier-add-open"));
+    fireEvent.change(screen.getByTestId("new-sku-supplier-add-name"), {
+      target: { value: "Hookka Manufacturing" },
+    });
+    expect(screen.getByTestId("new-sku-supplier-add-duplicate").textContent).toContain(
+      "Ohana is already a supplier",
+    );
+    fireEvent.click(screen.getByTestId("new-sku-supplier-add-use-existing"));
+    expect((screen.getByTestId("new-sku-supplier") as HTMLSelectElement).value).toBe("sup-ohana");
+  });
+
+  it("still allows a genuinely new name through", () => {
+    render(<NewSkuModal models={MODELS} optionPools={SIZE_POOLS} onClose={vi.fn()} />);
+    fireEvent.click(screen.getByTestId("new-sku-supplier-add-open"));
+    fireEvent.change(screen.getByTestId("new-sku-supplier-add-name"), {
+      target: { value: "Cody Furniture" },
+    });
+    expect(screen.queryByTestId("new-sku-supplier-add-duplicate")).not.toBeInTheDocument();
+    expect((screen.getByTestId("new-sku-supplier-add-save") as HTMLButtonElement).disabled).toBe(
+      false,
+    );
+  });
+});
+
+/**
+ * ⭐ A QUOTATION PRICES EACH SIZE DIFFERENTLY (2026-08-25).
+ *
+ * The measured case is Hookka's Cody bedframe — K 550 · Q 425 · S 395 ·
+ * SS 407.50, with a PWP-style Price 1 on only some rows. One batch price box
+ * generated every SKU wrong-or-zero, to be re-keyed by hand in SKU Master.
+ * One price + PWP box per ticked size, principal only, keyed by the canonical
+ * size NAME the submit sends (the supplierCodes contract).
+ */
+describe("NewSkuModal — per-size price and PWP on the generate flow", () => {
+  it("shows one price + PWP box per ticked size for the principal", () => {
+    render(<NewSkuModal models={MODELS} optionPools={SIZE_POOLS} onClose={vi.fn()} />);
+    expect(screen.getByTestId("new-sku-size-price-Single")).toBeInTheDocument();
+    expect(screen.getByTestId("new-sku-size-pwp-Queen")).toBeInTheDocument();
+    expect(screen.getByTestId("new-sku-size-price-King")).toBeInTheDocument();
+  });
+
+  it("⭐ never shows the boxes to a role the price lock would refuse", () => {
+    /* 0175/0186: price and pwp_price are principal-only writes. A box that
+       always fails teaches the operator to ignore failures. */
+    mockRole = "operation";
+    render(<NewSkuModal models={MODELS} optionPools={SIZE_POOLS} onClose={vi.fn()} />);
+    expect(screen.queryByTestId("new-sku-size-prices")).not.toBeInTheDocument();
+  });
+
+  it("⭐ sends the per-size maps keyed by the canonical name the variants use", async () => {
+    const onClose = vi.fn();
+    render(<NewSkuModal models={MODELS} optionPools={SIZE_POOLS} onClose={onClose} />);
+    fireEvent.change(screen.getByTestId("new-sku-name"), { target: { value: "Cody" } });
+    fireEvent.change(screen.getByTestId("new-sku-price"), { target: { value: "550" } });
+    fireEvent.change(screen.getByTestId("new-sku-size-price-Queen"), {
+      target: { value: "425" },
+    });
+    fireEvent.change(screen.getByTestId("new-sku-size-pwp-Queen"), { target: { value: "305" } });
+    fireEvent.click(screen.getByText("Create Mattress model + 3 SKUs"));
+
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    const call = mockGenerateSkusMutateAsync.mock.calls[0]?.[0] as {
+      input: { price?: number; prices?: Record<string, number>; pwpPrices?: Record<string, number> };
+    };
+    expect(call.input.price).toBe(550);
+    // Only the overridden size travels — the rest inherit the batch price
+    // server-side, so an untouched box adds nothing to the payload.
+    expect(call.input.prices).toEqual({ Queen: 425 });
+    expect(call.input.pwpPrices).toEqual({ Queen: 305 });
+  });
+
+  it("sends neither map when no box was touched — byte-identical to before", async () => {
+    const onClose = vi.fn();
+    render(<NewSkuModal models={MODELS} optionPools={SIZE_POOLS} onClose={onClose} />);
+    fireEvent.change(screen.getByTestId("new-sku-name"), { target: { value: "Cody" } });
+    fireEvent.click(screen.getByText("Create Mattress model + 3 SKUs"));
+
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    const call = mockGenerateSkusMutateAsync.mock.calls[0]?.[0] as {
+      input: Record<string, unknown>;
+    };
+    expect(call.input).not.toHaveProperty("prices");
+    expect(call.input).not.toHaveProperty("pwpPrices");
   });
 });

@@ -4,7 +4,7 @@
  *
  * ⭐ `action` IS A CELL-SIZED STRING, AND THAT IS A HARD CONSTRAINT.
  *
- * The register prints it inside the `Customer Delivery` column, which is
+ * The register prints it inside the `Requested Delivery Date` column, which is
  * 148px wide by governed default (`sales-order-columns.ts`) — 132px of ink
  * after the engine's 8px padding. Measured in the browser at the governed
  * `text-meta` size (12px Inter): `Confirm delivery date` is 122.4px and
@@ -46,7 +46,7 @@ export interface SalesOrderGuidance {
  *
  * The governed string is `Delivery date to be confirmed` (`COPY-STANDARD.md`
  * :1161), which is also the label on the checkbox that sets this flag. In the
- * `Customer Delivery` column the first two words are the column header, and the
+ * `Requested Delivery Date` column the first two words are the column header, and the
  * locked two-line grammar forbids repeating context the row already supplies —
  * so the cell prints the tail and the hover carries the whole sentence.
  */
@@ -80,7 +80,7 @@ export function missingDeliveryDateGuidance(input: {
   const owner = input.salesperson?.trim() || "Sales";
   const phone = input.phone?.trim() || "Phone not recorded";
   const ask = "Ask which delivery date the customer agrees to.";
-  const record = "Record the agreed Customer Delivery date.";
+  const record = "Record the agreed Requested Delivery Date.";
   return {
     problem: "No delivery date",
     detail: `${owner} · ${input.customer} · ${phone}\n${ask}\n${record}`,

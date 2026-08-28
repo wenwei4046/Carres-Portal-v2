@@ -52,6 +52,36 @@ export async function skuCategories(
   return out;
 }
 
+/**
+ * ⛔ THE STORAGE CALLERS ASK THROUGH THIS ONE, AND THE REASON IS A GATE.
+ *
+ * `storageBlock` wraps its whole body in a `try/catch` that **fails OPEN** —
+ * deliberately, so a lookup hiccup cannot strand a dispatch. That makes any new
+ * throw inside it a door: a catalog read that raises would not degrade the
+ * RATE, it would release goods whose fee is unpaid.
+ *
+ * `skuCategories` already returns an empty map on a query error, but a
+ * malformed client throws before that, and "money gate" is not the place to
+ * rely on that distinction. So the storage path asks through here, where the
+ * only possible answer is a map.
+ *
+ * AN EMPTY MAP IS THE RIGHT DEGRADE. It means "no catalog answer", and every
+ * storage caller reads that as the SKU-string parser — exactly the behaviour
+ * that shipped before CARD-2026-08-28. A catalog outage costs the fee its
+ * accuracy; it never costs the gate its authority.
+ */
+export async function storageSkuCategories(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  sb: any,
+  skus: readonly string[],
+): Promise<Map<string, string>> {
+  try {
+    return await skuCategories(sb, skus);
+  } catch {
+    return new Map();
+  }
+}
+
 /** SKUs per catalog read — 100 × 58 chars stays far inside any URL limit. */
 const SKU_QUERY_CHUNK = 100;
 

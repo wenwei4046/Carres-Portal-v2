@@ -297,6 +297,7 @@ import {
   type DeliveryArrangementEventRow,
   type AssignLogisticsInput,
   type SaveDeliveryArrangementInput,
+  type SupplierCreateInput,
 } from "@carres/shared";
 import { ApiError, apiFetch } from "./api";
 import { uploadCompartmentPhoto, uploadDeliveryPhoto, uploadModelPhoto } from "./photo-upload";
@@ -2730,6 +2731,10 @@ export interface DeliveryPartnersListResponse {
 export interface SupplierRow {
   id: string;
   name: string;
+  /** The STORED identity slug (0032 — keys SUPPLIER_SOP, unique in prod). A
+   *  supplier can be renamed while this stays: `Ohana` still carries `hookka`.
+   *  Optional so a browser on this build against an older Worker still parses. */
+  slug?: string | null;
   kind: "own_logistics" | "factory_pickup";
   cat_covered: string[];
   lead_time: string | null;
@@ -3190,6 +3195,18 @@ export interface operationOrderDetailHistoryRow {
   text: string;
   by_role: string | null;
   occurred_at: string;
+  /** The audit identity the event recorded (0387 stamps it on new writes).
+   *  Optional: an older Worker does not send it. */
+  by_user_id?: string | null;
+  /** The resolved real staff/salesperson name — resolved SERVER-SIDE from the
+   *  authoritative identity tables, never in the browser. */
+  actor?: string | null;
+  /** The server's truthful classification of who acted. `system` only when the
+   *  event's own facts prove automation; the browser never infers it from a
+   *  null id. Optional: an older Worker does not send it. */
+  actor_kind?: "human" | "system" | "missing";
+  /** The structured half of the event — reason/note/changed/revision. */
+  metadata?: unknown;
 }
 export interface operationOrderDetailWarehouse {
   id: string;
@@ -4138,6 +4155,128 @@ export function useOperationSuppliers(
 }
 
 /**
+ * ⭐ useCreateSupplier — POST /api/operation/suppliers (2026-08-24).
+ *
+ * The portal's FIRST supplier-creation door. Before this, a new factory was an
+ * engineering task: someone opened the SQL editor. Principal-only, which is not
+ * a new rule — `suppliers_principal_write` (0002) has always said so; there was
+ * simply nothing to call.
+ *
+ * Invalidates the suppliers list so the picker that opened this shows the new
+ * name without a reload — the whole point is that the keyer never leaves the
+ * SKU they were in the middle of writing.
+ */
+export function useCreateSupplier() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: SupplierCreateInput) =>
+      apiFetch<{ supplier: SupplierRow }>(
+        "/api/operation/suppliers",
+        catalogJson("POST", input),
+      ),
+    onSuccess: ({ supplier }) => {
+      /* ⭐ PUT IT IN THE LIST BEFORE THE REFETCH LANDS. The caller selects the
+         new supplier the instant it exists, and a <select> whose value matches
+         no option renders BLANK — so an invalidate alone would flash "nothing
+         selected" over a supplier that was created successfully. Seeding the
+         cache makes the option exist in the same paint as the selection.
+         Sorted by name because the list route orders that way; the invalidate
+         still runs, so the server's answer remains the one that survives. */
+      qc.setQueryData<SuppliersListResponse>(qk.operation.suppliers(), (prev) =>
+        prev
+          ? {
+              suppliers: [...prev.suppliers, supplier].sort((a, b) =>
+                a.name.localeCompare(b.name),
+              ),
+            }
+          : { suppliers: [supplier] },
+      );
+      qc.invalidateQueries({ queryKey: qk.operation.suppliers() });
+    },
+  });
+}
+
+/** 0388 — dual-sourcing's recording half. The SKU's supplier SLOT stays the
+ *  routing truth; these record what each supplier QUOTED for the piece. */
+export interface SkuSupplierOfferRow {
+  supplierId: string;
+  supplierName: string | null;
+  supplierCode: string | null;
+  price: number | null;
+  pwpPrice: number | null;
+  /** 0389 — the supplier's quote per sofa seat height ({size → RM}, the 0204
+   *  shape). Null = not quoted by height. */
+  pricesBySize: Record<string, number> | null;
+  updatedAt: string;
+}
+
+export function useSkuSupplierOffers(skuId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ["sku-supplier-offers", skuId],
+    queryFn: () =>
+      apiFetch<{ offers: SkuSupplierOfferRow[] }>(
+        `/api/catalog/skus/${encodeURIComponent(skuId)}/supplier-offers`,
+      ),
+    /* Fetched ONLY while the row's offers strip is open — a register of 500
+       SKUs must not make 500 of these on load. */
+    enabled,
+    staleTime: 30_000,
+  });
+}
+
+/** Every offer in one read — the Supplier Items view joins these against the
+ *  catalog bundle exactly as it joins the slot. */
+export function useAllSkuSupplierOffers() {
+  return useQuery({
+    queryKey: ["sku-supplier-offers", "all"],
+    queryFn: () =>
+      apiFetch<{ offers: Array<{ skuId: string; supplierId: string; supplierCode: string | null }> }>(
+        "/api/catalog/supplier-offers",
+      ),
+    staleTime: 30_000,
+  });
+}
+
+export function useUpsertSkuSupplierOffer() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ skuId, ...input }: {
+      skuId: string;
+      supplierId: string;
+      supplierCode?: string | null;
+      price?: number | null;
+      pwpPrice?: number | null;
+      /* Absent = leave the stored map alone (and keep the payload free of a
+         column an un-migrated database would refuse — the 0375 lesson). */
+      pricesBySize?: Record<string, number> | null;
+    }) =>
+      apiFetch<{ offer: SkuSupplierOfferRow }>(
+        `/api/catalog/skus/${encodeURIComponent(skuId)}/supplier-offers`,
+        catalogJson("PUT", input),
+      ),
+    onSuccess: () =>
+      /* The prefix, so BOTH the per-SKU strip and the all-offers list (the
+         Supplier Items join) refresh from one write. */
+      qc.invalidateQueries({ queryKey: ["sku-supplier-offers"] }),
+  });
+}
+
+export function useDeleteSkuSupplierOffer() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ skuId, supplierId }: { skuId: string; supplierId: string }) =>
+      apiFetch<{ ok: true }>(
+        `/api/catalog/skus/${encodeURIComponent(skuId)}/supplier-offers/${encodeURIComponent(supplierId)}`,
+        catalogJson("DELETE"),
+      ),
+    onSuccess: () =>
+      /* The prefix, so BOTH the per-SKU strip and the all-offers list (the
+         Supplier Items join) refresh from one write. */
+      qc.invalidateQueries({ queryKey: ["sku-supplier-offers"] }),
+  });
+}
+
+/**
  * usePurchaseToday — GET /api/operation/purchase/today (the Procurement MRP
  * cockpit). Read-only: assembles live demand + supply, runs the net-requirements
  * engine, and returns the delivery bundles to raise + a per-supplier buy list +
@@ -4662,6 +4801,13 @@ export interface SalesOrderRevisionRow {
   snapshot: SalesOrderSnapshot;
   created_at: string;
   created_by: string | null;
+  /** CARD 2026-08-27 — the recorder's real display name, resolved server-side
+   *  from the authoritative identity tables (`created_by` stays the audit
+   *  identity). Optional: an older Worker does not send it. */
+  created_by_name?: string | null;
+  /** Server-side classification of the recorder; the browser never infers
+   *  `system` from a null id. Optional: an older Worker does not send it. */
+  actor_kind?: "human" | "system" | "missing";
   /** CARD 1 (0340) — who asked: staff_correction | customer_change. NULL on
    *  Rev 1 (the original) and on pre-0340 rows — history is never guessed. */
   change_type?: "staff_correction" | "customer_change" | null;
@@ -5271,7 +5417,7 @@ export function useDecideSalesOrderAmendment(
 export interface SubmitAmendmentInput {
   proposed: AmendmentProposal;
   reason: string;
-  /** 0354 — `Amend date (from customer)`. Omitted by the goods proposal. */
+  /** 0354 — `Requested date (from customer)`. Omitted by the goods proposal. */
   customerAskedOn?: string | null;
 }
 
@@ -5906,7 +6052,7 @@ export interface DeliveryOrderRow {
     customer_name: string | null;
     customer_address_city?: string | null;
     customer_address_state?: string | null;
-    /** The SO's customer promise — the register's `Customer Delivery` column
+    /** The SO's customer promise — the register's `Requested Delivery Date` column
      *  (owner column ruling 2026-08-18). */
     delivery_date?: string | null;
     delivery_date_tbd?: boolean | null;
@@ -9234,20 +9380,31 @@ export function useOfferModelCompartments() {
       modelId,
       compartmentIds,
       supplierId,
+      supplierCodes,
     }: {
       modelId: string;
       compartmentIds: string[];
-      /* 2026-08-24 - override for the model's FIRST supplier'd sku. Harmless
-       * to send on every call: syncCompartmentSku's own inherit-from-siblings
-       * step wins the moment one compartment in the batch has written it. */
+      /* An explicit pick wins outright (2026-08-26) — the server's one
+       * precedence is explicit → sibling inherit → category cover, so every
+       * compartment in the batch lands on the supplier the keyer chose. */
       supplierId?: string;
+      /* ⭐ The supplier's own code per compartment (2026-08-24), keyed by
+       * compartmentId. This loop already sends one request per compartment, so
+       * a per-piece code costs nothing extra: it rides the request that
+       * compartment was making anyway. An absent entry sends nothing, which
+       * the server reads as "leave the existing code alone". */
+      supplierCodes?: Record<string, string>;
     }) => {
       const failed: { compartmentId: string; message: string }[] = [];
       for (const compartmentId of compartmentIds) {
         try {
+          const code = supplierCodes?.[compartmentId]?.trim();
           await apiFetch<{ modelSofaCompartment: ModelSofaCompartmentDto }>(
             `/api/catalog/models/${modelId}/compartments/${compartmentId}`,
-            catalogJson("PUT", supplierId ? { supplierId } : {}),
+            catalogJson("PUT", {
+              ...(supplierId ? { supplierId } : {}),
+              ...(code ? { supplierCode: code } : {}),
+            }),
           );
         } catch (e) {
           failed.push({

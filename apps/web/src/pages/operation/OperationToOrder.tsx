@@ -94,12 +94,14 @@ export default function OperationToOrder() {
   const empty: SoBatchPurchaseResponse = {
     today: "",
     rows: [],
+    registerRows: [],
     destinations: [],
     defaultDestinationId: null,
     currentPoDuty: null,
     actingPoDuty: null,
     mayIssue: false,
     procurementPartners: [],
+    safetyDays: 14,
   };
 
   if (selections && documents.length > 0 && data) {

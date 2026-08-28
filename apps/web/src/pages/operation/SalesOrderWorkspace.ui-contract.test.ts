@@ -9,7 +9,17 @@ const workspace = readFileSync(join(here, "SalesOrderWorkspace.tsx"), "utf8");
 const header = readFileSync(join(here, "SalesOrderTabs.tsx"), "utf8");
 const attribution = readFileSync(join(here, "SalesOrderAttribution.tsx"), "utf8");
 const amendDate = readFileSync(join(here, "SalesOrderAmendDeliveryDate.tsx"), "utf8");
+const amendment = readFileSync(join(here, "SalesOrderAmendment.tsx"), "utf8");
 const render = readFileSync(join(here, "../../lib/pdf/render.ts"), "utf8");
+/* The POS half of the parity contract (owner ruling 2026-08-26). A fact both
+   surfaces ask for must offer the same answers, so the list lives in shared and
+   BOTH files are read here — a POS that stopped importing it would pass its own
+   suite while silently re-forking the question. */
+const stairCarry = readFileSync(join(here, "../dealer/pos/StairCarryFields.tsx"), "utf8");
+const salesOrderForm = readFileSync(
+  join(here, "../../../../../packages/shared/src/sales-order-form.ts"),
+  "utf8",
+);
 
 describe("Sales Order object template contract", () => {
   it("keeps one object identity and the exact four-item object navigation", () => {
@@ -151,25 +161,171 @@ describe("Sales Order object template contract", () => {
     );
   });
 
-  it("shows Delivery Journey and a complete read-only Related Documents index", () => {
-    expect(workspace).toContain('<Block title="Delivery Journey">');
-    expect(workspace).toContain('<Block title="Related Documents">');
-    expect(workspace).toContain('data-testid="sales-order-related-documents"');
-    for (const word of [
-      "Purchase Orders",
-      "Receiving Sessions",
-      "Stock Units",
-      "Delivery Orders",
-      "Payments",
-      "Service Cases",
-      "Guarantees",
-    ]) {
-      expect(workspace).toContain(`label="${word}"`);
+  /* ⭐ THE ORDER TAB STOPS RE-PRINTING WHAT `Order Route` OWNS — owner ruling
+     2026-08-26 (Jess). This assertion is INVERTED, not deleted, and that needs
+     its reasoning recorded because it used to protect two whole cards.
+
+     `Delivery Journey` and `Related Documents` were both read-only mirrors of
+     facts another view already draws. Jess ruled them off the Order tab; the
+     facts survive because `Order Route` carries every one of them —
+     `packages/shared/src/sales-order-route.ts` builds a `LOGISTICS` node from
+     the same `logistics.partnerName`, a `DELIVERY DATE` node carrying the
+     appointment and its slot, a `DELIVERY ORDER` node, and a door on each of
+     PURCHASING · RECEIVING · STOCK · MONEY · the Service branch. Nothing was
+     the Order tab's alone.
+
+     Two duplications died with them and are asserted below so they cannot come
+     back: the customer's promised date was printed TWICE (`Requested Delivery Date`
+     in Order info and `Customer promise` in Delivery Journey — one fact, two
+     labels, ownership Law D), and `Journey` is a word COPY-STANDARD:1337 and
+     :1453 both ban in favour of `Order Route`. */
+  it("leaves the delivery journey and the document index to Order Route", () => {
+    expect(workspace).not.toContain('title="Delivery Journey"');
+    expect(workspace).not.toContain('title="Related Documents"');
+    expect(workspace).not.toContain('data-testid="sales-order-related-documents"');
+    /* The banned word is gone from the surface entirely. */
+    expect(workspace).not.toContain("Journey");
+    /* ONE promised-date FACT, under the one governed label. `Customer
+       Delivery` still appears twice — the create picker and the object-mode
+       Fact, which are the same field in two modes. `Customer promise` was a
+       SECOND label for that same date on a card that is now gone. */
+    expect(workspace).not.toContain('label="Customer promise"');
+    /* The tab that inherited the work is still reachable and still exists. */
+    expect(workspace).toContain('const OBJECT_VIEWS = ["Order", "Revisions", "History", "Order Route"]');
+    expect(workspace).toContain("<SalesOrderRoute");
+    /* And the queries that fed ONLY those two cards left with them, or the page
+       would still pay for three round trips it never renders. */
+    for (const dead of ["deliveryOrdersQ", "paymentsQ", "guaranteesQ", "relatedDocuments"]) {
+      expect(workspace, `${dead} outlived the card that read it`).not.toContain(dead);
     }
-    expect(workspace).toContain("<SalesOrderDeliveryOrdersBlock payload={deliveryOrdersQ.data} />");
-    expect(workspace).toContain("Delivery Orders could not be loaded");
-    expect(workspace).toContain("Documents could not be loaded");
-    expect(workspace).toContain("Open Order Route →");
+  });
+
+  /* ⭐ FEWER CARDS, SAME FACTS — owner ruling 2026-08-26 (Jess): "make it merge
+     more". `DELIVERY ADDRESS` joined `CUSTOMER` and `SALES OWNERSHIP` joined
+     `ORDER INFO`. The merge may not cost a locked WORD, so each keeps its exact
+     name as a subsection heading; what it loses is a border, a 24px gap and a
+     second heading rule. */
+  it("merges the address into Customer and ownership into Order info, keeping both names", () => {
+    expect(workspace).toContain("<SubHead>Delivery address</SubHead>");
+    expect(workspace).toContain("<SubHead>Sales ownership</SubHead>");
+    expect(workspace).not.toContain('<Block title="Delivery address">');
+    /* Every field of both merged sections still renders. */
+    expect(workspace).toContain('data-pos-field="address"');
+    expect(workspace).toContain('data-pos-field="billing"');
+    expect(workspace).toContain("<SalesOrderAttribution");
+  });
+
+  /* ⭐ THE THIRD MERGE PASS — YH, 2026-08-27. Seven cards became FOUR (plus
+     the conditional work card), and the order changed: MONEY rose above
+     ORDER INFO, directly under CUSTOMER.
+
+     `Emergency contact` and `Change delivery date` were the last two collapsible
+     cards. Merged, they lose the fold with the border — which also retires the
+     `forceOpen` machinery that existed ONLY because they could be collapsed: a
+     section that is always on screen cannot hide an unsaved change or a live
+     amendment, which is what those two guards were for.
+
+     Neither loses its NAME or its governed copy: `creates a Revision · needs
+     approval` moved onto the subsection heading rather than being reworded. */
+  it("keeps four cards, in the ruled order, with the two folds merged in", () => {
+    const cards = [...workspace.matchAll(/<Block$\s+title="([^"]+)"|<Block title="([^"]+)"/gm)]
+      .map((m) => m[1] ?? m[2]);
+    expect(cards).toEqual([
+      "Customer",
+      "Money",
+      "Order info",
+      "Goods",
+      "What this change started elsewhere",
+    ]);
+    /* `Emergency contact` survives as a named subsection of CUSTOMER… */
+    expect(workspace).toContain("<SubHead>Emergency contact</SubHead>");
+    expect(workspace).not.toContain('title="Emergency contact"');
+    expect(workspace).toContain("so-emergency-name");
+    /* …and it is still gated on the 0219 config, not hardcoded on. */
+    expect(workspace).toContain("{emergencyEnabled && (");
+  });
+
+  /* ⭐ THE AMEND TRIO IS A MODAL, OPENED FROM THE DATE IT MOVES — YH,
+     2026-08-27. It has now been a card, then a merged subsection, and neither
+     earned standing space: three fields open on every order for an act that
+     happens rarely.
+
+     Two things this pins beyond the move. The governed note travelled to the
+     modal's DESCRIPTION rather than being dropped — it is read on opening now,
+     not as a footnote beside the button that commits it. And a LIVE proposal
+     is NOT behind the modal: a pending amendment is truth, so it prints beside
+     the date it is waiting to move, where somebody reading that date sees it. */
+  it("opens the amend trio from beside Requested Delivery Date, and never hides a live one", () => {
+    expect(workspace).toContain('data-testid="amend-date-open"');
+    expect(workspace).toContain("setAmendDateOpen(true)");
+    expect(workspace).toContain('title="Change delivery date"');
+    expect(workspace).toContain('description="creates a Revision · needs approval"');
+    expect(workspace).toContain("<SalesOrderAmendDeliveryDate");
+    /* The modal closes itself once the proposal is recorded. */
+    expect(workspace).toContain("onDone={() => setAmendDateOpen(false)}");
+    expect(amendDate).toContain("onDone?.()");
+    /* A pending proposal is stated in the CARD, not behind the door. */
+    expect(workspace).toContain('data-testid="amend-date-waiting"');
+    /* And no standing section survives on the card. */
+    expect(workspace).not.toContain("<SubHead>Change delivery date</SubHead>");
+  });
+
+  /* ⭐ THE STANDING FACT SITS BESIDE THE CARD'S NAME (Jess, 2026-08-26) —
+     "add stuff to header part like the new/existing customer thingy". It stays
+     a FACT, never a control: the phone probe derives it and MASTER.md:1038
+     rules it read-only on both surfaces. */
+  it("answers new-or-existing in the Customer heading, and still never lets it be typed", () => {
+    expect(workspace).toContain('data-testid="customer-type-chip"');
+    expect(workspace).toContain("headerSlot=");
+    expect(workspace).not.toContain('label="Customer type (auto)"');
+    expect(workspace).toContain("customerTypeWord");
+    /* The accent is spent once, on the tab underline — a chip may not take it. */
+    expect(workspace.match(/bg-kit-blue-9/g)).toHaveLength(1);
+  });
+
+  /* ⭐ ONE FACT, ONE CONTROL SHAPE, BOTH SURFACES — owner ruling 2026-08-26
+     (Jess): "ensure both sides of filling in are the same". The POS offers two
+     named answers to the lift question; this page offered an unlabelled
+     tickbox, where unticked meant BOTH "no lift" and "nobody said". The two
+     words now live in ONE place and both surfaces import them. */
+  it("asks the lift question with the POS's own two words", () => {
+    expect(workspace).toContain('<Select id="so-lift" label="Lift available?"');
+    expect(workspace).toContain("LIFT_OPTIONS");
+    expect(workspace).not.toContain('<Checkbox id="so-lift"');
+    expect(stairCarry, "the POS must read the same list").toContain("LIFT_OPTIONS");
+    expect(salesOrderForm).toContain('export const LIFT_OPTIONS = ["No lift", "Has lift"] as const');
+  });
+
+  /* ⭐ THE STAIR CARRY IS ADDED UP OUT LOUD (Jess, 2026-08-26) — the office
+     keyed floor, quantity and lift and was told nothing back while the POS
+     printed the whole working-out. ⛔ The arithmetic is IMPORTED: one derived
+     fact has ONE arithmetic (ownership Law D), so a second copy of the formula
+     on this page is the failure being asserted against. */
+  it("shows the stair-carry working-out, without a second copy of the sum", () => {
+    expect(workspace).toContain('data-testid="so-stair-working"');
+    expect(workspace).toContain("floorSurchargeRaw(");
+    expect(workspace).toContain('from "@/lib/order-totals"');
+    /* The rate and the free floors are READ from config, never retyped. */
+    expect(workspace).toContain("cfg.freeUpToFloor");
+    expect(workspace).toContain("cfg.perFloorPerItem");
+    expect(workspace).not.toMatch(/freeUpToFloor\s*[:=]\s*\d/);
+  });
+
+  /* ⭐ PROCEED DATE IS READ-ONLY ON AN EXISTING ORDER (Jess, 2026-08-26).
+     This OVERWRITES `docs/orders/MASTER.md`:725-728, which gave Operations a
+     direct writer. CREATE keeps the picker — `createOrderInput` refuses an
+     order without a proceed date, so the office could not key one otherwise. */
+  it("records the proceed date on an existing order instead of offering it", () => {
+    const field = workspace.slice(
+      workspace.indexOf('data-pos-field="proceedDate"'),
+      workspace.indexOf('data-pos-field="stairCarry"'),
+    );
+    expect(field).toContain('mode === "create" ?');
+    expect(field).toContain('<Fact label="Proceed date"');
+    expect(field).toContain('<DatePicker id="so-proceed"');
+    /* The builtin still has a control on the page — the completeness test below
+       walks the POS registry and would not accept the field simply vanishing. */
+    expect(workspace).toContain('id="so-proceed"');
   });
 
   it("puts no toolbar on or above the paper", () => {
@@ -235,7 +391,12 @@ describe("Sales Order object template contract", () => {
     /* The stored column stays ONE text column — the codec is shared with the
        POS so a legacy string round-trips untouched. */
     expect(workspace).not.toContain('label="Emergency contact"');
-    expect(workspace).toContain("Used only if we cannot reach the customer on delivery day");
+    /* ⛔ The section's NOTE is retired (YH, 2026-08-27) — this used to assert
+       the sentence was present. What the ruling protected was the THREE
+       FIELDS over one column, which is asserted above and below; the note was
+       a separate 2026-08-15 decision and it has been overwritten in both
+       COPY-STANDARD and MASTER. Asserted absent so it cannot drift back. */
+    expect(workspace).not.toContain("Used only if we cannot reach the customer on delivery day");
   });
 
   it("keeps the document address and the editable parts as one fact", () => {
@@ -259,8 +420,8 @@ describe("Sales Order object template contract", () => {
 
   /* ── THE WRITE BOUNDARY ────────────────────────────────────────────────── */
 
-  it("keeps goods, price and Customer Delivery out of the direct writer", () => {
-    expect(workspace).toContain('<Fact label="Customer Delivery"');
+  it("keeps goods, price and Requested Delivery Date out of the direct writer", () => {
+    expect(workspace).toContain('<Fact label="Requested Delivery Date"');
     /* One promised-date picker exists, and it is CREATE's — an existing
        order's promise moves by amendment only. */
     expect(workspace.match(/id="so-promised"/g)).toHaveLength(1);
@@ -275,9 +436,9 @@ describe("Sales Order object template contract", () => {
   });
 
   it("opens the amend trio with exactly three fields, through the governed lane", () => {
-    expect(amendDate).toContain("Amend date (from customer)");
-    expect(amendDate).toContain("Amended delivery date");
-    expect(amendDate).toContain('label="Amend reason"');
+    expect(amendDate).toContain("Requested date (from customer)");
+    expect(amendDate).toContain("New delivery date");
+    expect(amendDate).toContain('label="Reason for change"');
     expect(amendDate).toContain("required");
     expect(amendDate).toContain("useSubmitSalesOrderAmendment");
     expect(amendDate).toContain("customerAskedOn");
@@ -290,8 +451,35 @@ describe("Sales Order object template contract", () => {
     expect(workspace.match(/<SalesOrderAmendment\b/g)).toHaveLength(1);
   });
 
+  /* ⭐ THAT DOOR MOVED TO `More actions` — YH, 2026-08-26, following the exact
+     precedent `Report a problem` set on 2026-08-15: a rare act does not hold
+     permanent space on a page read every day.
+
+     The strip is gone from `Order info`; the CAPABILITY is not, and that is
+     what this pins. The modal is the only way to change items, unit price or
+     instalment months anywhere on the Sales Order — `Change delivery date`
+     submits a date and nothing else — so a later "remove the button" would
+     silently retire three capabilities. It must fail here first. */
+  it("opens the amendment from More actions, and keeps no idle strip on the card", () => {
+    expect(workspace).toContain('data-testid="workspace-propose-change"');
+    expect(workspace).toContain("Propose a change to the customer");
+    expect(workspace).toContain("inlineTrigger={false}");
+    expect(workspace).toContain("openSignal={amendSignal}");
+    /* A counter, not a boolean — a boolean cannot reopen the modal after a
+       cancel, which is the bug this shape exists to avoid. */
+    expect(workspace).toContain("setAmendSignal((n) => n + 1)");
+    /* The standing sentence that sat beside it is gone for good. */
+    expect(amendment).not.toContain("they change by proposal, not by editing");
+    /* Still MOUNTED on the card, because a LIVE proposal is truth and belongs
+       there — only the rule + padding are conditional on one existing. */
+    expect(workspace).toContain('liveAmendment ? "mt-3 border-t border-kit-slate-5 pt-3" : ""');
+  });
+
   it("names the governed ownership request and hides it from Operation", () => {
-    expect(workspace).toContain('title="Sales ownership"');
+    /* The section merged into `Order info` on 2026-08-26 and kept its locked
+       word as the subsection heading — the merge moved the border, not the
+       name (COPY-STANDARD:1427 still governs the door below it). */
+    expect(workspace).toContain("<SubHead>Sales ownership</SubHead>");
     expect(attribution).toContain("Change salesperson — needs approval");
     expect(attribution).toContain('role === "principal" || role === "hr"');
     expect(attribution).toContain("Request ownership change");
@@ -307,10 +495,12 @@ describe("Sales Order object template contract", () => {
 
   /* ── ACTIONS ───────────────────────────────────────────────────────────── */
 
-  it("carries Copy, Report a problem and Cancel in More actions, and no Problems card", () => {
-    expect(workspace).toContain("Copy to new Sales Order");
-    /* The SAME route the register's context menu opens (Law C). */
-    expect(workspace).toContain("/operation/orders/so/new?copyFrom=");
+  /* Copy is RETIRED (Jess, 2026-08-28) — it dropped line configuration and
+     handed Purchasing an un-autofillable PO. The assertion is inverted rather
+     than dropped, so a quiet re-introduction fails here. */
+  it("carries Report a problem and Cancel in More actions, no Copy, and no Problems card", () => {
+    expect(workspace).not.toContain("Copy to new Sales Order");
+    expect(workspace).not.toContain("/operation/orders/so/new?copyFrom=");
     expect(workspace).toContain('data-testid="workspace-report-problem"');
     expect(workspace).toContain("Report a problem");
     expect(workspace).toContain("Cancel SO");
@@ -327,14 +517,22 @@ describe("Sales Order object template contract", () => {
     expect(workspace).not.toContain("Collect $");
   });
 
-  it("weights the money block Total · Paid · Outstanding, red while owed", () => {
+  /* THE PIN MOVED, NOT THE FACT (YH, 2026-08-28). This used to assert the
+     2026-08-15 weighting — Total large · Paid medium · Outstanding loudest.
+     That weighting never reached the amounts: `<Money>` renders each at its
+     `row` tone, so the three digits were always the same size and only the
+     containers differed, which is exactly why the three numbers did not line
+     up. The surviving invariant is what the block is FOR — three named money
+     facts, one size, and red while any is owed. */
+  it("shows Total · Paid · Outstanding at ONE size, red while owed", () => {
     expect(workspace).toContain('data-testid="money-total"');
     expect(workspace).toContain('data-testid="money-paid"');
     expect(workspace).toContain('data-testid="money-outstanding"');
-    /* Total large · Paid medium · Outstanding loudest (§6.4 ⑤ + owner ruling
-       2026-08-15: red while any of it is still owed). */
-    expect(workspace).toContain('className="text-title text-base-900" data-testid="money-total"');
+    expect(workspace).toContain('className="text-strong text-base-900" data-testid="money-total"');
     expect(workspace).toContain('className="text-strong text-base-700" data-testid="money-paid"');
+    expect(workspace).toContain('`text-strong ${money.known && money.outstanding > 0');
+    // The retired sizes may not come back on any of the three.
+    expect(workspace).not.toContain('className="text-title text-base-900" data-testid="money-total"');
     expect(workspace).toContain('money.known && money.outstanding > 0 ? "text-danger"');
     expect(workspace).not.toContain('label="Balance"');
   });
@@ -346,7 +544,7 @@ describe("Sales Order object template contract", () => {
     for (const label of ["Who must act", "Who to contact", "What to use", "What happens next"]) {
       expect(workspace).not.toContain(label);
     }
-    // What survives: the amber field-level note on Customer Delivery.
+    // What survives: the amber field-level note on Requested Delivery Date.
     expect(workspace).toContain('>No delivery date</span>');
   });
 
@@ -360,5 +558,53 @@ describe("Sales Order object template contract", () => {
     for (const source of [workspace, header, attribution, amendDate]) {
       expect(source).not.toMatch(/[一-鿿]/);
     }
+  });
+});
+
+/**
+ * ⭐ THE THREE-RANK RECORD GRAMMAR IS STRUCTURE, NOT STYLE (CARD 2026-08-27).
+ * `ui/MASTER.md` § HISTORY + REVISION THREE-RANK RECORD GRAMMAR is
+ * owner-approved/locked; this pins the parts a green component suite could
+ * quietly lose: the governed audit-defect words, the deleted `Unknown user`,
+ * the 13/12/11 tokens, and the complete-version navigation that must survive
+ * around them.
+ */
+describe("Sales Order record grammar contract", () => {
+  const ledger = readFileSync(join(here, "SalesOrderLedger.tsx"), "utf8");
+
+  it("⭐ has deleted `Unknown user` from employee copy, for good", () => {
+    expect(ledger).not.toContain("Unknown user");
+    expect(workspace).not.toContain("Unknown user");
+    /* The governed audit-data defect sentence stands in its place — a legacy
+       row without an actor states the defect; it never invents a person. */
+    expect(ledger).toContain("Actor was not recorded");
+  });
+
+  it("renders the three ranks in the ruled 13/12/11 tokens", () => {
+    expect(ledger).toContain("text-body font-semibold");
+    expect(ledger).toContain("text-meta font-normal");
+    expect(ledger).toContain("text-label font-normal");
+  });
+
+  it("translates raw stored values at the read boundary, never in the store", () => {
+    expect(ledger).toContain('"No deposit"');
+    expect(ledger).toContain('"Online order"');
+  });
+
+  it("keeps every revision record a real door into the complete version", () => {
+    /* Semantic list + button, with the existing focus token — mouse and
+       keyboard both activate it, and an old version opens the same complete
+       read-only workspace the assertions above pin. */
+    expect(ledger).toContain('data-testid="revision-list"');
+    expect(ledger).toContain("focus-visible:ring-2 focus-visible:ring-kit-blue-9");
+    expect(ledger).toContain("Propose this version again");
+    /* The duplicate chip strip above a second list is retired. */
+    expect(ledger).not.toContain("flex-wrap gap-1.5");
+  });
+
+  it("keeps the four object views and the old-revision door wired together", () => {
+    expect(workspace).toContain('const OBJECT_VIEWS = ["Order", "Revisions", "History", "Order Route"]');
+    expect(workspace).toContain("onViewRevision={setViewRev}");
+    expect(workspace).toContain('disabled={mode === "oldrev"}');
   });
 });

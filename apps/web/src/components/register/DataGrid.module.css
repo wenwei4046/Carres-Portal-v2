@@ -78,19 +78,23 @@
    geometry, and no longer authors this destination.
 
    The opt-in stays because it names an intent, not because it is shielding
-   other pages. MEASURED 2026-08-14: this stylesheet reaches exactly one screen
-   — DataGrid.module.css is imported only by components/register/DataGrid.tsx,
-   which is imported only by pages/operation/SalesOrdersRegister.tsx. The
-   frozen Purchasing pages (To Order, Purchase Orders, Receiving, Supplier
-   Claim) render components/data-grid/DataGrid.tsx, a different component on
-   Tailwind classes at 40px rows, and never load this file at all. So `.root`
-   is not a shared base with those pages; do not plan a change around that
-   belief without re-measuring the import graph.
+   other pages. RE-MEASURED 2026-08-27: seven screens now render this engine
+   with appearance="reference" (Sales Orders · Delivery Orders · Delivery ·
+   Manual Purchase · Warehouse Stock · SO Batch · Supplier Items) — the
+   2026-08-14 "exactly one screen" note is history. A change here is a change
+   to the Register template on all of them, which is the point: one grammar.
+   The frozen Purchasing pages (To Order, Purchase Orders, Receiving, Supplier
+   Claim) still render components/data-grid/DataGrid.tsx and never load this
+   file.
 
    No px font-size literal lives in this scope: the sizes are the `.root`
    token aliases, never a token redefined to a different value. */
+/* No outer frame (Jess, 2026-08-27): the page is the header and the table
+   listing — the toolbar band, the header rule and the status footer give all
+   the structure; a border wrapping toolbar + grid + footer read as a box
+   around the whole page. Same taste as the 2026-06-04 de-boxing above. */
 .rootReference {
-  border: 1px solid var(--line);
+  border: none;
 }
 .rootReference .toolbar {
   box-sizing: border-box;

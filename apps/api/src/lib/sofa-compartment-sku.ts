@@ -56,12 +56,23 @@ export async function syncCompartmentSku(
     modelId: string;
     compartmentId: string;
     priceOverride: number | null;
-    /* 2026-08-24 - override the auto-resolved supplier on a model's FIRST
-     * compartment. Once one supplier'd sku exists on the model, step 4's own
-     * inherit-from-siblings branch already wins over any fallback, so this
-     * only matters the one time it is genuinely ambiguous. Absent keeps the
-     * existing inherit-then-category-cover fallback byte-identical. */
+    /* ⭐ AN EXPLICIT PICK WINS OUTRIGHT (YH, 2026-08-26). Until today a
+     * sibling SKU's supplier beat the caller's pick — written when "one model,
+     * one supplier" was an invariant. Dual-sourcing ended that: both Hookkas
+     * genuinely supply the same models, and a keyer who PICKED Hookka
+     * Industries was silently handed Ohana, which is worse than the fork the
+     * old rule feared — a fork the keyer chose is a decision; a swap they
+     * did not see is a defect. The size lane (generate-skus) has always
+     * honoured the explicit pick; the two lanes now share one precedence:
+     * explicit pick → sibling inherit → category cover. Absent keeps the
+     * inherit-then-cover behaviour byte-identical. */
     supplierId?: string | null;
+    /* The supplier's own code for THIS compartment (2026-08-24). Absent means
+     * LEAVE ALONE — the key is omitted from the upsert payload entirely rather
+     * than written as null, so a re-offer cannot blank a code somebody keyed
+     * from the quotation. Like `supplierId` since 2026-08-26: an explicit
+     * value always wins. */
+    supplierCode?: string | null;
   },
 ): Promise<CompartmentSkuResult> {
   // 1. The model gives the sku prefix (model_key), the category (supplier +
@@ -92,26 +103,15 @@ export async function syncCompartmentSku(
   //    survive un-offer → re-offer.
   const seedPrice = args.priceOverride ?? 0;
 
-  // 4. Supplier: inherit THIS model's own supplier (each sofa model has exactly
-  //    one across its flat SKUs) so PO-by-sku routes the compartment to the
-  //    right factory; fall back to the category-wide cover (the generate-skus
-  //    path, for a brand-new compartment-only model), else null (tolerated — the
-  //    null-supplier PO guard covers it; we never block the offer on supplier).
+  // 4. Supplier precedence — ONE rule, shared with generate-skus:
+  //    explicit caller pick → sibling inherit → category cover → null
+  //    (tolerated; the null-supplier PO guard covers it — the offer is never
+  //    blocked on supplier). The keyer's explicit pick wins even over a
+  //    sibling: a fork they chose is a decision, a swap they did not see is a
+  //    defect (the 2026-08-26 Hookka Industries → Ohana incident).
   let supplierId: string | null = null;
   if (!SUPPLIERLESS_CATEGORIES.has(model.category as string)) {
-    const { data: own, error: ownErr } = await sb
-      .from("product_skus")
-      .select("supplier_id")
-      .eq("model_id", args.modelId)
-      .not("supplier_id", "is", null)
-      .limit(1)
-      .maybeSingle();
-    if (ownErr) return { ok: false, ...mapPgError(ownErr) };
-    // A sibling SKU's own supplier still wins over a caller override - the
-    // model already has a real answer, and one compartment cannot silently
-    // fork it onto a second supplier.
-    supplierId = (own?.supplier_id as string | null | undefined) ?? null;
-    if (!supplierId && args.supplierId) {
+    if (args.supplierId) {
       const { data: chosen, error: chosenErr } = await sb
         .from("suppliers")
         .select("id")
@@ -120,6 +120,17 @@ export async function syncCompartmentSku(
       if (chosenErr) return { ok: false, ...mapPgError(chosenErr) };
       if (!chosen) return notFound("supplierId");
       supplierId = chosen.id as string;
+    }
+    if (!supplierId) {
+      const { data: own, error: ownErr } = await sb
+        .from("product_skus")
+        .select("supplier_id")
+        .eq("model_id", args.modelId)
+        .not("supplier_id", "is", null)
+        .limit(1)
+        .maybeSingle();
+      if (ownErr) return { ok: false, ...mapPgError(ownErr) };
+      supplierId = (own?.supplier_id as string | null | undefined) ?? null;
     }
     if (!supplierId) {
       const { data: cover, error: covErr } = await sb
@@ -188,6 +199,12 @@ export async function syncCompartmentSku(
           : {}
         : { price: seedPrice, pos_active: true }),
       supplier_id: supplierId,
+      /* Omitted entirely when the caller said nothing — see the arg's note.
+         A trimmed-empty string is a deliberate CLEAR, so the keyer can undo a
+         typo; only `undefined` means "leave whatever is there". */
+      ...(args.supplierCode === undefined
+        ? {}
+        : { supplier_code: args.supplierCode?.trim() || null }),
       // "Sofa {Model} {code}" (Loo 2026-07-06) — the SKU Master row names the
       // model+compartment pair, NOT the pool compartment's own description
       // (e.g. "Sofa Angsa 1A(LHF)", not "Left hand facing"). Format lives in

@@ -84,8 +84,14 @@ export default function ProductMaintenancePage({
         <div>
           <div className="kicker">Catalog</div>
           <h1 className="text-page font-display mt-1.5 text-base-900">Product &amp; Maintenance</h1>
+          {/* ⭐ Pairs with the Operations catalog's own line (Jess, 2026-08-26).
+              The two doors open onto ONE catalog, so each says which side it is
+              and where the other half lives — the question she could not get an
+              answer to now has one on the page. */}
           <p className="text-body text-base-600 mt-1">
-            Manage the SKU master, modular models, combos, and delivery / add-on config.
+            The product list, from the selling side — what we sell and what the customer pays,
+            plus models, combos and delivery / add-on config. Costs and suppliers are on the
+            Operations catalog.
           </p>
         </div>
         <PillTabs

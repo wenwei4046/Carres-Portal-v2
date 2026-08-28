@@ -477,6 +477,13 @@ describe("GET /api/operation/orders/:id", () => {
      *  `skuCategories` (category) — which is the point: they read one join. */
     productSkus?: any[];
     freeUnits?: any[];
+    /** The two name sources the History actor is resolved from. They are
+     *  SEPARATE fixtures on purpose: the staff door (`actor_display_names`,
+     *  0390) returns only internal-staff accounts, so a test that fed one
+     *  list to both would prove nothing about the case that actually breaks
+     *  — a salesperson whose name only `salespersons` can answer. */
+    appUsers?: any[];
+    salespersons?: any[];
   }) {
     const fromImpl = vi.fn((table: string) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -503,6 +510,9 @@ describe("GET /api/operation/orders/:id", () => {
           break;
         case 'order_history':
           chain.order = vi.fn(() => promise(opts.history ?? []));
+          break;
+        case 'salespersons':
+          chain.in = vi.fn(() => promise(opts.salespersons ?? []));
           break;
         case 'purchase_orders':
           chain.or = vi.fn(() => promise(opts.pos ?? []));
@@ -549,9 +559,17 @@ describe("GET /api/operation/orders/:id", () => {
       }
       return chain;
     });
+    /* The staff half of the actor lookup goes through the 0390 definer door,
+       not a table read — the fixture keeps its old name because it plays the
+       same part: what the internal-staff source answers. */
+    const rpcImpl = vi.fn((fn: string) =>
+      fn === "actor_display_names"
+        ? Promise.resolve({ data: opts.appUsers ?? [], error: null })
+        : Promise.resolve({ data: null, error: { message: `unexpected rpc ${fn}` } }),
+    );
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ from: fromImpl } as any);
-    return fromImpl;
+    vi.mocked(userClient).mockReturnValue({ from: fromImpl, rpc: rpcImpl } as any);
+    return Object.assign(fromImpl, { rpc: rpcImpl });
   }
 
   it("returns 404 when order does not exist", async () => {
@@ -705,6 +723,182 @@ describe("GET /api/operation/orders/:id", () => {
 
     // The label reader still works off the same rows — one join, two consumers.
     expect(body.lines[0].label).toBe("Hookka · Charcoal");
+  });
+
+  /**
+   * ⭐ HISTORY NAMES ITS ACTOR — TWO SOURCES, BECAUSE ONE CANNOT SEE EVERYONE
+   * (2026-08-24).
+   *
+   * `by_role` said "Salesperson" and never which salesperson. The fix reads the
+   * name from TWO sources, and the split is an RLS fact, not a preference:
+   *
+   *   0390  `actor_display_names` — the definer door that names INTERNAL
+   *         staff (principal · operation · finance · bd · hr · warehouse),
+   *         because 0235's peers policy shows an operation JWT only
+   *         operation-role rows and a principal actor was rendering as an
+   *         audit defect on the very order that recorded her.
+   *   0002  `salespersons_scoped_read` lets any internal role read
+   *         `salespersons`, and that table carries `user_id`.
+   *
+   * The commonest actor on a sales order is a salesperson — exactly the one
+   * the staff door deliberately does NOT answer for. A test that fed one list
+   * to both sources would pass while the real page stated an audit defect on
+   * nearly every row — the defect moved rather than fixed. These cases hold
+   * both halves down.
+   */
+  describe("History names its actor", () => {
+    const SELLER = "00000000-0000-0000-0000-0000000000s1";
+    const STAFF = "00000000-0000-0000-0000-0000000000f1";
+    const BASE_ORDER = {
+      id: ORDER_ID, so: 4003, status: "proceed_order", operation_stage: "in_production",
+      warehouse_id: null,
+      customer_name: "Tan Ah Kow", customer_phone: "+60123456789", customer_address: "...",
+      delivery_date: null, placed_at: "2026-08-22T10:00:00Z",
+      do_number: null, do_note: null, dispatched_at: null, delivered_at: null,
+      delivery_partner_id: null, dealer_id: "00000000-0000-0000-0000-000000000d01",
+      dealers: { name: "BedHouse KL" }, outlet_id: null, outlets: null,
+    };
+
+    async function detail() {
+      const jwt = await makeJwt("operation");
+      const res = await app.fetch(
+        new Request(`http://t/api/operation/orders/${ORDER_ID}`, {
+          headers: { Authorization: `Bearer ${jwt}` },
+        }),
+        env,
+      );
+      expect(res.status).toBe(200);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (await res.json()) as any;
+    }
+
+    it("⭐ names a salesperson the staff door does not answer for", async () => {
+      mockDetailQueries({
+        order: BASE_ORDER,
+        history: [{ text: "Amendment proposed", by_role: "salesperson", by_user_id: SELLER, occurred_at: "2026-08-22T11:00:00Z" }],
+        // Exactly what production returns for a dealer-role id: the 0390
+        // door names internal staff only — not an error, just no row.
+        appUsers: [],
+        salespersons: [{ user_id: SELLER, name: "Kimmy Lee" }],
+      });
+      const body = await detail();
+      expect(body.history[0].actor).toBe("Kimmy Lee");
+      expect(body.history[0].by_role).toBe("salesperson");
+      expect(body.history[0].actor_kind).toBe("human");
+    });
+
+    it("names internal staff through the 0390 staff door", async () => {
+      mockDetailQueries({
+        order: BASE_ORDER,
+        history: [{ text: "Warehouse set", by_role: "operation", by_user_id: STAFF, occurred_at: "2026-08-22T11:00:00Z" }],
+        appUsers: [{ id: STAFF, name: "Wen Wei" }],
+        salespersons: [],
+      });
+      expect((await detail()).history[0].actor).toBe("Wen Wei");
+    });
+
+    it("⭐ names a principal actor for an operation reader — the SO-1329 walk defect", async () => {
+      /* The production walk found `Actor was not recorded · Principal` on an
+         order whose actor WAS recorded — the reader's JWT simply could not
+         see a principal-role row. The 0390 door answers for every internal
+         staff role, so the record now names her. */
+      const PRINCIPAL = "11111111-1111-1111-1111-000000000001";
+      mockDetailQueries({
+        order: BASE_ORDER,
+        history: [{ text: "Order created · 0% deposit · online", by_role: "principal", by_user_id: PRINCIPAL, occurred_at: "2026-08-27T04:30:36Z" }],
+        appUsers: [{ id: PRINCIPAL, name: "Jess" }],
+        salespersons: [],
+      });
+      const body = await detail();
+      expect(body.history[0].actor).toBe("Jess");
+      expect(body.history[0].actor_kind).toBe("human");
+    });
+
+    it("prefers the account when the same person answers from both tables", async () => {
+      /* `app_users` IS the account; the `salespersons` row is the sales-side
+         profile of the same human. One person may not print two names. */
+      mockDetailQueries({
+        order: BASE_ORDER,
+        history: [{ text: "Order placed", by_role: "salesperson", by_user_id: SELLER, occurred_at: "2026-08-22T11:00:00Z" }],
+        appUsers: [{ id: SELLER, name: "Kimmy Lee" }],
+        salespersons: [{ user_id: SELLER, name: "Kimmy (showroom)" }],
+      });
+      expect((await detail()).history[0].actor).toBe("Kimmy Lee");
+    });
+
+    it("fails OPEN — an unresolvable id keeps the event and names nobody", async () => {
+      /* A cron, a database trigger, a deleted account, an RLS miss. The event
+         is the record; losing it to protect a name would be the worse bug. */
+      mockDetailQueries({
+        order: BASE_ORDER,
+        history: [
+          { text: "Stock reserved", by_role: "system", by_user_id: "00000000-0000-0000-0000-0000000000c1", occurred_at: "2026-08-22T11:00:00Z" },
+          { text: "Order placed", by_role: "dealer", by_user_id: null, occurred_at: "2026-08-22T10:00:00Z" },
+        ],
+        appUsers: [],
+        salespersons: [],
+      });
+      const body = await detail();
+      expect(body.history).toHaveLength(2);
+      expect(body.history[0].actor).toBeNull();
+      expect(body.history[1].actor).toBeNull();
+      expect(body.history[0].text).toBe("Stock reserved");
+      /* Both are audit-data defects the UI must state — a recorded id the
+         reader cannot resolve, and a row that never recorded one. Neither is
+         a person, and neither is promoted to System. */
+      expect(body.history[0].actor_kind).toBe("missing");
+      expect(body.history[1].actor_kind).toBe("missing");
+    });
+
+    it("⭐ says System only when the event's own facts prove automation", async () => {
+      /* The Card's contract: `actor_kind` is derived server-side from
+         authoritative facts, and a missing person id does NOT by itself prove
+         the portal acted. The structured marker an automated writer stamps
+         (`metadata.actor = "system"`) is the proof; a bare null id is an
+         audit-data defect, not automation. */
+      mockDetailQueries({
+        order: BASE_ORDER,
+        history: [
+          { text: "Delivery order voided", by_role: null, by_user_id: null, occurred_at: "2026-08-22T11:00:00Z", metadata: { actor: "system" } },
+          { text: "Order placed", by_role: "dealer", by_user_id: null, occurred_at: "2026-08-22T10:00:00Z", metadata: null },
+        ],
+      });
+      const body = await detail();
+      expect(body.history[0].actor_kind).toBe("system");
+      expect(body.history[1].actor_kind).toBe("missing");
+    });
+
+    it("asks neither table when no event carries an actor id", async () => {
+      /* Cloudflare caps subrequests per invocation (50 Free / 1000 Paid) and
+         this route is already one of the heaviest reads in the portal. Two name
+         lookups are worth it when there is a name to look up, and are pure cost
+         when there is not. */
+      const fromImpl = mockDetailQueries({
+        order: BASE_ORDER,
+        history: [{ text: "Order placed", by_role: "dealer", by_user_id: null, occurred_at: "2026-08-22T10:00:00Z" }],
+      });
+      const body = await detail();
+      expect(body.history[0].actor).toBeNull();
+      const tables = fromImpl.mock.calls.map((c) => c[0]);
+      expect(tables).not.toContain("salespersons");
+      expect(fromImpl.rpc).not.toHaveBeenCalled();
+    });
+
+    it("looks each id up ONCE, however many events that person wrote", async () => {
+      mockDetailQueries({
+        order: BASE_ORDER,
+        history: [
+          { text: "Amendment proposed", by_role: "salesperson", by_user_id: SELLER, occurred_at: "2026-08-22T12:00:00Z" },
+          { text: "Amendment withdrawn", by_role: "salesperson", by_user_id: SELLER, occurred_at: "2026-08-22T11:00:00Z" },
+          { text: "Order placed", by_role: "salesperson", by_user_id: SELLER, occurred_at: "2026-08-22T10:00:00Z" },
+        ],
+        appUsers: [],
+        salespersons: [{ user_id: SELLER, name: "Kimmy Lee" }],
+      });
+      const body = await detail();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      expect(body.history.map((h: any) => h.actor)).toEqual(["Kimmy Lee", "Kimmy Lee", "Kimmy Lee"]);
+    });
   });
 });
 
@@ -2499,17 +2693,40 @@ describe("GET /api/operation/orders/:id/expansion", () => {
   });
 });
 
+/**
+ * ⭐ A REVISION NAMES ITS RECORDER (CARD 2026-08-27). `created_by` has been
+ * stored since 0327; the read now resolves it to a real display name through
+ * the SAME two-source resolver History uses (Law D — one arithmetic), and
+ * classifies the recorder truthfully. `created_by` still rides the wire as
+ * the audit identity, and the immutable snapshot is never touched.
+ */
 describe("GET /api/operation/orders/:id/revisions", () => {
-  it("reads the immutable store oldest-first", async () => {
-    const order = vi.fn().mockResolvedValue({
-      data: [{ revision: 1, snapshot: { header: {}, lines: [], addons: [] }, created_at: "2026-08-09", created_by: null }],
-      error: null,
-    });
+  const SELLER = "00000000-0000-0000-0000-0000000000s1";
+  const STAFF = "00000000-0000-0000-0000-0000000000f1";
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  function mockRevisionQueries(opts: { revisions: any[]; appUsers?: any[]; salespersons?: any[] }) {
+    const order = vi.fn().mockResolvedValue({ data: opts.revisions, error: null });
     const eq = vi.fn(() => ({ order }));
-    const select = vi.fn(() => ({ eq }));
-    const from = vi.fn(() => ({ select }));
+    const revisionSelect = vi.fn(() => ({ eq }));
+    const salespersonsIn = vi.fn(() => Promise.resolve({ data: opts.salespersons ?? [], error: null }));
+    const from = vi.fn((table: string) => {
+      if (table === "sales_order_revisions") return { select: revisionSelect };
+      if (table === "salespersons") return { select: vi.fn(() => ({ in: salespersonsIn })) };
+      throw new Error(`unexpected table ${table}`);
+    });
+    /* The staff half goes through the 0390 definer door. */
+    const rpc = vi.fn((fn: string) =>
+      fn === "actor_display_names"
+        ? Promise.resolve({ data: opts.appUsers ?? [], error: null })
+        : Promise.resolve({ data: null, error: { message: `unexpected rpc ${fn}` } }),
+    );
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ from } as any);
+    vi.mocked(userClient).mockReturnValue({ from, rpc } as any);
+    return { from, order, rpc, salespersonsIn };
+  }
+
+  async function revisions() {
     const jwt = await makeJwt("operation");
     const res = await app.fetch(
       new Request("http://t/api/operation/orders/00000000-0000-0000-0000-000000000b01/revisions", {
@@ -2518,11 +2735,85 @@ describe("GET /api/operation/orders/:id/revisions", () => {
       env,
     );
     expect(res.status).toBe(200);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (await res.json()) as any;
+  }
+
+  it("reads the immutable store oldest-first and keeps the audit identity", async () => {
+    const { from, order } = mockRevisionQueries({
+      revisions: [
+        { revision: 1, snapshot: { header: {}, lines: [], addons: [] }, created_at: "2026-08-09", created_by: STAFF, change_type: null, note: null },
+        { revision: 2, snapshot: { header: {}, lines: [], addons: [] }, created_at: "2026-08-10", created_by: STAFF, change_type: "staff_correction", note: null },
+      ],
+      appUsers: [{ id: STAFF, name: "Wen Wei" }],
+    });
+    const body = await revisions();
     expect(from).toHaveBeenCalledWith("sales_order_revisions");
     expect(order).toHaveBeenCalledWith("revision", { ascending: true });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await res.json()) as any;
-    expect(body.revisions).toHaveLength(1);
+    expect(body.revisions.map((r: { revision: number }) => r.revision)).toEqual([1, 2]);
+    /* `created_by` remains the audit identity; the name is presentation,
+       added beside it, never a replacement. The snapshot is untouched. */
+    expect(body.revisions[0].created_by).toBe(STAFF);
+    expect(body.revisions[0].snapshot).toEqual({ header: {}, lines: [], addons: [] });
+  });
+
+  it("names internal staff through the 0390 staff door", async () => {
+    mockRevisionQueries({
+      revisions: [{ revision: 1, snapshot: { header: {}, lines: [], addons: [] }, created_at: "2026-08-09", created_by: STAFF, change_type: null, note: null }],
+      appUsers: [{ id: STAFF, name: "Wen Wei" }],
+    });
+    const body = await revisions();
+    expect(body.revisions[0].created_by_name).toBe("Wen Wei");
+    expect(body.revisions[0].actor_kind).toBe("human");
+  });
+
+  it("⭐ names a salesperson the staff door does not answer for", async () => {
+    /* The same split History carries: the 0390 door names internal staff
+       only; `salespersons.user_id` (0002) answers the sales-side half. */
+    mockRevisionQueries({
+      revisions: [{ revision: 1, snapshot: { header: {}, lines: [], addons: [] }, created_at: "2026-08-09", created_by: SELLER, change_type: null, note: null }],
+      appUsers: [],
+      salespersons: [{ user_id: SELLER, name: "Kimmy Lee" }],
+    });
+    const body = await revisions();
+    expect(body.revisions[0].created_by_name).toBe("Kimmy Lee");
+    expect(body.revisions[0].actor_kind).toBe("human");
+  });
+
+  it("classifies an unrecorded or unresolvable recorder as missing, never a guess", async () => {
+    mockRevisionQueries({
+      revisions: [
+        { revision: 1, snapshot: { header: {}, lines: [], addons: [] }, created_at: "2026-08-09", created_by: null, change_type: null, note: null },
+        { revision: 2, snapshot: { header: {}, lines: [], addons: [] }, created_at: "2026-08-10", created_by: "00000000-0000-0000-0000-0000000000c1", change_type: "customer_change", note: null },
+      ],
+      appUsers: [],
+      salespersons: [],
+    });
+    const body = await revisions();
+    expect(body.revisions[0].created_by_name).toBeNull();
+    expect(body.revisions[0].actor_kind).toBe("missing");
+    expect(body.revisions[1].created_by_name).toBeNull();
+    expect(body.revisions[1].actor_kind).toBe("missing");
+  });
+
+  it("looks each distinct id up ONCE, however many revisions it authored", async () => {
+    const { rpc, salespersonsIn } = mockRevisionQueries({
+      revisions: [
+        { revision: 1, snapshot: { header: {}, lines: [], addons: [] }, created_at: "2026-08-09", created_by: SELLER, change_type: null, note: null },
+        { revision: 2, snapshot: { header: {}, lines: [], addons: [] }, created_at: "2026-08-10", created_by: SELLER, change_type: "customer_change", note: null },
+        { revision: 3, snapshot: { header: {}, lines: [], addons: [] }, created_at: "2026-08-11", created_by: STAFF, change_type: "staff_correction", note: null },
+      ],
+      appUsers: [{ id: STAFF, name: "Wen Wei" }],
+      salespersons: [{ user_id: SELLER, name: "Kimmy Lee" }],
+    });
+    const body = await revisions();
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(rpc).toHaveBeenCalledWith("actor_display_names", { p_ids: [SELLER, STAFF] });
+    expect(salespersonsIn).toHaveBeenCalledTimes(1);
+    expect(salespersonsIn).toHaveBeenCalledWith("user_id", [SELLER, STAFF]);
+    expect(body.revisions.map((r: { created_by_name: string | null }) => r.created_by_name)).toEqual([
+      "Kimmy Lee", "Kimmy Lee", "Wen Wei",
+    ]);
   });
 });
 

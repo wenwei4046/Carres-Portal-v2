@@ -16,6 +16,7 @@ import {
   modelFabricTierOverrideSchema,
   sizesActiveInput,
   generateSkusInput,
+  skuSupplierOfferUpsertInput,
   floorConfigPatchInput,
   addonCreateInput,
   addonPatchInput,
@@ -1503,6 +1504,45 @@ catalogRouter.post("/models/:id/generate-skus", async (c) => {
   if (exErr) { const m = mapPgError(exErr); return c.json(m.body, m.status); }
   const existing = new Set((existingRows ?? []).map((r) => (r as { sku: string }).sku));
 
+  /* ⭐ The supplier's own code per generated row (2026-08-24): the per-variant
+     override first, then the batch default, then NULL. Read against the RAW
+     variant the caller sent — the canonical size (`K` → `King`) is computed
+     here, so the caller cannot have keyed the map by it. A blank string is
+     NULL, not "", so an untouched box never writes an empty code. */
+  const supplierCodeFor = (v: string): string | null => {
+    /* A BLANK OVERRIDE IS AN ABSENT ONE, not an instruction to clear. The box
+       for a piece starts empty and shows the batch code as its placeholder, so
+       "left alone" and "deliberately emptied" look identical to the operator —
+       reading `""` as a clear would blank the code they had just typed above.
+       `??` alone gets this wrong: an empty string is not nullish, so it would
+       win the coalesce and take the batch default out of play. */
+    const own = (parsed.data.supplierCodes?.[v] ?? "").trim();
+    return own || (parsed.data.supplierCode ?? "").trim() || null;
+  };
+  /* THE DEPLOY-ORDER HAZARD, RESPECTED (`catalog.skus-supplier-code.test.ts`).
+     `supplier_code` (0375) was applied by hand, and PostgREST refuses an INSERT
+     naming a column that does not exist — which would take out SKU GENERATION
+     entirely rather than just the new field. So the key is named only when a
+     code was actually typed, and then on EVERY row of the batch, because a
+     bulk insert whose objects disagree about their keys is its own hazard. */
+  const anySupplierCode = variants.some((v) => supplierCodeFor(v) !== null);
+
+  /* ⭐ PER-VARIANT PRICE AND PWP (2026-08-25) — the quotation case: a bedframe
+     is priced per size, so ONE batch price wrote the wrong number on every row.
+     A variant's own entry wins; absent falls back to the batch price, then 0
+     (UNPRICED). An explicit per-variant 0 is a deliberate "unpriced at this
+     size" and is kept — `??` passes 0 through, which is exactly right.
+     pwp_price obeys the 0186 server law: a value <= 0 means NOT SET and is
+     stored as NULL, never as a zero that half-reads as a price. The key rides
+     every row of the batch or none (rows of one bulk insert must agree about
+     their columns). */
+  const priceFor = (v: string): number => parsed.data.prices?.[v] ?? parsed.data.price ?? 0;
+  const pwpFor = (v: string): number | null => {
+    const p = parsed.data.pwpPrices?.[v];
+    return typeof p === "number" && p > 0 ? p : null;
+  };
+  const anyPwp = variants.some((v) => pwpFor(v) !== null);
+
   const toInsert = variants
     .filter((v) => !existing.has(codeFor(v)))
     .map((v) => ({
@@ -1510,9 +1550,11 @@ catalogRouter.post("/models/:id/generate-skus", async (c) => {
       sku: codeFor(v),
       variant: resolve(v).name,
       variant_kind: "size" as const,
-      price: parsed.data.price ?? 0,
+      price: priceFor(v),
+      ...(anyPwp ? { pwp_price: pwpFor(v) } : {}),
       cost: null,
       supplier_id: supplierId,
+      ...(anySupplierCode ? { supplier_code: supplierCodeFor(v) } : {}),
       pos_active: true,
       description: autoBedSkuDescription(
         modelRow.category,
@@ -1552,6 +1594,116 @@ catalogRouter.post("/models/:id/generate-skus", async (c) => {
     }
   }
   return c.json({ ok: true, generated, skipped: variants.length - generated });
+});
+
+// ----- 0388 — dual-sourcing, the recording half ------------------------------
+//
+// A SKU's `supplier_id` slot stays THE routing truth for POs. These routes
+// only record what each supplier QUOTED for the piece — their own code, their
+// prices — so the second Hookka's paper stops being thrown away. Nothing that
+// reads the slot changes.
+
+/* `*` rather than a column list (0389): the strip must keep working in the
+   window between this code deploying and the hand-applied column existing —
+   a named missing column makes PostgREST refuse the whole select. */
+const OFFER_SELECT = "*, suppliers(name)";
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function offerFromRow(r: any) {
+  return {
+    supplierId: r.supplier_id as string,
+    supplierName: (r.suppliers?.name as string | undefined) ?? null,
+    supplierCode: (r.supplier_code as string | null) ?? null,
+    price: (r.price as number | null) ?? null,
+    pwpPrice: (r.pwp_price as number | null) ?? null,
+    pricesBySize: (r.prices_by_size as Record<string, number> | null | undefined) ?? null,
+    updatedAt: r.updated_at as string,
+  };
+}
+
+catalogRouter.get("/skus/:id/supplier-offers", async (c) => {
+  internalOnly(c);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from("sku_supplier_offers")
+    .select(OFFER_SELECT)
+    .eq("sku_id", c.req.param("id"));
+  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  const offers = (data ?? []).map(offerFromRow)
+    .sort((a, b) => (a.supplierName ?? "").localeCompare(b.supplierName ?? ""));
+  return c.json({ offers });
+});
+
+/* The WHOLE offer list in one read — the Supplier Items view joins it against
+   the catalog bundle client-side, exactly as it joins the slot. Without this,
+   an offer was visible only inside its own SKU's strip: Cody quoted by Hookka
+   Industries did not appear under Industries in Supplier Items, which reads
+   as "we never recorded it" — the precise impression 0388 exists to end. */
+catalogRouter.get("/supplier-offers", async (c) => {
+  internalOnly(c);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from("sku_supplier_offers")
+    .select("sku_id, supplier_id, supplier_code");
+  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  return c.json({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    offers: (data ?? []).map((r: any) => ({
+      skuId: r.sku_id as string,
+      supplierId: r.supplier_id as string,
+      supplierCode: (r.supplier_code as string | null) ?? null,
+    })),
+  });
+});
+
+catalogRouter.put("/skus/:id/supplier-offers", async (c) => {
+  /* Offers carry PRICES, and price-bearing catalog writes have been principal
+     locked since 0175/0186 — the same person who may set a SKU's price may
+     record what a supplier quoted for it. RLS enforces the same boundary. */
+  principalOnly(c, "Only the principal (Master Admin) can record supplier offers");
+  const parsed = await parseJsonBody(c, skuSupplierOfferUpsertInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from("sku_supplier_offers")
+    .upsert(
+      {
+        sku_id: c.req.param("id"),
+        supplier_id: parsed.data.supplierId,
+        supplier_code: parsed.data.supplierCode?.trim() || null,
+        price: parsed.data.price ?? null,
+        pwp_price: parsed.data.pwpPrice ?? null,
+        /* Named ONLY when the caller sent it — an upsert naming a not-yet-
+           applied column would take out offer saving entirely (0375 lesson),
+           and ABSENT also means "leave the stored map alone". */
+        ...(parsed.data.pricesBySize !== undefined
+          ? { prices_by_size: parsed.data.pricesBySize }
+          : {}),
+        updated_at: new Date().toISOString(),
+        updated_by: c.var.auth.id,
+      },
+      { onConflict: "sku_id,supplier_id" },
+    )
+    .select(OFFER_SELECT)
+    .maybeSingle();
+  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (!data) {
+    return c.json({ error: "not_found", code: "not_found", message: "upsert returned no row" }, 404);
+  }
+  return c.json({ offer: offerFromRow(data) });
+});
+
+catalogRouter.delete("/skus/:id/supplier-offers/:supplierId", async (c) => {
+  principalOnly(c, "Only the principal (Master Admin) can remove supplier offers");
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { error } = await sb
+    .from("sku_supplier_offers")
+    .delete()
+    .eq("sku_id", c.req.param("id"))
+    .eq("supplier_id", c.req.param("supplierId"));
+  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  // Idempotent: removing an offer that is not there is not an error.
+  return c.json({ ok: true });
 });
 
 // ----- Model photo (signed-upload pattern, mirrors storage/dos + partner/pod) -----
@@ -2166,6 +2318,7 @@ catalogRouter.put("/models/:modelId/compartments/:compartmentId", async (c) => {
     compartmentId,
     priceOverride: parsed.data.priceOverride ?? null,
     supplierId: parsed.data.supplierId,
+    supplierCode: parsed.data.supplierCode,
   });
   if (!synced.ok) return c.json(synced.body, synced.status);
 

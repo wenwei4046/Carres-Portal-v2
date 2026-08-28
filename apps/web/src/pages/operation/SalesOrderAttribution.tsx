@@ -277,15 +277,23 @@ export default function SalesOrderAttribution({
           </p>
         </div>
       ) : (
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-meta text-base-500">
-            Sales ownership changes only after approval.
-          </p>
+        <div className="flex flex-wrap items-center justify-end gap-2">
           {/* ⭐ READ-ONLY FOR OPERATION — owner ruling 2026-08-15. Who gets paid
               is not an Operation correction, and a button that always refuses
               teaches the operator to ignore refusals. The door appears for the
               roles GATE 3 lets decide it; the REQUEST panel above stays visible
               to everyone, because a pending change is truth, not an action. */}
+          {/* ⭐ THE DOOR IS JUST ITS VERB NOW — YH, 2026-08-26. It said
+              `Change salesperson — needs approval`, under a line reading "Sales
+              ownership changes only after approval", above a second line
+              reading "This is sent for approval…". THREE statements of one
+              fact, before anybody had pressed anything.
+              The modal this opens already carries that sentence as approved
+              copy, and it is read at the moment it matters — when the operator
+              is filling the form, not while they are scanning past the card.
+              So the two standing lines go and the suffix goes with them; what
+              was a warning becomes a verb. `COPY-STANDARD.md` records the new
+              word and keeps every rejected rename in its `Do NOT use` column. */}
           {canRequest && (
             <Button
               size="sm"
@@ -293,7 +301,7 @@ export default function SalesOrderAttribution({
               onClick={() => setFormOpen(true)}
               data-testid="attribution-open"
             >
-              Change salesperson — needs approval
+              Change salesperson
             </Button>
           )}
         </div>

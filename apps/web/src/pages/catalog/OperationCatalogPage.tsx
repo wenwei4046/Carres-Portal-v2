@@ -7,21 +7,28 @@ import OperationFabricCostTab from "./tabs/OperationFabricCostTab";
 import ModularTab from "./modular/ModularTab";
 
 /**
- * Operation Catalog (0226, Loo 2026-07-16) — the operation-facing COSTING
- * variant of Product & Maintenance. Three tabs only:
+ * Operation Catalog (0226, Loo 2026-07-16) — the BUYING-side door onto the one
+ * catalog. Three tabs:
  *
- *   • SKU Master — the SAME shared product_skus list, but the money column is
- *     COST (what we pay the supplier), editable by operation + principal.
- *     No selling price, no PWP, no margin — costing is fully isolated from
- *     the POS system's selling prices.
+ *   • SKU Master — the SAME shared product_skus list. Cost and supplier are
+ *     this door's reason to exist and are editable by operation + principal.
  *   • Modular    — the shared model-card wall (structure reference; same
  *     component as Product & Maintenance).
  *   • Fabric     — the procurement fabric master with a per-fabric buying
  *     ADD-ON (RM): picking a specific fabric adds its recorded cost.
  *
+ * ⭐ ALIGNED WITH PRODUCT & MAINTENANCE — owner ruling 2026-08-26 (Jess):
+ * *"the 2 catalogues should align"*. This page used to hide the selling price,
+ * PWP, margin, import/export and `+ New SKU` on the reasoning that costing is
+ * "fully isolated from POS selling prices". It is not isolated and never was —
+ * `Margin` was already printed on the OTHER door from these same two numbers.
+ * What is real is the WRITE boundary, not a viewing one: operation SEES the
+ * selling price and cannot change it (Jess: *"it avoids data pollution"*).
+ * See `docs/ERP-ARCHITECTURE.md` §3.1.
+ *
  * Data is the same `useCatalog({ admin: true })` bundle the main catalog page
- * uses (one shared cache entry); only the SURFACE differs. Selling-side knobs
- * never appear here.
+ * uses — ONE shared cache entry, which is the honest tell that this was always
+ * one catalog behind two doors.
  */
 
 type TabKey = "sku" | "modular" | "fabric";
@@ -44,9 +51,13 @@ export default function OperationCatalogPage() {
         <div>
           <div className="kicker">Catalog</div>
           <h1 className="text-page font-display mt-1.5 text-base-900">Operation Catalog</h1>
+          {/* ⭐ THE PAGE SAYS WHAT IT IS FOR (Jess, 2026-08-26). She could not
+              be told apart the three catalog-ish destinations, and that was a
+              real fault rather than a gap in the explaining — so each one now
+              answers its own question on screen instead of in a conversation. */}
           <p className="text-body text-base-600 mt-1">
-            Costing — record buying prices per SKU and per fabric. Isolated from POS
-            selling prices.
+            The product list, from the buying side — what each item costs us and who supplies it.
+            Selling prices are shown for reference; only the Master Admin can change them.
           </p>
         </div>
         <PillTabs tabs={TABS} active={tab} onChange={setTab} ariaLabel="Operation Catalog" />

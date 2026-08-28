@@ -426,9 +426,10 @@ describe("ProcurementTabContent — Check in hands over to the Receiving Workspa
   // 2026-05-11 (Loo): Direct-Receive escape hatch. The receive RPC is
   // status='open'-gated, NOT sup_status-gated, so DO-from-supplier or
   // DO-from-warehouse-direct flows shouldn't have to wait for the partner
-  // pickup state machine. Every non-terminal stage now exposes
-  // `receive-po-{id}` as either the primary button or a "Direct receive"
-  // text-link.
+  // pickup state machine. Every non-terminal stage now exposes the hatch as
+  // `direct-receive-{id}` (D11, 2026-08-28 - it used to share
+  // `receive-po-{id}` with the primary button, so this suite could not say
+  // which of the two controls it had actually found).
   it.each([
     ["ready_confirm_sent", "PO-4001"],
     ["ready_for_pickup", "PO-4002"],
@@ -445,7 +446,10 @@ describe("ProcurementTabContent — Check in hands over to the Receiving Workspa
         }),
       ]);
       render(wrap(<ProcurementTabContent slug="nice-future" />));
-      expect(screen.getByTestId(`receive-po-${poId}`)).toBeInTheDocument();
+      // The HATCH, named as itself - and the primary is genuinely NOT offered
+      // at these stages, which the shared handle could never have shown.
+      expect(screen.getByTestId(`direct-receive-${poId}`)).toBeInTheDocument();
+      expect(screen.queryByTestId(`receive-po-${poId}`)).not.toBeInTheDocument();
     },
   );
 
@@ -465,6 +469,7 @@ describe("ProcurementTabContent — Check in hands over to the Receiving Workspa
       ]);
       render(wrap(<ProcurementTabContent slug="nice-future" />));
       expect(screen.queryByTestId(`receive-po-${poId}`)).not.toBeInTheDocument();
+      expect(screen.queryByTestId(`direct-receive-${poId}`)).not.toBeInTheDocument();
     },
   );
 });

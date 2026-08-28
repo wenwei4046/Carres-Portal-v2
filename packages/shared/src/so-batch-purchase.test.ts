@@ -1,7 +1,17 @@
 import { describe, it, expect } from "vitest";
 import {
   SO_BATCH_PURCHASE_WORDS as W,
-  SO_BATCH_RAIL_GROUPS,
+  SO_BATCH_RAIL,
+  SO_BATCH_RAIL_CLEAR,
+  soBatchOrderSupplierNames,
+  soBatchRailFacts,
+  soBatchRailModel,
+  type SoBatchOrderRow,
+  type SoBatchRailFilter,
+  SO_BATCH_ORDER_STATUS_WORDS,
+  soBatchOrderStatusOf,
+  soBatchCellSummary,
+  soBatchOrderSelection,
   defaultAllocations,
   setDestination,
   splitAllocation,
@@ -50,7 +60,7 @@ const DESTINATIONS = [KLANG, SG_BULOH, CLOSED];
 function row(over: Partial<PurchaseDemandRow> = {}): PurchaseDemandRow {
   return {
     id: "build::o1::b1",
-    state: "ready_to_buy",
+    state: "can_order_early",
     lineIds: ["l1"],
     orderId: "o1",
     so: 1318,
@@ -71,7 +81,7 @@ function row(over: Partial<PurchaseDemandRow> = {}): PurchaseDemandRow {
     goodsMustArrive: "2026-08-19",
     issueRef: { proposalKey: "s-hooka::mattress", buildKey: "b1" },
     action: null,
-    costs: [{ sku: "B1201S-K", unitCost: 100 }],
+    parts: [{ sku: "B1201S-K", qty: 2, unitCost: 100 }],
     supplierKind: "own_logistics",
     ownerName: null,
     ownerDuty: null,
@@ -84,47 +94,132 @@ const sel = (r: PurchaseDemandRow, allocations: DestinationAllocation[]): SoBatc
   allocations,
 });
 
-describe("the rail is two headings over the six governed states", () => {
-  it("is BUYING RECORDS then WORK TO DO, in the approved order", () => {
-    expect(SO_BATCH_RAIL_GROUPS.map((g) => g.heading)).toEqual([
-      "BUYING RECORDS",
-      "WORK TO DO",
+describe("the rail — owner ruling 2026-08-27 (Card 02-C)", () => {
+  it("is TO ORDER · ORDER TIMING · PRODUCT · SUPPLIER · SETUP TO FIX, in the approved order", () => {
+    /* Section ORDER is the object's key order — a reader of this contract
+       sees the rail top to bottom. */
+    expect(Object.keys(SO_BATCH_RAIL)).toEqual([
+      "toOrder",
+      "timing",
+      "product",
+      "supplier",
+      "setup",
     ]);
-    expect(SO_BATCH_RAIL_GROUPS[0]!.states).toEqual(["ready_to_buy", "covered"]);
-    expect(SO_BATCH_RAIL_GROUPS[1]!.states).toEqual([
-      "no_customer_date",
-      "no_sku",
-      "no_supplier",
-      "no_production_days",
+    expect(SO_BATCH_RAIL.toOrder.heading).toBe("TO ORDER");
+    expect(SO_BATCH_RAIL.toOrder.all).toBe("All not ordered");
+    expect(SO_BATCH_RAIL.timing.heading).toBe("ORDER TIMING");
+    expect(SO_BATCH_RAIL.timing.states).toEqual([
+      "can_order_early",
+      "safety_days_full",
+      "safety_days_low",
+      "safety_days_none",
+      "not_enough_production_time",
     ]);
+    expect(SO_BATCH_RAIL.product.heading).toBe("PRODUCT");
+    expect(SO_BATCH_RAIL.product.all).toBe("All products");
+    /* The approved product filters, in the approved order — the CATALOG's
+       categories, never SKU-text inference. */
+    expect(SO_BATCH_RAIL.product.categories).toEqual([
+      { category: "mattress", word: "Mattress" },
+      { category: "bedframe", word: "Bedframe" },
+      { category: "sofa", word: "Sofa" },
+    ]);
+    expect(SO_BATCH_RAIL.supplier.heading).toBe("SUPPLIER");
+    expect(SO_BATCH_RAIL.supplier.all).toBe("All suppliers");
+    expect(SO_BATCH_RAIL.setup.heading).toBe("SETUP TO FIX");
+    expect(SO_BATCH_RAIL.setup.states).toEqual(["no_production_days"]);
   });
 
-  it("names all six states exactly once — there is no seventh", () => {
-    const all = SO_BATCH_RAIL_GROUPS.flatMap((g) => g.states);
-    expect(all).toHaveLength(6);
-    expect(new Set(all).size).toBe(6);
+  it("no facet appears twice, and the Sales/Catalog blockers are not facets", () => {
+    const all = [...SO_BATCH_RAIL.timing.states, ...SO_BATCH_RAIL.setup.states];
+    expect(new Set(all).size).toBe(all.length);
+    for (const gone of ["no_customer_date", "no_sku", "no_supplier"]) {
+      expect(all).not.toContain(gone);
+    }
   });
 
   it("the page's own words are the governed ones", () => {
     expect(W.search).toBe("Search Sales Order, customer, SKU or supplier…");
-    expect(W.empty).toBe("Nothing needs buying.");
-    expect(W.footerUnit).toBe("buying lines");
+    expect(W.empty).toBe("No proceeded Sales Orders.");
+    expect(W.footerUnit).toBe("Sales Orders");
     expect(W.deliverTo).toBe("Deliver To");
-    expect(W.goodsMustArrive).toBe("Goods Must Arrive");
-    expect(W.buy).toBe("Buy");
+    expect(W.multiple).toBe("Multiple");
   });
 
-  it("no banned Purchasing word is spelt anywhere in the dictionary", () => {
-    const spelt = Object.values(W).join(" ");
+  it("Card 02-B — the ten business column heads, in the approved order exactly", () => {
+    expect([
+      W.colStatus,
+      W.colProceedDate,
+      W.colPoNo,
+      W.colSoNo,
+      W.colCustomer,
+      W.colDeliveryLocation,
+      W.colRequestedDelivery,
+      W.colSupplier,
+      W.deliverTo,
+      W.colPoDeliveryDate,
+    ]).toEqual([
+      "Status",
+      "Proceed Date",
+      "PO No",
+      "SO No",
+      "Customer",
+      "Delivery Location",
+      "Requested Delivery Date",
+      "Supplier",
+      "Deliver To",
+      "PO Delivery Date",
+    ]);
+  });
+
+  it("the retired column heads left the dictionary and never come back", () => {
+    const words = Object.values(W).join(" | ");
+    for (const gone of [
+      "Source SO",
+      "Required For",
+      "SKU / configuration",
+      "Open PO",
+      "Goods Must Arrive",
+    ]) {
+      expect(words, gone).not.toContain(gone);
+    }
+    expect(W).not.toHaveProperty("buy");
+    expect(W).not.toHaveProperty("colWork");
+    expect(W).not.toHaveProperty("goodsMustArrive");
+  });
+
+  it("no banned or retired Purchasing word is spelt anywhere in the dictionary or the rail", () => {
+    const spelt = [
+      ...Object.values(W),
+      SO_BATCH_RAIL.toOrder.heading,
+      SO_BATCH_RAIL.toOrder.all,
+      SO_BATCH_RAIL.timing.heading,
+      SO_BATCH_RAIL.product.heading,
+      SO_BATCH_RAIL.product.all,
+      ...SO_BATCH_RAIL.product.categories.map((c) => c.word),
+      SO_BATCH_RAIL.supplier.heading,
+      SO_BATCH_RAIL.supplier.all,
+      SO_BATCH_RAIL.setup.heading,
+    ].join(" ");
     for (const banned of [
       "Today",
       "Tomorrow",
+      "Overdue",
       "Needs attention",
       "Follow up",
       "Pending",
       "Waiting",
       "Priority",
       "Next action",
+      "Buffer",
+      "buffer",
+      "Ready to buy",
+      "Covered",
+      "BUYING RECORDS",
+      "WORK TO DO",
+      "All lines",
+      "No buying needed",
+      "Cannot buy",
       "PO Schedule",
       "CATEGORY",
     ]) {
@@ -133,9 +228,193 @@ describe("the rail is two headings over the six governed states", () => {
   });
 });
 
-describe("only a ready row with something to buy may be selected", () => {
-  it("takes a ready row whose Buy is positive", () => {
-    expect(isSelectableForBuying(row())).toBe(true);
+/**
+ * ── THE RAIL MODEL (Card 02-C §§6–8) ─────────────────────────────────────────
+ *
+ * One filter per section, sections combine, and every count is UNIQUE Sales
+ * Orders computed under the OTHER sections' selections — the printed number
+ * predicts exactly the rows a click would show.
+ */
+function railOrder(over: Partial<SoBatchOrderRow> & { orderId: string }): SoBatchOrderRow {
+  return {
+    so: null,
+    customer: null,
+    status: "blank",
+    proceedDate: null,
+    requestedDeliveryDate: null,
+    deliveryCity: null,
+    deliveryState: null,
+    pos: [],
+    lines: [],
+    outstandingSuppliers: [],
+    ...over,
+  };
+}
+function line(
+  over: Partial<SoBatchOrderRow["lines"][number]> & { orderLineId: string },
+): SoBatchOrderRow["lines"][number] {
+  return {
+    sku: "B1201S-K",
+    qty: 1,
+    stockTaken: 0,
+    item: "Booqit",
+    variant: null,
+    category: "mattress",
+    pos: [],
+    ...over,
+  };
+}
+const po = (poId: string, supplierName: string | null): SoBatchOrderRow["pos"][number] => ({
+  poId,
+  status: "open",
+  supplierId: supplierName,
+  supplierName,
+  destinationId: null,
+  etaDate: null,
+  sentCurrentVersion: true,
+});
+
+/* oA — outstanding mattress, Hooka, can order early. */
+const RAIL_OA = railOrder({
+  orderId: "oA",
+  lines: [line({ orderLineId: "a1" }), line({ orderLineId: "a2" })],
+  outstandingSuppliers: ["Hooka"],
+});
+/* oB — outstanding, MULTI-category (mattress + bedframe), Ohana, low band. */
+const RAIL_OB = railOrder({
+  orderId: "oB",
+  lines: [
+    line({ orderLineId: "b1" }),
+    line({ orderLineId: "b2", sku: "BF-01", item: "Frame", category: "bedframe" }),
+  ],
+  outstandingSuppliers: ["Ohana"],
+});
+/* oC — fully Ordered sofa; its supplier comes from the PO lineage alone. */
+const RAIL_OC = railOrder({
+  orderId: "oC",
+  status: "ordered",
+  pos: [po("PO-1", "Nice Future")],
+  lines: [line({ orderLineId: "c1", sku: "S9-2A", item: "Sofa", category: "sofa" })],
+});
+/* oD — the one setup blocker, on a sofa from Ohana. */
+const RAIL_OD = railOrder({
+  orderId: "oD",
+  lines: [line({ orderLineId: "d1", sku: "5539-1B", item: "Chelsea", category: "sofa" })],
+  outstandingSuppliers: ["Ohana"],
+});
+/* oE — a SKU whose TEXT screams mattress but whose Catalog category is
+   absent: it must never be counted under `Mattress`. */
+const RAIL_OE = railOrder({
+  orderId: "oE",
+  status: "ordered",
+  pos: [po("PO-2", "Hooka")],
+  lines: [line({ orderLineId: "e1", sku: "MATTRESS-SPECIAL-K", category: null })],
+});
+const RAIL_ORDERS = [RAIL_OA, RAIL_OB, RAIL_OC, RAIL_OD, RAIL_OE];
+const RAIL_LEAFS = [
+  row({ id: "leaf-a", orderId: "oA", state: "can_order_early" }),
+  /* A second leaf in the SAME state — oA still counts ONCE. */
+  row({ id: "leaf-a2", orderId: "oA", state: "can_order_early" }),
+  row({ id: "leaf-b", orderId: "oB", state: "safety_days_low" }),
+  row({ id: "leaf-d", orderId: "oD", state: "no_production_days", toBuy: null, issueRef: null }),
+];
+const model = (over: Partial<SoBatchRailFilter> = {}) =>
+  soBatchRailModel(soBatchRailFacts(RAIL_ORDERS, RAIL_LEAFS), {
+    ...SO_BATCH_RAIL_CLEAR,
+    ...over,
+  });
+
+describe("the rail model — unique-SO counts that cross-update between sections", () => {
+  it("no filter shows the complete permanent Register, Ordered records included", () => {
+    expect([...model().visibleOrderIds].sort()).toEqual(["oA", "oB", "oC", "oD", "oE"]);
+  });
+
+  it("counts are unique Sales Orders — never leafs, lines or quantities", () => {
+    const m = model();
+    /* oA has TWO leafs in the band and TWO mattress lines — one order. */
+    expect(m.timingCounts.can_order_early).toBe(1);
+    expect(m.productCounts.mattress).toBe(2); // oA + oB, not four lines
+    expect(m.notOrderedCount).toBe(3); // oA · oB · oD — outstanding only
+  });
+
+  it("every timing band is present, zero included — an empty band prints 0, not silence", () => {
+    const m = model();
+    expect(m.timingCounts.safety_days_full).toBe(0);
+    expect(m.timingCounts.safety_days_none).toBe(0);
+    expect(m.timingCounts.not_enough_production_time).toBe(0);
+  });
+
+  it("product comes from the Catalog category — a mattress-shaped SKU text counts nothing", () => {
+    const m = model();
+    /* oE's `MATTRESS-SPECIAL-K` has no Catalog category: visible under
+       `All products`, counted under none of the three. */
+    expect(m.productCounts.mattress).toBe(2);
+    expect(m.visibleOrderIds.has("oE")).toBe(true);
+    expect(model({ product: "mattress" }).visibleOrderIds.has("oE")).toBe(false);
+  });
+
+  it("a multi-category order counts once under EVERY matching category, and appears once", () => {
+    const m = model();
+    expect(m.productCounts.bedframe).toBe(1); // oB
+    expect(m.productCounts.mattress).toBe(2); // oA + the same oB
+    expect(model({ product: "bedframe" }).visibleOrderIds.has("oB")).toBe(true);
+    expect(model({ product: "mattress" }).visibleOrderIds.has("oB")).toBe(true);
+  });
+
+  it("suppliers are the Register's own projection, alphabetical, never hardcoded", () => {
+    expect(soBatchOrderSupplierNames(RAIL_OC)).toEqual(["Nice Future"]);
+    expect(model().suppliers).toEqual([
+      { name: "Hooka", count: 2 }, // oA outstanding + oE lineage
+      { name: "Nice Future", count: 1 }, // oC lineage
+      { name: "Ohana", count: 2 }, // oB + oD outstanding
+    ]);
+  });
+
+  it("each section's counts update under the OTHER sections' selections", () => {
+    const m = model({ product: "sofa" });
+    /* Only oC (ordered) and oD (setup) are sofas. */
+    expect(m.timingCounts.can_order_early).toBe(0);
+    expect(m.notOrderedCount).toBe(1); // oD
+    expect(m.suppliers).toEqual([
+      { name: "Nice Future", count: 1 },
+      { name: "Ohana", count: 1 },
+    ]);
+    /* And the PRODUCT counts themselves ignore the product selection —
+       clicking `Mattress` next must show exactly that many rows. */
+    expect(m.productCounts.mattress).toBe(2);
+  });
+
+  it("a supplier with no match drops off; the SELECTED supplier stays, with 0", () => {
+    const dropped = model({ product: "mattress" });
+    expect(dropped.suppliers.map((s) => s.name)).toEqual(["Hooka", "Ohana"]);
+    const kept = model({ product: "mattress", supplier: "Nice Future" });
+    expect(kept.suppliers).toContainEqual({ name: "Nice Future", count: 0 });
+    expect([...kept.visibleOrderIds]).toEqual([]);
+  });
+
+  it("filters from different sections combine — All not ordered + Mattress + Hooka", () => {
+    const m = model({ notOrderedOnly: true, product: "mattress", supplier: "Hooka" });
+    expect([...m.visibleOrderIds]).toEqual(["oA"]);
+  });
+
+  it("SETUP TO FIX exists only while an affected order does, and filters to it", () => {
+    expect(model().setupExists).toBe(true);
+    expect(model().setupCount).toBe(1);
+    expect([...model({ setup: true }).visibleOrderIds]).toEqual(["oD"]);
+    const without = soBatchRailModel(
+      soBatchRailFacts(RAIL_ORDERS, RAIL_LEAFS.filter((l) => l.orderId !== "oD")),
+      SO_BATCH_RAIL_CLEAR,
+    );
+    expect(without.setupExists).toBe(false);
+    expect(without.setupCount).toBe(0);
+  });
+});
+
+describe("every timing row stays orderable; blockers and Buy = 0 do not", () => {
+  it("takes any timing state whose Buy is positive — timing risk is not `Cannot buy`", () => {
+    for (const state of SO_BATCH_RAIL.timing.states) {
+      expect(isSelectableForBuying(row({ state })), state).toBe(true);
+    }
   });
 
   it("refuses every blocked state, however tempting its numbers look", () => {
@@ -144,17 +423,16 @@ describe("only a ready row with something to buy may be selected", () => {
     }
   });
 
-  it("refuses a covered row and a row with nothing left to buy", () => {
-    expect(isSelectableForBuying(row({ state: "covered", toBuy: 0 }))).toBe(false);
+  it("refuses a row with nothing left to buy", () => {
     expect(isSelectableForBuying(row({ toBuy: 0 }))).toBe(false);
     expect(isSelectableForBuying(row({ toBuy: null }))).toBe(false);
   });
 
-  it("refuses a ready row the engine gave no issue reference", () => {
+  it("refuses a row the engine gave no issue reference", () => {
     expect(isSelectableForBuying(row({ issueRef: null }))).toBe(false);
   });
 
-  it("refuses a ready row with no supplier resolved", () => {
+  it("refuses a row with no supplier resolved", () => {
     expect(isSelectableForBuying(row({ supplierId: null, supplier: null }))).toBe(false);
   });
 });
@@ -537,5 +815,92 @@ describe("composeDocumentLines", () => {
       { build: single("b1", "M-KING", 1, null), orderId: "o1", so: 1, qty: 1 },
     ]);
     expect(res.ok && res.lines[0]!.cost).toBeNull();
+  });
+});
+
+// ─── Card 02-B — one row per proceeded Sales Order ───────────────────────────
+
+describe("soBatchOrderStatusOf — blank · Partial · Ordered, derived and never stored", () => {
+  it("nothing requiring purchasing is blank — a fully Ready-Stock order stays quiet", () => {
+    expect(soBatchOrderStatusOf({ buyingRequiredQty: 0, sentCoveredQty: 0 })).toBe("blank");
+  });
+
+  it("no current-version confirmed-sent coverage is blank — a numbered unsent PO completes nothing", () => {
+    expect(soBatchOrderStatusOf({ buyingRequiredQty: 5, sentCoveredQty: 0 })).toBe("blank");
+  });
+
+  it("some but not all covered is Partial", () => {
+    expect(soBatchOrderStatusOf({ buyingRequiredQty: 5, sentCoveredQty: 2 })).toBe("partial");
+  });
+
+  it("everything covered is Ordered", () => {
+    expect(soBatchOrderStatusOf({ buyingRequiredQty: 5, sentCoveredQty: 5 })).toBe("ordered");
+  });
+
+  it("the visible words are blank · Partial · Ordered — never a retired status word", () => {
+    expect(SO_BATCH_ORDER_STATUS_WORDS.blank).toBe("");
+    expect(SO_BATCH_ORDER_STATUS_WORDS.partial).toBe("Partial");
+    expect(SO_BATCH_ORDER_STATUS_WORDS.ordered).toBe("Ordered");
+    const spelt = Object.values(SO_BATCH_ORDER_STATUS_WORDS).join(" | ");
+    for (const banned of [
+      "Ready Stock",
+      "Ready to buy",
+      "Cannot buy",
+      "No buying needed",
+      "Posted",
+      "Sent",
+      "Not sent",
+      "Covered",
+    ]) {
+      expect(spelt, banned).not.toContain(banned);
+    }
+  });
+});
+
+describe("soBatchCellSummary — a deterministic parent cell over many values", () => {
+  it("none · one · many, deduplicated and sorted", () => {
+    expect(soBatchCellSummary([])).toEqual({ kind: "none" });
+    expect(soBatchCellSummary([null, ""])).toEqual({ kind: "none" });
+    expect(soBatchCellSummary(["PO-1"])).toEqual({ kind: "one", value: "PO-1" });
+    expect(soBatchCellSummary(["PO-2", "PO-1", "PO-2"])).toEqual({
+      kind: "many",
+      count: 2,
+      values: ["PO-1", "PO-2"],
+    });
+  });
+
+  it("two refreshes cannot summarise one order two ways — order of input is irrelevant", () => {
+    expect(soBatchCellSummary(["b", "a"])).toEqual(soBatchCellSummary(["a", "b", "a"]));
+  });
+});
+
+describe("soBatchOrderSelection — the parent checkbox is all eligible child demand", () => {
+  it("no eligible child demand is unselectable — Ordered and fully Ready-Stock rows refuse the tick", () => {
+    expect(soBatchOrderSelection({ eligibleIds: [], selectedIds: new Set() })).toEqual({
+      selectable: false,
+      checked: false,
+      indeterminate: false,
+    });
+  });
+
+  it("all eligible children selected is checked", () => {
+    expect(
+      soBatchOrderSelection({ eligibleIds: ["a", "b"], selectedIds: new Set(["a", "b"]) }),
+    ).toEqual({ selectable: true, checked: true, indeterminate: false });
+  });
+
+  it("part of the eligible children selected is indeterminate", () => {
+    expect(
+      soBatchOrderSelection({ eligibleIds: ["a", "b"], selectedIds: new Set(["a"]) }),
+    ).toEqual({ selectable: true, checked: false, indeterminate: true });
+  });
+
+  it("a Partial order selects only its uncovered eligible remainder — covered ids never count", () => {
+    // The covered line is simply not eligible, so a tick on it cannot exist.
+    const s = soBatchOrderSelection({
+      eligibleIds: ["remainder"],
+      selectedIds: new Set(["remainder", "covered-line"]),
+    });
+    expect(s).toEqual({ selectable: true, checked: true, indeterminate: false });
   });
 });

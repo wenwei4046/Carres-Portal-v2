@@ -93,3 +93,66 @@ describe("missingSupplierCodeCount", () => {
     expect(missingSupplierCodeCount(rows)).toBe(2);
   });
 });
+
+/**
+ * ⭐ 0388 — AN OFFER IS A SUPPLIER'S ITEM TOO (YH, 2026-08-26).
+ *
+ * Reproduced in production: Cody-K's slot named Ohana, and the Hookka
+ * Industries offer recorded against it — code `1007-(K)`, RM 550 — did not
+ * appear under Industries in Supplier Items. Recording paper the view then
+ * hides reads as "we never recorded it", which is the exact impression 0388
+ * exists to end. The offers list joins in the SAME way the slot does, with the
+ * SAME data-fault stance: an offer pointing at a SKU or supplier the bundles
+ * do not hold is dropped, never rendered blank.
+ */
+describe("buildSupplierItems — offers (0388)", () => {
+  it("⭐ lists a supplier's offer as their item, marked quoted", () => {
+    const rows = buildSupplierItems(catalog([SKU_SOFA]), SUPPLIERS, [
+      { skuId: "k1", supplierId: "s2", supplierCode: "AF-3S" },
+    ]);
+    expect(rows).toHaveLength(2);
+    const quoted = rows.find((r) => r.supplierId === "s2");
+    expect(quoted).toMatchObject({
+      supplierName: "Ace Foam",
+      supplierCode: "AF-3S",
+      sku: "sofa:hookka-3s",
+      source: "quoted",
+    });
+    // The slot row is untouched, and says so.
+    expect(rows.find((r) => r.supplierId === "s1")).toMatchObject({
+      supplierCode: "HK-3S",
+      source: "supplies",
+    });
+  });
+
+  it("prints one row where a supplier is both the slot and an offer", () => {
+    /* The pair (supplier, sku) is one relationship however many tables know
+       about it — the slot row wins, because it carries the routing fact. */
+    const rows = buildSupplierItems(catalog([SKU_SOFA]), SUPPLIERS, [
+      { skuId: "k1", supplierId: "s1", supplierCode: "HK-3S-QUOTE" },
+    ]);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ supplierCode: "HK-3S", source: "supplies" });
+  });
+
+  it("drops an offer pointing at a SKU or supplier the bundles do not hold", () => {
+    const rows = buildSupplierItems(catalog([SKU_SOFA]), SUPPLIERS, [
+      { skuId: "ghost", supplierId: "s2", supplierCode: "X" },
+      { skuId: "k1", supplierId: "ghost", supplierCode: "Y" },
+    ]);
+    expect(rows).toHaveLength(1);
+  });
+
+  it("counts a code-less offer in the still-to-key number", () => {
+    const rows = buildSupplierItems(catalog([SKU_SOFA]), SUPPLIERS, [
+      { skuId: "k1", supplierId: "s2", supplierCode: null },
+    ]);
+    expect(missingSupplierCodeCount(rows)).toBe(1);
+  });
+
+  it("changes nothing when no offers are passed — every existing caller is safe", () => {
+    const before = buildSupplierItems(catalog([SKU_SOFA, SKU_NO_CODE]), SUPPLIERS);
+    expect(before.every((r) => r.source === "supplies")).toBe(true);
+    expect(before).toHaveLength(2);
+  });
+});

@@ -288,7 +288,7 @@ describe("the listing", () => {
       "Customer",
       "Delivery Location",
       "Building",
-      "Customer Delivery",
+      "Requested Delivery Date",
       "Confirmed Delivery",
       "Confirmed Time",
       "Logistics Partner",
@@ -326,7 +326,7 @@ describe("the listing", () => {
     expect(screen.getByText("Delivery confirmed")).toBeInTheDocument();
   });
 
-  it("keeps the two Customer Delivery absences apart", () => {
+  it("keeps the two Requested Delivery Date absences apart", () => {
     ordersState.data = {
       orders: [
         order({ id: "a", so: 1322, delivery_date: null, delivery_date_tbd: false }),

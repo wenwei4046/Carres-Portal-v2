@@ -543,8 +543,8 @@ export default function OperationDelivery() {
         /* Sales Orders' promise, in Sales Orders' own word. Delivery reads it
            and may never rewrite it (`docs/orders/MASTER.md`). */
         key: "customer_delivery",
-        label: "Customer Delivery",
-        width: 150,
+        label: "Requested Delivery Date",
+        width: 192,
         sortable: true,
         filterType: "date",
         chooserGroup: "Dates",

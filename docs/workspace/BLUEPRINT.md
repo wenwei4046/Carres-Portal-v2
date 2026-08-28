@@ -138,7 +138,7 @@ System defects, missing server stamps, and failed automation belong in operation
 
 | Work | Why it exists | Owner / actor | Object / recipient | Required result / closure | Due / next / door |
 |---|---|---|---|---|---|
-| `Delay planning` | Latest supplier date exceeds Customer Delivery | Sales Order / order PIC | SO / internal decision | Decision records whether promise can still be met | 2 Office working days from stored detection; if no, opens logistics new-date action; open SO delay region |
+| `Delay planning` | Latest supplier date exceeds Requested Delivery Date | Sales Order / order PIC | SO / internal decision | Decision records whether promise can still be met | 2 Office working days from stored detection; if no, opens logistics new-date action; open SO delay region |
 | `Case owner decision required` | Supplier cannot fulfil and a customer-order decision is needed | Sales Order / case owner only | SO + affected item | Governed decision recorded | Due rule is **UNKNOWN in authority**; cannot enter Work until defined; open affected SO issue |
 | Sales Order amendment management decision | Staff requests an order change | Sales Order / management duty | amendment + SO / requester | approve or reject with reason | Due rule is **UNKNOWN**; opens owner confirmations or atomic apply; open amendment |
 | Amendment owner confirmation | Approved change affects another owner | affected owner module / resolved duty | amendment + affected object | owner confirms executable or refuses with reason | Due rules are **UNKNOWN per consequence**; closes into atomic apply or returns to management; deep-link to owner consequence |
@@ -183,7 +183,7 @@ The current Delivery page is a read-only view and the actions are presently owne
 
 | Work | Why it exists | Current action owner / actor | Object / recipient | Required result / closure | Due / next / door |
 |---|---|---|---|---|---|
-| `Assign logistics` | Order needs delivery and none is chosen | current Orders engine / order PIC | SO / internal | logistics company recorded | 3 Office working days before Customer Delivery; next booking call; open delivery region |
+| `Assign logistics` | Order needs delivery and none is chosen | current Orders engine / order PIC | SO / internal | logistics company recorded | 3 Office working days before Requested Delivery Date; next booking call; open delivery region |
 | `Call {logistics} — confirm delivery date` | Logistics chosen; customer-confirmed date + slot absent | current Orders engine / order PIC | SO / logistics | customer-confirmed date and slot recorded | configured Office working days before date; next DO; open booking region |
 | `Call {logistics} — arrange new delivery date` | Delay decision says promise cannot be met | Sales Order / order PIC | SO / logistics | new customer-confirmed date and slot | same Office working day; next DO; open delay/booking region |
 | `Issue delivery order` | booking exists, goods ready, and no Finance exception | current Orders engine / order PIC | SO / system document | governed DO exists | before delivery run; next Deliver today; open DO door |
@@ -326,19 +326,19 @@ My Work  12     Team Work 38                                    Search
 ────────────────────────────────────────────────────────────────────────────
 Overdue 3   Today 5   Upcoming 4   Blocked 1                     Filters
 ──────────────────────────────────────┬─────────────────────────────────────
-WORK LIST                              │ ACTION CONTEXT
-                                      │
-PO-2051 · Expected Arrival not recorded│ PO-2051 · Ohana
-[YJ] Call Ohana — confirm ready date   │ Required result
-                                      │ Latest ready date + outcome
-Overdue 2 working days · Purchasing    │
-                                      │ Why this exists
-SO-1300 · Customer Delivery changed    │ Ready date was not recorded…
-[KY] Confirm delivery consequence      │
-                                      │ Due · owner · blocker
-Today · Delivery                       │
-                                      │ [Open purchase order]
-…                                     │
+WORK LIST                                    │ ACTION CONTEXT
+                                             │
+PO-2051 · Expected Arrival not recorded      │ PO-2051 · Ohana
+[YJ] Call Ohana — confirm ready date         │ Required result
+                                             │ Latest ready date + outcome
+Overdue 2 working days · Purchasing          │
+                                             │ Why this exists
+SO-1300 · Requested Delivery Date changed    │ Ready date was not recorded…
+[KY] Confirm delivery consequence            │
+                                             │ Due · owner · blocker
+Today · Delivery                             │
+                                             │ [Open purchase order]
+…                                            │
 ──────────────────────────────────────┴─────────────────────────────────────
 12 open · 3 overdue · Updated 10:42
 ```
@@ -484,7 +484,7 @@ OPERATING FLOW
 └──────────────────────────────────────┴───────────────────────────────────┘
 
 RECENT MATERIAL CHANGE
-10:31  PO-2051 expected arrival moved beyond Customer Delivery       Open →
+10:31  PO-2051 expected arrival moved beyond Requested Delivery Date       Open →
 09:48  Finance opened payment exception on SO-1300                   Open →
 ```
 
@@ -947,34 +947,34 @@ The last cross-link appears only when Today is non-zero. Empty-state art is not 
 ```text
 ┌ Workspace │ Dashboard  Work                                      🔔  ?  ⚙ ┐
 ├────────────────────────────────────────────────────────────────────────────┤
-│ Fri 14 Aug · Business day                                Updated 10:42     │
-│                                                                            │
-│ MANAGEMENT EXCEPTIONS                                                      │
-│ ┌──────────────────────┬──────────────────────┬──────────────────────────┐ │
-│ │ Broken commitments 3 │ Duty coverage 1      │ Work health 2            │ │
-│ │ 2 delivery · 1 goods │ GRN duty covered     │ 1 no owner · 1 failed    │ │
-│ │ Open affected work → │ Open Team Work →     │ Open Work health →       │ │
-│ └──────────────────────┴──────────────────────┴──────────────────────────┘ │
-│                                                                            │
-│ CUSTOMER COMMITMENTS                            CASH REQUIRING ATTENTION    │
-│ ┌────────────────────────────────────┐          ┌────────────────────────┐ │
-│ │ Next 7 business days          18   │          │ Collectable  RM …      │ │
-│ │ On track 14 · At risk 3 · Broken 1 │          │ Finance exceptions 2   │ │
-│ │ versus prior 7 days   At risk +1   │          │ 30+ days          RM … │ │
-│ │ Open Sales Orders / Delivery →     │          │ Open Payment →         │ │
-│ └────────────────────────────────────┘          └────────────────────────┘ │
-│                                                                            │
-│ GOODS FLOW                                      WORKLOAD HEALTH             │
-│ ┌────────────────────────────────────┐          ┌────────────────────────┐ │
-│ │ To buy 12 · Arrival missing 4      │          │ Overdue 9              │ │
-│ │ Supplier late 3 · Held stock 1     │          │ Today 24 · Blocked 3   │ │
-│ │ Open Purchasing / Receiving →      │          │ No owner / cover 1     │ │
-│ └────────────────────────────────────┘          │ Open Team Work →       │ │
-│                                                 └────────────────────────┘ │
-│                                                                            │
-│ RECENT MATERIAL CHANGE                                                     │
-│ 10:31  PO-2051 arrival moved beyond Customer Delivery       Open PO →      │
-│ 09:48  SO-1300 payment exception opened by Finance          Open SO →      │
+│ Fri 14 Aug · Business day                                Updated 10:42   │
+│                                                                          │
+│ MANAGEMENT EXCEPTIONS                                                    │
+│ ┌──────────────────────┬──────────────────────┬──────────────────────────│
+│ │ Broken commitments 3 │ Duty coverage 1      │ Work health 2            │
+│ │ 2 delivery · 1 goods │ GRN duty covered     │ 1 no owner · 1 failed    │
+│ │ Open affected work → │ Open Team Work →     │ Open Work health →       │
+│ └──────────────────────┴──────────────────────┴──────────────────────────│
+│                                                                          │
+│ CUSTOMER COMMITMENTS                            CASH REQUIRING ATTENTION │
+│ ┌────────────────────────────────────┐          ┌────────────────────────│
+│ │ Next 7 business days          18   │          │ Collectable  RM …      │
+│ │ On track 14 · At risk 3 · Broken 1 │          │ Finance exceptions 2   │
+│ │ versus prior 7 days   At risk +1   │          │ 30+ days          RM … │
+│ │ Open Sales Orders / Delivery →     │          │ Open Payment →         │
+│ └────────────────────────────────────┘          └────────────────────────│
+│                                                                          │
+│ GOODS FLOW                                      WORKLOAD HEALTH          │
+│ ┌────────────────────────────────────┐          ┌────────────────────────│
+│ │ To buy 12 · Arrival missing 4      │          │ Overdue 9              │
+│ │ Supplier late 3 · Held stock 1     │          │ Today 24 · Blocked 3   │
+│ │ Open Purchasing / Receiving →      │          │ No owner / cover 1     │
+│ └────────────────────────────────────┘          │ Open Team Work →       │
+│                                                 └────────────────────────│
+│                                                                          │
+│ RECENT MATERIAL CHANGE                                                   │
+│ 10:31  PO-2051 arrival moved beyond Requested Delivery Date       Open PO│
+│ 09:48  SO-1300 payment exception opened by Finance          Open SO →    │
 └────────────────────────────────────────────────────────────────────────────┘
 ```
 

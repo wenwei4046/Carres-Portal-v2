@@ -98,10 +98,18 @@ const TABLES = (): Tbl => ({
         delivery_date: "2026-08-22", delivery_date_tbd: false,
         placed_at: "2026-07-01", created_at: "2026-07-01",
       },
+      /* Proceeded since Card 02-C: a `place` order no longer enters the
+         engine at all, and this fixture order is ordinary live demand. */
       {
-        id: "o2", so: 1204, customer_name: "ella", status: "place",
+        id: "o2", so: 1204, customer_name: "ella", status: "proceed_order",
         delivery_date: "2026-08-11", delivery_date_tbd: false,
         placed_at: "2026-07-01", created_at: "2026-07-01",
+      },
+      /* ⭐ Card 02-C — the `place` order the boundary keeps out. */
+      {
+        id: "o9", so: 1290, customer_name: "NOT YET PROCEEDED", status: "place",
+        delivery_date: "2026-08-11", delivery_date_tbd: false,
+        placed_at: "2026-06-01", created_at: "2026-06-01",
       },
     ],
     error: null,
@@ -113,6 +121,7 @@ const TABLES = (): Tbl => ({
       sofaLine("p3", "5539-2A(RHF)", "o1", "bk-a"),
       sofaLine("p4", "5539-1A(LHF)", "o1", "bk-b"),
       sofaLine("e1", "5539-1A(LHF)", "o2", "bk-e"),
+      sofaLine("e9", "5539-1A(LHF)", "o9", "bk-z"),
       // An accessory on a live order — it must never reach To Order.
       {
         id: "x1", order_id: "o2", sku: "MEMORY-FOAM-PILLOW", qty: 4, attrs: null,
@@ -2691,5 +2700,65 @@ describe("GET …/to-order/cost-approvals", () => {
     expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
     expect(sb.inserts).toEqual([]);
     expect(sb.updates).toEqual([]);
+  });
+});
+
+/**
+ * ⭐ CARD 02-C — THE PROCEEDED-ORDER BOUNDARY AT THE WRITE DOORS
+ * (RESOLVED FROM AUTHORITY, 2026-08-27).
+ *
+ * Both doors recompute through the ONE boundary read at POST time — a demand
+ * id naming a `place` order resolves to nothing and is refused BY NAME, with
+ * nothing created and nothing reserved. There is no second status check to
+ * drift from the read: the recomputation IS the recheck.
+ */
+describe("Card 02-C · a `place` order is refused at every door", () => {
+  it("never reaches the projection — no proposal row, no blocker row", async () => {
+    const sb = makeSb(TABLES());
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await (await get()).json()) as any;
+    for (const proposal of body.proposals) {
+      for (const row of proposal.rows) {
+        expect(row.orderId, `SO-${row.so}`).not.toBe("o9");
+        expect(row.so).not.toBe(1290);
+      }
+    }
+    for (const blocked of body.blockedDemand ?? []) {
+      expect(blocked.so).not.toBe(1290);
+    }
+  });
+
+  it("direct PO issuance is refused with ZERO purchase orders created", async () => {
+    const sb = makeSb(TABLES());
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await postBatch({
+      selections: [
+        { demandId: "build::o9::bk-z", allocations: [{ destinationId: KLANG, qty: 1 }] },
+      ],
+      documentDecisions: [],
+    });
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as { code?: string };
+    expect(body.code).toBe("unknown_demand");
+    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
+  });
+
+  it("direct Ready Stock reservation is refused with ZERO units drawn", async () => {
+    const sb = makeSb(TABLES());
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("http://t/api/operation/purchase/to-order/take-stock", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId: "o9", buildKey: "bk-z" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as { code?: string };
+    expect(body.code).toBe("unknown_build");
+    expect(sb.rpcCalls.filter((c) => c.fn === "ops_stock_pool_draw")).toHaveLength(0);
   });
 });

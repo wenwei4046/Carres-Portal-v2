@@ -89,4 +89,48 @@ describe("DataGrid · stickyIdentity offsets", () => {
     const firstRowCells = [...container.querySelectorAll<HTMLElement>("tbody tr:first-child td")];
     expect(firstRowCells.map((el) => el.style.left)).toEqual(["0px", "30px", "62px", ""]);
   });
+
+  /* ⭐ CARD 02-B (2026-08-27): a Register whose approved order does not put
+     the identity first names it. The gutter pins at its cumulative offsets;
+     the NAMED column pins directly after the gutter (62px), so a scrolled
+     sheet slides the columns before it underneath; nothing else pins. */
+  it("pins a NAMED identity column after the gutter, and no other data column", () => {
+    const threeCols: DataGridColumn<Row>[] = [
+      { key: "status", label: "Status", width: 90, accessor: () => "" },
+      { key: "so", label: "SO No", width: 85, accessor: (r) => r.so },
+      { key: "customer", label: "Customer", width: 190, accessor: (r) => r.customer },
+    ];
+    const { container } = render(
+      <DataGrid<Row>
+        rows={ROWS}
+        columns={threeCols}
+        storageKey="test.sticky.named"
+        rowKey={(r) => r.id}
+        stickyIdentity={{ columnKey: "so" }}
+        selectable={{ selectedKeys: new Set(), onToggle: () => {}, onToggleAll: () => {} }}
+        expandable={{ renderExpansion: () => <div>goods</div> }}
+      />,
+    );
+    const headCells = [...container.querySelectorAll<HTMLElement>("thead th")];
+    // __select__ · __expand__ · Status · SO No · Customer
+    expect(headCells.map((el) => el.style.left)).toEqual(["0px", "30px", "", "62px", ""]);
+    const firstRowCells = [...container.querySelectorAll<HTMLElement>("tbody tr:first-child td")];
+    expect(firstRowCells.map((el) => el.style.left)).toEqual(["0px", "30px", "", "62px", ""]);
+  });
+
+  it("existing boolean callers keep the first-data-column behaviour, byte-identical", () => {
+    const { container } = render(
+      <DataGrid<Row>
+        rows={ROWS}
+        columns={COLUMNS}
+        storageKey="test.sticky.legacy"
+        rowKey={(r) => r.id}
+        stickyIdentity
+        selectable={{ selectedKeys: new Set(), onToggle: () => {}, onToggleAll: () => {} }}
+        expandable={{ renderExpansion: () => <div>goods</div> }}
+      />,
+    );
+    const headCells = [...container.querySelectorAll<HTMLElement>("thead th")];
+    expect(headCells.map((el) => el.style.left)).toEqual(["0px", "30px", "62px", ""]);
+  });
 });

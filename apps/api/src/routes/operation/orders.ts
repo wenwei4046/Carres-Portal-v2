@@ -35,7 +35,7 @@ import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { storageBlock } from "../../lib/storage-gate";
 import { userClient } from "../../lib/supabase";
 
-import { skuCategories } from "../../lib/sku-categories";
+import { skuCategories, storageSkuCategories } from "../../lib/sku-categories";
 import type { AppEnv } from "../../types";
 
 /**
@@ -108,6 +108,74 @@ function mapPipelineV2Error(error: { code?: string; message?: string; details?: 
     };
   }
   return mapPgError(error);
+}
+
+/**
+ * ⭐ ONE ACTOR RESOLVER FOR EVERY SALES ORDER RECORD (CARD 2026-08-27).
+ *
+ * History events and Revision rows both answer "who did this" from the same
+ * two identity sources, and Law D says a derived fact has ONE arithmetic —
+ * this function is that arithmetic, extracted from the detail route where it
+ * was born (2026-08-24) so the Revisions read cannot drift from it.
+ *
+ * TWO SOURCES, BECAUSE ONE CANNOT SEE EVERYONE. The internal-staff half is
+ * `actor_display_names` (0390) — a narrow definer door returning exactly
+ * (id, name) for principal/operation/finance/bd/hr/warehouse accounts. The
+ * production walk of SO-1329 proved why a plain `app_users` read is not
+ * enough: 0235's peers policy shows an operation JWT only operation-role
+ * rows, so a PRINCIPAL actor rendered as an audit defect on the very order
+ * that recorded her. The sales-side half is `salespersons` (0002
+ * `salespersons_scoped_read`), which carries `user_id` and the salesperson's
+ * own display name. The staff door wins where both answer: it is the
+ * account; the salesperson row is the sales-side profile of the same person
+ * — and the door deliberately returns NO dealer-side rows, so that rule
+ * cannot print a shop login name over the person's own.
+ *
+ * BOUNDED: each distinct id is asked for once, however many events or
+ * revisions it authored. FAILS OPEN: a read error or an unresolved id leaves
+ * the record unnamed — the caller classifies that as an audit-data defect; a
+ * person is never invented and an event is never dropped.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function resolveActorNames(sb: any, ids: ReadonlyArray<string | null | undefined>): Promise<Map<string, string>> {
+  const distinct = [...new Set(ids.filter((v): v is string => !!v))];
+  const byId = new Map<string, string>();
+  if (distinct.length === 0) return byId;
+  const [staffRes, sellerRes] = await Promise.all([
+    sb.rpc("actor_display_names", { p_ids: distinct }),
+    sb.from("salespersons").select("user_id, name").in("user_id", distinct),
+  ]);
+  for (const r of (staffRes.data ?? []) as Array<{ id: string; name: string | null }>) {
+    if (r.name) byId.set(r.id, r.name);
+  }
+  for (const r of (sellerRes.data ?? []) as Array<{ user_id: string | null; name: string | null }>) {
+    if (r.user_id && r.name && !byId.has(r.user_id)) byId.set(r.user_id, r.name);
+  }
+  return byId;
+}
+
+/**
+ * The server's truthful classification of who acted — the browser renders it
+ * and never re-derives it (the Card's contract: "The browser does not infer
+ * `System` from a null id").
+ *
+ *   human    a person id was recorded and resolved to a real name
+ *   system   the event's own structured facts prove the portal/automation
+ *            acted (`metadata.actor === "system"`, the marker an automated
+ *            writer stamps). A missing person id is NEVER promoted to this.
+ *   missing  the actor was not recorded, or the recorded id cannot be
+ *            resolved to a name — an audit-data defect the UI states plainly
+ *            (`Actor was not recorded`), never a person guess.
+ */
+function actorKindOf(
+  byUserId: string | null | undefined,
+  resolvedName: string | null,
+  metadata?: unknown,
+): "human" | "system" | "missing" {
+  if (byUserId) return resolvedName ? "human" : "missing";
+  const meta = metadata as Record<string, unknown> | null | undefined;
+  if (meta && typeof meta === "object" && meta.actor === "system") return "system";
+  return "missing";
 }
 
 /**
@@ -484,7 +552,7 @@ operationOrdersRouter.get("/:id", requireOperation, async (c) => {
     // by identity (update-in-place keeps attrs + source_po).
     sb.from("order_lines").select("id, sku, qty, unit_price, attrs, source_po").eq("order_id", id),
     sb.from("order_addons").select("addon_key, qty, unit_price").eq("order_id", id),
-    sb.from("order_history").select("text, by_role, by_user_id, occurred_at").eq("order_id", id).order("occurred_at", { ascending: true }),
+    sb.from("order_history").select("text, by_role, by_user_id, occurred_at, metadata").eq("order_id", id).order("occurred_at", { ascending: true }),
     sb
       .from("order_supplier_threads")
       .select(
@@ -690,46 +758,38 @@ operationOrdersRouter.get("/:id", requireOperation, async (c) => {
   // MASTER.md:146 calls History "the append-only event ledger"; a ledger that
   // cannot name its actor is an audit trail with the audit removed.
   //
-  // TWO SOURCES, BECAUSE ONE CANNOT SEE EVERYONE. 0235 lets an operation JWT
-  // read app_users rows whose role IS 'operation' - deliberately, so staff can
-  // see colleagues without reading every dealer account. But the actor on a
-  // sales order is very often a SALESPERSON, whose app_users row is role
-  // 'dealer' and therefore invisible here. `salespersons` carries `user_id` and
-  // is readable by any internal role (0002 `salespersons_scoped_read`), so it
-  // answers exactly the half app_users cannot. Reading only app_users would
-  // have silently dropped the name in the commonest case - which is the whole
-  // defect, moved rather than fixed.
-  //
-  // FAILS OPEN, ALWAYS. An unresolved id (a cron, a trigger, a deleted account,
-  // an RLS miss) yields `actor: null` and the UI says `Unknown user`. It never
-  // invents an actor, and it never drops the event.
+  // The two-source lookup lives in `resolveActorNames` (CARD 2026-08-27 moved
+  // it there so the Revisions read shares the one arithmetic). FAILS OPEN,
+  // ALWAYS: an unresolved id (a cron, a trigger, a deleted account, an RLS
+  // miss) yields `actor: null` + `actor_kind: "missing"` and the UI states the
+  // audit-data defect. It never invents an actor, and it never drops the event.
   const historyRows = (historyRes.data ?? []) as Array<{
     text: string;
     by_role: string | null;
     by_user_id: string | null;
     occurred_at: string;
+    /* ⭐ THE STRUCTURED HALF OF THE EVENT (2026-08-25).
+     *
+     * `docs/orders/MASTER.md:1142` asks History for
+     * `actor/time/reason/Before/After`. Every governed writer has been STORING
+     * that all along — `metadata.reason` on a cancellation, `metadata.note` and
+     * `metadata.changed` on an edit, `metadata.revision` naming the version the
+     * edit minted — and this route selected four scalar columns and left it in
+     * the database. The ledger was not missing the facts; it was not asking for
+     * them. One more column on the SAME read: no extra subrequest, no new
+     * access, and the shape stays `unknown` because a writer may add a key
+     * without this route being redeployed. */
+    metadata: unknown;
   }>;
-  const actorIds = [...new Set(historyRows.map((h) => h.by_user_id).filter((v): v is string => !!v))];
-  const actorById = new Map<string, string>();
-  if (actorIds.length > 0) {
-    const [staffRes, sellerRes] = await Promise.all([
-      sb.from("app_users").select("id, name").in("id", actorIds),
-      sb.from("salespersons").select("user_id, name").in("user_id", actorIds),
-    ]);
-    // A read error is not fatal - the ledger still renders, unnamed.
-    for (const r of (staffRes.data ?? []) as Array<{ id: string; name: string | null }>) {
-      if (r.name) actorById.set(r.id, r.name);
-    }
-    // app_users wins where both answer: it is the account, the salesperson row
-    // is the sales-side profile of the same person.
-    for (const r of (sellerRes.data ?? []) as Array<{ user_id: string | null; name: string | null }>) {
-      if (r.user_id && r.name && !actorById.has(r.user_id)) actorById.set(r.user_id, r.name);
-    }
-  }
-  const historyWithActor = historyRows.map((h) => ({
-    ...h,
-    actor: h.by_user_id ? (actorById.get(h.by_user_id) ?? null) : null,
-  }));
+  const actorById = await resolveActorNames(sb, historyRows.map((h) => h.by_user_id));
+  const historyWithActor = historyRows.map((h) => {
+    const actor = h.by_user_id ? (actorById.get(h.by_user_id) ?? null) : null;
+    return {
+      ...h,
+      actor,
+      actor_kind: actorKindOf(h.by_user_id, actor, h.metadata),
+    };
+  });
 
   return c.json({
     order,
@@ -819,6 +879,13 @@ const revisionHeaderInput = z
   .strict();
 
 // GET /:id/revisions — the order's immutable snapshots, oldest first.
+//
+// ⭐ A REVISION NAMES ITS RECORDER (CARD 2026-08-27). `created_by` has been
+// stored since 0327 and this read handed the browser a bare uuid it could do
+// nothing with — so the Revisions view could not say WHO recorded a version.
+// The SAME resolver History uses answers it here (Law D: one arithmetic), in
+// one bounded read per identity table. `created_by` still rides the wire —
+// it remains the audit identity; the name is presentation, not a replacement.
 operationOrdersRouter.get("/:id/revisions", requireOperation, async (c) => {
   const id = c.req.param("id");
   const sb = userClient(c.env, c.var.auth.jwt);
@@ -831,7 +898,24 @@ operationOrdersRouter.get("/:id/revisions", requireOperation, async (c) => {
     const m = mapPgError(error);
     return c.json(m.body, m.status);
   }
-  return c.json({ revisions: data ?? [] });
+  const rows = (data ?? []) as Array<{
+    revision: number;
+    snapshot: unknown;
+    created_at: string;
+    created_by: string | null;
+    change_type: string | null;
+    note: string | null;
+  }>;
+  const nameById = await resolveActorNames(sb, rows.map((r) => r.created_by));
+  const revisions = rows.map((r) => {
+    const created_by_name = r.created_by ? (nameById.get(r.created_by) ?? null) : null;
+    return {
+      ...r,
+      created_by_name,
+      actor_kind: actorKindOf(r.created_by, created_by_name),
+    };
+  });
+  return c.json({ revisions });
 });
 
 // GET /:id/commitment — CARD 1's one authoritative read: what is the
@@ -1129,6 +1213,11 @@ operationOrdersRouter.get("/:id/completion", requireOperation, async (c) => {
     : (ord.ops_order_control as Record<string, unknown> | null);
   const price = (x: { qty: number; unit_price?: number | string | null }) =>
     Number(x.unit_price ?? 0) * Number(x.qty ?? 0);
+  // CARD-2026-08-28 - the CATALOG owns which rate applies. This handler is
+  // NOT the detail endpoint, so it cannot borrow that one's `categoryBySku`;
+  // it takes its own bounded read through the same one shared reader. A SKU
+  // the catalog does not hold falls back to the parser, per line.
+  const storageCats = await storageSkuCategories(sb, lines.map((l) => String(l.sku)));
   const hold = storageHold({
     storageFrom:
       ((ctrl?.extension_original_date as string | null) ??
@@ -1138,6 +1227,7 @@ operationOrdersRouter.get("/:id/completion", requireOperation, async (c) => {
     importedMsbf: (ctrl?.storage_fee_msbf as number | string | null) ?? null,
     importedSof: (ctrl?.storage_fee_sof as number | string | null) ?? null,
     skus: lines.map((l) => String(l.sku)),
+    categories: storageCats,
     asOf: new Date().toISOString().slice(0, 10),
     collectedAt: (ctrl?.storage_collected_at as string | null) ?? null,
     waiverStatus: (ctrl?.storage_waiver_status as string | null) ?? null,

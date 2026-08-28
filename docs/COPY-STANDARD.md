@@ -136,8 +136,11 @@ Add today's PO Duty holder · The system must route PO-2041.
 [Open duty roster]
 ```
 
-The two-line form is not forced onto ordinary History facts, completed records, small field
-validation or empty states. Their existing patterns below still govern them.
+The two-line ACTION form is not forced onto completed records, small field validation or empty
+states. **History and Revision records use their own governed three-rank grammar in
+`ui/MASTER.md`: what happened first, who/when second, and only the important result third.** A
+simple record may omit the third line when no result/detail exists, but actor, time and fact may
+never be flattened into one dot-separated database sentence.
 
 ## Work detail — five answers, not five compulsory boxes
 
@@ -630,33 +633,67 @@ sidebar page. Existing implementation constants do not override these approved p
 |---|---|
 | Page | No page — use `SO Batch Purchase` or the source object |
 | Search | `Search Sales Order, customer, SKU or supplier…` |
-| Rail heading | `BUYING RECORDS` · `WORK TO DO` |
-| Empty state | `Nothing needs buying.` |
-| Columns | `Item · Description` · `Variant` · `Category` · `SKU` · `SO No` · `Customer` · `Customer Delivery` · `Supplier` · `Qty Needed` · `Ready Stock` · `On PO` · `To Buy` · `Coverage` |
+| Rail headings | `TO ORDER` · `ORDER TIMING` · `PRODUCT` · `SUPPLIER` · `SETUP TO FIX` |
+| Empty state | `No proceeded Sales Orders.` |
+| Register columns (Card 02-B, 2026-08-27 — exactly, in this order) | `Status` · `Proceed Date` · `PO No` · `SO No` · `Customer` · `Delivery Location` · `Requested Delivery Date` · `Supplier` · `Deliver To` · `PO Delivery Date` |
+| The Status words | blank · `Partial` · `Ordered` — and nothing else. Never `Ready Stock` · `Ready to buy` · `Cannot buy` · `No buying needed` · `Posted` · `Sent` · `Not sent` · `Covered` |
+| A parent cell over several values | one value prints itself; several print `2 POs` · `2 suppliers` · `Multiple` — the exact mapping lives in the expansion |
 
-**The six states, and there is no seventh.** Line 1 is the FACT; line 2 is the FIX, in the
-imperative. The rail carries the short form, because 200px is 200px:
+**The rail — owner ruling 2026-08-27 (Card 02-C).** Five sections, in this order.
+`SETUP TO FIX` renders only when at least one affected Sales Order exists:
 
-| Fact (line 1) | Rail word | Fix (line 2) |
-|---|---|---|
-| `Ready to buy` | `Ready to buy` | — |
-| `Customer delivery date is missing` | `No customer date` | `Ask customer for a delivery date` |
-| `SKU not found` | `No SKU` | `Add this item to the SKU catalog` |
-| `Supplier not assigned` | `No supplier` | `Check the supplier for {model}` |
-| `Production days are missing` | `No production days` | `Add production days for {supplier} · {category}` |
-| `Covered — no buying needed` | `Covered` | — |
+| Heading | Rail rows |
+|---|---|
+| `TO ORDER` | `All not ordered` |
+| `ORDER TIMING` | `Can order early` · `14 safety days left` · `1–13 safety days left` · `No safety days left` · `Not enough production days` |
+| `PRODUCT` | `All products` · `Mattress` · `Bedframe` · `Sofa` |
+| `SUPPLIER` | `All suppliers` · actual supplier names, alphabetical — never hardcoded, never a placeholder, and no `No supplier` row |
+| `SETUP TO FIX` | `Production days not set` |
+
+Counts are UNIQUE Sales Orders, never documents, notifications, leaf lines, SKU quantities or
+PO counts, and each section's counts update against the other selected sections. The fixed
+rows print their live count, zero included; a supplier row exists only while it matches —
+except the selected supplier, which stays visible with `0`. The default no-filter Register
+shows every proceeded record; `All not ordered` is a real outstanding-only filter that
+excludes fully Ordered records. One filter per section; sections combine; a second click on
+the selected timing row clears it; `All products` and `All suppliers` clear their sections.
+The rail carries NO checkboxes — filters are `NavRow` rows; the only checkboxes on the page
+are the Register's `Issue PO` selection. Every `ORDER TIMING` row stays orderable — the words
+say timing risk, never `Cannot buy`, and Order By is a planned date, never an unlock date.
+`Production days not set` lines are not selectable until the Supplier × Category production
+days exist. Fully covered / `Buy = 0` DEMAND is never selectable, but the Sales Order's own
+row is permanent and never leaves the Register. A governed rail label is never truncated —
+it wraps onto a second line in the same body font, never a tooltip.
+
+**The row facts.** Line 1 is the FACT; line 2 is the FIX, in the imperative. A line the owning
+boundary (Sales / Catalog) unexpectedly let through without its customer date, SKU or supplier is
+NAMED on its own row — it is never silently defaulted and never a rail facet:
+
+| Fact (line 1) | Fix (line 2) |
+|---|---|
+| `Requested delivery date is missing` | `Ask the customer which date they want` |
+| `SKU not found` | `Add this item to the SKU catalog` |
+| `Supplier not assigned` | `Check the supplier for {model}` |
+| `Production days are missing` | `Add production days for {supplier} · {category}` |
 
 `Check the supplier for {model}` is the Work Engine's own dictionary row above, reused verbatim
 rather than respelt.
+
+**The Safety-days words.** The visible term is `Safety days`; `buffer` never reaches a screen.
+The Purchasing Settings row reads `Safety days` · `14 working days` with the explanation line
+`Extra time allowed for delays.`
 
 **The absence words.** A cell never prints a bare dash where a sentence is owed:
 `No delivery date yet` · `No supplier yet` · `Not counted yet` (the blocker also blocks the
 coverage arithmetic, so nothing is known) · `Nothing covers it yet` (the arithmetic ran and
 found nothing). The last two are DIFFERENT answers and may not be merged.
 
-**Banned on Purchasing surfaces:** `Today` · `Tomorrow` · `Needs attention` · `Follow up` · `Pending` ·
-`Waiting` · `Priority` · a generic `Next action` column. A word that tells the operator a row is
-important without telling them what is wrong with it is not a word this Register may use.
+**Banned on Purchasing surfaces:** `Today` · `Tomorrow` · `Overdue` · `Needs attention` ·
+`Follow up` · `Pending` · `Waiting` · `Priority` · `Buffer` · a generic `Next action` column. A
+word that tells the operator a row is important without telling them what is wrong with it is not
+a word this Register may use. **Retired from the SO Batch Purchase rail, never to return:**
+`Ready to buy` · `Covered` · `No customer date` · `No SKU` · `No supplier` · `No production days` ·
+`BUYING RECORDS` · `WORK TO DO` · `All lines` · `No buying needed` · `Cannot buy`.
 
 **MANUAL PURCHASE — the internal buy's own words.**
 
@@ -1242,6 +1279,7 @@ it is in the wrong element.
 
 `Chase` · `POD` / `Proof of Delivery` · `Unscheduled` · `Not booked` · `need booking` ·
 `Pending` · `Processing` · `In Progress` · `At Risk` · `Attention` ·
+`Customer Delivery` · `Deliver By` · `Promised Delivery` · `Customer 1st Requested Delivery` **as a name for the customer date** (retired 2026-08-27 — the word is `Requested Delivery Date`) ·
 `Inventory` · `Movements` · `Recovery` **in the delay sense** (staff say "this order going to
 delay" — the word on screen is `Delay planning`)
 
@@ -1316,7 +1354,7 @@ Information Architecture and live in [`ERP-ARCHITECTURE.md`](ERP-ARCHITECTURE.md
 | The earliest delivery date a store may sell | **Earliest date a store may sell** | Lead time · Minimum lead · Sell-from date · Earliest available |
 | The last day we may send the PO and still be safe | **order-by date** | Raise-by · Trigger date · Reorder date |
 | The days of the week we send POs | **PO days** | Cycle · Review day · Batch day |
-| Days kept back for arranging the delivery | **order-by buffer** | Safety stock days · Slack · Padding |
+| Days kept back for arranging the delivery | **Safety days** | Buffer · order-by buffer · Safety stock days · Slack · Padding |
 | Where the supplier must send the goods | **Deliver To** | Where the goods go · Ship-to · Destination · Drop point · Location |
 | Physical identity assigned to one stock unit | **Unit ID** | Serial · Item ID |
 | What is still owed after a short delivery | **balance** | Outstanding qty · Back-order · Shortfall |
@@ -1324,7 +1362,10 @@ Information Architecture and live in [`ERP-ARCHITECTURE.md`](ERP-ARCHITECTURE.md
 | An SO edit because the RECORD was wrong — the customer's agreement never changed | **Staff correction** | Amendment · Fix · Data fix · Edit (as a cause word) — the two cause words come from the SO V2 Card 1 spec (owner, 2026-08-11) and are the structured `change_type` on every contractual revision |
 | An SO edit because the CUSTOMER asked for something different | **Customer change** | Amendment · Change request (that is the pending ASK, not the applied change) · Revision (that is the record it mints) |
 | A fulfilment-side substitution/recovery that does not create a new customer transaction | **Fulfilment replacement** | Customer change · Staff correction · Cancel and reorder |
-| Register date promised/requested for the customer | **Customer Delivery** | Promised · Delivery date (as this register header) · Current |
+| The date the customer is asking Carres to deliver on | **`Requested Delivery Date`** | **`Customer Delivery`** · **`Deliver By`** · **`Promised Delivery`** · **`Customer 1st Requested Delivery`** — all four RETIRED 2026-08-27 and banned from reuse · `Delivery Window` (that word belongs to Delivery) · `Promised` · `Current` |
+| The delivery day Logistics and the customer agreed | **`Confirmed Delivery`** | Logistic delivery date · Final delivery date · Deliver by · Booked date — Delivery owns this word and this ruling does not rename it |
+| The time range Logistics and the customer agreed | **`Confirmed Time`** | Slot · Time window · Delivery window (that is the half-day/full-day fact) |
+| The goods actually reached the customer | **`Delivered`** | Completed · Closed · Done |
 | Register column of what the customer still owes | **Outstanding** | Balance — re-ruled 2026-08-15; `balance` is the goods word, two rows above |
 | Register column naming the selling showroom | **Showroom** | Outlet · Branch · Store |
 | Register destination summary | **Delivery Location** | Address · Location (ambiguous) · Ship-to |
@@ -1379,7 +1420,7 @@ rewording.
 |---|---|---|
 | The register's search placeholder | **`Search sales orders…`** | `SO number, customer, phone or item…` — the box is a governed 200px, so the long form clipped at every width, not only a narrow one |
 | The register's eighth default column | **`Showroom`** | Outlet · Branch · Store |
-| The footer's category tally | the governed words only — `Mattress · Bedframe · Sofa · Pillow · Mattress protector · Topper · Footrest · Service · Other goods` | any raw SKU word, and above all `M.P` — the AutoCount sheet's abbreviation. Anything not positively recognised is **`Other goods`**, never dropped from the count |
+| The footer's category tally | the governed words only — `Mattress · Bedframe · Sofa · Pillow · Mattress protector · Topper · Footrest · Service` | any raw SKU word, and above all `M.P` — the AutoCount sheet's abbreviation. ⛔ **`Other goods` is COUNTED BUT NO LONGER PRINTED here** (YH, 2026-08-27) — this overwrites the earlier "never dropped from the count". The word reports a CATALOG GAP (a line with no catalog row, or a catalogued `guarantee` item, since this vocabulary covers five of the catalog's six categories), which is not a fact about the customer's goods and is not actionable from a register footer. 🟡 The printed numbers therefore no longer sum to the order's item count; `footerWord` is untouched and still computes the bucket |
 | Copy this order into a new one, from the object page | **`Copy to new Sales Order`** | Duplicate · Clone · New from this |
 | The object MONEY card's door to the collections desk | **`Open this order in Payments`** | View payments · Go to Payments · Collect |
 | Payments' chip for that scope | **`Sales Order SO-{n}`** | Filtered by order · Order scope |
@@ -1397,7 +1438,7 @@ rewording.
 
 Two rules refuse an order at entry, and each refusal names what is wrong and exactly how to fix it
 (the Error pattern above). **`(TBD)`, `Confirm later` and `For Further Notice` are RETIRED** — a
-new Sales Order always carries a real Customer Delivery date.
+new Sales Order always carries a real `Requested Delivery Date`.
 
 | Meaning | Use exactly | Do NOT use |
 |---|---|---|
@@ -1416,20 +1457,64 @@ object page** — nothing announces permission to type into a field that is alre
 Register's context menu keeps the word `Edit` only because it names a destination, and that
 destination is the same one `View` opens.
 
+#### Its section names — owner ruling 2026-08-26 (Jess)
+
+Jess ruled the Order tab MERGED: fewer, fuller cards. A merged section keeps its exact word as
+an in-card heading — the merge moves a border, never a name — so this table governs FIVE
+surviving names and retires two.
+
+| Meaning | Use exactly | Do NOT use |
+|---|---|---|
+| The customer and everywhere their goods go | **`Customer`**, with **`Delivery address`** as its in-card heading | Customer details · Buyer · Client · Contact · Ship to |
+| The order's own administrative facts | **`Order info`**, with **`Sales ownership`** as its in-card heading | Order details · Dates · Dates / Access · Admin · Meta |
+| Whether we already have this customer, beside the card's name | **`New customer`** · **`Existing customer`** · **`Checking…`** · **`Not known yet`** | New/Returning · First-time · Repeat · a coloured status dot with no word |
+| ⛔ RETIRED — the delivery legs, holder, partner and appointment | nothing. **`Order Route` owns them** and always did; the Order tab printed a read-only copy | `Delivery Journey` — and `Journey` was already banned two sections below, against `Order Route` |
+| ⛔ RETIRED — the index of every linked document | nothing. **`Order Route` carries a door to each owner** | `Related Documents` · Linked documents · Attachments · Files |
+
+### The delivery fee — ONE name, the reason as a qualifier (YH, 2026-08-28)
+
+The charge for the delivery TRIP. It had no entry here at all, and the POS confirm step named
+it **six** ways on one screen — the base line renamed itself to `Cross-category follow-up
+delivery` or `Special delivery fee` depending on configuration the salesperson cannot see, and
+the two component rows used two more nouns. A salesperson reading a customer's order could not
+tell whether they were looking at one charge or four. Every row now opens with the same two
+words and puts the reason after a `·`, exactly as stair carry already qualifies itself with
+`(with lift)`.
+
+| Meaning | Use exactly | Do NOT use |
+|---|---|---|
+| The charge for the delivery trip | **`Delivery fee`** | Delivery charge · Transport fee · Trip fee · Freight · Shipping |
+| That charge at a per-target override rate | **`Delivery fee · special rate`** | `Special delivery fee` (it reads as a different charge) |
+| That charge reduced because an earlier order already paid the trip | **`Delivery fee · follow-up order`** | `Cross-category follow-up delivery` · Follow-up delivery |
+| The extra charged when one order spans two product categories | **`Delivery fee · extra category`** | `Cross-category delivery` · Cross-category surcharge — **`cross-category` is an internal word and may not appear on screen** |
+| The amount the store adds by hand | **`Delivery fee · added by store`** | `Additional delivery fee` · Extra fee · Surcharge |
+| The operator input that adds to it | **`Add to the delivery fee (optional)`** | Additional delivery fee · Extra charge |
+| The operator input naming the earlier order | **`Earlier order this delivery follows (optional)`** | `Previous SO — cross-category link` · Linked SO · Parent order |
+| Who sets the rate, beside the section name | **`Head office sets the rate — you can add to it here`** | `Server-priced` · System-priced · Auto-calculated |
+
 | Meaning | Use exactly | Do NOT use |
 |---|---|---|
 | The bar that appears when something has changed | **`⚠ {n} changes`** with **`Discard`** and **`Save`** | Unsaved changes · You have edits · Save changes · Apply |
 | The mark on the document preview while changes are unsaved | **`UNSAVED`** | Draft · Preview · Not saved yet |
 | A submitted amendment, above the document | **`⚠ Amendment pending approval: delivery date → {date}`** | Pending change · Proposed · Awaiting sign-off |
-| The three-field section that moves the promised date | **`Amend delivery date`**, with the note **`creates a Revision · needs approval`** | Change delivery date · Reschedule · Postpone |
-| Its three fields, in order | **`Amend date (from customer)`** · **`Amended delivery date`** · **`Amend reason`** (required) | Request date · New date · Notes · Remark |
-| Why the emergency contact is collected | **`Used only if we cannot reach the customer on delivery day`** | Next of kin · In case of emergency · Backup contact |
-| The management-only door on Sales ownership | **`Change salesperson — needs approval`** | Request ownership change (that stays the FORM's title) · Reassign · Change owner |
+| The three-field section that moves the promised date | **`Change delivery date`**, with the note **`creates a Revision · needs approval`** | Amend delivery date · Reschedule · Postpone · `Change delivery date` WITHOUT its note (the note is what carries "this is not a quiet edit") |
+| Its three fields, in order | **`Requested date (from customer)`** · **`New delivery date`** · **`Reason for change`** (required) | Request date · New date · Notes · Remark · the retired `Amend …` trio |
+| Why the emergency contact is collected | **nothing — the section carries no note** (YH, 2026-08-27; overwrites the 2026-08-15 ruling that required the sentence). `Emergency contact` needs no explaining, and the collapsed summary already says whether one is recorded | Next of kin · In case of emergency · Backup contact · **`Used only if we cannot reach the customer on delivery day`** (the retired note) |
+| The management-only door on Sales ownership | **`Change salesperson`** | Request ownership change (that stays the FORM's title) · Reassign · Change owner · **`Change salesperson — needs approval`** (the previous ruling; retired 2026-08-26). The suffix was one of THREE statements of the same fact stacked around an unpressed button — a line above it, the suffix, and a line below. The rule now lives once, on the modal the button opens, where it is read at the moment it is acted on. The verb alone is the door |
 | Report a problem, now inside `More actions` | **`Report a problem`** | Raise an issue · Log a complaint · New Service Case |
 | The delivery address the customer has not given yet | **`Address not given yet`** | Unknown · Fill in later · TBC |
 | Billing that repeats the delivery address | **`Billing address same as delivery`** | Same as above · Use delivery address |
-| The stair-carry count, when the salesperson named none | the field's own hint **`Empty = every item`** | Auto · All · Default |
+| The stair-carry count, when the salesperson named none | **`0`** — the box carries the number it means, and the hint states the range (**`0 to {n}`**) | Auto · All · Default · ⛔ **`Empty = every item`** (the retired hint). Unset means NONE from 2026-08-27: somebody says how many pieces need carrying before the customer is charged for carrying them |
 | The auto-detected customer type, before a dial-able phone | **`Not known yet`** | — · N/A · Unknown |
+| What the ADMIN catalog door is, on its own page | **`The product list, from the selling side — what we sell and what the customer pays…  Costs and suppliers are on the Operations catalog.`** | a feature list (`Manage the SKU master, modular models, combos…`) — it names the tabs the reader can already see and answers nothing. Each door says which SIDE it is and where the other half lives, because the owner could not tell the two apart (2026-08-26) |
+| What the OPERATIONS catalog door is | **`The product list, from the buying side — what each item costs us and who supplies it. Selling prices are shown for reference; only the Master Admin can change them.`** | `Isolated from POS selling prices` — that was the old ruling and it is no longer true; the read-only price is the whole point of the alignment |
+| The two money columns on a catalog grid, told apart | **`cost = what we pay · price = what the customer pays`** as the grid's own hint | Buying/selling price · Purchase price · RRP · List price — the two words `Cost` and `Price` are the governed column headers; the hint exists because both now sit on ONE row (owner ruling 2026-08-26) and an operator must not have to guess which is which |
+| A catalog money cell a role may read but not set | **`Prices: Master Admin only`** | Locked · Read-only · No permission · Contact admin |
+| Whether the building has a lift — the QUESTION | **`Lift available?`** | Lift · Lift available · Elevator · Has lift? — the POS has asked it this way since the wizard was written; the object page asked the same fact as an unlabelled tickbox until 2026-08-26 |
+| Its two ANSWERS, in this order | **`No lift`** · **`Has lift`** | Yes/No · ✓/✗ · With lift/Without lift · True/False — a tickbox cannot say the difference between *no lift* and *nobody asked*, which is why the answers are named. `No lift` leads because it is the stored default and the answer that costs the customer money. Both surfaces import `LIFT_OPTIONS` from `packages/shared/src/sales-order-form.ts`; neither may retype them |
+| Carrying goods up stairs — the CHARGEABLE fact | **`Stair carry`** (two words, no hyphen) | Stair-carry · Staircarry · Carry charge · Portage · Walk-up fee. **The hyphen is correct only as a compound ADJECTIVE** — `stair-carry fee`, `stair-carry items` — and the bare noun never takes it |
+| The count of items needing it, as a field label | **`Items needing stair carry`** | Stair carry items · Stair-carry items · Quantity · Qty |
+| The sum, shown to whoever keyed it | **`{n} of {m} items × {f} floors above {free}F × {rate} = {total}`** | a bare total with no working-out. Both surfaces print the same sentence from the same `floorSurchargeRaw`; a second copy of the arithmetic is a Law D failure |
 
 `Customer type (auto)`, `Existing customer`, `New customer` and `Checking…` are the Sales
 Portal's own words and are printed unchanged on the object page — one fact, one spelling.

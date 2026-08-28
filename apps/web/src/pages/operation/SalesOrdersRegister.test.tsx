@@ -315,7 +315,7 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     expect(hover).toHaveAttribute("title", expect.stringContaining("Shasha"));
   });
 
-  it("shows a governed missing Customer Delivery exception instead of a passive empty value", () => {
+  it("shows a governed missing Requested Delivery Date exception instead of a passive empty value", () => {
     listHookState.data = { orders: [order({
       delivery_date: null,
       delivery_date_tbd: false,
@@ -336,7 +336,7 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
       [
         "Shasha · Kimmy · 019-3478913",
         "Ask which delivery date the customer agrees to.",
-        "Record the agreed Customer Delivery date.",
+        "Record the agreed Requested Delivery Date.",
       ].join("\n"),
     );
     expect(screen.queryByText("No date yet")).not.toBeInTheDocument();
@@ -472,7 +472,19 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     /* `M.P/QUEEN` IS positively recognised as a protector — the governed word
        prints and the sheet's abbreviation never does. */
     expect(footer).toHaveTextContent("Mattress protector 2");
-    expect(footer).toHaveTextContent("Other goods 5");
+    /* ⛔ `Other goods` IS NO LONGER PRINTED — YH, 2026-08-27. This line used
+       to read `toHaveTextContent("Other goods 5")`.
+
+       What the 2026-08-15 ruling protected was that an unrecognised line is
+       never SILENTLY DROPPED BY THE CLASSIFIER into some other word, and that
+       survives untouched — see the negative control below, which is now the
+       load-bearing test of the pair. What changed is only whether the bucket is
+       PRINTED; `footerWord` still computes it.
+
+       🟡 The honest cost is asserted rather than hidden: those 5 legs are
+       counted and not shown, so the printed numbers no longer sum to the
+       order's item count. */
+    expect(footer).not.toHaveTextContent("Other goods");
     expect(footer).not.toHaveTextContent("M.P");
     expect(footer).not.toHaveTextContent("Leg");
   });
@@ -557,16 +569,35 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     expect(footer).not.toHaveTextContent("Other goods");
   });
 
-  it("NEGATIVE CONTROL: a line nothing recognises is STILL `Other goods` - the word keeps its meaning", () => {
-    // The fix must not launder unclassified goods into a category. This
-    // number is a real data-quality signal and has to survive.
+  /* ⭐ THIS IS NOW THE LOAD-BEARING HALF (YH, 2026-08-27).
+     While `Other goods` printed, a laundered line was merely mislabelled and
+     visible. Now that the word is hidden, laundering would be INVISIBLE — an
+     unrecognised line quietly inflating `Accessory` or `Mattress` with nobody
+     able to see it. So the assertion inverts with the ruling: an unrecognised
+     line must reach NO printed category at all. */
+  it("NEGATIVE CONTROL: a line nothing recognises is laundered into no category", () => {
     listHookState.data = {
       orders: [
         order({ order_lines: [{ sku: "Leg 4\"", qty: 5, unit_price: 20, category: null }] }),
       ],
     };
     mount();
-    expect(screen.getByTestId("grid-footer")).toHaveTextContent("Other goods 5");
+    const footer = screen.getByTestId("grid-footer");
+    for (const word of [
+      "Mattress",
+      "Bedframe",
+      "Sofa",
+      "Pillow",
+      "Topper",
+      "Footrest",
+      "Accessory",
+      "Service",
+      "Other goods",
+    ]) {
+      expect(footer, `an unrecognised line reached \`${word}\``).not.toHaveTextContent(word);
+    }
+    /* The order itself still counts — only its unnameable goods go unprinted. */
+    expect(footer).toHaveTextContent("1 order");
   });
 
   it("an OLDER Worker that sends no category behaves exactly as before", () => {
@@ -607,7 +638,7 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     expect(business.map((h) => h.replace(/[AV]$/, "").trim())).toEqual([
       "SO No",
       "Ordered",
-      "Customer Delivery",
+      "Requested Delivery Date",
       "Customer",
       "Delivery Location",
       "Showroom",
@@ -874,14 +905,27 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
   });
 });
 
-describe("Copy to new Sales Order", () => {
-  it("opens the authoritative create workspace with the source order as a draft seed", () => {
+/* COPY IS RETIRED — Jess, 2026-08-28, relayed by YH.
+ *
+ * This block used to prove the copy door opened the authoritative create
+ * workspace with the source order as a seed. That behaviour is GONE, and the
+ * reason is not tidiness: a copied order silently dropped each line’s
+ * configuration (fabric, colour), so Purchasing received a PO it could not
+ * autofill — a quiet wrong order rather than a visible failure. Jess called
+ * the act dangerous and it is not retained.
+ *
+ * The pin is rewritten to its SURVIVING invariant rather than deleted: the
+ * register offers no copy act, and no hand-typed `?copyFrom=` URL is minted
+ * from here. If copy ever returns it needs a card, a configuration answer and
+ * a new test — not the quiet return of this one.
+ */
+describe("Copy to new Sales Order — retired", () => {
+  it("offers no copy act on the row menu", () => {
     mount();
     fireEvent.contextMenu(screen.getByTestId("grid-parent-row"));
-    fireEvent.click(screen.getByRole("button", { name: "Copy to new Sales Order" }));
-    expect(screen.getByTestId("location")).toHaveTextContent(
-      "/operation/orders/so/new?copyFrom=00000000-0000-0000-0000-00000000cafe",
-    );
+    // The menu still renders — so this is a real absence, not an empty query.
+    expect(screen.getByRole("button", { name: "Cancel SO" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Copy to new Sales Order" })).toBeNull();
   });
 });
 
@@ -908,12 +952,24 @@ describe("Cancel SO", () => {
         [
           "View",
           "Edit",
-          "Preview PDF",
           "Print PDF",
-          "Copy to new Sales Order",
           "Cancel SO",
         ].includes(t ?? ""),
       );
     expect(labels[labels.length - 1]).toBe("Cancel SO");
+  });
+
+  /* ONE ACT, ONE NAME (YH, 2026-08-28). `Preview PDF` and `Print PDF` were
+     two rows calling one handler with one argument list, so the menu offered
+     a choice that did not exist. This pins the INTENT — the row menu names an
+     act once — not the surviving spelling of the word. */
+  it("names the document act ONCE — no Preview row shadowing Print", () => {
+    mount();
+    fireEvent.contextMenu(screen.getByTestId("grid-parent-row"));
+    const labels = screen
+      .getAllByRole("button")
+      .map((b) => b.textContent?.trim());
+    expect(labels).toContain("Print PDF");
+    expect(labels).not.toContain("Preview PDF");
   });
 });
