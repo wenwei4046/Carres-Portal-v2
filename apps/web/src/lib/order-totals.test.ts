@@ -3,6 +3,7 @@ import type { FloorConfigDto, Order } from "@carres/shared";
 import {
   addonSubtotal,
   floorSurcharge,
+  stairCarryCount,
   floorSurchargeRaw,
   lineSubtotal,
   orderTotal,
@@ -122,6 +123,50 @@ describe("floorSurcharge — un-stubbed in 2B.1", () => {
       ],
     });
     expect(floorSurcharge(o, CFG)).toBe(300);
+  });
+});
+
+/**
+ * THE COUNT CAN NEVER EXCEED THE ORDER (F-2, found by the field audit
+ * 2026-08-28; fixed 2026-08-29).
+ *
+ * `delivery_stair_items` is a free number input; the API takes
+ * `z.number().int().min(0)` with no max and the column has no CHECK. The
+ * clamp was written by hand in four places and `floorSurcharge` had only the
+ * lower half, so a typed 99 on a three-item order priced ninety-nine carries
+ * on the saved-order path while the office page priced three.
+ *
+ * These pin the INVARIANT — nobody is charged for carrying more items than
+ * they bought, on ANY surface — not the shape of the clamp.
+ */
+describe("stairCarryCount — the one clamp, both sides", () => {
+  it("never exceeds the number of items on the order", () => {
+    expect(stairCarryCount(3, 99)).toBe(3);
+  });
+
+  it("never goes below zero, and unset means none", () => {
+    expect(stairCarryCount(3, -5)).toBe(0);
+    expect(stairCarryCount(3, null)).toBe(0);
+    expect(stairCarryCount(3, undefined)).toBe(0);
+  });
+
+  it("passes a count that is already within the order straight through", () => {
+    expect(stairCarryCount(3, 2)).toBe(2);
+  });
+
+  it("floorSurcharge charges the ORDER, not the typed number", () => {
+    /* Three items on the order, 99 typed into the box. Before the fix this
+       priced 99 carries — real money, on the surface a shop reads back to a
+       customer. Floor 5, free to 2 → 3 flights × RM50 × 3 items = RM450. */
+    const o = baseOrder({
+      delivery: { date: null, dateTbd: false, floor: 5, hasLift: false, stairItems: 99, proceedDate: null },
+      lines: [
+        { id: "a", orderId: "x", sku: "s1", qty: 2, attrs: null, unitPrice: 100 },
+        { id: "b", orderId: "x", sku: "s2", qty: 1, attrs: null, unitPrice: 50 },
+      ],
+    });
+    expect(floorSurcharge(o, CFG)).toBe(450);
+    expect(floorSurcharge(o, CFG)).not.toBe(floorSurchargeRaw(5, false, 99, CFG));
   });
 });
 

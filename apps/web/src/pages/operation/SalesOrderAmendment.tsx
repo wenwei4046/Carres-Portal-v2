@@ -235,7 +235,7 @@ export default function SalesOrderAmendment({
 
            That matters because this modal is the ONLY way to change ITEMS,
            UNIT PRICE and INSTALMENT MONTHS anywhere on the Sales Order —
-           `Amend delivery date` submits a date and nothing else. Deleting the
+           `Change delivery date` submits a date and nothing else. Deleting the
            button outright would have retired three capabilities silently. */
         inlineTrigger ? (
           <div className="flex flex-wrap items-center justify-end gap-2">

@@ -5417,7 +5417,7 @@ export function useDecideSalesOrderAmendment(
 export interface SubmitAmendmentInput {
   proposed: AmendmentProposal;
   reason: string;
-  /** 0354 — `Amend date (from customer)`. Omitted by the goods proposal. */
+  /** 0354 — `Requested date (from customer)`. Omitted by the goods proposal. */
   customerAskedOn?: string | null;
 }
 

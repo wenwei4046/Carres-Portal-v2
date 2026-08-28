@@ -1236,10 +1236,16 @@ the amendment machinery, the goods truth and the Order Route architecture are un
   holds, and while one is open this block submits nothing. `Amend date (from customer)` is a
   column (`sales_order_amendments.customer_asked_on`, 0354), not a substring of the reason: a
   change phoned in on Monday and typed on Thursday is a Monday request.
-- **The MONEY block is read-only and weighted** — Total large · Paid medium · **Outstanding
-  loudest, red whenever any of it is still owed**. This is an explicit owner ruling and it
-  overrides `docs/ui/MASTER.md` §6.4 challenge C1's narrower "only when genuinely late". The
-  existing `Open this order in Payments` door is unchanged.
+- **The MONEY block is read-only, and its three amounts are ONE SIZE** — Total · Paid ·
+  **Outstanding, red whenever any of it is still owed**. The red is the 2026-08-15 owner ruling
+  and it stands; it overrides `docs/ui/MASTER.md` §6.4 challenge C1's narrower "only when
+  genuinely late". **The `Total large · Paid medium · Outstanding loudest` half of that ruling
+  is RETIRED (YH, 2026-08-28).** It never reached the amounts: `<Money>` renders every value at
+  its `row` tone, so all three digits were always the same size and only their CONTAINERS
+  differed — three line-heights under `items-end`, which is why the three numbers never sat on
+  one line. Weighting that only moves the box around the number is not weighting. Colour does
+  the separating now, which is the half that was always visible.
+  The existing `Open this order in Payments` door is unchanged.
 - **`SALES OWNERSHIP` is read-only for Operation — no button.** A management-authorised role
   (principal or HR, the same lane GATE 3 lets decide it) sees the one door, worded
   **`Change salesperson`** (⛔ the `— needs approval` suffix ruled here on 2026-08-15 was retired
@@ -5054,23 +5060,43 @@ right-click menu follows the approved 2990 Sales Orders action set and order exa
 ```
 Edit
 View
-Preview
 Print
 ────────
 Issue Delivery Order
-Copy to new Sales Order
 ────────
 Cancel SO
 ```
+
+**`Copy to new Sales Order` IS RETIRED — owner ruling (Jess, 2026-08-28, relayed by YH),
+overwriting the Loo 2026-08-11 line above.** Jess called the act dangerous, and the code says why:
+`copySalesOrderDraft` dropped each line's `attrs` — the fabric and colour a sofa is configured
+with — even though migration `0374` opened that slot on the create door specifically so
+configuration would cross, and two code comments claimed it did. The consequence was not a
+visible failure but a quiet wrong one: a copied configured order reached Purchasing as a PO that
+could not autofill. Both doors are removed (register row menu, and the object page's
+`More actions`), and the `?copyFrom=` route branch with them — a door nobody can see is still a
+door if the URL still works. **If Carres wants copy back it is a BUILD with its own card**, and
+that card must answer what a copied promo line means, whether configuration crosses, and whether
+a cancelled order may be copied — the three questions `§11` required and no document ever
+answered.
+
+**`Preview` IS RETIRED — owner ruling (YH, 2026-08-28), overwriting the Loo 2026-08-11 line
+above.** The locked menu had meant `Preview` and `Print` as two acts: a governed document
+preview, and the governed document output. Only the second was ever built. Both rows shipped
+calling `openSalesOrderPdf(r.id, r.so)` with the same arguments, so the menu asked the reader to
+choose between two names for one behaviour — the shape ERP-ARCHITECTURE ownership law C
+(*a door, never a duplicate*) exists to stop. The duplicate label is removed and the act is named
+once. **No capability was lost, because none was ever built behind the first name.** A real
+preview act, if Carres wants one, is a BUILD with its own card — not a restoration of this row.
 
 This is a Sales Orders module exception, not a Register Template requirement for every module.
 The menu copies the reference action inventory and ordering; Carres frozen tokens, typography,
 spacing, hover/current treatment, permissions and confirmation components still govern its visual
 and interaction treatment. Each item routes to the Carres-owned capability rather than executing
 foreign business rules inside the grid: `Edit` opens the full Sales Order Workspace in edit intent;
-`View` opens the owned read view; `Preview` opens the governed document preview; `Print` uses the
+`View` opens the owned read view; `Print` uses the
 governed Sales Order document output; `Issue Delivery Order` hands off to the Delivery-owned issue
-flow; `Copy to new Sales Order` starts a new draft from the governed copy boundary; and `Cancel SO`
+flow; and `Cancel SO`
 uses the owned cancellation gate and destructive confirmation. The implementation cards must
 define the unresolved permission, eligibility, copy-boundary and cancellation rules before those
 new capabilities can write business data. Right-click is a desktop shortcut: it does not remove
