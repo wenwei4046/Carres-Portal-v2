@@ -112,8 +112,21 @@ async function fetchOrderScoped(c: Context<AppEnv>, id: string) {
   };
 }
 
-/** The RPC's balance base: lines + addons (stair carry is a client-side
- *  display extra — mirroring top_up_order keeps every cap consistent). */
+/**
+ * The RPC's balance base: lines + addons — mirroring `top_up_order` keeps
+ * every cap consistent.
+ *
+ * ⛔ THE OLD NOTE CALLED stair carry "a client-side display extra". That is
+ * RETIRED (owner ruling YH, 2026-08-28): it is money the customer owes, and
+ * while it was excluded this function returned 422 `amount_exceeds_outstanding`
+ * BEFORE Stripe was ever called — the customer could not pay the balance they
+ * had signed for.
+ *
+ * The arithmetic below is UNCHANGED and deliberately so. 0393 makes the fee an
+ * `order_addons` row, so `addons` now carries it and the cap rises with it. The
+ * cap itself is the surviving invariant: a payment may never exceed what is
+ * owed. This ruling changed what IS owed, never whether the cap holds.
+ */
 function orderTotal(order: { order_lines: Array<{ unit_price: number | string; qty: number }>; order_addons: Array<{ unit_price: number | string; qty: number }> }): number {
   const lines = (order.order_lines ?? []).reduce((s, l) => s + Number(l.unit_price) * l.qty, 0);
   const addons = (order.order_addons ?? []).reduce((s, a) => s + Number(a.unit_price) * a.qty, 0);
