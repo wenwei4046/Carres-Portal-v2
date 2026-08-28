@@ -73,8 +73,34 @@ export function floorSurchargeRaw(
  * committed migration may not be edited (red line 6); the current meaning
  * lives in `docs/orders/MASTER.md`.
  */
+/**
+ * HOW MANY ITEMS ARE ACTUALLY CHARGED FOR CARRYING — the ONE clamp
+ * (ownership Law D, one derived fact one arithmetic).
+ *
+ * The rule is two-sided and always was: never below zero, and **never above
+ * the number of items on the order**. You cannot carry more sofas up the
+ * stairs than the customer bought.
+ *
+ * It was written out by hand in four places and one of them — `floorSurcharge`
+ * below — had only the lower half. `delivery_stair_items` is a free number
+ * input, the API takes `z.number().int().min(0)` with no max, and the column
+ * has no CHECK, so a typed `99` on a three-item order reached the saved-order
+ * path and priced ninety-nine carries. The office page showed the fee for
+ * three and the POS order detail showed the fee for ninety-nine, for one order.
+ *
+ * Both neighbouring comments claimed the surfaces already agreed. They did not,
+ * because agreement was four copies of a rule rather than one. It is one now.
+ */
+export function stairCarryCount(
+  itemsTotal: number,
+  stairItems: number | null | undefined,
+): number {
+  return Math.max(0, Math.min(itemsTotal, stairItems ?? 0));
+}
+
 export function floorSurcharge(order: Order, cfg: FloorConfigDto): number {
-  const count = Math.max(0, order.delivery.stairItems ?? 0);
+  const itemsTotal = (order.lines ?? []).reduce((n, l) => n + l.qty, 0);
+  const count = stairCarryCount(itemsTotal, order.delivery.stairItems);
   return floorSurchargeRaw(order.delivery.floor, order.delivery.hasLift, count, cfg);
 }
 
@@ -189,7 +215,7 @@ export function draftTotals(draft: DraftTotalsInput, catalog: CatalogResponse): 
   /* Unset = NONE (owner ruling 2026-08-27) — the same rule `floorSurcharge`
      applies to a saved order, so the wizard preview and the order detail
      cannot quote two different stair fees. */
-  const stairItems = Math.max(0, Math.min(itemsTotal, draft.delivery.stairItems ?? 0));
+  const stairItems = stairCarryCount(itemsTotal, draft.delivery.stairItems);
   const stair = floorSurchargeRaw(
     draft.delivery.floor,
     draft.delivery.hasLift,

@@ -87,7 +87,7 @@ import { apiFetch, ApiError } from "@/lib/api";
 import { cjkClassName } from "@/lib/cjk";
 import { composeAddress } from "@/data/malaysia-postcodes";
 import { fmtDate } from "@/lib/fmt-date";
-import { floorSurchargeRaw } from "@/lib/order-totals";
+import { floorSurchargeRaw, stairCarryCount } from "@/lib/order-totals";
 import { displayCustomerName } from "@/lib/customer-name";
 import { renderSalesOrderPdf } from "@/lib/pdf/render";
 import type { SalesOrderTemplateData } from "@/lib/pdf/types";
@@ -1807,7 +1807,7 @@ export default function SalesOrderWorkspace() {
        EVERY item (0104's column comment), so an order nobody was asked about
        carried the maximum fee. The same rule now runs in `order-totals.ts` and
        in the POS panel, so all three agree. */
-    const items = Math.max(0, Math.min(itemsTotal, draft.delivery_stair_items ?? 0));
+    const items = stairCarryCount(itemsTotal, draft.delivery_stair_items);
     const floors = Math.max(0, draft.delivery_floor - cfg.freeUpToFloor);
     return {
       cfg,

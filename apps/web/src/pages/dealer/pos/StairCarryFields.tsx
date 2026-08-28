@@ -1,5 +1,5 @@
 import { LIFT_OPTIONS, MAX_DELIVERY_FLOOR, type FloorConfigDto } from "@carres/shared";
-import { floorSurchargeRaw } from "@/lib/order-totals";
+import { floorSurchargeRaw, stairCarryCount } from "@/lib/order-totals";
 import { rm } from "@/lib/format-currency";
 import type { WizardDraft } from "../new-order/draft";
 
@@ -40,7 +40,7 @@ export default function StairCarryFields({
      customer is charged for carrying them. The same rule runs in
      `order-totals.ts` for a saved order, so this quote and the office page
      cannot disagree about the money. */
-  const stairItemsEffective = Math.max(0, Math.min(itemsTotal, draft.delivery.stairItems ?? 0));
+  const stairItemsEffective = stairCarryCount(itemsTotal, draft.delivery.stairItems);
   const stair = floorSurchargeRaw(
     draft.delivery.floor,
     draft.delivery.hasLift,
