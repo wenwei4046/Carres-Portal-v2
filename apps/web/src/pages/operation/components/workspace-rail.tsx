@@ -108,10 +108,11 @@ export function RailItem({
  * The rail is navigation, not batch selection — no row here ever grows a
  * checkbox.
  *
- * SO Batch Purchase draws it first; Manual Purchase imports the same shell
- * later. Pages still on `RailGroup`/`RailItem` migrate in their own cards,
- * not as a side effect of this one — which is why the legacy pair survives
- * above instead of being reshaped underneath four other governed pages.
+ * SO Batch Purchase drew it first; Manual Purchase imports the same shell
+ * since Card 03 (2026-08-28). Pages still on `RailGroup`/`RailItem` migrate
+ * in their own cards, not as a side effect of this one — which is why the
+ * legacy pair survives above instead of being reshaped underneath its other
+ * governed pages.
  */
 export function FilterRail({
   children,

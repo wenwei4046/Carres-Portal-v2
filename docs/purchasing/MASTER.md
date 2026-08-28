@@ -220,8 +220,14 @@ exists.
 ### 5.2 Two input doors
 
 `SO Batch Purchase` is system demand from customer Sales Orders. `Manual Purchase` is conscious
-internal intent for Ready Stock, purchased Display, Office, Spare Parts or Emergency / Urgent Stock.
-An approved Display Request may route to Manual Purchase or Consignment Order; staff do not retype it.
+internal intent under the owner-approved purpose vocabulary (ruling 2026-08-28, Card 03) —
+exactly `Ready Stock` · `Showroom Display` · `Service Case` · `Internal Staff Purchase` ·
+`Subsidiary Purchase`, with Management included under `Internal Staff Purchase` (there is no
+`Management Purchase`). An emergency is a Manual Purchase with an urgent reason and governed
+date (§2.2), not a purpose of its own. The four pre-ruling purposes (`Display` · `Warranty` ·
+`Office` · `Spare Parts`) are retired: no door accepts them for a new request and no historical
+row is relabelled into the new vocabulary. An approved Display Request may route to Manual
+Purchase or Consignment Order; staff do not retype it.
 
 ### 5.3 One PO issue authority
 
@@ -630,9 +636,9 @@ SETUP TO FIX              ← the whole section renders only when at least one a
   hidden behind a tooltip; the count stays visible and right-aligned; the rail scrolls
   vertically as supplier names grow; at narrow desktop widths the Register scrolls
   horizontally and the rail is never squeezed below 240px. The shell/group/row grammar is
-  the shared `FilterRail` component (`workspace-rail.tsx`). Manual Purchase later imports
-  the same shell, grammar, Product authority and unique-object count rule — never
-  `ORDER TIMING`, Safety-days arithmetic or the SO-specific `All not ordered` meaning.
+  the shared `FilterRail` component (`workspace-rail.tsx`). Manual Purchase imports the
+  same shell, grammar, Product authority and unique-object count rule (§9.2, Card 03) —
+  never `ORDER TIMING`, Safety-days arithmetic or the SO-specific `All not ordered` meaning.
 - **The rail may hide completely.** Its top-right `Hide filters` control uses the same governed
   panel-left icon grammar as the Portal sidebar. While hidden it does not become a 60px icon rail;
   the Register takes the width and its toolbar exposes `Show filters`. The choice is remembered for
@@ -769,9 +775,67 @@ blank `SO NO`.
 
 ### 9.2 Manual Purchase
 
-**Purpose / source:** non-SO internal buys: Ready Stock, purchased Display, Office, Spare Parts,
-Emergency / Urgent Stock.
-**Left rail:** `Details missing`, `Waiting for approval`, `Not approved`, `Ready to order`, `Ordered`.
+**Purpose / source:** non-SO internal buys under the approved §5.2 purpose vocabulary:
+`Ready Stock` · `Showroom Display` · `Service Case` · `Internal Staff Purchase` ·
+`Subsidiary Purchase`.
+
+**Left rail — APPROVED / LOCKED, owner ruling 2026-08-28 (Card 03).** The shared 240px
+`FilterRail` shell Card 02-C built — same group-heading typography and spacing, same blue
+`NavRow` active treatment, no checkboxes, labels wrap and never truncate, counts visible and
+right-aligned, rail scrolls vertically, Register scrolls horizontally when narrow and the
+rail is never squeezed below 240px. Four sections, in this exact order:
+
+```text
+TO ORDER
+  All not ordered
+  Need approval
+  Ready to order
+
+PURCHASE PURPOSE
+  All purposes
+  Ready Stock
+  Showroom Display
+  Service Case
+  Internal Staff Purchase
+  Subsidiary Purchase
+
+PRODUCT
+  All products
+  Mattress
+  Bedframe
+  Sofa
+
+SUPPLIER
+  All suppliers
+  [actual supplier names, dynamic and alphabetical — never hardcoded]
+```
+
+- The default no-filter Register is the permanent Manual Purchase listing, ordered history
+  included. Counts are UNIQUE Manual Purchase requests, cross-computed against the other
+  selected sections. One filter per section; sections combine with AND; each `All …` row
+  clears only its own section; a second click on the active row clears it.
+- The three `TO ORDER` rows are DERIVED request truth, never a stored status:
+  `All not ordered` = live quantity not yet fully issued to a PO (fully ordered requests
+  leave it but stay searchable in the Register); `Need approval` = submitted, awaiting the
+  configured approver's decision; `Ready to order` = approved remainder available for PO
+  Duty to issue.
+- Product is the authoritative Catalog category — never SKU text or a browser-only mapping.
+  Supplier is the demand line's Catalog-derived supplier (plus identical PO lineage) —
+  derived, never selected by Operation; actual names only, alphabetical; the selected
+  supplier stays visible with `0`.
+- **Banned rail rows, never to return:** `Supplier not selected` · `No supplier` ·
+  `Not in catalog` · `Need price` · `Ordered` · `Part received` · `Received` · `Arrived` ·
+  `Cancelled` · `My drafts` · `Need correction` · `Queues` · `ORDER TIMING` · safety-days
+  rows. A missing SKU or supplier is named inside the affected request and handled through
+  its owning Catalog boundary; it never becomes a permanent rail facet. Price is not a rail
+  state or filter.
+- The rail says `Need approval`; the Register/object shows the real action owner's name.
+  The approver is the configured Purchasing Settings manager gate — Jess today, changeable
+  without redesigning this rail; Jess may approve a purchase for herself. Operation
+  prepares and submits; it does not approve and does not control price. Approved requests
+  continue into the one governed PO Duty issuance door; Manual Purchase and SO Batch
+  Purchase remain separate doors.
+
 **Columns:** Request No., Purpose, Requested By, Items/Qty, Required Date, Deliver To, Approval,
 Purchase Coverage, Work.
 **Journey:** `+ Manual Purchase` → choose plain-language purpose → enter goods/quantity/date/
