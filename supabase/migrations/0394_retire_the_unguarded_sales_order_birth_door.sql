@@ -1,4 +1,4 @@
--- 0393_retire_the_unguarded_sales_order_birth_door.sql
+-- 0394_retire_the_unguarded_sales_order_birth_door.sql
 --
 -- Apply only AFTER the Worker containing `create_order_from_sales_portal` and
 -- `create_raw_order` is deployed and its production SHA is verified.

@@ -14,9 +14,17 @@ function migration(prefix: string): string {
 
 const read = (path: string) => readFileSync(join(ROOT, path), "utf8");
 
+/* ⚠️ These lookups are by NUMBER PREFIX, so they follow the file if it is ever
+   renumbered — and this suite is why that matters. When main took 0391 and
+   0393 first, these two migrations moved to 0392 and 0394, and every
+   `migration("0391_")` here silently resolved to a DIFFERENT migration rather
+   than failing to find one. The suffixed identifiers asserted below
+   (`_add_order_lines_0391_locked_impl` and its siblings) are SQL names, not
+   apply order, and deliberately did NOT move with the files. */
+
 describe("Sales final submit is the Sales → Purchasing handoff", () => {
   it("uses one governed transition for automatic and recovery handoff", () => {
-    const sql = migration("0391_");
+    const sql = migration("0392_");
     expect(sql).toMatch(/create or replace function public\._sales_order_proceed\(/i);
     expect(sql).toMatch(/create or replace function public\.proceed_order\([\s\S]*?_sales_order_proceed\(/i);
     expect(sql).toMatch(/create or replace function public\.create_order_from_sales_portal\([\s\S]*?create_order\([\s\S]*?_sales_order_proceed\(/i);
@@ -24,7 +32,7 @@ describe("Sales final submit is the Sales → Purchasing handoff", () => {
   });
 
   it("re-checks only final-submitted orders after governed writers reach their final transaction state", () => {
-    const sql = migration("0391_");
+    const sql = migration("0392_");
     expect(sql).toMatch(/add column if not exists sales_final_submitted_at timestamptz/i);
     expect(sql).toMatch(/create constraint trigger orders_auto_handoff_deferred[\s\S]*?deferrable initially deferred/i);
     expect(sql).toMatch(/create constraint trigger order_lines_auto_handoff_deferred[\s\S]*?deferrable initially deferred/i);
@@ -49,7 +57,7 @@ describe("Sales final submit is the Sales → Purchasing handoff", () => {
   });
 
   it("records the actual handoff and gives legacy recovery one exact-ID authority", () => {
-    const sql = migration("0391_");
+    const sql = migration("0392_");
     expect(sql).toMatch(/add column if not exists proceeded_at timestamptz/i);
     expect(sql).toMatch(/new\.proceeded_at := now\(\)/i);
     expect(sql).toMatch(/new\.proceeded_at := null/i);
@@ -69,7 +77,7 @@ describe("Sales final submit is the Sales → Purchasing handoff", () => {
   });
 
   it("keeps raw draft creation separate from final Sales Portal submission", () => {
-    const sql = migration("0391_");
+    const sql = migration("0392_");
     const route = read("apps/api/src/routes/orders.ts");
     expect(route).toMatch(/rpc\("create_order_from_sales_portal", \{ payload \}\)/);
     const raw = route.slice(route.indexOf('ordersRouter.post("/raw"'));
@@ -86,7 +94,7 @@ describe("Sales final submit is the Sales → Purchasing handoff", () => {
   });
 
   it("retires the direct birth primitive after the new Worker is live", () => {
-    const cutover = migration("0392_");
+    const cutover = migration("0394_");
     const route = read("apps/api/src/routes/orders.ts");
 
     expect(cutover).toMatch(
@@ -110,7 +118,7 @@ describe("Sales final submit is the Sales → Purchasing handoff", () => {
   });
 
   it("fails closed for orphan authenticated callers and authorizes Proceed under the row lock", () => {
-    const sql = migration("0391_");
+    const sql = migration("0392_");
     const portal = sql.slice(sql.indexOf("create or replace function public.create_order_from_sales_portal"));
     expect(portal).toMatch(/if v_role is null[\s\S]*?v_role not in \([\s\S]*?'dealer','salesperson','showroom',[\s\S]*?'principal','operation','finance','bd'[\s\S]*?public\.create_order\(payload\)/i);
     expect(sql).toMatch(/create or replace function public\.proceed_order\([\s\S]*?v_role not in \([\s\S]*?'dealer','salesperson','showroom'[\s\S]*?select \* into v_order[\s\S]*?where id = p_order_id[\s\S]*?dealer_id is not distinct from v_caller_dealer_id[\s\S]*?for update;[\s\S]*?cross-dealer proceed/i);
