@@ -375,6 +375,28 @@ describe("Sales Order object template contract", () => {
     expect(money).not.toContain("floorSurchargeRaw(");
   });
 
+  /* ⭐ THE PAPER AND THE MONEY CARD AGREE ON THE DRAFT (YH, 2026-08-28, found
+     on the screen). MONEY read RM 1,540 while the document beside it printed
+     BALANCE DUE RM 1,490 — the fee was in the card and not on the paper.
+     A SAVED order gets the row from `base.addons` (0393); a draft has no row
+     yet, so the preview synthesises the same one. */
+  it("puts the stair carry on the draft paper, and never on top of a saved row", () => {
+    const fn = workspace.slice(
+      workspace.indexOf("function draftTemplateData"),
+      workspace.indexOf("function snapshotTemplateData"),
+    );
+    /* The row is a real addon, so the customer can READ the charge they are
+       being asked to sign for — not a silent difference between two totals. */
+    expect(fn).toContain("STAIR_CARRY_ADDON_KEY");
+    expect(fn).toContain('label: "Stair carry"');
+    /* `base?.addons ??` — the saved row WINS. Adding the synthetic one on top
+       of it would print the charge twice on every upstairs order. */
+    expect(fn).toContain("base?.addons ??");
+    /* And it feeds the same subtotal every other addon feeds, so the paper's
+       BALANCE DUE cannot drift from the card again. */
+    expect(fn).toContain("addons.reduce((s, a) => s + a.line_total, 0)");
+  });
+
   it("refuses to create an office order with no proceed date", () => {
     expect(workspace).toContain("needDealer && !draft.proceed_date");
     /* COPY-STANDARD:1447 governs the words; a second spelling is how the POS
