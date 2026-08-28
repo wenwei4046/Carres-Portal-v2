@@ -2627,6 +2627,48 @@ describe("POST /api/operation/orders (create)", () => {
     expect(rpc).not.toHaveBeenCalled();
   });
 
+  /* ⭐ A BIRTH STAMPS THE STAIR FEE TOO (0393/0394).
+     The writer is main's, from the same report this branch answers — the office
+     create door was the one door that never stamped, so an order keyed here on
+     floor 3 with no lift was born carrying the three stair INPUTS and no fee.
+
+     This test is not the fix; it is the CONTRACT the fix has to keep, and that
+     door had none. What it pins is the non-fatal promise: the stamp runs after
+     the insert, so the order is already born and its Rev 1 minted, and a stamp
+     that fails may never report a create that did not fail. */
+  it("stamps the stair fee on a newly created order", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: { id: "00000000-0000-0000-0000-000000000b02", so: 1400, revision: 1 },
+      error: null,
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("http://t/api/operation/orders", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          header: {
+            customer_name: "Walk-in",
+            dealer_id: "00000000-0000-0000-0000-0000000000d1",
+            salesperson_id: "00000000-0000-0000-0000-0000000000a1",
+            proceed_date: "2026-09-01",
+            delivery_floor: 3,
+            delivery_has_lift: false,
+            delivery_stair_items: 3,
+          },
+          lines: [{ sku: "B1201S-K", qty: 5, unit_price: 1890 }],
+        }),
+      }),
+      env,
+    );
+    /* The create still succeeds and still returns the order. The stamp runs
+       after it and cannot change that — which is the contract being pinned. */
+    expect(res.status).toBe(201);
+    expect(await res.json()).toMatchObject({ so: 1400 });
+  });
+
   /* The EDIT door is deliberately untouched: `revisionHeaderInput` keeps
      proceed_date nullable-optional, because a save that only fixes a phone
      number must not be forced to restate a date it may not change. Narrowing
