@@ -1383,7 +1383,7 @@ export default function SalesOrderWorkspace() {
      * hang off it (Jess, 2026-08-21: it must be filled, delivery needs it).
      * An unknown address cannot demand one; a known address must say. */
     if (!draft.customer_address_unknown && !draft.building_type) {
-      return "Building type is required — pick what kind of building the delivery goes to";
+      return "Fill in the building type first — a condominium can only take a half-day delivery.";
     }
     return null;
   };
@@ -2011,7 +2011,7 @@ export default function SalesOrderWorkspace() {
           <Select id="so-building-type" label="Building type" required
             error={
               !draft.customer_address_unknown && !draft.building_type
-                ? "Required for delivery"
+                ? "Fill in the building type first — a condominium can only take a half-day delivery."
                 : undefined
             }
             value={draft.building_type || undefined}
@@ -2139,7 +2139,7 @@ export default function SalesOrderWorkspace() {
           a read-only date is the "reduce descriptions" Jess asked for. */}
       <Block title="Order info">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <Fact label="Ordered" value={isNew ? "Today" : fmtDate(order?.placed_at ?? null)} />
+          <Fact label="Ordered" value={isNew ? fmtDate(new Date().toISOString().slice(0, 10)) : fmtDate(order?.placed_at ?? null)} />
           {mode === "create" ? (
             <div data-pos-field="deliveryDate">
               <DatePicker id="so-promised" label="Requested Delivery Date" value={draft.delivery_date}
@@ -2466,7 +2466,7 @@ export default function SalesOrderWorkspace() {
                   <span className="text-label" aria-hidden="true">&nbsp;</span>
                   <button
                     type="button"
-                    aria-label="Remove line"
+                    aria-label="Remove"
                     className="grid h-8 w-8 place-items-center rounded-control text-base-500 hover:bg-hovertint hover:text-base-900"
                     onClick={() => setDraft((d) => ({ ...d, lines: d.lines.filter((x) => x.key !== l.key) }))}
                   >
@@ -2479,7 +2479,7 @@ export default function SalesOrderWorkspace() {
             <div>
               <Button size="sm" variant="neutral"
                 onClick={() => setDraft((d) => ({ ...d, lines: [...d.lines, { key: nextKey(), sku: "", qty: 1, unit_price: 0 }] }))}>
-                <Plus size={14} /> Add item
+                <Plus size={14} /> Add line
               </Button>
             </div>
           </div>
@@ -2676,6 +2676,26 @@ export default function SalesOrderWorkspace() {
         <div className="min-h-0 flex-1 overflow-auto bg-kit-slate-3 px-4 py-4">
           <div className="mx-auto max-w-5xl rounded-card border border-kit-slate-5 bg-white p-5">
             <h2 className="mb-4 text-title font-semibold text-base-900">{objectView}</h2>
+            {/* ⭐ R-7 — A FAILED READ IS NOT AN EMPTY LEDGER. Without these two
+                guards a 403 or a 500 falls straight through to the ledger's
+                governed EMPTY sentences (`No revisions recorded` / `No history
+                recorded`), which tell the reader the order HAS no revisions —
+                a statement the screen cannot know. The Order Route branch above
+                has carried both guards all along; this one never did, so a
+                permission refusal rendered here as a fact about the order. */}
+            {detailQ.isLoading || revisionsQ.isLoading ? (
+              <Loading label={objectView === "History" ? "Opening the history" : "Opening the revisions"} />
+            ) : detailQ.isError || revisionsQ.isError ? (
+              <EmptyState
+                title={objectView === "History" ? "This history could not be opened" : "These revisions could not be opened"}
+                detail={(detailQ.error as Error | undefined)?.message ?? (revisionsQ.error as Error | undefined)?.message}
+                action={
+                  <Button variant="neutral" onClick={() => { void detailQ.refetch(); void revisionsQ.refetch(); }}>
+                    Try again
+                  </Button>
+                }
+              />
+            ) : (
             <SalesOrderLedger
               revisions={revisions}
               history={detailQ.data?.history ?? []}
@@ -2701,6 +2721,7 @@ export default function SalesOrderWorkspace() {
                 setObjectView("Order");
               }}
             />
+            )}
           </div>
         </div>
       ) : (
@@ -3007,10 +3028,17 @@ export function skuEditPatch(
  *                       Kept because 975 live units have no catalog row.
  *
  * ⚠️ **Do not "simplify" ④ into `resolvedCategory`.** That helper returns
- * `CoreCat | "acc"` — it folds `unknown` INTO `acc`, which would silently
- * retire the ruled word `Other goods` and print `ACCESSORY` over goods nothing
- * recognised. That is the D9 lie this function exists to stop telling.
- * `lineClass` is three-valued on purpose.
+ * `CoreCat | "acc"` — it folds `unknown` INTO `acc`, which would print
+ * `ACCESSORY` over goods nothing recognised. That is the D9 lie this function
+ * exists to stop telling. `lineClass` is three-valued on purpose.
+ *
+ * ⛔ THE `unknown` WORD IS `Not in catalog` (COPY-STANDARD:1082), and this
+ * comment used to call `Other goods` "the ruled word". It is the opposite:
+ * :1082 lists `Other goods` in the Do NOT use column for exactly this fact,
+ * *"and above all never folded into `Accessory`"*. The screen already printed
+ * `Not in catalog` as the SKU hint three hundred lines above, so one fact was
+ * wearing two spellings on one card. The three-valued shape is what the
+ * warning above is really protecting; the word it named was wrong.
  */
 export function categoryWord(line: {
   sku: string;
@@ -3023,7 +3051,7 @@ export function categoryWord(line: {
   const fromCatalog = typeof line.category === "string" ? line.category.trim() : "";
   const fromSku = line.sku.includes(":") ? line.sku.split(":", 1)[0] : "";
   const classified = lineClass(line.sku);
-  const fallback = classified === "acc" ? "Accessory" : classified === "unknown" ? "Other goods" : classified;
+  const fallback = classified === "acc" ? "Accessory" : classified === "unknown" ? "Not in catalog" : classified;
   return (fromAttrs || fromCatalog || fromSku || fallback).replace(/[_-]+/g, " ").toUpperCase();
 }
 

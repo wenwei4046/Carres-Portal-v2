@@ -15,7 +15,6 @@ import {
   moneyText,
   MUTED_ABSENCES,
   NO_DATE_YET,
-  NOT_GIVEN,
   NOT_RECORDED,
   REGISTER_FIELDS,
 } from "./sales-order-columns";
@@ -87,11 +86,16 @@ describe("the default row is the owner's EIGHT, in the owner's order", () => {
 
   /* An absence is quieter than a fact — the page mutes exactly these two and
      never `No delivery date`, which heads a governed two-line action. */
-  it("mutes `Not recorded` and `Not given`, and only those", () => {
+  /* ONE ABSENCE WORD (YH, 2026-08-29). This used to pin TWO — `Not given` for
+     a customer fact, `Not recorded` for a Carres one. Same table, two spellings
+     of empty, and the difference was invisible to the operator reading it. The
+     surviving invariant is that an absence is MUTED and a real value is not;
+     the count of spellings was never the point. */
+  it("mutes the absence word, and only it", () => {
     expect(MUTED_ABSENCES.has(NOT_RECORDED)).toBe(true);
-    expect(MUTED_ABSENCES.has(NOT_GIVEN)).toBe(true);
     expect(MUTED_ABSENCES.has(NO_DATE_YET)).toBe(false);
-    expect(MUTED_ABSENCES.size).toBe(2);
+    // ONE word now, so ONE muted string (YH, 2026-08-29).
+    expect(MUTED_ABSENCES.size).toBe(1);
   });
 });
 describe("FIX 2 · Current is a DOCUMENT pointer", () => {
@@ -205,14 +209,14 @@ describe("POS parity columns — the register can show what the till asked", () 
     expect(byKey("stair_items").text(r)).toBe("3");
 
     const bare = buildRegisterRow(order({}));
-    expect(byKey("race").text(bare)).toBe(NOT_GIVEN);
-    expect(byKey("gender").text(bare)).toBe(NOT_GIVEN);
-    expect(byKey("birthday").text(bare)).toBe(NOT_GIVEN);
-    expect(byKey("stair_items").text(bare)).toBe(NOT_GIVEN);
+    expect(byKey("race").text(bare)).toBe(NOT_RECORDED);
+    expect(byKey("gender").text(bare)).toBe(NOT_RECORDED);
+    expect(byKey("birthday").text(bare)).toBe(NOT_RECORDED);
+    expect(byKey("stair_items").text(bare)).toBe(NOT_RECORDED);
   });
 
   it("ZERO stair items is a recorded fact, not an absence", () => {
-    // `0` means "asked, and the answer was none" — rendering it as NOT_GIVEN
+    // `0` means "asked, and the answer was none" — rendering it as NOT_RECORDED
     // would erase a real answer. Only null/undefined is absence.
     const r = buildRegisterRow(order({ delivery_stair_items: 0 }));
     expect(byKey("stair_items").text(r)).toBe("0");
@@ -252,9 +256,9 @@ describe("Emergency contact is three columns, not one crammed cell", () => {
 
   it("an absent contact reads as words in all three", () => {
     const r = withEmergency(null);
-    expect(byKey("emergency").text(r)).toBe("Not given");
-    expect(byKey("emergency_phone").text(r)).toBe("Not given");
-    expect(byKey("emergency_relationship").text(r)).toBe("Not given");
+    expect(byKey("emergency").text(r)).toBe("Not recorded");
+    expect(byKey("emergency_phone").text(r)).toBe("Not recorded");
+    expect(byKey("emergency_relationship").text(r)).toBe("Not recorded");
   });
 
   it("a legacy string nobody composed is kept WHOLE, never chopped", () => {
@@ -262,7 +266,7 @@ describe("Emergency contact is three columns, not one crammed cell", () => {
     // imported note survives intact instead of losing its tail to a split.
     const r = withEmergency("call the son first, he answers");
     expect(byKey("emergency").text(r)).toBe("call the son first, he answers");
-    expect(byKey("emergency_phone").text(r)).toBe("Not given");
+    expect(byKey("emergency_phone").text(r)).toBe("Not recorded");
   });
 
   it("a relationship containing the separator keeps its tail", () => {

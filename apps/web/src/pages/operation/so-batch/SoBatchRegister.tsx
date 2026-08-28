@@ -29,7 +29,7 @@ import {
 } from "@carres/shared";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import { fmtDate } from "@/lib/fmt-date";
-import { conciseLocality, NOT_GIVEN } from "@/lib/locality";
+import { conciseLocality, NOT_RECORDED } from "@/lib/locality";
 import { useSalesOrderExpansion } from "@/lib/queries";
 import { avatarColor, personInitials } from "@/lib/staff-avatar";
 import { FilterRail, FilterRailGroup, FilterRailRow } from "../components/workspace-rail";
@@ -423,7 +423,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
           const locality = conciseLocality(o.deliveryCity, o.deliveryState);
           return (
             <span data-testid={`so-batch-location-${o.orderId}`}>
-              {locality === NOT_GIVEN ? <Absent>{NOT_GIVEN}</Absent> : locality}
+              {locality === NOT_RECORDED ? <Absent>{NOT_RECORDED}</Absent> : locality}
             </span>
           );
         },

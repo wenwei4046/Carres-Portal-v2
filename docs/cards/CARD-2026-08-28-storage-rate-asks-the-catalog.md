@@ -257,6 +257,16 @@ instead, including one that pins the exact production SKU shapes that used to re
 Creating that state means switching storage on against a live order. That is a production data
 change, it is not required to prove the arithmetic, and it was not done.
 
+**Confirmed on the authenticated production UI, 2026-08-28 (YH).** A human operator who did not
+write the change opened the register and Old Orders on the live site and reported the storage
+scope correct on screen — the Storage panel and its `Storage fee uncollected · holding delivery`
+issue line appear on an order carrying catalogued mattress and bed-frame goods, where the server
+previously read the same lines as out of scope. That is the SCOPE half verified by a second pair
+of eyes, and it is what the deployed SHA was expected to change.
+
+**It does not close this section.** Scope is not a fee. No production order has storage switched
+on, so no real rate has been read and the RM150/month arithmetic remains proven only by tests.
+
 **What closes this line:** the first order that genuinely accrues storage. Read its Storage tab and
 its delivery gate, confirm the fee is non-zero and that both agree on scope, and record the SO
 number here. Until then `Status` stays `EXECUTED · SHIPPED`.

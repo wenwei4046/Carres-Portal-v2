@@ -46,15 +46,18 @@ export interface DeliveryPaymentApproval {
 
 /** ⭐ THE ONE PREDICATE. Does a recorded approval open this order's money gate? */
 export function paymentApprovalOpensGate(
-  approvals: readonly DeliveryPaymentApproval[],
+  /* Only `status` is read, so the parameter asks for only `status`. The Order
+     Route carries a narrower row than the money gate does, and it must be able
+     to ask THIS function rather than retype the test (Law D). */
+  approvals: readonly Pick<DeliveryPaymentApproval, "status">[],
 ): boolean {
   return approvals.some((a) => a.status === "approved");
 }
 
 /** The newest request still waiting for the approver. */
-export function pendingPaymentApproval(
-  approvals: readonly DeliveryPaymentApproval[],
-): DeliveryPaymentApproval | null {
+export function pendingPaymentApproval<T extends Pick<DeliveryPaymentApproval, "status">>(
+  approvals: readonly T[],
+): T | null {
   const pending = approvals.filter((a) => a.status === "pending");
   return pending.length > 0 ? pending[pending.length - 1]! : null;
 }

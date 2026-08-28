@@ -409,7 +409,7 @@ describe("one permanent row per proceeded Sales Order", () => {
     );
     expect(screen.getByTestId("so-batch-customer-o1").textContent).toBe("Kimmy");
     /* A locality nobody recorded says the governed absence, quietly. */
-    expect(screen.getByTestId("so-batch-location-o5").textContent).toBe("Not given");
+    expect(screen.getByTestId("so-batch-location-o5").textContent).toBe("Not recorded");
   });
 
   it("names an absent historical handoff instead of printing a blank cell", () => {

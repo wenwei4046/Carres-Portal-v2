@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { restampStairCarry, touchesStairInputs } from "../../lib/stair-carry-restamp";
 import { HTTPException } from "hono/http-exception";
 import type { MiddlewareHandler } from "hono";
 import { z } from "zod";
@@ -165,7 +166,7 @@ async function resolveActorNames(sb: any, ids: ReadonlyArray<string | null | und
  *            writer stamps). A missing person id is NEVER promoted to this.
  *   missing  the actor was not recorded, or the recorded id cannot be
  *            resolved to a name — an audit-data defect the UI states plainly
- *            (`Actor was not recorded`), never a person guess.
+ *            (`Staff identity not recorded`), never a person guess.
  */
 function actorKindOf(
   byUserId: string | null | undefined,
@@ -1484,6 +1485,22 @@ operationOrdersRouter.post("/:id/save", requireOperation, async (c) => {
     const m = mapPipelineV2Error(error);
     return c.json(m.body, m.status);
   }
+
+  /* 0394 — A STAIR FEE FOLLOWS THE FLOOR THAT CHANGED. This door can move
+     `delivery_floor` and `delivery_has_lift`, and the fee 0393 stamped at
+     create is priced from them. Without this, changing a floor from 1 to 3
+     left the order describing a charge its own inputs no longer produce.
+
+     Deliberately AFTER the save and deliberately non-fatal: the revision is
+     already minted, so throwing here would tell the operator their edit failed
+     when it did not. A stale fee is the state we were already in; a lost edit
+     would be new damage. */
+  if (touchesStairInputs(parsed.data.header as Record<string, unknown>)) {
+    const restamp = await restampStairCarry(sb, id);
+    if (!restamp.ok) {
+      console.error("stair carry re-stamp failed", { orderId: id, reason: restamp.reason });
+    }
+  }
   return c.json(data, 201);
 });
 
@@ -1559,6 +1576,30 @@ operationOrdersRouter.post("/", requireOperation, async (c) => {
   if (error) {
     const m = mapPipelineV2Error(error);
     return c.json(m.body, m.status);
+  }
+
+  /* 0393/0394 — STAIR CARRY ON AN OFFICE-BORN ORDER. Reported from
+     `/operation/orders/so/new`: the fee showed on the form and reached neither
+     the SO nor MONEY.
+
+     The POS door appends the fee into `create_order`’s payload, but
+     `sales_order_create` (0374) takes only a header and lines — it has no addon
+     parameter at all, so there is nothing to append TO. Rather than widen a
+     locked birth RPC, the order is stamped immediately after it exists, through
+     the SAME 0394 door the edit path uses. One writer, two callers.
+
+     Non-fatal for the same reason as the edit path: the order is already born
+     and its Rev 1 minted, so failing here would report a lost create that was
+     not lost. */
+  const createdId = (data as { id?: string } | null)?.id;
+  if (createdId) {
+    const stamped = await restampStairCarry(sb, createdId);
+    if (!stamped.ok) {
+      console.error("stair carry stamp failed on office create", {
+        orderId: createdId,
+        reason: stamped.reason,
+      });
+    }
   }
   return c.json(data, 201);
 });

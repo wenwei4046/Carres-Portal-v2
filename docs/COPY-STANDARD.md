@@ -1512,6 +1512,7 @@ words and puts the reason after a `·`, exactly as stair carry already qualifies
 | The management-only door on Sales ownership | **`Change salesperson`** | Request ownership change (that stays the FORM's title) · Reassign · Change owner · **`Change salesperson — needs approval`** (the previous ruling; retired 2026-08-26). The suffix was one of THREE statements of the same fact stacked around an unpressed button — a line above it, the suffix, and a line below. The rule now lives once, on the modal the button opens, where it is read at the moment it is acted on. The verb alone is the door |
 | Report a problem, now inside `More actions` | **`Report a problem`** | Raise an issue · Log a complaint · New Service Case |
 | The delivery address the customer has not given yet | **`Address not given yet`** | Unknown · Fill in later · TBC |
+| A cell with no value, anywhere in a register | **`Not recorded`** | `Not given` · Not provided · None · N/A · — · a blank cell. **ONE word, YH 2026-08-29.** The Sales Orders register printed TWO — `Not given` for a fact the customer never told us, `Not recorded` for one Carres never wrote down — 20 cells against 18 on the same table. The distinction is real and invisible: an operator sees two spellings of empty and must work out whether they differ. `Not recorded` survives because it is honest about EVERY column; nobody *gives* us an invoice number or a showroom. Neither word had ever been registered here, while `lib/locality.ts` claimed `Not given` was governed by this file |
 | Billing that repeats the delivery address | **`Billing address same as delivery`** | Same as above · Use delivery address |
 | The stair-carry count, when the salesperson named none | **`0`** — the box carries the number it means, and the hint states the range (**`0 to {n}`**) | Auto · All · Default · ⛔ **`Empty = every item`** (the retired hint). Unset means NONE from 2026-08-27: somebody says how many pieces need carrying before the customer is charged for carrying them |
 | The auto-detected customer type, before a dial-able phone | **`Not known yet`** | — · N/A · Unknown |
@@ -1666,6 +1667,15 @@ surface is how a dictionary splits.
 | Unknown promised date | **Delivery date to be confirmed** |
 | Empty immutable-version view | **No revisions recorded** |
 | Empty event-ledger view | **No history recorded** |
+| Those two views while the read is IN FLIGHT | **`Opening the revisions`** · **`Opening the history`** |
+| Those two views when the read FAILED | **`These revisions could not be opened`** · **`This history could not be opened`**, with `Try again` |
+
+⭐ **AN EMPTY SENTENCE MAY NEVER DOUBLE AS A FAILURE SENTENCE (2026-08-28).** The two rows above
+exist because the ledger had neither a loading state nor an error state, so a 403, a 500 or an
+expired token fell straight through to `No revisions recorded` — **a permission refusal rendering
+as a factual claim about the order.** `No revisions recorded` says Carres looked and found none;
+only a screen that actually got an answer may say it. The same rule binds every empty state in
+this document: if a surface can fail, its empty word is not allowed to describe the failure.
 | The drawer panel listing who to ring, one row per outside party | **Calls** | Chase Now · Actions · Follow-ups · Contacts — `Actions` is the ROW's open-action list and one word may not head two blocks (Jess 2026-07-28, PR #487); the panel's own empty state has read `0 calls to make · everything on track.` since C1, so the title is that sentence's noun, not a new word |
 
 ## The Purchase Order lifecycle words — CANONICAL HOME (Loo, 2026-07-29 · frozen by P6)

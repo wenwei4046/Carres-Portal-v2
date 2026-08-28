@@ -187,7 +187,7 @@ describe("historyRecordWords translates stored values into governed words", () =
       "Staff correction · Rev 2 · Customer name",
     );
     expect(historyWords("Changed delivery_date and delivery_has_lift")).toBe(
-      "Changed Requested Delivery Date and Lift available",
+      "Changed Requested Delivery Date and Lift available?",
     );
   });
 });
@@ -230,16 +230,16 @@ describe("History names the person, and never invents one", () => {
       historyActorWords({
         text: "", occurred_at: "2026-08-24T03:16:00Z", by_role: "principal", actor_kind: "missing",
       }),
-    ).toBe("Actor was not recorded · Principal · Mon, 24 Aug 11:16");
+    ).toBe("Staff identity not recorded · Principal · Mon, 24 Aug 11:16");
     expect(
       historyActorWords({ text: "", occurred_at: "2026-08-24T03:16:00Z", actor_kind: "missing" }),
-    ).toBe("Actor was not recorded · Mon, 24 Aug 11:16");
+    ).toBe("Staff identity not recorded · Mon, 24 Aug 11:16");
   });
 
   it("never promotes a null id to System when an older Worker sends no kind", () => {
     expect(
       historyActorWords({ text: "", occurred_at: "2026-08-24T03:16:00Z", by_role: "operation" }),
-    ).toBe("Actor was not recorded · Operation · Mon, 24 Aug 11:16");
+    ).toBe("Staff identity not recorded · Operation · Mon, 24 Aug 11:16");
   });
 
   it("treats a blank name as no name, never as a name made of spaces", () => {
@@ -247,7 +247,7 @@ describe("History names the person, and never invents one", () => {
       historyActorWords({
         text: "", occurred_at: "2026-08-24T03:16:00Z", actor: "   ", by_role: "   ",
       }),
-    ).toBe("Actor was not recorded · Mon, 24 Aug 11:16");
+    ).toBe("Staff identity not recorded · Mon, 24 Aug 11:16");
   });
 });
 
@@ -402,7 +402,7 @@ describe("Revisions are clear complete-version doors", () => {
       { ...revisions[0], created_by: null, created_by_name: null, actor_kind: "missing" as const },
       1,
     );
-    expect(words.detail).toEqual(["Actor was not recorded · Mon, 24 Aug 11:16"]);
+    expect(words.detail).toEqual(["Staff identity not recorded · Mon, 24 Aug 11:16"]);
     expect(JSON.stringify(words)).not.toContain("Unknown user");
   });
 

@@ -615,7 +615,7 @@ describe("Sales Order record grammar contract", () => {
     expect(workspace).not.toContain("Unknown user");
     /* The governed audit-data defect sentence stands in its place — a legacy
        row without an actor states the defect; it never invents a person. */
-    expect(ledger).toContain("Actor was not recorded");
+    expect(ledger).toContain("Staff identity not recorded");
   });
 
   it("renders the three ranks in the ruled 13/12/11 tokens", () => {
