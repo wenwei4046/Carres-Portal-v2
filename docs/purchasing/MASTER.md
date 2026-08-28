@@ -701,6 +701,17 @@ requires a written reason, rejects office/rental/imported records and records
 History + Audit before using the canonical transition. The retry runs at the final transaction
 state, so a multi-part Sales revision cannot enter Purchasing on an intermediate total.
 
+**PRODUCTION-VERIFIED 2026-08-28 (Card 02-D cutover).** Merge `97b7acd2` live on all five
+governed surfaces; migrations `0396_sales_final_submit_is_the_handoff` and
+`0397_retire_the_unguarded_sales_order_birth_door` applied in the governed order (0397 only
+after the Worker SHA was verified), so `create_order` no longer carries a direct authenticated
+grant. The five handoff behaviours were proven against production with rolled-back probes, and
+the Owner-confirmed legacy recovery ran as one Principal batch: 32 exact IDs recovered with a
+written reason (History + Audit per order), 20 entered the Register immediately (4 → 24 rows),
+12 stayed `place` with their named blockers, and 7 candidates without POS submit evidence were
+deliberately not recovered. Walked on the real Operation account: 24 rows, real buying lines on
+expand, rail counts matching the register facts, and the live PO-duty holder named.
+
 The read boundary is still drawn ONCE, at `loadToOrder`, before the engine ever sees a line — so a
 genuine `place` order is invisible to the WHOLE surface: no planning, no netting (it cannot consume
 Open PO coverage ahead of a proceeded order), no rail count, no Register row, no selection, no
