@@ -610,14 +610,31 @@ export function Block({
   return (
     <section className="rounded-card border border-kit-slate-5 bg-white px-4 py-3" data-block={title}>
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-l-2 border-base-300 pl-2">
-        {/* ⭐ A CARD TITLE WEARS THE CARD-TITLE TOKEN (2026-08-24).
+        {/* ⭐ A CARD TITLE WEARS THE CARD-TITLE TOKEN (2026-08-24) IN THE MONO
+            FACE (YH, 2026-08-28).
+
             `01-design-tokens.md` §1 assigns `text-strong` to "card title ·
-            field-group heading" and `text-label` to "field labels, micro-labels,
-            pill text". This heading wore `text-label` — an 11px uppercase
-            micro-label doing a section's job, which is exactly why the sections
-            did not read as sections. Restoring the documented token is the fix;
-            uppercase goes with it, because 15px shouting is a different defect. */}
-        <h2 id={headingId} className="text-strong text-base-900">
+            field-group heading". That token STAYS — the 2026-08-24 fix was that
+            this heading wore `text-label`, an 11px micro-label doing a section's
+            job, and the size is what made sections stop reading as sections.
+
+            What changes is the FACE. The kit loads exactly one UI family, so a
+            heading could only differ from its fields by weight — which is not
+            enough separation on a card holding three sub-sections. `font-mono`
+            is already in this app: every RM figure renders in it, so this is a
+            face the operator reads daily rather than a new one, and nothing
+            else on a form card is monospaced. No token is added.
+
+            ⚠ THIS OVERRIDES the 2026-08-24 note that uppercase "is a different
+            defect". That note was written about 15px SANS uppercase. Mono
+            uppercase with tracking reads as a label rather than as shouting,
+            which is what a section name is. **Falsifier:** if an operator reads
+            these headings as shouting, drop `uppercase tracking-[0.08em]` and
+            keep the face — one class, no other change. */}
+        <h2
+          id={headingId}
+          className="font-mono text-strong uppercase tracking-[0.08em] text-base-900"
+        >
           {title}
         </h2>
         {headerSlot}

@@ -1463,6 +1463,27 @@ surviving names and retires two.
 | ⛔ RETIRED — the delivery legs, holder, partner and appointment | nothing. **`Order Route` owns them** and always did; the Order tab printed a read-only copy | `Delivery Journey` — and `Journey` was already banned two sections below, against `Order Route` |
 | ⛔ RETIRED — the index of every linked document | nothing. **`Order Route` carries a door to each owner** | `Related Documents` · Linked documents · Attachments · Files |
 
+### The delivery fee — ONE name, the reason as a qualifier (YH, 2026-08-28)
+
+The charge for the delivery TRIP. It had no entry here at all, and the POS confirm step named
+it **six** ways on one screen — the base line renamed itself to `Cross-category follow-up
+delivery` or `Special delivery fee` depending on configuration the salesperson cannot see, and
+the two component rows used two more nouns. A salesperson reading a customer's order could not
+tell whether they were looking at one charge or four. Every row now opens with the same two
+words and puts the reason after a `·`, exactly as stair carry already qualifies itself with
+`(with lift)`.
+
+| Meaning | Use exactly | Do NOT use |
+|---|---|---|
+| The charge for the delivery trip | **`Delivery fee`** | Delivery charge · Transport fee · Trip fee · Freight · Shipping |
+| That charge at a per-target override rate | **`Delivery fee · special rate`** | `Special delivery fee` (it reads as a different charge) |
+| That charge reduced because an earlier order already paid the trip | **`Delivery fee · follow-up order`** | `Cross-category follow-up delivery` · Follow-up delivery |
+| The extra charged when one order spans two product categories | **`Delivery fee · extra category`** | `Cross-category delivery` · Cross-category surcharge — **`cross-category` is an internal word and may not appear on screen** |
+| The amount the store adds by hand | **`Delivery fee · added by store`** | `Additional delivery fee` · Extra fee · Surcharge |
+| The operator input that adds to it | **`Add to the delivery fee (optional)`** | Additional delivery fee · Extra charge |
+| The operator input naming the earlier order | **`Earlier order this delivery follows (optional)`** | `Previous SO — cross-category link` · Linked SO · Parent order |
+| Who sets the rate, beside the section name | **`Head office sets the rate — you can add to it here`** | `Server-priced` · System-priced · Auto-calculated |
+
 | Meaning | Use exactly | Do NOT use |
 |---|---|---|
 | The bar that appears when something has changed | **`⚠ {n} changes`** with **`Discard`** and **`Save`** | Unsaved changes · You have edits · Save changes · Apply |
