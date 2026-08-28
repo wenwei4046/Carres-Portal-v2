@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * BACKFILL THE STAIR-CARRY FEE ONTO EXISTING ORDERS (owner instruction YH,
  * 2026-08-29 — "fix them regardless; if they should be added, they get added").
@@ -7,17 +6,22 @@
  * floor, the lift flag or the count moves. Neither touches an order that already
  * existed, so this script does — once, deliberately, run by a human.
  *
- * ── WHY THIS IS A SCRIPT AND NOT A MIGRATION ────────────────────────────────
- *
- * Two reasons, and both are rules rather than taste:
+ * ── WHY A SCRIPT AND NOT A MIGRATION ────────────────────────────────────────
  *
  *  1. The fee formula lives in `packages/shared/src/stair-carry.ts`. A migration
  *     would have to re-implement it in PL/pgSQL, and ownership law D is that a
- *     derived fact has ONE arithmetic. This computes through the same function
- *     the POS confirm step, the create path and the re-stamp all use, then calls
- *     `order_stamp_stair_carry` (0394), which holds no formula.
+ *     derived fact has ONE arithmetic. This imports that exact function.
  *  2. CLAUDE.md red line 8 — a migration may never assert a production row
  *     count. Schema is what it owns; data is what it walks past.
+ *
+ * ── WHY `.ts` AND NOT `.mjs` ────────────────────────────────────────────────
+ *
+ * The first draft was `.mjs` and imported `@carres/shared`. It could not run:
+ * the workspace package is not a dependency of the repo root, so Node answered
+ * ERR_MODULE_NOT_FOUND. Inlining the formula would have created the second copy
+ * this whole Card exists to remove, so the script became TypeScript instead and
+ * imports the source directly. `tsx` is already the repo's script runner
+ * (`seed:test-users`, `reset:e2e-state`).
  *
  * ── WHAT IT CHANGES, SAID PLAINLY ───────────────────────────────────────────
  *
@@ -27,27 +31,31 @@
  * and it is why this is a separate deliberate act rather than something a deploy
  * does quietly.
  *
- * It is idempotent. `order_stamp_stair_carry` deletes before inserting, so
- * running twice leaves the same one row, and an order whose fee is 0 (a lift, a
- * free floor, an unset count) ends with NO row rather than a zero one.
+ * Idempotent. `order_stamp_stair_carry` deletes before inserting, so running
+ * twice leaves the same one row, and an order whose fee is 0 (a lift, a free
+ * floor, an unset count) ends with NO row rather than a zero one.
  *
- * ── USAGE ───────────────────────────────────────────────────────────────────
+ * ── USAGE (from the repo root) ──────────────────────────────────────────────
  *
- *   node scripts/backfill-stair-carry.mjs            # DRY RUN — prints, writes nothing
- *   node scripts/backfill-stair-carry.mjs --apply    # writes
+ *   pnpm backfill:stair-carry            # DRY RUN — prints, writes nothing
+ *   pnpm backfill:stair-carry -- --apply # writes
  *
  * Needs SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in the environment. The key
  * is never written to source (red line 3) — export it for the one command.
  */
 import { createClient } from "@supabase/supabase-js";
-import { stairCarryFee } from "@carres/shared";
+import { stairCarryFee } from "../packages/shared/src/stair-carry";
 
 const APPLY = process.argv.includes("--apply");
 const URL = process.env.SUPABASE_URL;
 const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!URL || !KEY) {
-  console.error("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set.");
+  console.error(
+    "SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set.\n" +
+      "The service-role key lives in Cloudflare Workers secrets — export it for\n" +
+      "this one command and do not paste it into any file.",
+  );
   process.exit(1);
 }
 
@@ -74,6 +82,16 @@ if (cfg.perFloorPerItem === 0) {
   process.exit(0);
 }
 
+interface OrderRow {
+  id: string;
+  so: number;
+  delivery_floor: number | null;
+  delivery_has_lift: boolean | null;
+  delivery_stair_items: number | null;
+  order_lines: Array<{ qty: number }> | null;
+  order_addons: Array<{ addon_key: string; unit_price: number | string; qty: number }> | null;
+}
+
 const ordersRes = await sb
   .from("orders")
   .select(
@@ -84,12 +102,12 @@ if (ordersRes.error) {
   process.exit(1);
 }
 
-let wouldWrite = 0;
-let wouldClear = 0;
+let toWrite = 0;
+let toClear = 0;
 let unchanged = 0;
 let failed = 0;
 
-for (const o of ordersRes.data ?? []) {
+for (const o of (ordersRes.data ?? []) as unknown as OrderRow[]) {
   const itemsTotal = (o.order_lines ?? []).reduce((n, l) => n + Number(l.qty), 0);
   const fee =
     Math.round(
@@ -112,8 +130,8 @@ for (const o of ordersRes.data ?? []) {
   }
 
   const verb = fee > 0 ? (existing ? "correct" : "add") : "remove";
-  if (fee > 0) wouldWrite += 1;
-  else wouldClear += 1;
+  if (fee > 0) toWrite += 1;
+  else toClear += 1;
   console.log(
     `SO-${o.so}: ${verb} — floor ${o.delivery_floor}, ${o.delivery_has_lift ? "lift" : "no lift"}, ` +
       `${o.delivery_stair_items ?? "unset"} of ${itemsTotal} carried · RM${current} -> RM${fee}`,
@@ -132,7 +150,7 @@ for (const o of ordersRes.data ?? []) {
 }
 
 console.log(
-  `\n${APPLY ? "APPLIED" : "DRY RUN"} · ${wouldWrite} to add/correct · ${wouldClear} to remove · ` +
+  `\n${APPLY ? "APPLIED" : "DRY RUN"} · ${toWrite} to add/correct · ${toClear} to remove · ` +
     `${unchanged} already right · ${failed} failed`,
 );
 if (!APPLY) console.log("Nothing was written. Re-run with --apply to write.");
