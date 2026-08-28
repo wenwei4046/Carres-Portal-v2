@@ -10,10 +10,21 @@
  * the rule is how two registers start printing two localities for one order.
  * So the rule lives here, neutrally, and the pages import it.
  *
- * `Not given` is the governed absence word for a locality nobody recorded
- * (`docs/COPY-STANDARD.md`) — a blank may never carry two meanings.
+ * ⭐ ONE ABSENCE WORD (YH, 2026-08-29). The register printed TWO — `Not given`
+ * for what a customer never told us, `Not recorded` for what Carres never
+ * wrote down. The distinction is real and it is invisible: an operator reading
+ * one table sees two spellings of "empty" and has to work out whether they
+ * mean different things. They do not, for anything the reader can act on.
+ *
+ * `Not recorded` is the survivor because it is honest about EVERY column.
+ * Nobody "gives" us an invoice number or a showroom — we record them, or we
+ * do not. `Not given` only ever fitted the customer-supplied half.
+ *
+ * ⛔ The old comment here claimed `Not given` was "the governed absence word
+ * (docs/COPY-STANDARD.md)". It was not: NEITHER word appeared in that file, so
+ * the citation was to a rule nobody had written. It is registered now.
  */
-export const NOT_GIVEN = "Not given";
+export const NOT_RECORDED = "Not recorded";
 
 export function conciseLocality(city?: string | null, state?: string | null): string {
   const cleanCity = city?.trim() || "";
@@ -25,5 +36,5 @@ export function conciseLocality(city?: string | null, state?: string | null): st
   ) {
     return cleanCity;
   }
-  return [cleanCity, cleanState].filter(Boolean).join(", ") || NOT_GIVEN;
+  return [cleanCity, cleanState].filter(Boolean).join(", ") || NOT_RECORDED;
 }

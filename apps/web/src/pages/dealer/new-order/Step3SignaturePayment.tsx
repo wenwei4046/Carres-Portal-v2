@@ -325,6 +325,31 @@ export default function Step3SignaturePayment({ draft, onChange, catalog, onStri
       </Section>
 
       {/* ---------- Delivery fee (0184) ---------- */}
+      {/* ⛔ THE TWO OPERATOR DELIVERY-FEE INPUTS ARE WITHHELD (YH, 2026-08-29).
+
+          `Add to the delivery fee` and `Earlier order this delivery follows`
+          are the only two delivery-fee values a salesperson can type. What
+          either one MEANS commercially has never been settled — the base rate
+          and the charged-category set are Mr Loo's to rule and he has not been
+          asked yet, and the whole subsystem is dormant (both configured rates
+          seed to RM 0), so neither field can change a price today anyway.
+
+          A box that cannot change anything still teaches a shop that it can.
+          So they are withheld rather than shown-and-ignored.
+
+          ⭐ DO NOT RESTORE THIS WITHOUT THE RULING. Put it back only when YH
+          says Mr Loo has answered: what a base trip fee is for, who sets the
+          rate, and which categories are charged. Restoring it early hands the
+          shop two inputs whose meaning nobody can explain to a customer.
+
+          Nothing else is touched: the server still computes and stamps the fee,
+          the summary above still itemises whatever it computed, and the draft
+          simply carries the defaults (`additionalDeliveryFee` 0,
+          `crossCategorySourceSo` null) that an untouched form always carried.
+
+          The block below is preserved verbatim so restoring it is a delete of
+          two lines, not a rebuild. */}
+      {false && (
       <Section title="Delivery fee" hint="Head office sets the rate — you can add to it here">
         <div className="rounded border border-base-200 bg-white p-4 flex flex-col gap-3.5">
           <FieldLabel label="Add to the delivery fee (optional)">
@@ -370,6 +395,7 @@ export default function Step3SignaturePayment({ draft, onChange, catalog, onStri
           </FieldLabel>
         </div>
       </Section>
+      )}
 
       {/* ---------- Payment received ---------- */}
       <Section title="Payment received" hint="50% required to move to Proceed Order">

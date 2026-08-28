@@ -1577,29 +1577,27 @@ operationOrdersRouter.post("/", requireOperation, async (c) => {
     const m = mapPipelineV2Error(error);
     return c.json(m.body, m.status);
   }
-  /* ⭐ A BIRTH STAMPS THE STAIR FEE TOO (0393). Every other door already did:
-     the POS create door recomputes, the POS edit door re-stamps, and the save
-     door twenty lines above re-stamps. THIS one did not — so an order keyed
-     here on floor 3 with no lift was born carrying the three stair INPUTS and
-     no fee, and the money only appeared if somebody later happened to re-save
-     it while touching Floor, Lift or the item count. A quiet wrong number, on
-     the one door where nobody had quoted the customer yet.
 
-     No `touchesStairInputs` test here, unlike the save door: a birth always
-     carries the inputs (`delivery_floor` defaults, `delivery_has_lift`
-     defaults), so the question is never "did this payload mention them".
+  /* 0393/0394 — STAIR CARRY ON AN OFFICE-BORN ORDER. Reported from
+     `/operation/orders/so/new`: the fee showed on the form and reached neither
+     the SO nor MONEY.
 
-     Deliberately AFTER the insert and deliberately non-fatal, for the same
-     reason the save door gives: the order exists and its number is already
-     minted, so throwing here would tell the operator their order failed when
-     it did not. */
-  const created = data as { id?: string } | null;
-  if (created?.id) {
-    const restamp = await restampStairCarry(sb, created.id);
-    if (!restamp.ok) {
-      console.error("stair carry stamp failed at birth", {
-        orderId: created.id,
-        reason: restamp.reason,
+     The POS door appends the fee into `create_order`’s payload, but
+     `sales_order_create` (0374) takes only a header and lines — it has no addon
+     parameter at all, so there is nothing to append TO. Rather than widen a
+     locked birth RPC, the order is stamped immediately after it exists, through
+     the SAME 0394 door the edit path uses. One writer, two callers.
+
+     Non-fatal for the same reason as the edit path: the order is already born
+     and its Rev 1 minted, so failing here would report a lost create that was
+     not lost. */
+  const createdId = (data as { id?: string } | null)?.id;
+  if (createdId) {
+    const stamped = await restampStairCarry(sb, createdId);
+    if (!stamped.ok) {
+      console.error("stair carry stamp failed on office create", {
+        orderId: createdId,
+        reason: stamped.reason,
       });
     }
   }

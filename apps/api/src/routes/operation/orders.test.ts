@@ -2627,14 +2627,15 @@ describe("POST /api/operation/orders (create)", () => {
     expect(rpc).not.toHaveBeenCalled();
   });
 
-  /* ⭐ A BIRTH STAMPS THE STAIR FEE TOO (YH, 2026-08-28).
-     Every other door already did — the POS create door recomputes, the POS
-     edit door re-stamps, the save door above re-stamps. This one did not, so
-     an order keyed here on floor 3 with no lift was born carrying the three
-     stair INPUTS and no fee, and the money only appeared if somebody later
-     happened to re-save it while touching Floor, Lift or the count.
-     Non-fatal by design, exactly like the save door: the order exists and its
-     number is minted, so a failed stamp may never fail the create. */
+  /* ⭐ A BIRTH STAMPS THE STAIR FEE TOO (0393/0394).
+     The writer is main's, from the same report this branch answers — the office
+     create door was the one door that never stamped, so an order keyed here on
+     floor 3 with no lift was born carrying the three stair INPUTS and no fee.
+
+     This test is not the fix; it is the CONTRACT the fix has to keep, and that
+     door had none. What it pins is the non-fatal promise: the stamp runs after
+     the insert, so the order is already born and its Rev 1 minted, and a stamp
+     that fails may never report a create that did not fail. */
   it("stamps the stair fee on a newly created order", async () => {
     const rpc = vi.fn().mockResolvedValue({
       data: { id: "00000000-0000-0000-0000-000000000b02", so: 1400, revision: 1 },

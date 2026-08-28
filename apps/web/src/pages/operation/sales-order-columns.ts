@@ -44,13 +44,14 @@ import {
   type MoneyState,
 } from "./sales-order-facts";
 
-/** The dictionary's absence words, so no caller spells them. `Not given` and
- *  the locality rule moved to the neutral `@/lib/locality` with Card 02-B —
- *  Purchasing reads them too, and a Purchasing surface may not import a Sales
- *  page file. Re-exported so every existing caller is untouched. */
-export { NOT_GIVEN, conciseLocality } from "@/lib/locality";
-import { NOT_GIVEN, conciseLocality } from "@/lib/locality";
-export const NOT_RECORDED = "Not recorded";
+/** The dictionary's ONE absence word, so no caller spells it. It and the
+ *  locality rule live in the neutral `@/lib/locality` — Purchasing reads them
+ *  too, and a Purchasing surface may not import a Sales page file.
+ *
+ *  This file used to hold TWO words and spend them by hand, 20 cells against
+ *  18. Same table, two spellings of empty (YH, 2026-08-29). */
+export { NOT_RECORDED, conciseLocality } from "@/lib/locality";
+import { NOT_RECORDED, conciseLocality } from "@/lib/locality";
 export const NO_DATE_YET = "No delivery date";
 
 /**
@@ -86,7 +87,7 @@ export function showroomShort(name: string | null | undefined): string {
  * absence — it is the head of a governed two-line action, and §0.1 already
  * rules how it paints.
  */
-export const MUTED_ABSENCES: ReadonlySet<string> = new Set([NOT_GIVEN, NOT_RECORDED]);
+export const MUTED_ABSENCES: ReadonlySet<string> = new Set([NOT_RECORDED]);
 
 /** One register row: the order, plus every fact already resolved to a string. */
 export interface RegisterRow {
@@ -272,23 +273,23 @@ export const REGISTER_FIELDS: readonly RegisterField[] = [
   /* ── CUSTOMER — the customer's own facts (BUILD-QUEUE "STRUCTURED ADDRESS":
      raw fallback + the five structured parts + Building Type) ─────────────── */
   { key: "phone", label: "Phone", width: "103px", group: "Customer",
-    text: (r) => r.phone || NOT_GIVEN },
+    text: (r) => r.phone || NOT_RECORDED },
   { key: "email", label: "Email", width: "200px", group: "Customer",
-    text: (r) => r.o.customer_email || NOT_GIVEN },
+    text: (r) => r.o.customer_email || NOT_RECORDED },
   { key: "address", label: "Address", width: "280px", group: "Customer",
-    text: (r) => r.o.customer_address || NOT_GIVEN },
+    text: (r) => r.o.customer_address || NOT_RECORDED },
   { key: "address_line1", label: "Address line 1", width: "200px", group: "Customer",
-    text: (r) => r.o.customer_address_line1 || NOT_GIVEN },
+    text: (r) => r.o.customer_address_line1 || NOT_RECORDED },
   { key: "address_line2", label: "Address line 2", width: "200px", group: "Customer",
-    text: (r) => r.o.customer_address_line2 || NOT_GIVEN },
+    text: (r) => r.o.customer_address_line2 || NOT_RECORDED },
   { key: "city", label: "City", width: "140px", group: "Customer",
-    text: (r) => r.o.customer_address_city || NOT_GIVEN },
+    text: (r) => r.o.customer_address_city || NOT_RECORDED },
   { key: "state", label: "State", width: "140px", group: "Customer",
-    text: (r) => r.o.customer_address_state || NOT_GIVEN },
+    text: (r) => r.o.customer_address_state || NOT_RECORDED },
   { key: "postcode", label: "Postcode", width: "96px", group: "Customer",
-    text: (r) => r.o.customer_address_postcode || NOT_GIVEN },
+    text: (r) => r.o.customer_address_postcode || NOT_RECORDED },
   { key: "building_type", label: "Building type", width: "130px", group: "Customer",
-    text: (r) => r.o.building_type || NOT_GIVEN },
+    text: (r) => r.o.building_type || NOT_RECORDED },
   /* THREE FACTS, THREE COLUMNS. `RegisterField.text` is "the ONE string:
      printed, filtered, sorted and exported", so a cell cannot carry a second
      line - and it should not: an operator filtering by relationship or sorting
@@ -297,13 +298,13 @@ export const REGISTER_FIELDS: readonly RegisterField[] = [
      wholly in `name` (see `parseEmergencyContact`), so nothing is lost and the
      other two read `Not given`. */
   { key: "emergency", label: "Emergency contact", width: "150px", group: "Customer",
-    text: (r) => r.emergency.name || NOT_GIVEN },
+    text: (r) => r.emergency.name || NOT_RECORDED },
   { key: "emergency_phone", label: "Emergency phone", width: "150px", group: "Customer",
-    text: (r) => r.emergency.phone || NOT_GIVEN },
+    text: (r) => r.emergency.phone || NOT_RECORDED },
   { key: "emergency_relationship", label: "Emergency relationship", width: "180px", group: "Customer",
-    text: (r) => r.emergency.relationship || NOT_GIVEN },
+    text: (r) => r.emergency.relationship || NOT_RECORDED },
   { key: "billing", label: "Billing address", width: "220px", group: "Customer",
-    text: (r) => r.o.customer_billing || NOT_GIVEN },
+    text: (r) => r.o.customer_billing || NOT_RECORDED },
 
   /* ⭐ PARITY WITH WHAT THE TILL ACTUALLY ASKS (2026-08-24).
      A salesperson fills these at SO creation and the register route already
@@ -312,17 +313,17 @@ export const REGISTER_FIELDS: readonly RegisterField[] = [
      ordinary optional columns: off by default, in the chooser like every other,
      so the owner-ruled default view is untouched. */
   { key: "race", label: "Race", width: "110px", group: "Customer",
-    text: (r) => r.o.customer_race || NOT_GIVEN },
+    text: (r) => r.o.customer_race || NOT_RECORDED },
   { key: "gender", label: "Gender", width: "100px", group: "Customer",
-    text: (r) => r.o.customer_gender || NOT_GIVEN },
+    text: (r) => r.o.customer_gender || NOT_RECORDED },
   { key: "birthday", label: "Birthday", width: "120px", group: "Customer",
-    text: (r) => r.o.customer_birthday || NOT_GIVEN },
+    text: (r) => r.o.customer_birthday || NOT_RECORDED },
   /* Stair carry is a DELIVERY fact, not a customer one — it sits with Floor and
      Lift, which is where the operator planning the trip looks. */
   { key: "stair_items", label: "Stair carry items", width: "140px", align: "right", numeric: true,
     group: "Delivery",
     text: (r) =>
-      r.o.delivery_stair_items == null ? NOT_GIVEN : String(r.o.delivery_stair_items) },
+      r.o.delivery_stair_items == null ? NOT_RECORDED : String(r.o.delivery_stair_items) },
 
   /* ── SOURCE — who sold it, through which door ───────────────────────────── */
   { key: "salesperson", label: "Salesperson", width: "167px", group: "Sales ownership",

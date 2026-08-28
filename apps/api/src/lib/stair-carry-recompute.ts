@@ -113,6 +113,33 @@ export async function recomputeStairCarry(
 
   if (fee <= 0) return { status: "ok", addons: [], fee: 0 };
 
+  /* ⛔ THE KEY MUST EXIST BEFORE THE ROW CAN REFERENCE IT.
+
+     `order_addons.addon_key` is FK’d to `addons(key)` (0001_init). Migrations
+     here are applied BY HAND, so code can reach production before its
+     migration does — and on 2026-08-29 it did: every stair-carry order failed
+     to submit with `order_addons_addon_key_fkey`, because the whole create is
+     one transaction and the FK aborted it.
+
+     A missing fee is the state Carres was already in and is recoverable with
+     the backfill. A shop that cannot take an order is not. So this degrades
+     LOUDLY rather than failing the sale: no row, a console error naming the
+     migration, and the order goes through.
+
+     One extra read, and only on an order that would actually be charged. */
+  const { data: key, error: keyError } = await sb
+    .from("addons")
+    .select("key")
+    .eq("key", STAIR_CARRY_ADDON_KEY)
+    .maybeSingle();
+  if (keyError || !key) {
+    console.error(
+      `stair carry NOT charged (RM${fee}): the '${STAIR_CARRY_ADDON_KEY}' addon key is missing. ` +
+        "Apply migration 0393, then run `pnpm backfill:stair-carry -- --apply`.",
+    );
+    return { status: "ok", addons: [], fee: 0 };
+  }
+
   /* qty 1 × the whole fee, matching the DELIVERY rows. The per-item breakdown
      is not re-stated here: the count that produced it is already stored on the
      order (`delivery_stair_items`), and a second copy of it on the addon row
