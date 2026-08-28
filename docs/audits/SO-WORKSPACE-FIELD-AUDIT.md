@@ -222,11 +222,24 @@ not. The card already requires a rendered-DOM test; this confirms why.
 >   (`:271-278`, `:314`), folds it into the 36px headline `Total` (`:123`, `:316-320`), sizes the
 >   deposit buttons off it (`:124`, `:397`, `:414`), and the T&C the customer ticks says
 >   *"Stair-carry surcharges (if any) are billed on this sales order"* (`:655-657`).
-> - The database **cannot express it**. No column, no addon key, no writer — all 403 migrations
->   searched. `order_addons.addon_key` is FK-constrained to six seeded keys
->   (`seed.sql:183-187`, `0184:112-116`); a stair addon is not absent, it is impossible. Only the
->   three *inputs* are stored. Change `floor_config.per_floor_per_item` and every historic
->   order's displayed fee silently changes.
+> - The database does not express it **today**. No column, no addon row, **no writer**. Only the
+>   three *inputs* are stored. Change `floor_config.per_floor_per_item` and every historic order's
+>   displayed fee silently changes.
+>
+>   ⚠️ **CORRECTION (YH, 2026-08-28).** An earlier draft of this finding said a stair addon was
+>   *"FK-impossible"*. **That was wrong.** `order_addons.addon_key` is FK-constrained to `addons`,
+>   but `addons` rows are **operator-creatable**: `POST /api/catalog/addons`
+>   (`catalog.ts:1854-1880`, gate `internalOnly`, schema `addonCreateInput`
+>   `schemas/catalog.ts:1302-1313`) inserts a new kebab-case key, and the door is on screen at
+>   **Settings → Catalog → Special**. Six keys are *seeded*; the set is not closed.
+>   **So the missing piece is not the schema and not the key — it is the WRITER.** The pattern is
+>   already proven one file away: `delivery-fee-recompute.ts` computes the delivery trip fee
+>   server-side and appends `DELIVERY` / `DELIVERY_CROSS` / `DELIVERY_ADD` rows to `order_addons`.
+>   Stair carry was simply never wired into that machinery — which is why the same file's claim
+>   that stair *"folds into the order total"* (`:38-39`) reads as true and is not.
+>   *(One design note for whoever builds it: `addons.price` is a fixed per-key price, while stair
+>   carry is computed. The recompute would write the per-order figure into `order_addons.qty` /
+>   `unit_price`, exactly as the delivery fee rows already do.)*
 > - **No payment door can collect it.** `stripe-checkout.ts:117-121` caps against lines+addons and
 >   returns **422 `amount_exceeds_outstanding`** at `:158-168` — *before* Stripe is called, so
 >   nothing appears in the Stripe dashboard. `top_up_order` caps identically
