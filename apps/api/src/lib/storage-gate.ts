@@ -1,5 +1,7 @@
 import { storageHold } from "@carres/shared";
 
+import { storageSkuCategories } from "./sku-categories";
+
 /**
  * Collect-before-delivery gate (balance job — Jess 2026-06-23: collect the
  * storage fee BEFORE delivery, gate delivery until collected; a release needs
@@ -44,12 +46,16 @@ export async function storageBlock(
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const skus: string[] = (linesRes?.data ?? []).map((l: any) => String(l.sku));
+    // CARD-2026-08-28 - the CATALOG owns which rate applies. One bounded read;
+    // a SKU the catalog does not hold falls back to the parser, per line.
+    const storageCats = await storageSkuCategories(sb, skus);
     const hold = storageHold({
       storageFrom: control.storage_from ?? null,
       override: control.storage_fee_override ?? null,
       importedMsbf: control.storage_fee_msbf ?? null,
       importedSof: control.storage_fee_sof ?? null,
       skus,
+      categories: storageCats,
       asOf: new Date().toISOString().slice(0, 10),
       collectedAt: control.storage_collected_at ?? null,
       waiverStatus: control.storage_waiver_status ?? null,

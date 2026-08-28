@@ -1498,11 +1498,19 @@ function DrawerBody({
     if (po.eta_date)
       for (const pl of po.lines)
         if (!poEtaBySku.has(pl.sku)) poEtaBySku.set(pl.sku, po.eta_date);
+  /* CARD-2026-08-28 - STORAGE SCOPE ASKS THE CATALOG.
+     These two decided which storage RATE applies, and they asked
+     `lineCategory` - the keyword parser `carry-forwards.md` records as
+     display-only. That made the Storage tab a SECOND wrong answer beside the
+     server's prefix parser: two functions, two rules, and nothing forcing the
+     screen and the delivery gate to agree about whether an order was even in
+     scope. `resolvedCategory` is already imported here and the lines already
+     carry the catalog's `category` (D9, 2026-08-20) - nobody was asking. */
   const hasMsbf = lines.some((l) => {
-    const c = lineCategory(l.sku);
+    const c = resolvedCategory(l.sku, l.category);
     return c === "mattress" || c === "bedframe";
   });
-  const hasSof = lines.some((l) => lineCategory(l.sku) === "sofa");
+  const hasSof = lines.some((l) => resolvedCategory(l.sku, l.category) === "sofa");
   // Contact-by basis (Jess): operation must reach the customer N days BEFORE the
   // deadline to confirm stock + timing. N = ops_order_control.contact_by_days
   // (default 3, editable per order); a daily cron (migration 0197) drops the

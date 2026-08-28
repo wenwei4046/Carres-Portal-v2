@@ -319,3 +319,33 @@ describe("OrderDetailDrawer - one money rule, asked once (D4)", () => {
     expect(calls, "a second call is a second answer waiting to happen").toHaveLength(1);
   });
 });
+
+/**
+ * CARD-2026-08-28 - THE STORAGE RATE ASKS THE CATALOG.
+ *
+ * The storage SCOPE (`hasMsbf` / `hasSof`) decided which rate applies and asked
+ * `lineCategory` - the keyword parser `carry-forwards.md` records as
+ * display-only. That made this screen a SECOND wrong answer beside the server's
+ * prefix parser, so the Storage tab and the delivery gate could disagree about
+ * whether an order was even in scope.
+ *
+ * Source scan, in this file's established method: the divergence needs a
+ * catalogued SKU whose string shape disagrees with its category, which no
+ * fixture mounts.
+ */
+describe("OrderDetailDrawer - storage scope asks the catalog (CARD-2026-08-28)", () => {
+  it("hasMsbf / hasSof read the resolved category, not the SKU string", () => {
+    expect(SRC).toContain("const c = resolvedCategory(l.sku, l.category);");
+    expect(SRC).toContain(
+      'const hasSof = lines.some((l) => resolvedCategory(l.sku, l.category) === "sofa");',
+    );
+  });
+
+  it("no storage-scope caller of the parser survives", () => {
+    // The three remaining `lineCategory` uses are the Stock card's category
+    // rows, the line-kind display split and the sofa-builder flag - none of
+    // them decides a RATE, and the Card's boundaries forbid touching them.
+    expect(SRC).not.toContain("const c = lineCategory(l.sku);");
+    expect(SRC).not.toContain('lineCategory(l.sku) === "sofa"');
+  });
+});
