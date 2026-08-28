@@ -47,6 +47,8 @@ import { validateOrderHasGoods } from "../lib/sku-categories";
 import { recomputeAndExplodeSofaBuildLines } from "../lib/sofa-recompute";
 import { recomputeOptionPickLines } from "../lib/option-picks-recompute";
 import { recomputeSpecialAddonLines } from "../lib/special-addons-recompute";
+import { recomputeStairCarry } from "../lib/stair-carry-recompute";
+import { SERVER_EXCLUSIVE_ADDON_KEYS } from "@carres/shared";
 import { recomputeDeliveryFee } from "../lib/delivery-fee-recompute";
 import { validateFreeItemClaims, resolveDefaultFreeGiftLines } from "../lib/free-gift-resolve";
 import { recomputePwpLines } from "../lib/pwp-recompute";
@@ -256,9 +258,15 @@ ordersRouter.get("/", async (c) => {
   // PostgREST: select.eq*.order — .order() ends the chain (returns awaitable).
   // We embed minimal `unit_price/qty` from order_lines + order_addons so the
   // dashboard can show the per-card RM total and the monthly-spend subtitle
-  // without an extra round-trip per order. Stair carry is intentionally
-  // EXCLUDED here (matches the prototype's `monthValue` definition which sums
-  // line+addon only — stair is a delivery-time concern, not a sales metric).
+  // without an extra round-trip per order.
+  //
+  // ⛔ THE OLD NOTE HERE SAID stair carry was "a delivery-time concern, not a
+  // sales metric". That is RETIRED (owner ruling YH, 2026-08-28): stair carry
+  // is money the customer owes. Nothing in this query changes, because 0393
+  // makes the fee an `order_addons` row — so `order_addons(unit_price, qty)`
+  // now carries it and this sum includes it without a second reader. The note
+  // is corrected rather than deleted because a comment contradicting the
+  // MASTER is exactly how the fee went uncollectable for four months.
   let q = sb.from("orders").select(
     "*, line_count:order_lines(count), order_lines(unit_price, qty), order_addons(unit_price, qty)",
   );
@@ -890,12 +898,33 @@ ordersRouter.post("/", async (c) => {
     throw new HTTPException(500, { message: deliveryRecompute.message });
   }
 
+  // 0393 (STAIR CARRY IS MONEY, owner ruling YH 2026-08-28) — the same road
+  // 0184 built. The fee was computed in the browser and written down nowhere,
+  // so the customer signed a total the order could not describe and no payment
+  // door could collect the difference. It is STAMPED here: the rate is a live
+  // singleton a principal can PATCH, and a charge a customer signed for may not
+  // move because a rate changed afterwards. Zero (lift / free floor / unset
+  // count) appends nothing, so a dormant rate leaves totals byte-identical.
+  const stairRecompute = await recomputeStairCarry(sb, finalLines, {
+    floor: parsed.data.delivery.floor,
+    hasLift: parsed.data.delivery.hasLift,
+    stairItems: parsed.data.delivery.stairItems,
+  });
+  if (stairRecompute.status === "server_error") {
+    await rollbackPwpClaims();
+    throw new HTTPException(500, { message: stairRecompute.message });
+  }
+
   // 0184 honest-pricing — the delivery fee is SERVER-authoritative. Strip any
   // client-sent delivery addon (DELIVERY / DELIVERY_CROSS / DELIVERY_ADD) BEFORE
   // merging, so the charge comes SOLELY from the server recompute above — a
   // tampered client cannot inject or pre-empt a delivery line.
-  const DELIVERY_ADDON_KEYS = new Set(["DELIVERY", "DELIVERY_CROSS", "DELIVERY_ADD"]);
-  const clientAddons = parsed.data.addons.filter((a) => !DELIVERY_ADDON_KEYS.has(a.addonKey));
+  // The ONE server-exclusive set (`@carres/shared`). It used to be spelled out
+  // here, and again at the raw door, and again in the add-lines pricer — so a
+  // new computed key had three chances to be added to two of them.
+  const clientAddons = parsed.data.addons.filter(
+    (a) => !SERVER_EXCLUSIVE_ADDON_KEYS.has(a.addonKey),
+  );
 
   // Feed the fully-verified line set (sofa-exploded + special-checked + freed
   // items + appended RM0 gifts) + the appended delivery addons into the RPC.
@@ -906,7 +935,7 @@ ordersRouter.post("/", async (c) => {
       salespersonId: attributedSalespersonId,
       outletId: attributedOutletId ?? parsed.data.outletId,
       lines: finalLines,
-      addons: [...clientAddons, ...deliveryRecompute.addons],
+      addons: [...clientAddons, ...deliveryRecompute.addons, ...stairRecompute.addons],
     },
     effectiveDealerId,
   );
@@ -1113,8 +1142,8 @@ ordersRouter.post("/raw", async (c) => {
 
   // Client delivery addons are server-exclusive on the POS door — same rule
   // here, even though the raw door never appends its own (no engine runs).
-  const RAW_DELIVERY_ADDON_KEYS = new Set(["DELIVERY", "DELIVERY_CROSS", "DELIVERY_ADD"]);
-  const addons = input.addons.filter((a) => !RAW_DELIVERY_ADDON_KEYS.has(a.addonKey));
+  // Same ONE set as the POS door — the raw door is not a lighter gate.
+  const addons = input.addons.filter((a) => !SERVER_EXCLUSIVE_ADDON_KEYS.has(a.addonKey));
 
   // deposit_pct only feeds the RPC's order_history line — derive it so the
   // timeline text matches what the operator saw. Addons count toward the total
@@ -2298,7 +2327,10 @@ ordersRouter.post("/:id/address", (c) =>
 
 /** The 0184 server-exclusive trip-fee addon keys the add-lines delivery
  *  recompute replaces (mirrors the create route's strip set). */
-const ADD_LINES_DELIVERY_KEYS = new Set(["DELIVERY", "DELIVERY_CROSS", "DELIVERY_ADD"]);
+/* The add-lines pricer refuses a server-exclusive key outright rather than
+   stripping it: this door is an explicit operator pick, so a computed fee
+   arriving here is a mistake worth naming, not noise to drop. Same ONE set. */
+const ADD_LINES_DELIVERY_KEYS = SERVER_EXCLUSIVE_ADDON_KEYS;
 
 interface AddLinesWriteSet {
   pLines: Array<{
