@@ -3,8 +3,9 @@
 **Module:** Payment / Money In (owns the FEE) · **Surface:** the shared storage arithmetic and its
 four server call sites, plus the drawer's Storage tab
 **Owner authority:** `docs/ERP-ARCHITECTURE.md` §6.1 — **FROZEN 2026-08-06**, and §3.1 · D9
-**Status:** BUILT — all five tasks implemented 2026-08-28; awaiting CI, merge, deploy and
-authenticated production acceptance (§10)
+**Status:** EXECUTED · SHIPPED — merged `14e0a375`, live on all five canonical surfaces in
+`e6863647`, 2026-08-28. **NOT `PRODUCTION-VERIFIED`:** the functional acceptance needs an order
+with storage switched ON, and no such order exists to read. See §10.1.
 **Lane:** BUILD / DELIVERY
 **Base:** `origin/main` at `4519a985c3bb01a175d91bdd5862eba186e89bfa`
 
@@ -227,18 +228,38 @@ read that blows up still blocks.
 ## 10 · Completion record
 
 ```text
-Implementation commit:
-PR:
-CI:
-Merge SHA:
-Deployment run:
-Production SHA:
-SKUs proved non-zero:
-Delivery-gate regression check:
-Drawer/gate scope agreement:
-lineCategory storage callers remaining:
-Defects opened:
+Implementation commit:   21c15d2e
+PR:                      #954
+CI:                      verify SUCCESS
+Merge SHA:               14e0a375f54c76483a7db347f10d2d04ae78f1e7
+Production SHA:          e68636471991386cfc507ace6ef2123f18a6d757 (contains 14e0a375)
+                         all five canonical surfaces, 2026-08-28T02:46Z
+Gates re-run:            shared 2,723 · api 2,508 · web 3,518 · typecheck · ci:migrations
+SKUs proved non-zero:    IN TESTS, not in production - see 10.1
+Delivery-gate regression: covered by two new gate tests - see 9.1
+Drawer/gate scope agreement: covered by source scan; NOT observed live - see 10.1
+lineCategory storage callers remaining: ZERO (three non-storage callers survive by design)
+Defects opened:          none. One found and fixed inside this delivery (9.1)
 ```
+
+## 10.1 · What is NOT verified, and why
+
+**The deployment is proven; the behaviour is not.** All five canonical surfaces report a SHA
+containing this change, and every gate re-ran green on the merged source. That is where the
+evidence stops, and the Card should not pretend otherwise.
+
+`computeOrderStorage` deliberately has no ETA fallback: **a fee is owed only once an operator has
+switched storage on.** Nothing on production has. So there is no order on which a real rate can be
+read, and the two acceptance lines that matter -- a catalogued mattress billing at RM150/month, and
+the drawer's scope agreeing with the gate's -- cannot be observed today. They are held by tests
+instead, including one that pins the exact production SKU shapes that used to return `other`.
+
+Creating that state means switching storage on against a live order. That is a production data
+change, it is not required to prove the arithmetic, and it was not done.
+
+**What closes this line:** the first order that genuinely accrues storage. Read its Storage tab and
+its delivery gate, confirm the fee is non-zero and that both agree on scope, and record the SO
+number here. Until then `Status` stays `EXECUTED · SHIPPED`.
 
 Only when every line above carries evidence may `Status` become
 `EXECUTED · SHIPPED · PRODUCTION-VERIFIED`, and only then may
