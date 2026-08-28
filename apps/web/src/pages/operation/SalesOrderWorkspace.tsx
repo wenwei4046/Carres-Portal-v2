@@ -1454,6 +1454,47 @@ export default function SalesOrderWorkspace() {
     }
   };
 
+  /* ⭐ THE STAIR CARRY, SHOWN THE WAY THE POS SHOWS IT (Jess, 2026-08-26).
+   *
+   * The office keyed `Floor`, `Items needing stair carry` and the lift answer
+   * and was told nothing back, while the POS printed the whole working-out —
+   * `3 of 5 items × 2 floors above 2F × RM50 = RM300`. Same three inputs, one
+   * surface explaining them and one not.
+   *
+   * ⛔ THE ARITHMETIC IS IMPORTED, NEVER RE-TYPED (ownership Law D — one
+   * derived fact, ONE arithmetic). `floorSurchargeRaw` is the same function the
+   * POS panel and the order totals call; a second copy here is exactly how the
+   * two surfaces would start disagreeing about money. */
+  const stair = useMemo(() => {
+    const cfg = catalogQ.data?.floorConfig;
+    if (!cfg) return null;
+    const itemsTotal =
+      mode === "create"
+        ? draft.lines.reduce((n, l) => n + l.qty, 0)
+        : (detailQ.data?.lines ?? []).reduce((n, l) => n + l.qty, 0);
+    /* ⭐ UNSET MEANS NONE — owner ruling 2026-08-27 (YH). It used to mean
+       EVERY item (0104's column comment), so an order nobody was asked about
+       carried the maximum fee. The same rule now runs in `order-totals.ts` and
+       in the POS panel, so all three agree. */
+    const items = stairCarryCount(itemsTotal, draft.delivery_stair_items);
+    const floors = Math.max(0, draft.delivery_floor - cfg.freeUpToFloor);
+    return {
+      cfg,
+      itemsTotal,
+      items,
+      floors,
+      fee: floorSurchargeRaw(draft.delivery_floor, draft.delivery_has_lift, items, cfg),
+    };
+  }, [
+    catalogQ.data?.floorConfig,
+    mode,
+    draft.lines,
+    draft.delivery_stair_items,
+    draft.delivery_floor,
+    draft.delivery_has_lift,
+    detailQ.data?.lines,
+  ]);
+
   /* ── The money the left side states (same arithmetic as the register). ── */
   const money = useMemo(() => {
     if (mode === "oldrev" && viewedRevision) {
@@ -1472,7 +1513,24 @@ export default function SalesOrderWorkspace() {
         (s, l) => s + (l.sku.trim() ? l.qty * l.unit_price : 0),
         0,
       );
-      const addonSum = (base?.addons ?? []).reduce((s, a) => s + a.line_total, 0);
+      /* ⭐ THE QUOTE INCLUDES THE CARRY, BEFORE IT IS SAVED (YH, 2026-08-28).
+         Stair carry is money the customer owes (MASTER § STAIR CARRY IS MONEY
+         THE CUSTOMER OWES), and 0393 makes it a real `STAIR_CARRY` addon row —
+         but that row does not exist until the order does. So on `/so/new` this
+         card printed a Total the operator could see was wrong: the ORDER INFO
+         block three cards down was narrating `× RM 50 = RM 300` while MONEY
+         showed lines only.
+
+         CREATE ONLY. In `object` and `oldrev` the fee is already IN the addons
+         — 0393 stamps the row at birth and re-stamps it whenever the floor,
+         the lift or the count moves — so adding it here too would count it
+         twice. This branch exists precisely because it is the one state with
+         no persisted row to read.
+
+         The number is `stair.fee`, the same memo the working-out line prints,
+         so the quote and its explanation cannot disagree (Law D). */
+      const addonSum =
+        (base?.addons ?? []).reduce((s, a) => s + a.line_total, 0) + (stair?.fee ?? 0);
       return orderMoney({ lineSum, addonSum, paid: base?.paid ?? 0, controlBalance: null });
     }
     const lines = detailQ.data?.lines ?? [];
@@ -1483,7 +1541,7 @@ export default function SalesOrderWorkspace() {
       paid: order?.paid,
       controlBalance: null,
     });
-  }, [mode, draft.lines, base, viewedRevision, detailQ.data, order]);
+  }, [mode, draft.lines, base, viewedRevision, detailQ.data, order, stair?.fee]);
 
   /* A line the current commitment no longer carries, but an earlier Revision
      did, was CANCELLED — and the Route states its outcome instead of letting
@@ -1794,46 +1852,6 @@ export default function SalesOrderWorkspace() {
     !draft.customer_address_postcode &&
     !(order?.customer_address ?? "").trim();
 
-  /* ⭐ THE STAIR CARRY, SHOWN THE WAY THE POS SHOWS IT (Jess, 2026-08-26).
-   *
-   * The office keyed `Floor`, `Items needing stair carry` and the lift answer
-   * and was told nothing back, while the POS printed the whole working-out —
-   * `3 of 5 items × 2 floors above 2F × RM50 = RM300`. Same three inputs, one
-   * surface explaining them and one not.
-   *
-   * ⛔ THE ARITHMETIC IS IMPORTED, NEVER RE-TYPED (ownership Law D — one
-   * derived fact, ONE arithmetic). `floorSurchargeRaw` is the same function the
-   * POS panel and the order totals call; a second copy here is exactly how the
-   * two surfaces would start disagreeing about money. */
-  const stair = useMemo(() => {
-    const cfg = catalogQ.data?.floorConfig;
-    if (!cfg) return null;
-    const itemsTotal =
-      mode === "create"
-        ? draft.lines.reduce((n, l) => n + l.qty, 0)
-        : (detailQ.data?.lines ?? []).reduce((n, l) => n + l.qty, 0);
-    /* ⭐ UNSET MEANS NONE — owner ruling 2026-08-27 (YH). It used to mean
-       EVERY item (0104's column comment), so an order nobody was asked about
-       carried the maximum fee. The same rule now runs in `order-totals.ts` and
-       in the POS panel, so all three agree. */
-    const items = stairCarryCount(itemsTotal, draft.delivery_stair_items);
-    const floors = Math.max(0, draft.delivery_floor - cfg.freeUpToFloor);
-    return {
-      cfg,
-      itemsTotal,
-      items,
-      floors,
-      fee: floorSurchargeRaw(draft.delivery_floor, draft.delivery_has_lift, items, cfg),
-    };
-  }, [
-    catalogQ.data?.floorConfig,
-    mode,
-    draft.lines,
-    draft.delivery_stair_items,
-    draft.delivery_floor,
-    draft.delivery_has_lift,
-    detailQ.data?.lines,
-  ]);
 
   /* ── THE LEFT PANE ─────────────────────────────────────────────────────── */
   const form = (

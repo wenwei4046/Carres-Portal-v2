@@ -1577,6 +1577,32 @@ operationOrdersRouter.post("/", requireOperation, async (c) => {
     const m = mapPipelineV2Error(error);
     return c.json(m.body, m.status);
   }
+  /* ⭐ A BIRTH STAMPS THE STAIR FEE TOO (0393). Every other door already did:
+     the POS create door recomputes, the POS edit door re-stamps, and the save
+     door twenty lines above re-stamps. THIS one did not — so an order keyed
+     here on floor 3 with no lift was born carrying the three stair INPUTS and
+     no fee, and the money only appeared if somebody later happened to re-save
+     it while touching Floor, Lift or the item count. A quiet wrong number, on
+     the one door where nobody had quoted the customer yet.
+
+     No `touchesStairInputs` test here, unlike the save door: a birth always
+     carries the inputs (`delivery_floor` defaults, `delivery_has_lift`
+     defaults), so the question is never "did this payload mention them".
+
+     Deliberately AFTER the insert and deliberately non-fatal, for the same
+     reason the save door gives: the order exists and its number is already
+     minted, so throwing here would tell the operator their order failed when
+     it did not. */
+  const created = data as { id?: string } | null;
+  if (created?.id) {
+    const restamp = await restampStairCarry(sb, created.id);
+    if (!restamp.ok) {
+      console.error("stair carry stamp failed at birth", {
+        orderId: created.id,
+        reason: restamp.reason,
+      });
+    }
+  }
   return c.json(data, 201);
 });
 
