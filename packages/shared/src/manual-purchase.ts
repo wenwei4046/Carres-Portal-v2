@@ -380,3 +380,17 @@ export function manualPurchaseRailModel(
       .sort((a, b) => a.name.localeCompare(b.name)),
   };
 }
+
+/**
+ * Card 03 §3 — the rail says `Need approval`; the Register and object print
+ * the REAL action owner's name. One sentence, spelt once: `Jess approves`,
+ * `Jess or YJ approves` when several hold the duty. No approver resolved
+ * prints nothing — an absent name is honest; a guessed one is not.
+ */
+export function manualPurchaseApproverLine(
+  names: ReadonlyArray<string | null | undefined>,
+): string | null {
+  const real = names.filter((n): n is string => n != null && n.trim() !== "");
+  if (real.length === 0) return null;
+  return `${real.join(" or ")} approves`;
+}

@@ -743,6 +743,12 @@ by Operation. **Banned from this rail, never to return:** `Supplier not selected
 safety-days row. A missing SKU or supplier is named inside the affected request and fixed at
 its owning Catalog boundary — never a rail facet. Price is not a rail state or filter.
 
+**The approval owner (Card 03 §3).** The rail says `Need approval`; the Register row and the
+object print the REAL action owner beside `Waiting for approval` as `{name} approves` — the
+resolved `ops_manager` duty holder(s); several print `{name} or {name} approves`; a robot or
+shared-password login never prints while a named person holds the duty; nothing resolved
+prints nothing.
+
 **PO REVISIONS — the sent document's version** (CARD-2026-08-19-po-revisions, executing
 purchasing/MASTER.md §4's revision rule, Jess 2026-08-18 — *a sent PO is not overwritten, it is
 REVISED*; registered on execution so no screen respells them):

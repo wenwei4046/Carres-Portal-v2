@@ -2105,6 +2105,7 @@ export {
   MANUAL_PURCHASE_STATUS_WORDS,
   MANUAL_PURCHASE_RAIL,
   MANUAL_PURCHASE_RAIL_CLEAR,
+  manualPurchaseApproverLine,
   manualPurchaseStatusOf,
   manualPurchaseToOrderMatches,
   manualPurchaseRailFacts,

@@ -15,6 +15,7 @@ vi.mock("../../lib/supabase", () => ({
 }));
 vi.mock("../../lib/duties", () => ({
   myDuties: vi.fn().mockResolvedValue([]),
+  dutyHolders: vi.fn().mockResolvedValue({}),
 }));
 vi.mock("../../lib/purchasing-settings", () => ({
   // The frozen ETA arithmetic is the SHARED function; the loader is mocked to
@@ -457,5 +458,72 @@ describe("GET /purchasing/requests/issue-costs", () => {
     const rpc = vi.fn();
     await ask(`?requestIds=${REQ_A}`, rpc);
     expect(rpc).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * ⭐ CARD 03 §3 — THE REGISTER NAMES THE REAL APPROVAL OWNER (2026-08-28).
+ *
+ * The rail says `Need approval`; the payload names who actually decides: the
+ * resolved `ops_manager` duty holder(s), the governed legacy list as the
+ * empty-seat fallback — and a robot or shared-password account never prints
+ * while a named person also holds the gate.
+ */
+import { dutyHolders } from "../../lib/duties";
+
+describe("Card 03 §3 · GET /purchasing/requests — the approval owner's name", () => {
+  const U_JESS = "11111111-1111-1111-1111-00000000000a";
+  const U_SHARED = "11111111-1111-1111-1111-00000000000b";
+
+  function makeApproverSb() {
+    return {
+      from: vi.fn((table: string) => {
+        switch (table) {
+          case "purchase_requests":
+            return tableStub(REQUESTS);
+          case "purchase_demands":
+            return tableStub([], { filterInBy: "request_id" });
+          case "app_users":
+            return tableStub([
+              { id: U_JESS, name: "Jess", email: "jess@carres.com" },
+              { id: U_SHARED, name: "Operation", email: "operation@carres.com" },
+            ]);
+          default:
+            return tableStub([]);
+        }
+      }),
+      rpc: vi.fn(),
+    } as unknown as ReturnType<typeof userClient>;
+  }
+
+  async function readRegister() {
+    vi.mocked(userClient).mockReturnValue(makeApproverSb());
+    const jwt = await makeJwt("operation");
+    return app.fetch(
+      new Request("https://api.test/api/operation/purchasing/requests", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env as never,
+      { waitUntil() {}, passThroughException() {} } as never,
+    );
+  }
+
+  it("names the resolved ops_manager duty holder — the shared login excluded beside a named person", async () => {
+    vi.mocked(dutyHolders).mockResolvedValueOnce({
+      [U_JESS]: ["ops_manager"],
+      [U_SHARED]: ["ops_manager"],
+    });
+    const res = await readRegister();
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { approvers: Array<{ id: string; name: string | null }> };
+    expect(body.approvers).toEqual([{ id: U_JESS, name: "Jess" }]);
+  });
+
+  it("falls back to the governed legacy list while the duty seat is empty", async () => {
+    // dutyHolders resolves {} (the file-level mock): the legacy emails hold
+    // the gate, and the shared login is still excluded beside a named one.
+    const res = await readRegister();
+    const body = (await res.json()) as { approvers: Array<{ id: string; name: string | null }> };
+    expect(body.approvers).toEqual([{ id: U_JESS, name: "Jess" }]);
   });
 });

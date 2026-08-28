@@ -2,13 +2,15 @@ import { Hono, type Context } from "hono";
 import { z } from "zod";
 import {
   DEMAND_PURPOSE_VALUES,
+  LEGACY_OPS_MANAGER_EMAILS,
   expectedArrivalOf,
+  isOpsGenericAccount,
   isOpsManager,
   PURCHASING_REFUSAL_CODES,
   purchasingRefusal,
 } from "@carres/shared";
 import { requireOperation } from "../../lib/auth-guards";
-import { myDuties } from "../../lib/duties";
+import { dutyHolders, myDuties } from "../../lib/duties";
 import { loadPurchasingSettings } from "../../lib/purchasing-settings";
 import { mapPgError } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
@@ -67,6 +69,36 @@ function refuse(
 async function canApprove(c: Context<AppEnv>): Promise<boolean> {
   const { role, email } = c.var.auth;
   return isOpsManager(role, email, await myDuties(c));
+}
+
+/**
+ * Card 03 §3 — THE REAL ACTION OWNER'S NAME. The rail says `Need approval`;
+ * the Register and object print who actually decides: the resolved
+ * `ops_manager` duty holder(s) (Purchasing Settings' own gate — Jess today,
+ * changeable in HR without redesigning the rail), falling back to the governed
+ * legacy list while the duty seat is empty. A robot or shared-password account
+ * is a PERMISSION, not a person (org-duties' own words: "the shared
+ * operation@ login is a manager for daily surfaces") — it never prints as the
+ * owner while a named person also holds the gate.
+ */
+async function resolveApprovers(
+  c: Context<AppEnv>,
+  users: Array<{ id: string; name: string | null; email: string | null }>,
+): Promise<Array<{ id: string; name: string | null }>> {
+  const holders = await dutyHolders(c);
+  let approvers = users.filter((u) => (holders[u.id] ?? []).includes("ops_manager"));
+  if (approvers.length === 0) {
+    approvers = users.filter((u) =>
+      (LEGACY_OPS_MANAGER_EMAILS as readonly string[]).includes(u.email ?? ""),
+    );
+  }
+  const isSharedLogin = (email: string | null) =>
+    (email ?? "").toLowerCase() === "operation@carres.com";
+  const named = approvers.filter(
+    (u) => !isOpsGenericAccount(u.email) && !isSharedLogin(u.email),
+  );
+  if (named.length > 0) approvers = named;
+  return approvers.map((u) => ({ id: u.id, name: u.name }));
 }
 
 /**
@@ -168,7 +200,7 @@ manualPurchaseRouter.get("/", requireOperation, async (c) => {
   const [dests, sups, users] = await Promise.all([
     sb.from("purchasing_destinations").select("id, name"),
     sb.from("suppliers").select("id, name, kind"),
-    sb.from("app_users").select("id, name"),
+    sb.from("app_users").select("id, name, email"),
   ]);
   for (const r of [dests, sups, users]) {
     if (r.error) {
@@ -176,13 +208,18 @@ manualPurchaseRouter.get("/", requireOperation, async (c) => {
       return c.json(m.body, m.status);
     }
   }
+  const approvers = await resolveApprovers(
+    c,
+    (users.data ?? []) as Array<{ id: string; name: string | null; email: string | null }>,
+  );
 
   return c.json({
     requests: requests ?? [],
     lines,
     destinations: dests.data ?? [],
     suppliers: sups.data ?? [],
-    users: users.data ?? [],
+    users: (users.data ?? []).map((u) => ({ id: u.id, name: u.name })),
+    approvers,
     canApprove: await canApprove(c),
   });
 });
@@ -238,8 +275,12 @@ manualPurchaseRouter.get("/detail/:id", requireOperation, async (c) => {
   const [dests, sups, users] = await Promise.all([
     sb.from("purchasing_destinations").select("id, name"),
     sb.from("suppliers").select("id, name, kind"),
-    sb.from("app_users").select("id, name"),
+    sb.from("app_users").select("id, name, email"),
   ]);
+  const approvers = await resolveApprovers(
+    c,
+    (users.data ?? []) as Array<{ id: string; name: string | null; email: string | null }>,
+  );
 
   return c.json({
     request,
@@ -251,7 +292,8 @@ manualPurchaseRouter.get("/detail/:id", requireOperation, async (c) => {
     })),
     destinations: dests.data ?? [],
     suppliers: sups.data ?? [],
-    users: users.data ?? [],
+    users: (users.data ?? []).map((u) => ({ id: u.id, name: u.name })),
+    approvers,
     canApprove: approver,
   });
 });
