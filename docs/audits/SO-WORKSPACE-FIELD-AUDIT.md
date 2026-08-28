@@ -10,6 +10,28 @@
 
 ---
 
+## 0-A · AMENDMENT LOG — re-measured 2026-08-28
+
+The tree moved under this document twice before it was committed, and twice after. Re-measured
+this morning; the corrections below **supersede the body text** wherever they disagree.
+
+| Was | Now | Cause |
+|---|---|---|
+| **F-3** 🔴 the Money weighting never reaches the screen | ✅ **RESOLVED — and the ruling was retired, not implemented.** `Total large · Paid medium · Outstanding loudest` is retired by owner ruling (YH, 2026-08-28) at `MASTER.md:1234-1243`. All three amounts are now `text-strong` on `items-baseline`; colour alone separates. Pinned by `ui-contract.test.ts:526-535`, including a **negative** assertion so the retired sizes cannot return | `2e83249d` |
+| **F-2(b)** 🔴 three call-sites clamp, one does not | ✅ **FIXED.** `stairCarryCount()` extracted to `order-totals.ts:94-99`; `floorSurcharge()` now derives `itemsTotal` from the order's own lines and clamps | `392a55e1` |
+| **F-2(a)** the fee is not in `Total` | 🔴 **STILL OPEN, and worse than reported.** No payment door can collect it — see the expanded finding below | — |
+| **F-5** "the MASTER states a false premise" | 🟡 **OVERSTATED — corrected below.** `createOrderInput` names **two different objects**; the POS door does require a proceed date | re-measure |
+| **G-4** "the UI is narrower than the law" | 🟡 **REFUTED — corrected below.** The `delivery_payment_approver` duty key was never created, so the gate is behaviourally identical to `principal` | re-measure |
+| rows #57, #58 `Amend delivery date` | `Change delivery date`, now governed at **CS:1500** | `2e83249d` |
+| all `SalesOrderWorkspace.tsx` line citations | drifted ±20 lines (fieldset 1815→1835, `canDecide` 736→753, `canRaise` 731→748, stair clamp 1859→1810). **Match on symbol names, not line numbers** | `2e83249d`, `0d56546b` |
+
+Unaffected: the +21 lines `0d56546b` added to COPY-STANDARD register the **delivery fee** on the
+POS confirm step — a different surface. The `NOT REGISTERED` list in §4 stands.
+**F-1 stands unchanged** — `ui-contract.test.ts:152` and `:608` still assert the *source string*
+`disabled={mode === "oldrev"}`, which remains why the test passes while the DOM does not.
+
+---
+
 ## 0 · What this audit ran, and what it did not
 
 Honesty about coverage matters more than a clean-looking report, so this is stated first.
@@ -111,7 +133,7 @@ Legend — **W?**: `RO` read-only · `ED` editable · `CR` create-only · `AM` a
 | 54 | `Earliest {date} — production lead` | ORDER INFO | hint | DERIVED — `earliestPromiseISO` ← catalog categories | – | – | NR | OK — same floor as POS |
 | 55 | `Too soon — earliest is {date}` | ORDER INFO | error | as above | – | – | NR | OK |
 | 56 | `No delivery date` (amber chip) | ORDER INFO | attention chip | `delivery_date_tbd` bool NOT NULL DEFAULT false | RO | — | M:1035 | OK |
-| 57 | `Amend delivery date` | ORDER INFO | button → Modal | `sales_order_submit_amendment` | AM | operation\|principal | M:1230 | OK — door sits beside the fact it moves |
+| 57 | `Change delivery date` *(was `Amend delivery date` until `2e83249d`)* | ORDER INFO | button → Modal | `sales_order_submit_amendment` | AM | operation\|principal | **CS:1500** | OK — door sits beside the fact it moves; the word is now registered, with its note |
 | 58 | `creates a Revision · needs approval` | ORDER INFO | modal description | — | – | – | M:259 | OK — governed copy moved, not reworded |
 | 59 | `A proposal is waiting for management.` | ORDER INFO | note | live `sales_order_amendments` row | RO | — | NR | 🟡 |
 | 60 | `A proposal on this order is out of date.` | ORDER INFO | note | `amendment.stale` | RO | — | NR | 🟡 says what is wrong, not the fix (CS rule 6) |
@@ -188,7 +210,55 @@ No data is at risk: `oldrev` has no writer and `changedFields` returns `[]` by c
 *source string* `disabled={mode === "oldrev"}` — which is why the test passes while the DOM does
 not. The card already requires a rendered-DOM test; this confirms why.
 
-### 🔴 F-2 · The stair fee — two defects in one field
+### 🔴 F-2 · The stair fee — EXPANDED 2026-08-28. Part (b) is fixed; part (a) is worse than reported
+
+> **(b) IS FIXED** by `392a55e1` — `stairCarryCount()` is extracted and `floorSurcharge()` now
+> clamps against the order's own line quantities. The four call-sites agree again.
+>
+> **(a) IS WORSE.** Re-measured end to end, the fee is not merely missing from `Total` — it is
+> **uncollectible by every door in the portal**:
+>
+> - The customer **signs** for it. `Step3SignaturePayment.tsx` itemises `Stair carry` twice
+>   (`:271-278`, `:314`), folds it into the 36px headline `Total` (`:123`, `:316-320`), sizes the
+>   deposit buttons off it (`:124`, `:397`, `:414`), and the T&C the customer ticks says
+>   *"Stair-carry surcharges (if any) are billed on this sales order"* (`:655-657`).
+> - The database does not express it **today**. No column, no addon row, **no writer**. Only the
+>   three *inputs* are stored. Change `floor_config.per_floor_per_item` and every historic order's
+>   displayed fee silently changes.
+>
+>   ⚠️ **CORRECTION (YH, 2026-08-28).** An earlier draft of this finding said a stair addon was
+>   *"FK-impossible"*. **That was wrong.** `order_addons.addon_key` is FK-constrained to `addons`,
+>   but `addons` rows are **operator-creatable**: `POST /api/catalog/addons`
+>   (`catalog.ts:1854-1880`, gate `internalOnly`, schema `addonCreateInput`
+>   `schemas/catalog.ts:1302-1313`) inserts a new kebab-case key, and the door is on screen at
+>   **Settings → Catalog → Special**. Six keys are *seeded*; the set is not closed.
+>   **So the missing piece is not the schema and not the key — it is the WRITER.** The pattern is
+>   already proven one file away: `delivery-fee-recompute.ts` computes the delivery trip fee
+>   server-side and appends `DELIVERY` / `DELIVERY_CROSS` / `DELIVERY_ADD` rows to `order_addons`.
+>   Stair carry was simply never wired into that machinery — which is why the same file's claim
+>   that stair *"folds into the order total"* (`:38-39`) reads as true and is not.
+>   *(One design note for whoever builds it: `addons.price` is a fixed per-key price, while stair
+>   carry is computed. The recompute would write the per-order figure into `order_addons.qty` /
+>   `unit_price`, exactly as the delivery fee rows already do.)*
+> - **No payment door can collect it.** `stripe-checkout.ts:117-121` caps against lines+addons and
+>   returns **422 `amount_exceeds_outstanding`** at `:158-168` — *before* Stripe is called, so
+>   nothing appears in the Stripe dashboard. `top_up_order` caps identically
+>   (`0351:245-249`) and answers *"Order is already fully paid"*. The lifetime ceiling through
+>   every door is lines + addons.
+> - The customer's **own SO PDF** prints the lower total and a `balance_due` that can go negative
+>   (`orders.ts:4121-4126`).
+>
+> **Worked example, at seeded rates** (`free_up_to_floor 2`, `per_floor_per_item 50`) — 5 items
+> @ RM 1,890, floor 3, no lift, 3 needing carry: POS quotes **RM 9,600**, database can only ever
+> describe **RM 9,450**, and the **RM 150** difference is uncollectible. *(Floor 4 is
+> unreachable — `MAX_DELIVERY_FLOOR = 3`, enforced at every door but with no DB CHECK.)*
+>
+> ⚠️ The phrasing *"Stripe rejects payments that include stair carry"* circulating in another
+> session is substantively right but mechanically wrong: **Carres' own route refuses**, before
+> Stripe. Debugging in the Stripe dashboard will find nothing, and fixing it as a Stripe bug
+> fixes the wrong file.
+
+*Original finding follows.*
 
 **(a) The money on screen does not add up.** `ORDER INFO` prints
 `3 of 5 items × 2 floors above 2F × RM50 = RM300`. `MONEY` prints
@@ -245,7 +315,39 @@ become the name.
 (`parse(compose(parts))`) is never asserted. *The surviving invariant is the string round-trip;
 a parts round-trip test would be an addition, not a replacement. No test needs deleting.*
 
-### 🔴 F-5 · The office create door can birth the orphan only it could have prevented
+### 🟡 F-5 · The office create door can birth an orphan the POS door cannot — CORRECTED 2026-08-28
+
+> **CORRECTION.** The original finding said the MASTER states a false premise. That was
+> overstated. **`createOrderInput` names two different objects in this repo**, and the MASTER's
+> sentence is true of one of them:
+>
+> | Door | Schema | Requires a proceed date? |
+> |---|---|---|
+> | **POS / Sales Portal** `POST /api/orders` | `createOrderInputSchema`, `packages/shared/src/schemas/orders.ts:325-327` | **YES** — and `order-entry.ts:246` pins it `locked, defaultRequired, not toggleable` |
+> | **Office** `POST /api/operation/orders` | the *local* `createOrderInput`, `apps/api/src/routes/operation/orders.ts:1483-1499` | **no** |
+> | **Raw** door | — | **no** |
+>
+> So the premise holds for the door most orders come through. What remains true, and is the
+> finding: **the office door is permissive at all three layers** — no `validateDraft` guard
+> (`:1356-1380`), `proceed_date` inherited as `.nullable().optional()` from `revisionHeaderInput`
+> (`:855`), and `sales_order_create` inserts `nullif(…)::date` with no NULL check
+> (`0374:115`). An SO keyed on this screen can be born with no proceed date, and this same
+> screen then renders it read-only as `Not recorded` forever.
+>
+> **Also measured:** the proceed date has **no derivation anywhere** — no lead-time arithmetic,
+> no production calendar, no delivery-minus-lead formula. It is a salesperson's free choice. The
+> only guidance in the product is prose in a hint: *"pick it deliberately (e.g. ~a month before
+> delivery) so we don't reserve stock too early"* (`Step3Delivery.tsx:139-143`). The one rule
+> enforced at every layer is `proceed_date <= delivery_date`.
+>
+> **Provenance of the read-only ruling.** All three proceed-date lines in `MASTER.md` landed in
+> ONE commit — `2515a136`, authored by `yhcominthruWork`, squashed PR #923, whose body never
+> mentions proceed date. The `(Jess)` attribution is a **quoted ruling recorded by a session**;
+> the quotation marks at `:287-288` are the entire provenance. Neither Lim, Chai nor Jess has
+> ever committed a proceed-date line to that file. (For scale: `Claude` is the third-largest
+> committer to `MASTER.md` at 17 commits.)
+
+*Original finding follows.*
 
 `MASTER.md:285` and `SalesOrderWorkspace.tsx:2162` both state:
 *"`createOrderInput` refuses an order without one."* **Measured across all three layers — it does not.**
@@ -453,7 +555,7 @@ Every place a UI gate and its API/RPC gate disagree. All re-verified by hand.
 | **G-1** | `Change salesperson` (submit) | `principal \| hr` (`SalesOrderAttribution.tsx:99`) | `requireOperation` = `operation \| principal` (`orders.ts:1613`) | `operation \| principal` (`0329:63`) | **Near-disjoint.** `operation` — the role the API and RPC admit — never sees the button. `hr` sees a button that 403s at the route. Only `principal` is in all three |
 | **G-2** | Approve · Reject · Apply · Take the approval back | **none** — render for every role reaching the screen | `requireAttributionLane` = `operation \| hr \| principal` (`orders.ts:1576`) | **refuses `operation`** (`0329:139`, `0336:85`) | An `operation` user is shown four buttons and 42501'd by the database every time. The file's own comment at `:280-285` claims the doors are gated; `canRequest` guards only the request button |
 | **G-3** | `Request payment approval` | `operation \| salesperson \| principal` (`:731`) | **no middleware at all** (`payment-approvals.ts:56`) | `operation \| salesperson \| principal` (`0362:173`) | UI mirrors the RPC correctly, but `salesperson` **cannot reach the screen** (`App.tsx:128` admits `operation \| principal`) and **cannot read the row back** — RLS `is_internal()` excludes salesperson (`0266:103`). A salesperson could write a request they can never see |
-| **G-4** | `Approve` / `Refuse` | `principal` only (`:736`) | none | `principal` **OR** any active non-dealer position holding the `delivery_payment_approver` duty (`0362:133-145`) | **UI is narrower than the law.** The duty is DATA precisely so managers join without a code change (M:4495). A duty-holding manager is authorised by the database and will never be shown the button |
+| **G-4** ~~🔴~~ | `Approve` / `Refuse` | `principal` only (`:753`) | none | `principal` **OR** a holder of the `delivery_payment_approver` duty (`0362:133-145`) | **REFUTED 2026-08-28 — not a mismatch today.** The duty key **was never created**: `org_duties` is seeded with exactly six keys (`0260:30-41` + `0286:74-79`) and this is not among them; `org_position_duties.duty_key` is `references org_duties(key)` (`0260:46-51`) and `hr_set_position_duty` raises `duty_not_found` first (`0260:203-204`), so a holder row is **FK-impossible**. `DUTY_KEYS` is a closed 6-tuple pinned by test (`org-duties.ts:18-29`). The gate's duty branch is reachable but **unsatisfiable**, and fails closed. `delivery_payment_approver_gate()` is therefore behaviourally **identical** to `role = 'principal'`. The UI and the RPC admit exactly the same people. **The real gap is a missing seed row, not a UI policy** |
 | **G-5** | the whole attribution lane | — | `hr` admitted (`orders.ts:1578`) and by three RPCs | `hr` admitted (`0329:144`, `0336:90`, `0335:41`) | `hr` is bounced at the **shell** — `App.tsx:128-130` wraps `OperationApp` in `RequireRole roles={["operation","principal"]}`. The GATE 3 approver lane has **no reachable UI for its designated approver** |
 | **G-6** | `Save` (the promised date) | not offered | Zod `.strict()` omits `delivery_date` | **whitelists and writes it** (`0354:129, :243`) | Not a role mismatch — a **depth** mismatch. See F-11 |
 
