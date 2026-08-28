@@ -40,7 +40,10 @@ export interface FinanceException {
 }
 
 /** Is this one still holding the delivery? */
-export function isOpenFinanceException(exception: FinanceException): boolean {
+export function isOpenFinanceException(
+  /* Only `status` is read — see the note on `openFinanceExceptions`. */
+  exception: Pick<FinanceException, "status">,
+): boolean {
   return exception.status === "open";
 }
 
@@ -50,9 +53,9 @@ export function isOpenFinanceException(exception: FinanceException): boolean {
  * An order may carry more than one: two Finance reasons are two decisions, and
  * collapsing them would hide the second from the operator who has to resolve it.
  */
-export function openFinanceExceptions(
-  exceptions: readonly FinanceException[],
-): FinanceException[] {
+export function openFinanceExceptions<T extends Pick<FinanceException, "status">>(
+  exceptions: readonly T[],
+): T[] {
   return exceptions.filter(isOpenFinanceException);
 }
 

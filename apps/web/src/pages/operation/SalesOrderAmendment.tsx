@@ -308,7 +308,7 @@ export default function SalesOrderAmendment({
           <div className="grid grid-cols-2 gap-3">
             <DatePicker
               id="amd-delivery-date"
-              label="Promised delivery"
+              label="Requested Delivery Date"
               disabled={deliveryDateTbd}
               value={deliveryDate}
               onChange={setDeliveryDate}

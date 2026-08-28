@@ -55,6 +55,12 @@
  */
 
 import { deliveryGroupOf, type DeliveryGroupKey } from "./delivery-groups";
+/* ⭐ LAW D — the canvas ASKS these, it does not re-decide them. Both predicates
+   were re-implemented inline here while this file's own comment claimed it
+   asked the shared one. They agreed, which is the condition Law D names: two
+   implementations that merely happen to match. */
+import { paymentApprovalOpensGate, pendingPaymentApproval } from "./delivery-payment-approval";
+import { openFinanceExceptions } from "./finance-exception";
 import { fmtMoney } from "./money-format";
 import type { AllocationUnit, SalesOrderAllocation } from "./sales-order-allocation";
 import { normalizeSkuKey } from "./sku-code";
@@ -642,7 +648,7 @@ function purchaseChain(
         ownerKey: "receiving",
         label: "Check in",
         context: {
-          detail: `${po.id} · ${units(slice.qty)} · ${destination ?? "Carres Warehouse"} · ${dated("Factory ready", po.expectedReadyDate) ?? dated("Requested Delivery Date", customerDelivery) ?? "Arrival date not recorded"}`,
+          detail: `${po.id} · ${units(slice.qty)} · ${destination ?? "Carres Warehouse"} · ${dated("Estimated ready", po.expectedReadyDate) ?? dated("Requested Delivery Date", customerDelivery) ?? "Arrival date not recorded"}`,
         },
       },
       door: record ? open(record.recordNo, receivingHref(record.id)) : null,
@@ -801,8 +807,8 @@ function moneyDraft(input: SalesOrderRouteInput): NodeDraft {
       door: payments,
     };
   }
-  const approved = input.paymentApprovals.some((a) => a.status === "approved");
-  const pending = input.paymentApprovals.some((a) => a.status === "pending");
+  const approved = paymentApprovalOpensGate(input.paymentApprovals);
+  const pending = pendingPaymentApproval(input.paymentApprovals) !== null;
   return {
     id: "money",
     kind: "money",
@@ -934,7 +940,7 @@ function goodsRequirement(
  * `collect`, and the truck goes regardless.
  */
 function financeExceptionRequirement(input: SalesOrderRouteInput): GateRequirement {
-  const openOnes = input.financeExceptions.filter((e) => e.status === "open");
+  const openOnes = openFinanceExceptions(input.financeExceptions);
   if (openOnes.length === 0) {
     return { id: "finance-exception", met: true, text: "No Finance hold" };
   }
@@ -965,7 +971,7 @@ function moneyRequirement(input: SalesOrderRouteInput): GateRequirement {
   if (input.money.outstanding <= 0) {
     return { id: "money", met: true, text: "Money in full" };
   }
-  const approved = input.paymentApprovals.some((a) => a.status === "approved");
+  const approved = paymentApprovalOpensGate(input.paymentApprovals);
   if (approved) {
     return {
       id: "money",
@@ -973,7 +979,7 @@ function moneyRequirement(input: SalesOrderRouteInput): GateRequirement {
       text: "COD approved — collect before unloading",
     };
   }
-  const pending = input.paymentApprovals.some((a) => a.status === "pending");
+  const pending = pendingPaymentApproval(input.paymentApprovals) !== null;
   return {
     id: "money",
     met: false,

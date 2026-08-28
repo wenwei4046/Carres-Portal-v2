@@ -166,7 +166,7 @@ async function resolveActorNames(sb: any, ids: ReadonlyArray<string | null | und
  *            writer stamps). A missing person id is NEVER promoted to this.
  *   missing  the actor was not recorded, or the recorded id cannot be
  *            resolved to a name — an audit-data defect the UI states plainly
- *            (`Actor was not recorded`), never a person guess.
+ *            (`Staff identity not recorded`), never a person guess.
  */
 function actorKindOf(
   byUserId: string | null | undefined,
