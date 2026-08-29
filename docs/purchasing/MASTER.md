@@ -259,9 +259,9 @@ Superuser through Principal authority; `operation@carres.com` is the explicitly 
 Operations Superuser. An ordinary Operations login that is neither duty, cover nor superuser is
 refused. Commercial approval remains separate and never follows from issue authority.
 
-**HOW IT IS ENFORCED — migrations 0379 / 0380 live in repository authority; this worktree's 0401
-is branch-only and pending merge-order reconciliation plus governed apply. Production still shows
-the pre-0401 refusal until the exact approved SHA is deployed and walked.**
+**HOW IT IS ENFORCED — migrations 0379 / 0380 live in repository authority; this worktree's 0403
+is branch-only, legally sequenced after current main, and pending merge plus governed apply.
+Production still shows the pre-0403 refusal until the exact approved SHA is deployed and walked.**
 `purchasing_po_actor()` is the ONE
 resolver. It reads the month's `ops_po_duty` holder and the dated `ops_po_duty_cover` window, and
 returns both people separately: the normal holder, because Team Work groups by them, and the acting

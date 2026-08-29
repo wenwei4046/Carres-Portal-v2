@@ -570,7 +570,7 @@ operationPosRouter.get("/", requireOperation, async (c) => {
            detail page has to be able to tell them apart. `kind`, `recipient` and
            `po_version` ride with the row so the evidence surface reads persisted
            truth rather than whatever it happens to remember. */
-        /* 0379/0400 — and WHO. `sent_by` is the person who pressed it,
+        /* 0379/0403 — and WHO. `sent_by` is the person who pressed it,
            `duty_user_id` the month's holder and `acting_user_id` the dated cover
            in force. Three facts: a Superuser action never turns the cover into
            the actor, while `Team Work` still groups by normal ownership. */

@@ -877,7 +877,7 @@ describe("a purchase order is born with its expected arrival", () => {
       documentDecisions: pricedAll(await readyDemands(sb), KLANG),
     });
 
-    // Migration 0400 stamps actual actor + duty/cover inside the same database
+    // Migration 0403 stamps actual actor + duty/cover inside the same database
     // transaction. A browser-side best-effort insert would be a second answer.
     const hist = sb.inserts.filter((i) => i.table === "po_history");
     expect(hist).toHaveLength(0);

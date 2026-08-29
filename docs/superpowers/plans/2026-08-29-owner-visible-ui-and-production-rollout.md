@@ -32,7 +32,7 @@
 - [x] Fetch latest main and PR #977, re-read changed files, and record actual integration SHAs.
 - [x] Integrate PR #977's head into one delivery branch because the PR remains open.
 - [x] Keep PR #977's `purchase-orders/PurchaseOrdersPage.tsx` as canonical and preserve the Superuser actor/owner evidence while resolving its API read conflict.
-- [x] Renumber this branch's provisional migrations from the integrated maximum: `0401` Operations Superuser and `0402` Deliver To Settings.
+- [x] After latest `main` claimed `0401`, renumber the three unmerged migrations behind it: `0402` Purchase Orders document, `0403` Operations Superuser, and `0404` Deliver To Settings.
 - [x] Run the migration checker, 612 targeted API/web/shared tests, and `git diff --check`; result: pass.
 - [ ] Commit: `git add -A && git commit -m "chore(purchasing): reconcile purchase register delivery"`.
 
@@ -72,7 +72,7 @@
 ## Task 4: Finish Settings-driven receiving destinations
 
 **Files:**
-- Current integrated number: `supabase/migrations/0402_deliver_to_is_purchasing_settings.sql`
+- Current integrated number: `supabase/migrations/0404_deliver_to_is_purchasing_settings.sql`
 - Modify: `packages/shared/src/purchasing-settings.ts`
 - Modify: `packages/shared/src/purchasing-settings.test.ts`
 - Modify: `apps/api/src/lib/purchasing-settings.ts`

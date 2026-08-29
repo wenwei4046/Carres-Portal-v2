@@ -437,7 +437,7 @@ on conflict (id) do update
       outlet_id   = excluded.outlet_id,
       name        = excluded.name;
 
--- Mirrors the governed production capability from 0400 for local resets.
+-- Mirrors the governed production capability from 0403 for local resets.
 update app_users
    set operations_superuser = true
  where lower(email) = 'operation@carres.com';

@@ -240,8 +240,8 @@ The complete release is not fixed until all of the following are true on the exa
 
 ## 12 · Delivery safety
 
-Open PR #977 (`codex/purchase-orders-register`) carries its own `0400` migration and overlaps the
-Purchase Orders register. This design does not authorise applying this worktree's `0400` or `0401`
-to production. The implementation branch must first reconcile the PR, re-read current `main`, assign
-the next legal migration numbers and pass governed migration approval. Deployment and production
-verification remain separate delivery gates after merge.
+PR #977 (`codex/purchase-orders-register`) was integrated into this delivery branch. After `main`
+claimed `0401`, the three still-unmerged migrations were assigned the next legal sequence: `0402`
+Purchase Orders document, `0403` Operations Superuser authority, and `0404` Deliver To Settings.
+This design does not authorise applying any of them to production. Governed migration approval,
+deployment, and production verification remain separate delivery gates after merge.

@@ -126,7 +126,7 @@ function mockRpcAndRefs(opts: {
 describe("GET /api/operation/pos/:id/print-data", () => {
   it("the governed repair reads the audit ledger's real occurred_at column", () => {
     const sql = readFileSync(
-      new URL("../../../../../supabase/migrations/0400_the_po_document_carries_every_destination.sql", import.meta.url),
+      new URL("../../../../../supabase/migrations/0402_the_po_document_carries_every_destination.sql", import.meta.url),
       "utf8",
     );
     expect(sql).toContain("order by occurred_at asc");
@@ -135,7 +135,7 @@ describe("GET /api/operation/pos/:id/print-data", () => {
 
   it("the document authority returns each line's effective destination", () => {
     const sql = readFileSync(
-      new URL("../../../../../supabase/migrations/0400_the_po_document_carries_every_destination.sql", import.meta.url),
+      new URL("../../../../../supabase/migrations/0402_the_po_document_carries_every_destination.sql", import.meta.url),
       "utf8",
     );
     expect(sql).toContain("coalesce(l.destination_id, v_po.destination_id)");

@@ -1,5 +1,5 @@
 -- ============================================================================
--- 0400 — the PO document carries every governed destination
+-- 0402 — the PO document carries every governed destination
 --
 -- Browser owner walk, 2026-08-28: every official PO document failed with
 -- `42703: column "created_at" does not exist`. Migration 0383 correctly moved
@@ -155,7 +155,7 @@ end;
 $function$;
 
 comment on function public.purchasing_po_document(text) is
-  '0400: money-free formal PO document authority; reads audit_log.occurred_at and returns every goods line effective governed Deliver To.';
+  '0402: money-free formal PO document authority; reads audit_log.occurred_at and returns every goods line effective governed Deliver To.';
 
 revoke execute on function public.purchasing_po_document(text) from public, anon;
 grant execute on function public.purchasing_po_document(text) to authenticated;

@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - Do not deploy or apply a production migration until the repository's governed migration approval is given.
-- PR #977 (`codex/purchase-orders-register`, head `a575b80c580e8554ab417c5a4d2d11bfac4b416a`) owns the incoming Purchase Orders register and migration `0400_the_po_document_carries_every_destination.sql`. Merge or rebase it before assigning final migration numbers.
+- PR #977 (`codex/purchase-orders-register`, head `a575b80c580e8554ab417c5a4d2d11bfac4b416a`) is integrated here. Latest `main` (`a1d11d53`) owns `0401`; this branch therefore owns only the later `0402`–`0404` sequence.
 - Never edit a committed migration. Renumber only this unmerged branch's new migrations after the integration point is known.
 - Never determine Operations Superuser authority from an email string in web, API, or SQL. `app_users.operations_superuser` and `is_operations_superuser(uuid)` are the governed capability.
 - PO Duty and GRN Duty remain normal ownership facts. A dated cover is acting ownership. Neither is overwritten when Jess or an Operations Superuser acts.
@@ -59,10 +59,10 @@ Each plan is independently testable. Plans 2–6 depend on Plan 1's authority/co
 
 ## Integration Gate
 
-- [x] Fetch `origin/main` (`f0a2ea93`) and PR #977 (`a575b80c`); record their SHAs in the implementation work log.
+- [x] Fetch `origin/main` (`a1d11d53`) and PR #977 (`a575b80c`); record their SHAs in the implementation work log.
 - [x] Integrate PR #977's head into this delivery branch because PR #977 remains open and both changes must be tested together before delivery.
 - [x] Run the migration checker and resolve every duplicate migration number before writing the first new SQL file.
-- [x] Preserve the two unmerged migration bodies while renumbering them after PR #977's `0400`: Operations Superuser is now `0401`; Deliver To Settings is now `0402`.
+- [x] Preserve all three unmerged migration bodies behind `main`'s `0401`: Purchase Orders document is `0402`; Operations Superuser is `0403`; Deliver To Settings is `0404`.
 - [x] Run `git diff --check` and the migration checker; result: zero whitespace errors, 415 valid migration filenames, and no migration applied.
 
 ## Final Programme Gate
