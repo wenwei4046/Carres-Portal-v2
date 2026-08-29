@@ -5,7 +5,7 @@
 **Page:** Manual Purchase
 **Surface:** The permanent right-side Register (columns, expansion, selection, toolbar),
 the `MPR-` number series, and the sixth approved purpose
-**Status:** MERGED — PR #978, main `a1d11d53`; production verification is not recorded in this Card
+**Status:** COMPLETE — production-verified 2026-08-29; migration `0401` APPLIED
 **Lane:** BUILD / DELIVERY
 **Depends on:** Purchasing Card 03 (the four-section rail — byte-behaviourally unchanged here)
 **Expected migration:** ONE — `0401` (0400 lives on PR #977's open branch; next free number
@@ -183,11 +183,49 @@ main SHA, authenticated checks prove normal and narrow desktop behaviour.
 
 ---
 
-## Completion evidence
+## Completion evidence — 2026-08-29
 
-- PR #978 merged the implementation to `main` as `a1d11d5328ffc095b88fe053e7745bf0cb2764f5`.
-- Implementation commits: `7452d362` (the eleven-fact permanent Register) and `7c3ec33c`
-  (export uses the displayed cell truth rather than hidden search tokens).
-- Card 04 persisted the six-purpose / `MPR-` / structured `For` authority and migration 0401.
-- Production exact-SHA proof remains unrecorded here; do not upgrade this Card to
-  `PRODUCTION-VERIFIED` without measured evidence.
+- **PR:** [#978](https://github.com/wenwei4046/Carres-Portal-v2/pull/978), built from `main`
+  `f0a2ea93`; CI green on head `7c3ec33c`; merged to `main` as
+  `a1d11d5328ffc095b88fe053e7745bf0cb2764f5`. Deploy run
+  [33241277079](https://github.com/wenwei4046/Carres-Portal-v2/actions/runs/33241277079)
+  SUCCEEDED; `erp.carresofficial.com/__carres_deploy.json` reports that exact SHA, and the
+  served bundle carries every Card word (`Manual Purchase No` · `Not ordered yet` ·
+  `Other Purchase` · `What is this for?` · `No approval needed` · `+ Manual Purchase` ·
+  `Still To Order` · `NEW MANUAL PURCHASE`) with `+ New request`, `NEW REQUEST` and
+  `Management Purchase` at zero.
+- **Migration `0401` APPLIED before the merge** (exact repository file; tracker tail =
+  `0401_the_sixth_purpose_and_the_mpr_number`), then proven with one rolled-back probe:
+  `office → unknown_purpose` · blank `other_purchase → why_required` · a foreign For fact
+  `→ for_fact_mismatch` · caseless `service_case → service_case_required`; the positives
+  minted real `MPR-20260829-RRRR` numbers and rolled back — 0 rows leaked. Apply-first was
+  deliberate: the new API calls the 7-parameter door and the old API works against it,
+  never the reverse. PR #977's unmerged `0400` was inspected — one new read function, no
+  object overlap.
+- **Authenticated production walk (operation@carres.com, 2026-08-29):** the live page
+  renders the six-purpose rail and the eleven columns; `+ Manual Purchase` →
+  `NEW MANUAL PURCHASE` → `Other Purchase` asked `What is this for?` (routine purposes
+  did not) → Send created **`MPR-20260829-2779`** — the governed allocator live — which
+  entered the Register as `Need approval` / `Jess approves` / `Not ordered yet` / its For
+  answer, moved the rail counts (Other Purchase 1 · Sofa 1), refused the selection tick,
+  and expanded to the read-only child table. The row was deliberately left for the owner:
+  its `What is this for?` says `Card 04 production walk`; refuse it (or approve it) at
+  will. The dev-preview walk covered what live data cannot (both PO summaries, all four
+  approval facts, `2 suppliers`, `Multiple`, the selection bar `1 selected · 2 units ·
+  Issue 1 PO` beside the resolved duty person, the issue POST, and 1100px narrow desktop
+  with the sticky Manual Purchase identity and the never-squeezed 240px rail).
+- **The walk found one adjacent defect (pre-existing, flagged for its own card):** the
+  object offers Approve/Refuse to the shared `operation@` login (`canApprove`'s
+  daily-surface answer) while `purchasing_decide_request` rightly refuses it — with the
+  raw word `forbidden`. The render gate must ask the door's own authority, and the
+  refusal must speak the governed two lines.
+- **Gates:** 8,885 tests green (shared 2,766 · api 2,542 · web 3,577 — including the new
+  Card 04 shared/API/web proofs), typecheck, design-standard lint clean, `ci:migrations`
+  (414 filenames), production build, `git diff --check`. A self-review against the Sales
+  Orders Register caught the export deriving cells from search tokens before merge
+  (`7c3ec33c`).
+
+```text
+PURCHASING CARD 04 COMPLETE
+Production SHA: a1d11d5328ffc095b88fe053e7745bf0cb2764f5
+```
