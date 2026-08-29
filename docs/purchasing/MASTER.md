@@ -220,14 +220,22 @@ exists.
 ### 5.2 Two input doors
 
 `SO Batch Purchase` is system demand from customer Sales Orders. `Manual Purchase` is conscious
-internal intent under the owner-approved purpose vocabulary (ruling 2026-08-28, Card 03) —
-exactly `Ready Stock` · `Showroom Display` · `Service Case` · `Internal Staff Purchase` ·
-`Subsidiary Purchase`, with Management included under `Internal Staff Purchase` (there is no
-`Management Purchase`). An emergency is a Manual Purchase with an urgent reason and governed
-date (§2.2), not a purpose of its own. The four pre-ruling purposes (`Display` · `Warranty` ·
-`Office` · `Spare Parts`) are retired: no door accepts them for a new request and no historical
-row is relabelled into the new vocabulary. An approved Display Request may route to Manual
-Purchase or Consignment Order; staff do not retype it.
+internal intent under the owner-approved purpose vocabulary (rulings 2026-08-28 Card 03 /
+2026-08-29 Card 04) — exactly `Ready Stock` · `Showroom Display` · `Service Case` ·
+`Internal Staff Purchase` · `Subsidiary Purchase` · `Other Purchase`, with Management included
+under `Internal Staff Purchase` (there is no `Management Purchase`). Only `Other Purchase`
+asks — and must answer — `What is this for?`; routine purposes do not ask a duplicate `Why`.
+Each exceptional purpose names its STRUCTURED object at creation (0401): a `Service Case`
+purchase links the actual Case, an `Internal Staff Purchase` names the real staff member, a
+`Subsidiary Purchase` names the actual subsidiary company; `Ready Stock` and
+`Showroom Display` are served by the governed destination on the request. An emergency is a
+Manual Purchase with an urgent reason and governed date (§2.2), not a purpose of its own. The
+four pre-ruling purposes (`Display` · `Warranty` · `Office` · `Spare Parts`) are retired: no
+door accepts them for a new request and no historical row is relabelled into the new
+vocabulary. A new Manual Purchase is numbered `MPR-YYYYMMDD-RRRR` through the one §6.1
+allocator (0401); pre-0401 `REQ-####` identities are permanent and print exactly as stored.
+An approved Display Request may route to Manual Purchase or Consignment Order; staff do not
+retype it.
 
 ### 5.3 One PO issue authority
 
@@ -788,13 +796,14 @@ blank `SO NO`.
 
 **Purpose / source:** non-SO internal buys under the approved §5.2 purpose vocabulary:
 `Ready Stock` · `Showroom Display` · `Service Case` · `Internal Staff Purchase` ·
-`Subsidiary Purchase`.
+`Subsidiary Purchase` · `Other Purchase` (Card 04, 2026-08-29 — only `Other Purchase`
+asks `What is this for?`).
 
 **Left rail — APPROVED / LOCKED, owner ruling 2026-08-28 (Card 03); BUILT, PR #973,
-production-verified on `4c8aa6d5` 2026-08-28.** Migration `0398` (the vocabulary's CHECKs
-and door gates) is committed; its production apply follows the governed ENGINEERING §5 path
-and, until it runs, the live doors still refuse the four new purpose values by name while
-`Ready Stock` requests store normally. The shared 240px
+production-verified on `4c8aa6d5` 2026-08-28.** The vocabulary's applied door authority is
+migration 0399 (2026-08-28), widened by 0401 (Card 04) with `other_purchase`; the sixth
+rail row arrives through the one shared `DEMAND_PURPOSES` list, so the rail and the doors
+cannot drift. The shared 240px
 `FilterRail` shell Card 02-C built — same group-heading typography and spacing, same blue
 `NavRow` active treatment, no checkboxes, labels wrap and never truncate, counts visible and
 right-aligned, rail scrolls vertically, Register scrolls horizontally when narrow and the
@@ -813,6 +822,7 @@ PURCHASE PURPOSE
   Service Case
   Internal Staff Purchase
   Subsidiary Purchase
+  Other Purchase
 
 PRODUCT
   All products
@@ -860,15 +870,69 @@ SUPPLIER
   by 0399 and must never be applied. The vocabulary itself is unchanged from the owner
   ruling above.
 
-**Columns:** Request No., Purpose, Requested By, Items/Qty, Required Date, Deliver To, Approval,
-Purchase Coverage, Work.
-**Journey:** `+ Manual Purchase` → choose plain-language purpose → enter goods/quantity/date/
-destination/reason → system resolves Catalog/supplier/approval → approved demand goes to PO Duty.
+**THE PERMANENT REGISTER — APPROVED / LOCKED, Card 04 (2026-08-29); BUILT.** One Manual
+Purchase request per parent row, on the same Register engine and visual grammar as Sales
+Orders (`register/DataGrid`, `appearance="reference"`, 36px header / 38px rows / 32px
+footer, sticky Manual Purchase identity, horizontal scroll that never squeezes the 240px
+rail). The default population is the COMPLETE permanent history, ordered records included —
+`All not ordered` stays an explicit rail filter, never a silent default. Default order:
+newest `Requested Date` (`created_at`) first.
+
+**Columns, exactly and in this order:** Requested Date · Approval Status · Manual Purchase
+No · PO No · Needed By · For · Items · Qty · Supplier · Deliver To · Requested By.
+
+- `Requested Date` is the actual `created_at` — never Needed By, approval or PO date.
+- `Approval Status` is the approval FACT (`Need approval` · `Approved` · `Refused` ·
+  `No approval needed`); while approval is needed a quiet second line names the real
+  configured approver — `{name} approves` (Card 03 §3's arithmetic).
+- `Manual Purchase No` is the identity and link, sticky during horizontal scrolling. New
+  requests mint `MPR-YYYYMMDD-RRRR` (§6.1 allocator, 0401); historical numbers print
+  exactly as stored.
+- `PO No` reads ONLY the lines' real lineage (`purchase_order_lines.demand_id`, the
+  demand's own `po_id` as pre-0361 fallback) resolved to actual `purchase_orders.po_no`:
+  `Not ordered yet` · the one clickable number · `{n} POs`. Never a UUID, never a
+  SKU/supplier/date inference.
+- `For` is the structured object the purchase serves (§5.2): destination context for
+  `Ready Stock` / `Showroom Display`, the linked Service Case, the real staff member, the
+  actual subsidiary, or `Other Purchase`'s required answer. A historical row without the
+  structured fact prints nothing.
+- `Items` speaks Catalog human words through the ONE item-label arithmetic
+  (`railItemLabel`): one item's name, or `{first item} + {n} more`; the SKU stays
+  searchable and shows in the expansion. `Qty` is the total originally requested
+  quantity, never the remainder. `Supplier` is Card 03's Catalog-derived projection —
+  one actual name or `{n} suppliers`, never `Supplier not selected`. `Deliver To` prints
+  the governed destination, `Multiple` when several. `Requested By` is the real staff
+  name — never a shared account, role, email or `(you)`.
+- **Purpose is NOT a parent column** — it lives in the rail, the expansion context and
+  the object. Banned parent columns, never to return: `Purchase Purpose` · `ORDER
+  TIMING` · `Order late` · `Need price` · `Part received` · `Received` · `Arrived` ·
+  `Work` · `Next action` · `Reason` · `Remark` · `Price` · a permanent PO Duty ·
+  row action buttons.
+
+**The row expansion** is ONE quiet read-only child table — `SKU · Item · Requested Qty ·
+Approved Qty · Ordered Qty · Still To Order · Supplier · Deliver To · PO No` — using the
+one governed remainder arithmetic (`manualPurchaseLineRemainingOf`: the approver's number,
+falling back to the ask, less what was issued, floored at zero — the same function the
+issue door and issue-costs read). No Approve/Refuse/Receive, no price editing, no PO
+creation and no PDF preview inside it.
+
+**Selection and PO Duty.** Only requests whose derived status is `Ready to order` with
+live remaining quantity take the tick. With no selection there is NO PO Duty block,
+initials or reminder anywhere on the page; with a selection, PO Duty appears once beside
+the one issue action — `{n} selected · {u} unit(s) · Issue {p} PO(s)`, the resolved
+person, `Issue PO` — where the PO count is the same document partition the issue door
+groups by (supplier × category × destination × purpose, merged across requests). Work
+ownership and reminders stay in central `Work`; issuance authority remains the one
+`purchasing_issue_pos_batch` door.
+
+**Journey:** `+ Manual Purchase` → choose plain-language purpose → name the purpose's
+structured For object → enter goods/quantity/date/destination → system resolves
+Catalog/supplier/approval → approved demand goes to PO Duty.
 **Object/placement:** internal full-width object; no supplier PDF. New supplier/SKU request is an
 in-context blocker, not a page.
 **Exceptions:** duplicate stock, missing quantity, unapproved price, emergency without required
 facts, rejected/withdrawn request.
-**Connections:** Catalog, Stock planning, Display Request, Purchase Demand, PO.
+**Connections:** Catalog, Stock planning, Display Request, Purchase Demand, PO, Service Case.
 
 ### 9.3 Purchase Orders
 

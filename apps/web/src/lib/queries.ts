@@ -4393,6 +4393,11 @@ export interface PurchaseRequestRow {
   refused_at: string | null;
   refused_by: string | null;
   refuse_reason: string | null;
+  /** Card 04 — the STRUCTURED For fact, per purpose; null on other
+   *  purposes and on pre-0401 history. */
+  for_service_case_id: string | null;
+  for_staff_user_id: string | null;
+  for_subsidiary_name: string | null;
   created_by: string | null;
   created_at: string;
 }
@@ -4402,6 +4407,8 @@ export interface PurchaseRequestLineRow {
   request_id: string;
   sku: string;
   supplier_id: string | null;
+  /** The line's governed Purchasing destination (register read, Card 04). */
+  destination_id?: string | null;
   qty: number;
   approved_qty: number | null;
   issued_qty: number;
@@ -4418,11 +4425,22 @@ export interface PurchaseRequestLineRow {
    *  Card 03) — the rail's `PRODUCT` authority, never SKU-text inference.
    *  `null` when Catalog has no category for the SKU. */
   category?: string | null;
+  /** Card 04 — the ONE item-label arithmetic's answer (`railItemLabel`
+   *  over the Catalog model name); falls back to the SKU when Catalog has
+   *  no model words. */
+  item_label?: string;
+  /** Card 04 — the line's REAL PO lineage (`purchase_order_lines.demand_id`
+   *  plus the demand's own po_id), never an inference. */
+  po_ids?: string[];
 }
 
 export interface ManualPurchaseRegisterPayload {
   requests: PurchaseRequestRow[];
   lines: PurchaseRequestLineRow[];
+  /** Every PO the lines' lineage names — id → the actual po_no. */
+  pos: Array<{ id: string; po_no: string }>;
+  /** The linked Service Cases behind `for_service_case_id`. */
+  serviceCases: Array<{ id: string; case_no: string }>;
   destinations: Array<{ id: string; name: string }>;
   suppliers: Array<{ id: string; name: string; kind?: string | null }>;
   users: Array<{ id: string; name: string | null }>;
@@ -4431,10 +4449,17 @@ export interface ManualPurchaseRegisterPayload {
   approvers: Array<{ id: string; name: string | null }>;
   /** The Settings manager gate — decides what RENDERS (money, Approve). */
   canApprove: boolean;
+  /** Card 04 — PO Duty, shown ONLY beside a selection's issue action. */
+  currentPoDuty: { userId: string; name: string } | null;
+  actingPoDuty: { userId: string; name: string } | null;
+  poDutyUnavailable: boolean;
+  mayIssue: boolean;
 }
 
 export interface ManualPurchaseDetailPayload {
   request: PurchaseRequestRow;
+  /** The linked Service Case's readable identity, when the purpose names one. */
+  serviceCaseNo: string | null;
   /** `unit_cost` is present ONLY for the approver — the same screen renders
    *  for both roles, minus the money, never a permission error. */
   lines: Array<PurchaseRequestLineRow & { unit_cost?: number | null }>;
@@ -4519,7 +4544,12 @@ export function useCreatePurchaseRequest() {
       purpose: string;
       destinationId: string;
       requiredBy?: string | null;
-      why: string;
+      /** Card 04: ONLY `other_purchase` answers `What is this for?`. */
+      why?: string | null;
+      /** The structured For fact, required on its own purpose (Card 04). */
+      serviceCaseId?: string | null;
+      staffUserId?: string | null;
+      subsidiaryName?: string | null;
     }) =>
       apiFetch<{ id: string; req_no: string; approval_required: boolean }>(
         "/api/operation/purchasing/requests",

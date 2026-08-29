@@ -59,6 +59,9 @@ const REGISTER = {
       refused_at: null,
       refused_by: null,
       refuse_reason: null,
+      for_service_case_id: null,
+      for_staff_user_id: null,
+      for_subsidiary_name: null,
       created_by: "u1",
       created_at: "2026-08-19T02:00:00Z",
     },
@@ -75,6 +78,9 @@ const REGISTER = {
       refused_at: null,
       refused_by: null,
       refuse_reason: null,
+      for_service_case_id: null,
+      for_staff_user_id: null,
+      for_subsidiary_name: null,
       created_by: "u1",
       created_at: "2026-08-19T03:00:00Z",
     },
@@ -93,6 +99,10 @@ const REGISTER = {
       refused_at: null,
       refused_by: null,
       refuse_reason: null,
+      for_service_case_id: null,
+      for_staff_user_id: null,
+      // Card 04 — the structured For: the actual subsidiary company.
+      for_subsidiary_name: "HOUZS Sdn Bhd",
       created_by: "u1",
       created_at: "2026-08-18T03:00:00Z",
     },
@@ -114,6 +124,10 @@ const REGISTER = {
       cancel_reason: null,
       // The CATALOG's answer, stamped by the API (Card 03).
       category: "sofa",
+      // Card 04 — the ONE item-label arithmetic's answer, and the lineage.
+      item_label: "Ohana 2 Seater",
+      po_ids: [],
+      destination_id: KLANG,
     },
     {
       id: "l2",
@@ -133,6 +147,9 @@ const REGISTER = {
       cancelled_at: null,
       cancel_reason: null,
       category: null,
+      item_label: "MATTRESS-LOOK-9",
+      po_ids: [],
+      destination_id: KLANG,
     },
     {
       id: "l3",
@@ -149,8 +166,14 @@ const REGISTER = {
       cancelled_at: null,
       cancel_reason: null,
       category: "bedframe",
+      item_label: "Atlas K",
+      po_ids: ["PO-9001"],
+      destination_id: KLANG,
     },
   ],
+  // Card 04 — id → the ACTUAL po_no; the column prints numbers, never UUIDs.
+  pos: [{ id: "PO-9001", po_no: "PO-20260818-9001" }],
+  serviceCases: [],
   destinations: [{ id: KLANG, name: "HOUZS Balakong" }],
   suppliers: [
     { id: "s1", name: "Ohana" },
@@ -160,6 +183,11 @@ const REGISTER = {
   users: [{ id: "u1", name: "Siti" }],
   approvers: [{ id: "u9", name: "Jess" }],
   canApprove: false,
+  // Card 04 — PO duty, shown ONLY beside a live selection.
+  currentPoDuty: { userId: "u7", name: "Shasha" },
+  actingPoDuty: null,
+  poDutyUnavailable: false,
+  mayIssue: true,
 };
 
 /** The detail payload — swapped per test to flip the approver gate. */
@@ -174,6 +202,7 @@ function seedDetail(canApprove: boolean) {
     suppliers: REGISTER.suppliers,
     users: REGISTER.users,
     approvers: REGISTER.approvers,
+    serviceCaseNo: null,
     canApprove,
   };
 }
@@ -275,12 +304,14 @@ describe("the register — one request per row (card §7)", () => {
     expect(document.body.textContent).not.toMatch(/\bPR-\d/);
   });
 
-  it("status derives — approval ON waits, approval OFF is ready", async () => {
+  it("Approval Status is the approval FACT — Need approval / No approval needed", async () => {
     await loaded();
     const grid = screen.getByTestId("register-column");
-    expect(within(grid).getByText("Waiting for approval")).toBeInTheDocument();
-    expect(within(grid).getByText("Ready to order")).toBeInTheDocument();
-    expect(within(grid).getByText("Ordered")).toBeInTheDocument();
+    // REQ-0001's switch was ON and nobody decided; REQ-0002/3 never asked.
+    expect(within(grid).getByText("Need approval")).toBeInTheDocument();
+    expect(within(grid).getAllByText("No approval needed").length).toBe(2);
+    // The second line names the REAL approver, only while approval is needed.
+    expect(screen.getByTestId(`mp-approver-${REQ1}`)).toHaveTextContent("Jess approves");
   });
 
   it("no money renders anywhere — purchasing has no money", async () => {
@@ -288,20 +319,26 @@ describe("the register — one request per row (card §7)", () => {
     expect(document.body.textContent).not.toContain("RM ");
   });
 
-  it("`+ New request` is the page's create door", async () => {
+  it("`+ Manual Purchase` is the page's create door — COPY-STANDARD's own word", async () => {
     await loaded();
-    expect(screen.getByTestId("manual-purchase-new-request")).toHaveTextContent(
-      MW.newRequest,
-    );
+    const btn = screen.getByTestId("manual-purchase-new-request");
+    expect(btn).toHaveTextContent("+ Manual Purchase");
+    expect(btn).toHaveTextContent(MW.newRequest);
   });
 
-  it("a retired purpose keeps its own truthful word — never the new vocabulary", async () => {
+  it("Purpose is NOT a parent column (Card 04); a retired word survives on the object", async () => {
+    seedDetail(false);
     await loaded();
     const grid = screen.getByTestId("register-column");
-    // REQ-0001 was asked as `display` before the 2026-08-28 ruling: it prints
-    // `Display`, never `Showroom Display` (no false relabelling, Card 03 §6).
-    expect(within(grid).getByText("Display")).toBeInTheDocument();
-    expect(within(grid).queryByText("Showroom Display")).toBeNull();
+    // The parent table carries no Purpose column and no relabelled word —
+    // purpose lives in the rail, the expansion context and the object.
+    expect(within(grid).queryByText("Purchase Purpose")).toBeNull();
+    expect(within(grid).queryByText("Need for")).toBeNull();
+    // The object still prints the RETIRED row's own truthful word.
+    fireEvent.click(screen.getByText("REQ-0001", { selector: "button" }));
+    await screen.findByTestId("mp-detail");
+    expect(screen.getByTestId("mp-detail").textContent).toContain("Display");
+    expect(screen.getByTestId("mp-detail").textContent).not.toContain("Showroom Display");
   });
 });
 
@@ -345,6 +382,7 @@ describe("Card 03 · the left filter rail", () => {
       "Service Case",
       "Internal Staff Purchase",
       "Subsidiary Purchase",
+      "Other Purchase",
       "PRODUCT",
       "All products",
       "Mattress",
@@ -514,7 +552,7 @@ describe("Card 03 · the left filter rail", () => {
 });
 
 describe("the create workspace — full page, never a dialog (card §3)", () => {
-  it("offers exactly the approved five purposes (Card 03, 2026-08-28)", () => {
+  it("offers exactly the approved six purposes (Cards 03/04)", () => {
     // The list a control may render IS the shared constant (0322's law); the
     // Select renders from it verbatim. Management folds under Internal Staff
     // Purchase; the retired four are not offerable.
@@ -524,11 +562,14 @@ describe("the create workspace — full page, never a dialog (card §3)", () => 
       "Service Case",
       "Internal Staff Purchase",
       "Subsidiary Purchase",
+      "Other Purchase",
     ]);
   });
 
-  it("Send NAMES its gap — the date first, then Why, then it is live (2026-08-19 walk)", async () => {
+  it("Send NAMES its gap — the date; a routine purpose asks no duplicate Why (Card 04)", async () => {
     await openWorkspace();
+    // Ready Stock is the default purpose — there is NO Why field to fill.
+    expect(screen.queryByTestId("mp-why")).toBeNull();
     fireEvent.focus(document.getElementById("mp-item-0")!);
     fireEvent.click(pickRow("5539-2NA"));
     // No date yet — the disabled button says which fact is missing.
@@ -536,16 +577,7 @@ describe("the create workspace — full page, never a dialog (card §3)", () => 
     expect(screen.getByTestId("mp-send")).toHaveTextContent(MW.sendNeedsDate);
 
     pickNeededBy();
-    expect(screen.getByTestId("mp-send")).toBeDisabled();
-    expect(screen.getByTestId("mp-send")).toHaveTextContent(MW.sendNeedsWhy);
-
-    // Whitespace does not pass for Why.
-    fireEvent.change(screen.getByTestId("mp-why"), { target: { value: "   " } });
-    expect(screen.getByTestId("mp-send")).toBeDisabled();
-
-    fireEvent.change(screen.getByTestId("mp-why"), {
-      target: { value: "Balakong floor sofa is worn." },
-    });
+    // Date + item is ALL a routine purpose asks — Send goes live.
     expect(screen.getByTestId("mp-send")).toBeEnabled();
     expect(screen.getByTestId("mp-send")).toHaveTextContent(MW.send);
   });
@@ -559,9 +591,9 @@ describe("the create workspace — full page, never a dialog (card §3)", () => 
     );
   });
 
-  it("Send stays off until an item is picked, even with a Why", async () => {
+  it("Send stays off until an item is picked, even with a date", async () => {
     await openWorkspace();
-    fireEvent.change(screen.getByTestId("mp-why"), { target: { value: "reason" } });
+    pickNeededBy();
     expect(screen.getByTestId("mp-send")).toBeDisabled();
   });
 
@@ -589,7 +621,6 @@ describe("the create workspace — full page, never a dialog (card §3)", () => 
 
   it("ONE act, per-row result — a failed line keeps its row, retry reuses the header", async () => {
     await openWorkspace();
-    fireEvent.change(screen.getByTestId("mp-why"), { target: { value: "two items" } });
     pickNeededBy();
     fireEvent.focus(document.getElementById("mp-item-0")!);
     fireEvent.click(pickRow("5539-2NA"));
@@ -633,7 +664,6 @@ describe("the create workspace — full page, never a dialog (card §3)", () => 
 
   it("no supplier key rides the wire — the server derives it", async () => {
     await openWorkspace();
-    fireEvent.change(screen.getByTestId("mp-why"), { target: { value: "one item" } });
     pickNeededBy();
     fireEvent.focus(document.getElementById("mp-item-0")!);
     fireEvent.click(pickRow("5539-2NA"));
@@ -1085,5 +1115,226 @@ describe("Card 03 §3 · the approval owner's name", () => {
     });
     await loaded();
     expect(screen.queryByTestId(`mp-approver-${REQ1}`)).toBeNull();
+  });
+});
+
+/**
+ * ⭐ PURCHASING CARD 04 — THE PERMANENT REGISTER
+ * (docs/cards/CARD-2026-08-29-purchasing-04-manual-purchase-permanent-register.md).
+ *
+ * Eleven columns in the Card's exact order · newest Requested Date first ·
+ * PO No from real lineage only · Items in Catalog human words · the
+ * structured For · a read-only expansion · selection admitting only
+ * Ready-to-order remainder · PO Duty existing ONLY beside a selection.
+ */
+describe("Card 04 · the eleven columns, in the Card's exact order", () => {
+  it("renders the exact heads, in order — and none of the banned columns", async () => {
+    await loaded();
+    const grid = screen.getByTestId("register-column");
+    const heads = [...grid.querySelectorAll("thead th")]
+      .map((th) => (th.textContent ?? "").replace(/[AV]$/, "").trim())
+      .filter((t) => t !== "");
+    expect(heads).toEqual([
+      "Requested Date",
+      "Approval Status",
+      "Manual Purchase No",
+      "PO No",
+      "Needed By",
+      "For",
+      "Items",
+      "Qty",
+      "Supplier",
+      "Deliver To",
+      "Requested By",
+    ]);
+    for (const banned of [
+      "Purchase Purpose",
+      "Order late",
+      "Need price",
+      "Part received",
+      "Received",
+      "Arrived",
+      "Work",
+      "Next action",
+      "Reason",
+      "Remark",
+      "Price",
+    ]) {
+      expect(heads, `banned column "${banned}"`).not.toContain(banned);
+    }
+  });
+
+  it("newest Requested Date leads by default — the actual created_at", async () => {
+    await loaded();
+    const grid = screen.getByTestId("register-column");
+    const order = [...grid.querySelectorAll("tbody tr")]
+      .map((tr) => tr.textContent ?? "")
+      .filter((t) => /REQ-\d{4}/.test(t))
+      .map((t) => t.match(/REQ-\d{4}/)![0]);
+    // REQ-0002 (19 Aug 03:00) · REQ-0001 (19 Aug 02:00) · REQ-0003 (18 Aug).
+    expect(order).toEqual(["REQ-0002", "REQ-0001", "REQ-0003"]);
+  });
+
+  it("PO No is real lineage — the actual number clickable, absence named", async () => {
+    await loaded();
+    // REQ-0003's line was issued onto PO-9001 → the ACTUAL po_no prints and
+    // opens the Purchase Orders page; never a UUID.
+    const link = screen.getByTestId(`mp-po-link-${REQ3}`);
+    expect(link).toHaveTextContent("PO-20260818-9001");
+    fireEvent.click(link);
+    expect(navigate).toHaveBeenCalledWith(
+      "/operation/procurement?po=PO-20260818-9001",
+    );
+    expect(document.body.textContent).not.toContain("PO-9001,");
+    // A request with no lineage says so in the governed sentence.
+    expect(screen.getAllByText("Not ordered yet").length).toBeGreaterThan(0);
+  });
+
+  it("Items speak the Catalog's human words; the SKU stays searchable off-screen", async () => {
+    await loaded();
+    const grid = screen.getByTestId("register-column");
+    expect(within(grid).getByText("Ohana 2 Seater")).toBeInTheDocument();
+    expect(within(grid).getByText("Atlas K")).toBeInTheDocument();
+    // The parent cell does NOT print the SKU — it lives in the expansion.
+    expect(within(grid).queryByText("BED-K-01")).toBeNull();
+  });
+
+  it("For is the structured object — subsidiary name, destination context, honest blank", async () => {
+    await loaded();
+    const grid = screen.getByTestId("register-column");
+    // Subsidiary Purchase names the actual company.
+    expect(within(grid).getByText("HOUZS Sdn Bhd")).toBeInTheDocument();
+    // Ready Stock shows the governed destination context.
+    expect(within(grid).getAllByText("HOUZS Balakong").length).toBeGreaterThan(0);
+    // The retired `display` request has no structured For — nothing prints,
+    // and its old free-text why is NOT borrowed into the column.
+    expect(within(grid).queryByText(/Balakong floor sofa/)).toBeNull();
+  });
+
+  it("Requested By is the real staff name — never an email, role or (you)", async () => {
+    await loaded();
+    const grid = screen.getByTestId("register-column");
+    expect(within(grid).getAllByText("Siti").length).toBeGreaterThan(0);
+    expect(grid.textContent).not.toContain("(you)");
+    expect(grid.textContent).not.toContain("@carres.com");
+  });
+});
+
+describe("Card 04 · the read-only expansion", () => {
+  it("shows exact per-line quantities and lineage, and offers no action", async () => {
+    await loaded();
+    fireEvent.click(screen.getByTestId(`mp-expand-${REQ3}`));
+    const box = await screen.findByTestId(`mp-expansion-${REQ3}`);
+    const heads = [...box.querySelectorAll("th")].map((th) => th.textContent?.trim());
+    expect(heads).toEqual([
+      "SKU",
+      "Item",
+      "Requested Qty",
+      "Approved Qty",
+      "Ordered Qty",
+      "Still To Order",
+      "Supplier",
+      "Deliver To",
+      "PO No",
+    ]);
+    /* `box.querySelector("tbody tr")` would match MY thead's tr — the whole
+       expansion lives inside the parent grid's tbody, and querySelector lets
+       the `tbody` part match that outer ancestor. Query the tds directly. */
+    const cells = [...box.querySelectorAll("td")].map((td) => td.textContent?.trim());
+    // SKU · Item · asked 2 · approved (blank — nobody cut) · ordered 2 ·
+    // still 0 · the Catalog-derived supplier · the governed destination ·
+    // the ACTUAL PO number.
+    expect(cells).toEqual([
+      "BED-K-01",
+      "Atlas K",
+      "2",
+      "",
+      "2",
+      "0",
+      "Hooka",
+      "HOUZS Balakong",
+      "PO-20260818-9001",
+    ]);
+    // Read-only: no control of any kind lives inside the expansion — no
+    // Approve/Refuse/Receive button, no price editor, no PO creation.
+    expect(box.querySelectorAll("button, input, select, textarea").length).toBe(0);
+    expect(box.textContent).not.toContain("Issue");
+  });
+});
+
+describe("Card 04 · selection and PO Duty", () => {
+  it("only Ready-to-order remainder takes the tick", async () => {
+    await loaded();
+    // REQ-0002: ready, 3 remaining → selectable.
+    expect(screen.getByTestId(`mp-select-${REQ2}`)).toBeEnabled();
+    // REQ-0001 needs approval; REQ-0003 is fully ordered — both refuse.
+    expect(screen.getByTestId(`mp-select-${REQ1}`)).toBeDisabled();
+    expect(screen.getByTestId(`mp-select-${REQ3}`)).toBeDisabled();
+  });
+
+  it("PO Duty exists NOWHERE until a selection; then once, beside Issue PO", async () => {
+    await loaded();
+    expect(screen.queryByTestId("mp-po-duty")).toBeNull();
+    expect(screen.queryByTestId("mp-selection-bar")).toBeNull();
+    expect(document.body.textContent).not.toContain("PO duty");
+
+    fireEvent.click(screen.getByTestId(`mp-select-${REQ2}`));
+    const bar = await screen.findByTestId("mp-selection-bar");
+    // The truthful sentence, pluralised from facts.
+    expect(screen.getByTestId("mp-selection-sentence")).toHaveTextContent(
+      "1 selected · 3 units · Issue 1 PO",
+    );
+    // The resolved person, once, beside the one issue action.
+    expect(within(bar).getByTestId("mp-po-duty")).toHaveTextContent(
+      "Shasha holds PO duty",
+    );
+    expect(within(bar).getByTestId("mp-issue-selected")).toBeInTheDocument();
+    expect(screen.getAllByTestId("mp-po-duty").length).toBe(1);
+
+    // Unticking removes the bar — and the duty with it.
+    fireEvent.click(screen.getByTestId(`mp-select-${REQ2}`));
+    expect(screen.queryByTestId("mp-selection-bar")).toBeNull();
+    expect(screen.queryByTestId("mp-po-duty")).toBeNull();
+  });
+
+  it("Issue PO declares the reviewed prices and issues the selection together", async () => {
+    await loaded();
+    fireEvent.click(screen.getByTestId(`mp-select-${REQ2}`));
+    fireEvent.click(await screen.findByTestId("mp-issue-selected"));
+    await waitFor(() => {
+      const costsRead = apiFetch.mock.calls.find((c) =>
+        String(c[0]).includes("/issue-costs"),
+      );
+      expect(costsRead).toBeTruthy();
+      const post = apiFetch.mock.calls.find((c) =>
+        String(c[0]).endsWith("/purchasing/requests/issue"),
+      );
+      expect(post).toBeTruthy();
+      const sent = JSON.parse(String((post![1] as RequestInit).body));
+      expect(sent.requestIds).toEqual([REQ2]);
+      expect(sent.together).toBe(true);
+      expect(sent.expectedCosts).toEqual({ "5539-2NA": 850 });
+    });
+  });
+
+  it("an operator who is not the actor sees the duty's name, not the button", async () => {
+    apiFetch.mockImplementation((url: string) => {
+      if (url.includes("/purchasing/requests/detail/")) return Promise.resolve(DETAIL);
+      if (url.includes("/purchasing/requests/issue-costs")) {
+        return Promise.resolve({ costs: [] });
+      }
+      if (url.includes("/purchasing/requests")) {
+        return Promise.resolve({ ...REGISTER, mayIssue: false });
+      }
+      if (url.includes("pick-items")) return Promise.resolve(PICK);
+      return Promise.resolve({});
+    });
+    await loaded();
+    fireEvent.click(screen.getByTestId(`mp-select-${REQ2}`));
+    const bar = await screen.findByTestId("mp-selection-bar");
+    expect(within(bar).getByTestId("mp-po-duty")).toHaveTextContent(
+      "Shasha holds PO duty",
+    );
+    expect(within(bar).queryByTestId("mp-issue-selected")).toBeNull();
   });
 });

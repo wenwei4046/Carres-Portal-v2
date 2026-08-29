@@ -15,20 +15,33 @@ import { SO_BATCH_RAIL, type SoBatchProductCategory } from "./so-batch-purchase"
 /** Every visible word on the Manual Purchase surfaces (COPY-STANDARD). */
 export const MANUAL_PURCHASE_WORDS = {
   page: "Manual Purchase",
-  newRequest: "+ New request",
-  createTitle: "NEW REQUEST",
+  /** COPY-STANDARD's own governed pair — built by Card 04. */
+  newRequest: "+ Manual Purchase",
+  createTitle: "NEW MANUAL PURCHASE",
   send: "Send for approval",
   /** The disabled Send NAMES its gap (the Receiving law: a grey button that
    *  will not say why is banned). The FIRST missing header fact wins, in the
    *  form's own top-to-bottom order. */
   sendNeedsDate: "Send — pick a date",
-  sendNeedsWhy: "Send — say why",
+  sendNeedsWhy: "Send — say what it is for",
+  sendNeedsServiceCase: "Send — pick the Service Case",
+  sendNeedsStaff: "Send — pick the staff member",
+  sendNeedsSubsidiary: "Send — name the subsidiary",
   cancel: "Cancel",
   needFor: "Need for",
   neededBy: "Needed by",
   deliverTo: "Deliver to",
   raisedBy: "Raised by",
+  /** Card 04 — ONLY `Other Purchase` asks this; routine purposes stopped
+   *  asking a duplicate `Why`. */
+  whatIsThisFor: "What is this for?",
+  /** History only — the label a pre-Card-04 routine request's stored reason
+   *  still prints under on the object. The form no longer asks it. */
   why: "Why",
+  /** The per-purpose structured-For fields on the create form. */
+  serviceCase: "Service Case",
+  staffMember: "Staff member",
+  subsidiary: "Subsidiary",
   items: "ITEMS",
   addLine: "+ Add line",
   remove: "Remove",
@@ -36,12 +49,70 @@ export const MANUAL_PURCHASE_WORDS = {
   freeStock: "free stock",
   alreadyOnPo: "already on PO",
   stillNeeded: "still needed",
-  /** Register column heads (card §7). */
-  colRef: "Ref",
-  colWhat: "What",
+  /**
+   * THE PERMANENT REGISTER'S ELEVEN COLUMNS — Card 04, exactly and in this
+   * order. Purpose is NOT a parent column: it lives in the rail, the
+   * expansion context and the object.
+   */
+  colRequestedDate: "Requested Date",
+  colApproval: "Approval Status",
+  colMprNo: "Manual Purchase No",
+  colPoNo: "PO No",
+  colNeededBy: "Needed By",
+  colFor: "For",
+  colItems: "Items",
   colQty: "Qty",
-  colStatus: "Status",
+  colSupplier: "Supplier",
+  colDeliverTo: "Deliver To",
+  colRequestedBy: "Requested By",
+  /** The PO lineage absence — the arithmetic ran and found no PO. */
+  notOrderedYet: "Not ordered yet",
+  /** Several destinations behind one request. */
+  multiple: "Multiple",
+  /** The expansion's own child columns (read-only; Card 04). */
+  expSku: "SKU",
+  expItem: "Item",
+  expRequestedQty: "Requested Qty",
+  expApprovedQty: "Approved Qty",
+  expOrderedQty: "Ordered Qty",
+  expStillToOrder: "Still To Order",
+  expSupplier: "Supplier",
+  expDeliverTo: "Deliver To",
+  expPoNo: "PO No",
+  emptyRegister: "No Manual Purchase yet.",
 } as const;
+
+/**
+ * THE APPROVAL COLUMN'S FOUR ANSWERS (Card 04 §3.2) — the approval FACT,
+ * never the request's whole status: `Need approval` while the configured
+ * approver has not decided; `Approved` / `Refused` once somebody did;
+ * `No approval needed` when the purpose's switch never asked.
+ */
+export const MANUAL_PURCHASE_APPROVAL_WORDS = {
+  need_approval: "Need approval",
+  approved: "Approved",
+  refused: "Refused",
+  not_needed: "No approval needed",
+} as const;
+
+export type ManualPurchaseApprovalKind = keyof typeof MANUAL_PURCHASE_APPROVAL_WORDS;
+
+/** ONE approval arithmetic over the stored decision facts (Law D). */
+export function manualPurchaseApprovalOf(r: {
+  approvalRequired: boolean;
+  approvedAt: string | null;
+  refusedAt: string | null;
+}): { kind: ManualPurchaseApprovalKind; label: string } {
+  const kind: ManualPurchaseApprovalKind =
+    r.refusedAt !== null
+      ? "refused"
+      : r.approvedAt !== null
+        ? "approved"
+        : r.approvalRequired
+          ? "need_approval"
+          : "not_needed";
+  return { kind, label: MANUAL_PURCHASE_APPROVAL_WORDS[kind] };
+}
 
 /**
  * The states (card §5). `Waiting` always names what it waits ON; `Arrived`
@@ -393,4 +464,151 @@ export function manualPurchaseApproverLine(
   const real = names.filter((n): n is string => n != null && n.trim() !== "");
   if (real.length === 0) return null;
   return `${real.join(" or ")} approves`;
+}
+
+// ─── The permanent Register — PURCHASING CARD 04, 2026-08-29 ─────────────────
+
+/**
+ * THE ONE REMAINDER ARITHMETIC — what a line still has to buy: the
+ * approver's number (falling back to the ask while undecided) less what
+ * already went out to a PO, floored at zero. The issue door, the
+ * issue-costs read and the Register expansion all call THIS (Law D); a
+ * second browser formula is the defect the Card bans by name.
+ */
+export function manualPurchaseLineRemainingOf(l: {
+  qty: number;
+  approvedQty: number | null;
+  issuedQty: number;
+}): number {
+  return Math.max(0, Number(l.approvedQty ?? l.qty) - Number(l.issuedQty ?? 0));
+}
+
+/**
+ * `PO No` — ONLY real lineage (Card 04 §3.4): the distinct actual
+ * `purchase_orders.po_no` values behind the request's lines. None:
+ * `Not ordered yet`. One: the number itself (the caller renders it as the
+ * clickable door). Several: `{n} POs`. Never a UUID, never an inference.
+ */
+export function manualPurchasePoSummary(poNos: readonly string[]): string {
+  const distinct = [...new Set(poNos.filter((n) => n && n.trim() !== ""))];
+  if (distinct.length === 0) return MANUAL_PURCHASE_WORDS.notOrderedYet;
+  if (distinct.length === 1) return distinct[0];
+  return `${distinct.length} POs`;
+}
+
+/**
+ * `Items` — human Catalog words (Card 04 §3.7): the ONE item-label
+ * arithmetic's output per live line. One item prints its name; several
+ * print `{first item} + {n} more`. SKU stays searchable and shows in the
+ * expansion, never here.
+ */
+export function manualPurchaseItemsSummary(labels: readonly string[]): string {
+  const real = labels.filter((l) => l && l.trim() !== "");
+  if (real.length === 0) return "";
+  if (real.length === 1) return real[0];
+  return `${real[0]} + ${real.length - 1} more`;
+}
+
+/** `Supplier` — Card 03's own projection summarised: one actual name, or
+ *  `{n} suppliers`. Never `Supplier not selected`, never a placeholder. */
+export function manualPurchaseSupplierSummary(names: readonly string[]): string {
+  const distinct = [...new Set(names.filter((n) => n && n.trim() !== ""))];
+  if (distinct.length === 0) return "";
+  if (distinct.length === 1) return distinct[0];
+  return `${distinct.length} suppliers`;
+}
+
+/** `Deliver To` — the governed destination; several print `Multiple`. */
+export function manualPurchaseDeliverToSummary(names: readonly string[]): string {
+  const distinct = [...new Set(names.filter((n) => n && n.trim() !== ""))];
+  if (distinct.length === 0) return "";
+  if (distinct.length === 1) return distinct[0];
+  return MANUAL_PURCHASE_WORDS.multiple;
+}
+
+/**
+ * `For` — the STRUCTURED object the purchase serves (Card 04 §3.6), one
+ * arithmetic for the Register and the object. Ready Stock and Showroom
+ * Display are served by the governed destination; Service Case by its
+ * linked Case number; Internal Staff Purchase by the real person;
+ * Subsidiary Purchase by the actual company; Other Purchase by its
+ * required `What is this for?` answer. A historical row without the
+ * structured fact prints nothing rather than a guess — and a retired
+ * purpose has no structured For at all, so it prints its stored reason
+ * only when that IS the row's own truth (`other_purchase`), never
+ * borrowed.
+ */
+export function manualPurchaseForOf(f: {
+  purpose: string;
+  destinationName: string | null;
+  serviceCaseNo: string | null;
+  staffName: string | null;
+  subsidiaryName: string | null;
+  why: string | null;
+}): string {
+  switch (f.purpose) {
+    case "ready_stock":
+    case "showroom_display":
+      return f.destinationName ?? "";
+    case "service_case":
+      return f.serviceCaseNo ?? "";
+    case "internal_staff_purchase":
+      return f.staffName ?? "";
+    case "subsidiary_purchase":
+      return f.subsidiaryName ?? "";
+    case "other_purchase":
+      return f.why ?? "";
+    default:
+      // A retired historical purpose has no structured For — honest blank.
+      return "";
+  }
+}
+
+/**
+ * WHO MAY BE TICKED (Card 04 §3, Selection): ONLY a request whose derived
+ * status is `Ready to order` with live remaining quantity. Need approval,
+ * refused/withdrawn, fully ordered and arrived rows refuse the tick — the
+ * same truth `manualPurchaseStatusOf` already derives, asked once.
+ */
+export function manualPurchaseSelectable(
+  status: ManualPurchaseStatusKind,
+  remainingQty: number,
+): boolean {
+  return status === "ready_to_order" && remainingQty > 0;
+}
+
+/**
+ * HOW MANY PURCHASE ORDERS THE SELECTION ISSUES — the document-partition
+ * arithmetic the issue door groups by (0380/0399: a document never mixes
+ * suppliers, categories, destinations or purposes; the register issues
+ * `together`, so the wall alone is the key). The printed `Issue {n} PO{s}`
+ * must predict what the server creates; the server still recomputes from
+ * its own read, which is agreement rather than trust.
+ */
+export function manualPurchaseIssueGroupCount(
+  lines: ReadonlyArray<{
+    supplierId: string | null;
+    category: string | null;
+    destinationId: string;
+    purpose: string;
+    remainingQty: number;
+  }>,
+): number {
+  const walls = new Set<string>();
+  for (const l of lines) {
+    if (l.remainingQty <= 0) continue;
+    walls.add(
+      `${l.supplierId ?? ""}|${l.category ?? ""}|${l.destinationId}|${l.purpose}`,
+    );
+  }
+  return walls.size;
+}
+
+/** `1 selected · 1 unit · Issue 1 PO` — pluralised from facts, never guessed. */
+export function manualPurchaseIssueSentence(
+  requests: number,
+  units: number,
+  pos: number,
+): string {
+  return `${requests} selected · ${units} unit${units === 1 ? "" : "s"} · Issue ${pos} PO${pos === 1 ? "" : "s"}`;
 }
