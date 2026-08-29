@@ -641,9 +641,14 @@ sidebar page. Existing implementation constants do not override these approved p
 | A parent cell over several values | one value prints itself; several print `2 POs` · `2 suppliers` · `Multiple` — the exact mapping lives in the expansion |
 | Open local filter-rail control | `Hide filters` |
 | Hidden local filter-rail control | `Show filters` |
-| Monthly PO duty holder | `{name} holds PO duty` |
-| Dated PO duty cover | `{name} is covering PO duty` |
-| No monthly holder | `Nobody holds PO duty this month.` |
+| Selected Issue action | `1 selected · 1 unit · Issue 1 PO          [YJ]  [Issue PO]` |
+| PO Duty owner chip title | `{name} · PO Duty` |
+| Dated cover chip title | `{cover name} · PO Duty cover for {normal holder}` |
+| No monthly holder in selected action | `Nobody holds PO duty this month.` |
+
+The SO Batch Purchase owner is never a permanent sentence in the toolbar or rail and never repeats
+on rows. Do not write Yu Jun's name in the action sentence. The compact chip carries the owner;
+`Issue PO` remains the one governed verb.
 
 **The rail — owner ruling 2026-08-27 (Card 02-C).** Five sections, in this order.
 `SETUP TO FIX` renders only when at least one affected Sales Order exists:

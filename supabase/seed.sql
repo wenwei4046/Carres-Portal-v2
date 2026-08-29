@@ -437,6 +437,11 @@ on conflict (id) do update
       outlet_id   = excluded.outlet_id,
       name        = excluded.name;
 
+-- Mirrors the governed production capability from 0400 for local resets.
+update app_users
+   set operations_superuser = true
+ where lower(email) = 'operation@carres.com';
+
 -- Also wire the salesperson seed row to its auth user
 update salespersons
    set user_id = '11111111-1111-1111-1111-000000000003'

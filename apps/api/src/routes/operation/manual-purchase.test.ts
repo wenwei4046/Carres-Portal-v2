@@ -132,7 +132,7 @@ function tableStub(result: unknown, opts?: { filterInBy?: string }) {
   return q;
 }
 
-function makeSb(rpc: ReturnType<typeof vi.fn>) {
+function makeSb(rpc: ReturnType<typeof vi.fn>, mayIssue = true) {
   return {
     from: vi.fn((table: string) => {
       switch (table) {
@@ -153,7 +153,12 @@ function makeSb(rpc: ReturnType<typeof vi.fn>) {
           return tableStub([]);
       }
     }),
-    rpc,
+    rpc: vi.fn((fn: string, args: unknown) => {
+      if (fn === "purchasing_actor_may_issue") {
+        return Promise.resolve({ data: mayIssue, error: null });
+      }
+      return rpc(fn, args);
+    }),
   } as unknown as ReturnType<typeof userClient>;
 }
 
@@ -161,9 +166,13 @@ function makeSb(rpc: ReturnType<typeof vi.fn>) {
  *  there is no "let the server read Catalog" path left. */
 const REVIEWED = { "5539-2NA": 850, "5539-CNR": 400 };
 
-async function issue(body: unknown, rpc: ReturnType<typeof vi.fn>) {
-  vi.mocked(userClient).mockReturnValue(makeSb(rpc));
-  const jwt = await makeJwt("operation");
+async function issue(
+  body: unknown,
+  rpc: ReturnType<typeof vi.fn>,
+  options: { mayIssue?: boolean; role?: "operation" | "principal" } = {},
+) {
+  vi.mocked(userClient).mockReturnValue(makeSb(rpc, options.mayIssue ?? true));
+  const jwt = await makeJwt(options.role ?? "operation");
   return app.fetch(
     new Request("https://api.test/api/operation/purchasing/requests/issue", {
       method: "POST",
@@ -176,6 +185,31 @@ async function issue(body: unknown, rpc: ReturnType<typeof vi.fn>) {
 }
 
 describe("POST /purchasing/requests/issue — the reason rides to the authority", () => {
+  it("refuses an ordinary non-duty operation user before the creation RPC", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: { po_ids: ["PO-9001"] }, error: null });
+    const res = await issue(
+      { requestIds: [REQ_A], together: false, expectedCosts: REVIEWED },
+      rpc,
+      { mayIssue: false },
+    );
+
+    expect(res.status).toBe(403);
+    expect(((await res.json()) as { code: string }).code).toBe("not_po_duty");
+    expect(rpc).not.toHaveBeenCalledWith("purchasing_issue_pos_batch", expect.anything());
+  });
+
+  it("accepts Jess through the same governed capability", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: { po_ids: ["PO-9001"] }, error: null });
+    const res = await issue(
+      { requestIds: [REQ_A], together: false, expectedCosts: REVIEWED },
+      rpc,
+      { role: "principal", mayIssue: true },
+    );
+
+    expect(res.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("purchasing_issue_pos_batch", expect.anything());
+  });
+
   it("together: one document per supplier×category wall, carrying purpose and demand links", async () => {
     const rpc = vi.fn().mockResolvedValue({ data: { po_ids: ["PO-9001"] }, error: null });
     const res = await issue({ requestIds: [REQ_A, REQ_B], together: true, expectedCosts: REVIEWED }, rpc);

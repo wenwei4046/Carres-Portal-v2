@@ -946,6 +946,11 @@ permanent band. Left = truthful selected count + Clear. Right = only actions val
 selection. A one-record action disappears for multi-selection rather than pretending to apply to
 many. Normal and selection states preserve the table's position and width.
 
+On SO Batch Purchase, PO Duty ownership is shown only beside the selected `Issue PO` action as one
+compact initials avatar chip (`YJ`, or the current dated cover), with full identity and duty context
+in title/accessible name. There is no permanent PO Duty toolbar/rail block and no owner repetition
+on rows. The chip states work ownership; it does not imply that the current actor is the owner.
+
 **REGISTER EXPORT AND OVERFLOW ROUTING — APPROVED / LOCKED (Loo, 2026-08-11).** A Register uses
 one visible `Export ▾` control for its supported current-view outputs: Excel · PDF · Print. Output
 formats do not scatter across `…` or become separate permanent normal-state buttons. When rows are

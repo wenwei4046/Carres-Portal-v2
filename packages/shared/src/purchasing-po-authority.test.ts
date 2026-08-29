@@ -31,6 +31,7 @@ const strip = (sql: string) => sql.replace(/--[^\n]*/g, "");
 const ACTOR = read("0379_");
 const MONEY = read("0380_");
 const DOCUMENT = read("0383_");
+const SUPERUSER = read("0400_");
 
 describe("0379 · one actor authority for every PO door", () => {
   it("has ONE resolver, and it answers about the DUTY", () => {
@@ -62,15 +63,6 @@ describe("0379 · one actor authority for every PO door", () => {
     expect(ACTOR).toMatch(/if not public\.purchasing_actor_may_issue\(v_actor\) then/);
   });
 
-  it("refuses a principal who is neither the holder nor the cover", () => {
-    /* Audit access is not issuance authority. The resolver answers about the
-       duty; a principal is refused like anyone else. */
-    expect(ACTOR).toMatch(
-      /select p_user is not null\s*\n\s*and \(public\.purchasing_po_actor\(\)->>'actor_user_id'\)::uuid = p_user/,
-    );
-    expect(strip(ACTOR)).not.toMatch(/app_role\(\) = 'principal'/);
-  });
-
   it("stores cover as a DATED record naming both people, written by no browser", () => {
     expect(ACTOR).toMatch(/create table if not exists public\.ops_po_duty_cover/);
     expect(ACTOR).toMatch(/normal_user_id uuid not null/);
@@ -85,6 +77,49 @@ describe("0379 · one actor authority for every PO door", () => {
     expect(ACTOR).toMatch(/add column if not exists duty_user_id uuid/);
     expect(ACTOR).toMatch(/add column if not exists acting_user_id uuid/);
     expect(ACTOR).toMatch(/kind, recipient, po_version,\s*\n\s*duty_user_id, acting_user_id/);
+  });
+});
+
+describe("0400 · Operations Superuser uses the same PO authority", () => {
+  it("stores one governed capability instead of checking operation@ in application code", () => {
+    expect(SUPERUSER).toMatch(
+      /alter table public\.app_users\s+add column if not exists operations_superuser boolean not null default false/,
+    );
+    expect(SUPERUSER).toMatch(
+      /create or replace function public\.is_operations_superuser\(p_user uuid\)/,
+    );
+    expect(SUPERUSER).toMatch(/u\.operations_superuser/);
+    expect(SUPERUSER).toMatch(/u\.role = 'principal'/);
+  });
+
+  it("governs the shared Operations account once in data, never in every caller", () => {
+    expect(SUPERUSER).toMatch(/where lower\(email\) = 'operation@carres\.com'/);
+    expect(SUPERUSER).toMatch(/set operations_superuser = true/);
+  });
+
+  it("accepts duty, cover or Operations Superuser through the existing single gate", () => {
+    expect(SUPERUSER).toMatch(
+      /create or replace function public\.purchasing_actor_may_issue\(p_user uuid\)/,
+    );
+    expect(SUPERUSER).toMatch(/public\.is_operations_superuser\(p_user\)/);
+    expect(SUPERUSER).toMatch(
+      /\(public\.purchasing_po_actor\(\)->>'actor_user_id'\)::uuid = p_user/,
+    );
+  });
+
+  it("does not turn every ordinary Operations login into a superuser", () => {
+    const code = strip(SUPERUSER);
+    expect(code).not.toMatch(/app_role\(\)\s*=\s*'operation'/);
+    expect(code).not.toMatch(/role\s*=\s*'operation'/);
+  });
+
+  it("records the actual issuer and normal duty or dated cover as distinct audit facts", () => {
+    expect(SUPERUSER).toMatch(/add column if not exists issue_duty_user_id uuid/);
+    expect(SUPERUSER).toMatch(/add column if not exists issue_cover_user_id uuid/);
+    expect(SUPERUSER).toMatch(/add column if not exists issue_authority text/);
+    expect(SUPERUSER).toMatch(/by_user_id,\s*issue_duty_user_id,\s*issue_cover_user_id/);
+    expect(SUPERUSER).toMatch(/v_actor,\s*v_normal,\s*v_cover/);
+    expect(SUPERUSER).toMatch(/'operations_superuser'/);
   });
 });
 

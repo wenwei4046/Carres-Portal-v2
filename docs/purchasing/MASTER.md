@@ -231,19 +231,24 @@ Purchase or Consignment Order; staff do not retype it.
 
 ### 5.3 One PO issue authority
 
-Only Current PO Duty may complete PO issuance. Manager approval governs exceptions and commercial
-authority; it does not replace Current PO Duty as operator. Manager does not manually assign every
-row. Duty, roster and buddy-cover resolve the action owner automatically.
+Current PO Duty, or the dated cover while one is in force, is the normal work owner and remains
+accountable for PO issuance. A governed Operations Superuser may also complete any operational PO
+action without becoming — or being displayed/audited as — the duty holder. Jess is an Operations
+Superuser through Principal authority; `operation@carres.com` is the explicitly governed shared
+Operations Superuser. An ordinary Operations login that is neither duty, cover nor superuser is
+refused. Commercial approval remains separate and never follows from issue authority.
 
-**HOW IT IS ENFORCED — BUILT, migrations 0379 / 0380, PR #894.** `purchasing_po_actor()` is the ONE
+**HOW IT IS ENFORCED — BUILT, migrations 0379 / 0380; 0400 pending governed apply.**
+`purchasing_po_actor()` is the ONE
 resolver. It reads the month's `ops_po_duty` holder and the dated `ops_po_duty_cover` window, and
 returns both people separately: the normal holder, because Team Work groups by them, and the acting
-cover, because the audit trail must say who pressed it. `purchasing_actor_may_issue()` is the gate,
-and it is asked by the CREATION AUTHORITY itself — `purchasing_issue_pos_batch` — and by the evidence
-door `purchasing_confirm_po_sent`. So SO Batch Purchase, Manual Purchase and a direct RPC call all
-meet the same authority; a door only its caller guards is not guarded. A principal who holds neither
-role is refused: audit access is not issuance authority. Cover has no write policy — it is set
-through a governed door, never by a browser.
+cover. `is_operations_superuser()` reads Principal or the governed `app_users` capability;
+application code never checks an email. `purchasing_actor_may_issue()` combines duty, dated cover
+and that capability, and is asked by SO Batch Purchase, Manual Purchase, the API issue routes, the
+creation authority `purchasing_issue_pos_batch`, and the evidence door
+`purchasing_confirm_po_sent`. PO History records actual actor, normal duty, dated cover and the
+authority used as distinct fields; a superuser is never rewritten as Yu Jun or the cover. Cover has
+no browser write policy.
 
 ### 5.4 Deliver To
 
@@ -643,9 +648,12 @@ SETUP TO FIX              ← the whole section renders only when at least one a
   panel-left icon grammar as the Portal sidebar. While hidden it does not become a 60px icon rail;
   the Register takes the width and its toolbar exposes `Show filters`. The choice is remembered for
   that staff browser. This is one local-filter control, not another module-navigation control.
-- **PO Duty appears once in the Register toolbar, never in the filter rail and never repeated on
-  every order.** The avatar/name comes from the live resolved Operation roster: dated cover first,
-  otherwise the monthly holder. Selection actions use the same resolved person.
+- **PO Duty appears only in the selected Issue action, never as a permanent toolbar/rail block and
+  never repeated on rows.** The selected bar direction is
+  `1 selected · 1 unit · Issue 1 PO          [YJ]  [Issue PO]`. `[YJ]` is a compact structured owner
+  avatar chip; hover/title reads `Yu Jun · PO Duty`. A dated cover replaces the initials and title
+  with the cover identity. The action sentence never names Yu Jun. The chip states normal ownership;
+  button authority comes from §5.3, so duty/cover, Jess and `operation@carres.com` see the live action.
 - Fully covered / `Buy = 0` DEMAND leaves the buying selection — it is not offered a tick, and
   the leaf listing drops it — but the SALES ORDER'S ROW never leaves (Card 02-B). If a PO is
   cancelled and the quantity is still required, the selectable demand returns automatically by
@@ -1076,6 +1084,7 @@ are snapshots, not editable truth or a second settlement ledger.
 | Requester | create Manual Purchase and supply missing request facts | approve own request or mark ordered |
 | Approver / Manager | approve/reject governed internal buy and commercial exceptions | replace receiving/PO duty evidence |
 | Current PO Duty | batch approved demand; issue/revise supplier documents; record promises/claims | approve own unauthorised price; post stock or supplier payment |
+| Operations Superuser (Jess; governed shared Operations account) | perform the operational PO actions available to Current PO Duty while preserving the normal duty/cover owner in evidence | become or impersonate PO Duty; approve own unauthorised price; erase the actual actor |
 | Current GRN Duty | count, inspect, attach note, accept/reject and post source receipt | change PO price/quantity or ownership agreement |
 | Stock / Warehouse | label, locate, move, reserve and prove physical custody | issue/cancel supplier commitments |
 | Service | intake problem and govern problem/outcome record | create unapproved Purchasing consequence |

@@ -127,6 +127,11 @@ roster, duty and buddy/cover facts; the Work Engine applies them so absence chan
 work without changing the underlying business record or rewriting its history. A manager may see or
 filter the resolved owner, but Work never creates a second assignment truth.
 
+An action owner and an action capability are separate facts. A governed Operations Superuser may
+perform the operational action without replacing the resolved owner. The event records both the
+actual actor and the normal duty/dated-cover context; UI owner chips continue to show the owner, not
+an invented reassignment.
+
 Keep these identities separate: object PIC/accountability · action owner · fault owner · cost
 bearer · service provider. A module may summarise another module's action and owner, but the module
 that owns the trigger and completion fact owns the owner rule. `ACTION-FLOW-STANDARD.md` defines the
@@ -612,8 +617,9 @@ Supplier Claim · Payment/Refund · Guarantee, as applicable.
 
 **LINKS TO** — the customer order (as its PIC).
 
-> **Duty, not email, decides permission** — V1's law, kept. **And the PIC on an order is a
-> POINTER to a person, never a copy of them.**
+> **Duty or a governed capability — never a runtime email check — decides permission.** Duty stays
+> the normal owner; an Operations Superuser capability permits action without changing ownership.
+> **And the PIC on an order is a POINTER to a person, never a copy of them.**
 
 ---
 
