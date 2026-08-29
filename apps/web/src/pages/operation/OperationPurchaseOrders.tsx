@@ -372,7 +372,7 @@ const NO_EXPANSION: ReadonlySet<string> = new Set<string>();
 const ITEM_GRID =
   "grid grid-cols-[16px_64px_minmax(0,1fr)_40px_160px_64px] gap-2";
 
-export default function OperationPurchaseOrders() {
+export function LegacyOperationPurchaseOrders() {
   const posQ = useOperationPos({ status: "all" });
   const suppliersQ = useOperationSuppliers();
   const warehouseQ = useOperationWarehouse();
@@ -1704,6 +1704,11 @@ export default function OperationPurchaseOrders() {
     </div>
   );
 }
+
+// The current owner-approved Purchase Orders Register/Object Detail. The
+// legacy Supplier Execution Workspace remains below as implementation history
+// while governed write components are migrated through their shared seams.
+export { default } from "./purchase-orders/PurchaseOrdersPage";
 
 /**
  * ── THE WORKING AREA — the row expand (Q5, Loo 2026-08-04) ─────────────────

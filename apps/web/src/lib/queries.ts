@@ -3402,6 +3402,24 @@ export interface operationPoListRow {
     destination_id?: string | null;
     /** Purchasing's own internal note; never printed on the PO. */
     ops_remark?: string | null;
+    /** Manual Purchase lineage: demand → request header. */
+    demand_id?: string | null;
+    /** 0382 governed customer-order allocation for this exact PO line. */
+    sources?: {
+      po_id: string;
+      po_line_id: string;
+      order_id: string;
+      order_line_id: string | null;
+      so: number | null;
+      qty: number;
+    }[];
+    /** Exact governed lineage for this line, including Manual Purchase. */
+    governed_sources?: Array<{
+      kind: "sales_order" | "manual_purchase";
+      reference: string;
+      /** Null preserves a legacy source link whose exact allocation is unknown. */
+      qty: number | null;
+    }>;
     /** Register (Jess, 2026-08-02) — the EXCEL rows this PO line becomes:
      *  one entry per SO × SKU, each carrying the SALESPERSON's remark from
      *  the sales order. Derived server-side; a quantity no SO claims comes
@@ -3440,6 +3458,9 @@ export interface operationPoListRow {
     recipient?: string | null;
     po_version?: number | null;
     sent_by?: string | null;
+    sent_by_name?: string | null;
+    duty_name?: string | null;
+    acting_name?: string | null;
     po_revisions: { rev_no: number } | null;
   }[];
   /** The supplier-date field's own history (0306 ledger, newest first) —
@@ -3468,11 +3489,18 @@ export interface operationPoListRow {
   /** 2026-05-18 (Loo C+D) — worst-case urgency across source SOs. NULL when
    *  the PO has no source SOs (stockpile) or all delivery_date are NULL. */
   urgency?: "critical" | "urgent" | "normal" | null;
+  /** Governed document sources, never inferred from display-only SO mirrors. */
+  sources?: Array<{
+    kind: "sales_order" | "manual_purchase";
+    reference: string;
+  }>;
 }
 export interface operationPosListResponse {
   pos: operationPoListRow[];
   /** The active destination registry (0307) — the per-line picker's options. */
   destinations?: { id: string; name: string; is_default: boolean }[];
+  /** Every destination referenced by these POs, including closed history. */
+  referencedDestinations?: { id: string; name: string; is_default: boolean }[];
   /** ONE company-wide supplier-message draft (0312). */
   messageTemplate?: string | null;
 }
@@ -3801,16 +3829,21 @@ export interface SupplierClaimsResponse {
 
 export function useOperationSupplierClaims(
   status: "open" | "closed" | "all",
+  poIdOrOpts?: string | Partial<UseQueryOptions<SupplierClaimsResponse>>,
   opts?: Partial<UseQueryOptions<SupplierClaimsResponse>>,
 ) {
+  const poId = typeof poIdOrOpts === "string" ? poIdOrOpts : null;
+  const options = typeof poIdOrOpts === "string" ? opts : poIdOrOpts;
   return useQuery({
-    queryKey: qk.operation.supplierClaims(status),
+    queryKey: [...qk.operation.supplierClaims(status), poId ?? "all-pos"] as const,
     queryFn: () =>
       apiFetch<SupplierClaimsResponse>(
-        `/api/operation/supplier-claims?status=${status}`,
+        `/api/operation/supplier-claims?status=${status}${
+          poId ? `&poId=${encodeURIComponent(poId)}` : ""
+        }`,
       ),
     staleTime: 30_000,
-    ...opts,
+    ...options,
   });
 }
 
@@ -5659,6 +5692,38 @@ export interface operationPoUnitRow {
 }
 export interface operationPoUnitsResponse {
   units: operationPoUnitRow[];
+}
+export interface OperationPoRevisionRow {
+  id: string;
+  rev_no: number;
+  reason: string | null;
+  created_by: string | null;
+  created_at: string;
+  snapshot: Record<string, unknown>;
+  actor_name: string | null;
+}
+export interface OperationPoHistoryRow {
+  id: string;
+  text: string;
+  by_role: string | null;
+  by_user_id: string | null;
+  occurred_at: string;
+  actor_name: string | null;
+}
+export interface OperationPoAuditResponse {
+  revisions: OperationPoRevisionRow[];
+  history: OperationPoHistoryRow[];
+}
+export function useOperationPoAudit(poId: string | null) {
+  return useQuery<OperationPoAuditResponse>({
+    queryKey: ["operation", "pos", poId ?? "", "audit"] as const,
+    queryFn: () =>
+      apiFetch<OperationPoAuditResponse>(
+        `/api/operation/pos/${encodeURIComponent(poId ?? "")}/audit`,
+      ),
+    enabled: !!poId,
+    staleTime: 30_000,
+  });
 }
 export function useOperationPoUnits(
   poId: string | null,

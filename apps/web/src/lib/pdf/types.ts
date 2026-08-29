@@ -180,6 +180,9 @@ export type PoTemplateData = {
     description: string;
     qty: number;
     unit: string;
+    /** Effective governed destination for this goods line. Older document
+     * payloads may omit it, in which case the PO-level destination applies. */
+    destination?: { name: string; address: string } | null;
     attrs?: Record<string, unknown> | null;
     /** ops_stock_items.unit_code — minted at PO-open under the locked
      *  `U1-000-001` identity (0381); the Item ID column is fed by this. */

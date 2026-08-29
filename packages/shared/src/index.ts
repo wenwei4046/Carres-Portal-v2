@@ -2840,3 +2840,5 @@ export * from "./sales-order-completion";
 // CARD 9 — the unified work engine: the five-part rule registry (Trigger ·
 // Owner · Action · Due · Completion fact) + WHO/ACTION/working-day composition.
 export * from "./work-engine";
+// Purchase Orders — one evidence-derived Register state and Work vocabulary.
+export * from "./purchase-order-register";

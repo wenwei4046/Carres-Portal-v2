@@ -73,6 +73,10 @@ function listBuilder(rows: unknown[], eqCalls: Array<[string, unknown]>): any {
     select: vi.fn(() => b),
     order: vi.fn(() => b),
     limit: vi.fn(() => b),
+    range: vi.fn((from: number, to: number) => Promise.resolve({
+      data: rows.slice(from, to + 1),
+      error: null,
+    })),
     in: vi.fn(() => b),
     eq: vi.fn((col: string, val: unknown) => {
       eqCalls.push([col, val]);
@@ -167,6 +171,81 @@ describe("GET /api/operation/supplier-claims", () => {
     expect(res.status).toBe(200);
     // Only the two head-count queries filter on status; the list itself does not.
     expect(eqCalls.filter(([c]) => c === "status")).toHaveLength(2);
+  });
+
+  it("can limit the return and claim connection to one governed PO", async () => {
+    const eqCalls: Array<[string, unknown]> = [];
+    const sb = { from: vi.fn(() => listBuilder([], eqCalls)) };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("http://t/api/operation/supplier-claims?status=all&poId=PO-2030", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(eqCalls).toContainEqual(["po_id", "PO-2030"]);
+  });
+
+  it("returns every claim connected to one PO beyond the worklist window", async () => {
+    const eqCalls: Array<[string, unknown]> = [];
+    const claims = Array.from({ length: 205 }, (_, index) => ({
+      ...CLAIM,
+      id: `claim-${index}`,
+      claim_no: `SC-${String(index).padStart(4, "0")}`,
+      po_id: "PO-2030",
+      supplier_id: null,
+      reported_by: null,
+    }));
+    const sb = {
+      from: vi.fn((table: string) => listBuilder(
+        table === "supplier_claims" ? claims : [],
+        eqCalls,
+      )),
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("http://t/api/operation/supplier-claims?status=all&poId=PO-2030", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { claims: unknown[] };
+    expect(body.claims).toHaveLength(205);
+  });
+
+  it("reports a held-unit connection error instead of calling it zero", async () => {
+    const eqCalls: Array<[string, unknown]> = [];
+    const held = listBuilder([], eqCalls);
+    held.range = vi.fn().mockResolvedValue({
+      data: null,
+      error: { code: "XX000", message: "held-unit read failed", details: "" },
+    });
+    const sb = {
+      from: vi.fn((table: string) => {
+        if (table === "supplier_claims") return listBuilder([CLAIM], eqCalls);
+        if (table === "suppliers") return listBuilder([{ id: "s1", name: "Ohana" }], eqCalls);
+        if (table === "app_users") return listBuilder([{ id: "u1", name: "Shasha" }], eqCalls);
+        if (table === "ops_stock_items") return held;
+        return listBuilder([], eqCalls);
+      }),
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("http://t/api/operation/supplier-claims", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual(expect.objectContaining({ error: expect.any(String) }));
   });
 
   it("an unknown status word falls back to open rather than leaking everything", async () => {
@@ -828,6 +907,10 @@ describe("GET / carries the customer resolution", () => {
         }),
         order: vi.fn(() => b),
         limit: vi.fn(() => b),
+        range: vi.fn((from: number, to: number) => Promise.resolve({
+          data: rows.slice(from, to + 1),
+          error: null,
+        })),
         in: vi.fn(() => b),
         eq: vi.fn(() => b),
         maybeSingle: vi.fn().mockResolvedValue({ data: rows[0] ?? null, error: null }),

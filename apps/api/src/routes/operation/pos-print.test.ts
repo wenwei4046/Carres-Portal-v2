@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
+import { readFileSync } from "node:fs";
 import { SignJWT, createLocalJWKSet, exportJWK, generateKeyPair, type JWK, type KeyLike } from "jose";
 import app from "../../index";
 import { _setJwksForTesting } from "../../middleware/auth";
@@ -123,6 +124,24 @@ function mockRpcAndRefs(opts: {
 }
 
 describe("GET /api/operation/pos/:id/print-data", () => {
+  it("the governed repair reads the audit ledger's real occurred_at column", () => {
+    const sql = readFileSync(
+      new URL("../../../../../supabase/migrations/0400_the_po_document_carries_every_destination.sql", import.meta.url),
+      "utf8",
+    );
+    expect(sql).toContain("order by occurred_at asc");
+    expect(sql).not.toMatch(/from audit_log[\s\S]{0,160}order by created_at/);
+  });
+
+  it("the document authority returns each line's effective destination", () => {
+    const sql = readFileSync(
+      new URL("../../../../../supabase/migrations/0400_the_po_document_carries_every_destination.sql", import.meta.url),
+      "utf8",
+    );
+    expect(sql).toContain("coalesce(l.destination_id, v_po.destination_id)");
+    expect(sql).toMatch(/'destination'[\s\S]{0,500}'name'[\s\S]{0,500}'address'/);
+  });
+
   it("200 — returns the document authority's answer, and adds nothing to it", async () => {
     const { rpc } = mockRpcAndRefs({});
     const jwt = await makeJwt("operation");

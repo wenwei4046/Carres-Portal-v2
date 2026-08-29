@@ -254,7 +254,13 @@ Default is `Carres Klang`.
 - Supplier already received a PDF: `Change Deliver To` creates a new version/change record and
   concrete work to send the new PDF.
 
-The final destination is one Purchasing-owned fact read by Sales Order and receiving/logistics.
+**Owner B, 2026-08-28:** one PO may carry several governed Deliver To destinations. The PO-level
+destination is the default; a goods line may name another active Purchasing destination. The formal
+PDF prints every line's effective destination and, when several are used, every exact address in its
+DELIVER TO block. A closed destination remains visible on old records but cannot be selected for new
+work. The final destination of each goods line is Purchasing-owned truth read by Sales Order and
+receiving/logistics. Changing it after the supplier received the PDF mints a new PO version and send
+work; it never silently changes the paper already sent.
 
 ### 5.5 Supplier and SKU resolution
 
