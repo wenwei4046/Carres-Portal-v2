@@ -530,21 +530,22 @@ outside duty/cover/capability is refused by the same web, API and SQL authority.
 
 The user-facing gate uses two lines:
 
-> **Delivery note is missing**
-> Upload it before you finish receiving.
+> **Supplier DO is missing**
+> Add the Supplier DO before you finish receiving.
 
 ### 7.4 Partial, reject, claim and return consequences
 
-- **Partial receipt:** accepted Units post immediately; the exact open balance remains Incoming.
+- **Partial receipt:** valid Received Qty posts immediately; the exact Pending Delivery Qty remains
+  open on the PO.
   `Confirm balance delivery date` opens for PO Duty and closes only from a new evidenced supplier
   promise. Partial by itself is not damage and does not create a claim.
 - **Reject on the spot:** rejected/not-delivered Units never become available Stock. The receipt
   records exact quantity/Units, observable reason, photos and supplier/carrier hand-back proof. A
   Claim opens only when Carres still needs a replacement, repair, collection or other supplier
   result.
-- **Accept with issue:** Carres accepts physical custody but the exact Unit is controlled and
-  unavailable. The same posted receipt creates the source-linked Supplier Claim and retains GRN
-  evidence.
+- **Problem found later:** the posted GRN remains sealed. The observation enters Service Case and an
+  authorised supplier-responsible outcome opens the source-linked Supplier Claim; Receiving is not
+  reopened to rewrite the original physical fact.
 - **Purchase Return:** only an approved Claim/outcome creates it. Issuing the document does not
   move custody. Exact-Unit scan/count, actual collector, time and handover proof create the Stock
   consequence. Partial collection leaves the remaining Units open.
@@ -632,7 +633,7 @@ summary. Action ownership uses structured avatar metadata.
 Official UI language is English at primary-school reading level.
 
 ```text
-Supplier date is missing
+Supplier Delivery Date is missing
 [YJ] Ask Dorsettloft for the delivery date
 ```
 
@@ -1229,7 +1230,7 @@ commitment. `PO Delivery Date` is the original official supplier-facing date on 
 unchanged rows read `Same as PO`. `Goods Received At` belongs to Receiving and never substitutes for
 any of these dates.
 **Columns:** PO No., PO Issued, Supplier, Source, Deliver To, PO Delivery Date, Supplier Delivery
-Date when changed, Ordered, Received, Pending Delivery Qty, Current Version, Supplier Has.
+Date when changed, Order Qty, Received Qty, Pending Delivery Qty, Current Version, Supplier Has.
 **Journey:** open prepared issue → validate authority/price/Units/destination → send PDF → record
 outbound fact → record supplier date or exception → monitor receipt balance.
 **Object/placement:** full-width view; 50/50 check/preview for issue/change; Document, Revisions,
@@ -1242,8 +1243,8 @@ overdelivery, price change, cancellation and post-send destination change.
 
 This section supersedes the stale `Goods Receipts` rail, status legend, `Source`, `Arrival Date`,
 `Expected`, `Accepted`, `Rejected` and Receiving `Work` column proposal that formerly lived here.
-The separate Receiving owner review owns its final page presentation; Purchasing binds these shared
-facts only:
+The separate Receiving owner review now owns the following approved page presentation and shared
+facts:
 
 - Navigation/workspace is `Receiving`. The supplier gives the Supplier DO; Carres creates the Goods
   Receipt and numbered GRN only after physical receiving.
@@ -1257,9 +1258,23 @@ facts only:
   `Pending Delivery Qty`. Extra quantity is recorded separately. Damaged/wrong/extra never reduce
   Pending Delivery Qty and never create available stock.
 - Supplier DO, channel/evidence, recorder and event times remain auditable. Finishing receiving
-  creates the GRN once and moves only valid received goods into Stock custody.
+  allocates and stores one formal `GRN-YYYYMMDD-RRRR` and moves only valid received goods into Stock
+  custody. Retry returns the same GRN; a reversed number is never reused.
 - Receiving-owned work deep-links the exact PO/Receiving Session. A Purchasing supplier chase
   deep-links the exact PO. Merely opening WhatsApp/email completes nothing.
+- The 240px `RECEIVING DATE` rail shows `Late`, six actual Warehouse work dates, `Later` and
+  `No delivery date`; Sunday and Selangor public holidays are excluded and zero counts remain
+  visible. It has no local Work panel.
+- Register rows are PO/CO open-balance parents with each physical Receiving Session/GRN disclosed
+  beneath. Default columns are `GRN No.` · `PO No.` · `PO Issued` · `Supplier` · `Deliver To` ·
+  `PO Delivery Date` · conditional `Supplier Delivery Date` · `Goods Received At` · `Order Qty` ·
+  `Received Qty` · `Damaged Qty` · `Wrong Item Qty` · `Pending Delivery Qty` · `Supplier DO No.` ·
+  `Unit ID`. There is no `Source`, purchase-origin, status or Work column.
+- `Start Receiving` creates a persistent autosaved Draft. Carres station uses `Save Receiving`;
+  Warehouse uses `Send count`; GRN Duty uses `Check in` or `Return count to {warehouse}`. All doors
+  converge on one posting authority.
+- Draft/count/review is full-width. A posted record is read-only and may show 50% operational facts
+  plus 50% official `GOODS RECEIPT NOTE`; below 1130px the GRN stacks after the facts.
 
 No migration or Receiving implementation is authorised by this 2026-08-29 seam record.
 
@@ -1324,9 +1339,9 @@ duplicate request.
 
 **Purpose / source:** supplier-owned display placement or swap from approved Display Request/claim;
 no blank `+ New`.
-**Left rail:** `PDF not sent`, `Supplier date missing`, `Due at showroom`, `Part received`, `Swap return proof missing`, `Completed`.
+**Left rail:** `PDF not sent`, `Supplier Delivery Date missing`, `Due at showroom`, `Part received`, `Swap return proof missing`, `Completed`.
 **Columns:** CO No., Supplier, Source Request, Coming In Units, Going Back Units, Showroom, Supplier
-Date, Received, Return Handover, Work.
+Delivery Date, Received Qty, Return Handover, Work.
 **Journey:** verify supplier ownership → allocate exact Unit IDs → check coming-in/going-back lines →
 send one PDF → record promise → receive through Receiving → prove outgoing handover.
 **Object/placement:** full-width view; 50/50 while issuing/revising. Ownership is locked.
@@ -1373,17 +1388,17 @@ invoice/settlement.
 | Manual Purchase awaits decision; due no later than its Order By | Configured real purchase approver | `Approve MPR-20260829-2779` | Stored approval or refusal with actual actor/time exists |
 | Approved Manual Purchase has remaining demand; due on its Order By | Normal PO Duty/cover; Operations Superuser may act | `Issue the purchase order for MPR-20260829-2779` | Current PO version has confirmed-sent evidence and actual actor |
 | Approved demand ready | Normal PO Duty/cover; Operations Superuser may act | `Issue the purchase order to Hooka` | Current PDF version sent, outbound fact and actual actor exist |
-| Supplier date missing | Normal PO Duty/cover; Operations Superuser may act | `Ask Hooka for the delivery date` | Actual supplier answer, channel, evidence, recorder and times exist on the exact PO |
+| Supplier Delivery Date missing | Normal PO Duty/cover; Operations Superuser may act | `Ask Hooka for the delivery date` | Actual supplier answer, channel, evidence, recorder and times exist on the exact PO |
 | Arrival due next Office work day | Normal PO Duty/cover; Operations Superuser may act | `Confirm Hooka's Fri, 28 Aug arrival` | Actual supplier answer/date, channel, evidence, recorder and times exist on the exact PO |
 | Required arrival at risk | Normal PO Duty/cover; Operations Superuser may act | `Ask Hooka if the goods can arrive by Fri, 28 Aug` | Governed supplier answer/exception, evidence and actual actor exist on the exact PO |
-| PO/CO goods arrive | Normal GRN Duty/cover; Operations Superuser may act | `Receive PO-20260820-4827 from Hooka` | Exact Receiving Session records physical outcome and numbered GRN |
+| PO/CO goods arrive | Normal GRN Duty/cover; Operations Superuser may act | `Check in PO-20260820-4827 from Hooka` | Exact Receiving Session records physical outcome and numbered GRN |
 | Supplier DO/evidence missing | Normal GRN Duty/cover; Operations Superuser may act | `Add the Supplier DO before you finish receiving` | Supplier DO reference/evidence and actual recorder exist on the Receiving Session |
 | Partial receipt leaves balance | Normal PO Duty/cover; Operations Superuser may act | `Ask Hooka for the balance delivery date` | Evidenced balance promise exists on the exact open PO line |
 | Showroom display change | Showroom role then Purchasing decision role | `Record the current Unit and requested model` | Required request facts exist |
-| Supplier claim reply missing | Current PO Duty | `Ask Hooka to reply to the supplier claim` | Supplier reply exists |
-| Return collection missing | Current PO Duty | `Ask Hooka for the collection date` | Collection date exists |
-| Repair date passed | Current PO Duty | `Ask Hooka when U1-000-001 will return` | New governed date/outcome exists |
-| Consignment Unit sold | Current PO Duty | `Issue the sale notice to Dorsettloft` | Current notice version sent |
+| Supplier claim reply missing | Normal PO Duty/cover; Operations Superuser may act | `Ask Hooka to reply to the supplier claim` | Supplier reply exists |
+| Return collection missing | Normal PO Duty/cover; Operations Superuser may act | `Ask Hooka for the collection date` | Supplier collection answer exists |
+| Repair date passed | Normal PO Duty/cover; Operations Superuser may act | `Ask Hooka when U1-000-001 will return` | New governed date/outcome exists |
+| Consignment Unit sold | Normal PO Duty/cover; Operations Superuser may act | `Issue the sale notice to Dorsettloft` | Current notice version sent |
 | Supplier invoice missing | Finance/AP Duty | `Ask Dorsettloft to send the invoice` | Supplier invoice fact exists |
 
 Quick Rail may show source, exact Unit, supplier contact, current document/version, destination,
@@ -1432,8 +1447,8 @@ Reports are generated from authoritative records and open in central Reports or 
 
 - demand remaining/covered/ordered by source;
 - purchase quantity and open balance by supplier/SKU/destination;
-- missing, changed and passed supplier dates;
-- partial receipts, quantity/condition differences and missing delivery notes;
+- missing, changed and passed Supplier Delivery Dates;
+- partial receipts, quantity/condition differences and missing Supplier DO evidence;
 - supplier delivery, claim, return and repair performance;
 - supplier-owned Units by showroom, label state and age;
 - consignment placement, return and sale notices by supplier/Unit/date;

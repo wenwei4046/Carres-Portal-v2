@@ -468,24 +468,28 @@ and eight tabs on it is one tab and seven empty rooms.
 PARALLEL TRACKS      Sales Order (8)
 REFERENCE ONLY       Purchase Order · Supplier Claim
                        work is the first tab; the rest are Versions / History / Order Route
-ONE SCROLL           Goods Receipt · Purchase Return · Repair Order · Display Request ·
+ONE SCROLL           Receiving Session / Goods Receipt · Purchase Return · Repair Order · Display Request ·
                        Manual Purchase · the governed Consignment documents
 ```
 **The test, and it is mechanical: would a staff member open this tab on an ordinary Tuesday?**
 Yes and it runs beside the others → reason one. No, but they would hunt for it when something
 went wrong → reason two. Neither → it is a section in the scroll, not a tab.
 
-### THE SPLIT IS AN EDIT MODE, AND ONLY WHERE AN OUTSIDER READS THE RESULT
-**Viewing never splits the screen** (Jess, 2026-08-18). Pressing edit does, and the right half is
-**the document the other party will actually receive**, redrawn as the left half is typed — which
-is the only way an operator can see what a supplier will read without printing it.
+### THE SPLIT IS AN EDIT MODE, PLUS ONE POSTED-GRN VIEW EXCEPTION
+**Viewing normally never splits the screen** (Jess, 2026-08-18); the posted-GRN evidence view below
+is the one explicit exception. For ordinary document work, pressing edit creates the split and the
+right half is **the document the other party will actually receive**, redrawn as the left half is
+typed — which is the only way an operator can see what a supplier will read without printing it.
 ```
 SPLITS       PO · Consignment Order · Consignment Return · Consignment Sale Notice ·
                Purchase Return · Repair Order · Supplier Claim
-NEVER        Goods Receipt · Display Request · Manual Purchase
+POSTED VIEW  GRN — 50% immutable Receiving facts + 50% official GOODS RECEIPT NOTE
+NEVER        Receiving draft/count/review · Display Request · Manual Purchase
 ```
-Receiving RECORDS what was counted; it composes nothing for anybody. A preview pane there spends
-half a screen on something no one outside will ever read.
+**Owner correction 2026-08-29:** Receiving draft/count/review remains full-width and composes no
+document. Only after posting may the read-only object show the operational evidence beside the
+official GRN. At 1130px and wider the two halves are 50/50; below 1130px Receiving facts come first
+and the GRN stacks below. This page-scoped exception does not admit a live preview while counting.
 
 ### A PANEL'S ACTIONS LIVE IN ITS OWN HEADER ⋮
 Already ruled (Jess, 2026-07-11) and it corrected nine surfaces at once —
@@ -665,7 +669,9 @@ directory only and said so.*
   `WORK TO DO` rail panel.** Module rails contain only that Register's approved factual filters.
   A future exception requires an explicit Owner ruling naming the action owner and write door; a
   UI kit or page author may never infer one from available action data. SO Batch Purchase has no
-  local work panel.
+  local work panel. Receiving's owner-approved 240px rail is the factual `RECEIVING DATE` filter
+  over Warehouse-calendar delivery days; Receiving actions stay in central My Work / Team Work and
+  deep-link the exact PO/Receiving Session, with no local Work panel or Register Work column.
 - A Current Action or Work row uses two visual lines when both fact and action are needed.
   **Line 1** is the fact/problem in governed body size and medium/semibold emphasis. **Line 2**
   is the next action in the governed smaller supporting size, regular weight and quieter but
@@ -930,7 +936,7 @@ chat does not re-decide them:
 |---|---|---|
 | Where do the DESTINATIONS come from? | `portal-nav`'s `visibleGroups` / `visibleItems` — the sidebar's own functions | A second destination list is a second permission model, and the copy is the one that drifts |
 | How are DOCUMENTS permission-filtered? | `GET /api/operation/jump` reads under the caller's own token; RLS decides what exists. `requireOperation` keeps every other role off the route entirely | A row the caller may not select is never returned to the Worker, so there is no filtered list to leak |
-| What does a `GRN` result open, given the number is DERIVED and never stored? | A query carrying a full `DDMMYY` reads the date back out of the number and asks for that day exactly; a half-typed query scans the 200 most recent posted records | An exact lookup must not depend on how far a recent window happens to reach |
+| What does a `GRN` result open? | The stored formal `GRN-YYYYMMDD-RRRR` identity opens its exact posted Receiving Session; partial permitted searches use the governed document index | A numbered official document must be found by its stored identity, never reconstructed from a date/hash or a recent-row window |
 | What does an `INV` result open? | The Sales Order it invoices | An invoice is a document OF an order (`invoices.order_id`, `orders.invoice_no`); the order's workspace is where the paper is read and reprinted |
 
 🟡 **ONE WORD IS OWED A RULING.** The locked contract names the empty state `No results`, and

@@ -146,7 +146,9 @@ party, time and proof create the Stock consequence. Partial collection keeps the
 - `Team Work` is the supervision view. It groups by normal owner and adds cover, actual actor,
   lateness, blocking fact and evidence state without reassigning the source object.
 - Module Register rails contain factual filters only; they do not copy owner-resolved actions into
-  a local `WORK TO DO` panel. SO Batch Purchase is the ruled example.
+  a local `WORK TO DO` panel. Receiving's factual rail is `RECEIVING DATE` over Warehouse-calendar
+  days; central Work deep-links the exact PO/session. SO Batch Purchase is the ruled no-Work-panel
+  example.
 - On SO Batch Purchase, no permanent PO Duty toolbar, rail block or sentence is allowed. When a
   valid selection exists, the action is:
 
@@ -156,9 +158,9 @@ party, time and proof create the Stock consequence. Partial collection keeps the
 
   The chip title is `Yu Jun · PO Duty`; a dated cover uses the cover's initials and names the cover
   context. The action sentence never contains Yu Jun's name.
-- Every current and future Register/listing kit owns one four-sided light frame around its toolbar,
-  table and fixed status footer. Sales Orders and SO Batch Purchase use the same engine rule; pages
-  do not cancel side borders or add wrapper frames.
+- Every current and future full Register follows the shared no-outer-frame boundary: toolbar bottom
+  divider, table grid lines and status-footer top divider remain, but no page recreates the retired
+  enclosing rectangle.
 
 ## 8 · Deliver To settings
 
@@ -200,9 +202,10 @@ This architecture must be delivered as independently reviewable plans, in this d
 4. **Receiving continuations** — owned by the separate Receiving task; the superseded plans in this
    worktree must not be executed.
 5. **Cross-module Work feed and supervision** — Purchasing, Receiving and Claim projections into
-   My Work / Team Work; module Register rails remain factual filters.
+   My Work / Team Work; module Register rails remain factual filters and Receiving keeps its
+   governed date rail.
 6. **Owner-visible UI closure and rollout** — SO Batch selected-action owner chip/button, global
-   Register frame, destination settings, real-account browser walks and production evidence.
+   Register boundary, destination settings, real-account browser walks and production evidence.
 
 Each plan starts with failing tests and ends with its own source-of-truth, API, SQL, audit and browser
 gates. No plan may create a second action store or a second receipt/PO writer.

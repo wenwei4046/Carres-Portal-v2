@@ -8,6 +8,12 @@
 
 ---
 
+> **Receiving carry-forward supersession — Owner ruling 2026-08-29.** Any later occurrence of
+> `receiving-queue-model-architecture-review` or
+> `receiving-progress-rail-word-outlives-the-goods-receipts-rename` is historical evidence and is
+> CLOSED. The final 240px local rail is `RECEIVING DATE`: `Late`, six actual Warehouse work dates,
+> `Later`, and `No delivery date`. It is neither a status legend nor a local Work queue.
+
 ### 17.5 Open carry-forwards
 
 **HIGH**:

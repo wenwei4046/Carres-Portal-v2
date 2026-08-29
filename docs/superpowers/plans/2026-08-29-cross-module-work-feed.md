@@ -17,7 +17,9 @@
 - A Purchasing chase row deep-links the exact Purchase Order. A Receiving row deep-links the exact
   PO/Receiving Session. Other rows open Supplier Claims or Purchase Returns according to source;
   Work never redirects every item to Sales Orders and never owns completion.
-- The module rail's first panel is `WORK TO DO`, filtered to the current module. It is not a second queue and uses the same feed/counts as Work.
+- An admitted module rail may place `WORK TO DO` first, filtered to the current module. Receiving
+  does not: its owner-approved rail is `RECEIVING DATE`, and central Work deep-links its exact
+  PO/Receiving Session. No local panel is a second queue.
 - Due dates name Office or Warehouse calendar explicitly. Late work keeps its original due date.
 
 ---
@@ -118,23 +120,24 @@ export interface ModuleWorkItem {
 - [ ] Run the Work and TeamPanel tests; expected result: pass.
 - [ ] Commit: `git add apps/web && git commit -m "feat(work): show cross-module daily actions"`.
 
-## Task 5: Put contextual WORK TO DO first in module rails
+## Task 5: Put contextual WORK TO DO first in admitted module rails
 
 **Files:**
 - Create: `apps/web/src/pages/operation/components/rail/ModuleWorkPanel.tsx`
 - Create: `apps/web/src/pages/operation/components/rail/ModuleWorkPanel.test.tsx`
 - Modify: `apps/web/src/pages/operation/so-batch/SoBatchRegister.tsx`
 - Modify after PR #977 integration: `apps/web/src/pages/operation/purchase-orders/PurchaseOrdersPage.tsx`
-- Modify: `apps/web/src/pages/operation/OperationReceiving.tsx`
 - Modify: `apps/web/src/pages/operation/OperationSupplierClaims.tsx`
 - Modify: `apps/web/src/pages/operation/PurchaseReturnsRegister.tsx`
 - Modify corresponding page tests.
 
-- [ ] Write failing tests asserting `WORK TO DO` is the first contextual rail panel and contains only current-module items from the one Work query.
+- [ ] Write failing tests asserting `WORK TO DO` is the first contextual rail panel on the admitted
+  pages and contains only current-module items from the one Work query. Add a Receiving regression
+  test proving its first/only local rail group remains `RECEIVING DATE`.
 - [ ] Reuse one `ModuleWorkPanel` with module prop; no page-local action computation.
 - [ ] Keep SO Batch's operational filters below it. Do not insert PO Duty as a permanent rail block.
 - [ ] Clicking an item opens its governed destination. `View all` opens My Work with the module filter.
-- [ ] Run the component and five page tests; expected result: pass.
+- [ ] Run the component and page tests; expected result: pass.
 - [ ] Commit: `git add apps/web && git commit -m "feat(work): lead module rails with daily actions"`.
 
 ## Task 6: Work slice verification
