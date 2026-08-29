@@ -359,3 +359,53 @@ governed approval due/cover;
 `docs/01-design-tokens.md` still says workspace rail 200px while the later approved SO Batch and
 Manual Purchase authorities say 240px. Card 05 does not reopen the rail or silently fix that
 cross-document token contradiction; report it to the owning UI authority task.
+
+---
+
+## 11 · Completion evidence — EXECUTED, 2026-08-29
+
+**Status: SHIPPED AND PRODUCTION-VERIFIED.** PR #984, merged to `main` as
+`a43de3b7556650a1cc323d31289eac1711ba6074`; no migration (tracker tail 0404, all applied by
+the Superuser lane before this merge). All five canonical surfaces report the exact merge SHA
+(`carres-portal` / `carres-pos` Pages, `erp.carresofficial.com`, `pos.carresofficial.com`,
+`api.carresofficial.com/health`).
+
+- **Gates.** Post-merge full suites green: shared 2,784 · api 2,575 · web 3,620 tests;
+  typecheck; design-standard 0 new violations; migration CI; production build;
+  `git diff --check`; PR CI `verify` pass.
+- **Authenticated production walk (operation@ negative)** — live `MPR-20260829-2779` on
+  `a43de3b7`: the full-width six-section object in the Card's exact order; Object Header with
+  one back destination, the MPR identity, the state pill and `1 of 1`; `Requested By` reads
+  `Staff identity not recorded` (shared-login record — a person is never invented); Approval
+  shows `Need approval · Jess approves` with no cost and no Approve/Refuse; Purchase Orders
+  reads `Not ordered yet`; History prints `Purchase requested` in the three-rank grammar;
+  `‹ Manual Purchase` restored the Register.
+- **Approver surface** — proven on the same SHA by the seeded dev walk (money, six-column
+  decision table, Approved Qty prefilled from Still Needed, Refuse behind the required
+  `Decision reason`) and by API contract tests (principal/real-duty positive, operation@
+  negative, 42501 → `not_purchase_approver` naming Jess — PR #982's tests byte-identical).
+  Jess's live positive walk (approve/refuse on a real request, including one raised for
+  herself) is the owner's own 1-minute check.
+- **Latent defect fixed in the same PR** — the register read selected
+  `purchase_orders.po_no`, a column that does not exist on the live schema (the PO number IS
+  `purchase_orders.id`); it would have 400'd the whole Register on the first issued MPR.
+
+### The four close-out review answers (§10)
+
+1. **Authority vs real code/data:** `purchase_orders` has no `po_no` column — the shipped
+   Card 04 read and its tests assumed one; the schema says the id is the number. Fixed, and
+   the MASTER now states it. Also: no store records the individual actor of a PO issue or a
+   line cancel, so those History events can only say `Staff identity not recorded`.
+2. **What would confuse a new hire:** `What We Already Have` reads open-PO cover live, so a
+   fully-ordered request whose PO has arrived shows `Still Needed` again — the section is
+   decision facts for approval, not order progress; the Purchase Orders section above answers
+   progress. Worth watching on Jess's walk.
+3. **Not implementable exactly as written:** `4 of 69` position requires the object to be in
+   the operator's current filtered Register; a deep-opened or filtered-away object hides the
+   position (the Card's own "when position is known"). The `Supplier Delivery Date` original
+   date is reconstructed from the promise ledger's first held date — exact for every PO whose
+   date moved through the governed doors, which is all of them.
+4. **What the flow does not cover:** the Work Engine approval due/cover (deferred by §6); a
+   re-decide/take-back door (deliberately not invented); the 200px vs 240px rail token
+   contradiction in `docs/01-design-tokens.md` (reported to the owning UI task, chip raised);
+   Jess's live approver walk.
