@@ -6,8 +6,10 @@ import {
   expectedArrivalOf,
   isOpsGenericAccount,
   isOpsManager,
+  manualPurchaseLineRemainingOf,
   PURCHASING_REFUSAL_CODES,
   purchasingRefusal,
+  railItemLabel,
 } from "@carres/shared";
 import { requireOperation } from "../../lib/auth-guards";
 import { dutyHolders, myDuties } from "../../lib/duties";
@@ -146,6 +148,7 @@ manualPurchaseRouter.get("/", requireOperation, async (c) => {
     .select(
       `id, req_no, purpose, destination_id, required_by, why, approval_required,
        approved_at, approved_by, refused_at, refused_by, refuse_reason,
+       for_service_case_id, for_staff_user_id, for_subsidiary_name,
        created_by, created_at`,
     )
     .order("created_at", { ascending: false })
@@ -157,12 +160,15 @@ manualPurchaseRouter.get("/", requireOperation, async (c) => {
 
   const ids = (requests ?? []).map((r) => r.id as string);
   let lines: Array<Record<string, unknown>> = [];
+  /** id → po_no, for every PO the lines' REAL lineage names (Card 04 §3.4). */
+  let pos: Array<{ id: string; po_no: string }> = [];
   if (ids.length > 0) {
     const res = await sb
       .from("purchase_demands")
       .select(
-        `id, request_id, sku, supplier_id, qty, approved_qty, issued_qty,
-         remaining_qty, required_by, remark, po_id, cancelled_at, cancel_reason`,
+        `id, request_id, sku, supplier_id, destination_id, qty, approved_qty,
+         issued_qty, remaining_qty, required_by, remark, po_id, cancelled_at,
+         cancel_reason`,
       )
       .in("request_id", ids);
     if (res.error) {
@@ -171,39 +177,116 @@ manualPurchaseRouter.get("/", requireOperation, async (c) => {
     }
     lines = await stampReceived(sb, res.data ?? []);
 
-    /* THE CATALOG'S CATEGORY RIDES EACH LINE (Card 03 §4) — the rail's
-       `PRODUCT` section is the CATALOG's answer (`product_models.category`),
-       never SKU-text inference. Read whole and matched here, never `.in()`
-       over free-text SKUs (live rows carry a double quote — `Leg 4"` — which
-       breaks the filter; the same rule issue-costs keeps). */
+    /* THE CATALOG'S CATEGORY AND ITEM WORDS RIDE EACH LINE (Cards 03/04) —
+       the rail's `PRODUCT` section is the CATALOG's answer
+       (`product_models.category`) and the Register's `Items` column is the
+       ONE item-label arithmetic (`railItemLabel`) over the CATALOG's model
+       name — never SKU-text inference. Read whole and matched here, never
+       `.in()` over free-text SKUs (live rows carry a double quote —
+       `Leg 4"` — which breaks the filter; the same rule issue-costs keeps). */
     const { data: catRows, error: catErr } = await sb
       .from("product_skus")
-      .select("sku, product_models(category)");
+      .select("sku, variant, variant_kind, product_models(category, name)");
     if (catErr) {
       const m = mapPgError(catErr);
       return c.json(m.body, m.status);
     }
-    const categoryBySku = new Map(
-      (catRows ?? []).map((r) => [
-        r.sku as string,
-        ((r.product_models as unknown as { category: string | null } | null)?.category ??
-          null) as string | null,
-      ]),
+    const catalogBySku = new Map(
+      (catRows ?? []).map((r) => {
+        const model = r.product_models as unknown as {
+          category: string | null;
+          name: string | null;
+        } | null;
+        return [
+          r.sku as string,
+          {
+            category: (model?.category ?? null) as string | null,
+            itemLabel: railItemLabel(
+              (model?.name ?? "").trim() || (r.sku as string),
+              r.variant_kind === "size" ? ((r.variant as string) ?? null) : null,
+            ),
+          },
+        ];
+      }),
     );
-    lines = lines.map((l) => ({
-      ...l,
-      category: categoryBySku.get(l.sku as string) ?? null,
-    }));
+
+    /* ⭐ THE PO LINEAGE, NEVER AN INFERENCE (Card 04 §3.4). A demand's own
+       `po_id` records the LAST issue only; `purchase_order_lines.demand_id`
+       (0361) holds every PO a line was actually issued onto. Both are read;
+       nothing is matched by SKU, supplier or date. UUID lists are safe in
+       `.in()` — the free-text ban above is about SKUs. */
+    const lineIds = lines.map((l) => l.id as string);
+    const directPoIds = lines
+      .map((l) => l.po_id as string | null)
+      .filter((v): v is string => v != null);
+    const { data: lineagePoLines, error: lineageErr } =
+      lineIds.length > 0
+        ? await sb
+            .from("purchase_order_lines")
+            .select("po_id, demand_id")
+            .in("demand_id", lineIds)
+        : { data: [] as Array<Record<string, unknown>>, error: null };
+    if (lineageErr) {
+      const m = mapPgError(lineageErr);
+      return c.json(m.body, m.status);
+    }
+    const poIdsByDemand = new Map<string, Set<string>>();
+    for (const pl of lineagePoLines ?? []) {
+      const d = pl.demand_id as string | null;
+      if (!d) continue;
+      const set = poIdsByDemand.get(d) ?? new Set<string>();
+      set.add(pl.po_id as string);
+      poIdsByDemand.set(d, set);
+    }
+    const allPoIds = [
+      ...new Set([
+        ...directPoIds,
+        ...[...poIdsByDemand.values()].flatMap((s) => [...s]),
+      ]),
+    ];
+    if (allPoIds.length > 0) {
+      const poRes = await sb
+        .from("purchase_orders")
+        .select("id, po_no")
+        .in("id", allPoIds);
+      if (poRes.error) {
+        const m = mapPgError(poRes.error);
+        return c.json(m.body, m.status);
+      }
+      pos = (poRes.data ?? []).map((p) => ({
+        id: p.id as string,
+        po_no: (p.po_no as string | null) ?? (p.id as string),
+      }));
+    }
+
+    lines = lines.map((l) => {
+      const viaLineage = poIdsByDemand.get(l.id as string);
+      const poIds = new Set<string>(viaLineage ?? []);
+      if (l.po_id != null) poIds.add(l.po_id as string);
+      const cat = catalogBySku.get(l.sku as string);
+      return {
+        ...l,
+        category: cat?.category ?? null,
+        item_label: cat?.itemLabel ?? (l.sku as string),
+        po_ids: [...poIds],
+      };
+    });
   }
 
   // Names for the columns — read through the owners' tables, never stored
   // twice (Law B: a summary is read-only).
-  const [dests, sups, users] = await Promise.all([
+  const forCaseIds = (requests ?? [])
+    .map((r) => r.for_service_case_id as string | null)
+    .filter((v): v is string => v != null);
+  const [dests, sups, users, cases] = await Promise.all([
     sb.from("purchasing_destinations").select("id, name"),
     sb.from("suppliers").select("id, name, kind"),
     sb.from("app_users").select("id, name, email"),
+    forCaseIds.length > 0
+      ? sb.from("service_cases").select("id, case_no").in("id", forCaseIds)
+      : Promise.resolve({ data: [] as Array<Record<string, unknown>>, error: null }),
   ]);
-  for (const r of [dests, sups, users]) {
+  for (const r of [dests, sups, users, cases]) {
     if (r.error) {
       const m = mapPgError(r.error);
       return c.json(m.body, m.status);
@@ -214,14 +297,64 @@ manualPurchaseRouter.get("/", requireOperation, async (c) => {
     (users.data ?? []) as Array<{ id: string; name: string | null; email: string | null }>,
   );
 
+  /* ⭐ PO DUTY — resolved by the ONE actor authority (0379), shown ONLY
+     beside a selection's issue action (Card 04: with no selection, no PO
+     Duty block anywhere). Fails soft: an unresolved duty costs the chip,
+     never the Register. */
+  let currentPoDuty: { userId: string; name: string } | null = null;
+  let actingPoDuty: { userId: string; name: string } | null = null;
+  let poDutyUnavailable = false;
+  let mayIssue = false;
+  try {
+    const actorRes = await sb.rpc("purchasing_po_actor");
+    if (actorRes.error) {
+      poDutyUnavailable = true;
+      console.error("manual purchase — PO duty unavailable", actorRes.error.message);
+    } else {
+      const actor = (actorRes.data ?? {}) as {
+        normal_user_id?: string | null;
+        acting_user_id?: string | null;
+        actor_user_id?: string | null;
+      };
+      const label = (id: string | null | undefined): string | null => {
+        if (!id) return null;
+        const u = (users.data ?? []).find((x) => x.id === id) as
+          | { name?: string | null; email?: string | null }
+          | undefined;
+        return ((u?.name ?? "").trim() || (u?.email ?? "").trim()) || null;
+      };
+      const normalName = label(actor.normal_user_id);
+      const actingName = label(actor.acting_user_id);
+      if (actor.normal_user_id && normalName) {
+        currentPoDuty = { userId: actor.normal_user_id, name: normalName };
+      }
+      if (actor.acting_user_id && actingName) {
+        actingPoDuty = { userId: actor.acting_user_id, name: actingName };
+      }
+      mayIssue = actor.actor_user_id != null && actor.actor_user_id === c.var.auth.id;
+    }
+  } catch (e) {
+    poDutyUnavailable = true;
+    console.error("manual purchase — PO duty unavailable", (e as Error).message);
+  }
+
   return c.json({
     requests: requests ?? [],
     lines,
+    pos,
+    serviceCases: (cases.data ?? []).map((sc) => ({
+      id: sc.id as string,
+      case_no: sc.case_no as string,
+    })),
     destinations: dests.data ?? [],
     suppliers: sups.data ?? [],
     users: (users.data ?? []).map((u) => ({ id: u.id, name: u.name })),
     approvers,
     canApprove: await canApprove(c),
+    currentPoDuty,
+    actingPoDuty,
+    poDutyUnavailable,
+    mayIssue,
   });
 });
 
@@ -283,8 +416,20 @@ manualPurchaseRouter.get("/detail/:id", requireOperation, async (c) => {
     (users.data ?? []) as Array<{ id: string; name: string | null; email: string | null }>,
   );
 
+  /* The structured For's readable identity (Card 04 §3.6). */
+  let serviceCaseNo: string | null = null;
+  if (request.for_service_case_id) {
+    const { data: sc } = await sb
+      .from("service_cases")
+      .select("case_no")
+      .eq("id", request.for_service_case_id as string)
+      .maybeSingle();
+    serviceCaseNo = (sc?.case_no as string | null) ?? null;
+  }
+
   return c.json({
     request,
+    serviceCaseNo,
     lines: stamped.map((l) => ({
       ...l,
       // The approver's money — absent entirely for everyone else, so the
@@ -339,12 +484,48 @@ manualPurchaseRouter.post("/:id/decide", requireOperation, async (c) => {
   return c.json(data);
 });
 
-const headerBody = z.object({
-  purpose: z.enum(DEMAND_PURPOSE_VALUES as [string, ...string[]]),
-  destinationId: z.string().uuid(),
-  requiredBy: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullish(),
-  why: z.string().min(1).max(1000),
-});
+/**
+ * Card 04 — only `Other Purchase` asks (and must answer) `What is this
+ * for?`; the other purposes carry their STRUCTURED For fact instead. The
+ * zod mirror keeps the refusal near the form; `purchasing_create_request`
+ * re-gates every rule in SQL, which is the actual protection.
+ */
+const headerBody = z
+  .object({
+    purpose: z.enum(DEMAND_PURPOSE_VALUES as [string, ...string[]]),
+    destinationId: z.string().uuid(),
+    requiredBy: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullish(),
+    why: z.string().max(1000).nullish(),
+    serviceCaseId: z.string().uuid().nullish(),
+    staffUserId: z.string().uuid().nullish(),
+    subsidiaryName: z.string().max(200).nullish(),
+  })
+  .superRefine((b, ctx) => {
+    if (b.purpose === "other_purchase" && !(b.why ?? "").trim()) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["why"], message: "why_required" });
+    }
+    if (b.purpose === "service_case" && !b.serviceCaseId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["serviceCaseId"],
+        message: "service_case_required",
+      });
+    }
+    if (b.purpose === "internal_staff_purchase" && !b.staffUserId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["staffUserId"],
+        message: "staff_member_required",
+      });
+    }
+    if (b.purpose === "subsidiary_purchase" && !(b.subsidiaryName ?? "").trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["subsidiaryName"],
+        message: "subsidiary_required",
+      });
+    }
+  });
 
 manualPurchaseRouter.post("/", requireOperation, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
@@ -359,13 +540,17 @@ manualPurchaseRouter.post("/", requireOperation, async (c) => {
   if (!parsed.success) {
     return c.json({ error: "invalid_body", code: "invalid_param" }, 400);
   }
-  const { purpose, destinationId, requiredBy, why } = parsed.data;
+  const { purpose, destinationId, requiredBy, why, serviceCaseId, staffUserId, subsidiaryName } =
+    parsed.data;
 
   const { data, error } = await sb.rpc("purchasing_create_request", {
     p_purpose: purpose,
     p_destination_id: destinationId,
-    p_why: why,
+    p_why: (why ?? "").trim() || null,
     p_required_by: requiredBy ?? null,
+    p_for_service_case_id: serviceCaseId ?? null,
+    p_for_staff_user_id: staffUserId ?? null,
+    p_for_subsidiary_name: (subsidiaryName ?? "").trim() || null,
   });
   if (error) {
     const m = mapPgError(error);
@@ -512,15 +697,18 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
   }
 
   // What is still to buy on each line: the approver's number less what was
-  // already issued — never the original ask (card §4's arithmetic, reused).
+  // already issued — never the original ask. THE one remainder arithmetic
+  // (`manualPurchaseLineRemainingOf`, Law D — the Register expansion and
+  // issue-costs read the same function).
   const toIssue = (allLines ?? [])
     .filter((l) => l.cancelled_at === null)
     .map((l) => ({
       ...l,
-      issueQty: Math.max(
-        0,
-        Number(l.approved_qty ?? l.qty) - Number(l.issued_qty ?? 0),
-      ),
+      issueQty: manualPurchaseLineRemainingOf({
+        qty: Number(l.qty),
+        approvedQty: l.approved_qty == null ? null : Number(l.approved_qty),
+        issuedQty: Number(l.issued_qty ?? 0),
+      }),
     }))
     .filter((l) => l.issueQty > 0);
   if (toIssue.length === 0) {
@@ -706,14 +894,20 @@ manualPurchaseRouter.get("/issue-costs", requireOperation, async (c) => {
     const m = mapPgError(error);
     return c.json(m.body, m.status);
   }
-  /* The same arithmetic `/issue` uses — the approver's number less what already
-     went out. A line with nothing left to buy has no price to review. */
+  /* The same arithmetic `/issue` uses (`manualPurchaseLineRemainingOf`) — the
+     approver's number less what already went out. A line with nothing left to
+     buy has no price to review. */
   const skus = [
     ...new Set(
       (lines ?? [])
         .filter((l) => l.cancelled_at === null)
         .filter(
-          (l) => Math.max(0, Number(l.approved_qty ?? l.qty) - Number(l.issued_qty ?? 0)) > 0,
+          (l) =>
+            manualPurchaseLineRemainingOf({
+              qty: Number(l.qty),
+              approvedQty: l.approved_qty == null ? null : Number(l.approved_qty),
+              issuedQty: Number(l.issued_qty ?? 0),
+            }) > 0,
         )
         .map((l) => l.sku as string),
     ),

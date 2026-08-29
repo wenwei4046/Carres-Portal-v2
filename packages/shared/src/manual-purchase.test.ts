@@ -53,10 +53,11 @@ describe("Card 03 · the rail words and order", () => {
     ]);
   });
 
-  it("PURCHASE PURPOSE offers exactly the approved five under `All purposes`", () => {
+  it("PURCHASE PURPOSE offers exactly the approved six under `All purposes`", () => {
     expect(MANUAL_PURCHASE_RAIL.purpose.all).toBe("All purposes");
     // The one creatable list — the same array the create form renders, so
-    // the rail and the door cannot drift (Law D).
+    // the rail and the door cannot drift (Law D). Card 04 widened it by
+    // `Other Purchase`; the rail row arrived through the same list.
     expect(MANUAL_PURCHASE_RAIL.purpose.rows).toBe(DEMAND_PURPOSES);
     expect(MANUAL_PURCHASE_RAIL.purpose.rows.map((p) => p.label)).toEqual([
       "Ready Stock",
@@ -64,6 +65,7 @@ describe("Card 03 · the rail words and order", () => {
       "Service Case",
       "Internal Staff Purchase",
       "Subsidiary Purchase",
+      "Other Purchase",
     ]);
   });
 
@@ -238,6 +240,7 @@ describe("Card 03 · the rail model", () => {
       service_case: 0,
       internal_staff_purchase: 0,
       subsidiary_purchase: 1,
+      other_purchase: 0,
     });
   });
 
@@ -349,5 +352,211 @@ describe("Card 03 §3 · the approval owner's sentence", () => {
     expect(manualPurchaseApproverLine(["Jess", "YJ"])).toBe("Jess or YJ approves");
     expect(manualPurchaseApproverLine([])).toBeNull();
     expect(manualPurchaseApproverLine([null, "", "  "])).toBeNull();
+  });
+});
+
+/**
+ * PURCHASING CARD 04 — the permanent Register's own arithmetic
+ * (docs/cards/CARD-2026-08-29-purchasing-04-manual-purchase-permanent-register.md).
+ */
+import {
+  MANUAL_PURCHASE_APPROVAL_WORDS,
+  MANUAL_PURCHASE_WORDS,
+  manualPurchaseApprovalOf,
+  manualPurchaseDeliverToSummary,
+  manualPurchaseForOf,
+  manualPurchaseIssueGroupCount,
+  manualPurchaseIssueSentence,
+  manualPurchaseItemsSummary,
+  manualPurchaseLineRemainingOf,
+  manualPurchasePoSummary,
+  manualPurchaseSelectable,
+  manualPurchaseSupplierSummary,
+} from "./manual-purchase";
+
+describe("Card 04 · the eleven column words", () => {
+  it("spells the Card's exact column heads once", () => {
+    expect([
+      MANUAL_PURCHASE_WORDS.colRequestedDate,
+      MANUAL_PURCHASE_WORDS.colApproval,
+      MANUAL_PURCHASE_WORDS.colMprNo,
+      MANUAL_PURCHASE_WORDS.colPoNo,
+      MANUAL_PURCHASE_WORDS.colNeededBy,
+      MANUAL_PURCHASE_WORDS.colFor,
+      MANUAL_PURCHASE_WORDS.colItems,
+      MANUAL_PURCHASE_WORDS.colQty,
+      MANUAL_PURCHASE_WORDS.colSupplier,
+      MANUAL_PURCHASE_WORDS.colDeliverTo,
+      MANUAL_PURCHASE_WORDS.colRequestedBy,
+    ]).toEqual([
+      "Requested Date",
+      "Approval Status",
+      "Manual Purchase No",
+      "PO No",
+      "Needed By",
+      "For",
+      "Items",
+      "Qty",
+      "Supplier",
+      "Deliver To",
+      "Requested By",
+    ]);
+  });
+
+  it("the toolbar's create words are COPY-STANDARD's own", () => {
+    expect(MANUAL_PURCHASE_WORDS.newRequest).toBe("+ Manual Purchase");
+    expect(MANUAL_PURCHASE_WORDS.createTitle).toBe("NEW MANUAL PURCHASE");
+    expect(MANUAL_PURCHASE_WORDS.emptyRegister).toBe("No Manual Purchase yet.");
+  });
+});
+
+describe("Card 04 · the approval fact", () => {
+  it("answers the four ways, decided states winning over the switch", () => {
+    expect(
+      manualPurchaseApprovalOf({ approvalRequired: true, approvedAt: null, refusedAt: null })
+        .label,
+    ).toBe(MANUAL_PURCHASE_APPROVAL_WORDS.need_approval);
+    expect(
+      manualPurchaseApprovalOf({ approvalRequired: true, approvedAt: "t", refusedAt: null })
+        .label,
+    ).toBe("Approved");
+    expect(
+      manualPurchaseApprovalOf({ approvalRequired: true, approvedAt: null, refusedAt: "t" })
+        .label,
+    ).toBe("Refused");
+    expect(
+      manualPurchaseApprovalOf({ approvalRequired: false, approvedAt: null, refusedAt: null })
+        .label,
+    ).toBe("No approval needed");
+  });
+});
+
+describe("Card 04 · the one remainder arithmetic", () => {
+  it("reads the approver's number, falls back to the ask, floors at zero", () => {
+    expect(manualPurchaseLineRemainingOf({ qty: 5, approvedQty: null, issuedQty: 0 })).toBe(5);
+    expect(manualPurchaseLineRemainingOf({ qty: 5, approvedQty: 3, issuedQty: 1 })).toBe(2);
+    expect(manualPurchaseLineRemainingOf({ qty: 5, approvedQty: 3, issuedQty: 4 })).toBe(0);
+    expect(manualPurchaseLineRemainingOf({ qty: 5, approvedQty: 0, issuedQty: 0 })).toBe(0);
+  });
+});
+
+describe("Card 04 · the deterministic summaries", () => {
+  it("PO No: absence sentence · the one number · a count", () => {
+    expect(manualPurchasePoSummary([])).toBe("Not ordered yet");
+    expect(manualPurchasePoSummary(["PO-20260829-1234"])).toBe("PO-20260829-1234");
+    expect(manualPurchasePoSummary(["PO-1", "PO-2", "PO-1"])).toBe("2 POs");
+  });
+
+  it("Items: the Catalog word, or `{first} + {n} more`", () => {
+    expect(manualPurchaseItemsSummary([])).toBe("");
+    expect(manualPurchaseItemsSummary(["Sonic Q"])).toBe("Sonic Q");
+    expect(manualPurchaseItemsSummary(["Sonic Q", "Booqit", "Atlas K"])).toBe(
+      "Sonic Q + 2 more",
+    );
+  });
+
+  it("Supplier: the actual name, or `{n} suppliers` — never a placeholder", () => {
+    expect(manualPurchaseSupplierSummary([])).toBe("");
+    expect(manualPurchaseSupplierSummary(["Hooka", "Hooka"])).toBe("Hooka");
+    expect(manualPurchaseSupplierSummary(["Hooka", "Dorsettloft"])).toBe("2 suppliers");
+  });
+
+  it("Deliver To: the destination, or `Multiple`", () => {
+    expect(manualPurchaseDeliverToSummary(["Carres Klang", "Carres Klang"])).toBe(
+      "Carres Klang",
+    );
+    expect(manualPurchaseDeliverToSummary(["Carres Klang", "HOUZS"])).toBe("Multiple");
+  });
+});
+
+describe("Card 04 · the structured For", () => {
+  it("each purpose answers with its own object; a foreign fact is never borrowed", () => {
+    const base = {
+      destinationName: "Carres Klang",
+      serviceCaseNo: "SC-20260829-1111",
+      staffName: "Li Ching",
+      subsidiaryName: "Carres Living Sdn Bhd",
+      why: "spare parts for the van",
+    };
+    expect(manualPurchaseForOf({ ...base, purpose: "ready_stock" })).toBe("Carres Klang");
+    expect(manualPurchaseForOf({ ...base, purpose: "showroom_display" })).toBe("Carres Klang");
+    expect(manualPurchaseForOf({ ...base, purpose: "service_case" })).toBe("SC-20260829-1111");
+    expect(manualPurchaseForOf({ ...base, purpose: "internal_staff_purchase" })).toBe(
+      "Li Ching",
+    );
+    expect(manualPurchaseForOf({ ...base, purpose: "subsidiary_purchase" })).toBe(
+      "Carres Living Sdn Bhd",
+    );
+    expect(manualPurchaseForOf({ ...base, purpose: "other_purchase" })).toBe(
+      "spare parts for the van",
+    );
+  });
+
+  it("a historical row without its structured fact prints nothing — never a guess", () => {
+    expect(
+      manualPurchaseForOf({
+        purpose: "service_case",
+        destinationName: "Carres Klang",
+        serviceCaseNo: null,
+        staffName: null,
+        subsidiaryName: null,
+        why: "an old reason",
+      }),
+    ).toBe("");
+    // A retired purpose has no structured For at all.
+    expect(
+      manualPurchaseForOf({
+        purpose: "office",
+        destinationName: "Carres Klang",
+        serviceCaseNo: null,
+        staffName: null,
+        subsidiaryName: null,
+        why: "printer ink",
+      }),
+    ).toBe("");
+  });
+});
+
+describe("Card 04 · selection and the issue sentence", () => {
+  it("only Ready to order with live remainder may be ticked", () => {
+    expect(manualPurchaseSelectable("ready_to_order", 3)).toBe(true);
+    expect(manualPurchaseSelectable("ready_to_order", 0)).toBe(false);
+    for (const s of [
+      "waiting_approval",
+      "waiting_sku",
+      "ordered",
+      "arrived",
+      "not_going_ahead",
+    ] as const) {
+      expect(manualPurchaseSelectable(s, 3)).toBe(false);
+    }
+  });
+
+  it("PO count is the document partition — supplier × category × destination × purpose", () => {
+    const line = (over: Record<string, unknown>) => ({
+      supplierId: "s1",
+      category: "sofa",
+      destinationId: "d1",
+      purpose: "ready_stock",
+      remainingQty: 1,
+      ...over,
+    });
+    expect(manualPurchaseIssueGroupCount([line({}), line({})])).toBe(1);
+    expect(
+      manualPurchaseIssueGroupCount([line({}), line({ supplierId: "s2" })]),
+    ).toBe(2);
+    expect(
+      manualPurchaseIssueGroupCount([line({}), line({ category: "mattress" })]),
+    ).toBe(2);
+    expect(
+      manualPurchaseIssueGroupCount([line({}), line({ purpose: "showroom_display" })]),
+    ).toBe(2);
+    // A line with nothing left to buy partitions nothing.
+    expect(manualPurchaseIssueGroupCount([line({ remainingQty: 0 })])).toBe(0);
+  });
+
+  it("pluralises from facts", () => {
+    expect(manualPurchaseIssueSentence(1, 1, 1)).toBe("1 selected · 1 unit · Issue 1 PO");
+    expect(manualPurchaseIssueSentence(2, 5, 3)).toBe("2 selected · 5 units · Issue 3 POs");
   });
 });

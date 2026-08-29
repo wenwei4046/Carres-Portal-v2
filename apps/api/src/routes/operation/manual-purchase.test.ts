@@ -390,17 +390,21 @@ describe("Card 03 · GET /purchasing/requests — the CATALOG's category rides e
 });
 
 describe("Card 03 · the doors speak the approved purpose vocabulary", () => {
-  async function createHeader(purpose: string, rpc = vi.fn().mockResolvedValue({
-    data: { id: REQ_A, req_no: "REQ-0009", approval_required: true },
-    error: null,
-  })) {
+  async function createHeader(
+    purpose: string,
+    extra: Record<string, unknown> = {},
+    rpc = vi.fn().mockResolvedValue({
+      data: { id: REQ_A, req_no: "MPR-20260829-0009", approval_required: true },
+      error: null,
+    }),
+  ) {
     vi.mocked(userClient).mockReturnValue(makeSb(rpc));
     const jwt = await makeJwt("operation");
     const res = await app.fetch(
       new Request("https://api.test/api/operation/purchasing/requests", {
         method: "POST",
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ purpose, destinationId: DEST, why: "we need it" }),
+        body: JSON.stringify({ purpose, destinationId: DEST, ...extra }),
       }),
       env as never,
       { waitUntil() {}, passThroughException() {} } as never,
@@ -408,20 +412,57 @@ describe("Card 03 · the doors speak the approved purpose vocabulary", () => {
     return { res, rpc };
   }
 
-  it("admits every approved purpose and hands it to the governed door", async () => {
+  /** Card 04 — each exceptional purpose ships its own structured For fact. */
+  const FOR_FACT: Record<string, Record<string, unknown>> = {
+    ready_stock: {},
+    showroom_display: {},
+    service_case: { serviceCaseId: "cccccccc-0000-0000-0000-000000000001" },
+    internal_staff_purchase: { staffUserId: "dddddddd-0000-0000-0000-000000000001" },
+    subsidiary_purchase: { subsidiaryName: "Carres Living Sdn Bhd" },
+    other_purchase: { why: "spare parts for the van" },
+  };
+
+  it("admits every approved purpose — six of them — and hands it to the governed door", async () => {
     for (const purpose of [
       "ready_stock",
       "showroom_display",
       "service_case",
       "internal_staff_purchase",
       "subsidiary_purchase",
+      "other_purchase",
     ]) {
-      const { res, rpc } = await createHeader(purpose);
+      const { res, rpc } = await createHeader(purpose, FOR_FACT[purpose]);
       expect(res.status).toBe(200);
       expect(rpc).toHaveBeenCalledWith(
         "purchasing_create_request",
         expect.objectContaining({ p_purpose: purpose }),
       );
+    }
+  });
+
+  it("Card 04 · only Other Purchase requires `What is this for?`", async () => {
+    // Routine purposes send with NO why at all…
+    const ok = await createHeader("ready_stock", {});
+    expect(ok.res.status).toBe(200);
+    expect(ok.rpc).toHaveBeenCalledWith(
+      "purchasing_create_request",
+      expect.objectContaining({ p_purpose: "ready_stock", p_why: null }),
+    );
+    // …and Other Purchase without its answer is refused before the RPC.
+    const bad = await createHeader("other_purchase", {});
+    expect(bad.res.status).toBe(400);
+    expect(bad.rpc).not.toHaveBeenCalled();
+  });
+
+  it("Card 04 · each exceptional purpose must name its structured For object", async () => {
+    for (const purpose of [
+      "service_case",
+      "internal_staff_purchase",
+      "subsidiary_purchase",
+    ]) {
+      const { res, rpc } = await createHeader(purpose, {});
+      expect(res.status).toBe(400);
+      expect(rpc).not.toHaveBeenCalled();
     }
   });
 
@@ -559,5 +600,95 @@ describe("Card 03 §3 · GET /purchasing/requests — the approval owner's name"
     const res = await readRegister();
     const body = (await res.json()) as { approvers: Array<{ id: string; name: string | null }> };
     expect(body.approvers).toEqual([{ id: U_JESS, name: "Jess" }]);
+  });
+});
+
+/**
+ * PURCHASING CARD 04 — the permanent Register's read: real PO lineage, the
+ * Catalog's item words, and PO duty resolved by the one actor authority.
+ */
+describe("Card 04 · GET /purchasing/requests — lineage, item words, PO duty", () => {
+  const ME = "11111111-1111-1111-1111-000000000999"; // makeJwt's subject
+  const PO_1 = "eeeeeeee-0000-0000-0000-0000000000a1";
+  const PO_2 = "eeeeeeee-0000-0000-0000-0000000000a2";
+  const LINE_1 = "dddddddd-0000-0000-0000-000000000001";
+  const REG_LINES = [
+    { id: LINE_1, request_id: REQ_A, sku: "5539-2NA",
+      supplier_id: SUP, destination_id: DEST, qty: 3, approved_qty: 2, issued_qty: 2,
+      remaining_qty: 0, required_by: null, remark: null, po_id: PO_1,
+      cancelled_at: null, cancel_reason: null },
+  ];
+
+  function makeSbCard04() {
+    return {
+      from: vi.fn((table: string) => {
+        switch (table) {
+          case "purchase_requests":
+            return tableStub(REQUESTS);
+          case "purchase_demands":
+            return tableStub(REG_LINES, { filterInBy: "request_id" });
+          case "product_skus":
+            return tableStub([
+              { sku: "5539-2NA", variant: "Queen", variant_kind: "size",
+                product_models: { category: "sofa", name: "Sonic" } },
+            ]);
+          case "purchase_order_lines":
+            // The 0361 lineage: this demand was issued onto TWO documents;
+            // the demand's own po_id remembers only the last.
+            return tableStub([
+              { po_id: PO_1, sku: "5539-2NA", qty: 1, received_qty: 0, demand_id: LINE_1 },
+              { po_id: PO_2, sku: "5539-2NA", qty: 1, received_qty: 0, demand_id: LINE_1 },
+            ]);
+          case "purchase_orders":
+            return tableStub([
+              { id: PO_1, po_no: "PO-20260829-1111" },
+              { id: PO_2, po_no: "PO-20260829-2222" },
+            ]);
+          case "suppliers":
+            return tableStub([{ id: SUP, name: "Hooka", kind: "own_logistics" }]);
+          case "app_users":
+            return tableStub([
+              { id: ME, name: "Shasha", email: "shasha@carres.com" },
+            ]);
+          default:
+            return tableStub([]);
+        }
+      }),
+      rpc: vi.fn().mockResolvedValue({
+        data: { normal_user_id: ME, acting_user_id: null, actor_user_id: ME },
+        error: null,
+      }),
+    } as unknown as ReturnType<typeof userClient>;
+  }
+
+  it("PO No comes ONLY from real lineage — both documents, actual numbers, no UUID", async () => {
+    vi.mocked(userClient).mockReturnValue(makeSbCard04());
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("https://api.test/api/operation/purchasing/requests", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env as never,
+      { waitUntil() {}, passThroughException() {} } as never,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      lines: Array<{ sku: string; po_ids: string[]; item_label: string }>;
+      pos: Array<{ id: string; po_no: string }>;
+      currentPoDuty: { userId: string; name: string } | null;
+      mayIssue: boolean;
+      poDutyUnavailable: boolean;
+    };
+    const line = body.lines.find((l) => l.sku === "5539-2NA")!;
+    expect(new Set(line.po_ids)).toEqual(new Set([PO_1, PO_2]));
+    expect(new Set(body.pos.map((p) => p.po_no))).toEqual(
+      new Set(["PO-20260829-1111", "PO-20260829-2222"]),
+    );
+    // The Catalog's human words ride the line (`railItemLabel`: Sonic Q).
+    expect(line.item_label).toBe("Sonic Q");
+    // PO duty resolved by the one actor authority; this login IS the actor.
+    expect(body.poDutyUnavailable).toBe(false);
+    expect(body.currentPoDuty).toEqual({ userId: ME, name: "Shasha" });
+    expect(body.mayIssue).toBe(true);
   });
 });

@@ -724,12 +724,16 @@ a word this Register may use. **Retired from the SO Batch Purchase rail, never t
 | The page's create button | `+ Manual Purchase` |
 | The create workspace title | `New Manual Purchase` |
 | Submit · abandon | `Send for approval` · `Cancel` |
-| The disabled Send NAMES its gap (the Receiving button law; first missing header fact wins, top-to-bottom) | `Send — pick a date` · `Send — say why` |
-| The form's fields | `Need for` · `Needed by` · `Deliver to` · `Raised by` · `Why` · `Items` · `Qty` · `Note` · `Supplier` · `+ Add line` · `Remove` |
+| The disabled Send NAMES its gap (the Receiving button law; first missing header fact wins, top-to-bottom) | `Send — pick a date` · `Send — pick the Service Case` · `Send — pick the staff member` · `Send — name the subsidiary` · `Send — say what it is for` |
+| The form's fields | `Need for` · `Needed by` · `Deliver to` · `Raised by` · `Items` · `Qty` · `Note` · `Supplier` · `+ Add line` · `Remove` — plus the per-purpose For field: `Service Case` · `Staff member` · `Subsidiary` · `What is this for?` (Other Purchase only; routine purposes ask no duplicate `Why` — the historical `Why` label survives on pre-Card-04 objects only) |
 | The already-have block | `WHAT WE ALREADY HAVE` — `free stock` · `already on PO` · `still needed` (the arithmetic is PRINTED, never left to the reader) |
-| The register columns | `Ref` · `Need for` · `What` · `Qty` · `Deliver to` · `Needed by` · `Raised by` · `Status` |
+| The register columns — Card 04 (2026-08-29), exactly and in this order | `Requested Date` · `Approval Status` · `Manual Purchase No` · `PO No` · `Needed By` · `For` · `Items` · `Qty` · `Supplier` · `Deliver To` · `Requested By` — Purpose is NOT a parent column |
+| The Approval Status facts | `Need approval` · `Approved` · `Refused` · `No approval needed` — with the quiet `{name} approves` second line only while approval is needed |
+| The deterministic summaries | `Not ordered yet` · the one PO number · `{n} POs` — `{first item} + {n} more` — `{n} suppliers` — `Multiple` (several destinations) |
+| The expansion's child columns (read-only) | `SKU` · `Item` · `Requested Qty` · `Approved Qty` · `Ordered Qty` · `Still To Order` · `Supplier` · `Deliver To` · `PO No` |
+| The selection bar | `{n} selected · {u} unit(s) · Issue {p} PO(s)` beside the resolved PO Duty person and `Issue PO` — PO Duty renders NOWHERE without a selection; `Select at most 20 requests for one issue.` |
 | The states | `Waiting for approval` · `Waiting for the SKU` · `Ready to order` · `Ordered` · `Arrived` · `Not going ahead` — `Waiting` always names what it waits ON; `Arrived` is a FACT the system observes, never a button |
-| The purpose choices — owner ruling 2026-08-28 (Card 03), exactly and in this order | `Ready Stock` · `Showroom Display` · `Service Case` · `Internal Staff Purchase` · `Subsidiary Purchase` — Management is included under `Internal Staff Purchase`; there is no `Management Purchase` |
+| The purpose choices — owner rulings 2026-08-28 (Card 03) / 2026-08-29 (Card 04), exactly and in this order | `Ready Stock` · `Showroom Display` · `Service Case` · `Internal Staff Purchase` · `Subsidiary Purchase` · `Other Purchase` — Management is included under `Internal Staff Purchase`; there is no `Management Purchase`; only `Other Purchase` asks `What is this for?` |
 | Retired purpose words — history only, never offered, never relabelled | `Display` · `Warranty` · `Office` · `Spare Parts` — a pre-ruling row keeps printing the word it was actually asked as; the doors refuse these values for a new request |
 | The number series | `MPR-YYYYMMDD-RRRR` (never `PR-` — that can be mistaken for Purchase Return) |
 | The consolidation OFFER | `Issue as one PO?` — with `Issue as one PO` · `Issue separately` both live on the same screen; an offer that cannot be declined is a gate wearing an offer's clothes |
@@ -741,7 +745,7 @@ a word this Register may use. **Retired from the SO Batch Purchase rail, never t
 | Heading | Rail rows |
 |---|---|
 | `TO ORDER` | `All not ordered` · `Need approval` · `Ready to order` |
-| `PURCHASE PURPOSE` | `All purposes` · the five approved purposes above, in the approved order |
+| `PURCHASE PURPOSE` | `All purposes` · the six approved purposes above, in the approved order |
 | `PRODUCT` | `All products` · `Mattress` · `Bedframe` · `Sofa` |
 | `SUPPLIER` | `All suppliers` · actual supplier names, alphabetical — never hardcoded, never a placeholder, and no `No supplier` row |
 
