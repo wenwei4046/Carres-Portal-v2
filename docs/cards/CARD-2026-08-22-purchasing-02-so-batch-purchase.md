@@ -250,14 +250,16 @@ retains source SO/line attribution. Client group keys are hints only; the server
 
 ### 5.1 Selection and review
 
-Selecting ready rows exposes one sticky selection bar:
+Selecting ready rows replaces the Register's top Work Toolbar with one selection bar. It remains
+above the column headings and does not create a second action surface at the bottom of the table:
 
 ```text
 4 selected · 7 units · Issue 3 POs
 ```
 
-`Issue PO` opens the full-screen `Review Purchase Orders` surface and preserves selection and
-allocations.
+The same top bar carries `Clear`, valid selection outputs, the compact PO Duty/cover chip and
+`Issue PO`. `Issue PO` opens the full-screen `Review Purchase Orders` surface and preserves
+selection and allocations.
 
 ### 5.2 50% work + 50% live PDF
 

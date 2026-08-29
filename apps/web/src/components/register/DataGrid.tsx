@@ -203,6 +203,10 @@ export type DataGridProps<T> = {
    * its unit passes it — `1 delivery scope selected` (owner ruling 2026-08-24).
    */
   selectionSummary?: (n: number) => string;
+  /** Page-owned context/actions at the right edge of the selected toolbar.
+   *  Use this for structured ownership beside the one governed action; it is
+   *  rendered only while the grid has a checked or indeterminate row. */
+  selectionEnd?: ReactNode;
   /** Hover/title on the disclosure chevron — what OPENS, not the mechanic. */
   expandTitle?: string;
   /** Hide the built-in Excel pill on the selection bar. */
@@ -441,6 +445,7 @@ function DataGridInner<T>({
   toolbarEnd,
   selectionActions,
   selectionSummary,
+  selectionEnd,
   expandTitle,
   hideSelectionExport,
   statusSummary,
@@ -1065,6 +1070,17 @@ function DataGridInner<T>({
     return sortedRows.filter((r) => selectable.selectedKeys.has(rowKey(r)));
   }, [selectable, sortedRows, rowKey]);
 
+  /* A parent row may truthfully represent selected child work without being
+     fully checked. Such an indeterminate row still owns the selected toolbar:
+     hiding the only action until every child is ticked makes a valid partial
+     selection impossible to complete. */
+  const selectedOrIndeterminateVisibleRows = useMemo(() => {
+    if (!selectable) return [];
+    return sortedRows.filter((r) =>
+      selectable.selectedKeys.has(rowKey(r)) || selectable.isIndeterminate?.(r as never) === true,
+    );
+  }, [selectable, sortedRows, rowKey]);
+
   // ── Group rendering ───────────────────────────────────────────────
   // Multi-level groups produced as a flat list of render instructions.
   type Render =
@@ -1587,7 +1603,7 @@ function DataGridInner<T>({
           2990 kept it right — that is the one composition change the laws
           mandate), then the caller's actions, then Export + Columns pinned
           right (LAWS 3 + 4). */}
-      {!(selectable && selectedVisibleRows.length > 0) ? (
+      {!(selectable && selectedOrIndeterminateVisibleRows.length > 0) ? (
       <div className={styles.toolbar} data-testid={isReference ? "work-toolbar" : undefined}>
         {isReference && toolbarStart}
         {isReference && <div className={styles.toolbarSpacer} />}
@@ -1827,8 +1843,8 @@ function DataGridInner<T>({
                 selected` beats `3 selected`, which is true and says nothing
                 about what three of. */}
             {selectionSummary
-              ? selectionSummary(selectedVisibleRows.length)
-              : `${selectedVisibleRows.length} selected`}
+              ? selectionSummary(selectedOrIndeterminateVisibleRows.length)
+              : `${selectedOrIndeterminateVisibleRows.length} selected`}
           </span>
           <button
             type="button"
@@ -1837,16 +1853,17 @@ function DataGridInner<T>({
           >
             Clear
           </button>
+          <div className={styles.toolbarSpacer} />
           {!hideSelectionExport && (
             <button
               type="button"
               className={styles.toolbarPill}
               onClick={() => {
-                void exportRows(selectedVisibleRows);
+                void exportRows(selectedOrIndeterminateVisibleRows);
               }}
             >
               <Download size={14} strokeWidth={1.75} aria-hidden />
-              <span>Export Excel ({selectedVisibleRows.length})</span>
+              <span>Export Excel ({selectedOrIndeterminateVisibleRows.length})</span>
             </button>
           )}
           {(selectionActions ?? [])
@@ -1854,23 +1871,24 @@ function DataGridInner<T>({
                OFFERED (owner ruling 2026-08-24). `Edit Delivery` opens one
                scope; showing it beside three ticked rows invites a click whose
                only possible answer is a refusal. */
-            .filter((a) => (a.visible ? a.visible(selectedVisibleRows.length) : true))
+            .filter((a) => (a.visible ? a.visible(selectedOrIndeterminateVisibleRows.length) : true))
             .map((a) => (
               <button
                 key={a.label(0)}
                 type="button"
                 className={styles.toolbarPill}
                 data-testid={`selection-action-${a.label(1).toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
-                onClick={() => a.onClick(selectedVisibleRows as never[])}
+                onClick={() => a.onClick(selectedOrIndeterminateVisibleRows as never[])}
               >
                 {/* A printer on `Assign logistics` would be a lie about what
                     the button does. Only an OUTPUT keeps the printer glyph. */}
                 {a.kind === "write" ? null : (
                   <Printer size={14} strokeWidth={1.75} aria-hidden />
                 )}
-                <span>{a.label(selectedVisibleRows.length)}</span>
+                <span>{a.label(selectedOrIndeterminateVisibleRows.length)}</span>
               </button>
             ))}
+          {selectionEnd}
         </div>
       )}
 

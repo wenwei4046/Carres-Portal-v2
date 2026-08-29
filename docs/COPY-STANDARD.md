@@ -655,7 +655,8 @@ sidebar page. Existing implementation constants do not override these approved p
 
 The SO Batch Purchase owner is never a permanent sentence in the toolbar or rail and never repeats
 on rows. Do not write Yu Jun's name in the action sentence. The compact chip carries the owner;
-`Issue PO` remains the one governed verb.
+`Issue PO` remains the one governed verb. This selected action replaces the Register's top Work
+Toolbar above the column headings; it is never a second bar at the bottom of the table.
 
 **Purchasing and Receiving date facts — owner ruling 2026-08-29.** These words are never
 interchangeable:

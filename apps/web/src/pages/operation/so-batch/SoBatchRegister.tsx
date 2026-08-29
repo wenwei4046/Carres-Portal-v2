@@ -749,6 +749,25 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
                   orderSelection(o.orderId).indeterminate,
                 testId: (o: SoBatchOrderRow) => `so-batch-select-${o.orderId}`,
               }}
+              selectionSummary={() => summary.text}
+              selectionEnd={summary.lines > 0 ? (
+                <span
+                  className="flex shrink-0 items-center gap-2"
+                  data-testid="so-batch-selection-actions"
+                >
+                  <SoBatchPoDutyChip data={data} />
+                  {data.mayIssue ? (
+                    <button
+                      type="button"
+                      data-testid="so-batch-issue"
+                      className="inline-flex h-7 shrink-0 items-center rounded-control bg-kit-blue-9 px-3 text-meta font-medium text-white hover:opacity-90"
+                      onClick={() => onIssue(selections)}
+                    >
+                      {W.issuePo}
+                    </button>
+                  ) : null}
+                </span>
+              ) : null}
               statusSummary={(filtered) => {
                 /* `not ordered` is the RAIL's word for outstanding demand —
                    printing a second, status-based "not ordered" number here
@@ -765,28 +784,6 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
               }}
             />
           </div>
-
-          {summary.lines > 0 ? (
-            <div
-              className="mt-2 flex shrink-0 items-center justify-between gap-3 rounded-control border border-kit-slate-6 bg-white px-3 py-2"
-              data-testid="so-batch-selection-bar"
-            >
-              <span className="truncate text-body">{summary.text}</span>
-              <span className="flex shrink-0 items-center gap-2">
-                <SoBatchPoDutyChip data={data} />
-                {data.mayIssue ? (
-                  <button
-                    type="button"
-                    data-testid="so-batch-issue"
-                    className="inline-flex h-7 shrink-0 items-center rounded-control bg-kit-blue-9 px-3 text-meta font-medium text-white hover:opacity-90"
-                    onClick={() => onIssue(selections)}
-                  >
-                    {W.issuePo}
-                  </button>
-                ) : null}
-              </span>
-            </div>
-          ) : null}
         </div>
       </div>
     </div>
