@@ -123,6 +123,12 @@ groups by (supplier × category × destination × purpose, merged across request
 ownership and reminders stay in central `Work`; issuance authority remains the ONE
 `purchasing_issue_pos_batch` door.
 
+**Post-merge owner seam, 2026-08-29:** `[YJ]` is the normal PO Duty work-owner hint, not the only
+permission. `operation@carres.com` and Jess are Operations Superusers and may use this SAME governed
+issue door; the actual authenticated actor remains separate from normal duty/cover. Issued Manual
+Purchase demand then enters the same Receiving engine as SO Batch Purchase; this Card creates no
+Manual receipt lane.
+
 ## 4 · The purpose correction — persisted by this Card
 
 The six approved purposes are exactly:

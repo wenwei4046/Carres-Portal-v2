@@ -201,7 +201,7 @@ SUPPLY CHAIN
 │   │   ├── Manual Purchase
 │   │   └── Purchase Orders
 │   ├── RECEIVE
-│   │   └── Goods Receipts
+│   │   └── Receiving
 │   ├── PROBLEMS
 │   │   ├── Supplier Claims
 │   │   ├── Purchase Returns
@@ -242,9 +242,10 @@ a second settings home. `Old Orders` is a temporary cutover door and is not part
 The right Quick Rail is governed by `ui/MASTER.md`; it never adds duplicate module destinations or
 business truth.
 
-**`Goods Receipts` is the exact Purchasing destination word.** It names the governed record
-operators need to find again; the work inside that destination is still receiving. The internal
-letters `GRN` remain banned from navigation and staff-facing status copy.
+**`Receiving` is the exact Purchasing destination/workspace word** (owner correction 2026-08-29).
+It names the physical operation. The numbered document Carres creates after that operation is the
+`GRN`; the supplier's separate evidence is the Supplier DO. Neither document word replaces the
+navigation word.
 
 **This is navigation, not workflow.** How the operator moves between these pages — which one
 feeds which — is the module MASTER's, and it changes when the business changes.
@@ -434,11 +435,14 @@ Case outcomes · Finance/AP read-only continuation.
 
 **OWNS**
 - The **Receiving Session / Goods Receipt** — ONE physical delivery, one session, from a PO or CO.
+- The supplier's DO reference/evidence and Carres's numbered GRN. The supplier provides its DO;
+  Carres creates the GRN only after physical receiving — one cannot substitute for the other.
 - The three times (goods received at · submitted at · posted at) and the append-only event
   ledger. **Amend and Void are its acts; history is never edited in place.**
 - **`purchase_order_lines.received_qty` moves only through this module.**
 
-**ACTIONS** — start a receiving · count the lines · record damaged and wrong · post it ·
+**ACTIONS** — start from the exact PO/CO · count Order/Received/Pending quantities · record damaged,
+wrong and extra separately · attach Supplier DO/evidence · post it ·
 amend it · void it · return a count for a re-check.
 
 **SUMMARISES** — the purchase order it is receiving against · the customer orders waiting on it.
@@ -446,7 +450,7 @@ amend it · void it · return a count for a re-check.
 **LINKS TO** — Purchasing (the PO) · Stock (where the units landed) · Supplier Claim (what the
 count opened).
 
-Supplier-consignment receipt preserves supplier ownership and creates no payable. Goods Receipts
+Supplier-consignment receipt preserves supplier ownership and creates no payable. Receiving
 is the one receipt engine; a separate Consignment Receipt page would duplicate the physical act.
 
 > **ONE DOOR. This is the boundary D2 restored**, and it is the sharpest example of Law C in the
@@ -770,7 +774,7 @@ that already exist. Until that fact exists, a trip table is an unowned record �
 
 **③ Purchasing / customer-order seam — RESOLVED FROM AUTHORITY 2026-08-22.**
 The customer order owns the reason and promise. Purchasing owns the generated `purchase_demand`
-remainder, supplier commitment and `Deliver To`; Goods Receipts owns the physical receipt; Stock
+remainder, supplier commitment and `Deliver To`; Receiving owns the physical receipt; Stock
 then owns Unit custody/location. The Sales Order reads risk and connected documents but cannot mark
 goods ordered or received.
 

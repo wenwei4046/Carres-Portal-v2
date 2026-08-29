@@ -172,9 +172,10 @@ WHEN             actual working weekday + date from the action's authoritative c
 Use the actual person or team when responsibility is known, the governed action verb, and the
 specific object, recipient and required result the operator can recognise. `WHEN` follows
 `ACTION-FLOW-STANDARD.md` Law 2A: use
-the applicable Carres working calendar, exclude its public holidays/non-working days, and move a
-due date only according to that authoritative calendar. A governed action surface that requires a
-due day prints weekday + date; `Today`, `Tomorrow` or `T−2` alone is not enough.
+the applicable Carres working calendar and exclude its public holidays/non-working days. Recorded
+business dates are never silently moved; only a computed work due date may move when its governing
+rule explicitly permits it. A governed action surface that requires a due day prints the resulting
+weekday + date; `Today`, `Tomorrow` or `T−2` alone is not enough.
 
 **Banned as substitutes for clear work:** `Follow up` · `Waiting` · `Need action` · vague
 `Chase`. These may describe neither a measurable act nor its object/recipient/result/date. A waiting condition is a
@@ -593,14 +594,14 @@ do not create a second business status, work queue or source of truth.
 |---|---|
 | Group headings | `BUY` · `RECEIVE` · `PROBLEMS` · `SHOWROOM` |
 | BUY pages | `SO Batch Purchase` · `Manual Purchase` · `Purchase Orders` |
-| RECEIVE pages | `Goods Receipts` |
+| RECEIVE pages | `Receiving` |
 | PROBLEMS pages | `Supplier Claims` · `Purchase Returns` · `Repair Orders` |
 | SHOWROOM pages | `Display Requests` · `Consignment Orders` · `Consignment Returns` · `Consignment Sale Notices` |
 
 Purchasing has no Home, module-specific Work, Purchase Demands, New Supplier/New SKU request,
 Consignment Overview, Consignment Receipts, Report or Settings sidebar destination. The capability
 lives in its authority home: Registers, central Work/Reports/Settings, in-context Catalog governance
-or the one Goods Receipts engine. `purchase_demand` remains an authoritative record, not a page.
+or the one Receiving engine. `purchase_demand` remains an authoritative record, not a page.
 
 | Queue tile | Row line | Button | Done message | Empty state |
 |---|---|---|---|---|
@@ -644,6 +645,20 @@ sidebar page. Existing implementation constants do not override these approved p
 | Monthly PO duty holder | `{name} holds PO duty` |
 | Dated PO duty cover | `{name} is covering PO duty` |
 | No monthly holder | `Nobody holds PO duty this month.` |
+
+**Purchasing and Receiving date facts — owner ruling 2026-08-29.** These words are never
+interchangeable:
+
+| Word | Exact fact |
+|---|---|
+| `PO Issued` | when Carres issued the supplier commitment; sits beside `PO No` |
+| `PO Delivery Date` | the original official supplier-facing date on the PO |
+| `Supplier Delivery Date` | a later date actually supplied by the supplier; show the additional Register column only when the supplier changed the PO date; otherwise `Same as PO` |
+| `Goods Received At` | when the goods physically arrived; never keyed/submitted/posted time |
+
+No recorded business date is silently moved to fit a calendar. Purchasing/Operation work uses the
+Office calendar (Mon–Fri); Receiving/GRN/Warehouse uses the Warehouse calendar (Mon–Sat); Sunday
+and Selangor public holidays are excluded.
 
 **The rail — owner ruling 2026-08-27 (Card 02-C).** Five sections, in this order.
 `SETUP TO FIX` renders only when at least one affected Sales Order exists:
@@ -1139,6 +1154,12 @@ under a confident one.
 
 ### The Receiving Workspace's own words (locked 2026-08-03, Slice B)
 
+**OWNER CORRECTION 2026-08-29.** The table below keeps the governed workspace/action words but its
+former `Received · Outstanding` summary is superseded. Receiving now keeps these quantity facts
+separate: `Order Qty` · `Received Qty` · `Damaged Qty` · `Wrong Item Qty` ·
+`Pending Delivery Qty`. Damaged, wrong and extra goods never reduce `Pending Delivery Qty` and
+never create available stock. `Accepted` / `Rejected` are not default Register quantity columns.
+
 `Check in` above is the ACT and stays the queue word. These are the words the
 Office Receiving Workspace puts on screen while performing it — they name
 sections, fields and the state of the Save button, so they are not actions and
@@ -1147,7 +1168,7 @@ do not take the five-string shape.
 | Word | Where | Why this word |
 |---|---|---|
 | `Receiving Summary` | workspace section | **Never `Progress`** (Jess): the section answers *what has this PO taken in*, a count, not a stage. |
-| `Received` · `Outstanding` | the summary's two rows | Outstanding is PRINTED, not left as `5 − 3`. An operator should never subtract to learn what is still owed. |
+| `Order Qty` · `Received Qty` · `Damaged Qty` · `Wrong Item Qty` · `Pending Delivery Qty` | receiving quantities | Each fact prints its own number. The operator never subtracts to learn what is still due, and a problem quantity never masquerades as received stock. |
 | `Start Receiving` | primary action | A PRIMARY ACTION, never a section — the operator's whole job here is one press. |
 | `Receiving Details` | the strip Receiving Mode adds | What this delivery was, as opposed to what was on it. |
 | `Goods Received At` | field | The Business Date Dictionary's own word — when the goods PHYSICALLY arrived, which is not when they were keyed in. |
@@ -1157,7 +1178,7 @@ do not take the five-string shape.
 | `What kind of wrong?` | per-line picker | Plain words. The claim needs the kind before it can be filed. |
 | `Save Receiving` | the Save button, when nothing is missing | |
 | `Save — {what is missing}` | the Save button otherwise | The button NAMES the gap: `Save — add a DO number` · `Save — upload signed DO` · `Save — count at least one unit`. A grey button that will not say why is a puzzle. |
-| `Remaining after save: {n} (stays on this PO)` | beside Save | Quiet, never a popup: a short receipt is normal, and routine confirms train people to click OK. |
+| `Pending Delivery Qty after save: {n}` | beside Save | Quiet, never a popup: a short receipt is normal, the number stays on the source PO, and routine confirms train people to click OK. |
 | `No receiving activity yet.` | Activity empty state | **Never `Nothing received yet`** (Jess, 2026-08-03) — that reads as *the goods have not come*, which is a different fact and usually a false one. What is empty is the RECORD. |
 | `Open in Claims` | Exceptions section | A DOOR, never a form. The claim already exists; the receive that recorded the problem opened it. |
 
