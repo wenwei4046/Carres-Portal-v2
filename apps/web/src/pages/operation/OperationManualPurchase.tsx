@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   DEMAND_PURPOSES,
   DEMAND_PURPOSE_DEFAULT,
+  MANUAL_PURCHASE_APPROVAL_WORDS,
   MANUAL_PURCHASE_RAIL,
   MANUAL_PURCHASE_RAIL_CLEAR,
   MANUAL_PURCHASE_STATUS_WORDS,
@@ -10,6 +11,7 @@ import {
   demandPurposeLabelOf,
   manualPurchaseApprovalOf,
   manualPurchaseApproverLine,
+  manualPurchaseHistoryRecord,
   manualPurchaseDeliverToSummary,
   manualPurchaseForOf,
   manualPurchaseIssueGroupCount,
@@ -34,12 +36,14 @@ import {
   type ProductCategory,
 } from "@carres/shared";
 import { useQuery } from "@tanstack/react-query";
-import { PanelLeftOpen } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { ChevronLeft, ChevronRight, PanelLeftOpen } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
 import Button from "@/components/kit/Button";
 import DataTable, { type Column } from "@/components/kit/DataTable";
 import DatePicker from "@/components/kit/DatePicker";
+import EmptyState from "@/components/kit/EmptyState";
 import Input from "@/components/kit/Input";
+import Loading from "@/components/kit/Loading";
 import SearchInput from "@/components/kit/SearchInput";
 import Select from "@/components/kit/Select";
 import StatusPill from "@/components/kit/StatusPill";
@@ -55,7 +59,6 @@ import {
   useCreatePurchaseRequest,
   useCreatePurchaseRequestLine,
   useDecidePurchaseRequest,
-  useDeliveryPartners,
   useIssuePurchaseRequests,
   useManualPurchaseDetail,
   useManualPurchaseRegister,
@@ -65,6 +68,13 @@ import {
 } from "@/lib/queries";
 import { avatarColor, personInitials } from "@/lib/staff-avatar";
 import PurchasingTabs from "./PurchasingTabs";
+import SalesOrderTabs from "./SalesOrderTabs";
+import { Block } from "./SalesOrderWorkspace";
+import {
+  RecordRanks,
+  groupHistoryChronology,
+  historyActorWords,
+} from "./SalesOrderLedger";
 import {
   FilterRail,
   FilterRailGroup,
@@ -370,6 +380,12 @@ export default function OperationManualPurchase() {
     [rows, rail],
   );
 
+  /* ── THE FILTERED REGISTER ORDER (Card 05 §3.1) — what the grid actually
+     shows after search + column filters, post-sort. The object header's
+     `‹ n of m ›` steps THIS list, so position is the operator's own filtered
+     Register truth, never a second ordering. ─────────────────────────── */
+  const [gridRows, setGridRows] = useState<RequestRegisterRow[]>([]);
+
   /* ── SELECTION (Card 04) — only `Ready to order` remainder may be ticked;
      PO Duty exists on this page ONLY beside a live selection. ─────────── */
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -636,45 +652,24 @@ export default function OperationManualPurchase() {
     );
   }
 
-  if (typeof mode === "object") {
-    return (
-      <div className="flex h-full min-h-0 flex-col">
-        <PurchasingTabs />
-        <RequestDetail
-          id={mode.detail}
-          readySiblingIds={(() => {
-            const mine = new Set(
-              (q.data?.lines ?? [])
-                .filter((l) => l.request_id === mode.detail && l.cancelled_at === null)
-                .map((l) => l.supplier_id),
-            );
-            return rows
-              .filter(
-                (r) =>
-                  r.id !== mode.detail &&
-                  r.status.kind === "ready_to_order" &&
-                  (q.data?.lines ?? []).some(
-                    (l) =>
-                      l.request_id === r.id &&
-                      l.cancelled_at === null &&
-                      mine.has(l.supplier_id),
-                  ),
-              )
-              .map((r) => r.id);
-          })()}
-          onBack={() => {
-            setMode("register");
-            void q.refetch();
-          }}
-        />
-      </div>
-    );
-  }
+  /* Card 05 §3 — clicking the MPR number opens WORK: the full-width object
+     replaces the Register content. The Register stays MOUNTED underneath
+     (visibility only), so `‹ Manual Purchase` restores the complete state
+     the operator left — rail filters, search, column filters, sort, scroll
+     and expansion — instead of a fresh grid. */
+  const detailId = typeof mode === "object" ? mode.detail : null;
+  const detailRow = detailId != null ? (rows.find((r) => r.id === detailId) ?? null) : null;
+  const gridIndex = detailId != null ? gridRows.findIndex((r) => r.id === detailId) : -1;
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <PurchasingTabs />
-      <div className="flex min-h-0 flex-1 overflow-hidden">
+      {detailId == null && <PurchasingTabs />}
+      <div className="relative min-h-0 flex-1">
+      <div
+        className={`absolute inset-0 flex overflow-hidden${detailId != null ? " invisible" : ""}`}
+        aria-hidden={detailId != null || undefined}
+        data-testid="mp-register-surface"
+      >
         {/* Card 03 — the readable 240px shell, BYTE-BEHAVIOURALLY UNCHANGED
             by Card 04 (the sixth purpose row arrives through the one shared
             `DEMAND_PURPOSES` list, Law D). */}
@@ -815,6 +810,9 @@ export default function OperationManualPurchase() {
             }
             rows={filtered}
             columns={columns}
+            /* The grid's own filtered+sorted order feeds the object header's
+               `‹ n of m ›` (Card 05 §3.1) — a STABLE setter, per the engine. */
+            onFilteredRowsChange={setGridRows}
             storageKey="carres.manualPurchase.register.v2"
             rowKey={(r) => r.id}
             rowTestId={(r) => `mp-row-${r.id}`}
@@ -910,6 +908,23 @@ export default function OperationManualPurchase() {
           ) : null}
         </div>
 
+      </div>
+
+      {detailId != null && (
+        <ManualPurchaseObject
+          key={detailId}
+          id={detailId}
+          registerReqNo={detailRow?.reqNo ?? null}
+          position={
+            gridIndex >= 0 ? { index: gridIndex + 1, total: gridRows.length } : null
+          }
+          onStep={(dir) => {
+            const next = gridRows[gridIndex + dir];
+            if (next) setMode({ detail: next.id });
+          }}
+          onBack={() => setMode("register")}
+        />
+      )}
       </div>
     </div>
   );
@@ -1624,494 +1639,164 @@ function LinePicker({
   );
 }
 
-/* ── The object detail — ONE SCROLL, no tabs (ui/MASTER §4.1; card §8) ────── */
-
-/**
- * One request, read top to bottom: the facts the card rules (raised by ·
- * for · what · how many · deliver to · needed by), then
- * `WHAT WE ALREADY HAVE` per line, then — for the APPROVER only — the money
- * and the decision. The same screen renders for both roles minus the money,
- * never a permission error.
+/* ══ THE MANUAL PURCHASE OBJECT — PURCHASING CARD 05 ═══════════════════════════
  *
- * The Approve control pre-fills `still needed`, NOT what was asked (card §4):
- * an approver who has to do the subtraction will not do it. Cutting is not
- * refusing. `Refuse` cannot be submitted without a reason.
+ * One full-width, calm, read-first object; ONE scroll; no tabs, no split
+ * preview, no floating 720/900px islands (ui/MASTER §4.1: Manual Purchase is
+ * ONE SCROLL and NEVER splits). Section order is the Card's, exactly:
+ * Request → Items Requested → What We Already Have → Approval →
+ * Purchase Orders → History.
+ *
+ * WHAT THIS OBJECT DOES NOT HOLD (Card 05 §7): no second `Issue PO`, no PO
+ * Duty block, no consolidation prompt, no price editor, no Receive button,
+ * no PDF preview. Approval makes the request eligible for the Register's
+ * selected `Issue PO` action — the ONE Manual Purchase issuance placement —
+ * and physical arrival belongs to the exact PO in `Receiving`.
+ *
+ * ONE APPROVAL AUTHORITY (PR 982, preserved): `canApprove` is the server's
+ * answer to exactly what `purchasing_decide_request`'s SQL gate asks —
+ * `principal` or the real `ops_manager` position duty. The same answer
+ * gates the approver-only money AND the Approve/Refuse controls; the shared
+ * operation@ login sees neither. The SQL door re-enforces in the decision
+ * transaction; a refusal leaves in the governed two lines.
  */
-function RequestDetail({
-  id,
-  onBack,
-  readySiblingIds,
+
+/** The three-rank identity line for one stored event — rank 2 is the
+ *  portal-wide `historyActorWords`; a missing individual states the governed
+ *  audit defect, never an invented person. */
+function mpEventIdentity(e: {
+  occurred_at: string;
+  actor: string | null;
+  actor_role: string | null;
+}): string {
+  return historyActorWords({
+    text: "",
+    occurred_at: e.occurred_at,
+    by_role: e.actor_role,
+    actor: e.actor,
+    actor_kind: e.actor ? "human" : "missing",
+  });
+}
+
+/** One quiet read-only fact table — the object's shared listing grammar
+ *  (GoodsMiniTable's alignment law: fixed columns, one visual listing). */
+function ObjectTable({
+  columns,
+  minWidth,
+  children,
+  testId,
 }: {
-  id: string;
-  onBack: () => void;
-  /** Other READY requests sharing a supplier with this one — the
-   *  consolidation OFFER's candidates (card §6). */
-  readySiblingIds: string[];
+  columns: ReadonlyArray<{ key: string; label: string; width?: number }>;
+  minWidth?: number;
+  children: React.ReactNode;
+  testId?: string;
 }) {
-  const q = useManualPurchaseDetail(id);
-  const pick = useQuery({
-    queryKey: ["to-order", "pick-items"],
-    queryFn: () =>
-      apiFetch<{ items: DemandPickItem[] }>(
-        "/api/operation/purchase/to-order/demand/pick-items",
-      ),
-    staleTime: 60_000,
-  });
-  const decide = useDecidePurchaseRequest();
-  const issue = useIssuePurchaseRequests();
-  const partnersQ = useDeliveryPartners();
-
-  /**
-   * ⭐ THE TRANSACTION COSTS THIS ISSUE WILL COMMIT TO (0380; Card 02 closure §2).
-   *
-   * The prices are READ and SHOWN before `Issue PO`, and the same numbers are
-   * declared with the request. `Issue as one PO` can pull in sibling requests
-   * whose lines are not on this screen, so the read covers them too.
-   */
-  const issueIds = useMemo(() => [id, ...readySiblingIds], [id, readySiblingIds]);
-  const costsQ = useQuery({
-    queryKey: ["operation", "purchasing", "requests", "issue-costs", issueIds],
-    queryFn: () =>
-      apiFetch<{ costs: { sku: string; unitCost: number | null }[] }>(
-        `/api/operation/purchasing/requests/issue-costs?requestIds=${encodeURIComponent(
-          issueIds.join(","),
-        )}`,
-      ),
-    staleTime: 15_000,
-  });
-
-  /** The approver's per-line numbers — seeded from `still needed` once the
-   *  stock facts land; the human may override before approving. */
-  const [cuts, setCuts] = useState<Record<string, string>>({});
-  const [refusing, setRefusing] = useState(false);
-  const [refuseReason, setRefuseReason] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [partnerId, setPartnerId] = useState<string | undefined>(undefined);
-  const [issueError, setIssueError] = useState<string | null>(null);
-
-  if (q.isLoading || !q.data) {
-    return (
-      <div className="flex min-h-0 flex-1 items-center justify-center text-meta text-base-500">
-        {q.isError ? (q.error as Error).message : "Loading…"}
-      </div>
-    );
-  }
-
-  const { request, lines, destinations, users, canApprove } = q.data;
-  const destName = destinations.find((d) => d.id === request.destination_id)?.name ?? "";
-  const raisedBy = users.find((u) => u.id === request.created_by)?.name ?? "";
-  const freeOf = (sku: string) =>
-    pick.data?.items.find((i) => i.sku === sku)?.free ?? 0;
-
-  /* The structured For — the same one arithmetic the Register prints. */
-  const forText = manualPurchaseForOf({
-    purpose: request.purpose,
-    destinationName: destName || null,
-    serviceCaseNo: q.data.serviceCaseNo,
-    staffName: request.for_staff_user_id
-      ? (users.find((u) => u.id === request.for_staff_user_id)?.name ?? null)
-      : null,
-    subsidiaryName: request.for_subsidiary_name,
-    why: request.why,
-  });
-
-  const status = manualPurchaseStatusOf({
-    approvalRequired: request.approval_required,
-    approvedAt: request.approved_at,
-    refusedAt: request.refused_at,
-    refuseReason: request.refuse_reason,
-    lines: lines.map((l) => ({
-      qty: l.qty,
-      issuedQty: l.issued_qty,
-      remainingQty: l.remaining_qty,
-      cancelledAt: l.cancelled_at,
-      poId: l.po_id,
-      received: l.received,
-    })),
-  });
-  const undecided = request.approved_at === null && request.refused_at === null;
-  const showDecision = canApprove && request.approval_required && undecided;
-
-  async function submitIssue(together: boolean) {
-    setIssueError(null);
-    if (!q.data) return;
-    const liveSuppliers = new Set(
-      q.data.lines.filter((l) => l.cancelled_at === null).map((l) => l.supplier_id),
-    );
-    const partners: Record<string, string> = {};
-    for (const sp of q.data.suppliers) {
-      if (liveSuppliers.has(sp.id) && sp.kind === "factory_pickup") {
-        if (!partnerId) {
-          setIssueError("Select a procurement partner for this factory-pickup supplier.");
-          return;
-        }
-        partners[sp.id] = partnerId;
-      }
-    }
-    /* THE PRICES SHOWN ON THIS SCREEN, declared. A SKU with no Catalog price is
-       a configuration hole; it is not declared as zero, and the server refuses
-       the line by name. */
-    const expectedCosts: Record<string, number> = {};
-    for (const c of costsQ.data?.costs ?? []) {
-      if (c.unitCost != null) expectedCosts[c.sku] = c.unitCost;
-    }
-    if (Object.keys(expectedCosts).length === 0) {
-      setIssueError("The transaction costs are still loading. Wait, then issue again.");
-      return;
-    }
-    try {
-      await issue.mutateAsync({
-        requestIds: together ? [id, ...readySiblingIds] : [id],
-        together,
-        partners: Object.keys(partners).length > 0 ? partners : null,
-        expectedCosts,
-      });
-      onBack();
-    } catch (e) {
-      /* THE APPROVED TWO LINES (closure §9): the fact, then the act. */
-      const body = (e as { body?: { message?: string; action?: string; code?: string } }).body;
-      const fallback = purchasingRefusal(body?.code);
-      setIssueError(
-        `${body?.message ?? fallback.wrong} ${body?.action ?? fallback.todo}`.trim(),
-      );
-    }
-  }
-
-  async function submitDecision(decision: "approve" | "refuse") {
-    setError(null);
-    try {
-      await decide.mutateAsync({
-        id,
-        decision,
-        reason: decision === "refuse" ? refuseReason.trim() : null,
-        cuts:
-          decision === "approve"
-            ? lines
-                .filter((l) => l.cancelled_at === null)
-                .map((l) => ({ id: l.id, qty: Number(cuts[l.id] ?? l.qty) }))
-                .filter((c) => Number.isInteger(c.qty) && c.qty >= 0)
-            : null,
-      });
-      onBack();
-    } catch (e) {
-      /* THE APPROVED TWO LINES (closure §9): when the door refuses with the
-         fact and the act, print both — never the raw code word. */
-      const body = (e as { body?: { message?: string; action?: string } }).body;
-      setError(
-        body?.action
-          ? `${body.message ?? ""} ${body.action}`.trim()
-          : e instanceof Error
-            ? e.message
-            : "The decision was not recorded",
-      );
-    }
-  }
-
   return (
-    <div
-      className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto p-4"
-      data-testid="mp-detail"
-    >
-      <div className="flex items-center justify-between">
-        <h2 className="text-body font-semibold text-base-900">
-          <span className="font-mono">{request.req_no}</span>
-          <span className="pl-3">
-            <StatusPill tone={STATUS_TONE[status.kind]}>{status.label}</StatusPill>
-          </span>
-        </h2>
-        <Button variant="ghost" onClick={onBack}>
-          Back
-        </Button>
-      </div>
-
-      {status.reasonLabel ? (
-        <p className="text-meta text-base-700" data-testid="mp-detail-refuse-reason">
-          {status.reasonLabel}
-        </p>
-      ) : null}
-
-      {/* Card 03 §3 — the object names the REAL action owner while the
-          request waits. Nothing resolved prints nothing. */}
-      {status.kind === "waiting_approval"
-        ? (() => {
-            const line = manualPurchaseApproverLine(
-              (q.data?.approvers ?? []).map((a) => a.name),
-            );
-            return line ? (
-              <p className="text-meta text-base-700" data-testid="mp-detail-approver">
-                {line}
-              </p>
-            ) : null;
-          })()
-        : null}
-
-      {/* The facts, in the card's own order. */}
-      <dl className="grid max-w-[720px] grid-cols-2 gap-x-6 gap-y-2 text-body">
-        <div>
-          <dt className="text-meta text-kit-slate-11">{MW.raisedBy}</dt>
-          <dd className="text-base-900">{raisedBy}</dd>
-        </div>
-        <div>
-          <dt className="text-meta text-kit-slate-11">{MW.needFor}</dt>
-          <dd className="text-base-900">{purposeLabelOf(request.purpose)}</dd>
-        </div>
-        <div>
-          <dt className="text-meta text-kit-slate-11">{MW.colFor}</dt>
-          <dd className="text-base-900" data-testid="mp-detail-for">
-            {forText}
-          </dd>
-        </div>
-        <div>
-          <dt className="text-meta text-kit-slate-11">{MW.deliverTo}</dt>
-          <dd className="text-base-900">{destName}</dd>
-        </div>
-        <div>
-          <dt className="text-meta text-kit-slate-11">{MW.neededBy}</dt>
-          <dd className="text-base-900">
-            {request.required_by ? fmtDate(request.required_by) : null}
-          </dd>
-        </div>
-        {/* A routine purpose that carries a historical reason still shows it
-            truthfully; Other Purchase shows its own answer under its own
-            question through `For` above. */}
-        {request.why && request.purpose !== "other_purchase" ? (
-          <div className="col-span-2">
-            <dt className="text-meta text-kit-slate-11">{MW.why}</dt>
-            <dd className="text-base-900" data-testid="mp-detail-why">
-              {request.why}
-            </dd>
-          </div>
-        ) : null}
-      </dl>
-
-      {/* The lines, each with WHAT WE ALREADY HAVE — and, for the approver,
-          the money and the pre-filled still-needed control. */}
-      <div className="flex max-w-[900px] flex-col gap-3">
-        <h3 className="text-label font-semibold uppercase tracking-[0.14em] text-base-500">
-          {MW.items}
-        </h3>
-        {lines.map((l, i) => {
-          const free = freeOf(l.sku);
-          return (
-            <div key={l.id} className="flex flex-col gap-1 border-b border-base-100 pb-3">
-              <div className="flex items-center gap-3">
-                <span className="font-mono text-body text-base-900">{l.sku}</span>
-                <span className="text-meta text-base-600">× {l.qty}</span>
-                {l.remark ? (
-                  <span className="text-meta text-base-600">· {l.remark}</span>
-                ) : null}
-                {l.cancelled_at ? (
-                  <span className="text-meta text-base-500">
-                    {MANUAL_PURCHASE_STATUS_WORDS.not_going_ahead}
-                    {l.cancel_reason ? ` — ${l.cancel_reason}` : ""}
-                  </span>
-                ) : null}
-                {"unit_cost" in l && l.unit_cost != null ? (
-                  /* THE MONEY — approver only; the server omits the key for
-                     everyone else, so nothing here can leak it. */
-                  <span
-                    className="ml-auto tabular-nums text-meta text-base-700"
-                    data-testid={`mp-detail-cost-${i}`}
-                  >
-                    RM {Number(l.unit_cost).toLocaleString()} × {l.qty}
-                  </span>
-                ) : null}
-              </div>
-
-              {l.cancelled_at === null ? (
-                <AlreadyHave sku={l.sku} free={free} qty={l.qty} index={i} />
-              ) : null}
-
-              {showDecision && l.cancelled_at === null ? (
-                <StillNeededControl
-                  line={l}
-                  free={free}
-                  value={cuts[l.id]}
-                  onChange={(v) => setCuts((c) => ({ ...c, [l.id]: v }))}
-                  index={i}
-                />
-              ) : null}
-            </div>
-          );
-        })}
-      </div>
-
-      {error ? (
-        <p className="text-meta text-kit-red-11" data-testid="mp-decide-error">
-          {error}
-        </p>
-      ) : null}
-
-      {showDecision ? (
-        <div className="flex max-w-[900px] items-center gap-3" data-testid="mp-decision">
-          <Button
-            variant="primary"
-            loading={decide.isPending}
-            onClick={() => void submitDecision("approve")}
-            data-testid="mp-approve"
-          >
-            Approve
-          </Button>
-          {refusing ? (
-            <span className="flex flex-1 items-center gap-2">
-              <Input
-                id="mp-refuse-reason"
-                aria-label="Refuse reason"
-                placeholder="Why is this not going ahead?"
-                value={refuseReason}
-                onChange={(e) => setRefuseReason(e.target.value)}
-                data-testid="mp-refuse-reason"
-              />
-              {/* The reason is REQUIRED — without it a refused request is
-                  simply never touched again (card §4). */}
-              <Button
-                variant="ghost"
-                disabled={refuseReason.trim().length === 0 || decide.isPending}
-                onClick={() => void submitDecision("refuse")}
-                data-testid="mp-refuse-submit"
+    <div className="overflow-x-auto" data-testid={testId}>
+      <table
+        className="w-full table-fixed text-left"
+        style={minWidth ? { minWidth } : undefined}
+      >
+        <colgroup>
+          {columns.map((c) => (
+            <col key={c.key} style={c.width ? { width: c.width } : undefined} />
+          ))}
+        </colgroup>
+        <thead className="border-b border-base-200 bg-base-50">
+          <tr className="divide-x divide-base-200">
+            {columns.map((c) => (
+              <th
+                key={c.key}
+                scope="col"
+                className="px-2 py-1.5 text-label font-semibold uppercase text-base-500"
               >
-                Refuse
-              </Button>
-            </span>
-          ) : (
-            <Button
-              variant="ghost"
-              onClick={() => setRefusing(true)}
-              data-testid="mp-refuse"
-            >
-              Refuse
-            </Button>
-          )}
-        </div>
-      ) : null}
-
-      {/* ── ISSUE — same day, no PO-day gate; consolidation is an OFFER
-          (card §6): issuing separately is ALWAYS available on the same
-          screen. An offer that cannot be declined is a gate wearing an
-          offer's clothes. */}
-      {status.kind === "ready_to_order" ? (
-        <div className="flex max-w-[900px] flex-col gap-2" data-testid="mp-issue">
-          {(() => {
-            const liveSuppliers = new Set(
-              lines.filter((l) => l.cancelled_at === null).map((l) => l.supplier_id),
-            );
-            const needsPartner = q.data!.suppliers.some(
-              (sp) => liveSuppliers.has(sp.id) && sp.kind === "factory_pickup",
-            );
-            return needsPartner ? (
-              <div className="flex items-center gap-2">
-                <label htmlFor="mp-issue-partner" className="text-meta text-kit-slate-11">
-                  Procurement partner
-                </label>
-                <span className="w-[220px]">
-                  <Select
-                    id="mp-issue-partner"
-                    value={partnerId}
-                    onValueChange={setPartnerId}
-                    options={(partnersQ.data?.partners ?? []).map(
-                      (dp: { id: string; name: string }) => ({
-                        value: dp.id,
-                        label: dp.name,
-                      }),
-                    )}
-                  />
-                </span>
-              </div>
-            ) : null;
-          })()}
-          {/* ⭐ THE PRICES THIS ISSUE COMMITS TO (0380; closure §2).
-              Shown before the button, because the request DECLARES them and a
-              number nobody was shown is not a number anybody reviewed. `Issue as
-              one PO` widens the set to the sibling requests, so this list does
-              too. A SKU Catalog has no price for is named, not defaulted. */}
-          {(costsQ.data?.costs ?? []).length > 0 ? (
-            <div className="flex flex-col gap-0.5" data-testid="mp-issue-costs">
-              <span className="text-label uppercase tracking-wide text-base-500">
-                Transaction cost
-              </span>
-              {(costsQ.data?.costs ?? []).map((c) => (
-                <span
-                  key={c.sku}
-                  className="flex items-center justify-between gap-3 text-meta"
-                  data-testid={`mp-issue-cost-${c.sku}`}
-                >
-                  <span className="min-w-0 truncate font-mono">{c.sku}</span>
-                  {c.unitCost == null ? (
-                    <span className="flex shrink-0 flex-col text-right">
-                      <span className="text-base-900">Catalog has no price.</span>
-                      <span className="text-base-500">
-                        Ask Catalog to set the cost of {c.sku}.
-                      </span>
-                    </span>
-                  ) : (
-                    <span className="shrink-0 tabular-nums text-base-900">
-                      RM {Number(c.unitCost).toLocaleString()}
-                    </span>
-                  )}
-                </span>
-              ))}
-            </div>
-          ) : null}
-          <div className="flex items-center gap-3">
-            {readySiblingIds.length > 0 ? (
-              <>
-                <span className="text-meta text-base-700" data-testid="mp-issue-offer">
-                  Issue as one PO? {readySiblingIds.length + 1} approved requests share
-                  this supplier.
-                </span>
-                <Button
-                  variant="primary"
-                  loading={issue.isPending}
-                  onClick={() => void submitIssue(true)}
-                  data-testid="mp-issue-together"
-                >
-                  Issue as one PO
-                </Button>
-                <Button
-                  variant="ghost"
-                  disabled={issue.isPending}
-                  onClick={() => void submitIssue(false)}
-                  data-testid="mp-issue-separate"
-                >
-                  Issue separately
-                </Button>
-              </>
-            ) : (
-              <Button
-                variant="primary"
-                loading={issue.isPending}
-                onClick={() => void submitIssue(false)}
-                data-testid="mp-issue-po"
-              >
-                Issue PO
-              </Button>
-            )}
-          </div>
-          {issueError ? (
-            <p className="text-meta text-kit-red-11" data-testid="mp-issue-error">
-              {issueError}
-            </p>
-          ) : null}
-        </div>
-      ) : null}
+                {c.label}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-base-200 text-body">{children}</tbody>
+      </table>
     </div>
   );
 }
 
+/** One REQUEST fact — label over value, the object's reading grammar. */
+function Fact({
+  label,
+  children,
+  testId,
+  wide,
+}: {
+  label: string;
+  children: React.ReactNode;
+  testId?: string;
+  wide?: boolean;
+}) {
+  return (
+    <div className={wide ? "col-span-full" : undefined}>
+      <dt className="text-meta text-kit-slate-11">{label}</dt>
+      <dd className="text-body text-base-900" data-testid={testId}>
+        {children}
+      </dd>
+    </div>
+  );
+}
+
+/** WHAT WE ALREADY HAVE — one row per live SKU. `free` rides the pick-items
+ *  read and `already on PO` the open-cover endpoint (the same reads the
+ *  create workspace uses — Law D); `Still Needed` is PRINTED. */
+function AlreadyHaveRow({
+  sku,
+  requestedQty,
+  free,
+  index,
+}: {
+  sku: string;
+  requestedQty: number;
+  free: number;
+  index: number;
+}) {
+  const onPo = useAlreadyOnPo(sku);
+  const already = onPo.data?.alreadyOnPo ?? 0;
+  return (
+    <tr className="divide-x divide-base-200" data-testid={`mp-object-have-${index}`}>
+      <td className="px-2 py-2 font-mono">{sku}</td>
+      <td className="px-2 py-2 tabular-nums">{free}</td>
+      <td className="px-2 py-2 tabular-nums">
+        {already}
+        {onPo.data?.firstPo ? (
+          <span className="pl-1 text-label text-base-600">
+            · {onPo.data.firstPo.id}
+            {onPo.data.firstPo.eta ? ` · ${fmtDate(onPo.data.firstPo.eta)}` : ""}
+          </span>
+        ) : null}
+      </td>
+      <td
+        className="px-2 py-2 font-semibold tabular-nums"
+        data-testid={`mp-object-still-${index}`}
+      >
+        {stillNeededOf(requestedQty, free, already)}
+      </td>
+    </tr>
+  );
+}
+
 /**
- * The approver's quantity — PRE-FILLED with `still needed`, never with what
- * was asked (card §4, `purchasing/MASTER.md`): an approver who has to do the
- * subtraction will not do it. The seed lands once the already-on-PO read
- * answers; a human edit afterwards is theirs and is not overwritten.
+ * One approver line — SKU · Requested Qty · Still Needed · Approved Qty ·
+ * Transaction Cost · Line Total (Card 05 §3.5). `Approved Qty` is prefilled
+ * ONCE from `Still Needed` when the open-cover read lands; a human edit is
+ * theirs and is never overwritten by a background refetch. The cost is
+ * read-only approval evidence, never an Operation price control.
  */
-function StillNeededControl({
+function ApprovalLineRow({
   line,
   free,
   value,
   onChange,
   index,
 }: {
-  line: { id: string; sku: string; qty: number };
+  line: { id: string; sku: string; qty: number; unit_cost?: number | null };
   free: number;
   value: string | undefined;
   onChange: (v: string) => void;
@@ -2124,23 +1809,690 @@ function StillNeededControl({
     if (!seeded && onPo.data) onChange(String(still));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onPo.data]);
+  const qty = Number(value);
+  const cost = line.unit_cost ?? null;
   return (
-    <div className="flex items-center gap-2 text-meta">
-      <label htmlFor={`mp-cut-${index}`} className="text-kit-slate-11">
-        Approve
-      </label>
-      <span className="w-[64px]">
-        <Input
-          id={`mp-cut-${index}`}
-          aria-label={`Approve quantity for ${line.sku}`}
-          value={value ?? ""}
-          onChange={(e) => onChange(e.target.value)}
-          data-testid={`mp-cut-${index}`}
-        />
-      </span>
-      <span className="text-base-600">
-        of {line.qty} asked — {MW.stillNeeded} {still}
-      </span>
+    <tr className="divide-x divide-base-200 align-middle">
+      <td className="px-2 py-2 font-mono">{line.sku}</td>
+      <td className="px-2 py-2 tabular-nums">{line.qty}</td>
+      <td className="px-2 py-2 tabular-nums">{still}</td>
+      <td className="px-2 py-1.5">
+        <span className="block w-[72px]">
+          <Input
+            id={`mp-cut-${index}`}
+            aria-label={`Approve quantity for ${line.sku}`}
+            value={value ?? ""}
+            onChange={(e) => onChange(e.target.value)}
+            data-testid={`mp-cut-${index}`}
+          />
+        </span>
+      </td>
+      <td className="px-2 py-2 tabular-nums" data-testid={`mp-detail-cost-${index}`}>
+        {cost == null ? (
+          <span className="text-base-600">Catalog has no price.</span>
+        ) : (
+          `RM ${Number(cost).toLocaleString()}`
+        )}
+      </td>
+      <td className="px-2 py-2 tabular-nums">
+        {cost == null || !Number.isInteger(qty) || qty < 0
+          ? null
+          : `RM ${(cost * qty).toLocaleString()}`}
+      </td>
+    </tr>
+  );
+}
+
+/** The governed two-line refusal/fact copy — Line 1 the fact, Line 2 the
+ *  smaller act (COPY-STANDARD's two-line law). */
+function TwoLines({
+  wrong,
+  todo,
+  testId,
+}: {
+  wrong: string;
+  todo: string;
+  testId?: string;
+}) {
+  return (
+    <span className="flex min-w-0 flex-col" data-testid={testId}>
+      <span className="text-body font-medium text-kit-red-11">{wrong}</span>
+      <span className="text-label text-base-600">{todo}</span>
+    </span>
+  );
+}
+
+function ManualPurchaseObject({
+  id,
+  registerReqNo,
+  position,
+  onStep,
+  onBack,
+}: {
+  id: string;
+  /** The Register row's own number — the header identity prints instantly
+   *  while the object read is in flight. */
+  registerReqNo: string | null;
+  /** The filtered Register position (`4 of 69`) — context, never truth;
+   *  null when the open object left the filtered list. */
+  position: { index: number; total: number } | null;
+  onStep: (dir: -1 | 1) => void;
+  onBack: () => void;
+}) {
+  const q = useManualPurchaseDetail(id);
+  const pick = useQuery({
+    queryKey: ["to-order", "pick-items"],
+    queryFn: () =>
+      apiFetch<{ items: DemandPickItem[] }>(
+        "/api/operation/purchase/to-order/demand/pick-items",
+      ),
+    staleTime: 60_000,
+  });
+  const navigate = useNavigate();
+  const decide = useDecidePurchaseRequest();
+
+  /** The approver's per-line numbers — seeded once from `Still Needed`. */
+  const [cuts, setCuts] = useState<Record<string, string>>({});
+  const [refusing, setRefusing] = useState(false);
+  const [refuseReason, setRefuseReason] = useState("");
+  const [decideError, setDecideError] = useState<{ wrong: string; todo: string } | null>(
+    null,
+  );
+
+  const d = q.data;
+  const reqNo = d?.request.req_no ?? registerReqNo ?? "";
+
+  const status = d
+    ? manualPurchaseStatusOf({
+        approvalRequired: d.request.approval_required,
+        approvedAt: d.request.approved_at,
+        refusedAt: d.request.refused_at,
+        refuseReason: d.request.refuse_reason,
+        lines: d.lines.map((l) => ({
+          qty: l.qty,
+          issuedQty: l.issued_qty,
+          remainingQty: l.remaining_qty,
+          cancelledAt: l.cancelled_at,
+          poId: l.po_id,
+          received: l.received,
+        })),
+      })
+    : null;
+
+  async function submitDecision(decision: "approve" | "refuse") {
+    if (!d) return;
+    setDecideError(null);
+    try {
+      await decide.mutateAsync({
+        id,
+        decision,
+        reason: decision === "refuse" ? refuseReason.trim() : null,
+        cuts:
+          decision === "approve"
+            ? d.lines
+                .filter((l) => l.cancelled_at === null)
+                .map((l) => ({ id: l.id, qty: Number(cuts[l.id]) }))
+            : null,
+      });
+      /* Success STAYS on the object (Card 05 §3.5): the mutation invalidates
+         the requests reads, the decided facts replace the controls and
+         History appends. The operator is not thrown back to the Register. */
+      setRefusing(false);
+      setRefuseReason("");
+    } catch (e) {
+      /* THE APPROVED TWO LINES — the fact, then the act; never a raw code. */
+      const body = (e as { body?: { message?: string; action?: string; code?: string } })
+        .body;
+      const fallback = purchasingRefusal(body?.code ?? "decision_not_recorded");
+      setDecideError({
+        wrong: body?.message ?? fallback.wrong,
+        todo: body?.action ?? fallback.todo,
+      });
+    }
+  }
+
+  /* ── The one Object Header (ui/MASTER §4.1) — the SAME implementation the
+     Sales Order and Delivery Order objects draw (Law C), with the Manual
+     Purchase Register as its one back destination. `‹ n of m ›` steps the
+     operator's own filtered Register order; position is context, never
+     another source of row truth. ─────────────────────────────────────── */
+  const header = (
+    <SalesOrderTabs
+      identity={reqNo}
+      status={
+        status ? (
+          <StatusPill tone={STATUS_TONE[status.kind]}>{status.label}</StatusPill>
+        ) : null
+      }
+      backTo="/operation?tab=manual-purchase"
+      backLabel={MW.backToRegister}
+      onBack={(event) => {
+        event.preventDefault();
+        onBack();
+      }}
+      docTitle={reqNo ? `${reqNo} — Carres` : undefined}
+      right={
+        position ? (
+          <span className="flex shrink-0 items-center gap-0.5" data-testid="mp-object-position">
+            <button
+              type="button"
+              onClick={() => onStep(-1)}
+              disabled={position.index <= 1}
+              aria-label="Previous Manual Purchase"
+              title="Previous Manual Purchase in the list"
+              className="grid size-7 place-items-center rounded-full text-base-600 hover:bg-hovertint disabled:opacity-30 disabled:hover:bg-transparent"
+            >
+              <ChevronLeft size={16} aria-hidden="true" />
+            </button>
+            <span className="whitespace-nowrap px-0.5 text-meta tabular-nums text-base-500">
+              {position.index} of {position.total}
+            </span>
+            <button
+              type="button"
+              onClick={() => onStep(1)}
+              disabled={position.index >= position.total}
+              aria-label="Next Manual Purchase"
+              title="Next Manual Purchase in the list"
+              className="grid size-7 place-items-center rounded-full text-base-600 hover:bg-hovertint disabled:opacity-30 disabled:hover:bg-transparent"
+            >
+              <ChevronRight size={16} aria-hidden="true" />
+            </button>
+          </span>
+        ) : null
+      }
+    />
+  );
+
+  if (q.isLoading || (!d && !q.isError)) {
+    return (
+      <div className="absolute inset-0 flex flex-col bg-kit-slate-3" data-testid="mp-detail-loading">
+        {header}
+        <div className="px-4 py-4">
+          <Loading label={MW.objectLoading} />
+        </div>
+      </div>
+    );
+  }
+  if (q.isError || !d || !status) {
+    return (
+      <div className="absolute inset-0 flex flex-col bg-kit-slate-3" data-testid="mp-detail-failed">
+        {header}
+        <div className="px-4 py-4">
+          <div className="rounded-card border border-kit-slate-5 bg-white">
+            <EmptyState
+              title={MW.objectLoadFailed}
+              detail={(q.error as Error | undefined)?.message}
+              action={
+                <Button variant="neutral" onClick={() => void q.refetch()}>
+                  {MW.tryAgain}
+                </Button>
+              }
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const { request, lines } = d;
+  const destName = new Map(d.destinations.map((dd) => [dd.id, dd.name]));
+  const supName = new Map(d.suppliers.map((s) => [s.id, s.name]));
+  const live = lines.filter((l) => l.cancelled_at === null);
+  const freeOf = (sku: string) => pick.data?.items.find((i) => i.sku === sku)?.free ?? 0;
+
+  const forText = manualPurchaseForOf({
+    purpose: request.purpose,
+    destinationName: destName.get(request.destination_id) ?? null,
+    serviceCaseNo: d.serviceCaseNo,
+    staffName: request.for_staff_user_id
+      ? (d.users.find((u) => u.id === request.for_staff_user_id)?.name ?? null)
+      : null,
+    subsidiaryName: request.for_subsidiary_name,
+    why: request.why,
+  });
+
+  const approval = manualPurchaseApprovalOf({
+    approvalRequired: request.approval_required,
+    approvedAt: request.approved_at,
+    refusedAt: request.refused_at,
+  });
+  const undecided = request.approved_at === null && request.refused_at === null;
+  const showDecision = d.canApprove && request.approval_required && undecided;
+  const approverLine = manualPurchaseApproverLine(d.approvers.map((a) => a.name));
+  const decidedEvent = (d.history ?? []).find(
+    (e) => e.kind === (approval.kind === "refused" ? "refused" : "approved"),
+  );
+
+  /* The approver's Approve gate — every live line must carry a whole number
+     from 0 through its own ask before the one primary action unlocks. */
+  const cutInvalid = live.find((l) => {
+    const v = cuts[l.id];
+    if (v === undefined) return false; // still seeding — not yet an error
+    const n = Number(v);
+    return !Number.isInteger(n) || n < 0 || n > l.qty;
+  });
+  const cutsReady =
+    live.length > 0 &&
+    live.every((l) => {
+      const n = Number(cuts[l.id]);
+      return cuts[l.id] !== undefined && Number.isInteger(n) && n >= 0 && n <= l.qty;
+    });
+
+  /* WHAT WE ALREADY HAVE — one row per live SKU, quantities summed. */
+  const haveRows: Array<{ sku: string; requestedQty: number }> = [];
+  for (const l of live) {
+    const found = haveRows.find((r) => r.sku === l.sku);
+    if (found) found.requestedQty += l.qty;
+    else haveRows.push({ sku: l.sku, requestedQty: l.qty });
+  }
+
+  /* PURCHASE ORDERS — the exact linked documents; `Still To Order` uses the
+     ONE remainder arithmetic over the demand lines each document carries. */
+  const supplierChanged = d.pos.some((p) => p.supplier_delivery_date != null);
+  const stillToOrderOf = (poId: string) =>
+    live
+      .filter((l) => (l.po_ids ?? []).includes(poId))
+      .reduce(
+        (n, l) =>
+          n +
+          manualPurchaseLineRemainingOf({
+            qty: l.qty,
+            approvedQty: l.approved_qty,
+            issuedQty: l.issued_qty,
+          }),
+        0,
+      );
+
+  const historyGroups = groupHistoryChronology(d.history ?? []);
+
+  return (
+    <div className="absolute inset-0 flex flex-col bg-kit-slate-3" data-testid="mp-detail">
+      {header}
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+        <div className="flex flex-col gap-6">
+          {/* ① REQUEST — the six authoritative facts, in the Card's order. */}
+          <Block title={MW.secRequest}>
+            <dl className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3 lg:grid-cols-6">
+              <Fact label={MW.colRequestedDate}>
+                {fmtDate(request.created_at.slice(0, 10))}
+              </Fact>
+              <Fact label={MW.colNeededBy}>
+                {request.required_by ? fmtDate(request.required_by) : null}
+              </Fact>
+              <Fact label={MW.needFor}>{purposeLabelOf(request.purpose)}</Fact>
+              <Fact label={MW.colFor} testId="mp-detail-for">
+                {forText}
+              </Fact>
+              <Fact label={MW.colDeliverTo}>
+                {destName.get(request.destination_id) ?? ""}
+              </Fact>
+              {/* The real staff display name — never `operation`, an email, a
+                  role or `(you)`. A shared-account record whose individual
+                  cannot be recovered states the audit defect. */}
+              <Fact label={MW.colRequestedBy} testId="mp-detail-requested-by">
+                {d.requested_by_name ?? (
+                  <span className="text-base-600">{MW.staffIdentityNotRecorded}</span>
+                )}
+              </Fact>
+              {/* A pre-Card-04 routine request keeps its stored reason visible
+                  under the historical `Why`; Other Purchase answers through
+                  `For` above and never prints twice. */}
+              {request.why && request.purpose !== "other_purchase" ? (
+                <Fact label={MW.why} testId="mp-detail-why" wide>
+                  {request.why}
+                </Fact>
+              ) : null}
+            </dl>
+          </Block>
+
+          {/* ② ITEMS REQUESTED — read-only; Catalog human words beside the
+              explicit SKU; the supplier is Catalog-derived, never chosen. */}
+          <Block title={MW.secItemsRequested}>
+            <ObjectTable
+              testId="mp-object-items"
+              minWidth={860}
+              columns={[
+                { key: "sku", label: MW.expSku, width: 150 },
+                { key: "item", label: MW.expItem, width: 220 },
+                { key: "supplier", label: MW.expSupplier, width: 180 },
+                { key: "qty", label: MW.expRequestedQty, width: 110 },
+                { key: "deliver", label: MW.expDeliverTo, width: 170 },
+                { key: "note", label: MW.colNote },
+              ]}
+            >
+              {lines.map((l, i) => (
+                <tr
+                  key={l.id}
+                  className={`divide-x divide-base-200 align-top${l.cancelled_at ? " text-base-400" : ""}`}
+                  data-testid={`mp-object-item-${i}`}
+                >
+                  <td className="px-2 py-2 font-mono">{l.sku}</td>
+                  <td className="px-2 py-2">
+                    {l.item_label ?? l.sku}
+                    {l.cancelled_at ? (
+                      <span className="block text-label text-base-400">
+                        {MANUAL_PURCHASE_STATUS_WORDS.not_going_ahead}
+                        {l.cancel_reason ? ` — ${l.cancel_reason}` : ""}
+                      </span>
+                    ) : null}
+                  </td>
+                  <td className="px-2 py-2">
+                    {l.supplier_id ? (
+                      (supName.get(l.supplier_id) ?? "")
+                    ) : (
+                      /* A missing Catalog relationship is a NAMED fact on the
+                         affected line, fixed at its owning Catalog boundary —
+                         never a rail facet, never a guess. */
+                      <span className="flex flex-col">
+                        <span>{MW.noSupplierYet}</span>
+                        <Link
+                          to="/operation?tab=catalog"
+                          className="text-label text-kit-blue-11 underline-offset-2 hover:underline"
+                        >
+                          Ask Catalog to set the supplier of {l.sku}.
+                        </Link>
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-2 py-2 tabular-nums">{l.qty}</td>
+                  <td className="px-2 py-2">
+                    {destName.get(l.destination_id ?? request.destination_id) ?? ""}
+                  </td>
+                  <td className="px-2 py-2">{l.remark}</td>
+                </tr>
+              ))}
+            </ObjectTable>
+          </Block>
+
+          {/* ③ WHAT WE ALREADY HAVE — decision facts, not buttons; the one
+              shared arithmetic prints `Still Needed`. */}
+          <Block title={MW.secAlreadyHave}>
+            {haveRows.length === 0 ? (
+              <p className="text-body text-base-500">
+                {MANUAL_PURCHASE_STATUS_WORDS.not_going_ahead}
+              </p>
+            ) : (
+              <ObjectTable
+                testId="mp-object-have"
+                minWidth={620}
+                columns={[
+                  { key: "sku", label: MW.expSku, width: 150 },
+                  { key: "free", label: MW.colFreeStock, width: 110 },
+                  { key: "onpo", label: MW.colAlreadyOnPo },
+                  { key: "still", label: MW.colStillNeeded, width: 130 },
+                ]}
+              >
+                {haveRows.map((r, i) => (
+                  <AlreadyHaveRow
+                    key={r.sku}
+                    sku={r.sku}
+                    requestedQty={r.requestedQty}
+                    free={freeOf(r.sku)}
+                    index={i}
+                  />
+                ))}
+              </ObjectTable>
+            )}
+          </Block>
+
+          {/* ④ APPROVAL — always present: the decision is part of the object.
+              Content follows the fact and the caller's real authority. */}
+          <Block title={MW.secApproval}>
+            {approval.kind === "not_needed" ? (
+              <p className="text-body text-base-700" data-testid="mp-approval-fact">
+                {MW.noApprovalNeeded}
+              </p>
+            ) : approval.kind === "need_approval" && !showDecision ? (
+              <div className="flex flex-col gap-0.5" data-testid="mp-approval-fact">
+                <span className="text-body font-medium text-base-900">
+                  {MANUAL_PURCHASE_APPROVAL_WORDS.need_approval}
+                </span>
+                {approverLine ? (
+                  <span className="text-meta text-base-600" data-testid="mp-detail-approver">
+                    {approverLine}
+                  </span>
+                ) : null}
+              </div>
+            ) : approval.kind === "need_approval" && showDecision ? (
+              <div className="flex flex-col gap-3" data-testid="mp-decision">
+                <ObjectTable
+                  testId="mp-approval-table"
+                  minWidth={760}
+                  columns={[
+                    { key: "sku", label: MW.expSku, width: 150 },
+                    { key: "qty", label: MW.expRequestedQty, width: 110 },
+                    { key: "still", label: MW.colStillNeeded, width: 110 },
+                    { key: "approved", label: MW.expApprovedQty, width: 110 },
+                    { key: "cost", label: MW.colTransactionCost, width: 140 },
+                    { key: "total", label: MW.colLineTotal },
+                  ]}
+                >
+                  {live.map((l, i) => (
+                    <ApprovalLineRow
+                      key={l.id}
+                      line={l}
+                      free={freeOf(l.sku)}
+                      value={cuts[l.id]}
+                      onChange={(v) => setCuts((c) => ({ ...c, [l.id]: v }))}
+                      index={i}
+                    />
+                  ))}
+                </ObjectTable>
+                {cutInvalid ? (
+                  <TwoLines
+                    testId="mp-cut-invalid"
+                    wrong={purchasingRefusal("invalid_cut_qty", { qty: cutInvalid.qty }).wrong}
+                    todo={purchasingRefusal("invalid_cut_qty", { qty: cutInvalid.qty }).todo}
+                  />
+                ) : null}
+                {decideError ? (
+                  <TwoLines
+                    testId="mp-decide-error"
+                    wrong={decideError.wrong}
+                    todo={decideError.todo}
+                  />
+                ) : null}
+                <div className="flex items-center justify-end gap-3">
+                  {refusing ? (
+                    <span className="flex flex-1 items-center gap-2">
+                      <label
+                        htmlFor="mp-refuse-reason"
+                        className="shrink-0 text-meta text-kit-slate-11"
+                      >
+                        {MW.decisionReason}
+                      </label>
+                      <Input
+                        id="mp-refuse-reason"
+                        aria-label={MW.decisionReason}
+                        placeholder="Why is this not going ahead?"
+                        value={refuseReason}
+                        onChange={(e) => setRefuseReason(e.target.value)}
+                        data-testid="mp-refuse-reason"
+                      />
+                      {/* The reason is REQUIRED — without it a refused request
+                          is simply never touched again. */}
+                      <Button
+                        variant="neutral"
+                        disabled={refuseReason.trim().length === 0 || decide.isPending}
+                        onClick={() => void submitDecision("refuse")}
+                        data-testid="mp-refuse-submit"
+                      >
+                        {MW.refuse}
+                      </Button>
+                    </span>
+                  ) : (
+                    <Button
+                      variant="neutral"
+                      onClick={() => setRefusing(true)}
+                      data-testid="mp-refuse"
+                    >
+                      {MW.refuse}
+                    </Button>
+                  )}
+                  {/* The ONE primary action in this section (Card 05 §3.5). */}
+                  <Button
+                    variant="primary"
+                    disabled={!cutsReady}
+                    loading={decide.isPending}
+                    onClick={() => void submitDecision("approve")}
+                    data-testid="mp-approve"
+                  >
+                    {MW.approve}
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              /* Decided — the fact, the real actor and time, and (approved)
+                 the quantity per line; (refused) the decision reason. */
+              <div className="flex flex-col gap-2" data-testid="mp-approval-fact">
+                <div className="flex min-w-0 flex-col gap-0.5">
+                  <span className="text-body font-semibold text-base-900">
+                    {approval.label}
+                  </span>
+                  {decidedEvent ? (
+                    <span className="text-meta text-base-600" data-testid="mp-decided-by">
+                      {mpEventIdentity(decidedEvent)}
+                    </span>
+                  ) : null}
+                  {approval.kind === "refused" && request.refuse_reason ? (
+                    <span
+                      className="text-label text-base-600"
+                      data-testid="mp-detail-refuse-reason"
+                    >
+                      {request.refuse_reason}
+                    </span>
+                  ) : null}
+                </div>
+                {approval.kind === "approved" && live.length > 0 ? (
+                  <ObjectTable
+                    testId="mp-approved-lines"
+                    minWidth={380}
+                    columns={[
+                      { key: "sku", label: MW.expSku, width: 150 },
+                      { key: "qty", label: MW.expRequestedQty, width: 120 },
+                      { key: "approved", label: MW.expApprovedQty },
+                    ]}
+                  >
+                    {live.map((l) => (
+                      <tr key={l.id} className="divide-x divide-base-200">
+                        <td className="px-2 py-2 font-mono">{l.sku}</td>
+                        <td className="px-2 py-2 tabular-nums">{l.qty}</td>
+                        <td className="px-2 py-2 tabular-nums">
+                          {l.approved_qty ?? l.qty}
+                        </td>
+                      </tr>
+                    ))}
+                  </ObjectTable>
+                ) : null}
+              </div>
+            )}
+          </Block>
+
+          {/* ⑤ PURCHASE ORDERS — read-only exact lineage. No Issue PO, no PO
+              Duty, no consolidation, no price, no Receive, no PDF: issuance
+              is the Register's selected action; arrival is Receiving's. */}
+          <Block title={MW.secPurchaseOrders}>
+            {d.pos.length === 0 ? (
+              <p className="text-body text-base-500" data-testid="mp-object-not-ordered">
+                {MW.notOrderedYet}
+              </p>
+            ) : (
+              <ObjectTable
+                testId="mp-object-pos"
+                minWidth={supplierChanged ? 860 : 700}
+                columns={[
+                  { key: "po", label: MW.expPoNo, width: 160 },
+                  { key: "qty", label: MW.expOrderedQty, width: 110 },
+                  { key: "still", label: MW.expStillToOrder, width: 110 },
+                  { key: "issued", label: MW.colPoIssued, width: 130 },
+                  { key: "date", label: MW.colPoDeliveryDate },
+                  ...(supplierChanged
+                    ? [{ key: "supdate", label: MW.colSupplierDeliveryDate }]
+                    : []),
+                ]}
+              >
+                {d.pos.map((p, i) => (
+                  <tr
+                    key={p.id}
+                    className="divide-x divide-base-200"
+                    data-testid={`mp-object-po-${i}`}
+                  >
+                    <td className="px-2 py-2 font-mono">
+                      <button
+                        type="button"
+                        className="text-kit-blue-11 underline-offset-2 hover:underline"
+                        data-testid={`mp-object-po-link-${i}`}
+                        onClick={() =>
+                          navigate(
+                            `/operation/procurement?po=${encodeURIComponent(p.po_no)}`,
+                          )
+                        }
+                      >
+                        {p.po_no}
+                      </button>
+                    </td>
+                    <td className="px-2 py-2 tabular-nums">{p.ordered_qty}</td>
+                    <td className="px-2 py-2 tabular-nums">{stillToOrderOf(p.id)}</td>
+                    <td className="px-2 py-2">
+                      {p.placed_at ? fmtDate(p.placed_at.slice(0, 10)) : null}
+                    </td>
+                    <td className="px-2 py-2">
+                      {p.po_delivery_date ? fmtDate(p.po_delivery_date) : null}
+                    </td>
+                    {supplierChanged ? (
+                      <td className="px-2 py-2">
+                        {p.supplier_delivery_date
+                          ? fmtDate(p.supplier_delivery_date)
+                          : MW.sameAsPo}
+                      </td>
+                    ) : null}
+                  </tr>
+                ))}
+              </ObjectTable>
+            )}
+          </Block>
+
+          {/* ⑥ HISTORY — stored facts in the locked three-rank grammar,
+              grouped Today · Yesterday · Earlier. */}
+          <Block title={MW.secHistory}>
+            {historyGroups.length === 0 ? (
+              <p className="text-body text-base-500">No history recorded</p>
+            ) : (
+              <div className="flex flex-col gap-4" data-testid="mp-object-history">
+                {historyGroups.map((group) => (
+                  <section key={group.heading}>
+                    <h3
+                      className="mb-1.5 text-label font-semibold text-base-500"
+                      data-testid={`mp-history-group-${group.heading}`}
+                    >
+                      {group.heading}
+                    </h3>
+                    <ul className="flex flex-col divide-y divide-base-200">
+                      {group.events.map((event, i) => {
+                        const words = manualPurchaseHistoryRecord(event);
+                        return (
+                          <li
+                            key={`${event.kind}-${event.occurred_at}-${i}`}
+                            className="flex min-w-0 flex-col gap-0.5 py-2 first:pt-0 last:pb-0"
+                          >
+                            <RecordRanks
+                              words={{
+                                title: words.title,
+                                identity: mpEventIdentity(event),
+                                detail: words.detail,
+                              }}
+                            />
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </section>
+                ))}
+              </div>
+            )}
+          </Block>
+        </div>
+      </div>
     </div>
   );
 }

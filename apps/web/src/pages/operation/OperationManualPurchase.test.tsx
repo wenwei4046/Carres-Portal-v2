@@ -192,7 +192,7 @@ const REGISTER = {
 
 /** The detail payload — swapped per test to flip the approver gate. */
 let DETAIL: Record<string, unknown> = {};
-function seedDetail(canApprove: boolean) {
+function seedDetail(canApprove: boolean, over: Record<string, unknown> = {}) {
   DETAIL = {
     request: REGISTER.requests[0],
     lines: REGISTER.lines
@@ -203,7 +203,21 @@ function seedDetail(canApprove: boolean) {
     users: REGISTER.users,
     approvers: REGISTER.approvers,
     serviceCaseNo: null,
+    /* Card 05 — the object payload: the resolved individual, the exact PO
+       facts and the stored-fact History. */
+    requested_by_name: "Siti",
+    pos: [],
+    history: [
+      {
+        kind: "created",
+        occurred_at: REGISTER.requests[0].created_at,
+        actor: "Siti",
+        actor_role: "operation",
+        units: 1,
+      },
+    ],
     canApprove,
+    ...over,
   };
 }
 
@@ -852,31 +866,61 @@ describe("the object detail and the decision (slice 2)", () => {
     });
     fireEvent.click(screen.getByTestId("mp-approve"));
     const err = await screen.findByTestId("mp-decide-error");
-    expect(err.textContent).toBe(
-      "Only the approver may decide this purchase. Ask Jess to approve or refuse it.",
+    /* The two lines render as fact then act — never the raw code word. */
+    expect(err).toHaveTextContent("Only the approver may decide this purchase.");
+    expect(err).toHaveTextContent("Ask Jess to approve or refuse it.");
+    expect(err.textContent).not.toContain("forbidden");
+  });
+
+  it("a decision stays on the object — no throw back to the Register", async () => {
+    await openDetail(true);
+    await waitFor(() =>
+      expect((screen.getByTestId("mp-cut-0") as HTMLInputElement).value).toBe("0"),
     );
+    /* After the door records the decision, the refetched object carries the
+       decided facts: controls gone, the actor and time on screen. */
+    seedDetail(true, {
+      request: {
+        ...REGISTER.requests[0],
+        approved_at: "2026-08-19T05:00:00Z",
+        approved_by: "u9",
+      },
+      history: [
+        {
+          kind: "created",
+          occurred_at: REGISTER.requests[0].created_at,
+          actor: "Siti",
+          actor_role: "operation",
+          units: 1,
+        },
+        {
+          kind: "approved",
+          occurred_at: "2026-08-19T05:00:00Z",
+          actor: "Jess",
+          actor_role: "principal",
+          requested_units: 1,
+          approved_units: 0,
+        },
+      ],
+    });
+    fireEvent.click(screen.getByTestId("mp-approve"));
+    await waitFor(() => expect(screen.queryByTestId("mp-approve")).toBeNull());
+    // Still on the object — the Register surface stays hidden underneath.
+    expect(screen.getByTestId("mp-detail")).toBeInTheDocument();
+    expect(screen.getByTestId("mp-decided-by")).toHaveTextContent("Jess");
+    expect(screen.queryByTestId("mp-refuse")).toBeNull();
   });
 });
 
 /**
- * SLICE 3 — the issue (card §5 · §6).
+ * THE OBSERVED ARRIVAL, AND THE ONE ISSUANCE PLACEMENT (Card 05 §3.6 · §7).
  *
- * `Arrived` IS NOT A BUTTON anywhere. The consolidation offer is declinable
- * on the same screen. Issue goes to the one door, same day — the page never
- * consults a PO day.
+ * `Arrived` IS NOT A BUTTON anywhere. The object holds NO second `Issue PO`,
+ * PO Duty block, consolidation prompt, price editor or Receive control —
+ * Card 04's selected Register action is the only Manual Purchase issuance
+ * placement, and physical arrival is Receiving's through the exact PO.
  */
-describe("issue and the observed arrival (slice 3)", () => {
-  function seedReadyDetail() {
-    DETAIL = {
-      request: REGISTER.requests[1], // approval OFF → Ready to order
-      lines: REGISTER.lines.filter((l) => l.request_id === REQ2),
-      destinations: REGISTER.destinations,
-      suppliers: [{ id: "s2", name: "Office Co", kind: "own_logistics" }],
-      users: REGISTER.users,
-      canApprove: false,
-    };
-  }
-
+describe("the object never issues (Card 05)", () => {
   it("`Arrived` cannot be set by any control — no such button exists", async () => {
     seedDetail(true);
     await loaded();
@@ -886,73 +930,31 @@ describe("issue and the observed arrival (slice 3)", () => {
     expect(document.querySelector("[data-testid*='arrived']")).toBeNull();
   });
 
-  it("a ready request issues through the one door, and no PO-day is consulted", async () => {
-    seedReadyDetail();
+  it("a Ready-to-order object offers NO issue door, duty block or offer", async () => {
+    seedDetail(false, {
+      request: REGISTER.requests[1], // approval OFF → Ready to order
+      lines: REGISTER.lines.filter((l) => l.request_id === REQ2),
+      suppliers: [{ id: "s2", name: "Office Co", kind: "own_logistics" }],
+      requested_by_name: "Siti",
+    });
     await loaded();
     fireEvent.click(screen.getByText("REQ-0002", { selector: "button" }));
-    await screen.findByTestId("mp-issue");
-    fireEvent.click(screen.getByTestId("mp-issue-po"));
-    await waitFor(() => {
-      const post = apiFetch.mock.calls.find((c) =>
-        String(c[0]).endsWith("/purchasing/requests/issue"),
-      );
-      expect(post).toBeTruthy();
-      const sent = JSON.parse(String((post![1] as RequestInit).body));
-      expect(sent.requestIds).toEqual([REQ2]);
-      expect(sent.together).toBe(false);
-    });
-  });
-
-  it("the consolidation offer is declinable on the same screen", async () => {
-    // Make REQ-0001 ready too (approved) and share the supplier with REQ-0002.
-    const approved = {
-      ...REGISTER.requests[0],
-      approved_at: "2026-08-19T05:00:00Z",
-      approved_by: "u1",
-    };
-    const shared = REGISTER.lines.map((l) =>
-      l.request_id === REQ1 ? { ...l, supplier_id: "s2" } : l,
-    );
-    apiFetch.mockImplementation((url: string) => {
-      if (url.includes("/purchasing/requests/detail/")) return Promise.resolve(DETAIL);
-      if (url.includes("/purchasing/requests/issue-costs")) {
-        return Promise.resolve({ costs: [{ sku: "5539-2NA", unitCost: 850 }] });
-      }
-      if (url.includes("/purchasing/requests/already-have")) {
-        return Promise.resolve({ sku: "x", alreadyOnPo: 0, firstPo: null });
-      }
-      if (url.includes("/purchasing/requests")) {
-        return Promise.resolve({ ...REGISTER, requests: [approved, REGISTER.requests[1]], lines: shared });
-      }
-      if (url.includes("pick-items")) return Promise.resolve(PICK);
-      return Promise.resolve({});
-    });
-    DETAIL = {
-      request: approved,
-      lines: shared.filter((l) => l.request_id === REQ1),
-      destinations: REGISTER.destinations,
-      suppliers: [{ id: "s2", name: "Office Co", kind: "own_logistics" }],
-      users: REGISTER.users,
-      canApprove: false,
-    };
-
-    await loaded();
-    fireEvent.click(screen.getByText("REQ-0001", { selector: "button" }));
-    await screen.findByTestId("mp-issue-offer");
-    // BOTH doors live on the same screen — the offer can be declined.
-    expect(screen.getByTestId("mp-issue-together")).toBeInTheDocument();
-    expect(screen.getByTestId("mp-issue-separate")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByTestId("mp-issue-separate"));
-    await waitFor(() => {
-      const post = apiFetch.mock.calls.find((c) =>
-        String(c[0]).endsWith("/purchasing/requests/issue"),
-      );
-      expect(post).toBeTruthy();
-      const sent = JSON.parse(String((post![1] as RequestInit).body));
-      expect(sent.together).toBe(false);
-      expect(sent.requestIds).toEqual([REQ1]);
-    });
+    const detail = await screen.findByTestId("mp-detail");
+    for (const gone of [
+      "mp-issue",
+      "mp-issue-po",
+      "mp-issue-offer",
+      "mp-issue-together",
+      "mp-issue-separate",
+      "mp-issue-costs",
+    ]) {
+      expect(screen.queryByTestId(gone)).toBeNull();
+    }
+    // No PO Duty, no consolidation words, no Receive, no price editor.
+    expect(within(detail).queryByTestId("mp-po-duty")).toBeNull();
+    expect(detail.textContent).not.toContain("Issue PO");
+    expect(detail.textContent).not.toContain("Issue as one PO");
+    expect(within(detail).queryByText("Receive")).toBeNull();
   });
 
   it("a received line derives Arrived through the one arithmetic", () => {
@@ -999,55 +1001,14 @@ describe("the control band (2026-08-19)", () => {
  * time. A price nobody was shown is a price nobody reviewed, so the surface
  * shows them and the request carries them.
  */
-describe("closure §2 · the issue declares the transaction cost it showed", () => {
-  it("shows the cost of every SKU it is about to buy", async () => {
-    DETAIL = {
-      request: REGISTER.requests[1],
-      lines: REGISTER.lines.filter((l) => l.request_id === REQ2),
-      destinations: REGISTER.destinations,
-      suppliers: [{ id: "s2", name: "Office Co", kind: "own_logistics" }],
-      users: REGISTER.users,
-      canApprove: false,
-    };
+describe("closure §2 · the Register's selected issue declares the price it showed", () => {
+  async function tickReady() {
     await loaded();
-    fireEvent.click(screen.getByText("REQ-0002", { selector: "button" }));
-    const costs = await screen.findByTestId("mp-issue-costs");
-    expect(costs).toHaveTextContent("Transaction cost");
-    expect(screen.getByTestId("mp-issue-cost-5539-2NA")).toHaveTextContent("RM 850");
-  });
-
-  it("sends those exact numbers with the issue request", async () => {
-    DETAIL = {
-      request: REGISTER.requests[1],
-      lines: REGISTER.lines.filter((l) => l.request_id === REQ2),
-      destinations: REGISTER.destinations,
-      suppliers: [{ id: "s2", name: "Office Co", kind: "own_logistics" }],
-      users: REGISTER.users,
-      canApprove: false,
-    };
-    await loaded();
-    fireEvent.click(screen.getByText("REQ-0002", { selector: "button" }));
-    await screen.findByTestId("mp-issue-costs");
-    fireEvent.click(screen.getByTestId("mp-issue-po"));
-    await waitFor(() => {
-      const post = apiFetch.mock.calls.find((c) =>
-        String(c[0]).endsWith("/purchasing/requests/issue"),
-      );
-      expect(post).toBeTruthy();
-      const sent = JSON.parse(String((post![1] as RequestInit).body));
-      expect(sent.expectedCosts).toEqual({ "5539-2NA": 850 });
-    });
-  });
+    fireEvent.click(screen.getByTestId(`mp-select-${REQ2}`));
+    await screen.findByTestId("mp-selection-bar");
+  }
 
   it("names a SKU Catalog has no price for, and never declares it as zero", async () => {
-    DETAIL = {
-      request: REGISTER.requests[1],
-      lines: REGISTER.lines.filter((l) => l.request_id === REQ2),
-      destinations: REGISTER.destinations,
-      suppliers: [{ id: "s2", name: "Office Co", kind: "own_logistics" }],
-      users: REGISTER.users,
-      canApprove: false,
-    };
     apiFetch.mockImplementation((url: string) => {
       if (url.includes("/purchasing/requests/issue-costs")) {
         return Promise.resolve({
@@ -1059,33 +1020,18 @@ describe("closure §2 · the issue declares the transaction cost it showed", () 
       }
       return Promise.resolve(respond(url));
     });
-    await loaded();
-    fireEvent.click(screen.getByText("REQ-0002", { selector: "button" }));
-    const row = await screen.findByTestId("mp-issue-cost-X-NEW-K");
-    /* The two lines: the fact, then the act. */
-    expect(row).toHaveTextContent("Catalog has no price.");
-    expect(row).toHaveTextContent("Ask Catalog to set the cost of X-NEW-K.");
-    fireEvent.click(screen.getByTestId("mp-issue-po"));
-    await waitFor(() => {
-      const post = apiFetch.mock.calls.find((c) =>
-        String(c[0]).endsWith("/purchasing/requests/issue"),
-      );
-      expect(post).toBeTruthy();
-      const sent = JSON.parse(String((post![1] as RequestInit).body));
-      /* A hole is NOT declared as RM0 — the server refuses the line by name. */
-      expect(sent.expectedCosts).toEqual({ "5539-2NA": 850 });
-    });
+    await tickReady();
+    fireEvent.click(screen.getByTestId("mp-issue-selected"));
+    const err = await screen.findByTestId("mp-issue-selected-error");
+    /* The hole is named, and NOTHING was issued at RM0. */
+    expect(err).toHaveTextContent("Catalog has no price.");
+    expect(err).toHaveTextContent("Ask Catalog to set the cost of X-NEW-K.");
+    expect(
+      apiFetch.mock.calls.find((c) => String(c[0]).endsWith("/purchasing/requests/issue")),
+    ).toBeUndefined();
   });
 
   it("reports a refusal in the approved two lines", async () => {
-    DETAIL = {
-      request: REGISTER.requests[1],
-      lines: REGISTER.lines.filter((l) => l.request_id === REQ2),
-      destinations: REGISTER.destinations,
-      suppliers: [{ id: "s2", name: "Office Co", kind: "own_logistics" }],
-      users: REGISTER.users,
-      canApprove: false,
-    };
     apiFetch.mockImplementation((url: string, init?: RequestInit) => {
       if (init?.method === "POST" && url.endsWith("/purchasing/requests/issue")) {
         return Promise.reject(
@@ -1103,11 +1049,9 @@ describe("closure §2 · the issue declares the transaction cost it showed", () 
       }
       return Promise.resolve(respond(url));
     });
-    await loaded();
-    fireEvent.click(screen.getByText("REQ-0002", { selector: "button" }));
-    await screen.findByTestId("mp-issue-costs");
-    fireEvent.click(screen.getByTestId("mp-issue-po"));
-    const err = await screen.findByTestId("mp-issue-error");
+    await tickReady();
+    fireEvent.click(screen.getByTestId("mp-issue-selected"));
+    const err = await screen.findByTestId("mp-issue-selected-error");
     expect(err).toHaveTextContent("You do not hold PO duty today.");
     expect(err).toHaveTextContent("Ask Shasha to issue this purchase order.");
   });
@@ -1380,5 +1324,300 @@ describe("Card 04 · the export derives the cell's own truth", () => {
     expect(within(grid).getByText("Hooka")).toBeInTheDocument();
     // The search box still finds by SKU (the token rides searchValue only).
     expect(within(grid).queryByText("BED-K-01")).toBeNull();
+  });
+});
+
+/**
+ * ⭐ PURCHASING CARD 05 — THE MANUAL PURCHASE OBJECT DETAIL
+ * (docs/cards/CARD-2026-08-29-purchasing-05-manual-purchase-object-detail-and-approval-authority.md).
+ *
+ * One full-width one-scroll object in the exact section order; the one
+ * Object Header with the Register back destination, the state pill and the
+ * filtered position; PR 982's approval authority carried unchanged; PO
+ * lineage read-only with the governed date words; History in the locked
+ * three-rank grammar; and the Register's own state preserved underneath.
+ */
+describe("Card 05 · the object detail", () => {
+  async function openObject(canApprove = false, over: Record<string, unknown> = {}) {
+    seedDetail(canApprove, over);
+    await loaded();
+    fireEvent.click(screen.getByText("REQ-0001", { selector: "button" }));
+    return await screen.findByTestId("mp-detail");
+  }
+
+  it("renders the six sections, full width, in the Card's exact order", async () => {
+    const detail = await openObject();
+    const blocks = [...detail.querySelectorAll("[data-block]")].map((b) =>
+      b.getAttribute("data-block"),
+    );
+    expect(blocks).toEqual([
+      "Request",
+      "Items Requested",
+      "What We Already Have",
+      "Approval",
+      "Purchase Orders",
+      "History",
+    ]);
+    // ONE scroll — no tabs, no split preview, no centred narrow island.
+    expect(within(detail).queryByRole("tablist")).toBeNull();
+    expect(detail.querySelector(".max-w-\\[720px\\]")).toBeNull();
+    expect(detail.querySelector(".max-w-\\[900px\\]")).toBeNull();
+    expect(detail.querySelector(".mx-auto")).toBeNull();
+  });
+
+  it("the Object Header: one back destination, the identity, one state pill", async () => {
+    const detail = await openObject();
+    // The shared object header (Law C) with the Register as back destination.
+    expect(within(detail).getByLabelText("Manual Purchase")).toBeInTheDocument();
+    expect(within(detail).getByTestId("object-identity")).toHaveTextContent("REQ-0001");
+    expect(within(detail).getByTestId("object-identity-status")).toHaveTextContent(
+      "Waiting for approval",
+    );
+    // The shell's destination header does not double as a second page title.
+    expect(screen.queryByTestId("purchasing-tabs")).toBeNull();
+    // No duplicate Back button and no PDF action.
+    expect(within(detail).queryByText(/^Back$/)).toBeNull();
+    expect(within(detail).queryByText(/PDF/)).toBeNull();
+  });
+
+  it("`‹ n of m ›` steps the operator's own filtered Register order", async () => {
+    const detail = await openObject();
+    // Default order is newest Requested Date first: REQ-0002 · REQ-0001 ·
+    // REQ-0003 — so the open object is 2 of 3.
+    expect(within(detail).getByTestId("mp-object-position")).toHaveTextContent("2 of 3");
+    fireEvent.click(within(detail).getByLabelText("Next Manual Purchase"));
+    await waitFor(() =>
+      expect(screen.getByTestId("object-identity")).toHaveTextContent("REQ-0003"),
+    );
+  });
+
+  it("back restores the Register — the grid stayed mounted underneath", async () => {
+    const detail = await openObject();
+    // The Register surface is preserved (hidden), not unmounted.
+    expect(screen.getByTestId("mp-register-surface")).toHaveAttribute("aria-hidden", "true");
+    fireEvent.click(within(detail).getByLabelText("Manual Purchase"));
+    await screen.findByTestId("purchasing-tabs");
+    expect(screen.queryByTestId("mp-detail")).toBeNull();
+    expect(screen.getByTestId("mp-register-surface")).not.toHaveAttribute("aria-hidden");
+  });
+
+  it("REQUEST prints the real staff name — a shared-account record states the defect", async () => {
+    await openObject(false, { requested_by_name: null });
+    expect(screen.getByTestId("mp-detail-requested-by")).toHaveTextContent(
+      "Staff identity not recorded",
+    );
+  });
+
+  it("ITEMS REQUESTED names a missing Catalog supplier on the line", async () => {
+    await openObject(false, {
+      lines: REGISTER.lines
+        .filter((l) => l.request_id === REQ1)
+        .map((l) => ({ ...l, supplier_id: null })),
+    });
+    const items = screen.getByTestId("mp-object-items");
+    expect(items).toHaveTextContent("No supplier yet");
+    expect(items).toHaveTextContent("Ask Catalog to set the supplier of 5539-2NA.");
+  });
+
+  it("WHAT WE ALREADY HAVE prints the one arithmetic per SKU", async () => {
+    await openObject();
+    const still = await screen.findByTestId("mp-object-still-0");
+    // qty 1 · free 2 · already on PO 1 → still needed 0, PRINTED.
+    await waitFor(() => expect(still).toHaveTextContent("0"));
+    const have = screen.getByTestId("mp-object-have");
+    expect(have).toHaveTextContent("Free Stock");
+    expect(have).toHaveTextContent("Already On PO");
+    expect(have).toHaveTextContent("Still Needed");
+  });
+
+  it("APPROVAL says `No approval needed` when the switch never asked", async () => {
+    await openObject(false, {
+      request: { ...REGISTER.requests[0], approval_required: false },
+    });
+    expect(screen.getByTestId("mp-approval-fact")).toHaveTextContent("No approval needed");
+  });
+
+  it("the approver's table asks the six columns; an out-of-range cut blocks Approve with the governed words", async () => {
+    await openObject(true);
+    const table = await screen.findByTestId("mp-approval-table");
+    for (const head of [
+      "SKU",
+      "Requested Qty",
+      "Still Needed",
+      "Approved Qty",
+      "Transaction Cost",
+      "Line Total",
+    ]) {
+      expect(table).toHaveTextContent(head);
+    }
+    await waitFor(() =>
+      expect((screen.getByTestId("mp-cut-0") as HTMLInputElement).value).toBe("0"),
+    );
+    fireEvent.change(screen.getByTestId("mp-cut-0"), { target: { value: "5" } });
+    expect(screen.getByTestId("mp-approve")).toBeDisabled();
+    const invalid = screen.getByTestId("mp-cut-invalid");
+    expect(invalid).toHaveTextContent("The approved quantity is not valid.");
+    expect(invalid).toHaveTextContent("Enter a whole number from 0 to 1.");
+  });
+
+  it("a refused object shows the fact, the real actor and the reason — and no controls", async () => {
+    await openObject(true, {
+      request: {
+        ...REGISTER.requests[0],
+        refused_at: "2026-08-19T06:00:00Z",
+        refused_by: "u9",
+        refuse_reason: "Shelf already covers it.",
+      },
+      history: [
+        {
+          kind: "created",
+          occurred_at: REGISTER.requests[0].created_at,
+          actor: "Siti",
+          actor_role: "operation",
+          units: 1,
+        },
+        {
+          kind: "refused",
+          occurred_at: "2026-08-19T06:00:00Z",
+          actor: "Jess",
+          actor_role: "principal",
+          reason: "Shelf already covers it.",
+        },
+      ],
+    });
+    expect(screen.getByTestId("mp-approval-fact")).toHaveTextContent("Refused");
+    expect(screen.getByTestId("mp-decided-by")).toHaveTextContent("Jess");
+    expect(screen.getByTestId("mp-detail-refuse-reason")).toHaveTextContent(
+      "Shelf already covers it.",
+    );
+    expect(screen.queryByTestId("mp-approve")).toBeNull();
+    expect(screen.queryByTestId("mp-refuse")).toBeNull();
+  });
+
+  it("PURCHASE ORDERS is read-only exact lineage with the governed date words", async () => {
+    await openObject(false, {
+      request: {
+        ...REGISTER.requests[0],
+        approved_at: "2026-08-19T05:00:00Z",
+        approved_by: "u9",
+      },
+      lines: [
+        {
+          ...REGISTER.lines[0],
+          approved_qty: 1,
+          issued_qty: 1,
+          po_id: "PO-20260819-9001",
+          po_ids: ["PO-20260819-9001"],
+        },
+      ],
+      pos: [
+        {
+          id: "PO-20260819-9001",
+          po_no: "PO-20260819-9001",
+          placed_at: "2026-08-19T05:10:00Z",
+          po_delivery_date: "2026-09-01",
+          supplier_delivery_date: null,
+          ordered_qty: 1,
+        },
+      ],
+    });
+    const table = await screen.findByTestId("mp-object-pos");
+    expect(table).toHaveTextContent("PO-20260819-9001");
+    expect(table).toHaveTextContent("PO Issued");
+    expect(table).toHaveTextContent("PO Delivery Date");
+    // Unchanged supplier date: the column itself stays away.
+    expect(table).not.toHaveTextContent("Supplier Delivery Date");
+    // Read-only: the number is a door to the exact PO, nothing else writes.
+    fireEvent.click(screen.getByTestId("mp-object-po-link-0"));
+    expect(navigate).toHaveBeenCalledWith(
+      "/operation/procurement?po=PO-20260819-9001",
+    );
+  });
+
+  it("a supplier-changed date shows beside `Same as PO` rows only when the ledger proves it", async () => {
+    await openObject(false, {
+      pos: [
+        {
+          id: "PO-1",
+          po_no: "PO-1",
+          placed_at: "2026-08-19T05:10:00Z",
+          po_delivery_date: "2026-09-01",
+          supplier_delivery_date: "2026-09-08",
+          ordered_qty: 1,
+        },
+        {
+          id: "PO-2",
+          po_no: "PO-2",
+          placed_at: "2026-08-19T05:10:00Z",
+          po_delivery_date: "2026-09-02",
+          supplier_delivery_date: null,
+          ordered_qty: 1,
+        },
+      ],
+    });
+    const table = await screen.findByTestId("mp-object-pos");
+    expect(table).toHaveTextContent("Supplier Delivery Date");
+    expect(within(table).getByTestId("mp-object-po-1")).toHaveTextContent("Same as PO");
+  });
+
+  it("no PO lineage reads `Not ordered yet` — never an inference", async () => {
+    await openObject();
+    expect(screen.getByTestId("mp-object-not-ordered")).toHaveTextContent(
+      "Not ordered yet",
+    );
+  });
+
+  it("HISTORY groups the stored facts and speaks the three-rank grammar", async () => {
+    await openObject(false, {
+      history: [
+        {
+          kind: "created",
+          occurred_at: "2026-08-19T02:00:00Z",
+          actor: "Siti",
+          actor_role: "operation",
+          units: 1,
+        },
+        {
+          kind: "approved",
+          occurred_at: "2026-08-19T05:00:00Z",
+          actor: "Jess",
+          actor_role: "principal",
+          requested_units: 2,
+          approved_units: 1,
+        },
+        {
+          kind: "po_issued",
+          occurred_at: "2026-08-19T06:00:00Z",
+          actor: null,
+          actor_role: null,
+          po_no: "PO-20260819-9001",
+          units: 1,
+        },
+      ],
+    });
+    const history = await screen.findByTestId("mp-object-history");
+    expect(history).toHaveTextContent("Purchase requested");
+    expect(history).toHaveTextContent("Purchase approved");
+    expect(history).toHaveTextContent("2 requested · 1 approved");
+    expect(history).toHaveTextContent("Purchase order issued");
+    expect(history).toHaveTextContent("PO-20260819-9001 · 1 unit");
+    // An event whose individual was never stored states the audit defect.
+    expect(history).toHaveTextContent("Staff identity not recorded");
+    // The chronology heading exists (all fixture events are Earlier).
+    expect(screen.getByTestId("mp-history-group-Earlier")).toBeInTheDocument();
+  });
+
+  it("a failed object read is the governed sentence with a retry — never a raw string", async () => {
+    seedDetail(false);
+    apiFetch.mockImplementation((url: string) => {
+      if (url.includes("/purchasing/requests/detail/")) {
+        return Promise.reject(new Error("boom"));
+      }
+      return Promise.resolve(respond(url));
+    });
+    await loaded();
+    fireEvent.click(screen.getByText("REQ-0001", { selector: "button" }));
+    await screen.findByText("This Manual Purchase could not be opened");
+    expect(screen.getByText("Try again")).toBeInTheDocument();
   });
 });

@@ -1038,11 +1038,69 @@ groups by (supplier × category × destination × purpose, merged across request
 ownership and reminders stay in central `Work`; issuance authority remains the one
 `purchasing_issue_pos_batch` door.
 
+**THE OBJECT DETAIL — APPROVED / LOCKED, Card 05 (2026-08-29).** Clicking `Manual Purchase
+No` opens WORK: one full-width, one-scroll object on the approved Object Header + Summary +
+Sections + History template. No tabs, no drawer, no split preview, no PDF and no narrow
+720/900px islands. Sections, exactly and in this order:
+`Request → Items Requested → What We Already Have → Approval → Purchase Orders → History`.
+
+- **Object Header** — the shared object identity header (the Sales Order / Delivery Order
+  implementation, Law C): one back destination `Manual Purchase` that restores the complete
+  Register state the operator left (the grid stays mounted underneath — rail filters, search,
+  column filters, sort, scroll and expansion survive); the actual `MPR-…` identity; one derived
+  state pill (`manualPurchaseStatusOf`); the filtered Register position `{n} of {m}` with
+  keyboard-operable previous/next when the object is in the filtered list. No duplicate Back,
+  page title, pseudo-tab, breadcrumb or PDF action; no new edit/delete/undo/take-back door.
+- **Request** — `Requested Date · Needed By · Need for · For · Deliver To · Requested By`, in
+  that reading order. `Requested By` is the real individual resolved server-side; a
+  shared-account record reads `Staff identity not recorded` — a person is never invented. A
+  pre-Card-04 stored reason stays visible under the historical `Why`.
+- **Items Requested** — read-only `SKU · Item · Supplier · Requested Qty · Deliver To · Note`;
+  Catalog human words beside the explicit SKU; a missing Catalog supplier is a named fact on
+  the line (`No supplier yet` + the Catalog act) and never a rail facet.
+- **What We Already Have** — `SKU · Free Stock · Already On PO · Still Needed` per live SKU,
+  through the one shared arithmetic (`stillNeededOf`) and the same stock/open-PO reads the
+  create workspace uses. Decision facts, not buttons and not Work rows.
+- **Approval** — always present. `No approval needed`; or `Need approval` + `{name} approves`
+  for a viewer without the gate; or, for the actual approver only, one line per live SKU
+  (`SKU · Requested Qty · Still Needed · Approved Qty · Transaction Cost · Line Total`) with
+  `Approved Qty` prefilled once from Still Needed (whole 0..Requested; a human edit is never
+  overwritten by a refetch), `Approve` as the one primary action, `Refuse` neutral behind a
+  required `Decision reason`. Cost is read-only approval evidence, never an Operation price
+  control. A decision is atomic and final; success STAYS on the object, refetches the facts,
+  removes the controls and appends History. A decided object shows the fact, the real actor,
+  date/time and (approved) the per-line quantity / (refused) the reason.
+- **Purchase Orders** — read-only exact lineage: `PO No` (a door to the exact PO) ·
+  `Ordered Qty` · `Still To Order` · `PO Issued` (`placed_at`) · `PO Delivery Date` (the
+  ORIGINAL supplier-facing date — the promise ledger's first held date when the supplier moved
+  it, else the issue-stamped date) · `Supplier Delivery Date` only when that ledger proves a
+  change (unchanged reads `Same as PO`). No lineage reads `Not ordered yet`. **The PO number
+  IS `purchase_orders.id`** — no `po_no` column exists; Card 05 fixed the latent register read
+  that selected one (it would have 400'd the whole Register on first lineage).
+- **History** — the final section: `Today · Yesterday · Earlier`, the locked three-rank record
+  grammar, stored facts only (`Purchase requested` · `Purchase approved` · `Purchase refused`
+  · `Marked not going ahead` · `Purchase order issued`). Real individual actor and actual
+  server time; an event whose individual was never stored (line cancel, PO issue,
+  shared-account creation) reads `Staff identity not recorded`; nothing infers that a supplier
+  received a PO or that goods arrived.
+- **What the object does NOT hold** — no second `Issue PO`, consolidation prompt (`Issue as
+  one PO?` is retired with the old detail), PO Duty block, transaction-cost editor, Receive
+  button, receipt quantity or PDF preview. Card 04's selected Register action is the only
+  Manual Purchase issuance placement; issued demand belongs to `Purchase Orders` and the one
+  shared Receiving engine. There is no Manual Purchase receipt lane.
+- **One decision refusal dictionary** (Card 05; shared `purchasingRefusal`): the 0360 door's
+  refusals leave as the governed two lines — `not_purchase_approver` (naming the resolved
+  approver) · `no_purchase_approver` · `already_decided` · `reason_required` ·
+  `invalid_cut_qty` · `decision_not_recorded` — never raw PostgreSQL text, `forbidden`, a
+  role or an email.
+- **Work Engine boundary** — the object preserves the structured facts central Work needs
+  (source MPR, undecided-approval trigger, `ops_manager` owner rule, real actor and times) and
+  builds no local pseudo-task, deadline, `Late` label, queue or worklist; the governed
+  approval due/cover remains a later Work Card.
+
 **Journey:** `+ Manual Purchase` → choose plain-language purpose → name the purpose's
 structured For object → enter goods/quantity/date/destination → system resolves
 Catalog/supplier/approval → approved demand goes to PO Duty.
-**Object/placement:** internal full-width object; no supplier PDF. New supplier/SKU request is an
-in-context blocker, not a page.
 **Exceptions:** duplicate stock, missing quantity/date/destination, unapproved price,
 missing governed Catalog/supplier relationship, refused/withdrawn request.
 **Connections:** Catalog, Stock planning, Display Request, Purchase Demand, PO, Service Case.

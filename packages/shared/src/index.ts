@@ -2111,6 +2111,8 @@ export {
   MANUAL_PURCHASE_APPROVAL_WORDS,
   MANUAL_PURCHASE_RAIL,
   MANUAL_PURCHASE_RAIL_CLEAR,
+  MANUAL_PURCHASE_HISTORY_WORDS,
+  manualPurchaseHistoryRecord,
   manualPurchaseApproverLine,
   manualPurchaseApprovalOf,
   manualPurchaseStatusOf,
@@ -2135,6 +2137,8 @@ export {
   type ManualPurchaseRailFilter,
   type ManualPurchaseRailFacts,
   type ManualPurchaseRailModel,
+  type ManualPurchaseHistoryKind,
+  type ManualPurchaseHistoryEvent,
 } from "./manual-purchase";
 export {
   PURCHASE_DEMAND_WORDS,

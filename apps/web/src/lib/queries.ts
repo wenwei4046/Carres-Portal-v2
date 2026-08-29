@@ -28,6 +28,7 @@ import {
   type SkuImportRow,
   type SkuImportResult,
   type StockEtaImportRow,
+  type ManualPurchaseHistoryEvent,
   type AppendMissingLinesInput,
   type AppendMissingLinesResult,
   type StorageFeeImportRow,
@@ -4495,9 +4496,28 @@ export interface ManualPurchaseDetailPayload {
   request: PurchaseRequestRow;
   /** The linked Service Case's readable identity, when the purpose names one. */
   serviceCaseNo: string | null;
+  /** Card 05 §3.2 — the real individual who raised it, resolved server-side;
+   *  `null` when the record was written by a shared account and the reader
+   *  states `Staff identity not recorded`. A person is never invented. */
+  requested_by_name: string | null;
   /** `unit_cost` is present ONLY for the approver — the same screen renders
    *  for both roles, minus the money, never a permission error. */
   lines: Array<PurchaseRequestLineRow & { unit_cost?: number | null }>;
+  /** Card 05 §3.6 — the EXACT linked documents' facts, read from each PO and
+   *  its promise ledger, never inferred from SKU/supplier/date matching. */
+  pos: Array<{
+    id: string;
+    po_no: string;
+    placed_at: string | null;
+    po_delivery_date: string | null;
+    /** Non-null ONLY when the promise ledger proves the supplier changed
+     *  the date; absent change reads `Same as PO`. */
+    supplier_delivery_date: string | null;
+    ordered_qty: number;
+  }>;
+  /** Card 05 §3.7 — stored-fact events only; words live in the shared
+   *  `manualPurchaseHistoryRecord` arithmetic. */
+  history: ManualPurchaseHistoryEvent[];
   destinations: Array<{ id: string; name: string }>;
   suppliers: Array<{ id: string; name: string; kind?: string | null }>;
   users: Array<{ id: string; name: string | null }>;

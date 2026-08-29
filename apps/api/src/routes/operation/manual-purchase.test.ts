@@ -609,8 +609,10 @@ describe("Card 03 §3 · GET /purchasing/requests — the approval owner's name"
  */
 describe("Card 04 · GET /purchasing/requests — lineage, item words, PO duty", () => {
   const ME = "11111111-1111-1111-1111-000000000999"; // makeJwt's subject
-  const PO_1 = "eeeeeeee-0000-0000-0000-0000000000a1";
-  const PO_2 = "eeeeeeee-0000-0000-0000-0000000000a2";
+  /* ⭐ The PO's id IS its number (`purchase_orders.id` is the `PO-…` text;
+     no `po_no` column exists on the live schema — Card 05's authority read). */
+  const PO_1 = "PO-20260829-1111";
+  const PO_2 = "PO-20260829-2222";
   const LINE_1 = "dddddddd-0000-0000-0000-000000000001";
   const REG_LINES = [
     { id: LINE_1, request_id: REQ_A, sku: "5539-2NA",
@@ -640,10 +642,7 @@ describe("Card 04 · GET /purchasing/requests — lineage, item words, PO duty",
               { po_id: PO_2, sku: "5539-2NA", qty: 1, received_qty: 0, demand_id: LINE_1 },
             ]);
           case "purchase_orders":
-            return tableStub([
-              { id: PO_1, po_no: "PO-20260829-1111" },
-              { id: PO_2, po_no: "PO-20260829-2222" },
-            ]);
+            return tableStub([{ id: PO_1 }, { id: PO_2 }]);
           case "suppliers":
             return tableStub([{ id: SUP, name: "Hooka", kind: "own_logistics" }]);
           case "app_users":
@@ -796,12 +795,88 @@ describe("the decision gate — render asks what the door asks", () => {
     expect(body.action).toBe("Ask Jess to approve or refuse it.");
   });
 
-  it("any other door refusal still maps through the ordinary pg contract", async () => {
+  /** Card 05 §5 — every 0360 refusal leaves in the approved two lines. */
+  async function decideWith(error: Record<string, unknown>) {
+    const rpc = vi.fn().mockResolvedValue({ data: null, error });
+    vi.mocked(userClient).mockReturnValue(makeGateSb(rpc));
+    const jwt = await makeJwt("operation");
+    return app.fetch(
+      new Request(
+        `https://api.test/api/operation/purchasing/requests/${REQ_A}/decide`,
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ decision: "approve" }),
+        },
+      ),
+      env as never,
+      { waitUntil() {}, passThroughException() {} } as never,
+    );
+  }
+
+  it("a second decision is refused atomically — in the governed words", async () => {
+    const res = await decideWith({
+      code: "22023",
+      message: "request is already decided",
+      details: "already_decided",
+    });
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as { code: string; message: string; action: string };
+    expect(body.code).toBe("already_decided");
+    expect(body.message).toBe("This purchase was already decided.");
+    expect(body.action).toBe("Reload the Manual Purchase to see the decision.");
+  });
+
+  it("a refusal without its reason leaves as the governed two lines", async () => {
+    const res = await decideWith({
+      code: "22023",
+      message: "a refusal needs a reason",
+      details: "reason_required",
+    });
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code: string; message: string; action: string };
+    expect(body.code).toBe("reason_required");
+    expect(body.message).toBe("The decision reason is missing.");
+    expect(body.action).toBe("Type why this purchase is not going ahead.");
+  });
+
+  it("an out-of-range cut leaves as the governed two lines", async () => {
+    const res = await decideWith({
+      code: "22023",
+      message: "cut for 5539-2NA must be between 0 and 3",
+      details: "invalid_cut_qty",
+    });
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code: string; message: string };
+    expect(body.code).toBe("invalid_cut_qty");
+    expect(body.message).toBe("The approved quantity is not valid.");
+  });
+
+  it("an unmapped door error is the honest decision fallback — never raw SQL text", async () => {
+    const res = await decideWith({ code: "XX000", message: "deadlock detected" });
+    expect(res.status).toBe(500);
+    const body = (await res.json()) as { code: string; message: string; action: string };
+    expect(body.code).toBe("decision_not_recorded");
+    expect(body.message).toBe("The decision was not recorded.");
+    expect(JSON.stringify(body)).not.toContain("deadlock");
+  });
+
+  it("42501 with NO resolvable approver names the configuration hole", async () => {
+    // Nobody holds the duty AND no legacy manager email exists among the
+    // users: the refusal must say no approver is SET, never invent a name.
     const rpc = vi.fn().mockResolvedValue({
       data: null,
-      error: { code: "22023", message: "request is already decided", details: "already_decided" },
+      error: { code: "42501", message: "forbidden" },
     });
-    vi.mocked(userClient).mockReturnValue(makeGateSb(rpc));
+    vi.mocked(userClient).mockReturnValue({
+      from: vi.fn((table: string) =>
+        table === "app_users"
+          ? tableStub([{ id: U_JESS, name: "Siti", email: "siti@carres.com" }])
+          : tableStub([]),
+      ),
+      rpc,
+    } as unknown as ReturnType<typeof userClient>);
+    vi.mocked(dutyHolders).mockResolvedValueOnce({});
     const jwt = await makeJwt("operation");
     const res = await app.fetch(
       new Request(
@@ -815,8 +890,176 @@ describe("the decision gate — render asks what the door asks", () => {
       env as never,
       { waitUntil() {}, passThroughException() {} } as never,
     );
-    expect(res.status).toBe(422);
-    const body = (await res.json()) as { message: string };
-    expect(body.message).toBe("request is already decided");
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { code: string; message: string; action: string };
+    expect(body.code).toBe("no_purchase_approver");
+    expect(body.message).toBe("No purchase approver is set.");
+    expect(body.action).toBe("Ask management to set the purchase approver.");
+  });
+});
+
+/**
+ * CARD 05 · GET /detail/:id — the Object Detail's facts: exact PO lineage
+ * with its date words, stored-fact History, and the individual-only
+ * `Requested By`. No migration: every fact below is a column that already
+ * exists.
+ */
+describe("Card 05 · GET /purchasing/requests/detail/:id", () => {
+  const U_SHARED = "11111111-1111-1111-1111-00000000000b";
+  const U_JESS = "11111111-1111-1111-1111-00000000000a";
+  const PO_D = "PO-20260829-3333";
+  const LINE_D = "dddddddd-0000-0000-0000-0000000000d1";
+  const REQ_D = {
+    id: REQ_A,
+    req_no: "MPR-20260829-2779",
+    purpose: "ready_stock",
+    destination_id: DEST,
+    required_by: "2026-09-12",
+    why: null,
+    approval_required: true,
+    approved_at: "2026-08-29T02:42:00Z",
+    approved_by: U_JESS,
+    refused_at: null,
+    refused_by: null,
+    refuse_reason: null,
+    for_service_case_id: null,
+    for_staff_user_id: null,
+    for_subsidiary_name: null,
+    // The shared login raised it — an individual CANNOT be recovered.
+    created_by: U_SHARED,
+    created_at: "2026-08-29T01:00:00Z",
+  };
+
+  function makeDetailSb() {
+    return {
+      from: vi.fn((table: string) => {
+        switch (table) {
+          case "purchase_requests":
+            return tableStub(REQ_D);
+          case "purchase_demands":
+            return tableStub([
+              { id: LINE_D, sku: "5539-2NA", supplier_id: SUP, destination_id: DEST,
+                qty: 2, approved_qty: 1, issued_qty: 1, remaining_qty: 0,
+                required_by: null, remark: null, po_id: PO_D,
+                cancelled_at: null, cancel_reason: null },
+            ]);
+          case "product_skus":
+            return tableStub([
+              { sku: "5539-2NA", variant: null, variant_kind: null, cost: 850,
+                product_models: { category: "sofa", name: "Ohana 2 Seater" } },
+            ]);
+          case "purchase_order_lines":
+            return tableStub([
+              { po_id: PO_D, sku: "5539-2NA", qty: 1, received_qty: 0, demand_id: LINE_D },
+            ]);
+          case "purchase_orders":
+            return tableStub([
+              { id: PO_D, placed_at: "2026-08-29T03:05:00Z", eta_date: "2026-09-08" },
+            ]);
+          case "po_supplier_promises":
+            // The supplier moved the date: the ledger holds the date we HELD.
+            return tableStub([
+              { po_id: PO_D, previous_date: "2026-09-01", new_date: "2026-09-08",
+                recorded_at: "2026-09-02T02:00:00Z" },
+            ]);
+          case "purchasing_destinations":
+            return tableStub([{ id: DEST, name: "Carres Klang" }]);
+          case "suppliers":
+            return tableStub([{ id: SUP, name: "Ohana", kind: "own_logistics" }]);
+          case "app_users":
+            return tableStub([
+              { id: U_JESS, name: "Jess", email: "jess@carres.com", role: "principal" },
+              { id: U_SHARED, name: "Operation", email: "operation@carres.com", role: "operation" },
+            ]);
+          default:
+            return tableStub([]);
+        }
+      }),
+      rpc: vi.fn(),
+    } as unknown as ReturnType<typeof userClient>;
+  }
+
+  async function readDetail(role = "operation") {
+    vi.mocked(userClient).mockReturnValue(makeDetailSb());
+    const jwt = await makeJwt(role);
+    return app.fetch(
+      new Request(
+        `https://api.test/api/operation/purchasing/requests/detail/${REQ_A}`,
+        { headers: { Authorization: `Bearer ${jwt}` } },
+      ),
+      env as never,
+      { waitUntil() {}, passThroughException() {} } as never,
+    );
+  }
+
+  it("PO facts come from the exact linked document — issue time, original date, changed date", async () => {
+    const res = await readDetail();
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      pos: Array<{
+        id: string; po_no: string; placed_at: string | null;
+        po_delivery_date: string | null; supplier_delivery_date: string | null;
+        ordered_qty: number;
+      }>;
+    };
+    expect(body.pos).toEqual([
+      {
+        id: PO_D,
+        po_no: PO_D, // the PO's id IS its number — no po_no column exists
+        placed_at: "2026-08-29T03:05:00Z",
+        // The ORIGINAL supplier-facing date is the one the ledger says we
+        // held before the supplier moved it; the moved date is the change.
+        po_delivery_date: "2026-09-01",
+        supplier_delivery_date: "2026-09-08",
+        ordered_qty: 1,
+      },
+    ]);
+  });
+
+  it("History holds only stored facts — created, approved, exact PO issue", async () => {
+    const res = await readDetail();
+    const body = (await res.json()) as {
+      history: Array<Record<string, unknown>>;
+      requested_by_name: string | null;
+    };
+    const kinds = body.history.map((h) => h.kind);
+    expect(kinds).toEqual(["created", "approved", "po_issued"]);
+    const created = body.history[0];
+    // The shared login is a permission, not a person — no actor is invented.
+    expect(created.actor).toBeNull();
+    expect(body.requested_by_name).toBeNull();
+    const approved = body.history[1];
+    expect(approved.actor).toBe("Jess");
+    expect(approved.actor_role).toBe("principal");
+    expect(approved.requested_units).toBe(2);
+    expect(approved.approved_units).toBe(1);
+    const issued = body.history[2];
+    expect(issued.po_no).toBe(PO_D);
+    expect(issued.units).toBe(1);
+    expect(issued.occurred_at).toBe("2026-08-29T03:05:00Z");
+  });
+
+  it("money is absent for a non-approver — the key does not exist", async () => {
+    const res = await readDetail("operation");
+    const body = (await res.json()) as {
+      canApprove: boolean;
+      lines: Array<Record<string, unknown>>;
+    };
+    expect(body.canApprove).toBe(false);
+    expect("unit_cost" in body.lines[0]).toBe(false);
+  });
+
+  it("the approver's money rides the line; lineage and item words ride every line", async () => {
+    vi.mocked(myDuties).mockResolvedValueOnce(["ops_manager"]);
+    const res = await readDetail("operation");
+    const body = (await res.json()) as {
+      canApprove: boolean;
+      lines: Array<{ unit_cost?: number | null; item_label?: string; po_ids?: string[]; destination_id?: string }>;
+    };
+    expect(body.canApprove).toBe(true);
+    expect(body.lines[0].unit_cost).toBe(850);
+    expect(body.lines[0].item_label).toBe("Ohana 2 Seater");
+    expect(body.lines[0].po_ids).toEqual([PO_D]);
+    expect(body.lines[0].destination_id).toBe(DEST);
   });
 });

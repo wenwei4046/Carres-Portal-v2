@@ -280,8 +280,10 @@ export function groupHistoryChronology<T extends { occurred_at: string }>(
 }
 
 /** The three ranks, rendered. Rank 3 may hold several structured lines (a
- *  Before → After list); an empty rank renders nothing at all. */
-function RecordRanks({ words, index }: { words: LedgerRecordWords; index?: number }) {
+ *  Before → After list); an empty rank renders nothing at all. Exported so
+ *  every object History (Manual Purchase, Card 05) draws the SAME record —
+ *  one implementation, never a lookalike (Law C). */
+export function RecordRanks({ words, index }: { words: LedgerRecordWords; index?: number }) {
   return (
     <>
       <span
