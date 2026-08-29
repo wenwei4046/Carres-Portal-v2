@@ -260,8 +260,10 @@ Superuser through Principal authority; `operation@carres.com` is the explicitly 
 Operations Superuser. An ordinary Operations login that is neither duty, cover nor superuser is
 refused. Commercial approval remains separate and never follows from issue authority.
 
-**HOW IT IS ENFORCED — migrations 0379 / 0380 plus the production-applied 0403 database authority;
-the dependent web/API code still requires merge, deployment and real-account verification.**
+**HOW IT IS ENFORCED — migrations 0379 / 0380 plus 0403, and the dependent web/API code, are
+production-verified at `98ce4220d15cd81482aef05124dbec470c2ed87b` on 29 Aug 2026. A real
+`operation@carres.com` walk selected an eligible SO, saw the compact duty chip and active `Issue PO`
+action, and reached `Review Purchase Orders`; the preview was not issued.**
 `purchasing_po_actor()` is the ONE
 resolver. It reads the month's `ops_po_duty` holder and the dated `ops_po_duty_cover` window, and
 returns both people separately: the normal holder, because Team Work groups by them, and the acting
