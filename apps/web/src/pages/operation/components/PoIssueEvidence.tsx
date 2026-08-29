@@ -100,9 +100,9 @@ export interface PoSendEvidence {
   sent_by?: string | null;
   /**
    * ⭐ WHO (0379; closure §8). Three separate facts: who actually pressed it,
-   * who holds PO duty for the month, and the authorised cover when one acted.
-   * `Team Work` groups by the holder; the audit must name the actor. A UUID is
-   * not an actor, so the API resolves the names.
+   * who holds PO duty for the month, and the dated cover in force. The cover
+   * context does not claim the cover pressed the action: `sent_by` alone names
+   * the actual actor. A UUID is not an actor, so the API resolves the names.
    */
   sent_by_name?: string | null;
   duty_name?: string | null;
@@ -130,6 +130,22 @@ export function confirmedSendFor(
   return (
     evidence.find((e) => e.kind === "confirmed_sent" && (e.po_version ?? 0) === version) ?? null
   );
+}
+
+function sendActorContext(evidence: PoSendEvidence): string {
+  const actor = evidence.sent_by_name ? ` by ${evidence.sent_by_name}` : "";
+  if (evidence.acting_name) {
+    if (evidence.acting_name === evidence.sent_by_name) {
+      return `${actor} (covering ${evidence.duty_name ?? "PO duty"})`;
+    }
+    return `${actor} · PO Duty cover ${evidence.acting_name}${
+      evidence.duty_name ? ` for ${evidence.duty_name}` : ""
+    }`;
+  }
+  if (evidence.duty_name && evidence.duty_name !== evidence.sent_by_name) {
+    return `${actor} · PO Duty ${evidence.duty_name}`;
+  }
+  return actor;
 }
 
 /**
@@ -278,11 +294,7 @@ export default function PoIssueEvidence({
         {confirmed
           ? `${CHANNEL_WORD[confirmed.channel] ?? confirmed.channel}${
               confirmed.recipient ? ` to ${confirmed.recipient}` : ""
-            }${confirmed.sent_by_name ? ` by ${confirmed.sent_by_name}` : ""}${
-              confirmed.acting_name && confirmed.acting_name !== confirmed.sent_by_name
-                ? ` (covering ${confirmed.duty_name ?? "PO duty"})`
-                : ""
-            } · ${fmtDate(confirmed.sent_at, { time: true })}`
+            }${sendActorContext(confirmed)} · ${fmtDate(confirmed.sent_at, { time: true })}`
           : `Open the ${CHANNEL_WORD[channel]} group and send this PDF`}
       </p>
 

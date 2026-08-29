@@ -18,6 +18,8 @@ const setNumber = vi.fn();
 const setPoDays = vi.fn();
 const setProduction = vi.fn();
 const setWorkWeek = vi.fn();
+const createDestination = vi.fn();
+const updateDestination = vi.fn();
 
 function mutation(mutateAsync: ReturnType<typeof vi.fn>) {
   return { mutateAsync, isPending: false, isError: false, error: null };
@@ -32,6 +34,8 @@ vi.mock("@/lib/queries", async () => {
     useSetPurchasingPoDays: () => mutation(setPoDays),
     useSetProductionDays: () => mutation(setProduction),
     useSetSupplierWorkWeek: () => mutation(setWorkWeek),
+    useCreatePurchasingDestination: () => mutation(createDestination),
+    useUpdatePurchasingDestination: () => mutation(updateDestination),
   };
 });
 
@@ -62,6 +66,32 @@ function settings(over: Partial<PurchasingSettingsResponse> = {}): PurchasingSet
       { supplierId: OHANA, category: "bedframe", workingDays: 7 },
       { supplierId: OHANA, category: "sofa", workingDays: 14 },
     ],
+    destinations: [
+      {
+        id: "33333333-0000-0000-0000-000000000003",
+        name: "Carres Klang",
+        address: "Lot 12, Klang",
+        isDefault: true,
+        active: true,
+        warehouseLinked: true,
+      },
+      {
+        id: "44444444-0000-0000-0000-000000000004",
+        name: "AL Sungai Buloh",
+        address: "Sungai Buloh",
+        isDefault: false,
+        active: true,
+        warehouseLinked: false,
+      },
+      {
+        id: "55555555-0000-0000-0000-000000000005",
+        name: "Ohana",
+        address: null,
+        isDefault: false,
+        active: true,
+        warehouseLinked: false,
+      },
+    ],
     lastChanges: [
       {
         settingKey: "production_days",
@@ -84,9 +114,52 @@ beforeEach(() => {
   setProduction.mockResolvedValue(settings());
   setNumber.mockResolvedValue(settings());
   setPoDays.mockResolvedValue(settings());
+  createDestination.mockResolvedValue(settings());
+  updateDestination.mockResolvedValue(settings());
 });
 
 describe("Purchasing → Settings", () => {
+  it("introduces Settings as the owner of destinations and ordering rules", () => {
+    render(wrap(<OperationPurchasingSettings />));
+    expect(
+      screen.getByText(
+        "The settings the ordering engine reads. Change one here and SO Batch Purchase uses it the same day.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/The numbers the ordering engine reads/)).not.toBeInTheDocument();
+  });
+
+  it("lists AL and Ohana from the shared Deliver To master data", () => {
+    render(wrap(<OperationPurchasingSettings />));
+    const section = screen.getByTestId("deliver-to-settings");
+    expect(within(section).getByText("AL Sungai Buloh")).toBeInTheDocument();
+    expect(within(section).getByText("Ohana")).toBeInTheDocument();
+    expect(within(section).getByText("Address not set")).toBeInTheDocument();
+  });
+
+  it("adds a future Deliver To from Settings", async () => {
+    render(wrap(<OperationPurchasingSettings />));
+    fireEvent.click(screen.getByRole("button", { name: "Add Deliver To" }));
+    fireEvent.change(screen.getByLabelText("Name"), { target: { value: "New Yard" } });
+    fireEvent.change(screen.getByLabelText("Address"), {
+      target: { value: "12 Jalan Baru" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+    await waitFor(() =>
+      expect(createDestination).toHaveBeenCalledWith({
+        name: "New Yard",
+        address: "12 Jalan Baru",
+      }),
+    );
+  });
+
+  it("does not let the current default be unchecked without choosing another", () => {
+    render(wrap(<OperationPurchasingSettings />));
+    const section = screen.getByTestId("deliver-to-settings");
+    fireEvent.click(within(section).getAllByRole("button", { name: "Edit" })[0]);
+    expect(within(section).getByLabelText("Default")).toBeDisabled();
+  });
+
   it("shows the sofa at 14 working days — the one number this card changes", () => {
     render(wrap(<OperationPurchasingSettings />));
     expect(screen.getByTestId("production-days-sofa")).toHaveValue(14);

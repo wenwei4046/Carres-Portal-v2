@@ -30,7 +30,7 @@ money or supplier payment.
 |---|---|
 | Customer order, customer promise and cancellation | Sales Orders |
 | Buy reason, purchase demand remainder, supplier, PO, supplier date and `Deliver To` | Purchasing |
-| Physical count, condition, Supplier DO and GRN | Receiving — ERP Architecture §3.4; seam in §9.4 |
+| Physical count, condition, Supplier DO and Goods Receipt/numbered GRN evidence | Receiving — ERP Architecture §3.4; seam in §9.4 |
 | Exact Unit, ownership, custody, location and availability | Stock / Warehouse |
 | Actual customer handover and delivery proof | Delivery |
 | Customer money | Payment |
@@ -70,6 +70,19 @@ There are not two genuine Carres operating models.
 
 Therefore the Manual Purchase relationship, demand truth and PO ownership are **RESOLVED FROM
 AUTHORITY**. No Owner Decision remains.
+
+### 2.3 Ruling — daily Purchasing → Receiving → GRN → Claim / Return chain
+
+**OWNER-APPROVED / LOCKED 2026-08-29.** Purchasing and Receiving execute in their owning
+modules while the shared Work Engine gives staff and managers one daily list. The governing design
+is recorded in
+[`docs/superpowers/specs/2026-08-29-purchasing-receiving-work-design.md`](../superpowers/specs/2026-08-29-purchasing-receiving-work-design.md).
+
+The six questions must be answerable for every open action: **who acts · which actual working day ·
+where they act · what proves completion · who supervises · what consequence follows**. `My Work`
+and `Team Work` project these module actions; they never store a second completion or expose manual
+`Done`. A module-local `WORK TO DO` panel is a contextual filter over the same actions, not a new
+work queue.
 
 ---
 
@@ -240,23 +253,25 @@ retype it.
 
 ### 5.3 One PO issue authority
 
-SO Batch Purchase and Manual Purchase reach ONE PO issuance authority. The normal PO Duty and dated
-cover remain the work-owner metadata and the selection toolbar's normal-owner hint; they are not the
-only permission. `operation@carres.com` and Jess are Operations Superusers and may use the same
-governed issue/send doors. The audit stores the actual authenticated actor separately from the
-normal duty holder and dated cover. Approval and commercial gates still apply; superuser authority
-does not create a second PO writer or permit a requester to mark demand ordered.
+Current PO Duty, or the dated cover while one is in force, is the normal work owner and remains
+accountable for PO issuance. A governed Operations Superuser may also complete any operational PO
+action without becoming — or being displayed/audited as — the duty holder. Jess is an Operations
+Superuser through Principal authority; `operation@carres.com` is the explicitly governed shared
+Operations Superuser. An ordinary Operations login that is neither duty, cover nor superuser is
+refused. Commercial approval remains separate and never follows from issue authority.
 
-**HOW IT IS ENFORCED — BUILT, migrations 0379 / 0380, PR #894.** `purchasing_po_actor()` is the ONE
-resolver. It reads the month's `ops_po_duty` holder, the dated `ops_po_duty_cover` window and the
-governed Operations Superuser identities, and returns owner metadata separately from the actual
-authenticated actor. `purchasing_actor_may_issue()` is the gate,
-and it is asked by the CREATION AUTHORITY itself — `purchasing_issue_pos_batch` — and by the evidence
-door `purchasing_confirm_po_sent`. So SO Batch Purchase, Manual Purchase and a direct RPC call all
-meet the same authority; a door only its caller guards is not guarded. A person who is neither an
-Operations Superuser nor the resolved duty/cover is refused: audit access alone is not issuance
-authority. Cover has no write policy — it is set
-through a governed door, never by a browser.
+**HOW IT IS ENFORCED — migrations 0379 / 0380 plus the production-applied 0403 database authority;
+the dependent web/API code still requires merge, deployment and real-account verification.**
+`purchasing_po_actor()` is the ONE
+resolver. It reads the month's `ops_po_duty` holder and the dated `ops_po_duty_cover` window, and
+returns both people separately: the normal holder, because Team Work groups by them, and the acting
+cover. `is_operations_superuser()` reads Principal or the governed `app_users` capability;
+application code never checks an email. `purchasing_actor_may_issue()` combines duty, dated cover
+and that capability, and is asked by SO Batch Purchase, Manual Purchase, the API issue routes, the
+creation authority `purchasing_issue_pos_batch`, and the evidence door
+`purchasing_confirm_po_sent`. PO History records actual actor, normal duty, dated cover and the
+authority used as distinct fields; a superuser is never rewritten as Yu Jun or the cover. Cover has
+no browser write policy.
 
 ### 5.4 Deliver To
 
@@ -264,12 +279,30 @@ The destination comes from the source PO/CO `Deliver To`. When a new buy needs a
 configured Carres warehouse (currently Carres Klang); a showroom is an explicit exception, never a
 Receiving guess.
 
+Permitted destinations are Purchasing Settings master data, not a fixed browser list. The current
+set is `Carres Klang` · `AL Sungai Buloh` · `HOUZS` · `Ohana`; an authorised Settings manager may
+add a future destination, record its address, make it the default or stop offering it for new POs.
+Historical POs keep the destination name and address saved on their issued version.
+
+Every active destination also resolves the receiving station/party, applicable arrival calendar,
+whether it links to a Carres warehouse or is external/no-Stock, and whether Unit scan and signed-DO
+evidence are required. A warehouse-linked destination derives its address and Stock consequence
+from Warehouse authority. An external destination does not create Carres Stock merely because it
+can receive a supplier PO. These receiving fields are **APPROVED TARGET / NOT BUILT**; until they
+exist, a new destination may not silently invent who receives or what Stock consequence follows.
+
 - Before issue: change or split quantity freely in SO Batch Purchase / Manual Purchase.
 - Numbered PDF prepared but not sent: update the same issue surface; History records it.
 - Supplier already received a PDF: `Change Deliver To` creates a new version/change record and
   concrete work to send the new PDF.
 
-The final destination is one Purchasing-owned fact read by Sales Order and receiving/logistics.
+**Owner B, 2026-08-28:** one PO may carry several governed Deliver To destinations. The PO-level
+destination is the default; a goods line may name another active Purchasing destination. The formal
+PDF prints every line's effective destination and, when several are used, every exact address in its
+DELIVER TO block. A closed destination remains visible on old records but cannot be selected for new
+work. The final destination of each goods line is Purchasing-owned truth read by Sales Order and
+receiving/logistics. Changing it after the supplier received the PDF mints a new PO version and send
+work; it never silently changes the paper already sent.
 
 ### 5.5 Supplier and SKU resolution
 
@@ -321,8 +354,8 @@ The operator sees facts, not a vague workflow:
 ```text
 Not sent to supplier
 Issued
-Supplier date missing
-Supplier date changed
+Supplier Delivery Date missing
+Supplier Delivery Date changed
 Partly received
 Completed
 Cancelled
@@ -434,7 +467,8 @@ Sales Order line
 → SO Batch Purchase groups ready lines by supplier
 → operator checks/splits Deliver To
 → an authorised issuer uses the one PO door; normal PO Duty remains the work owner
-→ supplier promise/exception is recorded
+→ exact version, recipient, channel, actual actor and normal duty/cover are recorded
+→ supplier promise/exception, answer and response evidence are recorded on the exact PO
 → Receiving starts from that exact PO and the supplier DO
 → Carres records physical receipt and creates the numbered GRN
 → Stock owns only valid received Units and location
@@ -470,19 +504,45 @@ PO/CO carries the official Deliver To and original PO Delivery Date
 └─ problem found later → Service Case → Supplier Claim workstream
 ```
 
+Office direct receiving and Warehouse submission are two entry doors to one Receiving Session and
+one posting engine. A Warehouse submission moves no Stock until GRN Duty posts it. Office direct
+receiving posts one `posted` event because one person performed one business act. `GRN-…` is the
+formal Receiving Record number and exists from the posted session; a draft/submitted count is not a
+formal GRN.
+
+Normal GRN Duty, dated cover and actual actor remain separate evidence. Jess and the governed
+Operations Superuser may perform the operational act without becoming GRN Duty. An ordinary person
+outside duty/cover/capability is refused by the same web, API and SQL authority.
+
 The user-facing gate uses two lines:
 
 > **Delivery note is missing**
 > Upload it before you finish receiving.
 
-### 7.4 Purchased showroom display
+### 7.4 Partial, reject, claim and return consequences
+
+- **Partial receipt:** accepted Units post immediately; the exact open balance remains Incoming.
+  `Confirm balance delivery date` opens for PO Duty and closes only from a new evidenced supplier
+  promise. Partial by itself is not damage and does not create a claim.
+- **Reject on the spot:** rejected/not-delivered Units never become available Stock. The receipt
+  records exact quantity/Units, observable reason, photos and supplier/carrier hand-back proof. A
+  Claim opens only when Carres still needs a replacement, repair, collection or other supplier
+  result.
+- **Accept with issue:** Carres accepts physical custody but the exact Unit is controlled and
+  unavailable. The same posted receipt creates the source-linked Supplier Claim and retains GRN
+  evidence.
+- **Purchase Return:** only an approved Claim/outcome creates it. Issuing the document does not
+  move custody. Exact-Unit scan/count, actual collector, time and handover proof create the Stock
+  consequence. Partial collection leaves the remaining Units open.
+
+### 7.5 Purchased showroom display
 
 Hooka/Ohana display goods are Carres purchases, not consignment. A Display Request resolves to Manual
 Purchase/PO. When the model changes, the Unit returns to Carres custody, may go to Hooka/Ohana for
 repair and may later be resold. Stock ownership remains Carres unless an authorised consequence
 changes it.
 
-### 7.5 Supplier-consignment showroom display
+### 7.6 Supplier-consignment showroom display
 
 Other sofa suppliers such as Dorsettloft may own display stock.
 
@@ -501,7 +561,7 @@ Display Request approved for consignment
 A model swap uses one CO external instruction with `COMING IN` and `GOING BACK`. The outgoing return
 record is auto-linked; no duplicate supplier message. Document issue alone does not move either Unit.
 
-### 7.6 Consignment sale notice trigger
+### 7.7 Consignment sale notice trigger
 
 Only a successful/partially successful delivery attempt for an exact supplier-owned Unit creates a
 notice. SO creation, deposit, reservation and delivery planning do not.
@@ -583,6 +643,12 @@ Cover rule
 My Work omits the current user's repeated avatar. Team Work groups by resolved owner. Leave/buddy
 cover changes who sees today's work while preserving normal owner and cover evidence.
 
+The owning module supplies stable action identity, source, trigger, due date/calendar, recipient,
+required result, completion fact and exact deep link. Work composes these actions and writes no
+business outcome. Managers, including the governed Operations Manager accounts, supervise through
+`Team Work`; the normal owner group survives even when a dated cover or Operations Superuser acts.
+Module-local `WORK TO DO` rails are filters over these same module actions.
+
 ---
 
 ## 9 · Page blueprints
@@ -591,11 +657,24 @@ cover changes who sees today's work while preserving normal owner and cover evid
 
 **Purpose / source:** system-generated uncovered SO lines only; no `+ New`.
 
-**Left rail — APPROVED / LOCKED, owner ruling 2026-08-27 (Card 02-C).** The rail answers, for
-an inexperienced operator: when should each order be placed, which product category, which
-actual supplier — with every label fully readable. Five sections, in this exact order:
+**Table listing frame — APPROVED / LOCKED, Owner correction 2026-08-29.** SO Batch inherits the
+shared Register Kit's complete light four-sided frame around its Work Toolbar, table and fixed status
+footer. It does not add a page-local second frame. This is not a card around the page and not a box
+around every row. The selected `Issue PO` action bar remains a separate governed action surface below.
+
+**Left rail — APPROVED / LOCKED, latest owner ruling 2026-08-29.** The rail first answers what
+must be done each day, then lets an inexperienced operator inspect when each order should be
+placed, which product category and which actual supplier — with every label fully readable.
+Six sections, in this exact order:
 
 ```text
+WORK TO DO
+  Issue PO
+  Ask customer for a delivery date
+  Add item to SKU catalog
+  Check the supplier
+  Add production days
+
 TO ORDER
   All not ordered
 
@@ -620,6 +699,13 @@ SETUP TO FIX              ← the whole section renders only when at least one a
   Production days not set
 ```
 
+- **`WORK TO DO` is the first local panel and always shows all five concrete actions, zero
+  included.** It is an action lens over the same server-derived purchase-demand states and
+  structured action contract; it is not a stored queue, not a second Work Engine and not a new
+  Purchasing Work page. My Work / Team Work remain the formal owner-resolved work surfaces.
+  Clicking an action filters this same Register. `Issue PO` groups all five orderable timing
+  states; the other four actions group their matching blocker state. Counts are unique Sales
+  Orders, so several demand lines under one SO still count once.
 - **The rail is navigation, not batch selection.** No checkboxes in the rail — rows use the
   governed `NavRow` active treatment; the only checkboxes on the page are the Register's own
   `Issue PO` selection. One filter may be selected per section; filters from different
@@ -630,8 +716,8 @@ SETUP TO FIX              ← the whole section renders only when at least one a
 - **Counts are UNIQUE Sales Orders** — never documents, notifications, leaf lines, SKU
   quantities or PO counts. Each section's counts update against the other selected sections,
   so the printed number predicts the resulting SO rows. The fixed rows (`All not ordered`,
-  the five timing rows, the three product rows, the setup row) print their live count,
-  zero included. A supplier appears only while it has a matching SO under the other active
+  the five work rows, the five timing rows, the three product rows, the setup row) print
+  their live count, zero included. A supplier appears only while it has a matching SO under the other active
   filters — except the currently selected supplier, which stays visible with `0`.
 - **Product comes from the authoritative Catalog category** — never SKU text, model name,
   description, supplier, or a browser-only mapping. A multi-category Sales Order counts once
@@ -641,8 +727,9 @@ SETUP TO FIX              ← the whole section renders only when at least one a
 - **Supplier uses the same projection as the Register's `Supplier` column** — the resolved
   outstanding-demand supplier plus the issued PO lineage supplier
   (`soBatchOrderSupplierNames`), no second browser-only supplier calculation. Actual names
-  only, alphabetical. There is no `No supplier` filter: an unexpectedly missing supplier
-  fails at Catalog authority and is not a normal purchasing category.
+  only, alphabetical. There is no `No supplier` fact category: an unexpectedly missing
+  supplier fails at Catalog authority and appears only through the concrete `Check the supplier`
+  action in `WORK TO DO`.
 - Every timing row remains orderable. `Can order early`, `1–13 safety days left`,
   `No safety days left` and `Not enough production days` express timing risk, never
   `Cannot buy`. Order By is a planned date, never an unlock date.
@@ -662,20 +749,23 @@ SETUP TO FIX              ← the whole section renders only when at least one a
   panel-left icon grammar as the Portal sidebar. While hidden it does not become a 60px icon rail;
   the Register takes the width and its toolbar exposes `Show filters`. The choice is remembered for
   that staff browser. This is one local-filter control, not another module-navigation control.
-- **PO Duty appears once in the Register toolbar, never in the filter rail and never repeated on
-  every order.** The avatar/name comes from the live resolved Operation roster: dated cover first,
-  otherwise the monthly holder. Selection actions use the same resolved person.
+- **PO Duty appears only in the selected Issue action, never as a permanent toolbar/rail block and
+  never repeated on rows.** The selected bar direction is
+  `1 selected · 1 unit · Issue 1 PO          [YJ]  [Issue PO]`. `[YJ]` is a compact structured owner
+  avatar chip; hover/title reads `Yu Jun · PO Duty`. A dated cover replaces the initials and title
+  with the cover identity. The action sentence never names Yu Jun. The chip states normal ownership;
+  button authority comes from §5.3, so duty/cover, Jess and `operation@carres.com` see the live action.
 - Fully covered / `Buy = 0` DEMAND leaves the buying selection — it is not offered a tick, and
   the leaf listing drops it — but the SALES ORDER'S ROW never leaves (Card 02-B). If a PO is
   cancelled and the quantity is still required, the selectable demand returns automatically by
   recomputation; nothing is stored.
 - A line whose customer date, SKU or supplier is unexpectedly missing fails safely at its owning
-  boundary (Sales / Catalog). It is named on its own row; it never becomes a permanent Purchasing
-  rail facet and is never silently defaulted.
+  boundary (Sales / Catalog). It is named on its own row and may be reached through its concrete
+  `WORK TO DO` action; it never becomes a normal fact category and is never silently defaulted.
 - Every category derives from the one server planning engine. There is no second stored status.
 - Retired rail words, never to return on this surface: `Ready to buy` · `Covered` ·
   `No customer date` · `No SKU` · `No supplier` · `No production days` · `BUYING RECORDS` ·
-  `WORK TO DO` · `All lines` · `No buying needed` · `Cannot buy` — alongside the standing bans
+  `All lines` · `No buying needed` · `Cannot buy` — alongside the standing bans
   `Today` · `Tomorrow` · `Overdue` · `Follow Up` · `Needs Attention` · `Priority` · `Pending` ·
   `Waiting` · `Next Action` · `Buffer`.
 
@@ -1109,9 +1199,11 @@ invoice/settlement.
 |---|---|---|---|
 | Approved demand ready | Normal PO Duty/cover; Operations Superuser may act | `Issue the purchase order to Hooka` | Current PDF version sent, outbound fact and actual actor exist |
 | Supplier date missing | Normal PO Duty/cover; Operations Superuser may act | `Ask Hooka for the delivery date` | Actual supplier answer, channel, evidence, recorder and times exist on the exact PO |
+| Arrival due next Office work day | Normal PO Duty/cover; Operations Superuser may act | `Confirm Hooka's Fri, 28 Aug arrival` | Actual supplier answer/date, channel, evidence, recorder and times exist on the exact PO |
 | Required arrival at risk | Normal PO Duty/cover; Operations Superuser may act | `Ask Hooka if the goods can arrive by Fri, 28 Aug` | Governed supplier answer/exception, evidence and actual actor exist on the exact PO |
 | PO/CO goods arrive | Normal GRN Duty/cover; Operations Superuser may act | `Receive PO-20260820-4827 from Hooka` | Exact Receiving Session records physical outcome and numbered GRN |
 | Supplier DO/evidence missing | Normal GRN Duty/cover; Operations Superuser may act | `Add the Supplier DO before you finish receiving` | Supplier DO reference/evidence and actual recorder exist on the Receiving Session |
+| Partial receipt leaves balance | Normal PO Duty/cover; Operations Superuser may act | `Ask Hooka for the balance delivery date` | Evidenced balance promise exists on the exact open PO line |
 | Showroom display change | Showroom role then Purchasing decision role | `Record the current Unit and requested model` | Required request facts exist |
 | Supplier claim reply missing | Current PO Duty | `Ask Hooka to reply to the supplier claim` | Supplier reply exists |
 | Return collection missing | Current PO Duty | `Ask Hooka for the collection date` | Collection date exists |
@@ -1129,6 +1221,11 @@ never silently moved: PO Delivery Date, Supplier Delivery Date and Goods Receive
 dates actually stated/observed. A computed work due date may use its governed calendar only when
 the rule and resulting date are visible.
 
+`My Work` is the employee's complete daily list and is the default even for a manager. `Team Work`
+is supervision over the same set: normal owner, dated cover, actual actor, due/late state, named
+blocker and missing evidence. Neither surface exposes manual `Done`; actions close from the module
+completion facts in the table above.
+
 ---
 
 ## 11 · Settings
@@ -1136,10 +1233,11 @@ the rule and resulting date are visible.
 Settings lives under the global header gear and requires authorised roles. It includes:
 
 - document number format/version and locked Unit ID family;
-- PO Duty and GRN Duty rosters, buddy cover, Operations Superusers and working calendars;
+- PO Duty and GRN Duty rosters, buddy cover, governed Operations Superusers and working calendars;
 - approval limits and Manual Purchase purposes;
-- configured default warehouse `Deliver To` (currently `Carres Klang`) and permitted showroom
-  exceptions;
+- default `Deliver To` (`Carres Klang`) and permitted destinations, including add, address,
+  availability, default, receiving station/party, arrival calendar, linked Warehouse/no-Stock
+  consequence, Unit-scan requirement and signed-DO evidence controls;
 - supplier channels, contacts, lead/production days and calendars;
 - PO grouping rules and source-preservation law;
 - purchased vs supplier-consignment agreements and settlement terms;
@@ -1180,7 +1278,7 @@ are snapshots, not editable truth or a second settlement ledger.
 | Requester | create Manual Purchase and supply missing request facts | issue PO or mark ordered merely because they requested it |
 | Approver / Manager | approve/reject governed internal buy and commercial exceptions; the configured approver may approve their own request | replace receiving/PO evidence |
 | Normal PO Duty / dated cover | owns the daily work; issue/revise supplier documents; record promises/claims through the one door | approve unauthorised price; post stock or supplier payment |
-| Operations Superuser (`operation@carres.com`, Jess) | use the same governed PO and Receiving doors when needed; actual actor remains separate from normal duty/cover | create a second PO/receipt writer or bypass approval/commercial gates |
+| Operations Superuser (`operation@carres.com`, Jess) | use the same governed operational doors when available, including PO issuance; actual actor remains separate from normal duty/cover | impersonate duty, create a second PO/receipt writer or bypass approval/commercial gates |
 | Normal GRN Duty / dated cover | owns daily Receiving work; count, inspect, attach Supplier DO/evidence and finish source receipt | change PO price/quantity or ownership agreement |
 | Stock / Warehouse | label, locate, move, reserve and prove physical custody | issue/cancel supplier commitments |
 | Service | intake problem and govern problem/outcome record | create unapproved Purchasing consequence |

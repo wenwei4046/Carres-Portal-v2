@@ -2,8 +2,8 @@
  * SO BATCH PURCHASE · RAIL PREVIEW — DEV ONLY (Cards 02-A · 02-B · 02-C).
  *
  * The REAL `SoBatchRegister`, the REAL stylesheet, only the payload seeded:
- * one row in every rail category, so the five-section TO ORDER · ORDER
- * TIMING · PRODUCT · SUPPLIER · SETUP TO FIX rail can be walked and
+ * one row in every rail category, so the six-section WORK TO DO · TO ORDER ·
+ * ORDER TIMING · PRODUCT · SUPPLIER · SETUP TO FIX rail can be walked and
  * photographed. The live screen is behind a login, and live data cannot be
  * made to hold all five timing bands at once.
  *

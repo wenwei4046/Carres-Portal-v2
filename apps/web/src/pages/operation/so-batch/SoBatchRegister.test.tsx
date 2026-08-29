@@ -269,7 +269,7 @@ function data(over: Partial<SoBatchPurchaseResponse> = {}): SoBatchPurchaseRespo
       { id: BULOH, name: "AL Sungai Buloh", isDefault: false, active: true },
     ],
     defaultDestinationId: KLANG,
-    currentPoDuty: { userId: "u1", name: "Yee Jean" },
+    currentPoDuty: { userId: "u-duty", name: "Yu Jun" },
     actingPoDuty: null,
     poDutyNameUnavailable: false,
     poDutyUnavailable: false,
@@ -435,6 +435,41 @@ describe("one permanent row per proceeded Sales Order", () => {
 });
 
 describe("selection — the parent checkbox is ALL eligible child demand", () => {
+  it("offers the governed Operations Superuser the duty owner chip and Issue PO action", () => {
+    renderRegister({
+      currentPoDuty: { userId: "u-duty", name: "Yu Jun" },
+      actingPoDuty: null,
+      mayIssue: true,
+    });
+
+    expect(screen.queryByTestId("so-batch-po-duty")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("so-batch-select-o1"));
+
+    const bar = screen.getByTestId("so-batch-selection-bar");
+    expect(within(bar).getByText("1 selected · 2 units · Issue 1 PO")).toBeVisible();
+    expect(within(bar).getByTestId("so-batch-duty-chip")).toHaveTextContent("YJ");
+    expect(within(bar).getByTestId("so-batch-duty-chip")).toHaveAttribute(
+      "title",
+      "Yu Jun · PO Duty",
+    );
+    expect(within(bar).getByTestId("so-batch-issue")).toBeEnabled();
+    expect(bar).not.toHaveTextContent("Yu Jun holds PO duty");
+  });
+
+  it("shows the dated cover as the selected action owner without pretending they hold the month", () => {
+    renderRegister({
+      currentPoDuty: { userId: "u-duty", name: "Yu Jun" },
+      actingPoDuty: { userId: "u-cover", name: "Shasha" },
+      mayIssue: true,
+    });
+
+    fireEvent.click(screen.getByTestId("so-batch-select-o1"));
+    const chip = screen.getByTestId("so-batch-duty-chip");
+    expect(chip).toHaveTextContent("SH");
+    expect(chip).toHaveAttribute("title", "Shasha · PO Duty cover for Yu Jun");
+    expect(screen.getByTestId("so-batch-issue")).toBeEnabled();
+  });
+
   it("ticking the parent selects the order's eligible demand and offers the issue", () => {
     renderRegister();
     fireEvent.click(screen.getByTestId("so-batch-select-o1"));
@@ -545,7 +580,7 @@ describe("the rail — Card 02-A wording, Card 02-B counting", () => {
   });
 });
 
-describe("the rail — Card 02-C: five readable sections, navigation not selection", () => {
+describe("the rail — six readable sections, navigation not selection", () => {
   const rail = () => screen.getByTestId("so-batch-rail");
 
   it("hides completely, reopens from the Register toolbar, and remembers the choice", () => {
@@ -563,14 +598,19 @@ describe("the rail — Card 02-C: five readable sections, navigation not selecti
     expect(localStorage.getItem("carres.soBatchPurchase.filters.open")).toBe("1");
   });
 
-  it("renders the five sections in the approved order, with the approved words", () => {
+  it("renders WORK TO DO first, followed by the five fact sections", () => {
     renderRegister();
     const text = rail().textContent ?? "";
-    const order = ["TO ORDER", "ORDER TIMING", "PRODUCT", "SUPPLIER", "SETUP TO FIX"];
+    const order = ["WORK TO DO", "TO ORDER", "ORDER TIMING", "PRODUCT", "SUPPLIER", "SETUP TO FIX"];
     const positions = order.map((h) => text.indexOf(h));
     expect(positions.every((p) => p >= 0)).toBe(true);
     expect([...positions].sort((a, b) => a - b)).toEqual(positions);
     for (const word of [
+      "Issue PO",
+      "Ask customer for a delivery date",
+      "Add item to SKU catalog",
+      "Check the supplier",
+      "Add production days",
       "All not ordered",
       "Can order early",
       "14 safety days left",
@@ -589,6 +629,18 @@ describe("the rail — Card 02-C: five readable sections, navigation not selecti
     /* The retired wording never returns. */
     expect(text).not.toContain("Not enough production time");
     expect(text).not.toContain("Production time not set");
+  });
+
+  it("WORK TO DO shows the daily action counts and filters the Register", () => {
+    renderRegister();
+    const issue = screen.getByTestId("so-batch-work-issue_po");
+    expect(issue.textContent).toContain("3"); // o1 · o3 · o8, never o8's two leafs
+    fireEvent.click(issue);
+    expect(screen.getByTestId("so-batch-row-o1")).toBeInTheDocument();
+    expect(screen.getByTestId("so-batch-row-o3")).toBeInTheDocument();
+    expect(screen.getByTestId("so-batch-row-o8")).toBeInTheDocument();
+    expect(screen.queryByTestId("so-batch-row-o4")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("so-batch-row-o5")).not.toBeInTheDocument();
   });
 
   it("all five timing rows stay visible, and an empty band prints 0, not silence", () => {
@@ -858,37 +910,24 @@ describe("what this page refuses to be", () => {
     expect(screen.getByText("No proceeded Sales Orders.")).toBeInTheDocument();
   });
 
-  it("names whoever may act today instead of a silent grey button", () => {
+  it("keeps an ordinary non-duty operator refused and shows only the owner chip", () => {
     renderRegister({ mayIssue: false });
     fireEvent.click(screen.getByTestId("so-batch-select-o1"));
-    expect(screen.getByTestId("so-batch-duty-chip")).toHaveTextContent(
-      "Yee Jean holds PO duty",
+    expect(screen.getByTestId("so-batch-duty-chip")).toHaveTextContent("YJ");
+    expect(screen.getByTestId("so-batch-duty-chip")).toHaveAttribute(
+      "title",
+      "Yu Jun · PO Duty",
     );
     expect(screen.queryByTestId("so-batch-issue")).not.toBeInTheDocument();
   });
 
-  it("shows the real resolved PO Duty once in the Register toolbar", () => {
+  it("does not add a permanent PO Duty block to the Register toolbar", () => {
     renderRegister({
-      currentPoDuty: { userId: "real-op-1", name: "Tan Qu Qu" },
+      currentPoDuty: { userId: "real-op-1", name: "Yu Jun" },
       actingPoDuty: null,
     });
-    expect(screen.getByTestId("so-batch-po-duty")).toHaveTextContent(
-      "Tan Qu Qu holds PO duty",
-    );
-    expect(screen.getByTestId("so-batch-po-duty")).toHaveAccessibleName(
-      "Tan Qu Qu holds PO duty",
-    );
-  });
-
-  it("shows the real dated cover instead of the absent holder", () => {
-    renderRegister({
-      currentPoDuty: { userId: "real-op-1", name: "Tan Qu Qu" },
-      actingPoDuty: { userId: "real-op-2", name: "Shasha" },
-    });
-    expect(screen.getByTestId("so-batch-po-duty")).toHaveTextContent(
-      "Shasha is covering PO duty",
-    );
-    expect(screen.getByTestId("so-batch-po-duty")).not.toHaveTextContent("Tan Qu Qu");
+    expect(screen.queryByTestId("so-batch-po-duty")).not.toBeInTheDocument();
+    expect(screen.queryByText(/holds PO duty|covering PO duty/)).not.toBeInTheDocument();
   });
 
   it("says the PO duty name is missing instead of saying nobody is on duty", () => {
@@ -902,9 +941,6 @@ describe("what this page refuses to be", () => {
     } as Partial<SoBatchPurchaseResponse> & { poDutyNameUnavailable: boolean };
     renderRegister(unresolvedDuty);
 
-    expect(screen.getByTestId("so-batch-po-duty")).toHaveTextContent(
-      "PO duty name is missing.",
-    );
     fireEvent.click(screen.getByTestId("so-batch-select-o1"));
     expect(screen.getByTestId("so-batch-duty-chip")).toHaveTextContent(
       "PO duty name is missing.",
@@ -922,7 +958,8 @@ describe("what this page refuses to be", () => {
       mayIssue: false,
     });
 
-    expect(screen.getByTestId("so-batch-po-duty")).toHaveTextContent(
+    fireEvent.click(screen.getByTestId("so-batch-select-o1"));
+    expect(screen.getByTestId("so-batch-duty-chip")).toHaveTextContent(
       "PO duty could not be checked.",
     );
     expect(screen.queryByText("Nobody holds PO duty this month.")).not.toBeInTheDocument();

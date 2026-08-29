@@ -554,6 +554,12 @@ stays open until somebody answers it — so a relative word is only true on the 
 `Shipping tomorrow`, answered two days late, is a sentence about a day that has already passed.
 `{date}` is the PO's expected arrival, and it is right whenever it is read.
 
+**The answer words are not sufficient completion evidence** (Owner-approved Purchasing → Receiving
+model, 2026-08-29). `Confirm supplier delivery`, `Supplier Delivery Date missing`, `Supplier Delivery Date passed`
+and `Balance date missing` close only when the structured answer/date is stored together with the
+supplier's WhatsApp or equivalent response evidence, recipient/channel, actual actor and time.
+Opening WhatsApp or transcribing an unsupported answer is not completion.
+
 **`Confirm balance delivery date` gets no row here and that is a filled answer, not a missing
 one**: it asks no question. It records ONE date, so its Button (`Record balance date`) is the
 whole interaction and there is nothing for a second string to say.
@@ -606,9 +612,9 @@ or the one Receiving engine. `purchase_demand` remains an authoritative record, 
 | Queue tile | Row line | Button | Done message | Empty state |
 |---|---|---|---|---|
 | `Issue PO` | `Issue PO to {supplier}` | `Issue PO` | `PO issued to {supplier}` | `No purchase orders to issue.` |
-| `Supplier date missing` | `Ask {supplier} for the delivery date` | `Record supplier date` | `Supplier date recorded` | `Every issued order has a supplier date.` |
-| `Supplier date passed` | `Ask {supplier} when the goods will arrive` | `Record supplier answer` | `Supplier answer recorded` | `No supplier date has passed.` |
-| `Goods to receive` | `Receive {document} from {supplier}` | `Start receiving` | `Received {n} of {m}` | `No supplier delivery is ready to receive.` |
+| `Supplier Delivery Date missing` | `Ask {supplier} for the delivery date` | `Record supplier answer` | `Supplier answer recorded` | `Every issued order has a supplier delivery answer.` |
+| `Supplier Delivery Date passed` | `Ask {supplier} when the goods will arrive` | `Record supplier answer` | `Supplier answer recorded` | `No Supplier Delivery Date has passed.` |
+| `Goods to receive` | `Check in {document} from {supplier}` | `Start receiving` | `GRN posted · {n} received · {m} pending delivery` | `No supplier delivery is ready to receive.` |
 | `Balance date missing` | `Ask {supplier} for the balance delivery date` | `Record balance date` | `Balance date recorded` | `Every part receipt has a balance date.` |
 | `Confirm what happens next` | `Call {supplier} — confirm what happens next` | `Record what happens next` | `Supplier answer recorded` | `No claim is waiting for a supplier answer.` |
 | `Issue consignment order` | `Issue consignment order to {supplier}` | `Issue consignment order` | `Consignment order issued to {supplier}` | `No showroom is waiting for stock.` |
@@ -634,7 +640,7 @@ sidebar page. Existing implementation constants do not override these approved p
 |---|---|
 | Page | No page — use `SO Batch Purchase` or the source object |
 | Search | `Search Sales Order, customer, SKU or supplier…` |
-| Rail headings | `TO ORDER` · `ORDER TIMING` · `PRODUCT` · `SUPPLIER` · `SETUP TO FIX` |
+| Rail headings | `WORK TO DO` · `TO ORDER` · `ORDER TIMING` · `PRODUCT` · `SUPPLIER` · `SETUP TO FIX` |
 | Empty state | `No proceeded Sales Orders.` |
 | Register columns (Card 02-B, 2026-08-27 — exactly, in this order) | `Status` · `Proceed Date` · `PO No` · `SO No` · `Customer` · `Delivery Location` · `Requested Delivery Date` · `Supplier` · `Deliver To` · `PO Delivery Date` |
 | `Proceed Date` on SO Batch Purchase | The actual date Sales handed the complete order to Operations (`orders.proceeded_at`). Never the planned production-start field (`orders.proceed_date`) |
@@ -642,9 +648,14 @@ sidebar page. Existing implementation constants do not override these approved p
 | A parent cell over several values | one value prints itself; several print `2 POs` · `2 suppliers` · `Multiple` — the exact mapping lives in the expansion |
 | Open local filter-rail control | `Hide filters` |
 | Hidden local filter-rail control | `Show filters` |
-| Monthly PO duty holder | `{name} holds PO duty` |
-| Dated PO duty cover | `{name} is covering PO duty` |
-| No monthly holder | `Nobody holds PO duty this month.` |
+| Selected Issue action | `1 selected · 1 unit · Issue 1 PO          [YJ]  [Issue PO]` |
+| PO Duty owner chip title | `{name} · PO Duty` |
+| Dated cover chip title | `{cover name} · PO Duty cover for {normal holder}` |
+| No monthly holder in selected action | `Nobody holds PO duty this month.` |
+
+The SO Batch Purchase owner is never a permanent sentence in the toolbar or rail and never repeats
+on rows. Do not write Yu Jun's name in the action sentence. The compact chip carries the owner;
+`Issue PO` remains the one governed verb.
 
 **Purchasing and Receiving date facts — owner ruling 2026-08-29.** These words are never
 interchangeable:
@@ -660,17 +671,21 @@ No recorded business date is silently moved to fit a calendar. Purchasing/Operat
 Office calendar (Mon–Fri); Receiving/GRN/Warehouse uses the Warehouse calendar (Mon–Sat); Sunday
 and Selangor public holidays are excluded.
 
-**The rail — owner ruling 2026-08-27 (Card 02-C).** Five sections, in this order.
+**The SO Batch Purchase rail — latest owner ruling 2026-08-29.** Six sections, in this order.
 `SETUP TO FIX` renders only when at least one affected Sales Order exists:
 
 | Heading | Rail rows |
 |---|---|
+| `WORK TO DO` | `Issue PO` · `Ask customer for a delivery date` · `Add item to SKU catalog` · `Check the supplier` · `Add production days` |
 | `TO ORDER` | `All not ordered` |
 | `ORDER TIMING` | `Can order early` · `14 safety days left` · `1–13 safety days left` · `No safety days left` · `Not enough production days` |
 | `PRODUCT` | `All products` · `Mattress` · `Bedframe` · `Sofa` |
 | `SUPPLIER` | `All suppliers` · actual supplier names, alphabetical — never hardcoded, never a placeholder, and no `No supplier` row |
 | `SETUP TO FIX` | `Production days not set` |
 
+`WORK TO DO` is always the first local panel. It names the five concrete daily actions and shows
+all five even at zero; it filters the same Register from the same structured purchase-demand
+states. It is not a second work queue or a substitute for owner-resolved My Work / Team Work.
 Counts are UNIQUE Sales Orders, never documents, notifications, leaf lines, SKU quantities or
 PO counts, and each section's counts update against the other selected sections. The fixed
 rows print their live count, zero included; a supplier row exists only while it matches —
@@ -688,7 +703,8 @@ it wraps onto a second line in the same body font, never a tooltip.
 
 **The row facts.** Line 1 is the FACT; line 2 is the FIX, in the imperative. A line the owning
 boundary (Sales / Catalog) unexpectedly let through without its customer date, SKU or supplier is
-NAMED on its own row — it is never silently defaulted and never a rail facet:
+NAMED on its own row — it is never silently defaulted or turned into a fact category. The first
+`WORK TO DO` panel may group it only by its concrete fix action:
 
 | Fact (line 1) | Fix (line 2) |
 |---|---|
@@ -714,7 +730,7 @@ found nothing). The last two are DIFFERENT answers and may not be merged.
 word that tells the operator a row is important without telling them what is wrong with it is not
 a word this Register may use. **Retired from the SO Batch Purchase rail, never to return:**
 `Ready to buy` · `Covered` · `No customer date` · `No SKU` · `No supplier` · `No production days` ·
-`BUYING RECORDS` · `WORK TO DO` · `All lines` · `No buying needed` · `Cannot buy`.
+`BUYING RECORDS` · `All lines` · `No buying needed` · `Cannot buy`.
 
 **MANUAL PURCHASE — the internal buy's own words.**
 
@@ -889,10 +905,19 @@ must send the goods; it never means a Unit's current physical Warehouse location
 | What | The word |
 |---|---|
 | The UI field/column label in Batch Purchase, Purchase Order and read-only SO goods expansion | **`Deliver To`** |
-| The three options | **`Carres Klang`** · **`AL Sungai Buloh`** · **`HOUZS`** |
+| The current options | **`Carres Klang`** · **`AL Sungai Buloh`** · **`HOUZS`** · **`Ohana`** |
 | Nice Future, which does not deliver | **`NETS collects from Nice Future and delivers to Carres Klang.`** |
 | The optional free-text field beside it | **`Delivery instructions`** |
 | A destination nobody has given an address for — **Settings only** | **`Address not set`** |
+
+Settings owns the expandable list; these are its exact management words:
+`Deliver To` · `Add Deliver To` · `Name` · `Address` · `Available for new POs` · `Default` ·
+`Not available for new POs`. A future destination is added here and then appears in every governed
+Purchasing picker. No SO Batch Purchase page keeps its own destination list.
+
+The Settings introduction is **`The settings the ordering engine reads. Change one here and SO Batch
+Purchase uses it the same day.`** It covers both destination master data and timing rules; do not narrow
+it back to numbers only.
 
 **The PO and the external document print the SAVED destination name**, never a re-derived one
 and never one of the banned nouns. That is why the name is stored rather than mapped from a
@@ -1152,7 +1177,7 @@ category tally, where a line is known goods that simply has no tally word of its
 know what this is* is a different fact, and borrowing the word would hide 975 unknown units
 under a confident one.
 
-### The Receiving Workspace's own words (locked 2026-08-03, Slice B)
+### The Receiving Workspace's own words (Owner-corrected 2026-08-29)
 
 **OWNER CORRECTION 2026-08-29.** The table below keeps the governed workspace/action words but its
 former `Received · Outstanding` summary is superseded. Receiving now keeps these quantity facts
@@ -1168,13 +1193,13 @@ do not take the five-string shape.
 | Word | Where | Why this word |
 |---|---|---|
 | `Receiving Summary` | workspace section | **Never `Progress`** (Jess): the section answers *what has this PO taken in*, a count, not a stage. |
-| `Order Qty` · `Received Qty` · `Damaged Qty` · `Wrong Item Qty` · `Pending Delivery Qty` | receiving quantities | Each fact prints its own number. The operator never subtracts to learn what is still due, and a problem quantity never masquerades as received stock. |
+| `Order Qty` · `Received Qty` · `Damaged Qty` · `Wrong Item Qty` · `Pending Delivery Qty` | receiving quantities | Each fact prints its own number. The operator never subtracts to learn what is still due; damaged, wrong and extra goods never reduce Pending Delivery Qty or create available Stock. |
 | `Start Receiving` | primary action | A PRIMARY ACTION, never a section — the operator's whole job here is one press. |
 | `Receiving Details` | the strip Receiving Mode adds | What this delivery was, as opposed to what was on it. |
 | `Goods Received At` | field | The Business Date Dictionary's own word — when the goods PHYSICALLY arrived, which is not when they were keyed in. |
 | `Supplier DO No.` | field | **Theirs, not ours.** It has no default and no suggestion; a number we invent is a reference the supplier never issued. |
 | `Signed DO photo` | field | The evidence, named by what it is a photo OF. |
-| `Receive now` | per-line input | *"Receive this time"*, never *"total so far"* — the column beside it already says `Received`. |
+| `Received Qty` | per-line physical count | What physically arrived in this receiving session; it is distinct from damaged and wrong quantities. |
 | `What kind of wrong?` | per-line picker | Plain words. The claim needs the kind before it can be filed. |
 | `Save Receiving` | the Save button, when nothing is missing | |
 | `Save — {what is missing}` | the Save button otherwise | The button NAMES the gap: `Save — add a DO number` · `Save — upload signed DO` · `Save — count at least one unit`. A grey button that will not say why is a puzzle. |
@@ -1260,7 +1285,7 @@ One vocabulary for every module that waits on a supplier. Never invent a synonym
 
 | Group | The words |
 |---|---|
-| Receiving result | `Received` · `Received with exception` · `Rejected` |
+| Receiving quantities | `Order Qty` · `Received Qty` · `Damaged Qty` · `Wrong Item Qty` · `Pending Delivery Qty` |
 | Exception lifecycle | `Receiving exception created` · **`Call {supplier} — confirm what happens next`** · `Waiting supplier reply` · `Waiting goods arrival` · `Overdue goods arrival` · `Supplier cannot fulfil` · `Case owner decision required` · `Exception closed` |
 
 **`Contact supplier` is retired** (Loo, 2026-07-28). It was a SIXTH verb for behaviour the

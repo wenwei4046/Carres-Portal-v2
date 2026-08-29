@@ -1578,7 +1578,7 @@ function DataGridInner<T>({
 
   return (
     <div
-      className={`${styles.root} ${embedded ? styles.rootEmbedded : ""} ${
+      className={`${styles.root} ${embedded ? styles.rootEmbedded : styles.rootFramed} ${
         isReference ? styles.rootReference : ""
       }`}
       data-testid={isReference ? "sales-orders-grid" : undefined}

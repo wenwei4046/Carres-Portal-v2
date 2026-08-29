@@ -24,6 +24,7 @@ import {
 } from "@carres/shared";
 // renderPoPdf moved to apps/web/src/lib/pdf/render.ts (Workers WASM ban).
 import { requireOperation } from "../../lib/auth-guards";
+import { chunk } from "../../lib/purchase-demand-read";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
@@ -54,6 +55,52 @@ import type { AppEnv } from "../../types";
  */
 const operationPosRouter = new Hono<AppEnv>();
 
+const REGISTER_PAGE_SIZE = 1_000;
+const REGISTER_READ_CONCURRENCY = 4;
+
+type ReadError = { code?: string; message?: string; details?: string };
+type PagedRead<T> = {
+  range: (
+    from: number,
+    to: number,
+  ) => PromiseLike<{ data: T[] | null; error: ReadError | null }>;
+};
+
+/**
+ * Read every row behind a bounded `.in(…)` URL.
+ *
+ * The Purchase Orders Register is evidence, not a sample: a PostgREST ceiling
+ * must never turn a real send, receipt, line or source into "Not recorded".
+ * Small IN batches keep proxy URLs safe; range pages remove the response cap.
+ */
+async function readEveryChunked<T, K>(
+  keys: readonly K[],
+  query: (batch: K[]) => PagedRead<T>,
+): Promise<{ data: T[]; error: ReadError | null }> {
+  const data: T[] = [];
+  const batches = chunk([...new Set(keys)]);
+  for (let index = 0; index < batches.length; index += REGISTER_READ_CONCURRENCY) {
+    const group = await Promise.all(
+      batches.slice(index, index + REGISTER_READ_CONCURRENCY).map(async (batch) => {
+        const rows: T[] = [];
+        for (let from = 0; ; from += REGISTER_PAGE_SIZE) {
+          const result = await query(batch).range(from, from + REGISTER_PAGE_SIZE - 1);
+          if (result.error) return { data: [] as T[], error: result.error };
+          const page = result.data ?? [];
+          rows.push(...page);
+          if (page.length < REGISTER_PAGE_SIZE) break;
+        }
+        return { data: rows, error: null };
+      }),
+    );
+    for (const result of group) {
+      if (result.error) return { data: [], error: result.error };
+      data.push(...result.data);
+    }
+  }
+  return { data, error: null };
+}
+
 /* `poDutyGate` was deleted with the two create routes above (Card 4B). It
    guarded PO creation against the PO-duty roster, and those were its only two
    callers. Batch Purchase carries its own server-side gate inside
@@ -75,9 +122,11 @@ operationPosRouter.get("/", requireOperation, async (c) => {
   const { status, supplierId } = parsed.data;
 
   const sb = userClient(c.env, c.var.auth.jwt);
-  let q = sb
-    .from("purchase_orders")
-    .select(
+  const pos: Array<Record<string, unknown>> = [];
+  for (let from = 0; ; from += REGISTER_PAGE_SIZE) {
+    let q = sb
+      .from("purchase_orders")
+      .select(
       // R1 (0284): damaged_qty + wrong_item_qty ride the list so the Receiving
       // queue can show a progress state — In transit / Partially received /
       // Fully received / Receiving issue — without opening a single PO.
@@ -99,19 +148,24 @@ operationPosRouter.get("/", requireOperation, async (c) => {
       // factory holds, and when the current one was minted. The panel prints
       // `PO-2041 · Version 2` and derives "Version N has not reached the
       // supplier" from `revised_at` against the latest send; nothing stores it.
-      "id, supplier_id, warehouse_id, destination_id, status, sup_status, so, so_refs, eta_date, expected_ready_date, placed_at, purpose, version, revised_at, purchase_order_lines(id, sku, qty, received_qty, damaged_qty, wrong_item_qty, short_since, attrs, destination_id, ops_remark)",
-    );
+        "id, supplier_id, warehouse_id, destination_id, status, sup_status, so, so_refs, eta_date, expected_ready_date, placed_at, purpose, version, revised_at",
+      );
 
-  if (status !== "all") q = q.eq("status", status);
-  if (supplierId) q = q.eq("supplier_id", supplierId);
+    if (status !== "all") q = q.eq("status", status);
+    if (supplierId) q = q.eq("supplier_id", supplierId);
 
-  q = q.order("placed_at", { ascending: false }).limit(200);
-  const { data, error } = await q;
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
+    const { data, error } = await q
+      .order("placed_at", { ascending: false })
+      .order("id", { ascending: false })
+      .range(from, from + REGISTER_PAGE_SIZE - 1);
+    if (error) {
+      const m = mapPgError(error);
+      return c.json(m.body, m.status);
+    }
+    const page = (data ?? []) as Array<Record<string, unknown>>;
+    pos.push(...page);
+    if (page.length < REGISTER_PAGE_SIZE) break;
   }
-  const pos = data ?? [];
 
   // ── P3 · what the supplier last told us, and what it was ABOUT ────────────
   //
@@ -123,9 +177,121 @@ operationPosRouter.get("/", requireOperation, async (c) => {
   //
   // A second read rather than an embed: `po_supplier_promises` has no FK
   // PostgREST can traverse to give "the latest one" — an embed would return
-  // every promise ever made and the client would sort them. Bounded by the same
-  // 200-PO page above.
+  // every promise ever made and the client would sort them. Every enrichment
+  // below is chunked and paged because the Register itself has no record cap.
   const poIds = pos.map((p) => (p as Record<string, unknown>).id as string);
+  const poLineResult = await readEveryChunked<Record<string, unknown>, string>(
+    poIds,
+    (ids) => sb
+      .from("purchase_order_lines")
+      .select("id, po_id, sku, qty, received_qty, damaged_qty, wrong_item_qty, short_since, attrs, destination_id, ops_remark, demand_id")
+      .in("po_id", ids)
+      .order("id"),
+  );
+  if (poLineResult.error) {
+    const m = mapPgError(poLineResult.error);
+    return c.json(m.body, m.status);
+  }
+  const linesByPo = new Map<string, Record<string, unknown>[]>();
+  for (const line of poLineResult.data) {
+    const rows = linesByPo.get(line.po_id as string) ?? [];
+    rows.push(line);
+    linesByPo.set(line.po_id as string, rows);
+  }
+  for (const po of pos) {
+    po.purchase_order_lines = linesByPo.get(po.id as string) ?? [];
+  }
+  // 0382 is the only governed customer-order lineage. The legacy `so` and
+  // `so_refs` fields remain useful historical facts, but the Register never
+  // presents them as line attribution. Manual Purchase lineage follows the
+  // line's `demand_id` to its request header.
+  const poSourcesByLine = new Map<string, Record<string, unknown>[]>();
+  const salesSourcesByPo = new Map<string, Array<{ kind: "sales_order"; reference: string }>>();
+  if (poIds.length > 0) {
+    const sourceResult = await readEveryChunked<Record<string, unknown>, string>(
+      poIds,
+      (ids) => sb
+        .from("po_line_sources")
+        .select("id, po_id, po_line_id, order_id, order_line_id, so, qty")
+        .in("po_id", ids)
+        .order("id"),
+    );
+    if (sourceResult.error) {
+      const m = mapPgError(sourceResult.error);
+      return c.json(m.body, m.status);
+    }
+    for (const source of sourceResult.data) {
+      const lineId = source.po_line_id as string;
+      const lineRows = poSourcesByLine.get(lineId) ?? [];
+      lineRows.push(source);
+      poSourcesByLine.set(lineId, lineRows);
+      if (source.so != null) {
+        const poId = source.po_id as string;
+        const reference = `SO-${Number(source.so)}`;
+        const current = salesSourcesByPo.get(poId) ?? [];
+        if (!current.some((item) => item.reference === reference)) {
+          current.push({ kind: "sales_order", reference });
+          salesSourcesByPo.set(poId, current);
+        }
+      }
+    }
+  }
+
+  const demandIds = [
+    ...new Set(
+      pos.flatMap((po) =>
+        ((po.purchase_order_lines as Array<Record<string, unknown>> | null) ?? [])
+          .map((line) => line.demand_id)
+          .filter((id): id is string => typeof id === "string" && id.length > 0),
+      ),
+    ),
+  ];
+  const demandById = new Map<string, { requestId: string | null; purpose: string | null }>();
+  if (demandIds.length > 0) {
+    const demandResult = await readEveryChunked<Record<string, unknown>, string>(
+      demandIds,
+      (ids) => sb
+        .from("purchase_demands")
+        .select("id, request_id, purpose")
+        .in("id", ids)
+        .order("id"),
+    );
+    if (demandResult.error) {
+      const m = mapPgError(demandResult.error);
+      return c.json(m.body, m.status);
+    }
+    for (const demand of demandResult.data) {
+      demandById.set(demand.id as string, {
+        requestId: (demand.request_id as string | null) ?? null,
+        purpose: (demand.purpose as string | null) ?? null,
+      });
+    }
+  }
+  const requestIds = [
+    ...new Set(
+      [...demandById.values()]
+        .map((demand) => demand.requestId)
+        .filter((id): id is string => !!id),
+    ),
+  ];
+  const requestNoById = new Map<string, string>();
+  if (requestIds.length > 0) {
+    const requestResult = await readEveryChunked<Record<string, unknown>, string>(
+      requestIds,
+      (ids) => sb
+        .from("purchase_requests")
+        .select("id, req_no")
+        .in("id", ids)
+        .order("id"),
+    );
+    if (requestResult.error) {
+      const m = mapPgError(requestResult.error);
+      return c.json(m.body, m.status);
+    }
+    for (const request of requestResult.data) {
+      requestNoById.set(request.id as string, request.req_no as string);
+    }
+  }
   const tomorrowAboutByPo = new Map<string, string | null>();
   const balanceAboutByLine = new Map<string, number | null>();
   // Register (Jess, 2026-08-02) — `(revised)`: the arriving date has been
@@ -139,25 +305,33 @@ operationPosRouter.get("/", requireOperation, async (c) => {
   // read — no extra round-trip.
   const promisesByPo = new Map<string, Record<string, unknown>[]>();
   if (poIds.length > 0) {
-    const { data: promiseRows, error: promiseErr } = await sb
-      .from("po_supplier_promises")
-      .select(
-        // `about_qty` and `remarks` are selected because this route already
-        // READS them: the balance call's re-open test compares `about_qty` (it
-        // was resolving to null on every row — a promise about a quantity the
-        // client never received), and the date history prints `remarks` beside
-        // the countable `reason` (0310). Found while wiring Q5's ready date;
-        // fixed rather than left, since both are one word in this string.
-        "po_id, po_line_id, kind, answer, about_date, about_qty, previous_date, new_date, reason, remarks, recorded_at",
-      )
-      .in("po_id", poIds)
-      .order("recorded_at", { ascending: false });
-    if (promiseErr) {
-      const m = mapPgError(promiseErr);
+    const promiseResult = await readEveryChunked<Record<string, unknown>, string>(
+      poIds,
+      (ids) => sb
+        .from("po_supplier_promises")
+        .select(
+          // `about_qty` and `remarks` are selected because this route already
+          // READS them: the balance call's re-open test compares `about_qty` (it
+          // was resolving to null on every row — a promise about a quantity the
+          // client never received), and the date history prints `remarks` beside
+          // the countable `reason` (0310). Found while wiring Q5's ready date;
+          // fixed rather than left, since both are one word in this string.
+          "id, po_id, po_line_id, kind, answer, about_date, about_qty, previous_date, new_date, reason, remarks, recorded_at",
+        )
+        .in("po_id", ids)
+        .order("recorded_at", { ascending: false })
+        .order("id", { ascending: false }),
+    );
+    if (promiseResult.error) {
+      const m = mapPgError(promiseResult.error);
       return c.json(m.body, m.status);
     }
+    const promiseRows = promiseResult.data.sort((a, b) =>
+      String(b.recorded_at ?? "").localeCompare(String(a.recorded_at ?? "")) ||
+      String(b.id ?? "").localeCompare(String(a.id ?? "")),
+    );
     // Newest first, so the FIRST row seen for a key is the current answer.
-    for (const r of promiseRows ?? []) {
+    for (const r of promiseRows) {
       const row = r as Record<string, unknown>;
       const pid = row.po_id as string;
       const hist = promisesByPo.get(pid) ?? [];
@@ -202,15 +376,19 @@ operationPosRouter.get("/", requireOperation, async (c) => {
   const customerBySo = new Map<number, string | null>();
   const orderIdBySo = new Map<number, string>();
   if (soSet.size > 0) {
-    const { data: orderRows, error: orderErr } = await sb
-      .from("orders")
-      .select("id, so, delivery_date, customer_name")
-      .in("so", [...soSet]);
-    if (orderErr) {
-      const m = mapPgError(orderErr);
+    const orderResult = await readEveryChunked<Record<string, unknown>, number>(
+      [...soSet],
+      (sos) => sb
+        .from("orders")
+        .select("id, so, delivery_date, customer_name")
+        .in("so", sos)
+        .order("id"),
+    );
+    if (orderResult.error) {
+      const m = mapPgError(orderResult.error);
       return c.json(m.body, m.status);
     }
-    for (const r of orderRows ?? []) {
+    for (const r of orderResult.data) {
       const row = r as Record<string, unknown>;
       deliveryBySo.set(Number(row.so), (row.delivery_date as string | null) ?? null);
       customerBySo.set(Number(row.so), (row.customer_name as string | null) ?? null);
@@ -229,15 +407,19 @@ operationPosRouter.get("/", requireOperation, async (c) => {
     { sku: string; qty: number; remark: string | null }[]
   >();
   if (orderIdBySo.size > 0) {
-    const { data: solRows, error: solErr } = await sb
-      .from("order_lines")
-      .select("order_id, sku, qty, attrs")
-      .in("order_id", [...orderIdBySo.values()]);
-    if (solErr) {
-      const m = mapPgError(solErr);
+    const solResult = await readEveryChunked<Record<string, unknown>, string>(
+      [...orderIdBySo.values()],
+      (ids) => sb
+        .from("order_lines")
+        .select("id, order_id, sku, qty, attrs")
+        .in("order_id", ids)
+        .order("id"),
+    );
+    if (solResult.error) {
+      const m = mapPgError(solResult.error);
       return c.json(m.body, m.status);
     }
-    for (const r of solRows ?? []) {
+    for (const r of solResult.data) {
       const row = r as Record<string, unknown>;
       const attrs = (row.attrs as Record<string, unknown> | null) ?? {};
       const remark =
@@ -312,15 +494,19 @@ operationPosRouter.get("/", requireOperation, async (c) => {
   }
   const modelBySku = new Map<string, { model_name: string | null; size: string | null }>();
   if (skuSet.size > 0) {
-    const { data: skuRows, error: skuErr } = await sb
-      .from("product_skus")
-      .select("sku, variant, product_models(name)")
-      .in("sku", [...skuSet]);
-    if (skuErr) {
-      const m = mapPgError(skuErr);
+    const skuResult = await readEveryChunked<Record<string, unknown>, string>(
+      [...skuSet],
+      (skus) => sb
+        .from("product_skus")
+        .select("sku, variant, product_models(name)")
+        .in("sku", skus)
+        .order("sku"),
+    );
+    if (skuResult.error) {
+      const m = mapPgError(skuResult.error);
       return c.json(m.body, m.status);
     }
-    for (const r of skuRows ?? []) {
+    for (const r of skuResult.data) {
       const row = r as Record<string, unknown>;
       const model = row.product_models as { name?: string | null } | null;
       modelBySku.set(row.sku as string, {
@@ -342,6 +528,33 @@ operationPosRouter.get("/", requireOperation, async (c) => {
     const m = mapPgError(destErr);
     return c.json(m.body, m.status);
   }
+  // Active rows remain the picker authority for existing consumers. Historical
+  // PO facts are a different read: a closed destination must keep its name on
+  // the document that already references it.
+  const referencedDestinationIds = [
+    ...new Set(
+      pos.flatMap((po) => [
+        po.destination_id,
+        ...(((po.purchase_order_lines as Array<Record<string, unknown>> | null) ?? [])
+          .map((line) => line.destination_id)),
+      ]).filter((id): id is string => typeof id === "string" && id.length > 0),
+    ),
+  ];
+  const referencedDestinationResult = await readEveryChunked<
+    Record<string, unknown>,
+    string
+  >(
+    referencedDestinationIds,
+    (ids) => sb
+      .from("purchasing_destinations")
+      .select("id, name, is_default")
+      .in("id", ids)
+      .order("id"),
+  );
+  if (referencedDestinationResult.error) {
+    const m = mapPgError(referencedDestinationResult.error);
+    return c.json(m.body, m.status);
+  }
 
   // What LEFT Carres (0312), and since 0377 WHAT KIND of leaving it was: an
   // `external_open` is communication history and completes nothing; a
@@ -349,31 +562,39 @@ operationPosRouter.get("/", requireOperation, async (c) => {
   // supplier received.
   const sendsByPo = new Map<string, Record<string, unknown>[]>();
   if (poIds.length > 0) {
-    const { data: sendRows, error: sendErr } = await sb
-      .from("po_sends")
-      /* 0377/0378 — an OPEN and a CONFIRMED SEND are different facts, and the
-         detail page has to be able to tell them apart. `kind`, `recipient` and
-         `po_version` ride with the row so the evidence surface reads persisted
-         truth rather than whatever it happens to remember. */
-      /* 0379 — and WHO. `sent_by` is the person who pressed it, `duty_user_id`
-         the month's holder and `acting_user_id` the authorised cover when one
-         acted. Three facts, because `Team Work` groups by the holder while the
-         audit trail must name the actor. */
-      .select(
-        "po_id, channel, note, sent_at, kind, recipient, po_version, sent_by, duty_user_id, acting_user_id, po_revisions(rev_no)",
-      )
-      .in("po_id", poIds)
-      .order("sent_at", { ascending: false });
-    if (sendErr) {
-      const m = mapPgError(sendErr);
+    const sendResult = await readEveryChunked<Record<string, unknown>, string>(
+      poIds,
+      (ids) => sb
+        .from("po_sends")
+        /* 0377/0378 — an OPEN and a CONFIRMED SEND are different facts, and the
+           detail page has to be able to tell them apart. `kind`, `recipient` and
+           `po_version` ride with the row so the evidence surface reads persisted
+           truth rather than whatever it happens to remember. */
+        /* 0379/0403 — and WHO. `sent_by` is the person who pressed it,
+           `duty_user_id` the month's holder and `acting_user_id` the dated cover
+           in force. Three facts: a Superuser action never turns the cover into
+           the actor, while `Team Work` still groups by normal ownership. */
+        .select(
+          "id, po_id, channel, note, sent_at, kind, recipient, po_version, sent_by, duty_user_id, acting_user_id, po_revisions(rev_no)",
+        )
+        .in("po_id", ids)
+        .order("sent_at", { ascending: false })
+        .order("id", { ascending: false }),
+    );
+    if (sendResult.error) {
+      const m = mapPgError(sendResult.error);
       return c.json(m.body, m.status);
     }
+    const sendRows = sendResult.data.sort((a, b) =>
+      String(b.sent_at ?? "").localeCompare(String(a.sent_at ?? "")) ||
+      String(b.id ?? "").localeCompare(String(a.id ?? "")),
+    );
     /* A UUID IS NOT AN ACTOR. The evidence has to be readable by a human
        checking later who sent what, so the names are resolved here rather than
        printed as an id (closure §8). */
     const actorIds = [
       ...new Set(
-        (sendRows ?? [])
+        sendRows
           .flatMap((r) => {
             const row = r as Record<string, unknown>;
             return [row.sent_by, row.duty_user_id, row.acting_user_id];
@@ -383,17 +604,25 @@ operationPosRouter.get("/", requireOperation, async (c) => {
     ];
     const actorName = new Map<string, string>();
     if (actorIds.length > 0) {
-      const { data: people } = await sb
-        .from("app_users")
-        .select("id, name, email")
-        .in("id", actorIds);
-      for (const u of (people ?? []) as Record<string, unknown>[]) {
+      const peopleResult = await readEveryChunked<Record<string, unknown>, string>(
+        actorIds,
+        (ids) => sb
+          .from("app_users")
+          .select("id, name, email")
+          .in("id", ids)
+          .order("id"),
+      );
+      if (peopleResult.error) {
+        const m = mapPgError(peopleResult.error);
+        return c.json(m.body, m.status);
+      }
+      for (const u of peopleResult.data) {
         const label =
           ((u.name as string | null) ?? "").trim() || ((u.email as string | null) ?? "");
         if (label) actorName.set(u.id as string, label);
       }
     }
-    for (const r of sendRows ?? []) {
+    for (const r of sendRows) {
       const row = r as Record<string, unknown>;
       const arr = sendsByPo.get(row.po_id as string) ?? [];
       arr.push({
@@ -406,36 +635,88 @@ operationPosRouter.get("/", requireOperation, async (c) => {
     }
   }
 
-  const { data: tmplRow } = await sb
+  const { data: tmplRow, error: tmplError } = await sb
     .from("purchasing_settings")
     .select("supplier_message_template")
     .eq("id", 1)
     .maybeSingle();
+  if (tmplError) {
+    const m = mapPgError(tmplError);
+    return c.json(m.body, m.status);
+  }
 
   const withAnswers = pos.map((p) => {
     const row = p as Record<string, unknown>;
     const lines = (row.purchase_order_lines as Array<Record<string, unknown>> | null) ?? [];
+    const manualSources = lines.flatMap((line) => {
+      const demandId = line.demand_id;
+      if (typeof demandId !== "string") return [];
+      const demand = demandById.get(demandId);
+      if (!demand) return [];
+      return [{
+        kind: "manual_purchase" as const,
+        reference:
+          (demand.requestId ? requestNoById.get(demand.requestId) : null) ??
+          "Manual Purchase",
+      }];
+    });
+    const sources = [...(salesSourcesByPo.get(row.id as string) ?? []), ...manualSources]
+      .filter(
+        (source, index, all) =>
+          all.findIndex(
+            (candidate) =>
+              candidate.kind === source.kind && candidate.reference === source.reference,
+          ) === index,
+      );
     return {
       ...row,
+      sources,
       tomorrow_answer_about_date: tomorrowAboutByPo.get(row.id as string) ?? null,
       customer_delivery: customerDeliveryOf(row),
       orders: ordersOf(row),
       eta_revised: (arrivalDatesByPo.get(row.id as string)?.size ?? 0) > 1,
       promises: promisesByPo.get(row.id as string) ?? [],
       sends: sendsByPo.get(row.id as string) ?? [],
-      purchase_order_lines: lines.map((l) => ({
-        ...l,
-        balance_answer_about_qty: balanceAboutByLine.get(l.id as string) ?? null,
-        model_name: modelBySku.get(l.sku as string)?.model_name ?? null,
-        size: modelBySku.get(l.sku as string)?.size ?? null,
-        so_rows: soRowsOf(row, l.sku as string, Number(l.qty ?? 0)),
-      })),
+      purchase_order_lines: lines.map((l) => {
+        const salesLineSources = poSourcesByLine.get(l.id as string) ?? [];
+        const salesAllocated = salesLineSources.reduce(
+          (sum, source) => sum + Number(source.qty ?? 0),
+          0,
+        );
+        const demand = typeof l.demand_id === "string" ? demandById.get(l.demand_id) : null;
+        const manualReference = demand
+          ? (demand.requestId ? requestNoById.get(demand.requestId) : null) ?? "Manual Purchase"
+          : null;
+        return {
+          ...l,
+          sources: salesLineSources,
+          governed_sources: [
+            ...salesLineSources.flatMap((source) => source.so == null ? [] : [{
+              kind: "sales_order" as const,
+              reference: `SO-${Number(source.so)}`,
+              qty: Number(source.qty ?? 0),
+            }]),
+            ...(manualReference ? [{
+              kind: "manual_purchase" as const,
+              reference: manualReference,
+              // A mixed legacy row can carry both ledgers. Preserve its Manual
+              // Purchase reference without claiming the full line twice.
+              qty: Math.max(0, Number(l.qty ?? 0) - salesAllocated) || null,
+            }] : []),
+          ],
+          balance_answer_about_qty: balanceAboutByLine.get(l.id as string) ?? null,
+          model_name: modelBySku.get(l.sku as string)?.model_name ?? null,
+          size: modelBySku.get(l.sku as string)?.size ?? null,
+          so_rows: soRowsOf(row, l.sku as string, Number(l.qty ?? 0)),
+        };
+      }),
     };
   });
 
   return c.json({
     pos: withAnswers,
     destinations: destRows ?? [],
+    referencedDestinations: referencedDestinationResult.data,
     messageTemplate:
       (tmplRow as { supplier_message_template?: string | null } | null)
         ?.supplier_message_template ?? null,
@@ -942,6 +1223,73 @@ operationPosRouter.get("/awaiting-stock-shortage", requireOperation, async (c) =
 
   const response: AwaitingStockShortageResponse = { shortage, orders };
   return c.json(response);
+});
+
+// ----- GET /:id/audit -----
+// Complete version index plus the append-only PO event ledger. Staff identity
+// is resolved through app_users; a permission role is never a person's name.
+operationPosRouter.get("/:id/audit", requireOperation, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const poId = c.req.param("id");
+  const [revisionResult, historyResult] = await Promise.all([
+    sb
+      .from("po_revisions")
+      .select("id, rev_no, reason, created_by, created_at, snapshot")
+      .eq("po_id", poId)
+      .order("rev_no", { ascending: false }),
+    sb
+      .from("po_history")
+      .select("id, text, by_role, by_user_id, occurred_at")
+      .eq("po_id", poId)
+      .order("occurred_at", { ascending: false }),
+  ]);
+  if (revisionResult.error) {
+    const mapped = mapPgError(revisionResult.error);
+    return c.json(mapped.body, mapped.status);
+  }
+  if (historyResult.error) {
+    const mapped = mapPgError(historyResult.error);
+    return c.json(mapped.body, mapped.status);
+  }
+  const revisions = (revisionResult.data ?? []) as Array<Record<string, unknown>>;
+  const history = (historyResult.data ?? []) as Array<Record<string, unknown>>;
+  const userIds = [
+    ...new Set(
+      [
+        ...revisions.map((row) => row.created_by),
+        ...history.map((row) => row.by_user_id),
+      ].filter((id): id is string => typeof id === "string" && id.length > 0),
+    ),
+  ];
+  const names = new Map<string, string>();
+  if (userIds.length > 0) {
+    const { data: users, error: usersError } = await sb
+      .from("app_users")
+      .select("id, name, email")
+      .in("id", userIds);
+    if (usersError) {
+      const mapped = mapPgError(usersError);
+      return c.json(mapped.body, mapped.status);
+    }
+    for (const user of (users ?? []) as Array<Record<string, unknown>>) {
+      const label =
+        ((user.name as string | null) ?? "").trim() ||
+        ((user.email as string | null) ?? "").trim();
+      if (label) names.set(user.id as string, label);
+    }
+  }
+  return c.json({
+    revisions: revisions.map((row) => ({
+      ...row,
+      actor_name:
+        (typeof row.created_by === "string" ? names.get(row.created_by) : null) ?? null,
+    })),
+    history: history.map((row) => ({
+      ...row,
+      actor_name:
+        (typeof row.by_user_id === "string" ? names.get(row.by_user_id) : null) ?? null,
+    })),
+  });
 });
 
 // ----- GET /:id/print -----
@@ -1654,7 +2002,7 @@ operationPosRouter.post("/:id/ready-date", requireOperation, async (c) => {
 //
 // Every row carries what makes it evidence: the kind (an OPEN completes
 // nothing), the exact version, the recipient, the channel, the time, and WHO —
-// the actor, the month's duty holder and the authorised cover when one acted.
+// the actual actor, the month's duty holder and the dated cover in force.
 operationPosRouter.get("/:id/sends", requireOperation, async (c) => {
   const poId = c.req.param("id");
   const sb = userClient(c.env, c.var.auth.jwt);

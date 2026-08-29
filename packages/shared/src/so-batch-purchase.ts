@@ -103,10 +103,12 @@ export const SO_BATCH_PURCHASE_WORDS = {
 // ─── The rail ────────────────────────────────────────────────────────────────
 
 /**
- * THE RAIL CONTRACT — owner ruling 2026-08-27 (Card 02-C;
+ * THE RAIL CONTRACT — latest Owner ruling 2026-08-29;
  * `docs/COPY-STANDARD.md` — the rail; `docs/purchasing/MASTER.md` §9.1).
  *
- * Five sections, in this exact order. `TO ORDER` holds the one `All not
+ * Six sections, in this exact order. `WORK TO DO` is the daily action lens
+ * over the SAME server-derived demand states; it is not another Work Engine
+ * or another stored work set. `TO ORDER` holds the one `All not
  * ordered` outstanding-only filter. `ORDER TIMING` holds the five timing rows,
  * every one of them orderable. `PRODUCT` holds the three Catalog categories —
  * the CATALOG's answer, never SKU-text inference. `SUPPLIER` holds the actual
@@ -120,6 +122,32 @@ export const SO_BATCH_PURCHASE_WORDS = {
  * checkboxes are the Register's `Issue PO` selection.
  */
 export const SO_BATCH_RAIL = {
+  work: {
+    heading: "WORK TO DO",
+    actions: [
+      { key: "issue_po", word: "Issue PO", states: PURCHASE_DEMAND_TIMING_STATES },
+      {
+        key: "ask_customer_date",
+        word: "Ask customer for a delivery date",
+        states: ["no_customer_date"] as const,
+      },
+      {
+        key: "add_sku",
+        word: "Add item to SKU catalog",
+        states: ["no_sku"] as const,
+      },
+      {
+        key: "check_supplier",
+        word: "Check the supplier",
+        states: ["no_supplier"] as const,
+      },
+      {
+        key: "add_production_days",
+        word: "Add production days",
+        states: ["no_production_days"] as const,
+      },
+    ],
+  },
   toOrder: { heading: "TO ORDER", all: "All not ordered" },
   timing: { heading: "ORDER TIMING", states: PURCHASE_DEMAND_TIMING_STATES },
   product: {
@@ -139,6 +167,10 @@ export const SO_BATCH_RAIL = {
   },
 } as const;
 
+/** The concrete daily actions the first rail panel may filter by. */
+export type SoBatchWorkKey =
+  (typeof SO_BATCH_RAIL.work.actions)[number]["key"];
+
 /** The three Catalog categories the `PRODUCT` section may filter by. */
 export type SoBatchProductCategory =
   (typeof SO_BATCH_RAIL.product.categories)[number]["category"];
@@ -152,6 +184,8 @@ export type SoBatchProductCategory =
  * records included.
  */
 export interface SoBatchRailFilter {
+  /** One concrete `WORK TO DO` action, or none. */
+  work: SoBatchWorkKey | null;
   /** `All not ordered` — the explicit outstanding-only filter. */
   notOrderedOnly: boolean;
   /** One `ORDER TIMING` row, or none. A second click clears it. */
@@ -165,6 +199,7 @@ export interface SoBatchRailFilter {
 }
 
 export const SO_BATCH_RAIL_CLEAR: SoBatchRailFilter = {
+  work: null,
   notOrderedOnly: false,
   timing: null,
   product: null,
@@ -229,7 +264,12 @@ export function soBatchRailFacts(
   }));
 }
 
-type SoBatchRailSection = "toOrder" | "timing" | "product" | "supplier" | "setup";
+type SoBatchRailSection = "work" | "toOrder" | "timing" | "product" | "supplier" | "setup";
+
+function hasWork(f: SoBatchRailFacts, key: SoBatchWorkKey): boolean {
+  const action = SO_BATCH_RAIL.work.actions.find((candidate) => candidate.key === key);
+  return action?.states.some((state) => f.states.has(state)) ?? false;
+}
 
 /** Does this order pass every selected section — except, optionally, one? */
 function railMatches(
@@ -237,6 +277,7 @@ function railMatches(
   filter: SoBatchRailFilter,
   except?: SoBatchRailSection,
 ): boolean {
+  if (except !== "work" && filter.work != null && !hasWork(f, filter.work)) return false;
   if (except !== "toOrder" && filter.notOrderedOnly && !f.outstanding) return false;
   if (except !== "timing" && filter.timing != null && !f.states.has(filter.timing)) {
     return false;
@@ -262,6 +303,7 @@ function railMatches(
 export interface SoBatchRailModel {
   /** Orders passing every selected filter — what the Register shows. */
   visibleOrderIds: ReadonlySet<string>;
+  workCounts: Record<SoBatchWorkKey, number>;
   notOrderedCount: number;
   timingCounts: Record<PurchaseDemandTimingState, number>;
   productCounts: Record<SoBatchProductCategory, number>;
@@ -278,6 +320,11 @@ export function soBatchRailModel(
 ): SoBatchRailModel {
   const count = (section: SoBatchRailSection, has: (f: SoBatchRailFacts) => boolean) =>
     facts.filter((f) => railMatches(f, filter, section) && has(f)).length;
+
+  const workCounts = {} as Record<SoBatchWorkKey, number>;
+  for (const action of SO_BATCH_RAIL.work.actions) {
+    workCounts[action.key] = count("work", (f) => hasWork(f, action.key));
+  }
 
   const timingCounts = {} as Record<PurchaseDemandTimingState, number>;
   for (const s of PURCHASE_DEMAND_TIMING_STATES) {
@@ -306,6 +353,7 @@ export function soBatchRailModel(
     visibleOrderIds: new Set(
       facts.filter((f) => railMatches(f, filter)).map((f) => f.orderId),
     ),
+    workCounts,
     notOrderedCount: count("toOrder", (f) => f.outstanding),
     timingCounts,
     productCounts,

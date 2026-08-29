@@ -634,7 +634,9 @@ read only as implementation history.
   combined status column.
 - The page has a compact destination header/work toolbar, then a breathing gap, then one light,
   clearly bordered Register. It is neither a borderless continuous slab nor a giant dashboard
-  card. KPI cards do not precede it.
+  card. KPI cards do not precede it. **Owner correction 2026-08-29:** all four outer edges,
+  including the left and right side frame, must be visible. The shared Register engine owns this
+  boundary; Sales Orders does not add or cancel it page-locally.
 - Default widths are governed and usable without staff resizing. Optional columns may widen the
   sheet and create horizontal scroll; default columns are never squeezed unnaturally to make an
   added column fit.

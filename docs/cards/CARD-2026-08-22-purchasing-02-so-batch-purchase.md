@@ -10,6 +10,13 @@ and NOT applied.** Merge, migration order and deployment await the owner's decis
 **Depends on:** `PURCHASING — CARD 01 · FIX SIDE MENU TO THE FINAL 4-GROUP / 11-PAGE LISTING`
 **Base:** local `main` containing commits `7de0a27a` and `0f52e23c`
 
+> **CURRENT AUTHORITY CORRECTION — OWNER RULING 2026-08-29.** The original Card's
+> “Current PO Duty / cover only” issuance wording is superseded. Current PO Duty or dated cover
+> remains the normal owner; Jess and the governed `operation@carres.com` Operations Superuser may
+> perform the operational action without becoming that owner. Web, API, SQL and audit must preserve
+> normal duty, dated cover and actual actor separately. The current truth lives in
+> `docs/purchasing/MASTER.md` §5.3; this Card does not create a second authority.
+
 > **For the build agent:** read `CLAUDE.md`, `docs/purchasing/MASTER.md`,
 > `docs/ui/MASTER.md` §§4–4.2 and 6.5–6.7, and the Purchasing section of
 > `docs/COPY-STANDARD.md` first. Use `superpowers:subagent-driven-development` or
@@ -50,7 +57,7 @@ supplier promise, revisions and receipt balance.
 | Issue review is a modal | A supplier document needs the governed edit/check surface | Full-screen 50% guided work + 50% live PO PDF |
 | Opening WhatsApp/email calls `purchasing_record_send` | The Portal observes a door opening, not a PDF leaving | Open controls record no completion; `Record the PDF sent` records evidence |
 | Existing `po_sends` rows represent external-app opens | They cannot prove the supplier received a version | Classify legacy rows as open events; only confirmed evidence completes Issue PO |
-| Any Operation login can reach creation | MASTER gives issuance to Current PO Duty | Read for permitted roles; create/confirm only for current duty/authorised cover |
+| Production excludes the shared Operations Superuser when it is not duty/cover | MASTER keeps PO Duty as normal owner but separates capability | Create/confirm for current duty, dated cover, Jess or governed Operations Superuser; preserve actual actor and normal owner separately |
 | Manual/typed Ready Stock demand leaks into the page | SO Batch Purchase is for uncovered SO lines only | Manual Purchase stays in its own destination and issue path |
 
 The operating model is **RESOLVED FROM AUTHORITY**. No Owner Decision remains.
@@ -323,11 +330,13 @@ export interface SoBatchPurchaseAction {
 | Ready to buy | Current PO Duty | Current PO version reached supplier with evidence |
 
 - Permitted Operations roles may read the Register.
-- Only Current PO Duty or authorised roster/buddy cover may create POs or confirm outbound evidence.
-  UI hiding is convenience; API/RPC is authority.
+- Current PO Duty, dated cover, Jess or the governed Operations Superuser may create POs or confirm
+  outbound evidence. UI hiding is convenience; API/RPC is authority. Superuser action never changes
+  the normal PO Duty owner.
 - Manager approval owns price/commercial exceptions. Operations cannot silently accept a changed
   price or treat an unknown cost as Free of Charge.
-- Principal/Owner audit access does not silently bypass Current PO Duty ownership.
+- Principal/Owner audit access alone does not silently grant issue authority; Jess's governed
+  Operations Superuser capability is explicit and audited.
 - No permanent `Owner` column. Owner is structured avatar metadata in Work.
 
 ## 7 · Data and API interfaces
@@ -694,7 +703,8 @@ The Card is complete only when every statement below is true.
 - [ ] The server rechecks demand, coverage, destination, supplier, price and permission immediately
       before issue.
 - [ ] A failure creates zero POs; a success immediately covers the bought quantities.
-- [ ] Only Current PO Duty or its authorised cover may create and confirm.
+- [ ] Current PO Duty, dated cover, Jess and governed Operations Superuser may create and confirm;
+      normal duty/cover and actual actor remain distinct evidence.
 
 ### 50/50 and supplier evidence
 

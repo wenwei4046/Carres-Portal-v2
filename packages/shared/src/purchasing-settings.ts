@@ -105,6 +105,17 @@ export interface PurchasingSettingChange {
   changedAt: string;
 }
 
+export interface PurchasingDestinationSetting {
+  id: string;
+  name: string;
+  address: string | null;
+  isDefault: boolean;
+  active: boolean;
+  /** A linked warehouse owns its own name and address. Purchasing Settings
+   *  may choose it as the default, but does not duplicate Warehouse truth. */
+  warehouseLinked: boolean;
+}
+
 export interface PurchasingSettings {
   orderByBufferDays: number;
   earliestSellDays: number;
@@ -112,6 +123,7 @@ export interface PurchasingSettings {
   poDays: readonly number[];
   suppliers: readonly PurchasingSupplierRow[];
   productionDays: readonly PurchasingProductionDays[];
+  destinations: readonly PurchasingDestinationSetting[];
   /** The most recent change per setting — the line under each row. */
   lastChanges: readonly PurchasingSettingChange[];
   /** May THIS caller edit? Hiding a control is a courtesy; the RPC gate
@@ -359,6 +371,16 @@ export const purchasingSettingsResponseSchema = z.object({
       workingDays: z.number().int(),
     }),
   ),
+  destinations: z.array(
+    z.object({
+      id: z.string().uuid(),
+      name: z.string(),
+      address: z.string().nullable(),
+      isDefault: z.boolean(),
+      active: z.boolean(),
+      warehouseLinked: z.boolean(),
+    }),
+  ),
   lastChanges: z.array(
     z.object({
       settingKey: z.string(),
@@ -373,6 +395,37 @@ export const purchasingSettingsResponseSchema = z.object({
   canEdit: z.boolean(),
 });
 export type PurchasingSettingsResponse = z.infer<typeof purchasingSettingsResponseSchema>;
+
+const purchasingDestinationName = z.string().trim().min(1).max(120);
+const purchasingDestinationAddress = z
+  .union([z.string().trim().max(500), z.null()])
+  .transform((value) => (value === "" ? null : value));
+
+export const purchasingCreateDestinationInput = z
+  .object({
+    name: purchasingDestinationName,
+    address: purchasingDestinationAddress.default(null),
+  })
+  .strict();
+export type PurchasingCreateDestinationInput = z.infer<
+  typeof purchasingCreateDestinationInput
+>;
+
+export const purchasingUpdateDestinationInput = z
+  .object({
+    name: purchasingDestinationName,
+    address: purchasingDestinationAddress,
+    active: z.boolean(),
+    isDefault: z.boolean(),
+  })
+  .strict()
+  .refine((value) => value.active || !value.isDefault, {
+    message: "The default Deliver To must stay available.",
+    path: ["active"],
+  });
+export type PurchasingUpdateDestinationInput = z.infer<
+  typeof purchasingUpdateDestinationInput
+>;
 
 export const purchasingSetNumberInput = z
   .object({

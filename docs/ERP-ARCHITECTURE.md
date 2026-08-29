@@ -66,6 +66,14 @@ live once in [`orders/MASTER.md`](orders/MASTER.md), immediately after the Card 
 record. Architecture owns this boundary; the Orders MASTER owns the build sequence and business
 flow.
 
+**PURCHASING → RECEIVING → GRN → CLAIM / RETURN WORK SLICE — OWNER-APPROVED / LOCKED
+2026-08-29.** Module writers remain separate; one shared Work projection composes their open
+actions. Purchase Orders owns supplier commitment and evidenced response, Receiving owns the
+physical session/posting/formal GRN, Stock owns accepted Unit consequences, and Supplier Claim /
+Return owns the authorised continuation. `My Work`, `Team Work` and module-local `WORK TO DO`
+filters all read the same stable action identities and write no completion. The complete contract is
+[`purchasing/MASTER.md` §2.3 and §7](purchasing/MASTER.md) and its approved design record.
+
 ---
 
 # §1 · The five ownership laws
@@ -127,6 +135,11 @@ roster, duty and buddy/cover facts; the Work Engine applies them so absence chan
 work without changing the underlying business record or rewriting its history. A manager may see or
 filter the resolved owner, but Work never creates a second assignment truth.
 
+An action owner and an action capability are separate facts. A governed Operations Superuser may
+perform the operational action without replacing the resolved owner. The event records both the
+actual actor and the normal duty/dated-cover context; UI owner chips continue to show the owner, not
+an invented reassignment.
+
 Keep these identities separate: object PIC/accountability · action owner · fault owner · cost
 bearer · service provider. A module may summarise another module's action and owner, but the module
 that owns the trigger and completion fact owns the owner rule. `ACTION-FLOW-STANDARD.md` defines the
@@ -170,8 +183,11 @@ invent Catalog truth.** Receiving and Supplier Claim remain responsibilities gov
 Purchasing MASTER until an approved re-ruling gives either a separate MASTER.
 
 Workspace is deliberately absent from this ownership table. Dashboard and Work are cross-module
-projections and own no business outcome. Their current complete design is still
-`docs/workspace/BLUEPRINT.md` **PROPOSAL FOR OWNER REVIEW**, not approved module law.
+projections and own no business outcome. The complete Workspace document remains
+`docs/workspace/BLUEPRINT.md` **PROPOSAL FOR OWNER REVIEW**, except for the approved
+Purchasing/Receiving/GRN/Claim/Return projection slice recorded in this Architecture and the
+Purchasing MASTER. Approval of that slice does not approve unrelated Dashboard or Workspace
+proposal sections.
 
 ---
 
@@ -243,9 +259,9 @@ The right Quick Rail is governed by `ui/MASTER.md`; it never adds duplicate modu
 business truth.
 
 **`Receiving` is the exact Purchasing destination/workspace word** (owner correction 2026-08-29).
-It names the physical operation. The numbered document Carres creates after that operation is the
-`GRN`; the supplier's separate evidence is the Supplier DO. Neither document word replaces the
-navigation word.
+It names the physical operation. The supplier provides the delivery date and Supplier DO; Carres
+creates the Goods Receipt and numbered GRN only after physical receiving. Neither document word
+replaces the navigation word, and `Goods Receipts` is retired as navigation.
 
 **This is navigation, not workflow.** How the operator moves between these pages — which one
 feeds which — is the module MASTER's, and it changes when the business changes.
@@ -616,8 +632,9 @@ Supplier Claim · Payment/Refund · Guarantee, as applicable.
 
 **LINKS TO** — the customer order (as its PIC).
 
-> **Duty, not email, decides permission** — V1's law, kept. **And the PIC on an order is a
-> POINTER to a person, never a copy of them.**
+> **Duty or a governed capability — never a runtime email check — decides permission.** Duty stays
+> the normal owner; an Operations Superuser capability permits action without changing ownership.
+> **And the PIC on an order is a POINTER to a person, never a copy of them.**
 
 ---
 

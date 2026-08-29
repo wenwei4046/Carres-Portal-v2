@@ -288,6 +288,13 @@ function makeSb(tables: Record<string, { data: unknown; error: unknown }>) {
 
   const rpc = vi.fn(async (fn: string, args: Record<string, unknown>) => {
     rpcCalls.push({ fn, args });
+    if (fn === "purchasing_actor_may_issue") {
+      if (tables.__mayIssue) return tables.__mayIssue;
+      const duty = tables.ops_po_duty?.data as { user_id?: string }[] | null;
+      const cover = tables.ops_po_duty_cover?.data as { acting_user_id?: string }[] | null;
+      const actor = cover?.[0]?.acting_user_id ?? duty?.[0]?.user_id ?? null;
+      return { data: actor === "u1", error: null };
+    }
     /* 0379 · THE ONE ACTOR RESOLVER, answered from the same two tables the SQL
        reads, so a test still says who holds the duty by setting `ops_po_duty`
        and says who covers by setting `ops_po_duty_cover`. */
@@ -862,7 +869,7 @@ describe("a purchase order is born with its expected arrival", () => {
     expect(pos.every((po) => po.eta_date === null)).toBe(true);
   });
 
-  it("records who raised it — po_history, the table that has existed since 0001", async () => {
+  it("leaves issue audit to the atomic database boundary", async () => {
     const sb = makeSb(TABLES());
     vi.mocked(userClient).mockReturnValue(sb as never);
     await postBatch({
@@ -870,14 +877,10 @@ describe("a purchase order is born with its expected arrival", () => {
       documentDecisions: pricedAll(await readyDemands(sb), KLANG),
     });
 
-    // Measured 2026-08-01: `purchasing_issue_pos_batch` writes no audit row of
-    // any kind, so a purchase order could not say who raised it or when.
+    // Migration 0403 stamps actual actor + duty/cover inside the same database
+    // transaction. A browser-side best-effort insert would be a second answer.
     const hist = sb.inserts.filter((i) => i.table === "po_history");
-    expect(hist).toHaveLength(1);
-    const rows = hist[0].rows as { po_id: string; text: string }[];
-    expect(rows).toHaveLength(2); // one per document the batch made
-    expect(rows[0].po_id).toBe("PO-2031");
-    expect(rows[0].text).toContain("expected arrival");
+    expect(hist).toHaveLength(0);
   });
 });
 
@@ -2152,7 +2155,7 @@ describe("there is exactly ONE issuance door left", () => {
  * asks it again, so a direct call cannot walk past it either.
  */
 describe("closure §1 · one governed PO actor authority", () => {
-  it("asks the ONE resolver, never the duty table, for who may act", async () => {
+  it("asks the ONE governed issue capability, never the duty table, for who may act", async () => {
     const sb = makeSb(TABLES());
     const demands = await readyDemands(sb);
     sb.rpcCalls.length = 0;
@@ -2161,8 +2164,50 @@ describe("closure §1 · one governed PO actor authority", () => {
       selections: allTo(demands, KLANG),
       documentDecisions: pricedAll(demands, KLANG),
     });
-    expect(sb.rpcCalls.some((c) => c.fn === "purchasing_po_actor")).toBe(true);
+    expect(sb.rpcCalls.some((c) => c.fn === "purchasing_actor_may_issue")).toBe(true);
     expect(sb.tableCalls).not.toContain("ops_po_duty");
+  });
+
+  it("accepts the governed operation@ Operations Superuser while Yu Jun remains duty owner", async () => {
+    const tables = TABLES();
+    tables.ops_po_duty = { data: [{ user_id: "u-yu-jun" }], error: null };
+    tables.app_users = {
+      data: [{ id: "u-yu-jun", name: "Yu Jun", email: "yujun@carres.com" }],
+      error: null,
+    };
+    tables.__mayIssue = { data: true, error: null };
+    const sb = makeSb(tables);
+    const demands = await readyDemands(sb);
+    sb.rpcCalls.length = 0;
+
+    const res = await postBatch({
+      selections: allTo(demands, KLANG),
+      documentDecisions: pricedAll(demands, KLANG),
+    });
+
+    expect(res.status).toBe(200);
+    expect(sb.rpcCalls.some((c) => c.fn === "purchasing_actor_may_issue")).toBe(true);
+    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(1);
+  });
+
+  it("accepts Jess through the same governed Operations Superuser capability", async () => {
+    const tables = TABLES();
+    tables.ops_po_duty = { data: [{ user_id: "u-yu-jun" }], error: null };
+    tables.__mayIssue = { data: true, error: null };
+    const sb = makeSb(tables);
+    const demands = await readyDemands(sb);
+    sb.rpcCalls.length = 0;
+
+    const res = await postBatch(
+      {
+        selections: allTo(demands, KLANG),
+        documentDecisions: pricedAll(demands, KLANG),
+      },
+      "principal",
+    );
+
+    expect(res.status).toBe(200);
+    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(1);
   });
 
   it("lets the authorised cover issue while the holder is away", async () => {

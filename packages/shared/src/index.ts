@@ -83,6 +83,8 @@ export {
   settingValueLabel,
   purchasingCategorySchema,
   purchasingSettingsResponseSchema,
+  purchasingCreateDestinationInput,
+  purchasingUpdateDestinationInput,
   purchasingSetNumberInput,
   purchasingSetPoDaysInput,
   purchasingSetProductionDaysInput,
@@ -92,8 +94,11 @@ export {
   type PurchasingProductionDays,
   type PurchasingSupplierRow,
   type PurchasingSettingChange,
+  type PurchasingDestinationSetting,
   type PurchasingSettings,
   type PurchasingSettingsResponse,
+  type PurchasingCreateDestinationInput,
+  type PurchasingUpdateDestinationInput,
   type PurchasingSetNumberInput,
   type PurchasingSetPoDaysInput,
   type PurchasingSetProductionDaysInput,
@@ -2172,6 +2177,7 @@ export {
   soBatchOrderSupplierNames,
   soBatchRailFacts,
   soBatchRailModel,
+  type SoBatchWorkKey,
   type SoBatchProductCategory,
   type SoBatchRailFilter,
   type SoBatchRailFacts,
@@ -2852,3 +2858,5 @@ export * from "./sales-order-completion";
 // CARD 9 — the unified work engine: the five-part rule registry (Trigger ·
 // Owner · Action · Due · Completion fact) + WHO/ACTION/working-day composition.
 export * from "./work-engine";
+// Purchase Orders — one evidence-derived Register state and Work vocabulary.
+export * from "./purchase-order-register";

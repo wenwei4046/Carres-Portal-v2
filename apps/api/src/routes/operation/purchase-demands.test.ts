@@ -360,6 +360,13 @@ function makeSb(tables: Record<string, { data: unknown; error: unknown }>) {
   });
   const rpc = vi.fn(async (fn: string) => {
     rpcCalls.push(fn);
+    if (fn === "purchasing_actor_may_issue") {
+      if (tables.__mayIssue) return tables.__mayIssue;
+      const duty = tables.ops_po_duty?.data as { user_id?: string }[] | null;
+      const cover = tables.ops_po_duty_cover?.data as { acting_user_id?: string }[] | null;
+      const actor = cover?.[0]?.acting_user_id ?? duty?.[0]?.user_id ?? null;
+      return { data: actor === "u1", error: null };
+    }
     /* 0379 · the ONE actor resolver, answered from the same two tables SQL
        reads, so a test still says who holds the duty with `ops_po_duty` and who
        covers it with `ops_po_duty_cover`. */
@@ -686,7 +693,7 @@ describe("the guard, and the promise not to write", () => {
     /* `purchasing_po_actor` is `stable` and writes nothing — it is a READ that
        happens to be a function, because the duty and cover answer is one rule
        and not two table joins repeated on four surfaces (0379). */
-    expect(sb.rpcCalls).toEqual(["purchasing_po_actor"]);
+    expect(sb.rpcCalls).toEqual(["purchasing_po_actor", "purchasing_actor_may_issue"]);
   });
 });
 
@@ -819,6 +826,18 @@ describe("who may issue", () => {
     };
     const { body } = await rowsOf(tables);
     expect(body.mayIssue).toBe(true);
+  });
+
+  it("offers Issue PO to the governed Operations Superuser while preserving Yu Jun as duty owner", async () => {
+    const tables = TABLES() as unknown as Record<string, { data: unknown; error: unknown }>;
+    tables.__mayIssue = { data: true, error: null };
+
+    const { body, sb } = await rowsOf(tables);
+
+    expect(body.mayIssue).toBe(true);
+    expect(body.currentPoDuty).toEqual({ userId: PO_HOLDER, name: "Yee Jin" });
+    expect(body.actingPoDuty).toBeNull();
+    expect(sb.rpcCalls).toContain("purchasing_actor_may_issue");
   });
 
   it("an operator who is NOT on duty reads the page and may not issue", async () => {

@@ -24,6 +24,7 @@ import {
   type RegisterOrderFact,
 } from "../../lib/purchase-demand-read";
 import { mapPgError } from "../../lib/route-helpers";
+import { purchasingActorMayIssue } from "../../lib/purchasing-po-authority";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -315,16 +316,16 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
   let actingId: string | null = null;
   let actingName: string | null = null;
   let poDutyUnavailable = false;
-  /** Who may act TODAY — the holder, or the dated cover when one is open. */
-  let actorId: string | null = null;
+  let mayIssue = false;
   const nameById = new Map<string, string>();
   try {
     /* ⭐ ONE ACTOR RESOLVER (0379). This read used to ask `ops_po_duty` itself,
        which meant the Register knew nothing about buddy cover: a covering
        operator was shown a page with no Issue PO on it, and the door would have
        let them through. One resolver, one answer, on every surface. */
-    const [actorRes, people] = await Promise.all([
+    const [actorRes, authorityRes, people] = await Promise.all([
       sb.rpc("purchasing_po_actor"),
+      purchasingActorMayIssue(sb, me),
       salespersonIds.length > 0
         ? sb.from("app_users").select("id, name, email").in("id", salespersonIds)
         : Promise.resolve({ data: [] as Record<string, unknown>[], error: null }),
@@ -334,6 +335,11 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
     for (const u of (people.data ?? []) as Record<string, unknown>[]) {
       const l = label(u);
       if (l) nameById.set(u.id as string, l);
+    }
+    if (authorityRes.error) {
+      console.error("purchase demands — PO issue authority unavailable", authorityRes.error.message);
+    } else {
+      mayIssue = authorityRes.mayIssue;
     }
     if (actorRes.error) {
       poDutyUnavailable = true;
@@ -346,7 +352,6 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
       };
       poDutyId = actor.normal_user_id ?? null;
       actingId = actor.acting_user_id ?? null;
-      actorId = actor.actor_user_id ?? null;
       const wanted = [poDutyId, actingId].filter((v): v is string => v != null);
       if (wanted.length > 0) {
         const who = await sb
@@ -612,12 +617,10 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
     poDutyNameUnavailable:
       (actingId ?? poDutyId) != null && (actingId != null ? actingName : poDutyName) == null,
     poDutyUnavailable,
-    /* Convenience only. `mayIssue` decides whether the browser OFFERS the act;
-       the issue endpoint asks the same resolver again and the creation RPC asks
-       it a third time (Card §6 — UI hiding is convenience, API/RPC is
-       authority). It answers about the ACTOR, so an authorised cover is offered
-       the act and a principal who holds neither role is not. */
-    mayIssue: actorId != null && actorId === me,
+    /* Convenience only. The browser, issue routes and SQL ask the same governed
+       capability. Duty/cover remains the owner fact; a superuser is not
+       relabelled as that owner. */
+    mayIssue,
     procurementPartners,
     /* Card 02-A — the governed Safety days value, so the rail words follow
        the one setting. The browser prints it; the arithmetic stayed here. */

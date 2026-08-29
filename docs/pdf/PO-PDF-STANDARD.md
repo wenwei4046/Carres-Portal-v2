@@ -56,10 +56,16 @@ not theirs. 100% legible on a cheap B/W laser, a fax, a WhatsApp photo.
   names both parties completely. Detail rows read in time order:
   `PO No · Issued · Deliver by (bold, last)`. Three columns give who supplies · where it goes · when it's due, the
   supplier's 3-second sweep in one row (restores the old law's
-  deliver-to-at-section-2). One PO = ONE destination — a line needing
-  another address is another PO. Nice Future prints its fixed collection
-  sentence via `delivery_instructions`.
-- **Items table**: `# · SO NO · ITEM ID · DESCRIPTION · QTY`.
+  deliver-to-at-section-2). **One PO may carry one or several governed
+  destinations** (Owner B, 2026-08-28). For one destination, DELIVER TO prints
+  that exact name and address. For several, it prints `Multiple destinations`
+  and every exact name/address used by the goods lines. Nice Future prints its
+  fixed collection sentence via `delivery_instructions`.
+- **Items table**: `# · SO NO · ITEM ID · DESCRIPTION · DELIVER TO · QTY`.
+  - Every goods line prints its effective governed destination name and address.
+    `purchase_order_lines.destination_id` overrides the PO default; a null line
+    destination follows `purchase_orders.destination_id`. This is document
+    truth, not display inference.
   - **Item ID = `ops_stock_items.unit_code` (0153)** — minted at PO-open, one
     scannable id per physical unit. The column the 2026-08-01 law reserved is
     now LIVE: the supplier labels each unit by id; the warehouse scans on
@@ -133,3 +139,4 @@ PO. The paper therefore carries `PO No` **and** `Version` (§2).
 | 2026-08-24 | `Version` prints on the paper, including Version 1 — identity block, PO DETAILS row and continuation header (0378). The confirmation records the version the operator rendered; a stale one is refused. The `never revises` line in §5 is marked superseded by 0364. | CARD-2026-08-22-purchasing-02 |
 | 2026-08-09 | FAMILY REWRITE: chrome deferred to SO-PDF-STANDARD (§2.1/§8.5); logo-stamp header, 35mm label gutter, caps header dates and the zero-fill table DELETED per the Master Overwrite Law; `Sales Order` column → `SO No`; `TOTAL QUANTITY` → family `TOTAL` row; Item ID column goes LIVE with 0153 unit codes; `Delivery by` bold in PO DETAILS; footer keeps the Issued-by audit. Business rules (no money, consolidation, one destination, sofa drawing) unchanged. | Loo |
 | 2026-08-24 | **P5 CLOSED**: per-line `SO No` reads `po_line_sources` (0382), so a bulk PO prints its per-customer breakdown instead of a blank column. `Issued by` is the real `audit_log` actor and the supplier's FULL address is read from `suppliers.address` (0383) — both were hard-coded `null` before. Item ID is fed by the `U1-000-001` allocator (0381). No visual or business rule changed. | CARD-2026-08-22-purchasing-02 |
+| 2026-08-28 | **Owner B**: one PO may carry several governed Deliver To destinations. The header names every exact destination and the items table prints each line's effective destination. A post-send destination change still mints a new version and must be sent again. | Owner |

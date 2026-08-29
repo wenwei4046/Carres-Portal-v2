@@ -12,6 +12,7 @@ import {
 } from "@carres/shared";
 import { requireOperation } from "../../lib/auth-guards";
 import { dutyHolders, myDuties } from "../../lib/duties";
+import { purchasingActorMayIssue } from "../../lib/purchasing-po-authority";
 import { loadPurchasingSettings } from "../../lib/purchasing-settings";
 import { mapPgError } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
@@ -680,6 +681,15 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
     return c.json({ error: "invalid_body", code: "invalid_param" }, 400);
   }
   const { requestIds, together, partners, expectedCosts } = parsed.data;
+
+  /* Manual Purchase and SO Batch Purchase ask the same governed capability;
+     the creation RPC asks again at the database boundary. */
+  const authority = await purchasingActorMayIssue(sb, c.var.auth.id);
+  if (authority.error) {
+    const m = mapPgError(authority.error);
+    return c.json(m.body, m.status);
+  }
+  if (!authority.mayIssue) return refuse(c, 403, "not_po_duty");
 
   const { data: requests, error: reqErr } = await sb
     .from("purchase_requests")

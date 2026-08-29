@@ -26,6 +26,7 @@ import {
   type SoBatchPurchaseResponse,
   type SoBatchRailFilter,
   type SoBatchSelection,
+  type SoBatchWorkKey,
 } from "@carres/shared";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import { fmtDate } from "@/lib/fmt-date";
@@ -121,7 +122,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
     return m;
   }, [orders, leafsByOrder]);
 
-  /* ── The rail (Card 02-C: five sections, one selection per section) ───────
+  /* ── The rail (six sections, one selection per section) ──────────────────
    *
    * The DEFAULT no-filter view shows every proceeded record, Ordered ones
    * included — the Register is permanent. One filter per section; sections
@@ -151,6 +152,9 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
     () => orders.filter((o) => rail.visibleOrderIds.has(o.orderId)),
     [orders, rail.visibleOrderIds],
   );
+  const toggleWork = useCallback((work: SoBatchWorkKey) => {
+    setFilter((prev) => ({ ...prev, work: prev.work === work ? null : work }));
+  }, []);
   const toggleTiming = useCallback((s: PurchaseDemandTimingState) => {
     setFilter((prev) => ({ ...prev, timing: prev.timing === s ? null : s }));
   }, []);
@@ -610,6 +614,19 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
             sections combine, and the fixed rows print their live count, zero
             included. */}
         {filterRailOpen && <FilterRail testId="so-batch-rail" onHide={() => setFilterRailVisible(false)}>
+          <FilterRailGroup title={SO_BATCH_RAIL.work.heading}>
+            {SO_BATCH_RAIL.work.actions.map((action) => (
+              <FilterRailRow
+                key={action.key}
+                active={filter.work === action.key}
+                onClick={() => toggleWork(action.key)}
+                testId={`so-batch-work-${action.key}`}
+                label={action.word}
+                count={rail.workCounts[action.key]}
+                title={`${rail.workCounts[action.key]} ${W.footerUnit} · ${action.word}`}
+              />
+            ))}
+          </FilterRailGroup>
           <FilterRailGroup title={SO_BATCH_RAIL.toOrder.heading}>
             <FilterRailRow
               active={filter.notOrderedOnly}
@@ -698,7 +715,10 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
         </FilterRail>}
 
         <div className="flex min-w-0 flex-1 flex-col p-2">
-          <div className="min-h-0 flex-1" data-testid="so-batch-grid">
+          <div
+            className="min-h-0 flex-1"
+            data-testid="so-batch-grid"
+          >
             <DataGrid<SoBatchOrderRow>
               appearance="reference"
               rows={shown}
@@ -722,7 +742,6 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
                   </button>
                 ) : null
               }
-              toolbarEnd={<SoBatchPoDuty data={data} />}
               isLoading={isLoading}
               emptyMessage={W.empty}
               groupBanner={false}
@@ -770,29 +789,19 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
               data-testid="so-batch-selection-bar"
             >
               <span className="truncate text-body">{summary.text}</span>
-              {data.mayIssue ? (
-                <button
-                  type="button"
-                  data-testid="so-batch-issue"
-                  className="inline-flex h-7 shrink-0 items-center rounded-control bg-kit-blue-9 px-3 text-meta font-medium text-white hover:opacity-90"
-                  onClick={() => onIssue(selections)}
-                >
-                  {W.issuePo}
-                </button>
-              ) : (
-                /* NOT a disabled button. A control the operator cannot use
-                   should say WHO can, not grey itself out and stay silent. */
-                /* ⭐ AND IT NAMES WHOEVER MAY ACT TODAY (0379; closure §1).
-                   A dated buddy cover is the person to ask, not the holder they
-                   are covering — a chip that named the absent holder sent the
-                   operator to somebody who is on leave. */
-                <span
-                  className="shrink-0 truncate text-meta text-kit-slate-11"
-                  data-testid="so-batch-duty-chip"
-                >
-                  {poDutyLabel(data)}
-                </span>
-              )}
+              <span className="flex shrink-0 items-center gap-2">
+                <SoBatchPoDutyChip data={data} />
+                {data.mayIssue ? (
+                  <button
+                    type="button"
+                    data-testid="so-batch-issue"
+                    className="inline-flex h-7 shrink-0 items-center rounded-control bg-kit-blue-9 px-3 text-meta font-medium text-white hover:opacity-90"
+                    onClick={() => onIssue(selections)}
+                  >
+                    {W.issuePo}
+                  </button>
+                ) : null}
+              </span>
             </div>
           ) : null}
         </div>
@@ -801,7 +810,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
   );
 }
 
-function SoBatchPoDuty({ data }: { data: SoBatchPurchaseResponse }) {
+function SoBatchPoDutyChip({ data }: { data: SoBatchPurchaseResponse }) {
   const person = data.poDutyUnavailable || data.poDutyNameUnavailable
     ? null
     : (data.actingPoDuty ?? data.currentPoDuty);
@@ -810,7 +819,7 @@ function SoBatchPoDuty({ data }: { data: SoBatchPurchaseResponse }) {
   if (!person) {
     return (
       <span
-        data-testid="so-batch-po-duty"
+        data-testid="so-batch-duty-chip"
         aria-label={label}
         title={label}
         className="shrink-0 text-meta text-kit-red-11"
@@ -823,28 +832,25 @@ function SoBatchPoDuty({ data }: { data: SoBatchPurchaseResponse }) {
   const colour = avatarColor(person.userId);
   return (
     <span
-      data-testid="so-batch-po-duty"
+      data-testid="so-batch-duty-chip"
       aria-label={label}
       title={label}
-      className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-control border border-kit-slate-6 bg-white px-2 text-meta text-kit-slate-11"
+      className="inline-flex h-7 min-w-7 shrink-0 items-center justify-center rounded-full border border-kit-slate-6 px-2 text-label font-semibold leading-none"
+      style={{ background: colour.bg, color: colour.fg }}
     >
-      <span
-        aria-hidden
-        className="grid h-5 w-5 place-items-center rounded-full text-label font-semibold leading-none"
-        style={{ background: colour.bg, color: colour.fg }}
-      >
-        {personInitials(person.name, person.name)}
-      </span>
-      <span>{label}</span>
+      {personInitials(person.name, person.name)}
     </span>
   );
 }
 
 function poDutyLabel(data: SoBatchPurchaseResponse): string {
   if (data.poDutyUnavailable) return "PO duty could not be checked.";
-  if (data.actingPoDuty) return `${data.actingPoDuty.name} is covering PO duty`;
+  if (data.actingPoDuty) {
+    const normal = data.currentPoDuty ? ` for ${data.currentPoDuty.name}` : "";
+    return `${data.actingPoDuty.name} · PO Duty cover${normal}`;
+  }
   if (data.poDutyNameUnavailable) return "PO duty name is missing.";
-  if (data.currentPoDuty) return `${data.currentPoDuty.name} holds PO duty`;
+  if (data.currentPoDuty) return `${data.currentPoDuty.name} · PO Duty`;
   return "Nobody holds PO duty this month.";
 }
 
