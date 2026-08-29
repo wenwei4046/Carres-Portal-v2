@@ -251,9 +251,9 @@ Superuser through Principal authority; `operation@carres.com` is the explicitly 
 Operations Superuser. An ordinary Operations login that is neither duty, cover nor superuser is
 refused. Commercial approval remains separate and never follows from issue authority.
 
-**HOW IT IS ENFORCED — migrations 0379 / 0380 live in repository authority; this worktree's 0400
+**HOW IT IS ENFORCED — migrations 0379 / 0380 live in repository authority; this worktree's 0401
 is branch-only and pending merge-order reconciliation plus governed apply. Production still shows
-the pre-0400 refusal until the exact approved SHA is deployed and walked.**
+the pre-0401 refusal until the exact approved SHA is deployed and walked.**
 `purchasing_po_actor()` is the ONE
 resolver. It reads the month's `ops_po_duty` holder and the dated `ops_po_duty_cover` window, and
 returns both people separately: the normal holder, because Team Work groups by them, and the acting
@@ -286,7 +286,13 @@ exist, a new destination may not silently invent who receives or what Stock cons
 - Supplier already received a PDF: `Change Deliver To` creates a new version/change record and
   concrete work to send the new PDF.
 
-The final destination is one Purchasing-owned fact read by Sales Order and receiving/logistics.
+**Owner B, 2026-08-28:** one PO may carry several governed Deliver To destinations. The PO-level
+destination is the default; a goods line may name another active Purchasing destination. The formal
+PDF prints every line's effective destination and, when several are used, every exact address in its
+DELIVER TO block. A closed destination remains visible on old records but cannot be selected for new
+work. The final destination of each goods line is Purchasing-owned truth read by Sales Order and
+receiving/logistics. Changing it after the supplier received the PDF mints a new PO version and send
+work; it never silently changes the paper already sent.
 
 ### 5.5 Supplier and SKU resolution
 

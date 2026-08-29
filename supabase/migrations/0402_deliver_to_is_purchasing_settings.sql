@@ -1,4 +1,4 @@
--- 0401 · Deliver To is Purchasing Settings master data
+-- 0402 · Deliver To is Purchasing Settings master data
 --
 -- Owner ruling, 2026-08-29:
 --   · AL remains the existing canonical `AL Sungai Buloh` destination.
@@ -198,9 +198,9 @@ grant execute on function public.purchasing_update_destination(uuid, text, text,
   to authenticated;
 
 comment on function public.purchasing_create_destination(text, text) is
-  '0401: manager-only audited Settings door for a future external Deliver To.';
+  '0402: manager-only audited Settings door for a future external Deliver To.';
 comment on function public.purchasing_update_destination(uuid, text, text, boolean, boolean) is
-  '0401: manager-only audited Settings door for name, address, availability and default.';
+  '0402: manager-only audited Settings door for name, address, availability and default.';
 
 do $$
 begin
@@ -208,12 +208,12 @@ begin
     select 1 from public.purchasing_destinations
      where name = 'Ohana' and active
   ) then
-    raise exception '0401: Ohana must be an active Deliver To';
+    raise exception '0402: Ohana must be an active Deliver To';
   end if;
   if to_regprocedure('public.purchasing_create_destination(text,text)') is null
      or to_regprocedure(
        'public.purchasing_update_destination(uuid,text,text,boolean,boolean)'
      ) is null then
-    raise exception '0401: governed destination Settings doors are missing';
+    raise exception '0402: governed destination Settings doors are missing';
   end if;
 end $$;

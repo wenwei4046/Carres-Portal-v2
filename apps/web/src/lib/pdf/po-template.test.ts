@@ -1,7 +1,10 @@
 import { describe, it, expect } from "vitest";
+import { isValidElement, type ReactElement, type ReactNode } from "react";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import { PoTemplate } from "./po-template";
+import type { PoTemplateData } from "./types";
 
 // PO-PDF-STANDARD guard (2026-08-02). A render test only sees the branches its
 // fixture reaches; a SOURCE scan holds every branch of the template to the
@@ -19,6 +22,13 @@ const SRC = readFileSync(
 // Strip comments before the money scan — the D0.5b lesson: a scan that reads
 // comments fails on the very sentence explaining why the rule exists.
 const CODE = SRC.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
+
+function renderedText(node: ReactNode): string {
+  if (typeof node === "string" || typeof node === "number") return String(node);
+  if (Array.isArray(node)) return node.map(renderedText).join(" ");
+  if (!isValidElement(node)) return "";
+  return renderedText((node as ReactElement<{ children?: ReactNode }>).props.children);
+}
 
 describe("po-template obeys docs/pdf/PO-PDF-STANDARD.md", () => {
   it("never mentions money — no price, no total, no RM, no currency", () => {
@@ -85,6 +95,43 @@ describe("po-template obeys docs/pdf/PO-PDF-STANDARD.md", () => {
  * customer column, and the route hard-coded the issuer to `null`.
  */
 describe("po-template prints the lineage and the issuer it is given", () => {
+  it("prints every line's governed destination on a multi-destination PO", () => {
+    const data: PoTemplateData = {
+      po_number: "PO-9801",
+      po_id: "PO-9801",
+      version: 2,
+      issue_date: "2026-08-28",
+      supplier: { name: "Ohana", address: "Muar", contact: null },
+      destination: { name: "Carres Klang", address: "Klang address" },
+      delivery_instructions: null,
+      eta_date: "2026-09-05",
+      issued_by: "Yee Jin",
+      lines: [
+        {
+          sku: "CODY-Q",
+          description: "Cody Queen",
+          qty: 1,
+          unit: "pc",
+          destination: { name: "Carres Klang", address: "Klang address" },
+        },
+        {
+          sku: "JAGER-K",
+          description: "Jager King",
+          qty: 1,
+          unit: "pc",
+          destination: { name: "Partner Penang", address: "Penang address" },
+        },
+      ],
+      terms: null,
+    };
+
+    const text = renderedText(PoTemplate(data));
+    expect(text).toContain("Multiple destinations");
+    expect(text).toContain("Carres Klang");
+    expect(text).toContain("Partner Penang");
+    expect(text).toContain("Penang address");
+  });
+
   it("reads SO NO from the LINE's own sources, not only the document", () => {
     /* The old rule — print the SO only when the whole PO covers exactly one —
        is now the fallback for purchase orders raised before 0382. */

@@ -29,11 +29,11 @@
 - PR #977 head at planning time: `a575b80c580e8554ab417c5a4d2d11bfac4b416a`
 - Collision files: `apps/api/src/routes/operation/pos.ts`, `apps/api/src/routes/operation/pos.test.ts`, `apps/web/src/lib/queries.ts`, `docs/purchasing/MASTER.md`, `packages/shared/src/index.ts`, migration numbers.
 
-- [ ] Fetch latest main and PR #977, re-read changed files, and record actual integration SHAs.
-- [ ] Rebase after PR #977 merges, or integrate its head into one delivery branch if the PR sequence requires it.
-- [ ] Keep PR #977's `purchase-orders/PurchaseOrdersPage.tsx` as canonical; port required authority/evidence changes into it and remove duplicate edits to the legacy page.
-- [ ] Renumber this branch's provisional migrations from the integrated maximum; never alter SQL content merely to conceal a duplicate number.
-- [ ] Run `pnpm ci:migrations`, targeted route/page tests, and `git diff --check`; expected result: pass.
+- [x] Fetch latest main and PR #977, re-read changed files, and record actual integration SHAs.
+- [x] Integrate PR #977's head into one delivery branch because the PR remains open.
+- [x] Keep PR #977's `purchase-orders/PurchaseOrdersPage.tsx` as canonical and preserve the Superuser actor/owner evidence while resolving its API read conflict.
+- [x] Renumber this branch's provisional migrations from the integrated maximum: `0401` Operations Superuser and `0402` Deliver To Settings.
+- [x] Run the migration checker, 612 targeted API/web/shared tests, and `git diff --check`; result: pass.
 - [ ] Commit: `git add -A && git commit -m "chore(purchasing): reconcile purchase register delivery"`.
 
 ## Task 2: Lock the exact SO Batch selected action
@@ -72,7 +72,7 @@
 ## Task 4: Finish Settings-driven receiving destinations
 
 **Files:**
-- Provisionally renumber current: `supabase/migrations/0401_deliver_to_is_purchasing_settings.sql`
+- Current integrated number: `supabase/migrations/0402_deliver_to_is_purchasing_settings.sql`
 - Modify: `packages/shared/src/purchasing-settings.ts`
 - Modify: `packages/shared/src/purchasing-settings.test.ts`
 - Modify: `apps/api/src/lib/purchasing-settings.ts`

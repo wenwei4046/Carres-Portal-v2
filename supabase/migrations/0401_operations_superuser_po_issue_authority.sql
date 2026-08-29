@@ -1,5 +1,5 @@
 -- =============================================================================
--- 0400 · Operations Superuser uses the one PO-issue authority
+-- 0401 · Operations Superuser uses the one PO-issue authority
 -- =============================================================================
 -- PO Duty / dated cover remains the normal work owner. This migration adds a
 -- governed capability for exceptional operational action; it never changes
@@ -43,7 +43,7 @@ revoke all on function public.is_operations_superuser(uuid) from public;
 grant execute on function public.is_operations_superuser(uuid) to authenticated;
 
 comment on function public.is_operations_superuser(uuid) is
-  '0400: governed operational capability. Principal (Jess) and explicitly flagged accounts may act without inheriting PO Duty ownership.';
+  '0401: governed operational capability. Principal (Jess) and explicitly flagged accounts may act without inheriting PO Duty ownership.';
 
 create or replace function public.purchasing_actor_may_issue(p_user uuid)
 returns boolean
@@ -62,7 +62,7 @@ revoke all on function public.purchasing_actor_may_issue(uuid) from public;
 grant execute on function public.purchasing_actor_may_issue(uuid) to authenticated;
 
 comment on function public.purchasing_actor_may_issue(uuid) is
-  '0400: the one PO issue capability — current duty, dated cover, or governed Operations Superuser.';
+  '0401: the one PO issue capability — current duty, dated cover, or governed Operations Superuser.';
 
 comment on column public.po_sends.acting_user_id is
   'Dated PO Duty cover in force when the send was confirmed. sent_by is the actual actor; a superuser action never turns this cover into the actor.';
@@ -124,7 +124,7 @@ end;
 $$;
 
 comment on function public.purchasing_record_po_issue_authority() is
-  '0400: atomically records actual PO issuer plus normal duty and dated cover context for every purchase_order insert.';
+  '0401: atomically records actual PO issuer plus normal duty and dated cover context for every purchase_order insert.';
 
 drop trigger if exists purchasing_record_po_issue_authority on public.purchase_orders;
 create trigger purchasing_record_po_issue_authority

@@ -59,11 +59,11 @@ Each plan is independently testable. Plans 2–6 depend on Plan 1's authority/co
 
 ## Integration Gate
 
-- [ ] Fetch `origin/main` and PR #977; record their SHAs in the implementation work log.
-- [ ] Rebase this branch after PR #977 is merged, or merge PR #977's head into the implementation branch if delivery sequencing requires one combined PR.
-- [ ] Run `pnpm ci:migrations` and resolve every duplicate migration number before writing the first new SQL file.
-- [ ] Keep `0400_operations_superuser_po_issue_authority.sql` and `0401_deliver_to_is_purchasing_settings.sql` content intact while renumbering them to the first free numbers after the integrated repository/branch maximum.
-- [ ] Run `git diff --check` and `pnpm ci:migrations`; expected result: zero whitespace errors and `Migration checks passed`.
+- [x] Fetch `origin/main` (`f0a2ea93`) and PR #977 (`a575b80c`); record their SHAs in the implementation work log.
+- [x] Integrate PR #977's head into this delivery branch because PR #977 remains open and both changes must be tested together before delivery.
+- [x] Run the migration checker and resolve every duplicate migration number before writing the first new SQL file.
+- [x] Preserve the two unmerged migration bodies while renumbering them after PR #977's `0400`: Operations Superuser is now `0401`; Deliver To Settings is now `0402`.
+- [x] Run `git diff --check` and the migration checker; result: zero whitespace errors, 415 valid migration filenames, and no migration applied.
 
 ## Final Programme Gate
 
