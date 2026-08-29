@@ -1,11 +1,13 @@
 # PURCHASING — MASTER
 
-Status: **APPROVED / LOCKED — OWNER REVIEW COMPLETE 2026-08-22**
+Status: **APPROVED / LOCKED — OWNER REVIEW COMPLETE 2026-08-29**
 Lane: **PLAN COMPLETE**
 
-This file is the only canonical Purchasing Blueprint. It owns the Purchasing and Goods Receipt
-operating model. Cross-module files keep only their ownership seams; Git history keeps superseded
-designs. A screen or earlier chat cannot create a second Purchasing truth.
+This file is the only canonical Purchasing Blueprint. It owns Purchasing and the governed
+Purchasing → Receiving seam. Receiving owns its physical-receipt workspace and GRN facts under
+ERP Architecture §3.4; §9.4 below records only the owner-confirmed seam while that page's separate
+owner review replaces its stale presentation. Cross-module files keep only their ownership seams;
+Git history keeps superseded designs. A screen or earlier chat cannot create a second truth.
 
 ---
 
@@ -16,18 +18,19 @@ Purchasing answers five questions:
 1. What must Carres buy or ask a supplier to place?
 2. Why is it required, in what quantity and by which actual date?
 3. Which supplier document must be sent, to whom and at which destination?
-4. What did the supplier actually deliver, repair, replace or collect?
+4. Which supplier outcome follows the physical receipt, repair, replacement or collection fact?
 5. Which supplier-owned showroom Unit was sold and must now be reported to the supplier?
 
 Purchasing owns supplier commitment from an approved buying need through formal document control
-and receipt. It does not own customer promises, physical stock location after receipt, customer
-delivery, customer money or supplier payment.
+and the handoff to Receiving. Receiving owns the physical receipt and creates the GRN. Purchasing
+does not own customer promises, physical stock location after receipt, customer delivery, customer
+money or supplier payment.
 
 | Truth | Authority |
 |---|---|
 | Customer order, customer promise and cancellation | Sales Orders |
 | Buy reason, purchase demand remainder, supplier, PO, supplier date and `Deliver To` | Purchasing |
-| Count, condition and delivery note at supplier receipt | Goods Receipts under this MASTER |
+| Physical count, condition, Supplier DO and GRN | Receiving — ERP Architecture §3.4; seam in §9.4 |
 | Exact Unit, ownership, custody, location and availability | Stock / Warehouse |
 | Actual customer handover and delivery proof | Delivery |
 | Customer money | Payment |
@@ -44,7 +47,7 @@ summarises and links.
 
 ### 2.1 Evidence searched
 
-The completion pass checked the existing emergency-order approval law, Manual Purchase authority,
+The completion pass checked the former emergency-order approval law, Manual Purchase authority,
 `purchase_demand` truth, PO issuance ownership, Sales Order purchasing seam, Stock Unit ownership,
 Goods Receipt, Service Case outcomes and Finance/AP boundary.
 
@@ -55,12 +58,9 @@ There are not two genuine Carres operating models.
 - A Sales Order creates a system purchase demand only for the uncovered quantity.
 - A person starts a non-SO buy in `Manual Purchase`; approval creates the same governed purchase
   demand truth.
-- An emergency is a Manual Purchase with an urgent reason and governed date. It is not another form,
-  authority, page or way to bypass quantity, supplier, destination, price approval or History.
-- Emergency changes the response clock: an approved urgent demand goes immediately to Current PO
-  Duty instead of waiting for a normal buying cycle.
-- If quantity, supplier, price authority, destination or required date is missing, the emergency is
-  not ready to approve or issue. The system names the missing fact and its owner.
+- There is no `Emergency`, `Urgent` or `Unknown` Manual Purchase purpose, question, queue or special
+  PO door. `Needed By` carries the required date; it never bypasses quantity, Catalog, supplier,
+  destination, approval, PO issuance or History.
 - Every approved demand reaches the same PO issuance authority. Sales, Warehouse and the requester
   cannot mark goods as ordered.
 - `purchase_demand` remains the canonical line-level need and coverage remainder, but it is not a
@@ -68,8 +68,8 @@ There are not two genuine Carres operating models.
 - `SO Batch Purchase` and `Manual Purchase` are the two operator doors. `Purchase Orders` is the
   formal supplier commitment register.
 
-Therefore the emergency continuation, Manual Purchase relationship, demand truth and PO ownership
-are **RESOLVED FROM AUTHORITY**. No Owner Decision remains.
+Therefore the Manual Purchase relationship, demand truth and PO ownership are **RESOLVED FROM
+AUTHORITY**. No Owner Decision remains.
 
 ---
 
@@ -128,12 +128,12 @@ Primary references: [Dynamics purchase requisitions](https://learn.microsoft.com
 | Non-SO buying | Requests are informal and may omit the business reason | Mature requisition separates internal approval from external PO | **ADAPT** | Staff create Manual Purchase; approval produces demand; rejection ends it | Select purpose, goods, quantity, date and destination; system routes approval | `Manual Purchase` Register and object; no separate request page | Catalog, Stock planning, approved Display Request, Finance approval boundary |
 | Purchase demand | Staff may confuse “need” with a document to send | 2990 recomputes need; mature ERP keeps requisition/demand separate from PO | **KEEP + RELOCATE** | One hidden canonical line record stores required, covered, ordered and remaining quantity | Staff see demand facts through the correct work door; never create/send a demand document | No sidebar page; read in SO Batch, Manual Purchase, PO and Order Route | Source object creates/reduces/cancels demand; PO allocation covers it |
 | Purchase Order | PDF/WhatsApp means the real order; changes can be lost | 2990 retains line balance, version and documents | **KEEP + IMPROVE** | Current PO Duty checks, sends the actual PDF, records channel/time; later changes create a version | Use 50/50 check/preview; send; record supplier promise or exception | `Purchase Orders` Register; full-width view; 50/50 only while issuing/editing | Demand, supplier, Goods Receipt, Stock, Finance read-only |
-| Goods receipt | Staff may sign without controlled count/evidence | Mature ERP separates receipt from invoice; 2990 supports partial receipt | **ADAPT + IMPROVE** | Start from due PO/CO; count exact goods; attach delivery note; accept/reject issues; post once | Select source, count lines/Units, record condition, upload note, finish | `Goods Receipts` Register and guided one-scroll object; no PDF preview | Purchasing source; Stock movement/Unit; Supplier Claim trigger; no AP for consignment |
-| Supplier problem | On-spot rejection and later defect are mixed | Source-linked claim/return flows preserve evidence | **IMPROVE** | Reject at receipt if still with supplier; later discovery enters Service Case and creates Purchasing claim workstream | Check source, evidence, supplier response and authorised outcome | `Supplier Claims` Register; claim object and optional supplier claim pack | Service Case authority; GRN/Unit evidence; Finance credit read-only |
+| Physical receipt / GRN | Supplier DO and Carres GRN can be confused; counts may hide damaged/wrong/extra goods | Mature ERP separates supplier delivery evidence, physical receipt and payable invoice | **ADAPT + IMPROVE** | Receiving starts from the PO/CO, records the supplier DO and physical counts, then Carres creates the numbered GRN once | Open the exact source, record Order/Received/Damaged/Wrong/Pending facts and evidence, finish once | Receiving-owned workspace and GRN record; no second receipt door | PO/CO source; Stock receives only valid goods; Supplier Claim consequence; no AP for consignment |
+| Supplier problem | Receipt differences and later defects can be mixed | Source-linked claim/return flows preserve evidence | **IMPROVE** | Receiving records damaged/wrong/extra separately without reducing pending delivery or making stock available; later discovery enters Service Case and creates Purchasing claim work | Check source, evidence, supplier response and authorised outcome | `Supplier Claims` Register; claim object and optional supplier claim pack | Service Case authority; GRN/Unit evidence; Finance credit read-only |
 | Purchase return | Staff may create a return because goods look wrong | 2990 can derive a return from GRN but also permits blank return | **ADAPT / REJECT blank create** | Only an approved claim/outcome creates a return; issue document; collection proof moves custody | Send return, obtain collection date, scan exact Units, record handover | `Purchase Returns` Register; formal object; 50/50 while issuing/revising | Claim source; Stock custody; Finance credit consequence |
 | Repair order | Repair can be confused with replacement | Mature service logistics preserves exact serial/Unit custody | **IMPROVE** | Approved repair outcome creates RO; same Unit leaves and must return; replacement gets a new Unit ID | Issue repair order, hand over, chase dated return, inspect same Unit | `Repair Orders` Register; formal object; 50/50 while issuing/revising | Service outcome; Stock custody; Goods Receipt/inspection on return |
 | Display request | Sales negotiates with supplier while Purchasing places/controls order | Requisition should state purpose before external commitment | **IMPROVE** | Showroom asks for a model/display change; Purchasing decides buy, consignment, swap or no action | Showroom enters simple request; Purchasing resolves supplier/SKU/path | `Display Requests` Register and internal object; no PDF preview | Showroom/Sales request; Catalog; Manual Purchase or CO; Stock location |
-| Consignment order | Supplier-owned sofas are hard to count; purchased Hooka/Ohana displays are mixed in | Mature ERP keeps supplier ownership on receipt; 2990 has documents but fragmented truth | **ADAPT + IMPROVE** | Approved display/claim swap creates CO; exact Units and supplier ownership are fixed before delivery | Issue CO, send Unit IDs, record promise, receive through Goods Receipts | `Consignment Orders` Register; formal object; 50/50 while issuing/revising | Display Request; Stock Unit; Goods Receipt; Consignment Return |
+| Consignment order | Supplier-owned sofas are hard to count; purchased Hooka/Ohana displays are mixed in | Mature ERP keeps supplier ownership on receipt; 2990 has documents but fragmented truth | **ADAPT + IMPROVE** | Approved display/claim swap creates CO; exact Units and supplier ownership are fixed before delivery | Issue CO, send Unit IDs, record promise, receive through the one Receiving engine | `Consignment Orders` Register; formal object; 50/50 while issuing/revising | Display Request; Stock Unit; Goods Receipt; Consignment Return |
 | Consignment return | Removal/swap may be arranged informally | Physical handover, not document issue, changes custody | **IMPROVE** | Approved remove/swap/claim/overdelivery creates return; combined swap can share one CO PDF | Send standalone return if needed; obtain collection date; scan and prove handover | `Consignment Returns` Register; formal object; 50/50 while issuing/revising | CO swap, Stock custody, supplier proof; no refund/credit on unsold consignment |
 | Consignment sale notice | Staff may forget to tell supplier after a sale | Mature ERP creates consumption advice after actual consumption | **ADAPT + IMPROVE** | Successful delivery of exact supplier-owned Unit auto-creates one notice per supplier × attempt | Current PO Duty checks and sends; Finance later matches invoice | `Consignment Sale Notices` Register; no `+ New`; 50/50 while issuing/correcting | Delivery success; Stock ownership; source CO; Finance/AP continuation |
 
@@ -148,7 +148,7 @@ Purchasing ▾
 │  ├─ Manual Purchase
 │  └─ Purchase Orders
 ├─ RECEIVE ▾
-│  └─ Goods Receipts
+│  └─ Receiving
 ├─ PROBLEMS ▾
 │  ├─ Supplier Claims
 │  ├─ Purchase Returns
@@ -173,13 +173,14 @@ Rules:
 - There is no Purchase Demands page. Demand is a record, not a staff destination.
 - There are no New Supplier or New SKU request pages. A blocked buy opens an in-context governed
   supplier/SKU request to Catalog/Master Data and returns to the same buy.
-- There is no Consignment Overview or Consignment Receipts page. Goods Receipts receives purchased
+- There is no Consignment Overview or Consignment Receipts page. Receiving handles purchased
   and consignment goods; Stock Register reports supplier-owned Units.
 - Settings stays behind the global header gear. Reports use the central Reports area and Register
   export, not permanent Purchasing sidebar rows.
 
-Every one of the 11 destinations is a full-width Listing using the approved Register Template. A
-Listing never becomes 50/50. Every Listing retains a 200px page-owned left rail containing concrete
+Every Register destination uses the approved Register Template. Receiving's separate owner review
+governs its physical-receipt workspace and any listing around it. A Listing never becomes 50/50.
+Every Listing retains the shared 240px page-owned `FilterRail` containing concrete
 record/work facets; it never says `Today`, `Tomorrow`, `Follow Up`, `Needs Attention`, `Priority` or
 `Next Action`.
 
@@ -228,9 +229,9 @@ asks — and must answer — `What is this for?`; routine purposes do not ask a 
 Each exceptional purpose names its STRUCTURED object at creation (0401): a `Service Case`
 purchase links the actual Case, an `Internal Staff Purchase` names the real staff member, a
 `Subsidiary Purchase` names the actual subsidiary company; `Ready Stock` and
-`Showroom Display` are served by the governed destination on the request. An emergency is a
-Manual Purchase with an urgent reason and governed date (§2.2), not a purpose of its own. The
-four pre-ruling purposes (`Display` · `Warranty` · `Office` · `Spare Parts`) are retired: no
+`Showroom Display` are served by the governed destination on the request. There is no urgent or
+emergency purpose, extra question, queue or approval/issue bypass. The four pre-ruling purposes
+(`Display` · `Warranty` · `Office` · `Spare Parts`) are retired: no
 door accepts them for a new request and no historical row is relabelled into the new
 vocabulary. A new Manual Purchase is numbered `MPR-YYYYMMDD-RRRR` through the one §6.1
 allocator (0401); pre-0401 `REQ-####` identities are permanent and print exactly as stored.
@@ -239,23 +240,29 @@ retype it.
 
 ### 5.3 One PO issue authority
 
-Only Current PO Duty may complete PO issuance. Manager approval governs exceptions and commercial
-authority; it does not replace Current PO Duty as operator. Manager does not manually assign every
-row. Duty, roster and buddy-cover resolve the action owner automatically.
+SO Batch Purchase and Manual Purchase reach ONE PO issuance authority. The normal PO Duty and dated
+cover remain the work-owner metadata and the selection toolbar's normal-owner hint; they are not the
+only permission. `operation@carres.com` and Jess are Operations Superusers and may use the same
+governed issue/send doors. The audit stores the actual authenticated actor separately from the
+normal duty holder and dated cover. Approval and commercial gates still apply; superuser authority
+does not create a second PO writer or permit a requester to mark demand ordered.
 
 **HOW IT IS ENFORCED — BUILT, migrations 0379 / 0380, PR #894.** `purchasing_po_actor()` is the ONE
-resolver. It reads the month's `ops_po_duty` holder and the dated `ops_po_duty_cover` window, and
-returns both people separately: the normal holder, because Team Work groups by them, and the acting
-cover, because the audit trail must say who pressed it. `purchasing_actor_may_issue()` is the gate,
+resolver. It reads the month's `ops_po_duty` holder, the dated `ops_po_duty_cover` window and the
+governed Operations Superuser identities, and returns owner metadata separately from the actual
+authenticated actor. `purchasing_actor_may_issue()` is the gate,
 and it is asked by the CREATION AUTHORITY itself — `purchasing_issue_pos_batch` — and by the evidence
 door `purchasing_confirm_po_sent`. So SO Batch Purchase, Manual Purchase and a direct RPC call all
-meet the same authority; a door only its caller guards is not guarded. A principal who holds neither
-role is refused: audit access is not issuance authority. Cover has no write policy — it is set
+meet the same authority; a door only its caller guards is not guarded. A person who is neither an
+Operations Superuser nor the resolved duty/cover is refused: audit access alone is not issuance
+authority. Cover has no write policy — it is set
 through a governed door, never by a browser.
 
 ### 5.4 Deliver To
 
-Default is `Carres Klang`.
+The destination comes from the source PO/CO `Deliver To`. When a new buy needs a default, use the
+configured Carres warehouse (currently Carres Klang); a showroom is an explicit exception, never a
+Receiving guess.
 
 - Before issue: change or split quantity freely in SO Batch Purchase / Manual Purchase.
 - Numbered PDF prepared but not sent: update the same issue surface; History records it.
@@ -321,9 +328,11 @@ Completed
 Cancelled
 ```
 
-Each line retains ordered, accepted, rejected, cancelled and remaining quantity. Supplier date may
-split by quantity. A late or missing promise creates dated supplier-contact work; it never rewrites
-the customer promise.
+Each line retains Order Qty, Received Qty and Pending Delivery Qty. Receiving records Damaged Qty,
+Wrong Item Qty and Extra Qty separately; damaged, wrong and extra goods do not reduce Pending
+Delivery Qty and never create available stock. A supplier date may split by quantity. A late,
+missing or changed promise creates supplier-contact work; it never rewrites the original PO
+Delivery Date or the customer promise.
 
 ---
 
@@ -424,16 +433,17 @@ Sales Order line
 → Delivery-derived latest arrival date becomes Purchasing required date
 → SO Batch Purchase groups ready lines by supplier
 → operator checks/splits Deliver To
-→ Current PO Duty sends numbered PO PDF
+→ an authorised issuer uses the one PO door; normal PO Duty remains the work owner
 → supplier promise/exception is recorded
-→ Goods Receipts records actual arrival
-→ Stock owns accepted Units and location
+→ Receiving starts from that exact PO and the supplier DO
+→ Carres records physical receipt and creates the numbered GRN
+→ Stock owns only valid received Units and location
 ```
 
 Partial availability creates separate Warehouse work for available quantity and Purchasing work for
 missing quantity. Sales Orders only displays the risk.
 
-### 7.2 Manual and emergency purchase
+### 7.2 Manual Purchase
 
 ```text
 Staff selects purpose
@@ -441,22 +451,23 @@ Staff selects purpose
 → Catalog/supplier/price authority checks
 → governed approver approves or rejects
 → approved record creates purchase_demand
-→ Current PO Duty issues through the same PO path
+→ an authorised issuer uses the same PO path as SO Batch Purchase
+→ the same Receiving engine handles physical arrival
 ```
-
-Emergency adds urgency reason, actual required date and faster governed approval/PO clock. It never
-permits “buy now, fill facts later”.
 
 ### 7.3 Receiving and later defect
 
 ```text
-PO/CO due to arrive
-→ Goods Receipt starts from source
-→ count quantity and exact Unit IDs where required
-→ inspect condition and delivery note
-├─ problem visible before acceptance → reject on the spot; record proof
-└─ accepted → Stock receives custody/location
-                    └─ problem found later → Service Case → Supplier Claim workstream
+PO/CO carries the official Deliver To and original PO Delivery Date
+→ supplier provides its Supplier DO and may provide a changed Supplier Delivery Date
+→ Receiving starts from that exact PO/CO; it never authors another purchase or receipt source
+→ record Goods Received At as the physical receipt date
+→ record Order Qty, Received Qty, Damaged Qty, Wrong Item Qty and Pending Delivery Qty
+→ attach Supplier DO/evidence and exact Unit IDs where required
+→ finish physical receiving; Carres creates the numbered GRN
+├─ valid received goods → Stock receives custody/location
+├─ damaged/wrong/extra → no available stock and no reduction of Pending Delivery Qty
+└─ problem found later → Service Case → Supplier Claim workstream
 ```
 
 The user-facing gate uses two lines:
@@ -509,7 +520,7 @@ correction preserves lineage.
 ```text
 ┌─ destination header · 50px · title 24px · no icon ──────────────────────────┐
 ├─ toolbar · search / filter / sort / display / export ───────────────────────┤
-├──── 200px local rail ────┬──────── full-width register table ───────────────┤
+├──── 240px local rail ────┬──────── full-width register table ───────────────┤
 │ record facets            │ 36px header · 38px rows · 32px footer           │
 │ concrete work facets     │ row inspector; safe bulk actions only           │
 └───────────────────────────┴──────────────────────────────────────────────────┘
@@ -930,8 +941,8 @@ structured For object → enter goods/quantity/date/destination → system resol
 Catalog/supplier/approval → approved demand goes to PO Duty.
 **Object/placement:** internal full-width object; no supplier PDF. New supplier/SKU request is an
 in-context blocker, not a page.
-**Exceptions:** duplicate stock, missing quantity, unapproved price, emergency without required
-facts, rejected/withdrawn request.
+**Exceptions:** duplicate stock, missing quantity/date/destination, unapproved price,
+missing governed Catalog/supplier relationship, refused/withdrawn request.
 **Connections:** Catalog, Stock planning, Display Request, Purchase Demand, PO, Service Case.
 
 ### 9.3 Purchase Orders
@@ -939,8 +950,13 @@ facts, rejected/withdrawn request.
 **Purpose / source:** every numbered supplier purchase commitment and version. No blank independent
 PO; source is approved demand.
 **Left rail:** `PDF not sent`, `Supplier date missing`, `Supplier date passed`, `Version changed — supplier update required`, `Partly received`, `Completed`.
-**Columns:** PO No., Supplier, Source, Issued, Deliver To, Ordered, Received, Open Balance, Supplier
-Date, Current Version, Supplier Has, Work.
+**Date facts:** `PO Issued` sits beside `PO No` and means when Carres issued the current supplier
+commitment. `PO Delivery Date` is the original official supplier-facing date on the PO. A separate
+`Supplier Delivery Date` Register column appears only when the supplier has changed that date;
+unchanged rows read `Same as PO`. `Goods Received At` belongs to Receiving and never substitutes for
+any of these dates.
+**Columns:** PO No., PO Issued, Supplier, Source, Deliver To, PO Delivery Date, Supplier Delivery
+Date when changed, Ordered, Received, Pending Delivery Qty, Current Version, Supplier Has.
 **Journey:** open prepared issue → validate authority/price/Units/destination → send PDF → record
 outbound fact → record supplier date or exception → monitor receipt balance.
 **Object/placement:** full-width view; 50/50 check/preview for issue/change; Document, Revisions,
@@ -949,19 +965,30 @@ History, Order Route.
 overdelivery, price change, cancellation and post-send destination change.
 **Connections:** demand, supplier, GRN, Stock, claims, Finance read-only.
 
-### 9.4 Goods Receipts
+### 9.4 Receiving / GRN seam — OWNER CORRECTION 2026-08-29
 
-**Purpose / source:** one receipt engine for PO and CO arrivals; source first, never blank.
-**Left rail:** `Due to arrive`, `Count not finished`, `Delivery note missing`, `Problem found`, `Part received`, `Posted`.
-**Columns:** GRN No., Source PO/CO, Supplier, Deliver To, Arrival Date, Expected, Accepted, Rejected,
-Delivery Note, Unit Labels, Work.
-**Journey:** select source → count → match Unit IDs → inspect → reject issue on spot or accept →
-upload note → finish → Stock movement is created once.
-**Object/placement:** guided full-width one-scroll object; no PDF preview.
-**Exceptions:** no delivery note, wrong/extra/missing/damaged item, duplicate receipt, unlabelled Unit,
-partial arrival. Overdelivery is not silently accepted.
-**Connections:** PO/CO, Stock Unit/location/ownership, Supplier Claim, Finance receipt match; consignment
-receipt creates no payable.
+This section supersedes the stale `Goods Receipts` rail, status legend, `Source`, `Arrival Date`,
+`Expected`, `Accepted`, `Rejected` and Receiving `Work` column proposal that formerly lived here.
+The separate Receiving owner review owns its final page presentation; Purchasing binds these shared
+facts only:
+
+- Navigation/workspace is `Receiving`. The supplier gives the Supplier DO; Carres creates the Goods
+  Receipt and numbered GRN only after physical receiving.
+- One Receiving engine handles PO and CO arrivals. SO Batch Purchase and Manual Purchase both pass
+  through the one PO authority and this same Receiving engine; no Manual receipt lane exists.
+- Source `Deliver To` is authoritative. The normal default is the configured Carres warehouse; a
+  showroom is an explicit source exception.
+- `Goods Received At` is the physical receipt date only. It never means keyed, submitted or posted
+  time and never replaces PO Issued, PO Delivery Date or Supplier Delivery Date.
+- Quantity words are `Order Qty` · `Received Qty` · `Damaged Qty` · `Wrong Item Qty` ·
+  `Pending Delivery Qty`. Extra quantity is recorded separately. Damaged/wrong/extra never reduce
+  Pending Delivery Qty and never create available stock.
+- Supplier DO, channel/evidence, recorder and event times remain auditable. Finishing receiving
+  creates the GRN once and moves only valid received goods into Stock custody.
+- Receiving-owned work deep-links the exact PO/Receiving Session. A Purchasing supplier chase
+  deep-links the exact PO. Merely opening WhatsApp/email completes nothing.
+
+No migration or Receiving implementation is authorised by this 2026-08-29 seam record.
 
 ### 9.5 Supplier Claims
 
@@ -1028,7 +1055,7 @@ no blank `+ New`.
 **Columns:** CO No., Supplier, Source Request, Coming In Units, Going Back Units, Showroom, Supplier
 Date, Received, Return Handover, Work.
 **Journey:** verify supplier ownership → allocate exact Unit IDs → check coming-in/going-back lines →
-send one PDF → record promise → receive through Goods Receipts → prove outgoing handover.
+send one PDF → record promise → receive through Receiving → prove outgoing handover.
 **Object/placement:** full-width view; 50/50 while issuing/revising. Ownership is locked.
 **Exceptions:** supplier cannot label physical Unit, package-only label, missing Unit source, partial
 swap, supplier changes model/date.
@@ -1070,11 +1097,11 @@ invoice/settlement.
 
 | Trigger | Owner rule | Action example | Completion fact |
 |---|---|---|---|
-| Approved demand ready | Current PO Duty | `Issue the purchase order to Hooka` | Current PDF version sent and outbound fact exists |
-| Supplier date missing | Current PO Duty | `Ask Hooka for the delivery date` | Supplier date exists |
-| Required arrival at risk | Current PO Duty | `Ask Hooka if the goods can arrive by Fri, 28 Aug` | Governed supplier answer/exception exists |
-| PO/CO goods arrive | Current GRN Duty | `Receive PO-20260820-4827 from Hooka` | GRN posted or rejected outcome recorded |
-| Delivery note missing | Current GRN Duty | `Upload the delivery note before you finish receiving` | Attachment exists |
+| Approved demand ready | Normal PO Duty/cover; Operations Superuser may act | `Issue the purchase order to Hooka` | Current PDF version sent, outbound fact and actual actor exist |
+| Supplier date missing | Normal PO Duty/cover; Operations Superuser may act | `Ask Hooka for the delivery date` | Actual supplier answer, channel, evidence, recorder and times exist on the exact PO |
+| Required arrival at risk | Normal PO Duty/cover; Operations Superuser may act | `Ask Hooka if the goods can arrive by Fri, 28 Aug` | Governed supplier answer/exception, evidence and actual actor exist on the exact PO |
+| PO/CO goods arrive | Normal GRN Duty/cover; Operations Superuser may act | `Receive PO-20260820-4827 from Hooka` | Exact Receiving Session records physical outcome and numbered GRN |
+| Supplier DO/evidence missing | Normal GRN Duty/cover; Operations Superuser may act | `Add the Supplier DO before you finish receiving` | Supplier DO reference/evidence and actual recorder exist on the Receiving Session |
 | Showroom display change | Showroom role then Purchasing decision role | `Record the current Unit and requested model` | Required request facts exist |
 | Supplier claim reply missing | Current PO Duty | `Ask Hooka to reply to the supplier claim` | Supplier reply exists |
 | Return collection missing | Current PO Duty | `Ask Hooka for the collection date` | Collection date exists |
@@ -1085,10 +1112,12 @@ invoice/settlement.
 Quick Rail may show source, exact Unit, supplier contact, current document/version, destination,
 proof, linked object and read-only foreign-module state. It never edits another module's truth.
 
-Calendar displays only governed work dates with actual weekday + calendar date. The shared date
-formatter omits the year only when it is the current year. Supplier, Carres,
-warehouse, showroom and logistics calendars/cutoffs may calculate different dates; no date is moved
-merely to make a queue look cleaner.
+Calendar displays only governed work dates with actual weekday + calendar date. Purchasing /
+Operation uses the Office calendar (Mon–Fri); Receiving / GRN / Warehouse uses the Warehouse
+calendar (Mon–Sat). Sunday and Selangor public holidays are excluded. Recorded business dates are
+never silently moved: PO Delivery Date, Supplier Delivery Date and Goods Received At remain the
+dates actually stated/observed. A computed work due date may use its governed calendar only when
+the rule and resulting date are visible.
 
 ---
 
@@ -1097,9 +1126,10 @@ merely to make a queue look cleaner.
 Settings lives under the global header gear and requires authorised roles. It includes:
 
 - document number format/version and locked Unit ID family;
-- PO Duty and GRN Duty rosters, buddy cover and working calendars;
-- approval limits, purposes and emergency response clock;
-- default `Deliver To` (`Carres Klang`) and permitted destinations;
+- PO Duty and GRN Duty rosters, buddy cover, Operations Superusers and working calendars;
+- approval limits and Manual Purchase purposes;
+- configured default warehouse `Deliver To` (currently `Carres Klang`) and permitted showroom
+  exceptions;
 - supplier channels, contacts, lead/production days and calendars;
 - PO grouping rules and source-preservation law;
 - purchased vs supplier-consignment agreements and settlement terms;
@@ -1137,10 +1167,11 @@ are snapshots, not editable truth or a second settlement ledger.
 | Role | May do | May not do |
 |---|---|---|
 | Sales / Showroom | create Display Request; read connected purchase state; receive/sign/report at showroom if rostered | issue PO/CO, choose supplier price, change ownership |
-| Requester | create Manual Purchase and supply missing request facts | approve own request or mark ordered |
-| Approver / Manager | approve/reject governed internal buy and commercial exceptions | replace receiving/PO duty evidence |
-| Current PO Duty | batch approved demand; issue/revise supplier documents; record promises/claims | approve own unauthorised price; post stock or supplier payment |
-| Current GRN Duty | count, inspect, attach note, accept/reject and post source receipt | change PO price/quantity or ownership agreement |
+| Requester | create Manual Purchase and supply missing request facts | issue PO or mark ordered merely because they requested it |
+| Approver / Manager | approve/reject governed internal buy and commercial exceptions; the configured approver may approve their own request | replace receiving/PO evidence |
+| Normal PO Duty / dated cover | owns the daily work; issue/revise supplier documents; record promises/claims through the one door | approve unauthorised price; post stock or supplier payment |
+| Operations Superuser (`operation@carres.com`, Jess) | use the same governed PO and Receiving doors when needed; actual actor remains separate from normal duty/cover | create a second PO/receipt writer or bypass approval/commercial gates |
+| Normal GRN Duty / dated cover | owns daily Receiving work; count, inspect, attach Supplier DO/evidence and finish source receipt | change PO price/quantity or ownership agreement |
 | Stock / Warehouse | label, locate, move, reserve and prove physical custody | issue/cancel supplier commitments |
 | Service | intake problem and govern problem/outcome record | create unapproved Purchasing consequence |
 | Finance / AP | match supplier invoice, credit, settlement and payment | rewrite receipt, Unit, delivery or PO facts |
@@ -1153,8 +1184,10 @@ No Purchasing object has one universal owner. Each action resolves owner and cov
 
 ## 14 · External integration boundaries
 
-- WhatsApp/email: supplier-facing PDF is sent outside; the Portal records version, recipient,
-  channel, actor and time. Opening the app is not proof of sending.
+- WhatsApp/email: supplier-facing PDF/questions are sent outside; the Portal records version,
+  recipient, channel, actor and time. Opening the app is not proof of sending or chasing. A chase
+  completes only when the actual supplier answer plus channel, evidence, reporter/recorder and
+  relevant times are stored on the exact PO.
 - Supplier portal: future read/response surface must write to the same PO/CO/claim/notice records,
   not create a parallel acknowledgement ledger.
 - AutoCount/Finance: may receive approved PO/GRN/invoice references at the Finance boundary. It does
@@ -1195,7 +1228,8 @@ The final Carres model rejects:
 |---|---|
 | ERP PLAN CHAT START PROTOCOL re-read | PASS |
 | Current authority and conflicts audited | PASS |
-| Emergency / Manual / demand / PO Owner Decision Gate | **RESOLVED FROM AUTHORITY** |
+| Manual / demand / PO Owner Decision Gate | **RESOLVED FROM AUTHORITY** |
+| Purchasing → Receiving owner seam reconciled 2026-08-29 | **PASS — no implementation/migration authorised** |
 | Current Carres challenged | PASS |
 | 2990 purchasing/consignment domain mined top-to-toe | PASS |
 | Mature ERP/WMS/logistics references reconciled | PASS |

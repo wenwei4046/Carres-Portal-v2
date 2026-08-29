@@ -149,8 +149,11 @@ module quietly inherited it.**
 | **Delivery** | **Monday–Friday**; **Saturday** runs at reduced capacity (`Landed = 1 · Condo = 0.5`); **Sunday closed** | delivery capacity · booking · route planning |
 
 **Common to all three:** Malaysian public holidays are excluded (the live set is the Selangor
-observance — the warehouse is in Selangor), and a due date landing on a non-working day moves
-automatically to the next working day OF ITS OWN CALENDAR.
+observance — the warehouse is in Selangor). A RECORDED BUSINESS DATE is never silently moved:
+customer request, PO Delivery Date, Supplier Delivery Date and Goods Received At remain exactly
+what was stated or observed. A computed WORK due date may move to the next working day OF ITS OWN
+CALENDAR only when the governing rule explicitly says so and the UI exposes the resulting actual
+weekday + date; otherwise the date is refused or retained with its named exception.
 
 **An action that does not name its calendar is not finished.** Two examples of why, both
 real: a supplier's own production week is neither of the three (docs/purchasing/MASTER.md); and the
