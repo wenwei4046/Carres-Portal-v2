@@ -1038,7 +1038,15 @@ groups by (supplier × category × destination × purpose, merged across request
 ownership and reminders stay in central `Work`; issuance authority remains the one
 `purchasing_issue_pos_batch` door.
 
-**THE OBJECT DETAIL — APPROVED / LOCKED, Card 05 (2026-08-29).** Clicking `Manual Purchase
+**THE OBJECT DETAIL — APPROVED / LOCKED, Card 05 (2026-08-29); PRODUCTION-VERIFIED on
+`a43de3b7` 2026-08-29** (PR #984; no migration; walked authenticated on the live
+`operation@carres.com` account against the real `MPR-20260829-2779`: full-width six-section
+object, `Requested By` honestly `Staff identity not recorded` for the shared-login record,
+Approval showing `Need approval · Jess approves` with NO money and NO controls, `Not ordered
+yet` lineage, History `Purchase requested` in the three-rank grammar, and `‹ Manual Purchase`
+restoring the Register; the approver money/decision surface and the prev/next stepping were
+proven on the same SHA's seeded dev walk plus the API contract tests — Jess's live positive
+walk remains hers). Clicking `Manual Purchase
 No` opens WORK: one full-width, one-scroll object on the approved Object Header + Summary +
 Sections + History template. No tabs, no drawer, no split preview, no PDF and no narrow
 720/900px islands. Sections, exactly and in this order:
