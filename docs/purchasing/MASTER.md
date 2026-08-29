@@ -874,6 +874,14 @@ SUPPLIER
   prepares and submits; it does not approve and does not control price. Approved requests
   continue into the one governed PO Duty issuance door; Manual Purchase and SO Batch
   Purchase remain separate doors.
+- **The decision renders only for who the SQL door would pass (fixed 2026-08-29).**
+  `purchasing_decide_request`'s gate (`purchasing_settings_gate`, 0360) is the `principal`
+  role or the real `ops_manager` position duty — no legacy-email pass — and `canApprove`
+  (the Approve/Refuse controls AND the approver-only money) asks exactly that, never the
+  wider daily-surface manager check that admits the shared `operation@` login. Card 04's
+  production walk measured the disagreement (`MPR-20260829-2779`: controls offered, door
+  refused with the raw word `forbidden`); the door's 42501 now leaves as the governed two
+  lines (`not_purchase_approver`), naming the resolved approver.
 - **The vocabulary's applied door authority is migration 0399** (2026-08-28): two Card-03
   build lanes collided on 0398, and the intermediate `0398a` apply left two inert
   `purchasing_purpose_approval` rows (`internal_staff`, `subsidiary`) that 0399 documents

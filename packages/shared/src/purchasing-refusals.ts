@@ -72,6 +72,11 @@ export function purchasingRefusal(
         wrong: "Nobody holds PO duty this month.",
         todo: "Ask management to set this month's PO duty holder.",
       };
+    case "not_purchase_approver":
+      return {
+        wrong: "Only the approver may decide this purchase.",
+        todo: `Ask ${some(facts.actor, "a manager")} to approve or refuse it.`,
+      };
 
     // ── THE MONEY (0380) ──────────────────────────────────────────────────
     case "supplier_price_changed":
@@ -301,6 +306,7 @@ export function purchasingRefusalLine(
 export const PURCHASING_REFUSAL_CODES = [
   "not_po_duty",
   "no_po_duty_holder",
+  "not_purchase_approver",
   "supplier_price_changed",
   "stale_catalog_cost",
   "expected_cost_required",
