@@ -658,6 +658,12 @@ directory only and said so.*
   do not repeat that group identity unless the row is shown outside the group. **The count words
   are `{n} actions to do · {n} late`** (owner ruling 2026-08-16, blueprint card §7 — supersedes
   this section's earlier `open · overdue` pair): every count says WHAT it counts.
+- **My Work is the default for every employee, including a manager** (Owner-approved Purchasing →
+  Receiving work model, 2026-08-29). Authority does not erase personal work. `Team Work` is the
+  explicit supervision view over the same set, never the manager's automatic landing replacement.
+- A module-local **`WORK TO DO` first rail panel is a contextual filter** over that module's same
+  governed actions. It may narrow the Register and deep-link to the owning write door; it may not
+  persist a second task row, calculate another owner/due date or expose manual `Done`.
 - A Current Action or Work row uses two visual lines when both fact and action are needed.
   **Line 1** is the fact/problem in governed body size and medium/semibold emphasis. **Line 2**
   is the next action in the governed smaller supporting size, regular weight and quieter but

@@ -1,6 +1,6 @@
 # PURCHASING — MASTER
 
-Status: **APPROVED / LOCKED — OWNER REVIEW COMPLETE 2026-08-22**
+Status: **APPROVED / LOCKED — OWNER REVIEW COMPLETE 2026-08-29**
 Lane: **PLAN COMPLETE**
 
 This file is the only canonical Purchasing Blueprint. It owns the Purchasing and Goods Receipt
@@ -70,6 +70,19 @@ There are not two genuine Carres operating models.
 
 Therefore the emergency continuation, Manual Purchase relationship, demand truth and PO ownership
 are **RESOLVED FROM AUTHORITY**. No Owner Decision remains.
+
+### 2.3 Ruling — daily Purchasing → Receiving → GRN → Claim / Return chain
+
+**OWNER-APPROVED / LOCKED 2026-08-29.** Purchasing and Goods Receipts execute in their owning
+modules while the shared Work Engine gives staff and managers one daily list. The governing design
+is recorded in
+[`docs/superpowers/specs/2026-08-29-purchasing-receiving-work-design.md`](../superpowers/specs/2026-08-29-purchasing-receiving-work-design.md).
+
+The six questions must be answerable for every open action: **who acts · which actual working day ·
+where they act · what proves completion · who supervises · what consequence follows**. `My Work`
+and `Team Work` project these module actions; they never store a second completion or expose manual
+`Done`. A module-local `WORK TO DO` panel is a contextual filter over the same actions, not a new
+work queue.
 
 ---
 
@@ -238,7 +251,9 @@ Superuser through Principal authority; `operation@carres.com` is the explicitly 
 Operations Superuser. An ordinary Operations login that is neither duty, cover nor superuser is
 refused. Commercial approval remains separate and never follows from issue authority.
 
-**HOW IT IS ENFORCED — BUILT, migrations 0379 / 0380; 0400 pending governed apply.**
+**HOW IT IS ENFORCED — migrations 0379 / 0380 live in repository authority; this worktree's 0400
+is branch-only and pending merge-order reconciliation plus governed apply. Production still shows
+the pre-0400 refusal until the exact approved SHA is deployed and walked.**
 `purchasing_po_actor()` is the ONE
 resolver. It reads the month's `ops_po_duty` holder and the dated `ops_po_duty_cover` window, and
 returns both people separately: the normal holder, because Team Work groups by them, and the acting
@@ -258,6 +273,13 @@ Permitted destinations are Purchasing Settings master data, not a fixed browser 
 set is `Carres Klang` · `AL Sungai Buloh` · `HOUZS` · `Ohana`; an authorised Settings manager may
 add a future destination, record its address, make it the default or stop offering it for new POs.
 Historical POs keep the destination name and address saved on their issued version.
+
+Every active destination also resolves the receiving station/party, applicable arrival calendar,
+whether it links to a Carres warehouse or is external/no-Stock, and whether Unit scan and signed-DO
+evidence are required. A warehouse-linked destination derives its address and Stock consequence
+from Warehouse authority. An external destination does not create Carres Stock merely because it
+can receive a supplier PO. These receiving fields are **APPROVED TARGET / NOT BUILT**; until they
+exist, a new destination may not silently invent who receives or what Stock consequence follows.
 
 - Before issue: change or split quantity freely in SO Batch Purchase / Manual Purchase.
 - Numbered PDF prepared but not sent: update the same issue surface; History records it.
@@ -427,8 +449,12 @@ Sales Order line
 → SO Batch Purchase groups ready lines by supplier
 → operator checks/splits Deliver To
 → Current PO Duty sends numbered PO PDF
-→ supplier promise/exception is recorded
-→ Goods Receipts records actual arrival
+→ exact version, recipient, channel, actual actor and normal duty/cover are recorded
+→ Current PO Duty confirms arrival one Office working day before it is due
+→ supplier answer/date and WhatsApp or equivalent response evidence are recorded
+→ Goods Receipts appears for Current GRN Duty on the Warehouse-calendar arrival day
+→ physical count/inspection becomes one Receiving Session
+→ Current GRN Duty posts it and the formal GRN exists
 → Stock owns accepted Units and location
 ```
 
@@ -449,31 +475,64 @@ Staff selects purpose
 Emergency adds urgency reason, actual required date and faster governed approval/PO clock. It never
 permits “buy now, fill facts later”.
 
-### 7.3 Receiving and later defect
+### 7.3 Receiving, formal GRN and later defect
 
 ```text
 PO/CO due to arrive
-→ Goods Receipt starts from source
-→ count quantity and exact Unit IDs where required
-→ inspect condition and delivery note
-├─ problem visible before acceptance → reject on the spot; record proof
-└─ accepted → Stock receives custody/location
-                    └─ problem found later → Service Case → Supplier Claim workstream
+→ Goods Receipt starts from source on the promised Warehouse-calendar arrival day
+├─ Carres receiving station → GRN Duty counts, inspects and records evidence
+└─ assigned 3PL warehouse → warehouse staff submits the physical count/evidence
+                              → GRN Duty reviews the same Receiving Session
+→ signed DO + exact Unit outcomes + counter + actual time/site are present
+├─ accepted → post once → formal GRN → Stock receives custody/location
+├─ accepted with issue → formal GRN → Unit controlled → Supplier Claim opens
+├─ rejected on spot → no available Stock → hand-back proof → Claim only if supplier still owes a result
+└─ not delivered / partial → accepted part posts; remainder stays Incoming
+                              → PO Duty confirms the balance delivery date
+
+problem found after acceptance → Service Case → authorised supplier responsibility
+                                  → Supplier Claim → Return / Repair / other governed outcome
 ```
+
+Office direct receiving and Warehouse submission are two entry doors to one Receiving Session and
+one posting engine. A Warehouse submission moves no Stock until GRN Duty posts it. Office direct
+receiving posts one `posted` event because one person performed one business act. `GRN-…` is the
+formal Receiving Record number and exists from the posted session; a draft/submitted count is not a
+formal GRN.
+
+Normal GRN Duty, dated cover and actual actor remain separate evidence. Jess and the governed
+Operations Superuser may perform the operational act without becoming GRN Duty. An ordinary person
+outside duty/cover/capability is refused by the same web, API and SQL authority.
 
 The user-facing gate uses two lines:
 
 > **Delivery note is missing**
 > Upload it before you finish receiving.
 
-### 7.4 Purchased showroom display
+### 7.4 Partial, reject, claim and return consequences
+
+- **Partial receipt:** accepted Units post immediately; the exact open balance remains Incoming.
+  `Confirm balance delivery date` opens for PO Duty and closes only from a new evidenced supplier
+  promise. Partial by itself is not damage and does not create a claim.
+- **Reject on the spot:** rejected/not-delivered Units never become available Stock. The receipt
+  records exact quantity/Units, observable reason, photos and supplier/carrier hand-back proof. A
+  Claim opens only when Carres still needs a replacement, repair, collection or other supplier
+  result.
+- **Accept with issue:** Carres accepts physical custody but the exact Unit is controlled and
+  unavailable. The same posted receipt creates the source-linked Supplier Claim and retains GRN
+  evidence.
+- **Purchase Return:** only an approved Claim/outcome creates it. Issuing the document does not
+  move custody. Exact-Unit scan/count, actual collector, time and handover proof create the Stock
+  consequence. Partial collection leaves the remaining Units open.
+
+### 7.5 Purchased showroom display
 
 Hooka/Ohana display goods are Carres purchases, not consignment. A Display Request resolves to Manual
 Purchase/PO. When the model changes, the Unit returns to Carres custody, may go to Hooka/Ohana for
 repair and may later be resold. Stock ownership remains Carres unless an authorised consequence
 changes it.
 
-### 7.5 Supplier-consignment showroom display
+### 7.6 Supplier-consignment showroom display
 
 Other sofa suppliers such as Dorsettloft may own display stock.
 
@@ -492,7 +551,7 @@ Display Request approved for consignment
 A model swap uses one CO external instruction with `COMING IN` and `GOING BACK`. The outgoing return
 record is auto-linked; no duplicate supplier message. Document issue alone does not move either Unit.
 
-### 7.6 Consignment sale notice trigger
+### 7.7 Consignment sale notice trigger
 
 Only a successful/partially successful delivery attempt for an exact supplier-owned Unit creates a
 notice. SO creation, deposit, reservation and delivery planning do not.
@@ -573,6 +632,12 @@ Cover rule
 
 My Work omits the current user's repeated avatar. Team Work groups by resolved owner. Leave/buddy
 cover changes who sees today's work while preserving normal owner and cover evidence.
+
+The owning module supplies stable action identity, source, trigger, due date/calendar, recipient,
+required result, completion fact and exact deep link. Work composes these actions and writes no
+business outcome. Managers, including the governed Operations Manager accounts, supervise through
+`Team Work`; the normal owner group survives even when a dated cover or Operations Superuser acts.
+Module-local `WORK TO DO` rails are filters over these same module actions.
 
 ---
 
@@ -933,6 +998,13 @@ partial arrival. Overdelivery is not silently accepted.
 **Connections:** PO/CO, Stock Unit/location/ownership, Supplier Claim, Finance receipt match; consignment
 receipt creates no payable.
 
+**Daily ownership / evidence:** promised arrival opens `Check in` for Current GRN Duty on that
+Warehouse-calendar date. At a Carres receiving station, GRN Duty performs count/inspection/posting.
+At an assigned 3PL, warehouse staff submits physical count/evidence and GRN Duty reviews/posts the
+same session. Jess or Operations Superuser may act without replacing GRN Duty. A posted session
+preserves counter, poster, normal duty, dated cover, signed DO, actual site/time and per-Unit
+outcomes, and only then carries the formal `GRN-…` identity.
+
 ### 9.5 Supplier Claims
 
 **Purpose / source:** Purchasing workstream for a supplier-responsible Service Case or receiving
@@ -1040,11 +1112,13 @@ invoice/settlement.
 
 | Trigger | Owner rule | Action example | Completion fact |
 |---|---|---|---|
-| Approved demand ready | Current PO Duty | `Issue the purchase order to Hooka` | Current PDF version sent and outbound fact exists |
-| Supplier date missing | Current PO Duty | `Ask Hooka for the delivery date` | Supplier date exists |
-| Required arrival at risk | Current PO Duty | `Ask Hooka if the goods can arrive by Fri, 28 Aug` | Governed supplier answer/exception exists |
-| PO/CO goods arrive | Current GRN Duty | `Receive PO-20260820-4827 from Hooka` | GRN posted or rejected outcome recorded |
+| Approved demand ready | Current PO Duty / dated cover | `Issue the purchase order to Hooka` | Current PDF version sent; normal duty/cover and actual actor preserved |
+| Supplier date missing | Current PO Duty / dated cover | `Ask Hooka for the delivery date` | Dated supplier answer plus response evidence exists |
+| Arrival due next Office work day | Current PO Duty / dated cover | `Confirm Hooka's Fri, 28 Aug arrival` | Arrival answer/date and WhatsApp or equivalent evidence exists |
+| Required arrival at risk | Current PO Duty / dated cover | `Ask Hooka if the goods can arrive by Fri, 28 Aug` | Governed supplier answer/exception and response evidence exists |
+| PO/CO goods arrive | Current GRN Duty / dated cover | `Check in PO-20260820-4827 from Hooka` | Receiving Session posted with exact outcomes; formal GRN exists |
 | Delivery note missing | Current GRN Duty | `Upload the delivery note before you finish receiving` | Attachment exists |
+| Partial receipt leaves balance | Current PO Duty / dated cover | `Ask Hooka for the balance delivery date` | Evidenced balance promise exists for the open line |
 | Showroom display change | Showroom role then Purchasing decision role | `Record the current Unit and requested model` | Required request facts exist |
 | Supplier claim reply missing | Current PO Duty | `Ask Hooka to reply to the supplier claim` | Supplier reply exists |
 | Return collection missing | Current PO Duty | `Ask Hooka for the collection date` | Collection date exists |
@@ -1060,6 +1134,11 @@ formatter omits the year only when it is the current year. Supplier, Carres,
 warehouse, showroom and logistics calendars/cutoffs may calculate different dates; no date is moved
 merely to make a queue look cleaner.
 
+`My Work` is the employee's complete daily list and is the default even for a manager. `Team Work`
+is supervision over the same set: normal owner, dated cover, actual actor, due/late state, named
+blocker and missing evidence. Neither surface exposes manual `Done`; actions close from the module
+completion facts in the table above.
+
 ---
 
 ## 11 · Settings
@@ -1070,7 +1149,8 @@ Settings lives under the global header gear and requires authorised roles. It in
 - PO Duty and GRN Duty rosters, buddy cover and working calendars;
 - approval limits, purposes and emergency response clock;
 - default `Deliver To` (`Carres Klang`) and permitted destinations, including add, address,
-  availability and default controls;
+  availability, default, receiving station/party, arrival calendar, linked Warehouse/no-Stock
+  consequence, Unit-scan requirement and signed-DO evidence controls;
 - supplier channels, contacts, lead/production days and calendars;
 - PO grouping rules and source-preservation law;
 - purchased vs supplier-consignment agreements and settlement terms;
@@ -1110,9 +1190,9 @@ are snapshots, not editable truth or a second settlement ledger.
 | Sales / Showroom | create Display Request; read connected purchase state; receive/sign/report at showroom if rostered | issue PO/CO, choose supplier price, change ownership |
 | Requester | create Manual Purchase and supply missing request facts | approve own request or mark ordered |
 | Approver / Manager | approve/reject governed internal buy and commercial exceptions | replace receiving/PO duty evidence |
-| Current PO Duty | batch approved demand; issue/revise supplier documents; record promises/claims | approve own unauthorised price; post stock or supplier payment |
-| Operations Superuser (Jess; governed shared Operations account) | perform the operational PO actions available to Current PO Duty while preserving the normal duty/cover owner in evidence | become or impersonate PO Duty; approve own unauthorised price; erase the actual actor |
-| Current GRN Duty | count, inspect, attach note, accept/reject and post source receipt | change PO price/quantity or ownership agreement |
+| Current PO Duty / dated cover | batch approved demand; issue/revise supplier documents; record evidenced promises/claims | approve own unauthorised price; post stock or supplier payment |
+| Operations Superuser (Jess; governed shared Operations account) | perform the governed operational actions Jess may perform, including PO issue and Goods Receipt posting, while preserving the normal PO/GRN duty and dated-cover context | become or impersonate PO/GRN Duty; approve own unauthorised price; erase the actual actor; perform Finance's act |
+| Current GRN Duty / dated cover | count, inspect, attach note, accept/reject and post source receipt | change PO price/quantity or ownership agreement |
 | Stock / Warehouse | label, locate, move, reserve and prove physical custody | issue/cancel supplier commitments |
 | Service | intake problem and govern problem/outcome record | create unapproved Purchasing consequence |
 | Finance / AP | match supplier invoice, credit, settlement and payment | rewrite receipt, Unit, delivery or PO facts |
@@ -1127,6 +1207,9 @@ No Purchasing object has one universal owner. Each action resolves owner and cov
 
 - WhatsApp/email: supplier-facing PDF is sent outside; the Portal records version, recipient,
   channel, actor and time. Opening the app is not proof of sending.
+- Supplier arrival/claim response: the Portal records the structured answer/date and the actual
+  WhatsApp or equivalent response evidence, recipient/channel, actor and time. A transcription or
+  an opened external app alone does not complete the action.
 - Supplier portal: future read/response surface must write to the same PO/CO/claim/notice records,
   not create a parallel acknowledgement ledger.
 - AutoCount/Finance: may receive approved PO/GRN/invoice references at the Finance boundary. It does

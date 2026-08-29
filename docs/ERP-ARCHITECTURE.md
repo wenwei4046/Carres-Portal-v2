@@ -66,6 +66,14 @@ live once in [`orders/MASTER.md`](orders/MASTER.md), immediately after the Card 
 record. Architecture owns this boundary; the Orders MASTER owns the build sequence and business
 flow.
 
+**PURCHASING → RECEIVING → GRN → CLAIM / RETURN WORK SLICE — OWNER-APPROVED / LOCKED
+2026-08-29.** Module writers remain separate; one shared Work projection composes their open
+actions. Purchase Orders owns supplier commitment and evidenced response, Goods Receipts owns the
+physical session/posting/formal GRN, Stock owns accepted Unit consequences, and Supplier Claim /
+Return owns the authorised continuation. `My Work`, `Team Work` and module-local `WORK TO DO`
+filters all read the same stable action identities and write no completion. The complete contract is
+[`purchasing/MASTER.md` §2.3 and §7](purchasing/MASTER.md) and its approved design record.
+
 ---
 
 # §1 · The five ownership laws
@@ -175,8 +183,11 @@ invent Catalog truth.** Receiving and Supplier Claim remain responsibilities gov
 Purchasing MASTER until an approved re-ruling gives either a separate MASTER.
 
 Workspace is deliberately absent from this ownership table. Dashboard and Work are cross-module
-projections and own no business outcome. Their current complete design is still
-`docs/workspace/BLUEPRINT.md` **PROPOSAL FOR OWNER REVIEW**, not approved module law.
+projections and own no business outcome. The complete Workspace document remains
+`docs/workspace/BLUEPRINT.md` **PROPOSAL FOR OWNER REVIEW**, except for the approved
+Purchasing/Receiving/GRN/Claim/Return projection slice recorded in this Architecture and the
+Purchasing MASTER. Approval of that slice does not approve unrelated Dashboard or Workspace
+proposal sections.
 
 ---
 

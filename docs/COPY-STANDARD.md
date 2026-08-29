@@ -553,6 +553,12 @@ stays open until somebody answers it — so a relative word is only true on the 
 `Shipping tomorrow`, answered two days late, is a sentence about a day that has already passed.
 `{date}` is the PO's expected arrival, and it is right whenever it is read.
 
+**The answer words are not sufficient completion evidence** (Owner-approved Purchasing → Receiving
+model, 2026-08-29). `Confirm tomorrow's delivery`, `Supplier date missing`, `Supplier date passed`
+and `Balance date missing` close only when the structured answer/date is stored together with the
+supplier's WhatsApp or equivalent response evidence, recipient/channel, actual actor and time.
+Opening WhatsApp or transcribing an unsupported answer is not completion.
+
 **`Confirm balance delivery date` gets no row here and that is a filled answer, not a missing
 one**: it asks no question. It records ONE date, so its Button (`Record balance date`) is the
 whole interaction and there is nothing for a second string to say.
@@ -607,7 +613,7 @@ or the one Goods Receipts engine. `purchase_demand` remains an authoritative rec
 | `Issue PO` | `Issue PO to {supplier}` | `Issue PO` | `PO issued to {supplier}` | `No purchase orders to issue.` |
 | `Supplier date missing` | `Ask {supplier} for the delivery date` | `Record supplier date` | `Supplier date recorded` | `Every issued order has a supplier date.` |
 | `Supplier date passed` | `Ask {supplier} when the goods will arrive` | `Record supplier answer` | `Supplier answer recorded` | `No supplier date has passed.` |
-| `Goods to receive` | `Receive {document} from {supplier}` | `Start receiving` | `Received {n} of {m}` | `No supplier delivery is ready to receive.` |
+| `Goods to receive` | `Check in {document} from {supplier}` | `Start receiving` | `GRN posted · {n} of {m} accepted` | `No supplier delivery is ready to receive.` |
 | `Balance date missing` | `Ask {supplier} for the balance delivery date` | `Record balance date` | `Balance date recorded` | `Every part receipt has a balance date.` |
 | `Confirm what happens next` | `Call {supplier} — confirm what happens next` | `Record what happens next` | `Supplier answer recorded` | `No claim is waiting for a supplier answer.` |
 | `Issue consignment order` | `Issue consignment order to {supplier}` | `Issue consignment order` | `Consignment order issued to {supplier}` | `No showroom is waiting for stock.` |
