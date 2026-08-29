@@ -870,7 +870,9 @@ SUPPLIER
   by 0399 and must never be applied. The vocabulary itself is unchanged from the owner
   ruling above.
 
-**THE PERMANENT REGISTER — APPROVED / LOCKED, Card 04 (2026-08-29); BUILT.** One Manual
+**THE PERMANENT REGISTER — APPROVED / LOCKED, Card 04 (2026-08-29); PRODUCTION-VERIFIED
+on `a1d11d53` 2026-08-29** (migration 0401 applied; walked authenticated — the live door
+minted `MPR-20260829-2779`). One Manual
 Purchase request per parent row, on the same Register engine and visual grammar as Sales
 Orders (`register/DataGrid`, `appearance="reference"`, 36px header / 38px rows / 32px
 footer, sticky Manual Purchase identity, horizontal scroll that never squeezes the 240px
