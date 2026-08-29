@@ -10,6 +10,7 @@ import { TopBarIcons } from "./components/GlobalTopBar";
 export default function SalesOrderTabs({
   identity,
   customer,
+  status,
   navigation,
   onBack,
   right,
@@ -19,6 +20,10 @@ export default function SalesOrderTabs({
 }: {
   identity: string;
   customer?: string | null;
+  /** One derived state pill beside the identity (Card 05 — the Manual
+   *  Purchase object header). Optional; absent, every existing caller is
+   *  byte-identical. A fact, never a control. */
+  status?: ReactNode;
   navigation?: ReactNode;
   onBack?: (event: React.MouseEvent<HTMLAnchorElement>) => void;
   right?: ReactNode;
@@ -56,6 +61,11 @@ export default function SalesOrderTabs({
           {customer && (
             <span className="min-w-0 truncate font-normal text-base-600" data-testid="object-identity-customer">
               · {customer}
+            </span>
+          )}
+          {status && (
+            <span className="shrink-0 pl-1.5" data-testid="object-identity-status">
+              {status}
             </span>
           )}
         </span>

@@ -41,6 +41,8 @@ export interface PurchasingRefusalFacts {
   toBuy?: number | null;
   version?: number | null;
   actor?: string | null;
+  /** The line's own requested quantity — the approved-quantity ceiling. */
+  qty?: number | null;
 }
 
 const some = (v: string | null | undefined, fallback: string) =>
@@ -76,6 +78,36 @@ export function purchasingRefusal(
       return {
         wrong: "Only the approver may decide this purchase.",
         todo: `Ask ${some(facts.actor, "a manager")} to approve or refuse it.`,
+      };
+
+    // ── THE DECISION (0360 · Card 05) — the Manual Purchase approval door ─
+    case "no_purchase_approver":
+      return {
+        wrong: "No purchase approver is set.",
+        todo: "Ask management to set the purchase approver.",
+      };
+    case "already_decided":
+      return {
+        wrong: "This purchase was already decided.",
+        todo: "Reload the Manual Purchase to see the decision.",
+      };
+    case "reason_required":
+      return {
+        wrong: "The decision reason is missing.",
+        todo: "Type why this purchase is not going ahead.",
+      };
+    case "invalid_cut_qty":
+      return {
+        wrong: "The approved quantity is not valid.",
+        todo: `Enter a whole number from 0 to ${some(
+          facts.qty == null ? null : String(facts.qty),
+          "the requested quantity",
+        )}.`,
+      };
+    case "decision_not_recorded":
+      return {
+        wrong: "The decision was not recorded.",
+        todo: "Reload the Manual Purchase and try once more. Tell IT if it happens again.",
       };
 
     // ── THE MONEY (0380) ──────────────────────────────────────────────────
@@ -307,6 +339,11 @@ export const PURCHASING_REFUSAL_CODES = [
   "not_po_duty",
   "no_po_duty_holder",
   "not_purchase_approver",
+  "no_purchase_approver",
+  "already_decided",
+  "reason_required",
+  "invalid_cut_qty",
+  "decision_not_recorded",
   "supplier_price_changed",
   "stale_catalog_cost",
   "expected_cost_required",

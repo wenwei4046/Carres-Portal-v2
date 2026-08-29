@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   MANUAL_PURCHASE_RAIL,
   MANUAL_PURCHASE_RAIL_CLEAR,
+  MANUAL_PURCHASE_HISTORY_WORDS,
   manualPurchaseApproverLine,
+  manualPurchaseHistoryRecord,
   manualPurchaseRailFacts,
   manualPurchaseRailModel,
   manualPurchaseStatusOf,
@@ -558,5 +560,76 @@ describe("Card 04 · selection and the issue sentence", () => {
   it("pluralises from facts", () => {
     expect(manualPurchaseIssueSentence(1, 1, 1)).toBe("1 selected · 1 unit · Issue 1 PO");
     expect(manualPurchaseIssueSentence(2, 5, 3)).toBe("2 selected · 5 units · Issue 3 POs");
+  });
+});
+
+describe("Card 05 · the History record arithmetic", () => {
+  it("speaks only the five stored-event titles", () => {
+    expect(Object.keys(MANUAL_PURCHASE_HISTORY_WORDS)).toEqual([
+      "created",
+      "approved",
+      "refused",
+      "line_not_going_ahead",
+      "po_issued",
+    ]);
+  });
+
+  it("an approval's result line counts units — the Card's own example", () => {
+    const r = manualPurchaseHistoryRecord({
+      kind: "approved",
+      occurred_at: "2026-08-29T02:42:00Z",
+      actor: "Jess",
+      actor_role: "principal",
+      requested_units: 2,
+      approved_units: 1,
+    });
+    expect(r.title).toBe("Purchase approved");
+    expect(r.detail).toEqual(["2 requested · 1 approved"]);
+  });
+
+  it("a refusal carries its reason verbatim; a missing reason renders no rank 3", () => {
+    expect(
+      manualPurchaseHistoryRecord({
+        kind: "refused",
+        occurred_at: "2026-08-29T02:42:00Z",
+        actor: "Jess",
+        actor_role: "principal",
+        reason: "Shelf already covers it.",
+      }).detail,
+    ).toEqual(["Shelf already covers it."]);
+    expect(
+      manualPurchaseHistoryRecord({
+        kind: "refused",
+        occurred_at: "2026-08-29T02:42:00Z",
+        actor: null,
+        actor_role: null,
+      }).detail,
+    ).toEqual([]);
+  });
+
+  it("a PO issue names the exact document and its units — never an inference", () => {
+    const r = manualPurchaseHistoryRecord({
+      kind: "po_issued",
+      occurred_at: "2026-08-29T03:00:00Z",
+      actor: null,
+      actor_role: null,
+      po_no: "PO-2054",
+      units: 3,
+    });
+    expect(r.title).toBe("Purchase order issued");
+    expect(r.detail).toEqual(["PO-2054 · 3 units"]);
+  });
+
+  it("a cancelled remainder names the SKU and the stored reason", () => {
+    expect(
+      manualPurchaseHistoryRecord({
+        kind: "line_not_going_ahead",
+        occurred_at: "2026-08-29T03:00:00Z",
+        actor: null,
+        actor_role: null,
+        sku: "5539-2NA",
+        reason: "Found in the showroom store",
+      }).detail,
+    ).toEqual(["5539-2NA — Found in the showroom store"]);
   });
 });

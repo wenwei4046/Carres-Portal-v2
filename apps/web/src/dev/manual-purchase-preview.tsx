@@ -38,7 +38,7 @@ let n = 0;
 const rid = () => `eeeeeee${++n}-0000-4000-8000-00000000000${n}`;
 const R1 = rid(), R2 = rid(), R3 = rid(), R4 = rid(), R5 = rid(), R6 = rid();
 
-function req(over: Record<string, unknown>) {
+function req(over: Record<string, unknown>): Record<string, unknown> {
   return {
     required_by: null,
     why: null,
@@ -58,7 +58,7 @@ function req(over: Record<string, unknown>) {
 }
 
 let ln = 0;
-function line(over: Record<string, unknown>) {
+function line(over: Record<string, unknown>): Record<string, unknown> {
   return {
     id: `fffffff${++ln}-0000-4000-8000-0000000000${String(ln).padStart(2, "0")}`,
     supplier_id: S_HOOKA,
@@ -168,7 +168,97 @@ const REGISTER = {
   mayIssue: true,
 };
 
-const PICK = { items: [], stockWarehouse: "Carres Klang" };
+const PICK = {
+  items: [
+    { sku: "5539-2NA", label: "Booqit 2 Seater", supplier: "Hooka", onHand: 3, reserved: 1, free: 2 },
+    { sku: "5539-CNR", label: "Booqit Corner", supplier: "Hooka", onHand: 0, reserved: 0, free: 0 },
+  ],
+  stockWarehouse: "Carres Klang",
+};
+
+/* ── CARD 05 — the OBJECT read, seeded per request ──────────────────────────
+   `?approver=1` on the preview URL walks the actual-approver view (money +
+   Approve/Refuse); without it the ordinary-Operations view renders — the
+   same screen minus the money, exactly the server contract. */
+const AS_APPROVER = new URLSearchParams(window.location.search).get("approver") === "1";
+
+const DETAIL_POS: Record<string, unknown[]> = {
+  [R4]: [
+    { id: PO_A, po_no: "PO-20260828-3301", placed_at: "2026-08-28T06:30:00Z",
+      po_delivery_date: "2026-09-08", supplier_delivery_date: "2026-09-15", ordered_qty: 2 },
+    { id: PO_B, po_no: "PO-20260828-6644", placed_at: "2026-08-28T06:30:00Z",
+      po_delivery_date: "2026-09-08", supplier_delivery_date: null, ordered_qty: 2 },
+  ],
+  [R5]: [
+    { id: PO_C, po_no: "PO-20260827-9012", placed_at: "2026-08-27T08:20:00Z",
+      po_delivery_date: "2026-09-05", supplier_delivery_date: null, ordered_qty: 1 },
+  ],
+};
+const DETAIL_HISTORY: Record<string, unknown[]> = {
+  [R1]: [
+    { kind: "created", occurred_at: "2026-08-29T03:10:00Z", actor: "Siti",
+      actor_role: "operation", units: 8 },
+  ],
+  [R2]: [
+    { kind: "created", occurred_at: "2026-08-29T02:00:00Z", actor: "Siti",
+      actor_role: "operation", units: 2 },
+    { kind: "approved", occurred_at: "2026-08-29T04:00:00Z", actor: "Jess",
+      actor_role: "principal", requested_units: 2, approved_units: 2 },
+  ],
+  [R3]: [
+    { kind: "created", occurred_at: "2026-08-20T01:00:00Z", actor: null,
+      actor_role: null, units: 1 },
+    { kind: "refused", occurred_at: "2026-08-20T02:00:00Z", actor: "Jess",
+      actor_role: "principal", reason: "a unit in Klang can move instead" },
+  ],
+  [R4]: [
+    { kind: "created", occurred_at: "2026-08-28T06:00:00Z", actor: "Siti",
+      actor_role: "operation", units: 4 },
+    { kind: "po_issued", occurred_at: "2026-08-28T06:30:00Z", actor: null,
+      actor_role: null, po_no: "PO-20260828-3301", units: 2 },
+    { kind: "po_issued", occurred_at: "2026-08-28T06:30:00Z", actor: null,
+      actor_role: null, po_no: "PO-20260828-6644", units: 2 },
+  ],
+  [R5]: [
+    { kind: "created", occurred_at: "2026-08-27T05:00:00Z", actor: "Li Ching",
+      actor_role: "operation", units: 3 },
+    { kind: "approved", occurred_at: "2026-08-27T08:00:00Z", actor: "Jess",
+      actor_role: "principal", requested_units: 3, approved_units: 2 },
+    { kind: "po_issued", occurred_at: "2026-08-27T08:20:00Z", actor: null,
+      actor_role: null, po_no: "PO-20260827-9012", units: 1 },
+  ],
+  [R6]: [
+    { kind: "created", occurred_at: "2026-08-27T02:00:00Z", actor: "Siti",
+      actor_role: "operation", units: 2 },
+  ],
+};
+
+function detailAnswer(id: string) {
+  const request = REGISTER.requests.find((r) => r.id === id);
+  const lines = REGISTER.lines
+    .filter((l) => l.request_id === id)
+    .map((l) => (AS_APPROVER ? { ...l, unit_cost: l.sku === "5539-CNR" ? 400 : 850 } : l));
+  return {
+    request,
+    serviceCaseNo:
+      (request as { for_service_case_id?: string | null } | undefined)
+        ?.for_service_case_id != null
+        ? "SC-20260815-3311"
+        : null,
+    requested_by_name:
+      id === R3 ? null : (REGISTER.users.find(
+        (u) => u.id === (request as { created_by?: string } | undefined)?.created_by,
+      )?.name ?? null),
+    lines,
+    pos: DETAIL_POS[id] ?? [],
+    history: DETAIL_HISTORY[id] ?? [],
+    destinations: REGISTER.destinations,
+    suppliers: REGISTER.suppliers,
+    users: REGISTER.users,
+    approvers: REGISTER.approvers,
+    canApprove: AS_APPROVER,
+  };
+}
 
 /* The page's own reads, answered locally — nothing leaves the browser. */
 const realFetch = window.fetch.bind(window);
@@ -181,11 +271,25 @@ window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
         headers: { "Content-Type": "application/json" },
       }),
     );
+  if (url.includes("/purchasing/requests/detail/")) {
+    return answer(detailAnswer(url.split("/detail/")[1].split("?")[0]));
+  }
+  if (url.includes("/purchasing/requests/already-have")) {
+    const sku = new URL(url, window.location.origin).searchParams.get("sku") ?? "";
+    return answer({
+      sku,
+      alreadyOnPo: sku === "5539-2NA" ? 1 : 0,
+      firstPo: sku === "5539-2NA" ? { id: "PO-20260828-3301", eta: "2026-09-08" } : null,
+    });
+  }
   if (url.includes("/purchasing/requests/issue-costs")) {
     return answer({ costs: [
       { sku: "5539-2NA", unitCost: 850 },
       { sku: "5539-CNR", unitCost: 400 },
     ] });
+  }
+  if (url.includes("/purchasing/requests/") && url.includes("/decide")) {
+    return answer({ id: "x", req_no: "MPR", decision: "approved" });
   }
   if (url.includes("/purchasing/requests/issue")) {
     return answer({ poIds: [], documents: 1 });

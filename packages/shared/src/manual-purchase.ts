@@ -80,7 +80,119 @@ export const MANUAL_PURCHASE_WORDS = {
   expDeliverTo: "Deliver To",
   expPoNo: "PO No",
   emptyRegister: "No Manual Purchase yet.",
+  /**
+   * THE OBJECT DETAIL (Card 05) — one full-width scroll, six sections in
+   * this exact order. The section names print through the Block heading's
+   * own uppercase; these are the words themselves.
+   */
+  secRequest: "Request",
+  secItemsRequested: "Items Requested",
+  secAlreadyHave: "What We Already Have",
+  secApproval: "Approval",
+  secPurchaseOrders: "Purchase Orders",
+  secHistory: "History",
+  /** The object header's one back destination — the owning Register. */
+  backToRegister: "Manual Purchase",
+  /** Governed loading / failure states (never a raw error string). */
+  objectLoading: "Opening the Manual Purchase",
+  objectLoadFailed: "This Manual Purchase could not be opened",
+  tryAgain: "Try again",
+  /** The audit-data defect sentence — a person is never invented. */
+  staffIdentityNotRecorded: "Staff identity not recorded",
+  /** Items Requested — a missing Catalog relationship is a NAMED fact. */
+  noSupplierYet: "No supplier yet",
+  colNote: "Note",
+  /** What We Already Have — the same three facts, as column heads. */
+  colFreeStock: "Free Stock",
+  colAlreadyOnPo: "Already On PO",
+  colStillNeeded: "Still Needed",
+  /** Approval — the decision facts and controls. */
+  noApprovalNeeded: "No approval needed",
+  approve: "Approve",
+  refuse: "Refuse",
+  decisionReason: "Decision reason",
+  colTransactionCost: "Transaction Cost",
+  colLineTotal: "Line Total",
+  /** Purchase Orders — the exact lineage's date words (MASTER §9.3). */
+  colPoIssued: "PO Issued",
+  colPoDeliveryDate: "PO Delivery Date",
+  colSupplierDeliveryDate: "Supplier Delivery Date",
+  sameAsPo: "Same as PO",
 } as const;
+
+/**
+ * HISTORY — the object's final section (Card 05 §3.7). Only events the
+ * database actually stores: request created · purchase approved/refused ·
+ * remaining demand marked not going ahead · exact linked PO issue. The
+ * titles are rank 1 of the locked three-rank record grammar; nothing here
+ * infers that a supplier received a PO or that goods arrived.
+ */
+export const MANUAL_PURCHASE_HISTORY_WORDS = {
+  created: "Purchase requested",
+  approved: "Purchase approved",
+  refused: "Purchase refused",
+  line_not_going_ahead: "Marked not going ahead",
+  po_issued: "Purchase order issued",
+} as const;
+
+export type ManualPurchaseHistoryKind = keyof typeof MANUAL_PURCHASE_HISTORY_WORDS;
+
+/** One stored event, as the detail read returns it — facts, never words. */
+export interface ManualPurchaseHistoryEvent {
+  kind: ManualPurchaseHistoryKind;
+  occurred_at: string;
+  /** The resolved real staff name, or null when the store never recorded
+   *  the individual (the reader prints `Staff identity not recorded`). */
+  actor: string | null;
+  actor_role: string | null;
+  sku?: string | null;
+  reason?: string | null;
+  po_no?: string | null;
+  units?: number | null;
+  requested_units?: number | null;
+  approved_units?: number | null;
+}
+
+const unitsWord = (n: number) => `${n} unit${n === 1 ? "" : "s"}`;
+
+/**
+ * Rank 1 + rank 3 of one History record — ONE arithmetic for the object
+ * (Law D). Rank 2 (who · when) is the portal-wide `historyActorWords`.
+ */
+export function manualPurchaseHistoryRecord(e: ManualPurchaseHistoryEvent): {
+  title: string;
+  detail: string[];
+} {
+  const title = MANUAL_PURCHASE_HISTORY_WORDS[e.kind];
+  switch (e.kind) {
+    case "created":
+      return { title, detail: e.units != null ? [`${unitsWord(e.units)} requested`] : [] };
+    case "approved":
+      return {
+        title,
+        detail:
+          e.requested_units != null && e.approved_units != null
+            ? [`${e.requested_units} requested · ${e.approved_units} approved`]
+            : [],
+      };
+    case "refused":
+      return { title, detail: e.reason ? [e.reason] : [] };
+    case "line_not_going_ahead":
+      return {
+        title,
+        detail: [[e.sku, e.reason].filter(Boolean).join(" — ")].filter((s) => s !== ""),
+      };
+    case "po_issued":
+      return {
+        title,
+        detail: [
+          [e.po_no, e.units != null ? unitsWord(e.units) : null]
+            .filter(Boolean)
+            .join(" · "),
+        ].filter((s) => s !== ""),
+      };
+  }
+}
 
 /**
  * THE APPROVAL COLUMN'S FOUR ANSWERS (Card 04 §3.2) — the approval FACT,
