@@ -5,7 +5,7 @@
 **Page:** Manual Purchase
 **Surface:** The permanent right-side Register (columns, expansion, selection, toolbar),
 the `MPR-` number series, and the sixth approved purpose
-**Status:** IN BUILD
+**Status:** MERGED — PR #978, main `a1d11d53`; production verification is not recorded in this Card
 **Lane:** BUILD / DELIVERY
 **Depends on:** Purchasing Card 03 (the four-section rail — byte-behaviourally unchanged here)
 **Expected migration:** ONE — `0401` (0400 lives on PR #977's open branch; next free number
@@ -123,6 +123,12 @@ groups by (supplier × category × destination × purpose, merged across request
 ownership and reminders stay in central `Work`; issuance authority remains the ONE
 `purchasing_issue_pos_batch` door.
 
+**Post-merge owner seam, 2026-08-29:** `[YJ]` is the normal PO Duty work-owner hint, not the only
+permission. `operation@carres.com` and Jess are Operations Superusers and may use this SAME governed
+issue door; the actual authenticated actor remains separate from normal duty/cover. Issued Manual
+Purchase demand then enters the same Receiving engine as SO Batch Purchase; this Card creates no
+Manual receipt lane.
+
 ## 4 · The purpose correction — persisted by this Card
 
 The six approved purposes are exactly:
@@ -179,4 +185,9 @@ main SHA, authenticated checks prove normal and narrow desktop behaviour.
 
 ## Completion evidence
 
-_To be written at closure._
+- PR #978 merged the implementation to `main` as `a1d11d5328ffc095b88fe053e7745bf0cb2764f5`.
+- Implementation commits: `7452d362` (the eleven-fact permanent Register) and `7c3ec33c`
+  (export uses the displayed cell truth rather than hidden search tokens).
+- Card 04 persisted the six-purpose / `MPR-` / structured `For` authority and migration 0401.
+- Production exact-SHA proof remains unrecorded here; do not upgrade this Card to
+  `PRODUCTION-VERIFIED` without measured evidence.
