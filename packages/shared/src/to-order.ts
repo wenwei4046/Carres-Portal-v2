@@ -233,17 +233,20 @@ export const TO_ORDER_WORDS = {
   reason: "Reason",
   /**
    * THE APPROVED PURPOSE VOCABULARY — owner ruling 2026-08-28 (Purchasing
-   * Card 03). Exactly five creatable purposes; the doors (0398:
-   * `purchasing_create_request` / `purchasing_create_demand`) admit exactly
-   * these values and refuse everything else — a retired value included — by
-   * name (`unknown_purpose`). Management is included under
-   * `Internal Staff Purchase`; there is no `Management Purchase`.
+   * Card 03; widened by Card 04, 2026-08-29). Exactly six creatable
+   * purposes; the doors (0399/0401: `purchasing_create_request` /
+   * `purchasing_create_demand`) admit exactly these values and refuse
+   * everything else — a retired value included — by name
+   * (`unknown_purpose`). Management is included under
+   * `Internal Staff Purchase`; there is no `Management Purchase`. Only
+   * `Other Purchase` asks — and must answer — `What is this for?`.
    */
   reasonReadyStock: "Ready Stock",
   reasonShowroomDisplay: "Showroom Display",
   reasonServiceCase: "Service Case",
   reasonInternalStaffPurchase: "Internal Staff Purchase",
   reasonSubsidiaryPurchase: "Subsidiary Purchase",
+  reasonOtherPurchase: "Other Purchase",
   /**
    * THE RETIRED FOUR — history's own words, never offered again (Card 03).
    * Rows stored before the 2026-08-28 ruling keep printing the word they were
@@ -477,21 +480,23 @@ export const TO_ORDER_WORDS = {
  *
  * **THE MIRROR OF A DATABASE LIST, NOT A MENU SOMEBODY CHOSE.** The values are
  * the ones the write doors admit (`purchasing_create_request` /
- * `purchasing_create_demand`, gates re-ruled by 0398 to the owner-approved
- * five, Card 03 2026-08-28). Three places must agree — the doors, the API
- * enums, and this — and 0322 is why: when the pool's reasons lived in four
- * places and only two were widened, every dropdown offered a word the server
- * refused by name. The CHECKs are deliberately WIDER than this list: they
- * also hold the retired history values no door accepts any more.
+ * `purchasing_create_demand`, gates re-ruled by 0399 to the owner-approved
+ * five, Card 03 2026-08-28; widened to six by 0401, Card 04 2026-08-29).
+ * Three places must agree — the doors, the API enums, and this — and 0322 is
+ * why: when the pool's reasons lived in four places and only two were
+ * widened, every dropdown offered a word the server refused by name. The
+ * CHECKs are deliberately WIDER than this list: they also hold the retired
+ * history values no door accepts any more.
  *
  * This array is therefore the ONLY list a control may render.
- * `Other…` is a ruled WORD in `TO_ORDER_WORDS` and is deliberately not
- * here: neither has ever had a value to be stored as, and inventing one would
- * be a screen ruling on a business question ("other" than what?).
+ * `Other Purchase` (Card 04) is the ruled catch-all with a value of its own,
+ * and it is the ONE purpose that asks — and must answer —
+ * `What is this for?`; the bare `Other…` word above remains a word with no
+ * stored value.
  *
- * THE ORDER IS THE DISPLAY ORDER — the owner-approved order (Card 03).
+ * THE ORDER IS THE DISPLAY ORDER — the owner-approved order (Cards 03/04).
  * Ready Stock is what almost every typed demand is, so it leads and is the
- * default; the other four are the exceptions this field exists to tell apart.
+ * default; the other five are the exceptions this field exists to tell apart.
  */
 export const DEMAND_PURPOSES = [
   { value: "ready_stock", label: TO_ORDER_WORDS.reasonReadyStock },
@@ -499,6 +504,7 @@ export const DEMAND_PURPOSES = [
   { value: "service_case", label: TO_ORDER_WORDS.reasonServiceCase },
   { value: "internal_staff_purchase", label: TO_ORDER_WORDS.reasonInternalStaffPurchase },
   { value: "subsidiary_purchase", label: TO_ORDER_WORDS.reasonSubsidiaryPurchase },
+  { value: "other_purchase", label: TO_ORDER_WORDS.reasonOtherPurchase },
 ] as const;
 
 /**
