@@ -26,12 +26,17 @@ const read = (prefix: string): string => {
   expect(name, `no migration starting ${prefix}`).toBeTruthy();
   return readFileSync(join(MIGRATIONS, name!), "utf8");
 };
+const readNamed = (suffix: string): string => {
+  const name = readdirSync(MIGRATIONS).find((f) => f.endsWith(suffix));
+  expect(name, `no migration ending ${suffix}`).toBeTruthy();
+  return readFileSync(join(MIGRATIONS, name!), "utf8");
+};
 const strip = (sql: string) => sql.replace(/--[^\n]*/g, "");
 
 const ACTOR = read("0379_");
 const MONEY = read("0380_");
 const DOCUMENT = read("0383_");
-const SUPERUSER = read("0400_");
+const SUPERUSER = readNamed("operations_superuser_po_issue_authority.sql");
 
 describe("0379 · one actor authority for every PO door", () => {
   it("has ONE resolver, and it answers about the DUTY", () => {
@@ -80,7 +85,7 @@ describe("0379 · one actor authority for every PO door", () => {
   });
 });
 
-describe("0400 · Operations Superuser uses the same PO authority", () => {
+describe("Operations Superuser uses the same PO authority", () => {
   it("stores one governed capability instead of checking operation@ in application code", () => {
     expect(SUPERUSER).toMatch(
       /alter table public\.app_users\s+add column if not exists operations_superuser boolean not null default false/,
