@@ -81,8 +81,8 @@ is recorded in
 The six questions must be answerable for every open action: **who acts · which actual working day ·
 where they act · what proves completion · who supervises · what consequence follows**. `My Work`
 and `Team Work` project these module actions; they never store a second completion or expose manual
-`Done`. A module-local `WORK TO DO` panel is a contextual filter over the same actions, not a new
-work queue.
+`Done`. These actions appear in owner-resolved `My Work` / `Team Work`; a module Register rail does
+not copy them into a second local work panel.
 
 ---
 
@@ -649,7 +649,7 @@ The owning module supplies stable action identity, source, trigger, due date/cal
 required result, completion fact and exact deep link. Work composes these actions and writes no
 business outcome. Managers, including the governed Operations Manager accounts, supervise through
 `Team Work`; the normal owner group survives even when a dated cover or Operations Superuser acts.
-Module-local `WORK TO DO` rails are filters over these same module actions.
+Module Register rails remain factual filters and do not copy central Work actions.
 
 ---
 
@@ -664,19 +664,12 @@ shared Register Kit's complete light four-sided frame around its Work Toolbar, t
 footer. It does not add a page-local second frame. This is not a card around the page and not a box
 around every row. The selected `Issue PO` action bar remains a separate governed action surface below.
 
-**Left rail — APPROVED / LOCKED, latest owner ruling 2026-08-29.** The rail first answers what
-must be done each day, then lets an inexperienced operator inspect when each order should be
-placed, which product category and which actual supplier — with every label fully readable.
-Six sections, in this exact order:
+**Left rail — APPROVED / LOCKED, latest owner ruling 2026-08-29.** The rail lets an operator inspect
+what remains unordered, when each order should be placed, which product category and which actual
+supplier — with every label fully readable. It does not repeat central Work or expose Sales/Catalog
+actions to Operation. Five sections, in this exact order:
 
 ```text
-WORK TO DO
-  Issue PO
-  Ask customer for a delivery date
-  Add item to SKU catalog
-  Check the supplier
-  Add production days
-
 TO ORDER
   All not ordered
 
@@ -701,13 +694,6 @@ SETUP TO FIX              ← the whole section renders only when at least one a
   Production days not set
 ```
 
-- **`WORK TO DO` is the first local panel and always shows all five concrete actions, zero
-  included.** It is an action lens over the same server-derived purchase-demand states and
-  structured action contract; it is not a stored queue, not a second Work Engine and not a new
-  Purchasing Work page. My Work / Team Work remain the formal owner-resolved work surfaces.
-  Clicking an action filters this same Register. `Issue PO` groups all five orderable timing
-  states; the other four actions group their matching blocker state. Counts are unique Sales
-  Orders, so several demand lines under one SO still count once.
 - **The rail is navigation, not batch selection.** No checkboxes in the rail — rows use the
   governed `NavRow` active treatment; the only checkboxes on the page are the Register's own
   `Issue PO` selection. One filter may be selected per section; filters from different
@@ -718,7 +704,7 @@ SETUP TO FIX              ← the whole section renders only when at least one a
 - **Counts are UNIQUE Sales Orders** — never documents, notifications, leaf lines, SKU
   quantities or PO counts. Each section's counts update against the other selected sections,
   so the printed number predicts the resulting SO rows. The fixed rows (`All not ordered`,
-  the five work rows, the five timing rows, the three product rows, the setup row) print
+  the five timing rows, the three product rows and the setup row) print
   their live count, zero included. A supplier appears only while it has a matching SO under the other active
   filters — except the currently selected supplier, which stays visible with `0`.
 - **Product comes from the authoritative Catalog category** — never SKU text, model name,
@@ -730,8 +716,8 @@ SETUP TO FIX              ← the whole section renders only when at least one a
   outstanding-demand supplier plus the issued PO lineage supplier
   (`soBatchOrderSupplierNames`), no second browser-only supplier calculation. Actual names
   only, alphabetical. There is no `No supplier` fact category: an unexpectedly missing
-  supplier fails at Catalog authority and appears only through the concrete `Check the supplier`
-  action in `WORK TO DO`.
+  supplier fails at Catalog authority; its concrete `Check the supplier` action belongs to the
+  responsible owner's central Work list, not this Operation rail.
 - Every timing row remains orderable. `Can order early`, `1–13 safety days left`,
   `No safety days left` and `Not enough production days` express timing risk, never
   `Cannot buy`. Order By is a planned date, never an unlock date.
@@ -762,8 +748,9 @@ SETUP TO FIX              ← the whole section renders only when at least one a
   cancelled and the quantity is still required, the selectable demand returns automatically by
   recomputation; nothing is stored.
 - A line whose customer date, SKU or supplier is unexpectedly missing fails safely at its owning
-  boundary (Sales / Catalog). It is named on its own row and may be reached through its concrete
-  `WORK TO DO` action; it never becomes a normal fact category and is never silently defaulted.
+  boundary (Sales / Catalog). It is named on its own row; the owning person's central Work action
+  deep-links to that owning door. It never becomes a local rail category and is never silently
+  defaulted.
 - Every category derives from the one server planning engine. There is no second stored status.
 - Retired rail words, never to return on this surface: `Ready to buy` · `Covered` ·
   `No customer date` · `No SKU` · `No supplier` · `No production days` · `BUYING RECORDS` ·

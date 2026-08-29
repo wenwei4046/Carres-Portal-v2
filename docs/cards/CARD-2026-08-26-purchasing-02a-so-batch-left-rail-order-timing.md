@@ -7,6 +7,9 @@ own authenticated walk of the live rail remains the one open checklist item
 **Depends on:** `PURCHASING — CARD 02 · REBUILD SO BATCH PURCHASE REGISTER AND COMPLETE THE
 GUIDED PO ISSUE JOURNEY`, including all production corrections through PR #921
 
+> **OWNER RECONFIRMED 2026-08-29.** `WORK TO DO` remains removed from this rail. A later
+> implementation that re-added central Work actions here is superseded and must be deleted.
+
 > **For the build agent:** start from the latest `origin/main`. Read `CLAUDE.md`,
 > `docs/ERP-ARCHITECTURE.md`, `docs/purchasing/MASTER.md`, `docs/ui/MASTER.md`,
 > `docs/COPY-STANDARD.md`, `docs/03-page-patterns.md`, `docs/ACTION-FLOW-STANDARD.md`, and the

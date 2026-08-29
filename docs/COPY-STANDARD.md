@@ -640,7 +640,7 @@ sidebar page. Existing implementation constants do not override these approved p
 |---|---|
 | Page | No page — use `SO Batch Purchase` or the source object |
 | Search | `Search Sales Order, customer, SKU or supplier…` |
-| Rail headings | `WORK TO DO` · `TO ORDER` · `ORDER TIMING` · `PRODUCT` · `SUPPLIER` · `SETUP TO FIX` |
+| Rail headings | `TO ORDER` · `ORDER TIMING` · `PRODUCT` · `SUPPLIER` · `SETUP TO FIX` |
 | Empty state | `No proceeded Sales Orders.` |
 | Register columns (Card 02-B, 2026-08-27 — exactly, in this order) | `Status` · `Proceed Date` · `PO No` · `SO No` · `Customer` · `Delivery Location` · `Requested Delivery Date` · `Supplier` · `Deliver To` · `PO Delivery Date` |
 | `Proceed Date` on SO Batch Purchase | The actual date Sales handed the complete order to Operations (`orders.proceeded_at`). Never the planned production-start field (`orders.proceed_date`) |
@@ -671,24 +671,23 @@ No recorded business date is silently moved to fit a calendar. Purchasing/Operat
 Office calendar (Mon–Fri); Receiving/GRN/Warehouse uses the Warehouse calendar (Mon–Sat); Sunday
 and Selangor public holidays are excluded.
 
-**The SO Batch Purchase rail — latest owner ruling 2026-08-29.** Six sections, in this order.
-`SETUP TO FIX` renders only when at least one affected Sales Order exists:
+**The SO Batch Purchase rail — latest owner ruling 2026-08-29.** Five purchasing fact sections,
+in this order. Central Work actions do not appear here. `SETUP TO FIX` renders only when at least
+one affected Sales Order exists:
 
 | Heading | Rail rows |
 |---|---|
-| `WORK TO DO` | `Issue PO` · `Ask customer for a delivery date` · `Add item to SKU catalog` · `Check the supplier` · `Add production days` |
 | `TO ORDER` | `All not ordered` |
 | `ORDER TIMING` | `Can order early` · `14 safety days left` · `1–13 safety days left` · `No safety days left` · `Not enough production days` |
 | `PRODUCT` | `All products` · `Mattress` · `Bedframe` · `Sofa` |
 | `SUPPLIER` | `All suppliers` · actual supplier names, alphabetical — never hardcoded, never a placeholder, and no `No supplier` row |
 | `SETUP TO FIX` | `Production days not set` |
 
-`WORK TO DO` is always the first local panel. It names the five concrete daily actions and shows
-all five even at zero; it filters the same Register from the same structured purchase-demand
-states. It is not a second work queue or a substitute for owner-resolved My Work / Team Work.
+`My Work` / `Team Work` are the only daily-work surfaces. The SO Batch rail must not copy
+`Issue PO`, customer-information, Catalog or supplier-setup actions into a local work panel.
 Counts are UNIQUE Sales Orders, never documents, notifications, leaf lines, SKU quantities or
 PO counts, and each section's counts update against the other selected sections. The fixed
-rows print their live count, zero included; a supplier row exists only while it matches —
+fact rows print their live count, zero included; a supplier row exists only while it matches —
 except the selected supplier, which stays visible with `0`. The default no-filter Register
 shows every proceeded record; `All not ordered` is a real outstanding-only filter that
 excludes fully Ordered records. One filter per section; sections combine; a second click on
@@ -703,8 +702,8 @@ it wraps onto a second line in the same body font, never a tooltip.
 
 **The row facts.** Line 1 is the FACT; line 2 is the FIX, in the imperative. A line the owning
 boundary (Sales / Catalog) unexpectedly let through without its customer date, SKU or supplier is
-NAMED on its own row — it is never silently defaulted or turned into a fact category. The first
-`WORK TO DO` panel may group it only by its concrete fix action:
+NAMED on its own row — it is never silently defaulted or turned into a rail category. Its concrete
+fix action belongs only to the owner-resolved central Work projection:
 
 | Fact (line 1) | Fix (line 2) |
 |---|---|

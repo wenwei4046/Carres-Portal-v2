@@ -26,7 +26,6 @@ import {
   type SoBatchPurchaseResponse,
   type SoBatchRailFilter,
   type SoBatchSelection,
-  type SoBatchWorkKey,
 } from "@carres/shared";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import { fmtDate } from "@/lib/fmt-date";
@@ -122,7 +121,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
     return m;
   }, [orders, leafsByOrder]);
 
-  /* ── The rail (six sections, one selection per section) ──────────────────
+  /* ── The rail (five fact sections, one selection per section) ───────────
    *
    * The DEFAULT no-filter view shows every proceeded record, Ordered ones
    * included — the Register is permanent. One filter per section; sections
@@ -152,9 +151,6 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
     () => orders.filter((o) => rail.visibleOrderIds.has(o.orderId)),
     [orders, rail.visibleOrderIds],
   );
-  const toggleWork = useCallback((work: SoBatchWorkKey) => {
-    setFilter((prev) => ({ ...prev, work: prev.work === work ? null : work }));
-  }, []);
   const toggleTiming = useCallback((s: PurchaseDemandTimingState) => {
     setFilter((prev) => ({ ...prev, timing: prev.timing === s ? null : s }));
   }, []);
@@ -614,19 +610,6 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
             sections combine, and the fixed rows print their live count, zero
             included. */}
         {filterRailOpen && <FilterRail testId="so-batch-rail" onHide={() => setFilterRailVisible(false)}>
-          <FilterRailGroup title={SO_BATCH_RAIL.work.heading}>
-            {SO_BATCH_RAIL.work.actions.map((action) => (
-              <FilterRailRow
-                key={action.key}
-                active={filter.work === action.key}
-                onClick={() => toggleWork(action.key)}
-                testId={`so-batch-work-${action.key}`}
-                label={action.word}
-                count={rail.workCounts[action.key]}
-                title={`${rail.workCounts[action.key]} ${W.footerUnit} · ${action.word}`}
-              />
-            ))}
-          </FilterRailGroup>
           <FilterRailGroup title={SO_BATCH_RAIL.toOrder.heading}>
             <FilterRailRow
               active={filter.notOrderedOnly}

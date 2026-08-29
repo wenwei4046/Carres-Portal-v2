@@ -661,9 +661,11 @@ directory only and said so.*
 - **My Work is the default for every employee, including a manager** (Owner-approved Purchasing →
   Receiving work model, 2026-08-29). Authority does not erase personal work. `Team Work` is the
   explicit supervision view over the same set, never the manager's automatic landing replacement.
-- A module-local **`WORK TO DO` first rail panel is a contextual filter** over that module's same
-  governed actions. It may narrow the Register and deep-link to the owning write door; it may not
-  persist a second task row, calculate another owner/due date or expose manual `Done`.
+- **Work stays in `My Work` / `Team Work`; a Register kit must not add a generic local
+  `WORK TO DO` rail panel.** Module rails contain only that Register's approved factual filters.
+  A future exception requires an explicit Owner ruling naming the action owner and write door; a
+  UI kit or page author may never infer one from available action data. SO Batch Purchase has no
+  local work panel.
 - A Current Action or Work row uses two visual lines when both fact and action are needed.
   **Line 1** is the fact/problem in governed body size and medium/semibold emphasis. **Line 2**
   is the next action in the governed smaller supporting size, regular weight and quieter but

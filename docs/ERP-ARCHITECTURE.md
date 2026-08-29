@@ -70,8 +70,9 @@ flow.
 2026-08-29.** Module writers remain separate; one shared Work projection composes their open
 actions. Purchase Orders owns supplier commitment and evidenced response, Receiving owns the
 physical session/posting/formal GRN, Stock owns accepted Unit consequences, and Supplier Claim /
-Return owns the authorised continuation. `My Work`, `Team Work` and module-local `WORK TO DO`
-filters all read the same stable action identities and write no completion. The complete contract is
+Return owns the authorised continuation. `My Work` and `Team Work` read the same stable action
+identities and write no completion. Module filter rails do not copy those actions into a local
+`WORK TO DO` panel; SO Batch Purchase is the ruled example. The complete contract is
 [`purchasing/MASTER.md` §2.3 and §7](purchasing/MASTER.md) and its approved design record.
 
 ---

@@ -17,6 +17,11 @@ and NOT applied.** Merge, migration order and deployment await the owner's decis
 > normal duty, dated cover and actual actor separately. The current truth lives in
 > `docs/purchasing/MASTER.md` §5.3; this Card does not create a second authority.
 
+> **CURRENT RAIL CORRECTION — OWNER RULING 2026-08-29.** The later experiment that copied
+> `WORK TO DO` actions into the SO Batch Purchase rail is removed. Customer information and Catalog
+> fixes belong to their responsible owner's central Work list, not the Operation buying rail. Any
+> older mock or evidence below showing a local work panel is historical only.
+
 > **For the build agent:** read `CLAUDE.md`, `docs/purchasing/MASTER.md`,
 > `docs/ui/MASTER.md` §§4–4.2 and 6.5–6.7, and the Purchasing section of
 > `docs/COPY-STANDARD.md` first. Use `superpowers:subagent-driven-development` or

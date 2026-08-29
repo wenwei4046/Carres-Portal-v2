@@ -145,8 +145,8 @@ party, time and proof create the Stock consequence. Partial collection keeps the
   managers.
 - `Team Work` is the supervision view. It groups by normal owner and adds cover, actual actor,
   lateness, blocking fact and evidence state without reassigning the source object.
-- A module's local rail may place `WORK TO DO` first, but it is a contextual filter over the same
-  module actions, not another work store.
+- Module Register rails contain factual filters only; they do not copy owner-resolved actions into
+  a local `WORK TO DO` panel. SO Batch Purchase is the ruled example.
 - On SO Batch Purchase, no permanent PO Duty toolbar, rail block or sentence is allowed. When a
   valid selection exists, the action is:
 
@@ -200,7 +200,7 @@ This architecture must be delivered as independently reviewable plans, in this d
 4. **Receiving continuations** — owned by the separate Receiving task; the superseded plans in this
    worktree must not be executed.
 5. **Cross-module Work feed and supervision** — Purchasing, Receiving and Claim projections into
-   My Work / Team Work, plus contextual `WORK TO DO` rail filters.
+   My Work / Team Work; module Register rails remain factual filters.
 6. **Owner-visible UI closure and rollout** — SO Batch selected-action owner chip/button, global
    Register frame, destination settings, real-account browser walks and production evidence.
 

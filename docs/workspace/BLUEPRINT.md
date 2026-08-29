@@ -5,8 +5,8 @@
 > **Decision surface:** the complete cross-module Workspace: `Dashboard = what I need to know` and `Work = what someone needs to do`.
 
 > **Approved slice, 29 Aug 2026:** Purchasing → Receiving → formal GRN → Claim / Return actions
-> execute in their owner modules and project into one `My Work` / `Team Work` set; module-local
-> `WORK TO DO` is a contextual filter, never a second queue. Normal duty, dated cover and actual
+> execute in their owner modules and project into one `My Work` / `Team Work` set. Module Register
+> rails do not copy those actions into local `WORK TO DO` panels. Normal duty, dated cover and actual
 > actor remain distinct. This slice is current law in `docs/purchasing/MASTER.md` and
 > `docs/ERP-ARCHITECTURE.md`. The rest of this Workspace/Dashboard proposal remains unapproved.
 
