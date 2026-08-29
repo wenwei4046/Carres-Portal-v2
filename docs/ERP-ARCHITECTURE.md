@@ -69,10 +69,11 @@ flow.
 **PURCHASING → RECEIVING → GRN → CLAIM / RETURN WORK SLICE — OWNER-APPROVED / LOCKED
 2026-08-29.** Module writers remain separate; one shared Work projection composes their open
 actions. Purchase Orders owns supplier commitment and evidenced response, Receiving owns the
-physical session/posting/formal GRN, Stock owns accepted Unit consequences, and Supplier Claim /
+physical session/posting/formal GRN, Stock owns valid-received Unit consequences, and Supplier Claim /
 Return owns the authorised continuation. `My Work` and `Team Work` read the same stable action
 identities and write no completion. Module filter rails do not copy those actions into a local
-`WORK TO DO` panel; SO Batch Purchase is the ruled example. The complete contract is
+`WORK TO DO` panel. Receiving's factual local rail is `RECEIVING DATE`; its actions remain in
+central Work and deep-link the exact PO/Receiving Session. The complete contract is
 [`purchasing/MASTER.md` §2.3 and §7](purchasing/MASTER.md) and its approved design record.
 
 ---
@@ -261,8 +262,9 @@ business truth.
 
 **`Receiving` is the exact Purchasing destination/workspace word** (owner correction 2026-08-29).
 It names the physical operation. The supplier provides the delivery date and Supplier DO; Carres
-creates the Goods Receipt and numbered GRN only after physical receiving. Neither document word
-replaces the navigation word, and `Goods Receipts` is retired as navigation.
+creates the Goods Receipt and numbered GRN only after physical receiving. The document abbreviation
+is `GRN`, its formal title is `GOODS RECEIPT NOTE`, and its number label is `GRN No.` Neither
+document word replaces the navigation word, and `Goods Receipts` is retired as navigation.
 
 **This is navigation, not workflow.** How the operator moves between these pages — which one
 feeds which — is the module MASTER's, and it changes when the business changes.
@@ -453,13 +455,15 @@ Case outcomes · Finance/AP read-only continuation.
 **OWNS**
 - The **Receiving Session / Goods Receipt** — ONE physical delivery, one session, from a PO or CO.
 - The supplier's DO reference/evidence and Carres's numbered GRN. The supplier provides its DO;
-  Carres creates the GRN only after physical receiving — one cannot substitute for the other.
+  Carres creates and stores the formal `GRN-YYYYMMDD-RRRR` identity only after physical receiving —
+  one cannot substitute for the other and a voided number is never reused.
 - The three times (goods received at · submitted at · posted at) and the append-only event
   ledger. **Amend and Void are its acts; history is never edited in place.**
 - **`purchase_order_lines.received_qty` moves only through this module.**
 
-**ACTIONS** — start from the exact PO/CO · count Order/Received/Pending quantities · record damaged,
-wrong and extra separately · attach Supplier DO/evidence · post it ·
+**ACTIONS** — `Start Receiving` from the exact PO/CO · count Order/Received/Pending quantities ·
+record damaged, wrong and extra separately · attach Supplier DO/evidence · `Save Receiving` at a
+Carres station or `Send count` from Warehouse · GRN Duty `Check in` once ·
 amend it · void it · return a count for a re-check.
 
 **SUMMARISES** — the purchase order it is receiving against · the customer orders waiting on it.

@@ -62,7 +62,7 @@ English; complexity is never used to make an instruction sound official.
 
 `Send` is banned from Portal action labels, buttons and Current Action copy. It hides the actor,
 channel, object, recipient and required result. Name the real act instead: `Email PO-2041 to Hooka`,
-`Ask Lim for mattress photos`, `Upload delivery note`, or `Record TCF's reply`. `Open WhatsApp`
+`Ask Lim for mattress photos`, `Add the Supplier DO`, or `Record TCF's reply`. `Open WhatsApp`
 names navigation only; opening the channel never proves that the business action is complete.
 
 ## Two-Line Action Copy Standard — owner ruling 2026-08-14
@@ -108,8 +108,8 @@ Further governed examples:
 PO-2041 Version 1 has not reached Hooka
 Email PO-2041 Version 1 to Hooka · Ask for delivery confirmation.
 
-Delivery note DO-883 is missing
-Upload Hooka DO-883 · Link it to PO-2041.
+Supplier DO is missing
+Upload Hooka's signed DO · Link it to PO-2041.
 
 Hooka has not replied
 Call Hooka about PO-2041 · Record item availability.
@@ -621,7 +621,7 @@ or the one Receiving engine. `purchase_demand` remains an authoritative record, 
 | `Issue purchase return` | `Issue purchase return to {supplier}` | `Issue purchase return` | `Purchase return issued to {supplier}` | `Nothing is going back.` |
 | `Issue repair order` | `Issue repair order to {supplier}` | `Issue repair order` | `Repair order issued to {supplier}` | `Nothing is out for repair.` |
 | `Confirm collection date` | `Call {supplier} — confirm collection date` | `Record collection date` | `Collection date recorded` | `Nobody is waiting to be collected.` |
-| `Upload delivery note` | `Upload delivery note` | `Upload delivery note` | `Delivery note saved` | `Every receipt has its note.` |
+| `Supplier DO missing` | `Add the Supplier DO to {document}` | `Add Supplier DO` | `Supplier DO added` | `Every receipt has its Supplier DO.` |
 | `Check quantity difference` | `Check quantity difference` | `Record the correct count` | `Count recorded` | `Every count matches.` |
 | `Close claim` | `Close claim` | `Close claim` | `Claim closed` | `No claim is finished and waiting.` |
 | `Approve the purchase` | `Approve {n} {model} for {purpose}` | `Approve` · `Refuse` | `Approved — {n} {model}` | `Nothing waiting for you.` |
@@ -1226,7 +1226,8 @@ do not take the five-string shape.
 | `Goods Received At` | field | The Business Date Dictionary's own word — when the goods PHYSICALLY arrived, which is not when they were keyed in. |
 | `Supplier DO No.` | field | **Theirs, not ours.** It has no default and no suggestion; a number we invent is a reference the supplier never issued. |
 | `Signed DO photo` | field | The evidence, named by what it is a photo OF. |
-| `Received Qty` | per-line physical count | What physically arrived in this receiving session; it is distinct from damaged and wrong quantities. |
+| `Receive now` | per-line input | The valid quantity physically received in this session; `Received Qty` beside it remains the cumulative posted fact. |
+| `Extra Qty` | per-line exception | What arrived above the governed PO/CO quantity. It never reduces Pending Delivery Qty or creates available Stock. |
 | `What kind of wrong?` | per-line picker | Plain words. The claim needs the kind before it can be filed. |
 | `Save Receiving` | the Save button, when nothing is missing | |
 | `Save — {what is missing}` | the Save button otherwise | The button NAMES the gap: `Save — add a DO number` · `Save — upload signed DO` · `Save — count at least one unit`. A grey button that will not say why is a puzzle. |
@@ -1435,7 +1436,7 @@ Information Architecture and live in [`ERP-ARCHITECTURE.md`](ERP-ARCHITECTURE.md
 | Pre-due polite follow-up on an open PO | **Remind** | Notify · Ping · Alert · Nudge |
 | Post-due firm follow-up on an open PO | **Call {supplier} — confirm ready date** | Chase · Expedite · Follow up · Push · Escalate |
 | Log goods arrival — the ACT | **Check in** | Receive (as a verb) · Book in · Goods receipt · **GRN** (that is the document, not the act) |
-| The DOCUMENT that the act produces | **GRN** | Goods receipt note · Receiving note · Check-in record |
+| The DOCUMENT that the act produces | **`GRN`**; formal document title **`GOODS RECEIPT NOTE`**; number label **`GRN No.`** | `Goods Receipt Note` as navigation/action · Receiving note · Check-in record |
 | An order line's goods are secured for that order | **Ready** | Reserved — on an order line it is read as `Received`, and the two mean opposite things. `Reserved` stays correct on the Stock screens, where it describes a UNIT and sits nowhere near `Received` |
 | Customer confirmed ETA — ready for PO | **Proceed** | Confirmed · Approved · Green-lit |
 | Customer ordered but no ETA yet | **Placed** | New · Draft · Pending · Open — **and this ban is about a CUSTOMER ORDER only. See the Purchasing exception below: `Draft` and `Issued` are ruled words on the Purchase Order axis** |
@@ -1836,8 +1837,8 @@ one-word instruction. It renders the shared structured Action contract in two li
 | Fact (line 1) | Action (line 2, with structured owner avatar) |
 |---|---|
 | `The PO PDF has not been sent` | `Issue the purchase order to {supplier}` |
-| `Supplier date is missing` | `Ask {supplier} for the delivery date` |
-| `The supplier date passed on {weekday, date}` | `Ask {supplier} when the goods will arrive` |
+| `Supplier Delivery Date is missing` | `Ask {supplier} for the delivery date` |
+| `The Supplier Delivery Date passed on {weekday, date}` | `Ask {supplier} when the goods will arrive` |
 | `The balance delivery date is missing` | `Ask {supplier} for the balance delivery date` |
 | `Version {n} has not been sent` | `Issue Version {n} to {supplier}` |
 | `Supplier changed the price` | `Ask the commercial approver to check the new price` |
