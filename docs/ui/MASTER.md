@@ -837,7 +837,7 @@ own decision and its own card.**
 **TABS ARE AVOIDED BY DEFAULT — APPROVED / LOCKED.** Separate business jobs, owned records
 or destinations are separate portal-navigation entries and pages; they are never compressed
 into a module tab strip. Purchasing is the explicit reference: `SO Batch Purchase` · `Manual
-Purchase` · `Purchase Orders` · `Goods Receipts` · `Supplier Claims` are individual
+Purchase` · `Purchase Orders` · `Receiving` · `Supplier Claims` are individual
 destinations inside its governed sidebar tree, with no Purchasing tabs and no substitute second
 navigation row.
 

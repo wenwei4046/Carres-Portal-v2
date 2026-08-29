@@ -554,7 +554,7 @@ stays open until somebody answers it — so a relative word is only true on the 
 `{date}` is the PO's expected arrival, and it is right whenever it is read.
 
 **The answer words are not sufficient completion evidence** (Owner-approved Purchasing → Receiving
-model, 2026-08-29). `Confirm tomorrow's delivery`, `Supplier date missing`, `Supplier date passed`
+model, 2026-08-29). `Confirm supplier delivery`, `Supplier Delivery Date missing`, `Supplier Delivery Date passed`
 and `Balance date missing` close only when the structured answer/date is stored together with the
 supplier's WhatsApp or equivalent response evidence, recipient/channel, actual actor and time.
 Opening WhatsApp or transcribing an unsupported answer is not completion.
@@ -599,21 +599,21 @@ do not create a second business status, work queue or source of truth.
 |---|---|
 | Group headings | `BUY` · `RECEIVE` · `PROBLEMS` · `SHOWROOM` |
 | BUY pages | `SO Batch Purchase` · `Manual Purchase` · `Purchase Orders` |
-| RECEIVE pages | `Goods Receipts` |
+| RECEIVE pages | `Receiving` |
 | PROBLEMS pages | `Supplier Claims` · `Purchase Returns` · `Repair Orders` |
 | SHOWROOM pages | `Display Requests` · `Consignment Orders` · `Consignment Returns` · `Consignment Sale Notices` |
 
 Purchasing has no Home, module-specific Work, Purchase Demands, New Supplier/New SKU request,
 Consignment Overview, Consignment Receipts, Report or Settings sidebar destination. The capability
 lives in its authority home: Registers, central Work/Reports/Settings, in-context Catalog governance
-or the one Goods Receipts engine. `purchase_demand` remains an authoritative record, not a page.
+or the one Receiving engine. `purchase_demand` remains an authoritative record, not a page.
 
 | Queue tile | Row line | Button | Done message | Empty state |
 |---|---|---|---|---|
 | `Issue PO` | `Issue PO to {supplier}` | `Issue PO` | `PO issued to {supplier}` | `No purchase orders to issue.` |
-| `Supplier date missing` | `Ask {supplier} for the delivery date` | `Record supplier date` | `Supplier date recorded` | `Every issued order has a supplier date.` |
-| `Supplier date passed` | `Ask {supplier} when the goods will arrive` | `Record supplier answer` | `Supplier answer recorded` | `No supplier date has passed.` |
-| `Goods to receive` | `Check in {document} from {supplier}` | `Start receiving` | `GRN posted · {n} of {m} accepted` | `No supplier delivery is ready to receive.` |
+| `Supplier Delivery Date missing` | `Ask {supplier} for the delivery date` | `Record supplier answer` | `Supplier answer recorded` | `Every issued order has a supplier delivery answer.` |
+| `Supplier Delivery Date passed` | `Ask {supplier} when the goods will arrive` | `Record supplier answer` | `Supplier answer recorded` | `No Supplier Delivery Date has passed.` |
+| `Goods to receive` | `Check in {document} from {supplier}` | `Start receiving` | `GRN posted · {n} received · {m} pending delivery` | `No supplier delivery is ready to receive.` |
 | `Balance date missing` | `Ask {supplier} for the balance delivery date` | `Record balance date` | `Balance date recorded` | `Every part receipt has a balance date.` |
 | `Confirm what happens next` | `Call {supplier} — confirm what happens next` | `Record what happens next` | `Supplier answer recorded` | `No claim is waiting for a supplier answer.` |
 | `Issue consignment order` | `Issue consignment order to {supplier}` | `Issue consignment order` | `Consignment order issued to {supplier}` | `No showroom is waiting for stock.` |
@@ -1162,7 +1162,7 @@ category tally, where a line is known goods that simply has no tally word of its
 know what this is* is a different fact, and borrowing the word would hide 975 unknown units
 under a confident one.
 
-### The Receiving Workspace's own words (locked 2026-08-03, Slice B)
+### The Receiving Workspace's own words (Owner-corrected 2026-08-29)
 
 `Check in` above is the ACT and stays the queue word. These are the words the
 Office Receiving Workspace puts on screen while performing it — they name
@@ -1172,13 +1172,13 @@ do not take the five-string shape.
 | Word | Where | Why this word |
 |---|---|---|
 | `Receiving Summary` | workspace section | **Never `Progress`** (Jess): the section answers *what has this PO taken in*, a count, not a stage. |
-| `Received` · `Outstanding` | the summary's two rows | Outstanding is PRINTED, not left as `5 − 3`. An operator should never subtract to learn what is still owed. |
+| `Order Qty` · `Received Qty` · `Damaged Qty` · `Wrong Item Qty` · `Pending Delivery Qty` | receiving quantities | Damaged, wrong and extra goods never reduce Pending Delivery Qty and never create available Stock. |
 | `Start Receiving` | primary action | A PRIMARY ACTION, never a section — the operator's whole job here is one press. |
 | `Receiving Details` | the strip Receiving Mode adds | What this delivery was, as opposed to what was on it. |
 | `Goods Received At` | field | The Business Date Dictionary's own word — when the goods PHYSICALLY arrived, which is not when they were keyed in. |
 | `Supplier DO No.` | field | **Theirs, not ours.** It has no default and no suggestion; a number we invent is a reference the supplier never issued. |
 | `Signed DO photo` | field | The evidence, named by what it is a photo OF. |
-| `Receive now` | per-line input | *"Receive this time"*, never *"total so far"* — the column beside it already says `Received`. |
+| `Received Qty` | per-line physical count | What physically arrived in this receiving session; it is distinct from damaged and wrong quantities. |
 | `What kind of wrong?` | per-line picker | Plain words. The claim needs the kind before it can be filed. |
 | `Save Receiving` | the Save button, when nothing is missing | |
 | `Save — {what is missing}` | the Save button otherwise | The button NAMES the gap: `Save — add a DO number` · `Save — upload signed DO` · `Save — count at least one unit`. A grey button that will not say why is a puzzle. |
@@ -1264,7 +1264,7 @@ One vocabulary for every module that waits on a supplier. Never invent a synonym
 
 | Group | The words |
 |---|---|
-| Receiving result | `Received` · `Received with exception` · `Rejected` |
+| Receiving quantities | `Order Qty` · `Received Qty` · `Damaged Qty` · `Wrong Item Qty` · `Pending Delivery Qty` |
 | Exception lifecycle | `Receiving exception created` · **`Call {supplier} — confirm what happens next`** · `Waiting supplier reply` · `Waiting goods arrival` · `Overdue goods arrival` · `Supplier cannot fulfil` · `Case owner decision required` · `Exception closed` |
 
 **`Contact supplier` is retired** (Loo, 2026-07-28). It was a SIXTH verb for behaviour the

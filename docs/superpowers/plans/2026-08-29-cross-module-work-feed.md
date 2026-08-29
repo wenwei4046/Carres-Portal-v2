@@ -14,7 +14,9 @@
 
 - Module work has no manual `Done` button. It disappears only when the owning module's completion fact exists.
 - My Work is the default view for every user, including managers. Team Work is the supervision view.
-- A Work row deep-links to Purchase Orders, Goods Receipts, Supplier Claims, or Purchase Returns according to its source; it never redirects every item to Sales Orders.
+- A Purchasing chase row deep-links the exact Purchase Order. A Receiving row deep-links the exact
+  PO/Receiving Session. Other rows open Supplier Claims or Purchase Returns according to source;
+  Work never redirects every item to Sales Orders and never owns completion.
 - The module rail's first panel is `WORK TO DO`, filtered to the current module. It is not a second queue and uses the same feed/counts as Work.
 - Due dates name Office or Warehouse calendar explicitly. Late work keeps its original due date.
 

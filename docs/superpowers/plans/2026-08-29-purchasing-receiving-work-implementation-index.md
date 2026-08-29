@@ -49,8 +49,8 @@ walked with the real account.
 
 1. `2026-08-29-operations-duty-authority-and-audit.md`
 2. `2026-08-29-supplier-confirmation-evidence.md`
-3. `2026-08-29-goods-receipt-and-formal-grn.md`
-4. `2026-08-29-receiving-continuations.md`
+3. `2026-08-29-goods-receipt-and-formal-grn.md` — superseded; Receiving task owns the correction
+4. `2026-08-29-receiving-continuations.md` — superseded; do not execute from this task
 5. `2026-08-29-purchase-return.md`
 6. `2026-08-29-cross-module-work-feed.md`
 7. `2026-08-29-owner-visible-ui-and-production-rollout.md`

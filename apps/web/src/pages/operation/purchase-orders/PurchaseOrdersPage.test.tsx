@@ -11,6 +11,15 @@ let requiredLoading = false;
 let connectionLoading = false;
 let connectionEmpty = false;
 let receivingReturnReason: string | null = null;
+type TestPromise = {
+  kind: string;
+  answer: string;
+  about_date: string | null;
+  previous_date: string | null;
+  new_date: string | null;
+  reason: string | null;
+  recorded_at: string;
+};
 const queryData = {
   pos: [
     {
@@ -22,7 +31,7 @@ const queryData = {
       sup_status: "pending",
       so: null,
       so_refs: null,
-      eta_date: null,
+      eta_date: "2026-09-10",
       expected_ready_date: null,
       purpose: "customer_sales",
       version: 2,
@@ -46,7 +55,15 @@ const queryData = {
           po_revisions: null,
         },
       ],
-      promises: [],
+      promises: [{
+        kind: "tomorrow_delivery",
+        answer: "shipping",
+        about_date: "2026-09-10",
+        previous_date: null,
+        new_date: null,
+        reason: null,
+        recorded_at: "2026-09-09T09:00:00Z",
+      }] as TestPromise[],
       purchase_order_lines: [
         {
           id: "line-1",
@@ -86,7 +103,7 @@ const queryData = {
       placed_at: "2025-01-01T08:00:00Z",
       sources: [],
       sends: [],
-      promises: [],
+      promises: [] as TestPromise[],
       purchase_order_lines: [],
     },
   ],
@@ -198,6 +215,16 @@ beforeEach(() => {
     { id: "destination-2", name: "Carres Penang", is_default: false },
   );
   queryData.pos[0]!.purchase_order_lines[0]!.destination_id = "destination-1";
+  queryData.pos[0]!.eta_date = "2026-09-10";
+  queryData.pos[0]!.promises.splice(0, queryData.pos[0]!.promises.length, {
+    kind: "tomorrow_delivery",
+    answer: "shipping",
+    about_date: "2026-09-10",
+    previous_date: null,
+    new_date: null,
+    reason: null,
+    recorded_at: "2026-09-09T09:00:00Z",
+  });
   vi.mocked(apiFetch).mockResolvedValue({});
 });
 
@@ -205,18 +232,36 @@ describe("Purchase Orders Register", () => {
   it("uses the governed columns and filter rail, and does not hide old or cancelled POs", () => {
     renderPage();
     expect(screen.getByTestId("register-grid")).toHaveTextContent(
-      "PO No. | Supplier | Source | Issued | Deliver To | Ordered | Received | Open Balance | Supplier Date | Current Version | Supplier Has | Work",
+      "PO No. | PO Issued | Supplier | Source | Deliver To | PO Delivery Date | Supplier Delivery Date | Ordered | Received | Open Balance | Current Version | Supplier Has | Work",
     );
     for (const word of [
       "PDF not sent",
-      "Supplier date missing",
-      "Supplier date passed",
+      "Supplier Delivery Date missing",
+      "Supplier Delivery Date passed",
       "Version changed — supplier update required",
       "Partly received",
       "Completed",
     ]) expect(screen.getByRole("button", { name: new RegExp(word) })).toBeInTheDocument();
     expect(screen.getByTestId("grid-row-PO-20260828-4827")).toBeInTheDocument();
     expect(screen.getByTestId("grid-row-PO-LEGACY")).toHaveTextContent("Not recorded");
+  });
+
+  it("keeps the official PO Delivery Date and shows only a changed supplier date", () => {
+    renderPage();
+    expect(screen.getByTestId("grid-row-PO-20260828-4827")).toHaveTextContent("Same as PO");
+
+    queryData.pos[0]!.promises.push({
+      kind: "tomorrow_delivery",
+      answer: "delayed",
+      about_date: "2026-09-10",
+      previous_date: "2026-09-10",
+      new_date: "2026-09-14",
+      reason: "Production Delay",
+      recorded_at: "2026-09-09T10:00:00Z",
+    });
+    const changed = renderPage();
+    expect(screen.getAllByTestId("grid-row-PO-20260828-4827").at(-1)).toHaveTextContent("Mon, 14 Sep");
+    changed.unmount();
   });
 
   it("shows two-line work copy with structured real-roster owner metadata", () => {
@@ -311,7 +356,7 @@ describe("Purchase Order object", () => {
     connectionError = true;
     renderPage("/operation/procurement?po=PO-20260828-4827");
     fireEvent.click(screen.getByRole("button", { name: "Order Route" }));
-    expect(screen.getByText("The Goods Receipts connection could not be loaded")).toBeInTheDocument();
+    expect(screen.getByText("The Receiving connection could not be loaded")).toBeInTheDocument();
     expect(screen.getByText("The claims and returns connection could not be loaded")).toBeInTheDocument();
     expect(screen.queryByText("None recorded")).not.toBeInTheDocument();
   });

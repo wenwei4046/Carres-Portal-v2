@@ -41,8 +41,8 @@ import PoIssueEvidence, { doorsForIssuedPo } from "../components/PoIssueEvidence
 
 const FILTERS: Array<{ key: PurchaseOrderRegisterFilter; label: string }> = [
   { key: "pdf_not_sent", label: "PDF not sent" },
-  { key: "supplier_date_missing", label: "Supplier date missing" },
-  { key: "supplier_date_passed", label: "Supplier date passed" },
+  { key: "supplier_date_missing", label: "Supplier Delivery Date missing" },
+  { key: "supplier_date_passed", label: "Supplier Delivery Date passed" },
   { key: "supplier_update_required", label: "Version changed — supplier update required" },
   { key: "partly_received", label: "Partly received" },
   { key: "completed", label: "Completed" },
@@ -277,6 +277,17 @@ export default function PurchaseOrdersPage() {
       filterValue: (row) => row.id,
     },
     {
+      key: "issued",
+      label: "PO Issued",
+      width: 174,
+      sortable: true,
+      accessor: (row) => row.facts.currentSend
+        ? fmtDate(row.facts.currentSend.sentAt, { time: true })
+        : <Absence>Not sent</Absence>,
+      searchValue: (row) => row.facts.documentState,
+      filterValue: (row) => row.facts.documentState,
+    },
+    {
       key: "supplier",
       label: "Supplier",
       width: 150,
@@ -295,17 +306,6 @@ export default function PurchaseOrdersPage() {
       filterValue: (row) => row.source,
     },
     {
-      key: "issued",
-      label: "Issued",
-      width: 174,
-      sortable: true,
-      accessor: (row) => row.facts.currentSend
-        ? fmtDate(row.facts.currentSend.sentAt, { time: true })
-        : <Absence>Not sent</Absence>,
-      searchValue: (row) => row.facts.documentState,
-      filterValue: (row) => row.facts.documentState,
-    },
-    {
       key: "deliver_to",
       label: "Deliver To",
       width: 160,
@@ -313,6 +313,34 @@ export default function PurchaseOrdersPage() {
       accessor: (row) => row.deliverTo === "Not recorded" ? <Absence /> : row.deliverTo,
       searchValue: (row) => row.deliverTo,
       filterValue: (row) => row.deliverTo,
+    },
+    {
+      key: "po_delivery_date",
+      label: "PO Delivery Date",
+      width: 150,
+      sortable: true,
+      accessor: (row) => row.po.eta_date ? fmtDate(row.po.eta_date) : <Absence />,
+      searchValue: (row) => row.po.eta_date ?? "Not recorded",
+      filterValue: (row) => row.po.eta_date ?? "Not recorded",
+      dateValue: (row) => row.po.eta_date,
+      filterType: "date",
+    },
+    {
+      key: "supplier_delivery_date",
+      label: "Supplier Delivery Date",
+      width: 166,
+      sortable: true,
+      accessor: (row) => row.po.eta_date && (!row.supplierDate || row.supplierDate === row.po.eta_date)
+        ? "Same as PO"
+        : row.supplierDate ? fmtDate(row.supplierDate) : <Absence />,
+      searchValue: (row) => row.po.eta_date && (!row.supplierDate || row.supplierDate === row.po.eta_date)
+        ? "Same as PO"
+        : row.supplierDate ?? "Not recorded",
+      filterValue: (row) => row.po.eta_date && (!row.supplierDate || row.supplierDate === row.po.eta_date)
+        ? "Same as PO"
+        : row.supplierDate ?? "Not recorded",
+      dateValue: (row) => row.supplierDate === row.po.eta_date ? null : row.supplierDate,
+      filterType: "date",
     },
     ...(["ordered", "received", "open"] as const).map((key): DataGridColumn<RegisterRow> => ({
       key,
@@ -327,17 +355,6 @@ export default function PurchaseOrdersPage() {
       filterType: "number",
       footerTotal: (rows) => rows.reduce((sum, row) => sum + row.facts.quantities[key], 0),
     })),
-    {
-      key: "supplier_date",
-      label: "Supplier Date",
-      width: 140,
-      sortable: true,
-      accessor: (row) => row.supplierDate ? fmtDate(row.supplierDate) : <Absence />,
-      searchValue: (row) => row.supplierDate ?? "Not recorded",
-      filterValue: (row) => row.supplierDate ?? "Not recorded",
-      dateValue: (row) => row.supplierDate,
-      filterType: "date",
-    },
     {
       key: "current_version",
       label: "Current Version",
@@ -746,8 +763,9 @@ function DocumentView({ row, owner, units, receiving, claims, destinations, unit
           <Fact label="Supplier" value={row.supplierName} />
           <Fact label="Deliver To" value={row.deliverTo} />
           <Fact label="Source" value={row.source} />
-          <Fact label="Issued" value={row.facts.currentSend ? fmtDate(row.facts.currentSend.sentAt, { time: true }) : "Not sent"} />
-          <Fact label="Supplier Date" value={row.supplierDate ? fmtDate(row.supplierDate) : "Not recorded"} />
+          <Fact label="PO Issued" value={row.facts.currentSend ? fmtDate(row.facts.currentSend.sentAt, { time: true }) : "Not sent"} />
+          <Fact label="PO Delivery Date" value={row.po.eta_date ? fmtDate(row.po.eta_date) : "Not recorded"} />
+          <Fact label="Supplier Delivery Date" value={row.po.eta_date && (!row.supplierDate || row.supplierDate === row.po.eta_date) ? "Same as PO" : row.supplierDate ? fmtDate(row.supplierDate) : "Not recorded"} />
           <Fact label="Current Version" value={`Version ${row.facts.version}`} />
           <Fact label="Supplier Has" value={row.facts.supplierHas} />
           <Fact label="Status" value={row.facts.operationStatus ?? row.facts.documentState} />
@@ -784,9 +802,9 @@ function DocumentView({ row, owner, units, receiving, claims, destinations, unit
         <ConnectionBlock title="Unit IDs" empty="No Unit ID is recorded for this PO." hasContent={units.length > 0} loading={unitLoading} problem={unitError ? "The Unit ID connection could not be loaded" : null} action="Try again. If it still fails, ask the system owner to check the PO Unit IDs." onRetry={onRetryUnits}>
           {units.map((unit) => <ConnectionRow key={unit.unit_code} primary={unit.unit_code} secondary={`${unit.sku} · ${unit.status}`} />)}
         </ConnectionBlock>
-        <ConnectionBlock title="Goods Receipts" empty="No receiving session is connected to this PO." hasContent={receiving.length > 0} loading={receivingLoading} problem={receivingError ? "The Goods Receipts connection could not be loaded" : null} action="Try again. If it still fails, ask the system owner to check the receiving connection." onRetry={onRetryReceiving}>
+        <ConnectionBlock title="Receiving" empty="No receiving session is connected to this PO." hasContent={receiving.length > 0} loading={receivingLoading} problem={receivingError ? "The Receiving connection could not be loaded" : null} action="Try again. If it still fails, ask the system owner to check the receiving connection." onRetry={onRetryReceiving}>
           {receiving.map((receipt) => <ConnectionRow key={receipt.id} primary={receipt.do_number ?? "Supplier DO not recorded"} secondary={`${receipt.status} · ${fmtDate(receipt.goods_received_at)}`} />)}
-          {receiving.length > 0 ? <Link className="mt-2 text-meta font-medium text-kit-blue-11 hover:underline" to={`/operation?tab=receiving&po=${encodeURIComponent(po.id)}`}>Open Goods Receipts</Link> : null}
+          {receiving.length > 0 ? <Link className="mt-2 text-meta font-medium text-kit-blue-11 hover:underline" to={`/operation?tab=receiving&po=${encodeURIComponent(po.id)}`}>Open Receiving</Link> : null}
         </ConnectionBlock>
         <ConnectionBlock title="Claims and returns" empty="No claim or return is connected to this PO." hasContent={claims.length + returnRows.length > 0} loading={claimsLoading || receivingLoading} problem={claimsError || receivingError ? "The claims and returns connection could not be loaded" : null} action="Try again. If it still fails, ask the system owner to check the claim and receiving return connections." onRetry={() => { onRetryClaims(); onRetryReceiving(); }}>
           {claims.map((claim) => <ConnectionRow key={claim.id} primary={claim.claim_no} secondary={`${claim.status}${claim.requested_action === "return" ? " · Return requested" : ""}`} />)}
@@ -834,7 +852,7 @@ function OrderRoute({ row, receiving, claims, receivingLoading, claimsLoading, r
   const problemCount = claims.length + returnRows.length;
   const problemLoading = claimsLoading || receivingLoading;
   const problemError = claimsError || receivingError;
-  return <section className="mx-auto max-w-[1100px] border border-kit-slate-5 bg-white p-4"><h2 className="text-label font-semibold uppercase tracking-wide text-kit-slate-9">Order Route</h2><div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-4"><RouteNode title="Source" main={row.source} detail={row.sourceSearch === "Not recorded" ? "No governed source is recorded" : row.sourceSearch} /><RouteNode title="Purchase Order" main={row.id} detail={`Version ${row.facts.version} · ${row.facts.documentState}`} />{receivingError ? <RouteProblem title="Goods Receipts" problem="The Goods Receipts connection could not be loaded" action="Try again. If it still fails, ask the system owner to check the receiving connection." onRetry={onRetryReceiving} /> : <RouteNode title="Goods Receipts" main={receivingLoading ? "Loading…" : receiving.length ? `${receiving.length} connected` : "None recorded"} detail={receivingLoading ? "Checking the receiving record" : receiving.map((receipt) => receipt.do_number ?? receipt.status).join(" · ") || "Receiving owns this fact"} />}{problemError ? <RouteProblem title="Claims and returns" problem="The claims and returns connection could not be loaded" action="Try again. If it still fails, ask the system owner to check the claim and receiving return connections." onRetry={() => { onRetryClaims(); onRetryReceiving(); }} /> : <RouteNode title="Claims and returns" main={problemLoading ? "Loading…" : problemCount ? `${problemCount} connected` : "None recorded"} detail={problemLoading ? "Checking the claim and receiving return records" : [...claims.map((claim) => claim.claim_no), ...returnRows.map(() => "Receiving return")].join(" · ") || "No connected problem record"} />}</div></section>;
+  return <section className="mx-auto max-w-[1100px] border border-kit-slate-5 bg-white p-4"><h2 className="text-label font-semibold uppercase tracking-wide text-kit-slate-9">Order Route</h2><div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-4"><RouteNode title="Source" main={row.source} detail={row.sourceSearch === "Not recorded" ? "No governed source is recorded" : row.sourceSearch} /><RouteNode title="Purchase Order" main={row.id} detail={`Version ${row.facts.version} · ${row.facts.documentState}`} />{receivingError ? <RouteProblem title="Receiving" problem="The Receiving connection could not be loaded" action="Try again. If it still fails, ask the system owner to check the receiving connection." onRetry={onRetryReceiving} /> : <RouteNode title="Receiving" main={receivingLoading ? "Loading…" : receiving.length ? `${receiving.length} connected` : "None recorded"} detail={receivingLoading ? "Checking the receiving record" : receiving.map((receipt) => receipt.do_number ?? receipt.status).join(" · ") || "Receiving owns this fact"} />}{problemError ? <RouteProblem title="Claims and returns" problem="The claims and returns connection could not be loaded" action="Try again. If it still fails, ask the system owner to check the claim and receiving return connections." onRetry={() => { onRetryClaims(); onRetryReceiving(); }} /> : <RouteNode title="Claims and returns" main={problemLoading ? "Loading…" : problemCount ? `${problemCount} connected` : "None recorded"} detail={problemLoading ? "Checking the claim and receiving return records" : [...claims.map((claim) => claim.claim_no), ...returnRows.map(() => "Receiving return")].join(" · ") || "No connected problem record"} />}</div></section>;
 }
 
 function RouteNode({ title, main, detail }: { title: string; main: string; detail: string }) {

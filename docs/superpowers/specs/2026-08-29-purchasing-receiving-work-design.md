@@ -60,7 +60,7 @@ The accepted approach is **module execution with one cross-module Work projectio
 |---|---|---|
 | SO Batch Purchase / Manual Purchase | approved purchase input and issue preparation | Work assignment, receiving or Stock |
 | Purchase Orders | supplier commitment, document/version, promise and supplier response evidence | physical receipt or Stock |
-| Goods Receipts | count, Unit inspection, delivery note, receipt outcome, posting and formal GRN | supplier commercial commitment or later custody |
+| Receiving | physical count, Unit inspection, Supplier DO, Goods Receipt posting and formal GRN | supplier commercial commitment or later custody |
 | Supplier Claims | what Carres asked, what the supplier answered and approved supplier-resolution path | original receipt or physical return handover |
 | Purchase Returns / Repair Orders | approved source-linked outgoing instruction and collection/return evidence | blank problem intake |
 | Stock | exact Unit custody, condition, availability and append-only physical consequence | PO, supplier promise or GRN |
@@ -91,12 +91,10 @@ only when its module completion fact exists.
 |---|---|---|---|---|---|---|
 | Issue PO | PO Duty or dated cover; Jess / Operations Superuser may act | approved demand's governed issue date · Office | SO Batch / Manual Purchase issue review | current version, source, destination, normal duty, cover, actual actor, authority | Team Work | formal PO/version created |
 | Record PO sent | same | issue day · Office | Purchase Orders communication region | exact version, recipient, channel, actor, Malaysia time | Team Work | current version becomes Issued |
-| Confirm arrival | PO Duty / cover; superuser may act | one Office working day before expected arrival | Purchase Orders | structured answer/date plus WhatsApp or equivalent response evidence, recipient/channel, actor/time | Team Work | arrival remains or moves; Receiving work recomputes |
-| Physical count | Carres location: GRN Duty; external Warehouse: assigned warehouse staff, accountable to GRN Duty | promised arrival day · Warehouse | Goods Receipts / Warehouse portal | exact Unit IDs where required, expected/accepted/rejected/not-delivered quantity, condition, signed DO, photos, site/time, counter | Team Work | submitted Receiving Session; no Stock movement yet for Warehouse submission |
-| Post receipt | GRN Duty / dated cover; Jess / Operations Superuser may act | receipt day · Warehouse | Goods Receipts | submitted count or direct Office count, poster, source, signed DO, per-Unit outcomes | Team Work | session `posted`; formal GRN; Stock/Claim consequences once |
-| Confirm balance date | PO Duty / cover | opens from partial posting; due on the next governed Office action day | Purchase Orders | open balance, supplier's new date and response evidence | Team Work | accepted quantity stays posted; remainder stays Incoming |
-| Reject on spot | GRN Duty / receiving station | receipt day · Warehouse | Goods Receipts | exact Units/quantity, observable reason, photo, supplier/carrier hand-back proof | Team Work | rejected goods never become available Stock; Claim opens only when a supplier obligation remains |
-| Accept with issue | GRN Duty | receipt day · Warehouse | Goods Receipts | exact Units, issue type, condition/photo evidence | Team Work | accepted Unit becomes controlled/unavailable and source-linked Supplier Claim opens |
+| Confirm supplier delivery | PO Duty / cover; superuser may act | one Office working day before Supplier Delivery Date | Purchase Orders | actual supplier answer/date, recipient, channel, evidence, reporter/recorder and times | Team Work | unchanged reads `Same as PO`; a changed Supplier Delivery Date is appended without changing the official PO Delivery Date |
+| Physical count | Carres location: GRN Duty; external Warehouse: assigned warehouse staff, accountable to GRN Duty | Supplier Delivery Date · Warehouse | Receiving / Warehouse portal | exact PO/Receiving Session, Supplier DO, Unit IDs where required, Order/Received/Damaged/Wrong Item/Pending Delivery quantities, photos, site/time and counter | Team Work | submitted Receiving Session; no Stock movement yet for Warehouse submission |
+| Post receipt | GRN Duty / dated cover; Jess / Operations Superuser may act | Goods Received At · Warehouse | Receiving | submitted count or direct Carres count, poster, Supplier DO, evidence and actual physical time | Team Work | Carres Goods Receipt and numbered GRN; only eligible received goods can become available Stock |
+| Confirm balance date | PO Duty / cover | opens from partial posting; due on the next governed Office action day | Purchase Orders | Pending Delivery Qty, supplier's new date and response evidence | Team Work | posted stock stays posted; pending quantity remains open |
 | Claim request / response | PO Duty of the claim-open month or dated cover | each step has a governed Office date | Supplier Claims | requested result, supplier answer, response evidence, actor/time | Team Work | authorised replacement, repair, return, accept-as-is or other valid continuation |
 | Purchase Return | created only from approved claim/outcome | supplier collection date · Warehouse | Purchase Returns | formal return version, exact Units, collection date, scan/count, handover proof, actual collector | Team Work | custody changes only on actual handover; Finance reads credit consequence |
 
@@ -107,39 +105,28 @@ actor as different facts.
 ## 5 · Calendar rules
 
 - PO issue, supplier calls, supplier answer recording and balance-date work use the Office calendar:
-  Monday–Friday, excluding governed Malaysian holidays.
+  Monday–Friday, excluding Selangor public holidays.
 - Physical arrival, count, inspection, receipt posting and supplier collection use the Warehouse
-  calendar: Monday–Saturday, excluding governed holidays.
+  calendar: Monday–Saturday, excluding Sunday and Selangor public holidays.
 - Supplier production uses the supplier's configured factory calendar. It does not redefine the
   Office or Warehouse week.
 - A Saturday arrival creates Friday confirmation work. A Monday arrival also creates Friday work
   unless Friday is a holiday, in which case the Office engine moves to the prior valid day.
 - Changing a supplier promise recomputes the confirmation and receipt actions from the new fact;
   it does not edit a Work row directly.
+- Date arithmetic schedules work but never silently changes PO Delivery Date, Supplier Delivery
+  Date or Goods Received At.
 
-## 6 · Receiving outcomes and downstream truth
+## 6 · Receiving quantity seam and downstream truth
 
-### Complete acceptance
+The Receiving task owns the detailed posting design. Purchasing must preserve these distinct facts:
+Order Qty, Received Qty, Damaged Qty, Wrong Item Qty and Pending Delivery Qty. Damaged, wrong and
+extra goods never reduce Pending Delivery Qty and never create available Stock. `Accepted` and
+`Rejected` are not default Register quantities.
 
-Posting creates the formal GRN and applies accepted Stock/Unit consequences once. The PO closes
-only when every ordered quantity is covered by accepted receipts or another authorised terminal
-outcome.
-
-### Partial receipt
-
-Accepted Units post immediately. The remaining quantity stays Incoming on the PO line. Posting
-opens `Confirm balance delivery date` for PO Duty; it does not invent damage or a claim.
-
-### Reject on the spot
-
-The goods remain with the supplier/carrier. The GRN records the rejected/not-delivered result and
-proof but creates no available Stock. A Supplier Claim is created only when Carres must obtain a
-replacement, repair, collection or other supplier result.
-
-### Accept with issue
-
-Physical custody is accepted, but the Unit is controlled and unavailable. The same posting creates
-the source-linked claim and keeps the evidence connected to the GRN and Unit.
+Posting after physical receiving creates the Carres Goods Receipt and numbered GRN. A partial
+receipt leaves Pending Delivery Qty open and creates evidenced supplier-date work for PO Duty; it
+does not change the original official PO Delivery Date.
 
 ### Later defect
 
@@ -208,10 +195,10 @@ This architecture must be delivered as independently reviewable plans, in this d
    dated covers, normal-owner/cover/actor audit contract.
 2. **Supplier confirmation evidence** — structured answer plus response evidence and the purchasing
    action projection.
-3. **Goods Receipt / formal GRN authority** — per-Unit outcomes, two receiving doors, GRN Duty gate,
-   posting and Stock/Claim consequences.
-4. **Partial / reject / claim / return continuations** — balance work, reject vs accept-with-issue,
-   source-linked Purchase Return and handover evidence.
+3. **Receiving / formal GRN authority** — owned by the separate Receiving task; this Purchasing
+   task supplies PO/CO, Deliver To, date and actor/owner lineage only.
+4. **Receiving continuations** — owned by the separate Receiving task; the superseded plans in this
+   worktree must not be executed.
 5. **Cross-module Work feed and supervision** — Purchasing, Receiving and Claim projections into
    My Work / Team Work, plus contextual `WORK TO DO` rail filters.
 6. **Owner-visible UI closure and rollout** — SO Batch selected-action owner chip/button, global

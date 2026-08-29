@@ -1,5 +1,12 @@
 # Goods Receipt and Formal GRN Implementation Plan
 
+> **SUPERSEDED — DO NOT EXECUTE.** Owner correction, 2026-08-29: the workspace is `Receiving`,
+> Supplier DO and physical receipt produce the Carres Goods Receipt/numbered GRN, and quantities are
+> Order / Received / Damaged / Wrong Item / Pending Delivery. Damaged, wrong and extra goods never
+> reduce Pending Delivery or create available Stock. The separate Receiving task owns the corrected
+> implementation. This file remains only as historical evidence and authorises no Receiving UI or
+> migration work from the SO Batch Purchase task.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Converge Carres-station and external-Warehouse receiving on one GRN-Duty-controlled posting engine that records exact outcomes, creates one formal GRN, and applies Stock/Claim consequences once.
@@ -116,4 +123,3 @@ export interface ReceivingUnitOutcome {
 - [ ] Run `pnpm typecheck`, `pnpm lint`, and `pnpm ci:migrations`.
 - [ ] Search `rg -n "operation_receive_po_with_do|office_receive_post|warehouse_receipt_check_in|post_receiving_session" apps supabase/migrations`; verify current routes converge on `post_receiving_session` and only migration history contains prior direct paths.
 - [ ] Commit verification corrections with `git commit -m "test(receiving): verify one formal GRN engine"`.
-

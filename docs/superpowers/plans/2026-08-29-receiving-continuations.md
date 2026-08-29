@@ -1,5 +1,10 @@
 # Receiving Continuations Implementation Plan
 
+> **SUPERSEDED — DO NOT EXECUTE.** Owner correction, 2026-08-29, replaced this plan's default
+> accepted/rejected outcome model. The Receiving task owns the revised quantity, evidence, calendar
+> and GRN design. The SO Batch Purchase task must preserve PO/CO lineage and must not implement this
+> page or a second receipt writer.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Turn partial, rejected, and accepted-with-issue receipt outcomes into the correct governed next work without reversing accepted goods or inventing claims.
@@ -89,4 +94,3 @@ export interface ReceivingConsequence {
 - [ ] Run `pnpm typecheck`, `pnpm lint`, and `pnpm ci:migrations`.
 - [ ] Search for any new manual `Complete` mutation for balance/claim work; expected result: none.
 - [ ] Commit verification corrections with `git commit -m "test(receiving): verify partial reject and issue continuations"`.
-
