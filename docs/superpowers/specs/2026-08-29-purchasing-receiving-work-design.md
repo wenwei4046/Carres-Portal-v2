@@ -1,8 +1,11 @@
 # Purchasing → Receiving → GRN → Claim / Return Design
 
-> **Status:** OWNER-APPROVED · 29 Aug 2026  
-> **Lane:** PLAN / DESIGN · no production migration or deployment authorised  
-> **Canonical business authority:** [`docs/purchasing/MASTER.md`](../../purchasing/MASTER.md)  
+> **Status:** OWNER-APPROVED · 29 Aug 2026
+>
+> **Lane:** PLAN / DESIGN · no production migration or deployment authorised
+>
+> **Canonical business authority:** [`docs/purchasing/MASTER.md`](../../purchasing/MASTER.md)
+>
 > **Cross-module boundary authority:** [`docs/ERP-ARCHITECTURE.md`](../../ERP-ARCHITECTURE.md)
 
 ## 1 · Owner-visible outcome
