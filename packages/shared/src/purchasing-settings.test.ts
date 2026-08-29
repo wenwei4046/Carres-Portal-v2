@@ -9,7 +9,9 @@ import {
   parsePgIntArray,
   productionWorkingDaysFor,
   purchasingSetNumberInput,
+  purchasingCreateDestinationInput,
   purchasingSetProductionDaysInput,
+  purchasingUpdateDestinationInput,
   purchasingSetWorkWeekInput,
   purchasingUrgentWindowDays,
   settingValueLabel,
@@ -39,6 +41,24 @@ const SETTINGS: PurchasingSettings = {
     { supplierId: NICE, category: "mattress", workingDays: 7 },
     { supplierId: OHANA, category: "bedframe", workingDays: 7 },
     { supplierId: OHANA, category: "sofa", workingDays: 14 },
+  ],
+  destinations: [
+    {
+      id: "44444444-0000-0000-0000-000000000004",
+      name: "Carres Klang",
+      address: "Lot 12, Klang",
+      isDefault: true,
+      active: true,
+      warehouseLinked: true,
+    },
+    {
+      id: "55555555-0000-0000-0000-000000000005",
+      name: "Ohana",
+      address: null,
+      isDefault: false,
+      active: true,
+      warehouseLinked: false,
+    },
   ],
   lastChanges: [
     {
@@ -161,6 +181,40 @@ describe("workWeekLabel", () => {
 });
 
 describe("the wire refuses what the database would refuse", () => {
+  it("accepts a future Deliver To and trims its name and address", () => {
+    expect(
+      purchasingCreateDestinationInput.parse({
+        name: "  Ohana  ",
+        address: "  Sungai Buloh  ",
+      }),
+    ).toEqual({ name: "Ohana", address: "Sungai Buloh" });
+  });
+
+  it("refuses a blank Deliver To name", () => {
+    expect(
+      purchasingCreateDestinationInput.safeParse({ name: "   ", address: null }).success,
+    ).toBe(false);
+  });
+
+  it("a destination edit carries the full governed state", () => {
+    expect(
+      purchasingUpdateDestinationInput.safeParse({
+        name: "Ohana",
+        address: null,
+        active: true,
+        isDefault: false,
+      }).success,
+    ).toBe(true);
+    expect(
+      purchasingUpdateDestinationInput.safeParse({
+        name: "Ohana",
+        address: null,
+        active: false,
+        isDefault: true,
+      }).success,
+    ).toBe(false);
+  });
+
   it("only the three single numbers are settable by key", () => {
     expect(PURCHASING_NUMBER_KEYS).toEqual([
       "order_by_buffer_days",

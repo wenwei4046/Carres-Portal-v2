@@ -493,8 +493,9 @@ export default function OperationPurchaseOrders() {
    * same one the expand's picker reads), and a PO with no destination follows
    * its warehouse — so the register can never print a blank for a fact every
    * PO has. **The names are the SAVED ones**, never re-spelt: COPY-STANDARD
-   * locks `Carres Klang` · `AL Sungai Buloh` · `HOUZS` and warns by name
-   * against shortening `AL Sungai Buloh` to `AL`.
+   * defines the current Settings-owned names (`Carres Klang` ·
+   * `AL Sungai Buloh` · `HOUZS` · `Ohana`) and warns against shortening
+   * `AL Sungai Buloh` to `AL`. Future names ride the same master data.
    *
    * The PO's own destination LEADS when the lines disagree — the row is one
    * value for one document (§12.7.5's ROW test) and the per-line truth is the

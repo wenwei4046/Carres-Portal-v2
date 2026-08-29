@@ -580,7 +580,7 @@ describe("the rail — Card 02-A wording, Card 02-B counting", () => {
   });
 });
 
-describe("the rail — Card 02-C: five readable sections, navigation not selection", () => {
+describe("the rail — six readable sections, navigation not selection", () => {
   const rail = () => screen.getByTestId("so-batch-rail");
 
   it("hides completely, reopens from the Register toolbar, and remembers the choice", () => {
@@ -598,14 +598,19 @@ describe("the rail — Card 02-C: five readable sections, navigation not selecti
     expect(localStorage.getItem("carres.soBatchPurchase.filters.open")).toBe("1");
   });
 
-  it("renders the five sections in the approved order, with the approved words", () => {
+  it("renders WORK TO DO first, followed by the five fact sections", () => {
     renderRegister();
     const text = rail().textContent ?? "";
-    const order = ["TO ORDER", "ORDER TIMING", "PRODUCT", "SUPPLIER", "SETUP TO FIX"];
+    const order = ["WORK TO DO", "TO ORDER", "ORDER TIMING", "PRODUCT", "SUPPLIER", "SETUP TO FIX"];
     const positions = order.map((h) => text.indexOf(h));
     expect(positions.every((p) => p >= 0)).toBe(true);
     expect([...positions].sort((a, b) => a - b)).toEqual(positions);
     for (const word of [
+      "Issue PO",
+      "Ask customer for a delivery date",
+      "Add item to SKU catalog",
+      "Check the supplier",
+      "Add production days",
       "All not ordered",
       "Can order early",
       "14 safety days left",
@@ -624,6 +629,18 @@ describe("the rail — Card 02-C: five readable sections, navigation not selecti
     /* The retired wording never returns. */
     expect(text).not.toContain("Not enough production time");
     expect(text).not.toContain("Production time not set");
+  });
+
+  it("WORK TO DO shows the daily action counts and filters the Register", () => {
+    renderRegister();
+    const issue = screen.getByTestId("so-batch-work-issue_po");
+    expect(issue.textContent).toContain("3"); // o1 · o3 · o8, never o8's two leafs
+    fireEvent.click(issue);
+    expect(screen.getByTestId("so-batch-row-o1")).toBeInTheDocument();
+    expect(screen.getByTestId("so-batch-row-o3")).toBeInTheDocument();
+    expect(screen.getByTestId("so-batch-row-o8")).toBeInTheDocument();
+    expect(screen.queryByTestId("so-batch-row-o4")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("so-batch-row-o5")).not.toBeInTheDocument();
   });
 
   it("all five timing rows stay visible, and an empty band prints 0, not silence", () => {

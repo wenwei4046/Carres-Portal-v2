@@ -1032,6 +1032,14 @@ table** in the page Work Toolbar, selection bar or the relevant top popover; `Re
 belongs to Columns and never to the footer. Each Register MASTER owns its truthful summary
 vocabulary and arithmetic; the global template may not invent a KPI, status or unit.
 
+**REGISTER LISTING FRAME — APPROVED / LOCKED, Owner correction 2026-08-29.** Every current and
+future Register/listing kit draws one complete light structural border on all four sides. The frame
+contains the Work Toolbar, table states/rows and fixed status footer as one listing; it is never a
+border around the whole page and never one card per row. The shared engines own it:
+`register/DataGrid` frames every full grid and `kit/DataTable` frames every kit table; embedded child
+tables may use their governed child-box boundary. A page may not cancel the left/right edges or add a
+second wrapper frame. New UI kits inherit this rule rather than offering a frameless variant.
+
 The table frame has an 8px outer gap above and an 8px outer gap below. The bottom gap is page
 breathing room outside the frame; the 32px footer remains inside it and never touches the browser
 edge. Available vertical space is filled with consecutive complete parent rows. There is no
@@ -1094,12 +1102,10 @@ breathing gap
     | Delivery Location | Showroom | PO No | DO No
 ```
 
-- **NO OUTER FRAME — owner ruling 2026-08-27 (Jess), overwriting this section's earlier "light
-  bordered Register".** The page is the header and the table listing; a border wrapping the Work
-  Toolbar, grid and status footer read as a box around the whole page and is deleted. The toolbar
-  band, the table header rule and the fixed footer give all the structure. This is Register
-  template grammar (`register/DataGrid` `appearance="reference"`), so every Register on the
-  engine inherits it — the frame does not survive page by page.
+- **THE COMPLETE REGISTER FRAME IS INHERITED FROM THE KIT — Owner correction 2026-08-29.** The
+  earlier text falsely attributed a global `NO OUTER FRAME` ruling to the Owner and is withdrawn.
+  Sales Orders must show the same four-sided light boundary as every Register; missing left/right
+  edges are a defect, not a page-scoped appearance. The engine supplies the frame once.
 - Sales Orders is a truth Register, not Work and not a dashboard. No KPI-card preamble, no
   giant card around the page.
 - The seven business columns above are the governed default and exact order. `▸` is chrome.

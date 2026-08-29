@@ -37,13 +37,14 @@
   --radius-pill: 999px;
   --shadow-3: 0 8px 24px rgba(0, 0, 0, 0.16);
 
-  /* De-boxed (Wei Siang 2026-06-04): a flat, full-width table surface — NOT a
-     floating brochure card. No border, no radius — the grid is a flat
-     full-bleed panel that flows with the page instead of sitting in a "框框".
-     The toolbar's band + the header rule give all the structure needed. */
+  /* Owner correction 2026-08-29: a Register listing always carries one
+     complete structural frame. It is still a flat sheet, never a rounded
+     brochure card and never one box per row. Keeping the frame here makes
+     every current and future caller inherit all four sides from the engine. */
   display: flex;
   flex-direction: column;
   background: var(--c-paper);
+  box-sizing: border-box;
   border: none;
   border-radius: 0;
   box-shadow: none;
@@ -54,6 +55,12 @@
      calc(100vh − 150px) viewport math. */
   flex: 1 1 auto;
   min-height: 0;
+}
+
+/* One shared boundary for every full Register. Kept as a named engine class
+   so the guard test proves no page or future caller can silently omit it. */
+.rootFramed {
+  border: 1px solid var(--line);
 }
 
 /* Embedded (drill-down) mode — no card chrome. The grid sits inside a
@@ -89,13 +96,9 @@
 
    No px font-size literal lives in this scope: the sizes are the `.root`
    token aliases, never a token redefined to a different value. */
-/* No outer frame (Jess, 2026-08-27): the page is the header and the table
-   listing — the toolbar band, the header rule and the status footer give all
-   the structure; a border wrapping toolbar + grid + footer read as a box
-   around the whole page. Same taste as the 2026-06-04 de-boxing above. */
-.rootReference {
-  border: none;
-}
+/* Reference geometry inherits the engine's mandatory complete listing frame.
+   Do not cancel any edge: Sales Orders exposed the missing side frame that
+   led to the Owner's 2026-08-29 correction. */
 .rootReference .toolbar {
   box-sizing: border-box;
   height: 45px;

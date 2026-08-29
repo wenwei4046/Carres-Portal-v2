@@ -77,7 +77,7 @@ export async function loadPurchasingSettings(
 ): Promise<LoadedPurchasingSettings> {
   const numbers = await loadPurchasingNumbers(sb);
 
-  const [skusR, suppliersR, prodR, weekR, changesR] = await Promise.all([
+  const [skusR, suppliersR, prodR, weekR, changesR, destinationsR] = await Promise.all([
     sb
       .from("product_skus")
       .select("supplier_id, product_models!inner(category)")
@@ -90,8 +90,13 @@ export async function loadPurchasingSettings(
       .select("setting_key, supplier_id, category, old_value, new_value, changed_at, changed_by")
       .order("changed_at", { ascending: false })
       .limit(400),
+    sb
+      .from("purchasing_destinations")
+      .select("id, name, address, is_default, active, warehouse_id, warehouses(address)")
+      .order("sort_order")
+      .order("name"),
   ]);
-  for (const r of [skusR, suppliersR, prodR, weekR, changesR]) {
+  for (const r of [skusR, suppliersR, prodR, weekR, changesR, destinationsR]) {
     if (r.error) throw new Error(`purchasing settings: ${r.error.message}`);
   }
 
@@ -152,6 +157,29 @@ export async function loadPurchasingSettings(
     });
   }
 
+  const destinations = ((destinationsR.data ?? []) as Array<Record<string, unknown>>).map(
+    (row) => {
+      const warehouse = row.warehouses as
+        | { address?: string | null }
+        | { address?: string | null }[]
+        | null;
+      const warehouseAddress = Array.isArray(warehouse)
+        ? warehouse[0]?.address
+        : warehouse?.address;
+      return {
+        id: row.id as string,
+        name: (row.name as string | null) ?? "",
+        address:
+          row.warehouse_id != null
+            ? (warehouseAddress ?? null)
+            : ((row.address as string | null) ?? null),
+        isDefault: row.is_default === true,
+        active: row.active !== false,
+        warehouseLinked: row.warehouse_id != null,
+      };
+    },
+  );
+
   // The screen shows ONE line per setting — the most recent change. Rows come
   // back newest-first, so the first hit per key wins.
   const seen = new Set<string>();
@@ -188,5 +216,5 @@ export async function loadPurchasingSettings(
     }
   }
 
-  return { ...numbers, suppliers, productionDays, lastChanges };
+  return { ...numbers, suppliers, productionDays, destinations, lastChanges };
 }

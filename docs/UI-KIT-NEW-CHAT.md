@@ -127,6 +127,9 @@ Carres  Tailwind class,散在 305 个页面里
    docs/pdf/SO-PDF-STANDARD.md,而且刚发生过一次回归。
 4. 不准靠放宽守卫门槛来让数字好看。
 5. 删除是最后一步:先建新 → 迁移 → 证明 → 才删。
+6. **Register listing 外框已经决定，不准重开。** 先读 `docs/ui/MASTER.md` 的
+   `REGISTER LISTING FRAME`：现有和未来 listing kit 都由共享组件画完整四边框；页面
+   不得取消左右边，也不得再包第二层外框。
 ```
 
 ## 一条从血里换来的规矩

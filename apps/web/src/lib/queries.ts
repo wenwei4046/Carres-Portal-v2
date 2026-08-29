@@ -227,10 +227,12 @@ import {
   type PoReportResponse,
   // P1 (0303) — Purchasing → Settings.
   type PurchasingSettingsResponse,
+  type PurchasingCreateDestinationInput,
   type PurchasingSetNumberInput,
   type PurchasingSetPoDaysInput,
   type PurchasingSetProductionDaysInput,
   type PurchasingSetWorkWeekInput,
+  type PurchasingUpdateDestinationInput,
   // 0244/0245 — HR commission portal (GET /api/hr/report + config writes).
   type CommissionReport,
   type CommissionStaff,
@@ -4765,6 +4767,43 @@ export function useSetProductionDays() {
 }
 export function useSetSupplierWorkWeek() {
   return usePurchasingSettingsMutation<PurchasingSetWorkWeekInput>("/work-week");
+}
+
+export function useCreatePurchasingDestination() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: PurchasingCreateDestinationInput) =>
+      apiFetch<PurchasingSettingsResponse>("/api/operation/purchasing/settings/destinations", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: (data) => {
+      qc.setQueryData(qk.operation.purchasingSettings(), data);
+      void qc.invalidateQueries({ queryKey: ["so-batch-purchase"] });
+      void qc.invalidateQueries({ queryKey: ["to-order", "pick-items"] });
+      void qc.invalidateQueries({ queryKey: ["operation", "pos"] });
+    },
+  });
+}
+
+export function useUpdatePurchasingDestination() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      destinationId,
+      ...input
+    }: PurchasingUpdateDestinationInput & { destinationId: string }) =>
+      apiFetch<PurchasingSettingsResponse>(
+        `/api/operation/purchasing/settings/destinations/${encodeURIComponent(destinationId)}`,
+        { method: "PUT", body: JSON.stringify(input) },
+      ),
+    onSuccess: (data) => {
+      qc.setQueryData(qk.operation.purchasingSettings(), data);
+      void qc.invalidateQueries({ queryKey: ["so-batch-purchase"] });
+      void qc.invalidateQueries({ queryKey: ["to-order", "pick-items"] });
+      void qc.invalidateQueries({ queryKey: ["operation", "pos"] });
+    },
+  });
 }
 
 /** Purchase §6 · Snooze PO — defer a whole supplier's PO planning until
