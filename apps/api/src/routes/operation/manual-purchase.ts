@@ -5,7 +5,6 @@ import {
   LEGACY_OPS_MANAGER_EMAILS,
   expectedArrivalOf,
   isOpsGenericAccount,
-  isOpsManager,
   manualPurchaseLineRemainingOf,
   PURCHASING_REFUSAL_CODES,
   purchasingRefusal,
@@ -67,10 +66,18 @@ function refuse(
 /** The approver is the Settings manager — the card names them one and the
  *  same gate (`ops_manager` duty or principal). `canApprove` decides what
  *  RENDERS (the money, the Approve row); `purchasing_decide_request`
- *  re-gates in SQL, which is the actual protection. */
+ *  re-gates in SQL, which is the actual protection.
+ *
+ *  ⭐ THE RENDER GATE ASKS EXACTLY WHAT THE DOOR ASKS. The SQL gate
+ *  (`purchasing_settings_gate`, 0360/0303) passes the `principal` role or a
+ *  real `ops_manager` POSITION duty — it has no legacy-email pass. The old
+ *  `isOpsManager` check here did (the shared operation@ login is a manager
+ *  for other daily surfaces), so the shared login was offered Approve/Refuse
+ *  the door then refused — measured on production, MPR-20260829-2779,
+ *  2026-08-29. One authority, two consumers: the web hides, SQL enforces. */
 async function canApprove(c: Context<AppEnv>): Promise<boolean> {
-  const { role, email } = c.var.auth;
-  return isOpsManager(role, email, await myDuties(c));
+  if (c.var.auth.role === "principal") return true;
+  return (await myDuties(c)).includes("ops_manager");
 }
 
 /**
@@ -477,6 +484,24 @@ manualPurchaseRouter.post("/:id/decide", requireOperation, async (c) => {
     p_cuts: cuts && cuts.length > 0 ? cuts : null,
   });
   if (error) {
+    /* THE SAME DOOR, THE SAME WORDS (closure §9): the SQL gate refuses a
+       non-approver with a bare 42501 whose message is the single word
+       `forbidden` — measured reaching the operator raw on production
+       (MPR-20260829-2779, 2026-08-29). The refusal leaves in the approved
+       two lines and names who can actually decide. */
+    if ((error as { code?: string }).code === "42501") {
+      const { data: users } = await sb.from("app_users").select("id, name, email");
+      const approvers = await resolveApprovers(
+        c,
+        (users ?? []) as Array<{ id: string; name: string | null; email: string | null }>,
+      );
+      const names = approvers
+        .map((a) => (a.name ?? "").trim())
+        .filter((n) => n !== "");
+      return refuse(c, 403, "not_purchase_approver", {
+        actor: names.length > 0 ? names.join(" or ") : null,
+      });
+    }
     const m = mapPgError(error);
     return c.json(m.body, m.status);
   }
