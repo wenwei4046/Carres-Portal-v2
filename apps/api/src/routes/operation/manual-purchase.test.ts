@@ -692,3 +692,131 @@ describe("Card 04 · GET /purchasing/requests — lineage, item words, PO duty",
     expect(body.mayIssue).toBe(true);
   });
 });
+
+/**
+ * ⭐ THE RENDER GATE AND THE SQL GATE ARE ONE GATE (2026-08-29).
+ *
+ * `purchasing_decide_request`'s SQL gate (`purchasing_settings_gate`) passes
+ * the `principal` role or a real `ops_manager` POSITION duty — no legacy
+ * email pass. `canApprove` used to answer through `isOpsManager`, whose
+ * legacy fallback admits the shared operation@ login — so the shared login
+ * was offered Approve/Refuse the door then refused with a raw `forbidden`
+ * (measured on production, MPR-20260829-2779). Both defects are pinned here.
+ */
+import { myDuties } from "../../lib/duties";
+
+describe("the decision gate — render asks what the door asks", () => {
+  const U_JESS = "11111111-1111-1111-1111-00000000000a";
+  const U_SHARED = "11111111-1111-1111-1111-00000000000b";
+
+  function makeGateSb(rpc: ReturnType<typeof vi.fn>) {
+    return {
+      from: vi.fn((table: string) => {
+        switch (table) {
+          case "purchase_requests":
+            return tableStub(REQUESTS);
+          case "purchase_demands":
+            return tableStub([], { filterInBy: "request_id" });
+          case "app_users":
+            return tableStub([
+              { id: U_JESS, name: "Jess", email: "jess@carres.com" },
+              { id: U_SHARED, name: "Operation", email: "operation@carres.com" },
+            ]);
+          default:
+            return tableStub([]);
+        }
+      }),
+      rpc,
+    } as unknown as ReturnType<typeof userClient>;
+  }
+
+  async function readRegister(role: string) {
+    vi.mocked(userClient).mockReturnValue(makeGateSb(vi.fn()));
+    const jwt = await makeJwt(role);
+    return app.fetch(
+      new Request("https://api.test/api/operation/purchasing/requests", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env as never,
+      { waitUntil() {}, passThroughException() {} } as never,
+    );
+  }
+
+  it("the shared operation@ login is NOT offered the decision — the door would refuse it", async () => {
+    // makeJwt("operation") is operation@carres.com: the legacy list's first
+    // entry. Without the ops_manager position duty, canApprove must say no.
+    const res = await readRegister("operation");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { canApprove: boolean };
+    expect(body.canApprove).toBe(false);
+  });
+
+  it("a real ops_manager duty holder IS offered the decision", async () => {
+    vi.mocked(myDuties).mockResolvedValueOnce(["ops_manager"]);
+    const res = await readRegister("operation");
+    const body = (await res.json()) as { canApprove: boolean };
+    expect(body.canApprove).toBe(true);
+  });
+
+  it("the principal role passes, as it does at the SQL gate", async () => {
+    const res = await readRegister("principal");
+    const body = (await res.json()) as { canApprove: boolean };
+    expect(body.canApprove).toBe(true);
+  });
+
+  it("the door's 42501 leaves as the approved two lines, naming the real approver", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: null,
+      error: { code: "42501", message: "forbidden" },
+    });
+    vi.mocked(userClient).mockReturnValue(makeGateSb(rpc));
+    vi.mocked(dutyHolders).mockResolvedValueOnce({ [U_JESS]: ["ops_manager"] });
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(
+        `https://api.test/api/operation/purchasing/requests/${REQ_A}/decide`,
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ decision: "approve" }),
+        },
+      ),
+      env as never,
+      { waitUntil() {}, passThroughException() {} } as never,
+    );
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as {
+      code: string;
+      message: string;
+      action: string;
+    };
+    expect(body.code).toBe("not_purchase_approver");
+    // Never the raw word: the fact, then the act, naming who decides.
+    expect(body.message).toBe("Only the approver may decide this purchase.");
+    expect(body.action).toBe("Ask Jess to approve or refuse it.");
+  });
+
+  it("any other door refusal still maps through the ordinary pg contract", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: null,
+      error: { code: "22023", message: "request is already decided", details: "already_decided" },
+    });
+    vi.mocked(userClient).mockReturnValue(makeGateSb(rpc));
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(
+        `https://api.test/api/operation/purchasing/requests/${REQ_A}/decide`,
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ decision: "approve" }),
+        },
+      ),
+      env as never,
+      { waitUntil() {}, passThroughException() {} } as never,
+    );
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { message: string };
+    expect(body.message).toBe("request is already decided");
+  });
+});

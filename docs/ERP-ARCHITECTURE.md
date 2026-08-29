@@ -258,9 +258,10 @@ a second settings home. `Old Orders` is a temporary cutover door and is not part
 The right Quick Rail is governed by `ui/MASTER.md`; it never adds duplicate module destinations or
 business truth.
 
-**`Receiving` is the exact destination word (Owner correction, 2026-08-29).** The supplier gives
-the delivery date and Supplier DO; Carres creates the Goods Receipt and numbered GRN only after
-physical receiving. `Goods Receipts` is retired as navigation.
+**`Receiving` is the exact Purchasing destination/workspace word** (owner correction 2026-08-29).
+It names the physical operation. The supplier provides the delivery date and Supplier DO; Carres
+creates the Goods Receipt and numbered GRN only after physical receiving. Neither document word
+replaces the navigation word, and `Goods Receipts` is retired as navigation.
 
 **This is navigation, not workflow.** How the operator moves between these pages — which one
 feeds which — is the module MASTER's, and it changes when the business changes.
@@ -450,11 +451,14 @@ Case outcomes · Finance/AP read-only continuation.
 
 **OWNS**
 - The **Receiving Session / Goods Receipt** — ONE physical delivery, one session, from a PO or CO.
+- The supplier's DO reference/evidence and Carres's numbered GRN. The supplier provides its DO;
+  Carres creates the GRN only after physical receiving — one cannot substitute for the other.
 - The three times (goods received at · submitted at · posted at) and the append-only event
   ledger. **Amend and Void are its acts; history is never edited in place.**
 - **`purchase_order_lines.received_qty` moves only through this module.**
 
-**ACTIONS** — start a receiving · count the lines · record damaged and wrong · post it ·
+**ACTIONS** — start from the exact PO/CO · count Order/Received/Pending quantities · record damaged,
+wrong and extra separately · attach Supplier DO/evidence · post it ·
 amend it · void it · return a count for a re-check.
 
 **SUMMARISES** — the purchase order it is receiving against · the customer orders waiting on it.

@@ -1794,7 +1794,16 @@ function RequestDetail({
       });
       onBack();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "The decision was not recorded");
+      /* THE APPROVED TWO LINES (closure §9): when the door refuses with the
+         fact and the act, print both — never the raw code word. */
+      const body = (e as { body?: { message?: string; action?: string } }).body;
+      setError(
+        body?.action
+          ? `${body.message ?? ""} ${body.action}`.trim()
+          : e instanceof Error
+            ? e.message
+            : "The decision was not recorded",
+      );
     }
   }
 

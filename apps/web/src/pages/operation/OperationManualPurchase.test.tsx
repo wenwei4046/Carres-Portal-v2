@@ -827,6 +827,35 @@ describe("the object detail and the decision (slice 2)", () => {
     expect(screen.queryByTestId("mp-decision")).toBeNull();
     expect(screen.queryByTestId("mp-approve")).toBeNull();
   });
+
+  it("a refused decide prints the approved two lines, never the raw code word", async () => {
+    await openDetail(true);
+    await waitFor(() =>
+      expect((screen.getByTestId("mp-cut-0") as HTMLInputElement).value).toBe("0"),
+    );
+    const base = apiFetch.getMockImplementation()!;
+    apiFetch.mockImplementation((url: string, init?: RequestInit) => {
+      if (String(url).includes("/decide")) {
+        // The door's 42501, already translated by the API into the fact
+        // and the act (2026-08-29 — `forbidden` alone reached production).
+        return Promise.reject(
+          Object.assign(new Error("forbidden"), {
+            body: {
+              code: "not_purchase_approver",
+              message: "Only the approver may decide this purchase.",
+              action: "Ask Jess to approve or refuse it.",
+            },
+          }),
+        );
+      }
+      return base(url, init);
+    });
+    fireEvent.click(screen.getByTestId("mp-approve"));
+    const err = await screen.findByTestId("mp-decide-error");
+    expect(err.textContent).toBe(
+      "Only the approver may decide this purchase. Ask Jess to approve or refuse it.",
+    );
+  });
 });
 
 /**
