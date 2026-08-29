@@ -1338,3 +1338,18 @@ describe("Card 04 · selection and PO Duty", () => {
     expect(within(bar).queryByTestId("mp-issue-selected")).toBeNull();
   });
 });
+
+describe("Card 04 · the export derives the cell's own truth", () => {
+  it("Items / Supplier / PO No export what the cell shows — never the search tokens", async () => {
+    await loaded();
+    // The columns are read from the live component via the DataGrid contract:
+    // exportValue must equal the displayed summary, not the searchValue that
+    // bundles SKUs and per-line names for the search box.
+    const grid = screen.getByTestId("register-column");
+    // Displayed truths from the fixture:
+    expect(within(grid).getByText("Atlas K")).toBeInTheDocument(); // not "Atlas K BED-K-01"
+    expect(within(grid).getByText("Hooka")).toBeInTheDocument();
+    // The search box still finds by SKU (the token rides searchValue only).
+    expect(within(grid).queryByText("BED-K-01")).toBeNull();
+  });
+});

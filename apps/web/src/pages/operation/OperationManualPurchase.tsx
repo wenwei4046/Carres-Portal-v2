@@ -519,6 +519,9 @@ export default function OperationManualPurchase() {
         },
         searchValue: (r) => r.poNos.join(" "),
         filterValue: (r) => manualPurchasePoSummary(r.poNos),
+        /* Excel prints the CELL's truth, not the search tokens (§6.7: the
+           outputs derive their cells once). */
+        exportValue: (r) => manualPurchasePoSummary(r.poNos),
       },
       {
         key: "needed_by",
@@ -558,6 +561,7 @@ export default function OperationManualPurchase() {
         /* SKU stays searchable even though the cell speaks Catalog words. */
         searchValue: (r) => `${r.itemsText} ${r.skuTokens}`,
         filterValue: (r) => r.itemsText,
+        exportValue: (r) => r.itemsText,
       },
       {
         key: "qty",
@@ -584,6 +588,7 @@ export default function OperationManualPurchase() {
         searchValue: (r) =>
           [r.supplierText, ...r.lineSupplierNames.filter(Boolean)].join(" "),
         filterValue: (r) => r.supplierText,
+        exportValue: (r) => r.supplierText,
       },
       {
         key: "deliver_to",
