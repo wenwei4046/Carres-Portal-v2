@@ -30,7 +30,7 @@
 import { myHolidaySet } from "./my-holidays";
 import { PURCHASING_OFFICE_OFF_DAYS } from "./purchasing-supplier-calls";
 import { z } from "zod";
-import { addWorkingDays, DEFAULT_OFF_DAYS } from "./working-days";
+import { addWorkingDays, DEFAULT_OFF_DAYS, subtractWorkingDays } from "./working-days";
 
 /** The categories purchasing can buy. A guarantee or a service has no factory. */
 export const PURCHASING_CATEGORIES = ["sofa", "bedframe", "mattress"] as const;
@@ -278,6 +278,53 @@ export function arrivalFromReadyDate(
   return addWorkingDays(ready, transit, {
     offDays: PURCHASING_OFFICE_OFF_DAYS,
     holidays: args.holidays ?? myHolidaySet(),
+  });
+}
+
+/**
+ * WHEN THE ORDER MUST BE PLACED — the ONE inverse of `expectedArrivalOf`
+ * (Purchasing Card 06; Law D: a derived fact has ONE arithmetic).
+ *
+ * The Manual Purchase `Order By` walks the requested Delivery Date BACKWARDS
+ * through the same two legs the forward planner walks forwards, each on its
+ * own named calendar (Law 2A):
+ *
+ *   Delivery Date
+ *   − supplier transit working days            on the OFFICE week (Mon–Fri)
+ *   − Supplier × Category production days      on that FACTORY's own week
+ *   = Order By
+ *
+ * Sunday and Selangor public holidays are excluded by the same injected
+ * holiday set. Manual Purchase never subtracts SO Safety days: its Delivery
+ * Date is already goods arrival at Carres.
+ *
+ * NULL IS A REAL ANSWER. No production number, no transit number or no
+ * Delivery Date → no Order By, never a guessed one — the screen names the
+ * missing Settings fact instead (P1's rule, unchanged).
+ */
+export function orderByFromDeliveryDate(
+  settings: Pick<PurchasingSettings, "productionDays" | "suppliers">,
+  args: {
+    supplierId: string | null | undefined;
+    category: string | null | undefined;
+    deliveryDateIso: string | null | undefined;
+    /** Malaysian public holidays. Omitted → the live Selangor set. */
+    holidays?: ReadonlySet<string>;
+  },
+): string | null {
+  const delivery = (args.deliveryDateIso ?? "").slice(0, 10);
+  if (delivery.length !== 10) return null;
+  const production = productionWorkingDaysFor(settings, args.supplierId, args.category);
+  const transit = transitDaysFor(settings, args.supplierId);
+  if (production == null || transit == null) return null;
+  const holidays = args.holidays ?? myHolidaySet();
+  const ready = subtractWorkingDays(delivery, transit, {
+    offDays: PURCHASING_OFFICE_OFF_DAYS,
+    holidays,
+  });
+  return subtractWorkingDays(ready, production, {
+    offDays: workWeekOffDaysFor(settings, args.supplierId),
+    holidays,
   });
 }
 

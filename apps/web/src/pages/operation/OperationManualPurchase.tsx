@@ -8,6 +8,7 @@ import {
   MANUAL_PURCHASE_STATUS_WORDS,
   MANUAL_PURCHASE_WORDS as MW,
   TO_ORDER_WORDS as W,
+  categoryLabel,
   demandPurposeLabelOf,
   manualPurchaseApprovalOf,
   manualPurchaseApproverLine,
@@ -17,13 +18,18 @@ import {
   manualPurchaseIssueGroupCount,
   manualPurchaseIssueSentence,
   manualPurchaseItemsSummary,
+  manualPurchaseLeadDayFacts,
   manualPurchaseLineRemainingOf,
+  manualPurchaseOrderByLine,
+  manualPurchaseOrderByOf,
   manualPurchasePoSummary,
   manualPurchaseRailFacts,
   manualPurchaseRailModel,
   manualPurchaseSelectable,
   manualPurchaseStatusOf,
   manualPurchaseSupplierSummary,
+  manualPurchaseTimingOf,
+  manualPurchaseWorkOrder,
   purchasingRefusal,
   stillNeededOf,
   type DemandPickItem,
@@ -37,7 +43,7 @@ import {
 } from "@carres/shared";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, PanelLeftOpen } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import Button from "@/components/kit/Button";
 import DataTable, { type Column } from "@/components/kit/DataTable";
 import DatePicker from "@/components/kit/DatePicker";
@@ -61,7 +67,9 @@ import {
   useDecidePurchaseRequest,
   useIssuePurchaseRequests,
   useManualPurchaseDetail,
+  useManualPurchasePlan,
   useManualPurchaseRegister,
+  type ManualPurchasePlanLine,
   type ManualPurchaseRegisterPayload,
   type PurchaseRequestLineRow,
   type PurchaseRequestRow,
@@ -145,10 +153,15 @@ interface RequestRegisterRow {
   id: string;
   reqNo: string;
   purpose: string;
-  requestedDate: string;
+  /** Card 06 §3.1 — the actual hand-off fact (`created_at`), immutable. */
+  proceedDate: string;
   approval: { kind: ManualPurchaseApprovalKind; label: string };
   poNos: string[];
-  neededBy: string | null;
+  /** Card 06 §3.2 — when supplier goods must reach Deliver To
+   *  (`required_by`); a historical null prints `Not recorded`. */
+  deliveryDate: string | null;
+  /** The SERVER-derived earliest line Order By (Card 06 §3.3), or null. */
+  orderBy: string | null;
   forText: string;
   itemsText: string;
   qty: number;
@@ -164,12 +177,21 @@ interface RequestRegisterRow {
   /** Actual supplier names behind the live lines — the demand line's
    *  Catalog-derived supplier (0323/0359), never chosen by Operation. */
   lineSupplierNames: (string | null)[];
-  /** The document-partition facts behind `Issue {n} PO{s}`. */
+  /** Per live line: the server's Order By — the rail's timing facts. */
+  lineOrderBys: (string | null)[];
+  /** Card 06 §5 — the named configuration gaps the rail's work/setup
+   *  lenses filter by, straight from the server's own plan. */
+  supplierGap: boolean;
+  productionDaysMissing: boolean;
+  transitDaysMissing: boolean;
+  /** The document-partition facts behind `Issue {n} PO{s}` — Card 06 adds
+   *  Delivery Date: one PO has ONE official supplier-facing date. */
   issueWalls: Array<{
     supplierId: string | null;
     category: string | null;
     destinationId: string;
     purpose: string;
+    deliveryDate: string | null;
     remainingQty: number;
   }>;
   lines: ExpansionLine[];
@@ -237,14 +259,17 @@ function buildRows(data: ManualPurchaseRegisterPayload): RequestRegisterRow[] {
       id: r.id,
       reqNo: r.req_no,
       purpose: r.purpose,
-      requestedDate: r.created_at,
+      proceedDate: r.created_at,
       approval: manualPurchaseApprovalOf({
         approvalRequired: r.approval_required,
         approvedAt: r.approved_at,
         refusedAt: r.refused_at,
       }),
       poNos: [...new Set(live.flatMap(linePoNos))],
-      neededBy: r.required_by,
+      deliveryDate: r.required_by,
+      /* The earliest server-derived line Order By governs the request —
+         the first item that must start (Card 06 §3.3). */
+      orderBy: manualPurchaseOrderByOf(live.map((l) => l.order_by ?? null)),
       forText: manualPurchaseForOf({
         purpose: r.purpose,
         destinationName: destName.get(r.destination_id) ?? null,
@@ -278,11 +303,19 @@ function buildRows(data: ManualPurchaseRegisterPayload): RequestRegisterRow[] {
       lineSupplierNames: live.map((l) =>
         l.supplier_id ? (supplierName.get(l.supplier_id) ?? null) : null,
       ),
+      lineOrderBys: live.map((l) => l.order_by ?? null),
+      /* Card 06 §5 — the named gaps, straight from the server's plan:
+         a live line without its Catalog supplier, or with a supplier whose
+         Settings numbers nobody set. */
+      supplierGap: live.some((l) => l.supplier_id == null),
+      productionDaysMissing: live.some((l) => l.production_days_missing === true),
+      transitDaysMissing: live.some((l) => l.transit_days_missing === true),
       issueWalls: live.map((l) => ({
         supplierId: l.supplier_id,
         category: (l.category as string | null | undefined) ?? null,
         destinationId: l.destination_id ?? r.destination_id,
         purpose: r.purpose,
+        deliveryDate: (l.delivery_date ?? l.required_by ?? r.required_by) || null,
         remainingQty: remainingOf(l),
       })),
       lines: lines.map((l) => ({
@@ -320,6 +353,20 @@ export default function OperationManualPurchase() {
   const q = useManualPurchaseRegister();
   const navigate = useNavigate();
   const issue = useIssuePurchaseRequests();
+
+  /* Card 06 §7 — a Work action deep-links the exact MPR:
+     `?tab=manual-purchase&mpr={id}` opens the object directly. The param is
+     consumed so `‹ Manual Purchase` returns to the Register, not a loop. */
+  const [searchParams, setSearchParams] = useSearchParams();
+  const linkedMpr = searchParams.get("mpr");
+  useEffect(() => {
+    if (!linkedMpr) return;
+    setMode({ detail: linkedMpr });
+    const next = new URLSearchParams(searchParams);
+    next.delete("mpr");
+    setSearchParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [linkedMpr]);
 
   const rows = useMemo(
     () => (q.data ? buildRows(q.data) : []),
@@ -364,21 +411,34 @@ export default function OperationManualPurchase() {
           requestId: r.id,
           status: r.status.kind,
           purpose: r.purpose,
+          remainingQty: r.remainingQty,
           lineCategories: r.lineCategories,
           lineSupplierNames: r.lineSupplierNames,
+          lineOrderBys: r.lineOrderBys,
+          supplierGap: r.supplierGap,
+          productionDaysMissing: r.productionDaysMissing,
+          transitDaysMissing: r.transitDaysMissing,
         })),
+        /* The SERVER's Malaysia date — the browser never reads its own clock
+           for a business classification (Card 06 §5). */
+        q.data?.todayIso ?? null,
       ),
-    [rows],
+    [rows, q.data?.todayIso],
   );
   const rail = useMemo(
     () => manualPurchaseRailModel(railFacts, railFilter),
     [railFacts, railFilter],
   );
 
-  const filtered = useMemo(
-    () => rows.filter((r) => rail.visibleRequestIds.has(r.id)),
-    [rows, rail],
-  );
+  const filtered = useMemo(() => {
+    const visible = rows.filter((r) => rail.visibleRequestIds.has(r.id));
+    /* Card 06 §6 — a work/timing lens sorts earliest Order By first, then
+       newest Proceed Date, so the most urgent visible request is first. The
+       no-filter default stays newest Proceed Date first (buildRows' order). */
+    return railFilter.work != null || railFilter.timing != null
+      ? manualPurchaseWorkOrder(visible)
+      : visible;
+  }, [rows, rail, railFilter.work, railFilter.timing]);
 
   /* ── THE FILTERED REGISTER ORDER (Card 05 §3.1) — what the grid actually
      shows after search + column filters, post-sort. The object header's
@@ -451,16 +511,16 @@ export default function OperationManualPurchase() {
   const columns = useMemo<DataGridColumn<RequestRegisterRow>[]>(
     () => [
       {
-        key: "requested_date",
-        label: MW.colRequestedDate,
+        key: "proceed_date",
+        label: MW.colProceedDate,
         width: 118,
         sortable: true,
         filterType: "date",
-        dateValue: (r) => r.requestedDate,
-        accessor: (r) => fmtDate(r.requestedDate.slice(0, 10)),
-        searchValue: (r) => fmtDate(r.requestedDate.slice(0, 10)),
-        filterValue: (r) => fmtDate(r.requestedDate.slice(0, 10)),
-        sortFn: (a, b) => a.requestedDate.localeCompare(b.requestedDate),
+        dateValue: (r) => r.proceedDate,
+        accessor: (r) => fmtDate(r.proceedDate.slice(0, 10)),
+        searchValue: (r) => fmtDate(r.proceedDate.slice(0, 10)),
+        filterValue: (r) => fmtDate(r.proceedDate.slice(0, 10)),
+        sortFn: (a, b) => a.proceedDate.localeCompare(b.proceedDate),
       },
       {
         key: "approval",
@@ -540,16 +600,24 @@ export default function OperationManualPurchase() {
         exportValue: (r) => manualPurchasePoSummary(r.poNos),
       },
       {
-        key: "needed_by",
-        label: MW.colNeededBy,
+        key: "delivery_date",
+        label: MW.colDeliveryDate,
         width: 113,
         sortable: true,
         filterType: "date",
-        dateValue: (r) => r.neededBy,
-        accessor: (r) => (r.neededBy ? fmtDate(r.neededBy) : null),
-        searchValue: (r) => (r.neededBy ? fmtDate(r.neededBy) : ""),
-        filterValue: (r) => (r.neededBy ? fmtDate(r.neededBy) : ""),
-        sortFn: (a, b) => (a.neededBy ?? "").localeCompare(b.neededBy ?? ""),
+        dateValue: (r) => r.deliveryDate,
+        /* A historical null Delivery Date prints the honest sentence, never
+           a bare dash — and gains no invented Order By (Card 06 §6). */
+        accessor: (r) =>
+          r.deliveryDate ? (
+            fmtDate(r.deliveryDate)
+          ) : (
+            <span className="text-base-500">{MW.notRecorded}</span>
+          ),
+        searchValue: (r) => (r.deliveryDate ? fmtDate(r.deliveryDate) : MW.notRecorded),
+        filterValue: (r) => (r.deliveryDate ? fmtDate(r.deliveryDate) : MW.notRecorded),
+        exportValue: (r) => (r.deliveryDate ? fmtDate(r.deliveryDate) : MW.notRecorded),
+        sortFn: (a, b) => (a.deliveryDate ?? "").localeCompare(b.deliveryDate ?? ""),
       },
       {
         key: "for",
@@ -678,22 +746,62 @@ export default function OperationManualPurchase() {
           testId="manual-purchase-rail"
           onHide={() => setFilterRailVisible(false)}
         >
-          <FilterRailGroup title={MANUAL_PURCHASE_RAIL.toOrder.heading}>
-            {/* Three DERIVED request states (`manualPurchaseStatusOf`), never
-                a stored status. A second click clears the row. */}
-            {MANUAL_PURCHASE_RAIL.toOrder.rows.map((row) => (
+          <FilterRailGroup title={MANUAL_PURCHASE_RAIL.work.heading}>
+            {/* Card 06 §5 — the five concrete daily actions, all visible with
+                zero: an action LENS over the same server facts and central
+                Work identities, never a second queue. Clicking a filter never
+                grants approval or PO authority — the filtered row/object
+                names the real owner. A second click clears the row. */}
+            {MANUAL_PURCHASE_RAIL.work.actions.map((action) => (
               <FilterRailRow
-                key={row.state}
-                active={railFilter.toOrder === row.state}
+                key={action.key}
+                active={railFilter.work === action.key}
                 onClick={() =>
                   setRailFilter((prev) => ({
                     ...prev,
-                    toOrder: prev.toOrder === row.state ? null : row.state,
+                    work: prev.work === action.key ? null : action.key,
                   }))
                 }
-                testId={`mp-to-order-${row.state}`}
+                testId={`mp-work-${action.key}`}
+                label={action.word}
+                count={rail.workCounts[action.key]}
+              />
+            ))}
+          </FilterRailGroup>
+          <FilterRailGroup title={MANUAL_PURCHASE_RAIL.toOrder.heading}>
+            {/* `All not ordered` — live quantity not yet fully issued.
+                (`Need approval` / `Ready to order` retired into WORK TO DO,
+                Card 06 §5.) */}
+            <FilterRailRow
+              active={railFilter.notOrderedOnly}
+              onClick={() =>
+                setRailFilter((prev) => ({
+                  ...prev,
+                  notOrderedOnly: !prev.notOrderedOnly,
+                }))
+              }
+              testId="mp-to-order-not_ordered"
+              label={MANUAL_PURCHASE_RAIL.toOrder.all}
+              count={rail.notOrderedCount}
+            />
+          </FilterRailGroup>
+          <FilterRailGroup title={MANUAL_PURCHASE_RAIL.timing.heading}>
+            {/* The request's earliest server-derived Order By against the
+                server's Malaysia date — a filter and fact, never an issue
+                permission gate (an authorised person may buy early). */}
+            {MANUAL_PURCHASE_RAIL.timing.rows.map((row) => (
+              <FilterRailRow
+                key={row.state}
+                active={railFilter.timing === row.state}
+                onClick={() =>
+                  setRailFilter((prev) => ({
+                    ...prev,
+                    timing: prev.timing === row.state ? null : row.state,
+                  }))
+                }
+                testId={`mp-timing-${row.state}`}
                 label={row.word}
-                count={rail.toOrderCounts[row.state]}
+                count={rail.timingCounts[row.state]}
               />
             ))}
           </FilterRailGroup>
@@ -774,6 +882,28 @@ export default function OperationManualPurchase() {
               />
             ))}
           </FilterRailGroup>
+          {/* Card 06 §5 — SETUP TO FIX renders ONLY while an affected request
+              exists: it states the missing configuration; the owning action
+              (and its Settings deep link) stays in WORK TO DO. */}
+          {rail.setupExists && (
+            <FilterRailGroup title={MANUAL_PURCHASE_RAIL.setup.heading}>
+              {MANUAL_PURCHASE_RAIL.setup.rows.map((row) => (
+                <FilterRailRow
+                  key={row.key}
+                  active={railFilter.setup === row.key}
+                  onClick={() =>
+                    setRailFilter((prev) => ({
+                      ...prev,
+                      setup: prev.setup === row.key ? null : row.key,
+                    }))
+                  }
+                  testId={`mp-setup-${row.key}`}
+                  label={row.word}
+                  count={rail.setupCounts[row.key]}
+                />
+              ))}
+            </FilterRailGroup>
+          )}
         </FilterRail>
         )}
         <div
@@ -813,7 +943,7 @@ export default function OperationManualPurchase() {
             /* The grid's own filtered+sorted order feeds the object header's
                `‹ n of m ›` (Card 05 §3.1) — a STABLE setter, per the engine. */
             onFilteredRowsChange={setGridRows}
-            storageKey="carres.manualPurchase.register.v2"
+            storageKey="carres.manualPurchase.register.v3"
             rowKey={(r) => r.id}
             rowTestId={(r) => `mp-row-${r.id}`}
             exportName="Manual Purchase"
@@ -1143,7 +1273,13 @@ function CreateRequestWorkspace({
 
   const [purpose, setPurpose] = useState<DemandPurpose>(DEMAND_PURPOSE_DEFAULT);
   const [dest, setDest] = useState<string | undefined>(undefined);
-  const [neededBy, setNeededBy] = useState("");
+  /** Card 06 §3.2 — `Delivery Date`: when supplier goods must reach the
+   *  selected Deliver To. The SERVER proposes it from the slowest selected
+   *  line once every lead fact is complete; a person may move it, and a
+   *  chosen date is preserved — adding/removing an item never silently
+   *  overwrites it. */
+  const [deliveryDate, setDeliveryDate] = useState("");
+  const [dateTouched, setDateTouched] = useState(false);
   /** Only `Other Purchase` asks — and must answer — `What is this for?`. */
   const [why, setWhy] = useState("");
   /** The per-purpose structured For fact (Card 04 §4). */
@@ -1176,6 +1312,63 @@ function CreateRequestWorkspace({
   const active = activeId ?? lines[0]?.id;
   const chosenDest = dest ?? destinations[0]?.id;
 
+  /* ── THE SERVER DATE PLAN (Card 06 §3) ─────────────────────────────────
+     The server previews Proceed Date (its Malaysia date) and, once every
+     picked line resolves Catalog Supplier × Category with complete
+     Settings, proposes Delivery Date from the slowest line. The browser
+     performs no working-day arithmetic and never guesses a date. */
+  const pickedSkus = useMemo(
+    () => [...new Set(lines.map((l) => l.sku).filter((s): s is string => s != null))],
+    [lines],
+  );
+  const plan = useManualPurchasePlan(pickedSkus);
+  const planBySku = useMemo(
+    () =>
+      new Map<string, ManualPurchasePlanLine>(
+        (plan.data?.lines ?? []).map((l) => [l.sku, l]),
+      ),
+    [plan.data],
+  );
+  /* The server's proposal fills the field only while the person has not
+     chosen a date; a chosen date is theirs and is preserved (§3.2). */
+  const planDefault = plan.data?.deliveryDateDefault ?? null;
+  useEffect(() => {
+    if (!dateTouched && planDefault != null) setDeliveryDate(planDefault);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [planDefault]);
+
+  /** The exact missing lead facts across picked lines — each names its
+   *  supplier and repair (§3.4). An unresolved Catalog supplier is named by
+   *  the line's own `No supplier yet` fact, not silently a lead-day gap. */
+  const leadGaps = useMemo(() => {
+    const gaps: Array<{ sku: string; wrong: string; todo: string }> = [];
+    for (const sku of pickedSkus) {
+      const p = planBySku.get(sku);
+      if (!p || p.supplierId == null || p.category == null) continue;
+      if (p.productionDays == null) {
+        const facts = manualPurchaseLeadDayFacts({
+          kind: "production",
+          supplierName: p.supplierName,
+          categoryLabel: categoryLabel(p.category),
+        });
+        gaps.push({ sku, ...facts });
+      }
+      if (p.transitDays == null) {
+        const facts = manualPurchaseLeadDayFacts({
+          kind: "transit",
+          supplierName: p.supplierName,
+        });
+        gaps.push({ sku, ...facts });
+      }
+    }
+    return gaps;
+  }, [pickedSkus, planBySku]);
+  /** Send stays blocked until every picked line's lead facts are complete —
+   *  and until the plan itself has answered (nothing is assumed). */
+  const leadDaysOk =
+    pickedSkus.length === 0 ||
+    (plan.data != null && !plan.data.planUnavailable && leadGaps.length === 0);
+
   const patch = (id: string, p: Partial<LineDraft>) =>
     setLines((ls) => ls.map((l) => (l.id === id ? { ...l, ...p } : l)));
 
@@ -1190,13 +1383,14 @@ function CreateRequestWorkspace({
   const staffOk = purpose !== "internal_staff_purchase" || staffUserId != null;
   const subsidiaryOk =
     purpose !== "subsidiary_purchase" || subsidiaryName.trim().length > 0;
-  /** `Needed by` is one of the request's six facts (MASTER §3) — a request
+  /** `Delivery Date` is one of the request's facts (MASTER §3) — a request
    *  with no date leaves the approver and the issuer with nothing to plan
    *  against. Found empty-but-sendable on the 2026-08-19 owner walk. */
-  const dateOk = neededBy !== "";
+  const dateOk = deliveryDate !== "";
 
   const canSend =
     !saving &&
+    leadDaysOk &&
     whyOk &&
     caseOk &&
     staffOk &&
@@ -1208,18 +1402,27 @@ function CreateRequestWorkspace({
     everyStartedLineNamesAnItem;
 
   /** The disabled button NAMES its gap (the Receiving law) — the first
-   *  missing header fact wins, in the form's own top-to-bottom order. */
-  const sendLabel = !dateOk
-    ? MW.sendNeedsDate
-    : !caseOk
-      ? MW.sendNeedsServiceCase
-      : !staffOk
-        ? MW.sendNeedsStaff
-        : !subsidiaryOk
-          ? MW.sendNeedsSubsidiary
-          : !whyOk
-            ? MW.sendNeedsWhy
-            : MW.send;
+   *  missing fact wins, in the governed order: lead days first (Card 06),
+   *  then the header facts top-to-bottom. While the plan is still being
+   *  asked, the button is quiet rather than accusing Settings untruthfully. */
+  const leadBlocked =
+    pickedSkus.length > 0 &&
+    plan.data != null &&
+    (plan.data.planUnavailable || leadGaps.length > 0);
+  const sendLabel =
+    leadBlocked
+      ? MW.sendNeedsLeadDays
+      : !dateOk
+        ? MW.sendNeedsDate
+        : !caseOk
+          ? MW.sendNeedsServiceCase
+          : !staffOk
+            ? MW.sendNeedsStaff
+            : !subsidiaryOk
+              ? MW.sendNeedsSubsidiary
+              : !whyOk
+                ? MW.sendNeedsWhy
+                : MW.send;
 
   function addLine() {
     const l = blankLine();
@@ -1252,7 +1455,7 @@ function CreateRequestWorkspace({
         const created = await createHeader.mutateAsync({
           purpose,
           destinationId: chosenDest,
-          requiredBy: neededBy || null,
+          requiredBy: deliveryDate || null,
           why: purpose === "other_purchase" ? why.trim() : null,
           serviceCaseId: purpose === "service_case" ? (serviceCaseId ?? null) : null,
           staffUserId:
@@ -1286,7 +1489,7 @@ function CreateRequestWorkspace({
           sku: line.sku,
           qty: Number(line.qty),
           destinationId: chosenDest,
-          requiredBy: neededBy || null,
+          requiredBy: deliveryDate || null,
           note: line.note.trim() || null,
           purpose,
         });
@@ -1354,11 +1557,26 @@ function CreateRequestWorkspace({
             options={destinations.map((d) => ({ value: d.id, label: d.name }))}
           />
         </div>
+        {/* Card 06 §4 — `Proceed Date` is a read-only FACT: the server's
+            Malaysia-date preview before Send; the stored hand-off truth
+            after. Never an input, never a browser clock. */}
+        <div>
+          <span className="text-meta text-kit-slate-11">{MW.proceedDate}</span>
+          <p className="pt-1.5 text-body text-base-900" data-testid="mp-proceed-date">
+            {plan.data?.proceedDate ? fmtDate(plan.data.proceedDate) : null}
+          </p>
+        </div>
+        {/* `Delivery Date` — the ONE date input. The server proposes the
+            slowest selected line's arrival once lead facts are complete; a
+            chosen date is the person's and is never silently overwritten. */}
         <DatePicker
-          id="mp-needed"
-          label={MW.neededBy}
-          value={neededBy || null}
-          onChange={(v) => setNeededBy(v ?? "")}
+          id="mp-delivery-date"
+          label={MW.deliveryDate}
+          value={deliveryDate || null}
+          onChange={(v) => {
+            setDateTouched(true);
+            setDeliveryDate(v ?? "");
+          }}
         />
         <div>
           <span className="text-meta text-kit-slate-11">{MW.raisedBy}</span>
@@ -1520,6 +1738,30 @@ function CreateRequestWorkspace({
                   {W.supplierLabel}: {picked.supplier}
                 </p>
               ) : null}
+
+              {/* Card 06 §3.4 — a missing lead number is NAMED on its line in
+                  the governed two lines, and the act deep-links Settings.
+                  Send stays `Send — lead days are not set` until repaired;
+                  nothing substitutes zero or a browser date. */}
+              {leadGaps
+                .filter((g) => g.sku === line.sku)
+                .map((g) => (
+                  <span
+                    key={`${g.sku}-${g.wrong}`}
+                    className="flex min-w-0 flex-col"
+                    data-testid={`mp-lead-gap-${i}`}
+                  >
+                    <span className="text-body font-medium text-kit-red-11">
+                      {g.wrong}
+                    </span>
+                    <Link
+                      to="/operation?tab=purchasing-settings"
+                      className="text-label text-kit-blue-11 underline-offset-2 hover:underline"
+                    >
+                      {g.todo}
+                    </Link>
+                  </span>
+                ))}
 
               {picked ? (
                 <AlreadyHave
@@ -1843,6 +2085,22 @@ function ApprovalLineRow({
   );
 }
 
+/** One missing lead-day fact on its own line (Card 06 §3.4) — the governed
+ *  two lines, with the act deep-linking Settings. */
+function LeadGapLine({ facts }: { facts: { wrong: string; todo: string } }) {
+  return (
+    <span className="flex min-w-0 flex-col">
+      <span className="text-label font-medium text-kit-red-11">{facts.wrong}</span>
+      <Link
+        to="/operation?tab=purchasing-settings"
+        className="text-label text-kit-blue-11 underline-offset-2 hover:underline"
+      >
+        {facts.todo}
+      </Link>
+    </span>
+  );
+}
+
 /** The governed two-line refusal/fact copy — Line 1 the fact, Line 2 the
  *  smaller act (COPY-STANDARD's two-line law). */
 function TwoLines({
@@ -2038,6 +2296,10 @@ function ManualPurchaseObject({
   const destName = new Map(d.destinations.map((dd) => [dd.id, dd.name]));
   const supName = new Map(d.suppliers.map((s) => [s.id, s.name]));
   const live = lines.filter((l) => l.cancelled_at === null);
+  /* Card 06 §6 — the SERVER-derived earliest live Order By and its timing
+     against the server's Malaysia date; the browser derives nothing. */
+  const orderBy = manualPurchaseOrderByOf(live.map((l) => l.order_by ?? null));
+  const timing = manualPurchaseTimingOf(orderBy, d.todayIso ?? null);
   const freeOf = (sku: string) => pick.data?.items.find((i) => i.sku === sku)?.free ?? 0;
 
   const forText = manualPurchaseForOf({
@@ -2110,14 +2372,33 @@ function ManualPurchaseObject({
       {header}
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
         <div className="flex flex-col gap-6">
-          {/* ① REQUEST — the six authoritative facts, in the Card's order. */}
+          {/* ① REQUEST — the six authoritative facts, in the Card 06 order:
+              Proceed Date · Delivery Date · Need for · For · Deliver To ·
+              Requested By. */}
           <Block title={MW.secRequest}>
             <dl className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3 lg:grid-cols-6">
-              <Fact label={MW.colRequestedDate}>
+              <Fact label={MW.colProceedDate} testId="mp-detail-proceed-date">
                 {fmtDate(request.created_at.slice(0, 10))}
               </Fact>
-              <Fact label={MW.colNeededBy}>
-                {request.required_by ? fmtDate(request.required_by) : null}
+              <Fact label={MW.colDeliveryDate} testId="mp-detail-delivery-date">
+                {request.required_by ? (
+                  fmtDate(request.required_by)
+                ) : (
+                  /* A historical null stays honest — never backfilled, never
+                     given an invented Order By (Card 06 §6). */
+                  <span className="text-base-600">{MW.notRecorded}</span>
+                )}
+                {/* The quiet derived timing fact — `Order by {date}`; when
+                    passed, the fact states `Order date passed` first. No
+                    Object Issue PO button arrives with it. */}
+                {orderBy != null ? (
+                  <span className="block text-label text-base-600" data-testid="mp-detail-order-by">
+                    {timing === "order_date_passed" ? (
+                      <span className="block text-kit-red-11">{MW.orderDatePassed}</span>
+                    ) : null}
+                    {manualPurchaseOrderByLine(fmtDate(orderBy))}
+                  </span>
+                ) : null}
               </Fact>
               <Fact label={MW.needFor}>{purposeLabelOf(request.purpose)}</Fact>
               <Fact label={MW.colFor} testId="mp-detail-for">
@@ -2178,7 +2459,32 @@ function ManualPurchaseObject({
                   </td>
                   <td className="px-2 py-2">
                     {l.supplier_id ? (
-                      (supName.get(l.supplier_id) ?? "")
+                      <span className="flex flex-col">
+                        <span>{supName.get(l.supplier_id) ?? ""}</span>
+                        {/* Card 06 §3.4 — a live line whose lead numbers
+                            nobody set names the exact Settings fact here and
+                            deep-links the repair; the engine invents no
+                            date. */}
+                        {l.production_days_missing ? (
+                          <LeadGapLine
+                            facts={manualPurchaseLeadDayFacts({
+                              kind: "production",
+                              supplierName: supName.get(l.supplier_id) ?? null,
+                              categoryLabel: l.category
+                                ? categoryLabel(l.category)
+                                : null,
+                            })}
+                          />
+                        ) : null}
+                        {l.transit_days_missing ? (
+                          <LeadGapLine
+                            facts={manualPurchaseLeadDayFacts({
+                              kind: "transit",
+                              supplierName: supName.get(l.supplier_id) ?? null,
+                            })}
+                          />
+                        ) : null}
+                      </span>
                     ) : (
                       /* A missing Catalog relationship is a NAMED fact on the
                          affected line, fixed at its owning Catalog boundary —

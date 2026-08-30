@@ -6,14 +6,20 @@ import {
   expectedArrivalOf,
   isOpsGenericAccount,
   manualPurchaseLineRemainingOf,
+  orderByFromDeliveryDate,
+  productionWorkingDaysFor,
   PURCHASING_REFUSAL_CODES,
   purchasingRefusal,
   railItemLabel,
+  transitDaysFor,
 } from "@carres/shared";
 import { requireOperation } from "../../lib/auth-guards";
 import { dutyHolders, myDuties } from "../../lib/duties";
 import { purchasingActorMayIssue } from "../../lib/purchasing-po-authority";
-import { loadPurchasingSettings } from "../../lib/purchasing-settings";
+import {
+  loadPurchasingSettings,
+  type LoadedPurchasingSettings,
+} from "../../lib/purchasing-settings";
 import { mapPgError } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
@@ -62,6 +68,77 @@ function refuse(
     { error: code, code, message: r.wrong, action: r.todo, ...(facts ?? {}) },
     status,
   );
+}
+
+/** Today in Asia/Kuala_Lumpur (UTC+8, no DST) — the Malaysia calendar date
+ *  the Proceed Date preview and the timing lens read (Card 06 §3.1). The
+ *  browser never guesses a date; this server fact travels in the payload. */
+function todayMyt(): string {
+  return new Date(Date.now() + 8 * 3_600_000).toISOString().slice(0, 10);
+}
+
+/**
+ * THE SERVER DATE PROJECTION (Card 06 §3) — one place stamps every demand
+ * line with its date-plan facts, so the Register, the object and the Work
+ * lens read the SAME arithmetic (Law D) and the browser performs no
+ * working-day arithmetic of its own:
+ *
+ *   delivery_date            the line's stored `required_by`, falling back to
+ *                            the request header's — when supplier goods must
+ *                            reach Deliver To. Never invented.
+ *   order_by                 Delivery Date − transit (Office week) −
+ *                            Supplier × Category production (factory week),
+ *                            via the ONE inverse planner. Null is a real
+ *                            answer: missing Settings, missing Catalog
+ *                            relationship or a historical `Not recorded`
+ *                            date produce NO Order By, never a guessed one.
+ *   production_days_missing  a live line whose Supplier × Category pair has
+ *   transit_days_missing     no configured number — the exact Settings fact
+ *                            the rail's setup lens and Work rows name.
+ *
+ * `settings == null` (the loader failed) stamps nulls and no gap flags —
+ * an unavailable plan is stated by `planUnavailable`, never faked.
+ */
+function withDatePlan(
+  settings: LoadedPurchasingSettings | null,
+  lines: Array<Record<string, unknown>>,
+  requestRequiredBy: Map<string, string | null>,
+  /** The one open request's own date — the detail read's lines carry no
+   *  `request_id` column, so the header fact rides in directly. */
+  fallbackRequiredBy: string | null = null,
+): Array<Record<string, unknown>> {
+  return lines.map((l) => {
+    const deliveryDate =
+      ((l.required_by as string | null) ??
+        requestRequiredBy.get(l.request_id as string) ??
+        fallbackRequiredBy) ||
+      null;
+    const live = l.cancelled_at == null;
+    const supplierId = (l.supplier_id as string | null) ?? null;
+    const category = (l.category as string | null) ?? null;
+    const production =
+      settings != null
+        ? productionWorkingDaysFor(settings, supplierId, category)
+        : null;
+    const transit = settings != null ? transitDaysFor(settings, supplierId) : null;
+    return {
+      ...l,
+      delivery_date: deliveryDate,
+      order_by:
+        settings != null
+          ? orderByFromDeliveryDate(settings, {
+              supplierId,
+              category,
+              deliveryDateIso: deliveryDate,
+            })
+          : null,
+      production_days_missing:
+        settings != null && live && supplierId != null && category != null &&
+        production == null,
+      transit_days_missing:
+        settings != null && live && supplierId != null && transit == null,
+    };
+  });
 }
 
 /** The approver is the Settings manager — the card names them one and the
@@ -168,7 +245,7 @@ async function withCatalogAndLineage(
 ): Promise<
   | {
       lines: Array<Record<string, unknown>>;
-      pos: Array<{ id: string; po_no: string }>;
+      pos: Array<{ id: string; po_no: string; version: number | null }>;
       /** po_id → the qty this set of lines actually put on that document. */
       orderedByPo: Map<string, number>;
       error: null;
@@ -247,13 +324,20 @@ async function withCatalogAndLineage(
       ...[...poIdsByDemand.values()].flatMap((s) => [...s]),
     ]),
   ];
-  let pos: Array<{ id: string; po_no: string }> = [];
+  let pos: Array<{ id: string; po_no: string; version: number | null }> = [];
   if (allPoIds.length > 0) {
-    const poRes = await sb.from("purchase_orders").select("id").in("id", allPoIds);
+    /* `version` rides along for the Work lens: `Issue the purchase order`
+       completes only when the CURRENT version has confirmed-sent evidence
+       (Card 06 §7), and the current version is the PO's own fact. */
+    const poRes = await sb
+      .from("purchase_orders")
+      .select("id, version")
+      .in("id", allPoIds);
     if (poRes.error) return { error: poRes.error };
     pos = (poRes.data ?? []).map((p) => ({
       id: p.id as string,
       po_no: p.id as string,
+      version: (p.version as number | null) ?? null,
     }));
   }
 
@@ -296,8 +380,10 @@ manualPurchaseRouter.get("/", requireOperation, async (c) => {
 
   const ids = (requests ?? []).map((r) => r.id as string);
   let lines: Array<Record<string, unknown>> = [];
-  /** id → po_no, for every PO the lines' REAL lineage names (Card 04 §3.4). */
-  let pos: Array<{ id: string; po_no: string }> = [];
+  /** id → po_no, for every PO the lines' REAL lineage names (Card 04 §3.4),
+   *  plus the Card 06 completion fact: whether the CURRENT version has
+   *  confirmed-sent evidence. */
+  let pos: Array<{ id: string; po_no: string; sent: boolean }> = [];
   if (ids.length > 0) {
     const res = await sb
       .from("purchase_demands")
@@ -321,8 +407,51 @@ manualPurchaseRouter.get("/", requireOperation, async (c) => {
       return c.json(m.body, m.status);
     }
     lines = enriched.lines;
-    pos = enriched.pos;
+
+    /* Card 06 §7 — issuance work completes ONLY on the current PO version's
+       confirmed-sent evidence (`po_sends`, 0378). A numbered PO or an opened
+       WhatsApp/email completes nothing. */
+    const poIds = enriched.pos.map((p) => p.id);
+    const sentVersions = new Set<string>();
+    if (poIds.length > 0) {
+      const sends = await sb
+        .from("po_sends")
+        .select("po_id, po_version, kind")
+        .eq("kind", "confirmed_sent")
+        .in("po_id", poIds);
+      if (sends.error) {
+        const m = mapPgError(sends.error);
+        return c.json(m.body, m.status);
+      }
+      for (const s of sends.data ?? []) {
+        // SQL already filtered; the guard keeps a permissive test double honest.
+        if (s.kind != null && s.kind !== "confirmed_sent") continue;
+        if (s.po_version == null) continue;
+        sentVersions.add(`${s.po_id as string}::${Number(s.po_version)}`);
+      }
+    }
+    pos = enriched.pos.map((p) => ({
+      id: p.id,
+      po_no: p.po_no,
+      sent: sentVersions.has(`${p.id}::${p.version ?? 1}`),
+    }));
   }
+
+  /* Card 06 §3 — the ONE server date projection stamps every line. The plan
+     failing to load costs the timing facts, never the Register (the honest
+     flag travels; nothing is guessed). */
+  let settings: LoadedPurchasingSettings | null = null;
+  let planUnavailable = false;
+  try {
+    settings = await loadPurchasingSettings(sb);
+  } catch (e) {
+    planUnavailable = true;
+    console.error("manual purchase — date plan unavailable", (e as Error).message);
+  }
+  const requestRequiredBy = new Map(
+    (requests ?? []).map((r) => [r.id as string, (r.required_by as string | null) ?? null]),
+  );
+  lines = withDatePlan(settings, lines, requestRequiredBy);
 
   // Names for the columns — read through the owners' tables, never stored
   // twice (Law B: a summary is read-only).
@@ -406,6 +535,11 @@ manualPurchaseRouter.get("/", requireOperation, async (c) => {
     actingPoDuty,
     poDutyUnavailable,
     mayIssue,
+    /* Card 06 — the Malaysia calendar date the timing lens compares against
+       (the browser never reads its own clock for a business classification),
+       and the honest date-plan availability fact. */
+    todayIso: todayMyt(),
+    planUnavailable,
   });
 });
 
@@ -453,6 +587,23 @@ manualPurchaseRouter.get("/detail/:id", requireOperation, async (c) => {
     return c.json(m.body, m.status);
   }
   stamped = enriched.lines;
+
+  /* Card 06 §3/§6 — the SAME server date projection the Register reads, so
+     the object's `Order by {date}` fact can never disagree with the row. */
+  let settings: LoadedPurchasingSettings | null = null;
+  let planUnavailable = false;
+  try {
+    settings = await loadPurchasingSettings(sb);
+  } catch (e) {
+    planUnavailable = true;
+    console.error("manual purchase — date plan unavailable", (e as Error).message);
+  }
+  stamped = withDatePlan(
+    settings,
+    stamped,
+    new Map(),
+    (request.required_by as string | null) ?? null,
+  );
 
   const approver = await canApprove(c);
   let costs: Record<string, number | null> = {};
@@ -657,6 +808,8 @@ manualPurchaseRouter.get("/detail/:id", requireOperation, async (c) => {
     users: (users.data ?? []).map((u) => ({ id: u.id, name: u.name })),
     approvers,
     canApprove: approver,
+    todayIso: todayMyt(),
+    planUnavailable,
   });
 });
 
@@ -746,7 +899,9 @@ const headerBody = z
   .object({
     purpose: z.enum(DEMAND_PURPOSE_VALUES as [string, ...string[]]),
     destinationId: z.string().uuid(),
-    requiredBy: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullish(),
+    /* Card 06 — a new request always carries its Delivery Date: the form
+       blocks Send without one, and the door agrees rather than trusts. */
+    requiredBy: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     why: z.string().max(1000).nullish(),
     serviceCaseId: z.string().uuid().nullish(),
     staffUserId: z.string().uuid().nullish(),
@@ -857,6 +1012,126 @@ manualPurchaseRouter.post("/:id/lines", requireOperation, async (c) => {
   return c.json(data);
 });
 
+/** The create form's plan read may name up to this many distinct SKUs —
+ *  far above any real request, far below a scraping loop. */
+const planBody = z
+  .object({ skus: z.array(z.string().min(1).max(120)).max(50) })
+  .strict();
+
+/**
+ * POST /plan — THE CREATE FORM'S DATE PLAN (Card 06 §3). A READ wearing POST
+ * only because live SKUs carry free text (`Leg 4"`) no query string should
+ * have to survive. It creates and reserves nothing.
+ *
+ * The server answers, for the preview Proceed Date (today, Malaysia):
+ *
+ *   proceedDate           the read-only preview the form shows before Send;
+ *                         after Send the stored `created_at` is authoritative.
+ *   lines[]               per asked SKU: the Catalog supplier × category and
+ *                         the configured production/transit numbers (null
+ *                         where nobody set one — the form names the exact
+ *                         Settings fact and blocks Send), plus the proposed
+ *                         arrival from the ONE forward planner.
+ *   deliveryDateDefault   the LATEST line arrival — the one request date every
+ *                         selected item can meet — and ONLY when every asked
+ *                         SKU resolves and has complete Settings. A partial
+ *                         plan proposes nothing; the browser never guesses.
+ */
+manualPurchaseRouter.post("/plan", requireOperation, async (c) => {
+  let raw: unknown;
+  try {
+    raw = await c.req.json();
+  } catch {
+    return c.json({ error: "invalid_json" }, 400);
+  }
+  const parsed = planBody.safeParse(raw);
+  if (!parsed.success) {
+    return c.json({ error: "invalid_body", code: "invalid_param" }, 400);
+  }
+  const skus = [...new Set(parsed.data.skus)];
+  const proceedDate = todayMyt();
+  if (skus.length === 0) {
+    return c.json({
+      proceedDate,
+      lines: [],
+      deliveryDateDefault: null,
+      planUnavailable: false,
+    });
+  }
+
+  const sb = userClient(c.env, c.var.auth.jwt);
+  let settings: LoadedPurchasingSettings | null = null;
+  let planUnavailable = false;
+  try {
+    settings = await loadPurchasingSettings(sb);
+  } catch (e) {
+    planUnavailable = true;
+    console.error("manual purchase — date plan unavailable", (e as Error).message);
+  }
+
+  /* Read whole and matched here — no free-text SKU in a PostgREST `.in()`
+     (live rows carry a double quote, `Leg 4"`). */
+  const [catRes, supRes] = await Promise.all([
+    sb.from("product_skus").select("sku, supplier_id, product_models(category)"),
+    sb.from("suppliers").select("id, name"),
+  ]);
+  if (catRes.error) {
+    const m = mapPgError(catRes.error);
+    return c.json(m.body, m.status);
+  }
+  if (supRes.error) {
+    const m = mapPgError(supRes.error);
+    return c.json(m.body, m.status);
+  }
+  const catalogBySku = new Map(
+    (catRes.data ?? []).map((r) => [
+      r.sku as string,
+      {
+        supplierId: (r.supplier_id as string | null) ?? null,
+        category:
+          ((r.product_models as unknown as { category: string | null } | null)
+            ?.category as string | null) ?? null,
+      },
+    ]),
+  );
+  const supplierName = new Map(
+    (supRes.data ?? []).map((s) => [s.id as string, (s.name as string | null) ?? null]),
+  );
+
+  const lines = skus.map((sku) => {
+    const cat = catalogBySku.get(sku);
+    const supplierId = cat?.supplierId ?? null;
+    const category = cat?.category ?? null;
+    const productionDays =
+      settings != null ? productionWorkingDaysFor(settings, supplierId, category) : null;
+    const transitDays = settings != null ? transitDaysFor(settings, supplierId) : null;
+    return {
+      sku,
+      supplierId,
+      supplierName: supplierId ? (supplierName.get(supplierId) ?? null) : null,
+      category,
+      productionDays,
+      transitDays,
+      /* The ONE forward arithmetic (`expectedArrivalOf`) from the preview
+         Proceed Date — null is a real answer, never a guessed arrival. */
+      arrival:
+        settings != null
+          ? expectedArrivalOf(settings, { supplierId, category, fromIso: proceedDate })
+          : null,
+    };
+  });
+
+  const complete = lines.every((l) => l.arrival != null);
+  const deliveryDateDefault = complete
+    ? lines.reduce<string | null>(
+        (latest, l) => (latest == null || l.arrival! > latest ? l.arrival! : latest),
+        null,
+      )
+    : null;
+
+  return c.json({ proceedDate, lines, deliveryDateDefault, planUnavailable });
+});
+
 const issueBody = z.object({
   requestIds: z.array(z.string().uuid()).min(1).max(20),
   /** The consolidation OFFER's answer. Declinable by design (card §6):
@@ -941,7 +1216,9 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
 
   const { data: allLines, error: lineErr } = await sb
     .from("purchase_demands")
-    .select("id, request_id, sku, supplier_id, qty, approved_qty, issued_qty, cancelled_at")
+    .select(
+      "id, request_id, sku, supplier_id, destination_id, qty, approved_qty, issued_qty, required_by, cancelled_at",
+    )
     .in("request_id", requestIds);
   if (lineErr) {
     const m = mapPgError(lineErr);
@@ -1004,18 +1281,18 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
     (whRows ?? [])[0];
   if (!warehouse) return c.json({ error: "no_warehouse", code: "no_warehouse" }, 500);
 
-  let settings;
-  try {
-    settings = await loadPurchasingSettings(sb);
-  } catch (e) {
-    return c.json({ error: "settings_unavailable", message: (e as Error).message }, 500);
-  }
-
   const reqById = new Map((requests ?? []).map((r) => [r.id as string, r]));
 
-  // A document never mixes suppliers, categories, destinations or purposes.
-  // `together` widens the group across requests inside those walls.
-  const groups = new Map<string, typeof toIssue>();
+  /* A document never mixes suppliers, categories, destinations, purposes or
+     DELIVERY DATES (Card 06 §7: one PO has one official supplier-facing
+     delivery date, so different approved Manual Delivery Dates create
+     different POs — the same partition `manualPurchaseIssueGroupCount`
+     predicts in the browser, recomputed here from the server's own read).
+     `together` widens the group across requests inside those walls. */
+  const groups = new Map<
+    string,
+    { lines: typeof toIssue; destinationId: string; deliveryDate: string | null }
+  >();
   for (const l of toIssue) {
     const cat = catalog.get(l.sku as string);
     if (!cat || !cat.supplierId) {
@@ -1041,14 +1318,20 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
       return refuse(c, 409, "supplier_price_changed", { sku: l.sku as string });
     }
     const req = reqById.get(l.request_id as string)!;
-    const wall = `${cat.supplierId}|${cat.category}|${req.destination_id}|${req.purpose}`;
+    const destinationId =
+      ((l.destination_id as string | null) ?? (req.destination_id as string));
+    const deliveryDate =
+      ((l.required_by as string | null) ?? (req.required_by as string | null)) || null;
+    const wall = `${cat.supplierId}|${cat.category}|${destinationId}|${req.purpose}|${deliveryDate ?? ""}`;
     const key = together ? wall : `${l.request_id}|${wall}`;
-    groups.set(key, [...(groups.get(key) ?? []), l]);
+    const group = groups.get(key) ?? { lines: [], destinationId, deliveryDate };
+    group.lines.push(l);
+    groups.set(key, group);
   }
 
-  const todayIso = new Date().toISOString().slice(0, 10);
   const governedPos: Record<string, unknown>[] = [];
-  for (const [, lines] of groups) {
+  for (const [, group] of groups) {
+    const lines = group.lines;
     const first = catalog.get(lines[0].sku as string)!;
     const req = reqById.get(lines[0].request_id as string)!;
     const kind = supplierKind.get(first.supplierId!) ?? null;
@@ -1066,14 +1349,14 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
     governedPos.push({
       supplier_id: first.supplierId,
       warehouse_id: warehouse.id as string,
-      destination_id: req.destination_id,
-      // The frozen ETA arithmetic, called not copied — no PO-day gate ever
-      // touches this lane.
-      eta_date: expectedArrivalOf(settings, {
-        supplierId: first.supplierId!,
-        category: first.category,
-        fromIso: todayIso,
-      }),
+      destination_id: group.destinationId,
+      /* ⭐ THE APPROVED MANUAL DELIVERY DATE BECOMES THE OFFICIAL PO DELIVERY
+         DATE (Card 06 §7). An approved request date must survive into the
+         supplier commitment — never recalculated from the issue day. A
+         historical `Not recorded` request honestly issues with no date; a
+         later supplier change records `Supplier Delivery Date` while the
+         promise ledger preserves the original. */
+      eta_date: group.deliveryDate,
       procurement_partner_id: kind === "factory_pickup" ? partnerId : null,
       so_refs: null,
       purpose: req.purpose,

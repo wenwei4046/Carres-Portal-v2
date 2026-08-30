@@ -8,6 +8,7 @@ import {
   manualPurchaseStatusOf,
   stillNeededOf,
 } from "@carres/shared";
+import { fmtDate } from "@/lib/fmt-date";
 import OperationManualPurchase from "./OperationManualPurchase";
 
 /**
@@ -42,7 +43,12 @@ const REQ1 = "aaaaaaaa-0000-0000-0000-000000000001";
 const REQ2 = "aaaaaaaa-0000-0000-0000-000000000002";
 const REQ3 = "aaaaaaaa-0000-0000-0000-000000000003";
 
+/** Card 06 — the SERVER's Malaysia date every timing fact compares against. */
+const TODAY = "2026-08-30";
+
 const REGISTER = {
+  todayIso: TODAY,
+  planUnavailable: false,
   requests: [
     {
       id: REQ1,
@@ -128,6 +134,11 @@ const REGISTER = {
       item_label: "Ohana 2 Seater",
       po_ids: [],
       destination_id: KLANG,
+      // Card 06 — the SERVER date projection: delivery, derived Order By.
+      delivery_date: "2026-09-12",
+      order_by: "2026-09-01",
+      production_days_missing: false,
+      transit_days_missing: false,
     },
     {
       id: "l2",
@@ -150,6 +161,12 @@ const REGISTER = {
       item_label: "MATTRESS-LOOK-9",
       po_ids: [],
       destination_id: KLANG,
+      // Card 06 — no Delivery Date and no transit number: no Order By, and
+      // the exact Settings fact is named for the setup lens.
+      delivery_date: null,
+      order_by: null,
+      production_days_missing: false,
+      transit_days_missing: true,
     },
     {
       id: "l3",
@@ -169,10 +186,15 @@ const REGISTER = {
       item_label: "Atlas K",
       po_ids: ["PO-9001"],
       destination_id: KLANG,
+      delivery_date: null,
+      order_by: null,
+      production_days_missing: false,
+      transit_days_missing: false,
     },
   ],
   // Card 04 — id → the ACTUAL po_no; the column prints numbers, never UUIDs.
-  pos: [{ id: "PO-9001", po_no: "PO-20260818-9001" }],
+  // Card 06 — `sent`: the current version's confirmed-sent evidence.
+  pos: [{ id: "PO-9001", po_no: "PO-20260818-9001", sent: true }],
   serviceCases: [],
   destinations: [{ id: KLANG, name: "HOUZS Balakong" }],
   suppliers: [
@@ -217,6 +239,8 @@ function seedDetail(canApprove: boolean, over: Record<string, unknown> = {}) {
       },
     ],
     canApprove,
+    todayIso: TODAY,
+    planUnavailable: false,
     ...over,
   };
 }
@@ -243,7 +267,43 @@ const PICK = {
   stockWarehouse: "Carres Klang",
 };
 
-function respond(url: string): unknown {
+/** Card 06 — the create form's server date plan, per SKU. Both picker items
+ *  are COMPLETE here; a lead-days gap is injected per test. */
+const PLAN_LINES: Record<string, Record<string, unknown>> = {
+  "5539-2NA": {
+    sku: "5539-2NA", supplierId: "s1", supplierName: "Ohana", category: "sofa",
+    productionDays: 14, transitDays: 1, arrival: "2026-09-12",
+  },
+  "5539-CNR": {
+    sku: "5539-CNR", supplierId: "s1", supplierName: "Ohana", category: "sofa",
+    productionDays: 14, transitDays: 1, arrival: "2026-09-14",
+  },
+};
+
+function planFor(init?: RequestInit): unknown {
+  const skus: string[] = init?.body
+    ? ((JSON.parse(String(init.body)) as { skus?: string[] }).skus ?? [])
+    : [];
+  const lines = skus.map(
+    (sku) =>
+      PLAN_LINES[sku] ?? {
+        sku, supplierId: null, supplierName: null, category: null,
+        productionDays: null, transitDays: null, arrival: null,
+      },
+  );
+  const complete = lines.length > 0 && lines.every((l) => l.arrival != null);
+  return {
+    proceedDate: TODAY,
+    lines,
+    deliveryDateDefault: complete
+      ? [...lines].map((l) => l.arrival as string).sort().at(-1)!
+      : null,
+    planUnavailable: false,
+  };
+}
+
+function respond(url: string, init?: RequestInit): unknown {
+  if (url.includes("/purchasing/requests/plan")) return planFor(init);
   if (url.includes("/purchasing/requests/detail/")) return DETAIL;
   /* ⭐ THE PRICES THIS ISSUE WILL COMMIT TO (0380; Card 02 closure §2). The
      surface reads them, shows them and declares them, because the API compares
@@ -263,7 +323,9 @@ function respond(url: string): unknown {
 beforeEach(() => {
   apiFetch.mockReset();
   navigate.mockReset();
-  apiFetch.mockImplementation((url: string) => Promise.resolve(respond(url)));
+  apiFetch.mockImplementation((url: string, init?: RequestInit) =>
+    Promise.resolve(respond(url, init)),
+  );
   // The rail's remembered open/closed choice must not leak between tests.
   localStorage.clear();
 });
@@ -298,9 +360,10 @@ const pickRow = (sku: string) =>
   screen.getByText(sku, { selector: ".font-mono" }).closest("tr")!;
 
 /** The DatePicker opens on the current month — pick a day there (the
- *  SalesOrderAmendDeliveryDate.test.tsx pattern). */
-function pickNeededBy(dayOfMonth = 15) {
-  fireEvent.click(document.getElementById("mp-needed")!);
+ *  SalesOrderAmendDeliveryDate.test.tsx pattern). Card 06: the one date
+ *  input is `Delivery Date`. */
+function pickDeliveryDate(dayOfMonth = 15) {
+  fireEvent.click(document.getElementById("mp-delivery-date")!);
   const cell = screen
     .getAllByRole("gridcell")
     .find((c) => c.textContent?.trim() === String(dayOfMonth));
@@ -380,15 +443,23 @@ describe("Card 03 · the left filter rail", () => {
     ).toBeTruthy();
   });
 
-  it("renders exactly the approved groups and rows, in the approved order", async () => {
+  it("renders exactly the seven approved groups and rows, in the approved order", async () => {
     await loaded();
     const rail = screen.getByTestId("manual-purchase-rail");
     const text = rail.textContent ?? "";
     const expected = [
+      "WORK TO DO",
+      "Approve purchase",
+      "Issue PO",
+      "Check the supplier",
+      "Add production days",
+      "Add transit days",
       "TO ORDER",
       "All not ordered",
-      "Need approval",
-      "Ready to order",
+      "ORDER TIMING",
+      "Can order early",
+      "Order date reached",
+      "Order date passed",
       "PURCHASE PURPOSE",
       "All purposes",
       "Ready Stock",
@@ -408,6 +479,11 @@ describe("Card 03 · the left filter rail", () => {
       "Hooka",
       "Office Co",
       "Ohana",
+      // An affected request exists (REQ-0002's transit gap) — the exception
+      // section renders, last.
+      "SETUP TO FIX",
+      "Production days not set",
+      "Transit days not set",
     ];
     let cursor = -1;
     for (const word of expected) {
@@ -441,19 +517,31 @@ describe("Card 03 · the left filter rail", () => {
       "Office",
       "Spare Parts",
       "Management Purchase",
+      // Card 06 — retired from TO ORDER; their capability moved to the
+      // WORK TO DO action rows without duplication.
+      "Need approval",
+      "Ready to order",
     ]) {
       expect(rowLabels, `banned row "${banned}"`).not.toContain(banned);
     }
-    expect(rail.textContent).not.toContain("ORDER TIMING");
     expect(rail.textContent).not.toContain("Queues");
     expect(rail.textContent).not.toMatch(/safety days/i);
   });
 
   it("counts are unique requests, zero printed rather than hidden", async () => {
     await loaded();
+    // WORK TO DO — all five rows visible, zero included.
+    expect(screen.getByTestId("mp-work-approve_purchase").textContent).toContain("1");
+    expect(screen.getByTestId("mp-work-issue_po").textContent).toContain("1");
+    expect(screen.getByTestId("mp-work-check_supplier").textContent).toContain("0");
+    expect(screen.getByTestId("mp-work-add_production_days").textContent).toContain("0");
+    expect(screen.getByTestId("mp-work-add_transit_days").textContent).toContain("1");
     expect(screen.getByTestId("mp-to-order-not_ordered").textContent).toContain("2");
-    expect(screen.getByTestId("mp-to-order-need_approval").textContent).toContain("1");
-    expect(screen.getByTestId("mp-to-order-ready_to_order").textContent).toContain("1");
+    // ORDER TIMING reads the server-derived Order By against the SERVER's
+    // Malaysia date — REQ-0001's 1 Sep is still ahead of 30 Aug.
+    expect(screen.getByTestId("mp-timing-can_order_early").textContent).toContain("1");
+    expect(screen.getByTestId("mp-timing-order_date_reached").textContent).toContain("0");
+    expect(screen.getByTestId("mp-timing-order_date_passed").textContent).toContain("0");
     // Zero is a fact, not an absence:
     expect(screen.getByTestId("mp-purpose-service_case").textContent).toContain("0");
     // The Catalog decides PRODUCT: `MATTRESS-LOOK-9` has no Catalog category,
@@ -461,6 +549,9 @@ describe("Card 03 · the left filter rail", () => {
     expect(screen.getByTestId("mp-product-mattress").textContent).toContain("0");
     expect(screen.getByTestId("mp-product-sofa").textContent).toContain("1");
     expect(screen.getByTestId("mp-product-bedframe").textContent).toContain("1");
+    // SETUP TO FIX states the exact configuration facts.
+    expect(screen.getByTestId("mp-setup-transit_days_not_set").textContent).toContain("1");
+    expect(screen.getByTestId("mp-setup-production_days_not_set").textContent).toContain("0");
   });
 
   it("the default Register keeps ordered history; `All not ordered` drops it", async () => {
@@ -475,12 +566,35 @@ describe("Card 03 · the left filter rail", () => {
     expect(screen.getByText("REQ-0003")).toBeInTheDocument();
   });
 
-  it("`Need approval` is the derived awaiting-approver truth", async () => {
+  it("`Approve purchase` is the derived awaiting-approver truth — a filter, not a grant", async () => {
     await loaded();
-    fireEvent.click(screen.getByTestId("mp-to-order-need_approval"));
+    fireEvent.click(screen.getByTestId("mp-work-approve_purchase"));
     expect(screen.getByText("REQ-0001")).toBeInTheDocument();
     expect(screen.queryByText("REQ-0002")).toBeNull();
     expect(screen.queryByText("REQ-0003")).toBeNull();
+    // Clicking the filter grants nothing: the filtered row still names the
+    // REAL owner and this operator still has no Approve control anywhere.
+    expect(screen.getByTestId(`mp-approver-${REQ1}`)).toHaveTextContent("Jess approves");
+    expect(screen.queryByTestId("mp-approve")).toBeNull();
+  });
+
+  it("`Issue PO` filters approved remaining demand", async () => {
+    await loaded();
+    fireEvent.click(screen.getByTestId("mp-work-issue_po"));
+    expect(screen.getByText("REQ-0002")).toBeInTheDocument();
+    expect(screen.queryByText("REQ-0001")).toBeNull();
+    expect(screen.queryByText("REQ-0003")).toBeNull();
+  });
+
+  it("a timing lens sorts earliest Order By first and never blocks issuance", async () => {
+    await loaded();
+    fireEvent.click(screen.getByTestId("mp-timing-can_order_early"));
+    expect(screen.getByText("REQ-0001")).toBeInTheDocument();
+    expect(screen.queryByText("REQ-0002")).toBeNull();
+    // Early is a FACT, not a gate — nothing on the row loses selection
+    // rights it otherwise has (REQ-0001 refuses the tick for approval,
+    // exactly as without the filter).
+    expect(screen.getByTestId(`mp-select-${REQ1}`)).toBeDisabled();
   });
 
   it("a purpose row narrows; `All purposes` clears only its own section", async () => {
@@ -528,17 +642,18 @@ describe("Card 03 · the left filter rail", () => {
     fireEvent.click(screen.getByTestId("mp-supplier-Hooka"));
     expect(screen.getByText("REQ-0003")).toBeInTheDocument();
     expect(screen.queryByText("REQ-0001")).toBeNull();
-    // AND with TO ORDER: Hooka + Need approval matches nothing — an unmatched
-    // supplier row drops, but the SELECTED one survives with its honest 0.
-    fireEvent.click(screen.getByTestId("mp-to-order-need_approval"));
+    // AND with WORK TO DO: Hooka + Approve purchase matches nothing — an
+    // unmatched supplier row drops, but the SELECTED one survives with its
+    // honest 0.
+    fireEvent.click(screen.getByTestId("mp-work-approve_purchase"));
     expect(screen.queryByText("REQ-0003")).toBeNull();
     expect(screen.getByTestId("mp-supplier-Hooka").textContent).toContain("0");
-    // Ohana + Need approval shows exactly REQ-0001 — the AND of both.
+    // Ohana + Approve purchase shows exactly REQ-0001 — the AND of both.
     fireEvent.click(screen.getByTestId("mp-supplier-Ohana"));
     expect(screen.getByText("REQ-0001")).toBeInTheDocument();
     expect(screen.queryByText("REQ-0002")).toBeNull();
     fireEvent.click(screen.getByTestId("mp-supplier-all"));
-    fireEvent.click(screen.getByTestId("mp-to-order-need_approval"));
+    fireEvent.click(screen.getByTestId("mp-work-approve_purchase"));
     expect(screen.getByText("REQ-0003")).toBeInTheDocument();
   });
 
@@ -580,20 +695,69 @@ describe("the create workspace — full page, never a dialog (card §3)", () => 
     ]);
   });
 
-  it("Send NAMES its gap — the date; a routine purpose asks no duplicate Why (Card 04)", async () => {
+  it("Card 06 · Proceed Date is a read-only server preview; the browser holds no clock", async () => {
+    await openWorkspace();
+    // The server's Malaysia date, as a FACT — no input anywhere near it.
+    await waitFor(() =>
+      expect(screen.getByTestId("mp-proceed-date").textContent).not.toBe(""),
+    );
+    expect(screen.getByTestId("mp-proceed-date").querySelector("input")).toBeNull();
+  });
+
+  it("Card 06 · complete lead facts DEFAULT Delivery Date from the slowest line — Send goes live", async () => {
     await openWorkspace();
     // Ready Stock is the default purpose — there is NO Why field to fill.
     expect(screen.queryByTestId("mp-why")).toBeNull();
     fireEvent.focus(document.getElementById("mp-item-0")!);
     fireEvent.click(pickRow("5539-2NA"));
-    // No date yet — the disabled button says which fact is missing.
-    expect(screen.getByTestId("mp-send")).toBeDisabled();
-    expect(screen.getByTestId("mp-send")).toHaveTextContent(MW.sendNeedsDate);
-
-    pickNeededBy();
-    // Date + item is ALL a routine purpose asks — Send goes live.
-    expect(screen.getByTestId("mp-send")).toBeEnabled();
+    // The SERVER proposes the arrival; the operator types no date at all.
+    await waitFor(() => expect(screen.getByTestId("mp-send")).toBeEnabled());
     expect(screen.getByTestId("mp-send")).toHaveTextContent(MW.send);
+  });
+
+  it("Card 06 · a person's chosen Delivery Date is preserved — never silently overwritten", async () => {
+    await openWorkspace();
+    // The person chooses first; the plan's later default must not replace it.
+    pickDeliveryDate(20);
+    // The DatePicker trigger prints the governed fmtDate of the chosen day.
+    const chosen = document.getElementById("mp-delivery-date")!.textContent ?? "";
+    expect(chosen).toContain("20");
+    fireEvent.focus(document.getElementById("mp-item-0")!);
+    fireEvent.click(pickRow("5539-2NA"));
+    await waitFor(() => expect(screen.getByTestId("mp-send")).toBeEnabled());
+    // The server's 12 Sep proposal did NOT overwrite the person's date.
+    expect(document.getElementById("mp-delivery-date")!.textContent).toBe(chosen);
+  });
+
+  it("Card 06 · a missing lead number blocks Send by name and deep-links Settings", async () => {
+    // Inject the Settings hole: production days were never set for this pair.
+    apiFetch.mockImplementation((url: string, init?: RequestInit) => {
+      if (url.includes("/purchasing/requests/plan")) {
+        const base = planFor(init) as { lines: Array<Record<string, unknown>> };
+        return Promise.resolve({
+          ...base,
+          lines: base.lines.map((l) => ({ ...l, productionDays: null, arrival: null })),
+          deliveryDateDefault: null,
+        });
+      }
+      return Promise.resolve(respond(url, init));
+    });
+    await openWorkspace();
+    fireEvent.focus(document.getElementById("mp-item-0")!);
+    fireEvent.click(pickRow("5539-2NA"));
+    pickDeliveryDate();
+    // The exact fact and act, on the affected line — and Send names the gap.
+    const gap = await screen.findByTestId("mp-lead-gap-0");
+    expect(gap.textContent).toContain("Production days are not set");
+    expect(gap.textContent).toContain("Add production days for Ohana · Sofa in Settings");
+    expect(gap.querySelector("a")).toHaveAttribute(
+      "href",
+      "/operation?tab=purchasing-settings",
+    );
+    expect(screen.getByTestId("mp-send")).toBeDisabled();
+    expect(screen.getByTestId("mp-send")).toHaveTextContent(MW.sendNeedsLeadDays);
+    // No date was guessed anywhere: the default stayed empty until the
+    // person picked one, and no browser arithmetic invented an arrival.
   });
 
   it("a picked line shows SKU + Model, never the model word alone (P15's defect, returned)", async () => {
@@ -607,7 +771,7 @@ describe("the create workspace — full page, never a dialog (card §3)", () => 
 
   it("Send stays off until an item is picked, even with a date", async () => {
     await openWorkspace();
-    pickNeededBy();
+    pickDeliveryDate();
     expect(screen.getByTestId("mp-send")).toBeDisabled();
   });
 
@@ -635,7 +799,7 @@ describe("the create workspace — full page, never a dialog (card §3)", () => 
 
   it("ONE act, per-row result — a failed line keeps its row, retry reuses the header", async () => {
     await openWorkspace();
-    pickNeededBy();
+    pickDeliveryDate();
     fireEvent.focus(document.getElementById("mp-item-0")!);
     fireEvent.click(pickRow("5539-2NA"));
     fireEvent.click(screen.getByTestId("mp-line-add"));
@@ -656,6 +820,8 @@ describe("the create workspace — full page, never a dialog (card §3)", () => 
       return Promise.resolve(respond(url));
     });
 
+    // The plan read must land before Send unlocks (Card 06's own gate).
+    await waitFor(() => expect(screen.getByTestId("mp-send")).toBeEnabled());
     fireEvent.click(screen.getByTestId("mp-send"));
     await screen.findByTestId("mp-line-failed-1");
     expect(screen.getByTestId("mp-line-failed-1").textContent).toContain("no supplier");
@@ -678,7 +844,7 @@ describe("the create workspace — full page, never a dialog (card §3)", () => 
 
   it("no supplier key rides the wire — the server derives it", async () => {
     await openWorkspace();
-    pickNeededBy();
+    pickDeliveryDate();
     fireEvent.focus(document.getElementById("mp-item-0")!);
     fireEvent.click(pickRow("5539-2NA"));
 
@@ -692,6 +858,7 @@ describe("the create workspace — full page, never a dialog (card §3)", () => 
       return Promise.resolve(respond(url));
     });
 
+    await waitFor(() => expect(screen.getByTestId("mp-send")).toBeEnabled());
     fireEvent.click(screen.getByTestId("mp-send"));
     await waitFor(() => {
       const linePost = apiFetch.mock.calls.find((c) => String(c[0]).includes("/lines"));
@@ -1108,11 +1275,11 @@ describe("Card 04 · the eleven columns, in the Card's exact order", () => {
       .map((th) => (th.textContent ?? "").replace(/[AV]$/, "").trim())
       .filter((t) => t !== "");
     expect(heads).toEqual([
-      "Requested Date",
+      "Proceed Date",
       "Approval Status",
       "Manual Purchase No",
       "PO No",
-      "Needed By",
+      "Delivery Date",
       "For",
       "Items",
       "Qty",
@@ -1132,12 +1299,17 @@ describe("Card 04 · the eleven columns, in the Card's exact order", () => {
       "Reason",
       "Remark",
       "Price",
+      // Card 06 — the corrected date words replace these, everywhere.
+      "Requested Date",
+      "Needed By",
+      // Order By drives timing/work; it is NOT another parent column.
+      "Order By",
     ]) {
       expect(heads, `banned column "${banned}"`).not.toContain(banned);
     }
   });
 
-  it("newest Requested Date leads by default — the actual created_at", async () => {
+  it("newest Proceed Date leads by default — the actual created_at", async () => {
     await loaded();
     const grid = screen.getByTestId("register-column");
     const order = [...grid.querySelectorAll("tbody tr")]
@@ -1619,5 +1791,120 @@ describe("Card 05 · the object detail", () => {
     fireEvent.click(screen.getByText("REQ-0001", { selector: "button" }));
     await screen.findByText("This Manual Purchase could not be opened");
     expect(screen.getByText("Try again")).toBeInTheDocument();
+  });
+});
+
+/**
+ * ⭐ PURCHASING CARD 06 — the date plan on the Register, the object and the
+ * Work hand-off (owner-corrected 2026-08-29).
+ */
+describe("Card 06 · the Register's date facts and lens order", () => {
+  it("a historical null Delivery Date prints `Not recorded` — never a dash or a guess", async () => {
+    await loaded();
+    const grid = screen.getByTestId("register-column");
+    // REQ-0002 and REQ-0003 have no stored Delivery Date.
+    expect(within(grid).getAllByText("Not recorded").length).toBe(2);
+  });
+
+  it("a work lens sorts earliest Order By first, then newest Proceed Date", async () => {
+    await loaded();
+    // Both not-ordered rows under `All not ordered`: REQ-0001 carries the
+    // only Order By (1 Sep) and leads; the null-dated REQ-0002 follows even
+    // though it is newer.
+    fireEvent.click(screen.getByTestId("mp-work-issue_po"));
+    fireEvent.click(screen.getByTestId("mp-work-issue_po")); // clear again
+    fireEvent.click(screen.getByTestId("mp-to-order-not_ordered"));
+    // TO ORDER alone is not a work/timing lens — default newest-first holds.
+    let order = [...screen.getByTestId("register-column").querySelectorAll("tbody tr")]
+      .map((tr) => tr.textContent ?? "")
+      .filter((t) => /REQ-\d{4}/.test(t))
+      .map((t) => t.match(/REQ-\d{4}/)![0]);
+    expect(order).toEqual(["REQ-0002", "REQ-0001"]);
+    fireEvent.click(screen.getByTestId("mp-to-order-not_ordered"));
+    // The WORK lens re-orders: earliest Order By first, null-dated last.
+    fireEvent.click(screen.getByTestId("mp-timing-can_order_early"));
+    fireEvent.click(screen.getByTestId("mp-timing-can_order_early"));
+    fireEvent.click(screen.getByTestId("mp-work-approve_purchase"));
+    order = [...screen.getByTestId("register-column").querySelectorAll("tbody tr")]
+      .map((tr) => tr.textContent ?? "")
+      .filter((t) => /REQ-\d{4}/.test(t))
+      .map((t) => t.match(/REQ-\d{4}/)![0]);
+    expect(order).toEqual(["REQ-0001"]);
+  });
+});
+
+describe("Card 06 · the object's date facts", () => {
+  it("Request reads Proceed Date · Delivery Date with the quiet `Order by {date}` fact", async () => {
+    seedDetail(false);
+    await loaded();
+    fireEvent.click(screen.getByText("REQ-0001", { selector: "button" }));
+    await screen.findByTestId("mp-detail");
+    expect(screen.getByTestId("mp-detail-proceed-date")).toHaveTextContent(
+      fmtDate("2026-08-19"),
+    );
+    expect(screen.getByTestId("mp-detail-delivery-date")).toHaveTextContent(
+      fmtDate("2026-09-12"),
+    );
+    // The derived timing fact — quiet, and NOT past due at the server's date.
+    expect(screen.getByTestId("mp-detail-order-by")).toHaveTextContent(
+      `Order by ${fmtDate("2026-09-01")}`,
+    );
+    expect(screen.getByTestId("mp-detail-order-by").textContent).not.toContain(
+      "Order date passed",
+    );
+    // Retired words never return to this object.
+    const detail = screen.getByTestId("mp-detail");
+    expect(detail.textContent).not.toContain("Requested Date");
+    expect(detail.textContent).not.toContain("Needed By");
+  });
+
+  it("a passed Order By states `Order date passed` first — a fact, not a gate", async () => {
+    seedDetail(false, {
+      todayIso: "2026-09-03",
+      lines: REGISTER.lines
+        .filter((l) => l.request_id === REQ1)
+        .map((l) => ({ ...l, order_by: "2026-09-01" })),
+    });
+    await loaded();
+    fireEvent.click(screen.getByText("REQ-0001", { selector: "button" }));
+    await screen.findByTestId("mp-detail");
+    const timing = screen.getByTestId("mp-detail-order-by");
+    expect(timing).toHaveTextContent("Order date passed");
+    expect(timing).toHaveTextContent(`Order by ${fmtDate("2026-09-01")}`);
+    // Still no object-side Issue PO door arrives with the fact (Card 05/06).
+    expect(screen.queryByTestId("mp-issue-selected")).toBeNull();
+  });
+
+  it("a historical null Delivery Date reads `Not recorded` with no invented Order By", async () => {
+    seedDetail(false, {
+      request: { ...REGISTER.requests[0], required_by: null },
+      lines: REGISTER.lines
+        .filter((l) => l.request_id === REQ1)
+        .map((l) => ({ ...l, delivery_date: null, order_by: null })),
+    });
+    await loaded();
+    fireEvent.click(screen.getByText("REQ-0001", { selector: "button" }));
+    await screen.findByTestId("mp-detail");
+    expect(screen.getByTestId("mp-detail-delivery-date")).toHaveTextContent("Not recorded");
+    expect(screen.queryByTestId("mp-detail-order-by")).toBeNull();
+  });
+});
+
+describe("Card 06 §7 · the Work deep link opens the exact MPR", () => {
+  it("`?mpr={id}` lands directly on the object, and Back restores the Register", async () => {
+    seedDetail(false);
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter initialEntries={[`/operation?tab=manual-purchase&mpr=${REQ1}`]}>
+          <OperationManualPurchase />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    await screen.findByTestId("mp-detail");
+    expect(screen.getByTestId("mp-detail").textContent).toContain("REQ-0001");
+    // `‹ Manual Purchase` returns to the Register — not a reopen loop.
+    fireEvent.click(screen.getByText("Manual Purchase", { selector: "a *, a" }));
+    await waitFor(() => expect(screen.queryByTestId("mp-detail")).toBeNull());
   });
 });

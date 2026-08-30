@@ -4468,13 +4468,23 @@ export interface PurchaseRequestLineRow {
   /** Card 04 — the line's REAL PO lineage (`purchase_order_lines.demand_id`
    *  plus the demand's own po_id), never an inference. */
   po_ids?: string[];
+  /** Card 06 — the SERVER date projection (the browser performs no
+   *  working-day arithmetic): the line's effective Delivery Date, its
+   *  derived Order By (null is a real answer, never a guessed one), and the
+   *  exact missing Settings facts the rail/setup lens names. */
+  delivery_date?: string | null;
+  order_by?: string | null;
+  production_days_missing?: boolean;
+  transit_days_missing?: boolean;
 }
 
 export interface ManualPurchaseRegisterPayload {
   requests: PurchaseRequestRow[];
   lines: PurchaseRequestLineRow[];
-  /** Every PO the lines' lineage names — id → the actual po_no. */
-  pos: Array<{ id: string; po_no: string }>;
+  /** Every PO the lines' lineage names — id → the actual po_no — plus the
+   *  Card 06 issuance-completion fact: whether the CURRENT version has
+   *  confirmed-sent evidence (`po_sends`, 0378). */
+  pos: Array<{ id: string; po_no: string; sent?: boolean }>;
   /** The linked Service Cases behind `for_service_case_id`. */
   serviceCases: Array<{ id: string; case_no: string }>;
   destinations: Array<{ id: string; name: string }>;
@@ -4490,6 +4500,10 @@ export interface ManualPurchaseRegisterPayload {
   actingPoDuty: { userId: string; name: string } | null;
   poDutyUnavailable: boolean;
   mayIssue: boolean;
+  /** Card 06 — the Malaysia calendar date the timing lens compares against,
+   *  and whether the server date plan could be loaded at all. */
+  todayIso?: string;
+  planUnavailable?: boolean;
 }
 
 export interface ManualPurchaseDetailPayload {
@@ -4524,6 +4538,51 @@ export interface ManualPurchaseDetailPayload {
   /** Card 03 §3 — the real action owner's name on the object too. */
   approvers: Array<{ id: string; name: string | null }>;
   canApprove: boolean;
+  /** Card 06 — the same server date plan the Register reads. */
+  todayIso?: string;
+  planUnavailable?: boolean;
+}
+
+/** Card 06 §3 — one line of the create form's server date plan. */
+export interface ManualPurchasePlanLine {
+  sku: string;
+  supplierId: string | null;
+  supplierName: string | null;
+  category: string | null;
+  productionDays: number | null;
+  transitDays: number | null;
+  /** `expectedArrivalOf` from the preview Proceed Date — null is a real
+   *  answer (missing Catalog relationship or Settings), never a guess. */
+  arrival: string | null;
+}
+
+export interface ManualPurchasePlanPayload {
+  /** The server's Malaysia date — the read-only Proceed Date preview. */
+  proceedDate: string;
+  lines: ManualPurchasePlanLine[];
+  /** The latest line arrival — proposed ONLY when every asked SKU resolves
+   *  and has complete Settings. */
+  deliveryDateDefault: string | null;
+  planUnavailable: boolean;
+}
+
+/**
+ * The create form's date plan (Card 06 §3) — the SERVER proposes Delivery
+ * Date and names missing lead facts; the browser never guesses a date. A
+ * POST only because live SKUs carry free text (`Leg 4"`); it reads, creates
+ * nothing and reserves nothing.
+ */
+export function useManualPurchasePlan(skus: string[]) {
+  const sorted = [...skus].sort();
+  return useQuery<ManualPurchasePlanPayload, ApiError>({
+    queryKey: ["operation", "purchasing", "requests", "plan", sorted.join("|")],
+    queryFn: () =>
+      apiFetch<ManualPurchasePlanPayload>(
+        "/api/operation/purchasing/requests/plan",
+        { method: "POST", body: JSON.stringify({ skus: sorted }) },
+      ),
+    staleTime: 30_000,
+  });
 }
 
 export function useManualPurchaseDetail(id: string | null) {

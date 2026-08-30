@@ -192,7 +192,13 @@ export default function OperationWork() {
   const visible = activeView === "mine" ? mine : allItems;
   const lateCount = visible.filter((i) => i.workingDaysLate > 0).length;
 
-  const openRow = (i: WorkRow) => navigate(`/operation/orders/so/${i.orderId}`);
+  /* A row is a DOOR to its exact source (Card 06 §7): an order-track item
+     opens the Sales Order Workspace; a Manual Purchase action deep-links
+     the exact MPR object. */
+  const openRow = (i: WorkRow) =>
+    i.ruleKey.startsWith("manual_purchase.")
+      ? navigate(`/operation?tab=manual-purchase&mpr=${i.orderId}`)
+      : navigate(`/operation/orders/so/${i.orderId}`);
 
   return (
     <ListPageShell
