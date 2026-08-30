@@ -201,7 +201,7 @@ SUPPLY CHAIN
 │   │   ├── Manual Purchase
 │   │   └── Purchase Orders
 │   ├── RECEIVE
-│   │   └── Goods Receipts
+│   │   └── Receiving
 │   ├── PROBLEMS
 │   │   ├── Supplier Claims
 │   │   ├── Purchase Returns
@@ -242,9 +242,9 @@ a second settings home. `Old Orders` is a temporary cutover door and is not part
 The right Quick Rail is governed by `ui/MASTER.md`; it never adds duplicate module destinations or
 business truth.
 
-**`Goods Receipts` is the exact Purchasing destination word.** It names the governed record
-operators need to find again; the work inside that destination is still receiving. The internal
-letters `GRN` remain banned from navigation and staff-facing status copy.
+**`Receiving` is the exact Purchasing destination and workspace word.** `Check in` names the
+physical act; `Goods Receipt` names the Carres record and `GRN` its numbered document after physical
+receiving; `Supplier DO` names the supplier's document. These words never replace one another.
 
 **This is navigation, not workflow.** How the operator moves between these pages — which one
 feeds which — is the module MASTER's, and it changes when the business changes.
@@ -446,8 +446,8 @@ amend it · void it · return a count for a re-check.
 **LINKS TO** — Purchasing (the PO) · Stock (where the units landed) · Supplier Claim (what the
 count opened).
 
-Supplier-consignment receipt preserves supplier ownership and creates no payable. Goods Receipts
-is the one receipt engine; a separate Consignment Receipt page would duplicate the physical act.
+Supplier-consignment receipt preserves supplier ownership and creates no payable. Receiving is the
+one receipt engine; a separate Consignment Receipt page would duplicate the physical act.
 
 > **ONE DOOR. This is the boundary D2 restored**, and it is the sharpest example of Law C in the
 > whole system: a second receive form did not create a second door onto one act — **it created a
@@ -770,9 +770,9 @@ that already exist. Until that fact exists, a trip table is an unowned record �
 
 **③ Purchasing / customer-order seam — RESOLVED FROM AUTHORITY 2026-08-22.**
 The customer order owns the reason and promise. Purchasing owns the generated `purchase_demand`
-remainder, supplier commitment and `Deliver To`; Goods Receipts owns the physical receipt; Stock
-then owns Unit custody/location. The Sales Order reads risk and connected documents but cannot mark
-goods ordered or received.
+remainder, supplier commitment and `Deliver To`; Receiving owns the physical check-in and creates
+the Goods Receipt/GRN; Stock then owns Unit custody/location. The Sales Order reads risk and
+connected documents but cannot mark goods ordered or received.
 
 **④ Supplier Claim entrance — RESOLVED FROM AUTHORITY 2026-08-22.**
 There is one problem intake through Service Case or the authoritative receiving exception. The
