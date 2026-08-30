@@ -870,15 +870,13 @@ rule from the Sales Order entrance.
 | Context | Words |
 |---|---|
 | Review title | `Review Purchase Orders` |
-| Ordinary commercial choice | `Normal Purchase` |
-| PO-line price | `Transaction Cost` · empty: `Cost required` |
-| Zero-price commercial choice | `Free of Charge` |
-| Free-of-Charge explanation | `Reason` · empty: `Reason required` |
-| Factory-pickup document fact | `Procurement Partner` |
+| Factory-pickup collection fact | `{partner} collects from {supplier} and delivers to {destination}.` |
+| Missing Catalog cost | `{sku} has no transaction cost.` · `Set the cost of {sku} in Catalog.` |
+| Missing supplier collection rule | `{supplier} collection is not configured.` · `Set its collector and destination in Purchasing Settings.` |
 
-`Free of Charge` is a commercial classification, never the empty or default value for an
-unknown cost. `Procurement Partner` appears once per governed Issue document, never once per
-demand line.
+Issue review contains no cost editor, `Free of Charge` choice or procurement-partner picker.
+Catalog owns normal cost; Purchasing Settings owns supplier collection. The review only states the
+resolved collection fact once per governed Issue document.
 
 **THIS TABLE IS THE CANONICAL HOME FOR EVERY PURCHASING ACTION, INCLUDING THE ONES THE ORDERS
 LADDER DISPLAYS.** Orders and Purchasing show the same structured action; they never store two
@@ -1858,8 +1856,7 @@ The load-bearing ones, verbatim:
 | Catalog's price moved since the review | `{sku} costs a different price now.` | `Go back to buying and check the new price before you issue.` |
 | Nobody checked the price of a line | `{sku} has no checked transaction cost.` | `Check the cost of {sku} on this page, then issue again.` |
 | An exception has no manager's approval | `Nobody approved this price for {sku}.` | `Ask a manager to approve the price of {sku} for {supplier}.` |
-| Catalog holds no price at all | `{sku} has no transaction cost.` | `Type the agreed cost of {sku}, or mark it Free of Charge.` |
-| Free of Charge with no reason | `{sku} is Free of Charge with no reason.` | `Type why {sku} is free, then ask a manager to approve it.` |
+| Catalog holds no price at all | `{sku} has no transaction cost.` | `Set the cost of {sku} in Catalog.` |
 | A manager would approve their own exception | `You cannot approve a price you will use yourself.` | `Ask another manager to approve this price.` |
 | The Deliver To split does not add up | `You arranged {n} units and must buy {m}.` | `Change the Deliver To split so the units add up, then issue again.` |
 | A matched set was split across two places | `A sofa set cannot go to two places.` | `Send the whole set to one place, then issue again.` |

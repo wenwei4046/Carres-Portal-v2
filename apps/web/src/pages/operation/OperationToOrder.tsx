@@ -111,7 +111,6 @@ export default function OperationToOrder() {
       <SoBatchIssueWorkspace
         documents={documents}
         destinations={data.destinations}
-        procurementPartners={data.procurementPartners}
         onBack={backToBuying}
         onDone={finish}
       />

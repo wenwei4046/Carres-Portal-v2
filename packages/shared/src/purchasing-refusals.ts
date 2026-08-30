@@ -238,9 +238,20 @@ export function purchasingRefusal(
         todo: `Ask Catalog to set the supplier of ${sku}, then issue again.`,
       };
     case "pickup_partner_required":
+    case "supplier_collection_not_configured":
       return {
-        wrong: `${supplier} does not deliver. Nobody is collecting.`,
-        todo: "Choose who collects the goods, then issue again.",
+        wrong: `${supplier} collection is not configured.`,
+        todo: "Set its collector and destination in Purchasing Settings, then issue again.",
+      };
+    case "supplier_collection_mismatch":
+      return {
+        wrong: `${supplier} has a different collector in Purchasing Settings.`,
+        todo: "Reload the purchase, then issue it with the configured collector.",
+      };
+    case "supplier_collection_destination_mismatch":
+      return {
+        wrong: `${supplier} must be collected to its configured destination.`,
+        todo: "Reload the purchase, then issue it to the destination in Purchasing Settings.",
       };
     case "pickup_partner_not_allowed":
       return {
@@ -374,6 +385,9 @@ export const PURCHASING_REFUSAL_CODES = [
   "production_days_required",
   "unresolved_supplier",
   "pickup_partner_required",
+  "supplier_collection_not_configured",
+  "supplier_collection_mismatch",
+  "supplier_collection_destination_mismatch",
   "pickup_partner_not_allowed",
   "no_warehouse",
   "unknown_source_order",

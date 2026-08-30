@@ -486,6 +486,12 @@ manualPurchaseRouter.get("/", requireOperation, async (c) => {
   let poDutyUnavailable = false;
   let mayIssue = false;
   try {
+    const authority = await purchasingActorMayIssue(sb, c.var.auth.id);
+    if (authority.error) {
+      console.error("manual purchase — PO issue authority unavailable", authority.error.message);
+    } else {
+      mayIssue = authority.mayIssue;
+    }
     const actorRes = await sb.rpc("purchasing_po_actor");
     if (actorRes.error) {
       poDutyUnavailable = true;
@@ -511,7 +517,6 @@ manualPurchaseRouter.get("/", requireOperation, async (c) => {
       if (actor.acting_user_id && actingName) {
         actingPoDuty = { userId: actor.acting_user_id, name: actingName };
       }
-      mayIssue = actor.actor_user_id != null && actor.actor_user_id === c.var.auth.id;
     }
   } catch (e) {
     poDutyUnavailable = true;
@@ -1137,23 +1142,6 @@ const issueBody = z.object({
   /** The consolidation OFFER's answer. Declinable by design (card §6):
    *  `false` issues one document per request. */
   together: z.boolean(),
-  /** supplierId → delivery partner, required only for factory-pickup
-   *  suppliers; the RPC re-validates. */
-  partners: z.record(z.string().uuid(), z.string().uuid()).nullish(),
-  /**
-   * ⭐ THE TRANSACTION COST THE OPERATOR REVIEWED, per SKU (0380; closure §2).
-   *
-   * This lane issues at the Catalog price, and the API used to read that price
-   * itself and hand it back to the RPC as `cost_source: catalog` — so the
-   * database compared its own live value against itself and agreed every time.
-   * A supplier price that moved between the review and Issue was adopted with
-   * nobody's approval.
-   *
-   * The browser now declares what it SHOWED. The stored number is still the
-   * server's own read; the declaration is only what makes the comparison
-   * possible at all.
-   */
-  expectedCosts: z.record(z.string().min(1), z.number().nonnegative()),
 });
 
 /**
@@ -1182,7 +1170,7 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
   if (!parsed.success) {
     return c.json({ error: "invalid_body", code: "invalid_param" }, 400);
   }
-  const { requestIds, together, partners, expectedCosts } = parsed.data;
+  const { requestIds, together } = parsed.data;
 
   /* Manual Purchase and SO Batch Purchase ask the same governed capability;
      the creation RPC asks again at the database boundary. */
@@ -1267,6 +1255,22 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
 
   const { data: supRows } = await sb.from("suppliers").select("id, kind");
   const supplierKind = new Map((supRows ?? []).map((s) => [s.id as string, s.kind as string]));
+  const { data: collectionRows, error: collectionErr } = await sb
+    .from("purchasing_supplier_settings")
+    .select("supplier_id, fixed_destination_id, collected_by_partner_id");
+  if (collectionErr) {
+    const m = mapPgError(collectionErr);
+    return c.json(m.body, m.status);
+  }
+  const collectionBySupplier = new Map(
+    ((collectionRows ?? []) as Record<string, unknown>[]).map((r) => [
+      r.supplier_id as string,
+      {
+        partnerId: (r.collected_by_partner_id as string | null) ?? null,
+        fixedDestinationId: (r.fixed_destination_id as string | null) ?? null,
+      },
+    ]),
+  );
 
   const { data: whRows, error: whErr } = await sb
     .from("warehouses")
@@ -1306,17 +1310,8 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
       // configuration hole the catalog must fix — surfaced by name.
       return refuse(c, 422, "cost_required", { sku: l.sku as string });
     }
-    /* ⭐ THE REVIEWED PRICE MUST STILL BE TRUE (0380; closure §2). Nothing
-       declared means nothing reviewed, and a declaration that no longer matches
-       Catalog means the supplier moved the price after the operator looked.
-       Neither is Operations' decision to wave through. */
-    const reviewed = expectedCosts[l.sku as string];
-    if (reviewed == null) {
-      return refuse(c, 422, "expected_cost_required", { sku: l.sku as string });
-    }
-    if (reviewed !== cat.cost) {
-      return refuse(c, 409, "supplier_price_changed", { sku: l.sku as string });
-    }
+    /* Catalog is the commercial authority for this normal purchase. The
+       creation RPC rechecks the same value inside the transaction. */
     const req = reqById.get(l.request_id as string)!;
     const destinationId =
       ((l.destination_id as string | null) ?? (req.destination_id as string));
@@ -1335,16 +1330,17 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
     const first = catalog.get(lines[0].sku as string)!;
     const req = reqById.get(lines[0].request_id as string)!;
     const kind = supplierKind.get(first.supplierId!) ?? null;
-    const partnerId = partners?.[first.supplierId!] ?? null;
+    const collection = collectionBySupplier.get(first.supplierId!) ?? null;
+    const partnerId = kind === "factory_pickup" ? (collection?.partnerId ?? null) : null;
     if (kind === "factory_pickup" && !partnerId) {
-      return c.json(
-        {
-          error: "pickup_partner_required",
-          code: "pickup_partner_required",
-          supplierId: first.supplierId,
-        },
-        422,
-      );
+      return refuse(c, 422, "pickup_partner_required");
+    }
+    if (
+      kind === "factory_pickup" &&
+      collection?.fixedDestinationId &&
+      collection.fixedDestinationId !== group.destinationId
+    ) {
+      return refuse(c, 422, "supplier_collection_destination_mismatch");
     }
     governedPos.push({
       supplier_id: first.supplierId,
@@ -1368,9 +1364,8 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
         cost_source: "catalog",
         commercial_treatment: "normal",
         commercial_reason: null,
-        /* …and the reviewed price travels beside it, so 0380 has two numbers to
-           compare instead of one number compared with itself. */
-        expected_catalog_cost: expectedCosts[l.sku as string] ?? null,
+        /* SQL compares the Catalog value again inside the creation transaction. */
+        expected_catalog_cost: catalog.get(l.sku as string)!.cost,
         demand_id: l.id,
       })),
     });

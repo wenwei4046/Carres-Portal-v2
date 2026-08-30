@@ -385,6 +385,48 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
 
   const rows: PurchaseDemandRow[] = [];
 
+  /* Factory collection is governed supplier master data. The buying screen
+     carries the resolved fact so Review can state it; it never offers an
+     ad-hoc collector choice. */
+  const collectionBySupplier = new Map<
+    string,
+    {
+      procurementPartnerId: string;
+      procurementPartnerName: string;
+      fixedDestinationId: string | null;
+    }
+  >();
+  try {
+    const [configured, partners] = await Promise.all([
+      sb
+        .from("purchasing_supplier_settings")
+        .select("supplier_id, fixed_destination_id, collected_by_partner_id"),
+      sb.from("delivery_partners").select("id, name"),
+    ]);
+    if (configured.error || partners.error) {
+      const m = mapPgError(configured.error ?? partners.error!);
+      return c.json(m.body, m.status);
+    }
+    const partnerNames = new Map(
+      ((partners.data ?? []) as Record<string, unknown>[]).map((p) => [
+        p.id as string,
+        (p.name as string) ?? "",
+      ]),
+    );
+    for (const setting of (configured.data ?? []) as Record<string, unknown>[]) {
+      const partnerId = setting.collected_by_partner_id as string | null;
+      const partnerName = partnerId ? partnerNames.get(partnerId) : null;
+      if (!partnerId || !partnerName) continue;
+      collectionBySupplier.set(setting.supplier_id as string, {
+        procurementPartnerId: partnerId,
+        procurementPartnerName: partnerName,
+        fixedDestinationId: (setting.fixed_destination_id as string | null) ?? null,
+      });
+    }
+  } catch (e) {
+    console.error("so batch — supplier collection rules unavailable", (e as Error).message);
+  }
+
   /* ── 1 · the demand the engine CARRIED ──────────────────────────────────── */
   for (const proposal of proposals) {
     for (const row of proposal.rows) {
@@ -403,6 +445,10 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
         /* THE ENGINE'S OWN ARRIVAL DATE. `stockReady` IS `arriveBy` — the day
            the goods must be at Carres for this customer promise to hold. */
         const goodsMustArrive = row.stockReady;
+        const catalogCostMissing = build.lines.some((l) => {
+          const cost = catalog.get(l.sku)?.cost ?? null;
+          return cost == null || cost <= 0;
+        });
         /* A carried build has its SKU, supplier and production days by
            construction — the read refuses the others line by line into
            `registerFacts` below. The one blocker it can still carry is the
@@ -410,6 +456,8 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
         const state: PurchaseDemandState =
           row.delivery == null
             ? "no_customer_date"
+            : catalogCostMissing
+              ? "no_cost"
             : build.readyIfOrderedToday != null
               ? purchaseDemandTimingOf({
                   today,
@@ -451,7 +499,9 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
           /* A CARRIED build can be issued, so it carries the reference the
              issue endpoint recomputes against. A refused line below cannot,
              and says so by having none. */
-          issueRef: { proposalKey: proposal.key, buildKey: build.key },
+          issueRef: state === "no_cost"
+            ? null
+            : { proposalKey: proposal.key, buildKey: build.key },
           /* The CATALOG's price per SKU, carried so the 50/50 can ask for the
              one it does not have. `null` is load-bearing: a SKU with no price
              cannot be issued until somebody states a cost or marks it Free of
@@ -465,6 +515,7 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
             unitCost: catalog.get(l.sku)?.cost ?? null,
           })),
           supplierKind: supplierKinds.get(proposal.supplierId) ?? "own_logistics",
+          supplierCollection: collectionBySupplier.get(proposal.supplierId) ?? null,
           action: soBatchAction({
             state,
             item: build.model,
@@ -533,6 +584,9 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
       parts: [{ sku: line.sku, qty: line.qty, unitCost: catalog.get(line.sku)?.cost ?? null }],
       supplierKind: line.supplierId
         ? (supplierKinds.get(line.supplierId) ?? "own_logistics")
+        : null,
+      supplierCollection: line.supplierId
+        ? (collectionBySupplier.get(line.supplierId) ?? null)
         : null,
       action: soBatchAction({
         state,

@@ -264,7 +264,7 @@ describe("POST /purchasing/requests/issue — the reason rides to the authority"
  * re-read the Catalog price itself and sent it back as `cost_source: catalog` —
  * so the database compared its own live value against itself.
  */
-describe("closure §2 · the manual lane declares the price it reviewed", () => {
+describe("closure §2 · Catalog is the manual lane's normal price authority", () => {
   it("sends the reviewed cost beside the server's own read", async () => {
     const rpc = vi.fn().mockResolvedValue({ data: { po_ids: ["PO-9001"] }, error: null });
     const res = await issue(
@@ -281,22 +281,19 @@ describe("closure §2 · the manual lane declares the price it reviewed", () => 
     }
   });
 
-  it("refuses a SKU whose price was never reviewed", async () => {
-    const rpc = vi.fn();
+  it("does not require a browser price declaration", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: { po_ids: ["PO-9001"] }, error: null });
     const res = await issue(
       { requestIds: [REQ_A, REQ_B], together: true, expectedCosts: { "5539-2NA": 850 } },
       rpc,
     );
-    expect(res.status).toBe(422);
-    const body = (await res.json()) as { code?: string; message?: string; action?: string };
-    expect(body.code).toBe("expected_cost_required");
-    expect(body.message).toBe("5539-CNR has no checked transaction cost.");
-    expect(body.action?.length).toBeGreaterThan(0);
-    expect(rpc).not.toHaveBeenCalled();
+    expect(res.status).toBe(200);
+    const pos = rpc.mock.calls[0][1].p_pos as Array<Record<string, unknown>>;
+    expect((pos[0].lines as Array<Record<string, unknown>>)[1].cost).toBe(400);
   });
 
-  it("refuses a price that moved between the review and Issue", async () => {
-    const rpc = vi.fn();
+  it("ignores a stale browser price and uses Catalog", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: { po_ids: ["PO-9001"] }, error: null });
     const res = await issue(
       {
         requestIds: [REQ_A, REQ_B],
@@ -306,11 +303,9 @@ describe("closure §2 · the manual lane declares the price it reviewed", () => 
       },
       rpc,
     );
-    expect(res.status).toBe(409);
-    const body = (await res.json()) as { code?: string; action?: string };
-    expect(body.code).toBe("supplier_price_changed");
-    expect(body.action).toBe("Go back to buying and check the new price before you issue.");
-    expect(rpc).not.toHaveBeenCalled();
+    expect(res.status).toBe(200);
+    const pos = rpc.mock.calls[0][1].p_pos as Array<Record<string, unknown>>;
+    expect((pos[0].lines as Array<Record<string, unknown>>)[1].cost).toBe(400);
   });
 
   it("turns the database's duty refusal into the approved two lines", async () => {
@@ -633,7 +628,9 @@ describe("Card 04 · GET /purchasing/requests — lineage, item words, PO duty",
       cancelled_at: null, cancel_reason: null },
   ];
 
-  function makeSbCard04() {
+  function makeSbCard04(options: { actorUserId?: string; mayIssue?: boolean } = {}) {
+    const actorUserId = options.actorUserId ?? ME;
+    const mayIssue = options.mayIssue ?? true;
     return {
       from: vi.fn((table: string) => {
         switch (table) {
@@ -665,9 +662,14 @@ describe("Card 04 · GET /purchasing/requests — lineage, item words, PO duty",
             return tableStub([]);
         }
       }),
-      rpc: vi.fn().mockResolvedValue({
-        data: { normal_user_id: ME, acting_user_id: null, actor_user_id: ME },
-        error: null,
+      rpc: vi.fn((fn: string) => {
+        if (fn === "purchasing_actor_may_issue") {
+          return Promise.resolve({ data: mayIssue, error: null });
+        }
+        return Promise.resolve({
+          data: { normal_user_id: actorUserId, acting_user_id: null, actor_user_id: actorUserId },
+          error: null,
+        });
       }),
     } as unknown as ReturnType<typeof userClient>;
   }
@@ -701,6 +703,46 @@ describe("Card 04 · GET /purchasing/requests — lineage, item words, PO duty",
     expect(body.poDutyUnavailable).toBe(false);
     expect(body.currentPoDuty).toEqual({ userId: ME, name: "Shasha" });
     expect(body.mayIssue).toBe(true);
+  });
+
+  it("offers Issue PO to the governed Operations Superuser while another person holds PO duty", async () => {
+    vi.mocked(userClient).mockReturnValue(
+      makeSbCard04({
+        actorUserId: "11111111-1111-1111-1111-000000000888",
+        mayIssue: true,
+      }),
+    );
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("https://api.test/api/operation/purchasing/requests", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env as never,
+      { waitUntil() {}, passThroughException() {} } as never,
+    );
+
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { mayIssue: boolean }).mayIssue).toBe(true);
+  });
+
+  it("does not offer Issue PO to an ordinary non-duty user", async () => {
+    vi.mocked(userClient).mockReturnValue(
+      makeSbCard04({
+        actorUserId: "11111111-1111-1111-1111-000000000888",
+        mayIssue: false,
+      }),
+    );
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("https://api.test/api/operation/purchasing/requests", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env as never,
+      { waitUntil() {}, passThroughException() {} } as never,
+    );
+
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { mayIssue: boolean }).mayIssue).toBe(false);
   });
 });
 

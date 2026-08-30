@@ -95,7 +95,6 @@ function renderWorkspace(documents: SoBatchDocument[] = [doc()]) {
     <SoBatchIssueWorkspace
       documents={documents}
       destinations={[KLANG, BULOH]}
-      procurementPartners={[{ id: "p-nets", name: "NETS" }]}
       onBack={onBack}
       onDone={onDone}
     />,
@@ -138,36 +137,6 @@ function issueBody() {
 /** The issue succeeds and creates nothing this test looks at. */
 const issuesOk = () =>
   stubReads((path) => (path.includes("issue-batch") ? { ok: true, pos: [] } : undefined));
-
-/**
- * A MANAGER'S STANDING APPROVAL for one exception (0380). PO Duty cannot write
- * one for itself, so a changed price or a Free of Charge cannot be issued until
- * this exists.
- */
-function withApproval(a: {
-  sku: string;
-  treatment: "hand_entered" | "free_of_charge";
-  unitCost?: number | null;
-  approvedBy?: string;
-}) {
-  stubReads((path) => {
-    if (path.includes("/cost-approvals")) {
-      return {
-        approvals: [
-          {
-            sku: a.sku,
-            treatment: a.treatment,
-            unitCost: a.unitCost ?? null,
-            approvedBy: a.approvedBy ?? "Jess",
-            expiresOn: null,
-          },
-        ],
-      };
-    }
-    if (path.includes("issue-batch")) return { ok: true, pos: [] };
-    return undefined;
-  });
-}
 
 beforeEach(() => {
   onBack.mockClear();
@@ -486,247 +455,46 @@ describe("Issue PO stays open until the PDF actually reaches the supplier", () =
 });
 
 
-/**
- * THE GOVERNED DOCUMENT DECISIONS (Card §5.2, §7.3).
- *
- * The left side is the ONLY editable issue surface, so every commercial fact a
- * purchase order needs has to be settleable HERE. An operator who meets
- * `cost_required` or `pickup_partner_required` must be able to fix it without
- * leaving the journey — an error message is not a control.
- */
-const noCost = doc({
-  lines: [
-    {
-      demandId: "build::o9::b9", orderId: "o9", so: 1399, item: "Orphan",
-      variant: "King", skus: ["X-NEW-K"], qty: 1, goodsMustArrive: "2026-09-01",
-      issueRef: { proposalKey: "s-hooka::mattress", buildKey: "b9" },
-      parts: [{ sku: "X-NEW-K", qty: 1, unitCost: null }],
-    },
-  ],
-});
+const fixedPickup = {
+  ...doc({ supplierKind: "factory_pickup" }),
+  supplierName: "Nice Future",
+  supplierCollection: {
+    procurementPartnerId: "p-nets",
+    procurementPartnerName: "NETS",
+    fixedDestinationId: KLANG.id,
+  },
+} as SoBatchDocument;
 
-const pickup = doc({ supplierKind: "factory_pickup" });
-
-describe("Transaction Cost, or Free of Charge with a reason", () => {
-  it("shows the Catalog price it already has, and does not ask again", () => {
+describe("the issue review only reviews the purchase order", () => {
+  it("does not become a second cost-maintenance screen", () => {
     renderWorkspace();
-    const cost = screen.getByTestId("so-batch-cost-B1201S-K") as HTMLInputElement;
-    expect(cost.value).toBe("100");
+    expect(screen.queryByText("Transaction cost", { exact: false })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Free of Charge" })).not.toBeInTheDocument();
+  });
+
+  it("shows the governed collection rule as a fact instead of asking who collects", () => {
+    renderWorkspace([fixedPickup]);
+    expect(screen.getByText("NETS collects from Nice Future and delivers to Carres Klang.")).toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "Procurement partner" })).not.toBeInTheDocument();
     expect(screen.getByTestId("so-batch-issue-create")).toBeEnabled();
   });
 
-  it("a SKU Catalog has no price for BLOCKS the issue until somebody states one", () => {
-    renderWorkspace([noCost]);
-    expect(screen.getByTestId("so-batch-issue-create")).toBeDisabled();
-    const blocker = screen.getByTestId("so-batch-issue-blocker");
-    /* ⭐ THE TWO LINES (closure §9): the fact, then the act. */
-    expect(blocker).toHaveTextContent("X-NEW-K has no transaction cost.");
-    expect(blocker).toHaveTextContent("Type the agreed cost of X-NEW-K");
-  });
-
-  /**
-   * ⭐ A TYPED PRICE IS A COMMERCIAL EXCEPTION (0380; closure §2).
-   *
-   * PO Duty could type any Transaction Cost and issue it on its own word.
-   * Operations executes the buy; it does not decide what Carres agrees to pay,
-   * so the button stays shut until somebody else has approved the number — and
-   * the surface says whose approval is missing rather than waiting to refuse.
-   */
-  it("a typed cost still waits for a manager, and says so", () => {
-    renderWorkspace([noCost]);
-    fireEvent.change(screen.getByTestId("so-batch-cost-X-NEW-K"), {
-      target: { value: "480" },
-    });
-    expect(screen.getByTestId("so-batch-issue-create")).toBeDisabled();
-    const hint = screen.getByTestId("so-batch-needs-approval-X-NEW-K");
-    expect(hint).toHaveTextContent("This is not the Catalog price.");
-    expect(hint).toHaveTextContent("Ask a manager to approve this price for Hooka.");
-    const blocker = screen.getByTestId("so-batch-issue-blocker");
-    expect(blocker).toHaveTextContent("Nobody approved this price for X-NEW-K.");
-  });
-
-  it("an approved typed cost unblocks it, names the approver, and rides as hand-entered", async () => {
-    withApproval({ sku: "X-NEW-K", treatment: "hand_entered", unitCost: 480, approvedBy: "Jess" });
-    renderWorkspace([noCost]);
-    fireEvent.change(screen.getByTestId("so-batch-cost-X-NEW-K"), {
-      target: { value: "480" },
-    });
-    await waitFor(() =>
-      expect(screen.getByTestId("so-batch-approved-X-NEW-K")).toHaveTextContent(
-        "Jess approved this price.",
-      ),
-    );
-    expect(screen.getByTestId("so-batch-issue-create")).toBeEnabled();
-    fireEvent.click(screen.getByTestId("so-batch-issue-create"));
-    await waitFor(() => expect(issueBody()).toBeTruthy());
-    const body = issueBody();
-    expect(body.documentDecisions[0].lineDecisions).toEqual([
-      {
-        sku: "X-NEW-K", treatment: "normal", unitCost: 480,
-        costSource: "hand_entered", expectedCatalogCost: null,
-      },
-    ]);
-    // ...and the decision names the exact document it belongs to.
-    expect(body.documentDecisions[0].documentKey).toBe(noCost.key);
-  });
-
-  /**
-   * ⭐ AN UNTOUCHED CATALOG PRICE IS DECLARED TOO (0380; closure §2).
-   *
-   * It used to be OMITTED, on the reasoning that the server would read its own
-   * catalog and stamp it. That WAS the defect: the database then compared the
-   * live value against itself and agreed every time, so a supplier price that
-   * moved between the review and Issue PO was adopted with nobody's approval and
-   * nobody's knowledge. What the operator SAW now travels with the line.
-   */
-  it("an untouched Catalog price is DECLARED, so the server has something to compare", async () => {
-    issuesOk();
-    renderWorkspace();
-    fireEvent.click(screen.getByTestId("so-batch-issue-create"));
-    await waitFor(() => expect(issueBody()).toBeTruthy());
-    expect(issueBody().documentDecisions[0].lineDecisions).toEqual([
-      {
-        sku: "B1201S-K",
-        treatment: "normal",
-        costSource: "catalog",
-        unitCost: 100,
-        expectedCatalogCost: 100,
-      },
-    ]);
-  });
-
-  it("a CHANGED catalog price is sent as hand-entered, never as `catalog`", async () => {
-    withApproval({ sku: "B1201S-K", treatment: "hand_entered", unitCost: 150 });
-    renderWorkspace();
-    fireEvent.change(screen.getByTestId("so-batch-cost-B1201S-K"), {
-      target: { value: "150" },
-    });
-    await waitFor(() => expect(screen.getByTestId("so-batch-issue-create")).toBeEnabled());
-    fireEvent.click(screen.getByTestId("so-batch-issue-create"));
-    await waitFor(() => expect(issueBody()).toBeTruthy());
-    const body = issueBody();
-    expect(body.documentDecisions[0].lineDecisions[0]).toEqual({
-      sku: "B1201S-K", treatment: "normal", unitCost: 150,
-      costSource: "hand_entered",
-      /* The price it was reviewed against — so the server can tell an agreed
-         difference from a supplier moving the price after the operator looked. */
-      expectedCatalogCost: 100,
-    });
-  });
-
-  it("Free of Charge needs a reason, and says so until it has one", () => {
-    renderWorkspace([noCost]);
-    fireEvent.click(screen.getByTestId("so-batch-foc-X-NEW-K"));
+  it("refuses a destination that differs from the governed collection rule", () => {
+    renderWorkspace([{ ...fixedPickup, destinationId: BULOH.id }]);
     expect(screen.getByTestId("so-batch-issue-create")).toBeDisabled();
     expect(screen.getByTestId("so-batch-issue-blocker")).toHaveTextContent(
-      "X-NEW-K is Free of Charge with no reason.",
-    );
-    fireEvent.change(screen.getByTestId("so-batch-foc-reason-X-NEW-K"), {
-      target: { value: "   " },
-    });
-    expect(screen.getByTestId("so-batch-issue-create")).toBeDisabled();
-  });
-
-  /**
-   * ⭐ AND A REASON IS NOT AN APPROVAL (0380; closure §2). PO Duty could mark a
-   * line Free of Charge with only a reason string. Giving goods away is a
-   * commercial decision, so it needs the same approval a changed price needs.
-   */
-  it("Free of Charge with a reason still waits for a manager", () => {
-    renderWorkspace([noCost]);
-    fireEvent.click(screen.getByTestId("so-batch-foc-X-NEW-K"));
-    fireEvent.change(screen.getByTestId("so-batch-foc-reason-X-NEW-K"), {
-      target: { value: "Supplier replacement" },
-    });
-    expect(screen.getByTestId("so-batch-issue-create")).toBeDisabled();
-    expect(screen.getByTestId("so-batch-issue-blocker")).toHaveTextContent(
-      "Nobody approved this price for X-NEW-K.",
+      "Nice Future must be collected to its configured destination.",
     );
   });
 
-  it("an APPROVED Free of Charge rides the request, and asks no price", async () => {
-    withApproval({ sku: "X-NEW-K", treatment: "free_of_charge" });
-    renderWorkspace([noCost]);
-    fireEvent.click(screen.getByTestId("so-batch-foc-X-NEW-K"));
-    fireEvent.change(screen.getByTestId("so-batch-foc-reason-X-NEW-K"), {
-      target: { value: "Supplier replacement" },
-    });
-    expect(screen.queryByTestId("so-batch-cost-X-NEW-K")).not.toBeInTheDocument();
-    await waitFor(() => expect(screen.getByTestId("so-batch-issue-create")).toBeEnabled());
+  it("sends only the selected demand and destination arrangement", async () => {
+    issuesOk();
+    renderWorkspace();
     fireEvent.click(screen.getByTestId("so-batch-issue-create"));
     await waitFor(() => expect(issueBody()).toBeTruthy());
-    expect(issueBody().documentDecisions[0].lineDecisions).toEqual([
-      { sku: "X-NEW-K", treatment: "free_of_charge", reason: "Supplier replacement" },
-    ]);
-  });
-
-  it("a zero or negative cost is not a price", () => {
-    renderWorkspace([noCost]);
-    for (const bad of ["0", "-5"]) {
-      fireEvent.change(screen.getByTestId("so-batch-cost-X-NEW-K"), { target: { value: bad } });
-      expect(screen.getByTestId("so-batch-issue-create"), bad).toBeDisabled();
-    }
+    expect(Object.keys(issueBody())).toEqual(["selections"]);
   });
 });
-
-describe("a factory-pickup document needs its procurement partner", () => {
-  it("blocks the issue until one is chosen, and names what is missing", () => {
-    renderWorkspace([pickup]);
-    expect(screen.getByTestId("so-batch-issue-create")).toBeDisabled();
-    const blocker = screen.getByTestId("so-batch-issue-blocker");
-    expect(blocker).toHaveTextContent("Hooka does not deliver. Nobody is collecting.");
-    expect(blocker).toHaveTextContent("Choose who collects the goods, then issue again.");
-  });
-
-  it("choosing one unblocks it and rides the request", async () => {
-    issuesOk();
-    renderWorkspace([pickup]);
-    fireEvent.change(screen.getByTestId("so-batch-partner"), { target: { value: "p-nets" } });
-    expect(screen.getByTestId("so-batch-issue-create")).toBeEnabled();
-    fireEvent.click(screen.getByTestId("so-batch-issue-create"));
-    await waitFor(() => expect(apiFetch).toHaveBeenCalled());
-    const body = issueBody();
-    expect(body.documentDecisions[0].procurementPartnerId).toBe("p-nets");
-  });
-
-  it("an own-logistics document is offered no partner control at all", () => {
-    renderWorkspace();
-    expect(screen.queryByTestId("so-batch-partner")).not.toBeInTheDocument();
-  });
-
-  it("its partner is null on the wire — never omitted, never smuggled", async () => {
-    issuesOk();
-    renderWorkspace();
-    fireEvent.click(screen.getByTestId("so-batch-issue-create"));
-    await waitFor(() => expect(apiFetch).toHaveBeenCalled());
-    const body = issueBody();
-    expect(body.documentDecisions[0].procurementPartnerId).toBeNull();
-  });
-});
-
-describe("a decision is sent for EVERY document, not just the one on screen", () => {
-  it("two documents produce two decisions, each keyed to its own pair", async () => {
-    issuesOk();
-    renderWorkspace([doc(), SECOND]);
-    fireEvent.click(screen.getByTestId("so-batch-issue-create"));
-    await waitFor(() => expect(apiFetch).toHaveBeenCalled());
-    const body = issueBody();
-    expect(body.documentDecisions).toHaveLength(2);
-    expect(body.documentDecisions.map((d: { supplierId: string }) => d.supplierId)).toEqual([
-      "s-hooka",
-      "s-ohana",
-    ]);
-  });
-
-  it("a blocker on document 2 blocks the batch from document 1's screen", () => {
-    renderWorkspace([doc(), noCost]);
-    expect(screen.getByTestId("so-batch-issue-count")).toHaveTextContent("1 of 2");
-    expect(screen.getByTestId("so-batch-issue-create")).toBeDisabled();
-    // ...and it says which document, so the operator knows where to go.
-    expect(screen.getByTestId("so-batch-issue-blocker")).toHaveTextContent("X-NEW-K");
-  });
-});
-
 
 /**
  * THE RIGHT-HAND SIDE IS THE ACTUAL DOCUMENT (Card §5.2).

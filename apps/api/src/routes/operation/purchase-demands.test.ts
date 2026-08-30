@@ -707,6 +707,43 @@ describe("the guard, and the promise not to write", () => {
  * destinations a buy may be sent to.
  */
 describe("the buying facts SO Batch Purchase needs", () => {
+  it("blocks a missing Catalog cost before Issue review", async () => {
+    const t = TABLES() as unknown as Record<string, { data: unknown; error: unknown }>;
+    const sku = (t.product_skus.data as Record<string, unknown>[]).find(
+      (r) => r.sku === "B1201S-K",
+    )!;
+    sku.cost = null;
+
+    const { rows } = await rowsOf(t);
+    const row = bySku(rows, "B1201S-K")!;
+    expect(row.state).toBe("no_cost");
+    expect(row.issueRef).toBeNull();
+  });
+
+  it("carries the supplier's governed collection rule into the review", async () => {
+    const t = TABLES() as unknown as Record<string, { data: unknown; error: unknown }>;
+    (t.suppliers.data as Record<string, unknown>[])[0]!.kind = "factory_pickup";
+    t.purchasing_supplier_settings = {
+      data: [{
+        supplier_id: NICE,
+        off_days: [0],
+        transit_days: 1,
+        fixed_destination_id: KLANG_DEST,
+        collected_by_partner_id: "p-nets",
+      }],
+      error: null,
+    };
+    t.delivery_partners = { data: [{ id: "p-nets", name: "NETS" }], error: null };
+
+    const { rows } = await rowsOf(t);
+
+    expect(bySku(rows, "B1201S-K")!.supplierCollection).toEqual({
+      procurementPartnerId: "p-nets",
+      procurementPartnerName: "NETS",
+      fixedDestinationId: KLANG_DEST,
+    });
+  });
+
   it("carries the arrival date off the ENGINE — the route subtracts nothing", async () => {
     const { rows } = await rowsOf();
     const ready = bySku(rows, "B1201S-K")!;
