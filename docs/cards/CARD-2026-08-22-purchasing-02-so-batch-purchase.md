@@ -17,6 +17,11 @@ and NOT applied.** Merge, migration order and deployment await the owner's decis
 > normal duty, dated cover and actual actor separately. The current truth lives in
 > `docs/purchasing/MASTER.md` §5.3; this Card does not create a second authority.
 
+> **CURRENT RAIL CORRECTION — OWNER RULING 2026-08-29.** The later experiment that copied
+> `WORK TO DO` actions into the SO Batch Purchase rail is removed. Customer information and Catalog
+> fixes belong to their responsible owner's central Work list, not the Operation buying rail. Any
+> older mock or evidence below showing a local work panel is historical only.
+
 > **For the build agent:** read `CLAUDE.md`, `docs/purchasing/MASTER.md`,
 > `docs/ui/MASTER.md` §§4–4.2 and 6.5–6.7, and the Purchasing section of
 > `docs/COPY-STANDARD.md` first. Use `superpowers:subagent-driven-development` or
@@ -245,14 +250,16 @@ retains source SO/line attribution. Client group keys are hints only; the server
 
 ### 5.1 Selection and review
 
-Selecting ready rows exposes one sticky selection bar:
+Selecting ready rows replaces the Register's top Work Toolbar with one selection bar. It remains
+above the column headings and does not create a second action surface at the bottom of the table:
 
 ```text
 4 selected · 7 units · Issue 3 POs
 ```
 
-`Issue PO` opens the full-screen `Review Purchase Orders` surface and preserves selection and
-allocations.
+The same top bar carries summary · `Clear` · compact PO Duty/cover chip · `Issue PO` on the left;
+valid selection outputs such as `Export Excel` stay at the far right. `Issue PO` opens the
+full-screen `Review Purchase Orders` surface and preserves selection and allocations.
 
 ### 5.2 50% work + 50% live PDF
 

@@ -191,7 +191,7 @@ describe("the whole journey — tick, arrange, issue, prove it arrived", () => {
     await screen.findByTestId("so-batch-row-o1");
 
     fireEvent.click(screen.getByTestId("so-batch-select-o1"));
-    expect(screen.getByTestId("so-batch-selection-bar")).toHaveTextContent(
+    expect(screen.getByTestId("selection-bar")).toHaveTextContent(
       "1 selected · 2 units · Issue 1 PO",
     );
 

@@ -2191,7 +2191,6 @@ export {
   soBatchOrderSupplierNames,
   soBatchRailFacts,
   soBatchRailModel,
-  type SoBatchWorkKey,
   type SoBatchProductCategory,
   type SoBatchRailFilter,
   type SoBatchRailFacts,

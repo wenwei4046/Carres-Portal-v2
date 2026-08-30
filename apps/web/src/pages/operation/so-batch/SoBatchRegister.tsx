@@ -26,7 +26,6 @@ import {
   type SoBatchPurchaseResponse,
   type SoBatchRailFilter,
   type SoBatchSelection,
-  type SoBatchWorkKey,
 } from "@carres/shared";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import { fmtDate } from "@/lib/fmt-date";
@@ -122,7 +121,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
     return m;
   }, [orders, leafsByOrder]);
 
-  /* ── The rail (six sections, one selection per section) ──────────────────
+  /* ── The rail (five fact sections, one selection per section) ───────────
    *
    * The DEFAULT no-filter view shows every proceeded record, Ordered ones
    * included — the Register is permanent. One filter per section; sections
@@ -152,9 +151,6 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
     () => orders.filter((o) => rail.visibleOrderIds.has(o.orderId)),
     [orders, rail.visibleOrderIds],
   );
-  const toggleWork = useCallback((work: SoBatchWorkKey) => {
-    setFilter((prev) => ({ ...prev, work: prev.work === work ? null : work }));
-  }, []);
   const toggleTiming = useCallback((s: PurchaseDemandTimingState) => {
     setFilter((prev) => ({ ...prev, timing: prev.timing === s ? null : s }));
   }, []);
@@ -614,19 +610,6 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
             sections combine, and the fixed rows print their live count, zero
             included. */}
         {filterRailOpen && <FilterRail testId="so-batch-rail" onHide={() => setFilterRailVisible(false)}>
-          <FilterRailGroup title={SO_BATCH_RAIL.work.heading}>
-            {SO_BATCH_RAIL.work.actions.map((action) => (
-              <FilterRailRow
-                key={action.key}
-                active={filter.work === action.key}
-                onClick={() => toggleWork(action.key)}
-                testId={`so-batch-work-${action.key}`}
-                label={action.word}
-                count={rail.workCounts[action.key]}
-                title={`${rail.workCounts[action.key]} ${W.footerUnit} · ${action.word}`}
-              />
-            ))}
-          </FilterRailGroup>
           <FilterRailGroup title={SO_BATCH_RAIL.toOrder.heading}>
             <FilterRailRow
               active={filter.notOrderedOnly}
@@ -766,6 +749,25 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
                   orderSelection(o.orderId).indeterminate,
                 testId: (o: SoBatchOrderRow) => `so-batch-select-${o.orderId}`,
               }}
+              selectionSummary={() => summary.text}
+              selectionPrimary={summary.lines > 0 ? (
+                <span
+                  className="flex shrink-0 items-center gap-2"
+                  data-testid="so-batch-selection-actions"
+                >
+                  <SoBatchPoDutyChip data={data} />
+                  {data.mayIssue ? (
+                    <button
+                      type="button"
+                      data-testid="so-batch-issue"
+                      className="inline-flex h-7 shrink-0 items-center rounded-control bg-kit-blue-9 px-3 text-meta font-medium text-white hover:opacity-90"
+                      onClick={() => onIssue(selections)}
+                    >
+                      {W.issuePo}
+                    </button>
+                  ) : null}
+                </span>
+              ) : null}
               statusSummary={(filtered) => {
                 /* `not ordered` is the RAIL's word for outstanding demand —
                    printing a second, status-based "not ordered" number here
@@ -782,28 +784,6 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
               }}
             />
           </div>
-
-          {summary.lines > 0 ? (
-            <div
-              className="mt-2 flex shrink-0 items-center justify-between gap-3 rounded-control border border-kit-slate-6 bg-white px-3 py-2"
-              data-testid="so-batch-selection-bar"
-            >
-              <span className="truncate text-body">{summary.text}</span>
-              <span className="flex shrink-0 items-center gap-2">
-                <SoBatchPoDutyChip data={data} />
-                {data.mayIssue ? (
-                  <button
-                    type="button"
-                    data-testid="so-batch-issue"
-                    className="inline-flex h-7 shrink-0 items-center rounded-control bg-kit-blue-9 px-3 text-meta font-medium text-white hover:opacity-90"
-                    onClick={() => onIssue(selections)}
-                  >
-                    {W.issuePo}
-                  </button>
-                ) : null}
-              </span>
-            </div>
-          ) : null}
         </div>
       </div>
     </div>

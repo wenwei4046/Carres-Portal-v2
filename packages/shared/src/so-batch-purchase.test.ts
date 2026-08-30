@@ -95,33 +95,17 @@ const sel = (r: PurchaseDemandRow, allocations: DestinationAllocation[]): SoBatc
 });
 
 describe("the rail — latest Owner ruling 2026-08-29", () => {
-  it("starts with the daily WORK TO DO actions, then keeps the five approved fact sections", () => {
+  it("contains only the five purchasing fact sections", () => {
     /* Section ORDER is the object's key order — a reader of this contract
        sees the rail top to bottom. */
     expect(Object.keys(SO_BATCH_RAIL)).toEqual([
-      "work",
       "toOrder",
       "timing",
       "product",
       "supplier",
       "setup",
     ]);
-    expect(SO_BATCH_RAIL.work).toEqual({
-      heading: "WORK TO DO",
-      actions: [
-        { key: "issue_po", word: "Issue PO", states: [
-          "can_order_early",
-          "safety_days_full",
-          "safety_days_low",
-          "safety_days_none",
-          "not_enough_production_time",
-        ] },
-        { key: "ask_customer_date", word: "Ask customer for a delivery date", states: ["no_customer_date"] },
-        { key: "add_sku", word: "Add item to SKU catalog", states: ["no_sku"] },
-        { key: "check_supplier", word: "Check the supplier", states: ["no_supplier"] },
-        { key: "add_production_days", word: "Add production days", states: ["no_production_days"] },
-      ],
-    });
+    expect(SO_BATCH_RAIL).not.toHaveProperty("work");
     expect(SO_BATCH_RAIL.toOrder.heading).toBe("TO ORDER");
     expect(SO_BATCH_RAIL.toOrder.all).toBe("All not ordered");
     expect(SO_BATCH_RAIL.timing.heading).toBe("ORDER TIMING");
@@ -217,8 +201,6 @@ describe("the rail — latest Owner ruling 2026-08-29", () => {
       SO_BATCH_RAIL.supplier.heading,
       SO_BATCH_RAIL.supplier.all,
       SO_BATCH_RAIL.setup.heading,
-      SO_BATCH_RAIL.work.heading,
-      ...SO_BATCH_RAIL.work.actions.map((a) => a.word),
     ].join(" ");
     for (const banned of [
       "Today",
@@ -343,15 +325,8 @@ const model = (over: Partial<SoBatchRailFilter> = {}) =>
   });
 
 describe("the rail model — unique-SO counts that cross-update between sections", () => {
-  it("counts and filters the daily actions by unique Sales Order", () => {
-    const m = model();
-    expect(m.workCounts.issue_po).toBe(2); // oA + oB; oA's duplicate leaf still counts once
-    expect(m.workCounts.ask_customer_date).toBe(0);
-    expect(m.workCounts.add_sku).toBe(0);
-    expect(m.workCounts.check_supplier).toBe(0);
-    expect(m.workCounts.add_production_days).toBe(1); // oD
-    expect([...model({ work: "issue_po" }).visibleOrderIds]).toEqual(["oA", "oB"]);
-    expect([...model({ work: "add_production_days" }).visibleOrderIds]).toEqual(["oD"]);
+  it("does not expose a second local work lens", () => {
+    expect(model()).not.toHaveProperty("workCounts");
   });
 
   it("no filter shows the complete permanent Register, Ordered records included", () => {

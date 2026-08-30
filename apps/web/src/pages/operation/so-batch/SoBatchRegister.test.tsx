@@ -445,7 +445,7 @@ describe("selection — the parent checkbox is ALL eligible child demand", () =>
     expect(screen.queryByTestId("so-batch-po-duty")).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId("so-batch-select-o1"));
 
-    const bar = screen.getByTestId("so-batch-selection-bar");
+    const bar = screen.getByTestId("selection-bar");
     expect(within(bar).getByText("1 selected · 2 units · Issue 1 PO")).toBeVisible();
     expect(within(bar).getByTestId("so-batch-duty-chip")).toHaveTextContent("YJ");
     expect(within(bar).getByTestId("so-batch-duty-chip")).toHaveAttribute(
@@ -454,6 +454,12 @@ describe("selection — the parent checkbox is ALL eligible child demand", () =>
     );
     expect(within(bar).getByTestId("so-batch-issue")).toBeEnabled();
     expect(bar).not.toHaveTextContent("Yu Jun holds PO duty");
+    expect(within(bar).getAllByRole("button").map((button) => button.textContent)).toEqual([
+      "Clear",
+      "Issue PO",
+      "Export Excel (1)",
+    ]);
+    expect(screen.queryByTestId("so-batch-selection-bar")).not.toBeInTheDocument();
   });
 
   it("shows the dated cover as the selected action owner without pretending they hold the month", () => {
@@ -473,7 +479,7 @@ describe("selection — the parent checkbox is ALL eligible child demand", () =>
   it("ticking the parent selects the order's eligible demand and offers the issue", () => {
     renderRegister();
     fireEvent.click(screen.getByTestId("so-batch-select-o1"));
-    expect(screen.getByTestId("so-batch-selection-bar")).toHaveTextContent(
+    expect(screen.getByTestId("selection-bar")).toHaveTextContent(
       "1 selected · 2 units · Issue 1 PO",
     );
     fireEvent.click(screen.getByTestId("so-batch-issue"));
@@ -492,7 +498,7 @@ describe("selection — the parent checkbox is ALL eligible child demand", () =>
     renderRegister();
     fireEvent.click(screen.getByTestId("so-batch-select-o3"));
     /* The leaf's own remainder — 1 unit, never the 2 already on the PO. */
-    expect(screen.getByTestId("so-batch-selection-bar")).toHaveTextContent(
+    expect(screen.getByTestId("selection-bar")).toHaveTextContent(
       "1 selected · 1 unit · Issue 1 PO",
     );
   });
@@ -507,6 +513,7 @@ describe("selection — the parent checkbox is ALL eligible child demand", () =>
     const parent = screen.getByTestId("so-batch-select-o8") as HTMLInputElement;
     expect(parent.checked).toBe(false);
     expect(parent.indeterminate).toBe(true);
+    expect(within(screen.getByTestId("selection-bar")).getByTestId("so-batch-issue")).toBeEnabled();
     /* The other child completes the set. */
     const second = within(box).getAllByRole("checkbox")[1]!;
     fireEvent.click(second);
@@ -520,7 +527,7 @@ describe("selection — the parent checkbox is ALL eligible child demand", () =>
     expect(screen.queryByTestId("so-batch-row-o1")).not.toBeInTheDocument();
     const header = screen.getAllByRole("checkbox")[0]!;
     fireEvent.click(header);
-    expect(screen.queryByTestId("so-batch-selection-bar")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("selection-bar")).not.toBeInTheDocument();
   });
 });
 
@@ -580,7 +587,7 @@ describe("the rail — Card 02-A wording, Card 02-B counting", () => {
   });
 });
 
-describe("the rail — six readable sections, navigation not selection", () => {
+describe("the rail — five purchasing fact sections, navigation not selection", () => {
   const rail = () => screen.getByTestId("so-batch-rail");
 
   it("hides completely, reopens from the Register toolbar, and remembers the choice", () => {
@@ -598,19 +605,14 @@ describe("the rail — six readable sections, navigation not selection", () => {
     expect(localStorage.getItem("carres.soBatchPurchase.filters.open")).toBe("1");
   });
 
-  it("renders WORK TO DO first, followed by the five fact sections", () => {
+  it("renders only the five purchasing fact sections", () => {
     renderRegister();
     const text = rail().textContent ?? "";
-    const order = ["WORK TO DO", "TO ORDER", "ORDER TIMING", "PRODUCT", "SUPPLIER", "SETUP TO FIX"];
+    const order = ["TO ORDER", "ORDER TIMING", "PRODUCT", "SUPPLIER", "SETUP TO FIX"];
     const positions = order.map((h) => text.indexOf(h));
     expect(positions.every((p) => p >= 0)).toBe(true);
     expect([...positions].sort((a, b) => a - b)).toEqual(positions);
     for (const word of [
-      "Issue PO",
-      "Ask customer for a delivery date",
-      "Add item to SKU catalog",
-      "Check the supplier",
-      "Add production days",
       "All not ordered",
       "Can order early",
       "14 safety days left",
@@ -626,21 +628,17 @@ describe("the rail — six readable sections, navigation not selection", () => {
     ]) {
       expect(text, word).toContain(word);
     }
+    expect(text).not.toContain("WORK TO DO");
+    expect(text).not.toContain("Ask customer for a delivery date");
     /* The retired wording never returns. */
     expect(text).not.toContain("Not enough production time");
     expect(text).not.toContain("Production time not set");
   });
 
-  it("WORK TO DO shows the daily action counts and filters the Register", () => {
+  it("does not expose central Work actions as local rail filters", () => {
     renderRegister();
-    const issue = screen.getByTestId("so-batch-work-issue_po");
-    expect(issue.textContent).toContain("3"); // o1 · o3 · o8, never o8's two leafs
-    fireEvent.click(issue);
-    expect(screen.getByTestId("so-batch-row-o1")).toBeInTheDocument();
-    expect(screen.getByTestId("so-batch-row-o3")).toBeInTheDocument();
-    expect(screen.getByTestId("so-batch-row-o8")).toBeInTheDocument();
-    expect(screen.queryByTestId("so-batch-row-o4")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("so-batch-row-o5")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("so-batch-work-issue_po")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("so-batch-work-ask_customer_date")).not.toBeInTheDocument();
   });
 
   it("all five timing rows stay visible, and an empty band prints 0, not silence", () => {
@@ -876,7 +874,7 @@ describe("the arrangement on the parent row", () => {
     const select = screen.getByTestId("so-batch-deliver-to-select-o8");
     fireEvent.change(select, { target: { value: BULOH } });
     /* Arranging TICKS — both leafs are now selected for Sungai Buloh. */
-    expect(screen.getByTestId("so-batch-selection-bar")).toHaveTextContent(
+    expect(screen.getByTestId("selection-bar")).toHaveTextContent(
       "2 selected · 2 units",
     );
     fireEvent.click(screen.getByTestId("so-batch-issue"));
@@ -898,7 +896,7 @@ describe("the arrangement on the parent row", () => {
       target: { value: "1" },
     });
     fireEvent.click(within(box).getByTestId("so-batch-split-apply-build::o1::b1"));
-    expect(screen.getByTestId("so-batch-selection-bar")).toHaveTextContent(
+    expect(screen.getByTestId("selection-bar")).toHaveTextContent(
       "1 selected · 2 units · Issue 2 POs",
     );
   });

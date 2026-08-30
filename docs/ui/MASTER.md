@@ -661,9 +661,11 @@ directory only and said so.*
 - **My Work is the default for every employee, including a manager** (Owner-approved Purchasing →
   Receiving work model, 2026-08-29). Authority does not erase personal work. `Team Work` is the
   explicit supervision view over the same set, never the manager's automatic landing replacement.
-- A module-local **`WORK TO DO` first rail panel is a contextual filter** over that module's same
-  governed actions. It may narrow the Register and deep-link to the owning write door; it may not
-  persist a second task row, calculate another owner/due date or expose manual `Done`.
+- **Work stays in `My Work` / `Team Work`; a Register kit must not add a generic local
+  `WORK TO DO` rail panel.** Module rails contain only that Register's approved factual filters.
+  A future exception requires an explicit Owner ruling naming the action owner and write door; a
+  UI kit or page author may never infer one from available action data. SO Batch Purchase has no
+  local work panel.
 - A Current Action or Work row uses two visual lines when both fact and action are needed.
   **Line 1** is the fact/problem in governed body size and medium/semibold emphasis. **Line 2**
   is the next action in the governed smaller supporting size, regular weight and quieter but
@@ -948,14 +950,16 @@ row of pills. Header-column filters remain the direct per-column filter door; th
 add a duplicate generic Filters button. `Reset layout` remains inside Columns.
 
 Selecting rows **replaces** the normal Toolbar within the same 45px height; it never adds a third
-permanent band. Left = truthful selected count + Clear. Right = only actions valid for that exact
-selection. A one-record action disappears for multi-selection rather than pretending to apply to
-many. Normal and selection states preserve the table's position and width.
+permanent band. Left = truthful selected count + Clear + the primary work action and any structured
+owner context it needs. Right = outputs such as Export, followed only by secondary actions valid for
+that exact selection. A one-record action disappears for multi-selection rather than pretending to
+apply to many. Normal and selection states preserve the table's position and width.
 
 On SO Batch Purchase, PO Duty ownership is shown only beside the selected `Issue PO` action as one
 compact initials avatar chip (`YJ`, or the current dated cover), with full identity and duty context
 in title/accessible name. There is no permanent PO Duty toolbar/rail block and no owner repetition
-on rows. The chip states work ownership; it does not imply that the current actor is the owner.
+on rows. The left-side order is summary · Clear · owner chip · `Issue PO`; `Export Excel` stays at
+the far right. The chip states work ownership; it does not imply that the current actor is the owner.
 
 **REGISTER EXPORT AND OVERFLOW ROUTING — APPROVED / LOCKED (Loo, 2026-08-11).** A Register uses
 one visible `Export ▾` control for its supported current-view outputs: Excel · PDF · Print. Output
