@@ -59,8 +59,10 @@ There are not two genuine Carres operating models.
 - A person starts a non-SO buy in `Manual Purchase`; approval creates the same governed purchase
   demand truth.
 - There is no `Emergency`, `Urgent` or `Unknown` Manual Purchase purpose, question, queue or special
-  PO door. `Needed By` carries the required date; it never bypasses quantity, Catalog, supplier,
-  destination, approval, PO issuance or History.
+  PO door. Manual Purchase carries `Proceed Date` and `Delivery Date`: Proceed Date is the actual
+  successful request hand-off; Delivery Date is when the supplier's goods must reach `Deliver To`.
+  Settings lead days derive `Order By`; none bypass quantity, Catalog, supplier, destination,
+  approval, PO issuance or History.
 - Every approved demand reaches the same PO issuance authority. Sales, Warehouse and the requester
   cannot mark goods as ordered.
 - `purchase_demand` remains the canonical line-level need and coverage remainder, but it is not a
@@ -483,11 +485,14 @@ missing quantity. Sales Orders only displays the risk.
 
 ```text
 Staff selects purpose
-→ enters goods, quantity, required date, Deliver To and reason
+→ enters goods, quantity and Deliver To
+→ Catalog resolves supplier/category and Settings resolves production + transit days
+→ server previews Proceed Date and defaults Delivery Date from the slowest selected line
+→ Delivery Date minus those same lead days derives each line's Order By
 → Catalog/supplier/price authority checks
 → governed approver approves or rejects
 → approved record creates purchase_demand
-→ an authorised issuer uses the same PO path as SO Batch Purchase
+→ an authorised issuer uses the same PO path; Manual grouping keeps Delivery Date distinct
 → the same Receiving engine handles physical arrival
 ```
 
@@ -745,8 +750,9 @@ SETUP TO FIX              ← the whole section renders only when at least one a
   vertically as supplier names grow; at narrow desktop widths the Register scrolls
   horizontally and the rail is never squeezed below 240px. The shell/group/row grammar is
   the shared `FilterRail` component (`workspace-rail.tsx`). Manual Purchase imports the
-  same shell, grammar, Product authority and unique-object count rule (§9.2, Card 03) —
-  never `ORDER TIMING`, Safety-days arithmetic or the SO-specific `All not ordered` meaning.
+  same shell, grammar, daily-work lens, Product authority and unique-object count rule (§9.2,
+  Card 06). Its `ORDER TIMING` reads Manual `Order By`; it never imports SO Safety-days arithmetic
+  or the SO-specific meaning of `All not ordered`.
 - **The rail may hide completely.** Its top-right `Hide filters` control uses the same governed
   panel-left icon grammar as the Portal sidebar. While hidden it does not become a 60px icon rail;
   the Register takes the width and its toolbar exposes `Show filters`. The choice is remembered for
@@ -902,21 +908,31 @@ blank `SO NO`.
 `Subsidiary Purchase` · `Other Purchase` (Card 04, 2026-08-29 — only `Other Purchase`
 asks `What is this for?`).
 
-**Left rail — APPROVED / LOCKED, owner ruling 2026-08-28 (Card 03); BUILT, PR #973,
-production-verified on `4c8aa6d5` 2026-08-28.** The vocabulary's applied door authority is
+**Left rail — OWNER-CORRECTED 2026-08-29 (Card 06 supersedes Card 03's four-section
+shape; Card 03 remains the shipped shell/count history).** The vocabulary's applied door authority is
 migration 0399 (2026-08-28), widened by 0401 (Card 04) with `other_purchase`; the sixth
 rail row arrives through the one shared `DEMAND_PURPOSES` list, so the rail and the doors
 cannot drift. The shared 240px
 `FilterRail` shell Card 02-C built — same group-heading typography and spacing, same blue
 `NavRow` active treatment, no checkboxes, labels wrap and never truncate, counts visible and
 right-aligned, rail scrolls vertically, Register scrolls horizontally when narrow and the
-rail is never squeezed below 240px. Four sections, in this exact order:
+rail is never squeezed below 240px. Seven sections, in this exact order:
 
 ```text
+WORK TO DO
+  Approve purchase
+  Issue PO
+  Check the supplier
+  Add production days
+  Add transit days
+
 TO ORDER
   All not ordered
-  Need approval
-  Ready to order
+
+ORDER TIMING
+  Can order early
+  Order date reached
+  Order date passed
 
 PURCHASE PURPOSE
   All purposes
@@ -936,28 +952,43 @@ PRODUCT
 SUPPLIER
   All suppliers
   [actual supplier names, dynamic and alphabetical — never hardcoded]
+
+SETUP TO FIX
+  Production days not set
+  Transit days not set
 ```
 
 - The default no-filter Register is the permanent Manual Purchase listing, ordered history
   included. Counts are UNIQUE Manual Purchase requests, cross-computed against the other
   selected sections. One filter per section; sections combine with AND; each `All …` row
   clears only its own section; a second click on the active row clears it.
-- The three `TO ORDER` rows are DERIVED request truth, never a stored status:
-  `All not ordered` = live quantity not yet fully issued to a PO (fully ordered requests
-  leave it but stay searchable in the Register); `Need approval` = submitted, awaiting the
-  configured approver's decision; `Ready to order` = approved remainder available for PO
-  Duty to issue.
+- `WORK TO DO` is a local action lens over central Work's same stable action identities, not a
+  second queue. All five rows remain visible with zero. `Approve purchase` is submitted and
+  undecided approval; `Issue PO` is approved remaining demand; the other three name the exact
+  Catalog/Settings repair. `Need approval` and `Ready to order` retire from `TO ORDER` because
+  their capability has moved to these concrete action rows without duplication.
+- Everyone permitted to read Manual Purchase may use these rows as filters. The filtered
+  Register/object names the real action owner; a filter never grants approval or PO authority.
+- `All not ordered` = live quantity not yet fully issued to a PO. Fully ordered requests leave
+  this filter but stay searchable in the permanent Register.
+- `ORDER TIMING` reads the request's earliest calculated `Order By`: today before it =
+  `Can order early`; today equals it = `Order date reached`; today after it =
+  `Order date passed`. These are filters and facts, not permission gates; an authorised issuer
+  may buy early.
+- `SETUP TO FIX` renders only when an affected request exists. `Production days not set` and
+  `Transit days not set` state the configuration fact; their owning actions and Settings links
+  live in `WORK TO DO`. The engine never invents a date.
 - Product is the authoritative Catalog category — never SKU text or a browser-only mapping.
   Supplier is the demand line's Catalog-derived supplier (plus identical PO lineage) —
   derived, never selected by Operation; actual names only, alphabetical; the selected
   supplier stays visible with `0`.
 - **Banned rail rows, never to return:** `Supplier not selected` · `No supplier` ·
   `Not in catalog` · `Need price` · `Ordered` · `Part received` · `Received` · `Arrived` ·
-  `Cancelled` · `My drafts` · `Need correction` · `Queues` · `ORDER TIMING` · safety-days
-  rows. A missing SKU or supplier is named inside the affected request and handled through
+  `Cancelled` · `My drafts` · `Need correction` · `Queues` · safety-days rows. A missing SKU or
+  supplier is named inside the affected request and handled through
   its owning Catalog boundary; it never becomes a permanent rail facet. Price is not a rail
   state or filter.
-- The rail says `Need approval`; the Register/object shows the real action owner's name —
+- The rail says `Approve purchase`; the Register/object shows the real action owner's name —
   the governed sentence `{name} approves` beside `Waiting for approval`, naming the resolved
   `ops_manager` duty holder(s); a robot or shared-password login never prints while a named
   person holds the duty; nothing resolved prints nothing.
@@ -989,12 +1020,26 @@ Orders (`register/DataGrid`, `appearance="reference"`, 36px header / 38px rows /
 footer, sticky Manual Purchase identity, horizontal scroll that never squeezes the 240px
 rail). The default population is the COMPLETE permanent history, ordered records included —
 `All not ordered` stays an explicit rail filter, never a silent default. Default order:
-newest `Requested Date` (`created_at`) first.
+newest `Proceed Date` (`created_at`) first. A work/timing lens sorts earliest calculated
+`Order By` first, then newest Proceed Date.
 
-**Columns, exactly and in this order:** Requested Date · Approval Status · Manual Purchase
-No · PO No · Needed By · For · Items · Qty · Supplier · Deliver To · Requested By.
+**Columns, exactly and in this order — owner correction 2026-08-29 (Card 06):** Proceed Date ·
+Approval Status · Manual Purchase No · PO No · Delivery Date · For · Items · Qty · Supplier ·
+Deliver To · Requested By.
 
-- `Requested Date` is the actual `created_at` — never Needed By, approval or PO date.
+- `Proceed Date` is the Malaysia date of the successful `Send for approval` header transaction,
+  projected from the actual `created_at`. It is immutable and never approval date, PO issue date,
+  Delivery Date or calculated Order By.
+- `Delivery Date` is `purchase_requests.required_by`: when supplier goods must reach `Deliver To`,
+  not a customer promise or physical receipt time. With complete Catalog/Settings, the create form
+  defaults it to the latest `expectedArrivalOf(Settings, Proceed Date)` across selected lines.
+  Staff may move it; the engine never silently overwrites a chosen value.
+- `Order By` is derived for every line by walking Delivery Date backwards through supplier transit
+  days on the Office calendar and Supplier × Category production days on that supplier's calendar.
+  One request uses the earliest line result. It drives timing/work and the optional quiet
+  `Order by {date}` second line; it is not another parent column or stored date.
+- Manual Purchase does not subtract SO Safety days; Delivery Date is already goods arrival at
+  Carres. Missing production/transit Settings produce no default or Order By.
 - `Approval Status` is the approval FACT (`Need approval` · `Approved` · `Refused` ·
   `No approval needed`); while approval is needed a quiet second line names the real
   configured approver — `{name} approves` (Card 03 §3's arithmetic).
@@ -1017,8 +1062,8 @@ No · PO No · Needed By · For · Items · Qty · Supplier · Deliver To · Req
   the governed destination, `Multiple` when several. `Requested By` is the real staff
   name — never a shared account, role, email or `(you)`.
 - **Purpose is NOT a parent column** — it lives in the rail, the expansion context and
-  the object. Banned parent columns, never to return: `Purchase Purpose` · `ORDER
-  TIMING` · `Order late` · `Need price` · `Part received` · `Received` · `Arrived` ·
+  the object. Banned parent columns, never to return: `Purchase Purpose` · `Order late` ·
+  `Need price` · `Part received` · `Received` · `Arrived` ·
   `Work` · `Next action` · `Reason` · `Remark` · `Price` · a permanent PO Duty ·
   row action buttons.
 
@@ -1034,9 +1079,11 @@ live remaining quantity take the tick. With no selection there is NO PO Duty blo
 initials or reminder anywhere on the page; with a selection, PO Duty appears once beside
 the one issue action — `{n} selected · {u} unit(s) · Issue {p} PO(s)`, the resolved
 person, `Issue PO` — where the PO count is the same document partition the issue door
-groups by (supplier × category × destination × purpose, merged across requests). Work
-ownership and reminders stay in central `Work`; issuance authority remains the one
-`purchasing_issue_pos_batch` door.
+groups by (supplier × category × destination × purpose × Manual Delivery Date, merged across
+requests only when every fact matches). One PO has one official supplier-facing Delivery Date;
+different dates therefore report and create different POs. The issued PO saves the approved
+Manual Delivery Date instead of recomputing an ETA from issue day. Work ownership and reminders
+stay in central `Work`; issuance authority remains the one `purchasing_issue_pos_batch` door.
 
 **THE OBJECT DETAIL — APPROVED / LOCKED, Card 05 (2026-08-29); PRODUCTION-VERIFIED on
 `a43de3b7` 2026-08-29** (PR #984; no migration; walked authenticated on the live
@@ -1059,8 +1106,11 @@ Sections + History template. No tabs, no drawer, no split preview, no PDF and no
   state pill (`manualPurchaseStatusOf`); the filtered Register position `{n} of {m}` with
   keyboard-operable previous/next when the object is in the filtered list. No duplicate Back,
   page title, pseudo-tab, breadcrumb or PDF action; no new edit/delete/undo/take-back door.
-- **Request** — `Requested Date · Needed By · Need for · For · Deliver To · Requested By`, in
-  that reading order. `Requested By` is the real individual resolved server-side; a
+- **Request** — `Proceed Date · Delivery Date · Need for · For · Deliver To · Requested By`, in
+  that reading order. Proceed Date is the actual successful request hand-off; Delivery Date is
+  supplier-goods arrival at Deliver To. With a complete plan, a quiet second line reads
+  `Order by {date}`; if passed, the fact first states `Order date passed`. `Requested By` is the
+  real individual resolved server-side; a
   shared-account record reads `Staff identity not recorded` — a person is never invented. A
   pre-Card-04 stored reason stays visible under the historical `Why`.
 - **Items Requested** — read-only `SKU · Item · Supplier · Requested Qty · Deliver To · Note`;
@@ -1101,14 +1151,17 @@ Sections + History template. No tabs, no drawer, no split preview, no PDF and no
   approver) · `no_purchase_approver` · `already_decided` · `reason_required` ·
   `invalid_cut_qty` · `decision_not_recorded` — never raw PostgreSQL text, `forbidden`, a
   role or an email.
-- **Work Engine boundary** — the object preserves the structured facts central Work needs
-  (source MPR, undecided-approval trigger, `ops_manager` owner rule, real actor and times) and
-  builds no local pseudo-task, deadline, `Late` label, queue or worklist; the governed
-  approval due/cover remains a later Work Card.
+- **Work Engine boundary — owner-corrected by Card 06:** undecided approval supplies
+  `Approve {MPR}` to the configured real approver, due no later than Order By and completed only by
+  the stored decision. Approved remaining demand supplies `Issue the purchase order for {MPR}` to
+  normal PO Duty/cover (Operations Superusers may act), due on Order By and completed only when the
+  current PO version has confirmed-sent evidence. Both deep-link the exact source; the local
+  `WORK TO DO` rail filters these same identities and never becomes a second queue or manual Done.
 
 **Journey:** `+ Manual Purchase` → choose plain-language purpose → name the purpose's
-structured For object → enter goods/quantity/date/destination → system resolves
-Catalog/supplier/approval → approved demand goes to PO Duty.
+structured For object → enter goods/quantity/destination → system previews Proceed Date and
+defaults Delivery Date from Settings → Send records actual Proceed Date → approval → approved
+demand goes to PO Duty by Order By.
 **Exceptions:** duplicate stock, missing quantity/date/destination, unapproved price,
 missing governed Catalog/supplier relationship, refused/withdrawn request.
 **Connections:** Catalog, Stock planning, Display Request, Purchase Demand, PO, Service Case.
@@ -1265,6 +1318,8 @@ invoice/settlement.
 
 | Trigger | Owner rule | Action example | Completion fact |
 |---|---|---|---|
+| Manual Purchase awaits decision; due no later than its Order By | Configured real purchase approver | `Approve MPR-20260829-2779` | Stored approval or refusal with actual actor/time exists |
+| Approved Manual Purchase has remaining demand; due on its Order By | Normal PO Duty/cover; Operations Superuser may act | `Issue the purchase order for MPR-20260829-2779` | Current PO version has confirmed-sent evidence and actual actor |
 | Approved demand ready | Normal PO Duty/cover; Operations Superuser may act | `Issue the purchase order to Hooka` | Current PDF version sent, outbound fact and actual actor exist |
 | Supplier date missing | Normal PO Duty/cover; Operations Superuser may act | `Ask Hooka for the delivery date` | Actual supplier answer, channel, evidence, recorder and times exist on the exact PO |
 | Arrival due next Office work day | Normal PO Duty/cover; Operations Superuser may act | `Confirm Hooka's Fri, 28 Aug arrival` | Actual supplier answer/date, channel, evidence, recorder and times exist on the exact PO |

@@ -739,10 +739,12 @@ a word this Register may use. **Retired from the SO Batch Purchase rail, never t
 | The page's create button | `+ Manual Purchase` |
 | The create workspace title | `New Manual Purchase` |
 | Submit · abandon | `Send for approval` · `Cancel` |
-| The disabled Send NAMES its gap (the Receiving button law; first missing header fact wins, top-to-bottom) | `Send — pick a date` · `Send — pick the Service Case` · `Send — pick the staff member` · `Send — name the subsidiary` · `Send — say what it is for` |
-| The form's fields | `Need for` · `Needed by` · `Deliver to` · `Raised by` · `Items` · `Qty` · `Note` · `Supplier` · `+ Add line` · `Remove` — plus the per-purpose For field: `Service Case` · `Staff member` · `Subsidiary` · `What is this for?` (Other Purchase only; routine purposes ask no duplicate `Why` — the historical `Why` label survives on pre-Card-04 objects only) |
+| The disabled Send NAMES its gap (the Receiving button law; first missing header fact wins, top-to-bottom) | `Send — lead days are not set` · `Send — pick a date` · `Send — pick the Service Case` · `Send — pick the staff member` · `Send — name the subsidiary` · `Send — say what it is for` |
+| The form's fields | `Need for` · `Proceed Date` (read-only server preview before Send; actual server hand-off after Send) · `Delivery Date` · `Deliver to` · `Raised by` · `Items` · `Qty` · `Note` · `Supplier` · `+ Add line` · `Remove` — plus the per-purpose For field: `Service Case` · `Staff member` · `Subsidiary` · `What is this for?` (Other Purchase only; routine purposes ask no duplicate `Why` — the historical `Why` label survives on pre-Card-04 objects only) |
 | The already-have block | `WHAT WE ALREADY HAVE` — `free stock` · `already on PO` · `still needed` (the arithmetic is PRINTED, never left to the reader) |
-| The register columns — Card 04 (2026-08-29), exactly and in this order | `Requested Date` · `Approval Status` · `Manual Purchase No` · `PO No` · `Needed By` · `For` · `Items` · `Qty` · `Supplier` · `Deliver To` · `Requested By` — Purpose is NOT a parent column |
+| The register columns — Card 06 owner correction (2026-08-29), exactly and in this order | `Proceed Date` · `Approval Status` · `Manual Purchase No` · `PO No` · `Delivery Date` · `For` · `Items` · `Qty` · `Supplier` · `Deliver To` · `Requested By` — Purpose and Order By are NOT parent columns |
+| Manual date planning | `Proceed Date` is the actual request hand-off. `Delivery Date` defaults from the slowest selected line's Supplier × Category production days + supplier transit days. `Order by {date}` is derived by walking the same lead days backwards; the earliest line governs the request. Never apply SO Safety days. |
+| Missing lead facts | `Production days are not set` → `Add production days for {supplier} · {category} in Settings`; `Transit days are not set` → `Add transit days for {supplier} in Settings`; disabled Send: `Send — lead days are not set`. |
 | The Approval Status facts | `Need approval` · `Approved` · `Refused` · `No approval needed` — with the quiet `{name} approves` second line only while approval is needed |
 | The deterministic summaries | `Not ordered yet` · the one PO number · `{n} POs` — `{first item} + {n} more` — `{n} suppliers` — `Multiple` (several destinations) |
 | The expansion's child columns (read-only) | `SKU` · `Item` · `Requested Qty` · `Approved Qty` · `Ordered Qty` · `Still To Order` · `Supplier` · `Deliver To` · `PO No` |
@@ -751,10 +753,11 @@ a word this Register may use. **Retired from the SO Batch Purchase rail, never t
 | The purpose choices — owner rulings 2026-08-28 (Card 03) / 2026-08-29 (Card 04), exactly and in this order | `Ready Stock` · `Showroom Display` · `Service Case` · `Internal Staff Purchase` · `Subsidiary Purchase` · `Other Purchase` — Management is included under `Internal Staff Purchase`; there is no `Management Purchase`; only `Other Purchase` asks `What is this for?` |
 | Retired purpose words — history only, never offered, never relabelled | `Display` · `Warranty` · `Office` · `Spare Parts` — a pre-ruling row keeps printing the word it was actually asked as; the doors refuse these values for a new request |
 | The number series | `MPR-YYYYMMDD-RRRR` (never `PR-` — that can be mistaken for Purchase Return) |
+| Manual PO grouping | `Issue {p} PO(s)` counts Supplier × Category × Deliver To × Purpose × Delivery Date. Different Delivery Dates create different POs; each PO keeps that approved `PO Delivery Date`. |
 | The register's empty state | `No Manual Purchase yet.` |
 | The Object Detail sections — Card 05 (2026-08-29), exactly and in this order | `Request` · `Items Requested` · `What We Already Have` · `Approval` · `Purchase Orders` · `History` — one full-width scroll; no tabs, no split preview |
 | The object header | back destination `Manual Purchase` · the actual `MPR-…` identity · one state pill · the filtered position `{n} of {m}` with previous/next — no duplicate Back, page title, breadcrumb or PDF action |
-| The Request facts, in reading order | `Requested Date` · `Needed By` · `Need for` · `For` · `Deliver To` · `Requested By` — `Requested By` is the real staff display name; a shared-account record whose individual cannot be recovered reads `Staff identity not recorded` |
+| The Request facts, in reading order | `Proceed Date` · `Delivery Date` · `Need for` · `For` · `Deliver To` · `Requested By` — timing second line: `Order by {date}`; if passed, `Order date passed` then `Order by {date}`; `Requested By` is the real staff display name; a shared-account record whose individual cannot be recovered reads `Staff identity not recorded` |
 | A missing Catalog supplier on a line | `No supplier yet` + `Ask Catalog to set the supplier of {sku}.` — a named fact on the affected line, fixed at the Catalog boundary, never a rail facet |
 | The already-have table heads | `SKU` · `Free Stock` · `Already On PO` · `Still Needed` — decision facts, not buttons |
 | The Approval facts | `No approval needed` · `Need approval` + `{name} approves` · `Approved` / `Refused` + the real actor, date/time and (approved) quantity per line, (refused) the reason |
@@ -766,31 +769,37 @@ a word this Register may use. **Retired from the SO Batch Purchase rail, never t
 | The decision refusals — two lines, fact then act | `Only the approver may decide this purchase.` + `Ask {approver} to approve or refuse it.` — `No purchase approver is set.` + `Ask management to set the purchase approver.` — `This purchase was already decided.` + `Reload the Manual Purchase to see the decision.` — `The decision reason is missing.` + `Type why this purchase is not going ahead.` — `The approved quantity is not valid.` + `Enter a whole number from 0 to {requested quantity}.` — `The decision was not recorded.` + `Reload the Manual Purchase and try once more. Tell IT if it happens again.` |
 | Retired from this surface, never to return | the object's own `Issue PO` / `Issue as one PO?` consolidation offer and every other issuance, PO Duty, price-edit or Receive control — PO issuance lives ONLY in the Register's selected action (`Issue PO` beside PO Duty); physical arrival lives only in `Receiving` |
 
-**The Manual Purchase rail — owner ruling 2026-08-28 (Card 03).** The shared 240px
-`FilterRail` shell (Card 02-C). Four sections, in this exact order:
+**The Manual Purchase rail — owner correction 2026-08-29 (Card 06 supersedes Card 03's
+four-section shape).** The shared 240px `FilterRail` shell (Card 02-C). Seven sections, in this
+exact order:
 
 | Heading | Rail rows |
 |---|---|
-| `TO ORDER` | `All not ordered` · `Need approval` · `Ready to order` |
+| `WORK TO DO` | `Approve purchase` · `Issue PO` · `Check the supplier` · `Add production days` · `Add transit days` |
+| `TO ORDER` | `All not ordered` |
+| `ORDER TIMING` | `Can order early` · `Order date reached` · `Order date passed` |
 | `PURCHASE PURPOSE` | `All purposes` · the six approved purposes above, in the approved order |
 | `PRODUCT` | `All products` · `Mattress` · `Bedframe` · `Sofa` |
 | `SUPPLIER` | `All suppliers` · actual supplier names, alphabetical — never hardcoded, never a placeholder, and no `No supplier` row |
+| `SETUP TO FIX` | `Production days not set` · `Transit days not set` — the whole section renders only when an affected request exists |
 
 Counts are UNIQUE Manual Purchase requests, cross-computed against the other selected
-sections. The three `TO ORDER` rows are derived request truth: `All not ordered` is live
-quantity not yet fully issued to a PO; `Need approval` is submitted and awaiting the
-configured approver; `Ready to order` is the approved remainder for PO Duty. The default
+sections. `WORK TO DO` is a concrete action lens over central Work: `Approve purchase` is submitted
+and undecided; `Issue PO` is approved remaining demand; the other three name their exact
+Catalog/Settings repair. `Need approval` and `Ready to order` retire from `TO ORDER`; `All not
+ordered` is live quantity not yet fully issued to a PO. The default
 no-filter Register is the permanent listing, ordered history included. One filter per
 section; sections combine with AND; each `All …` row clears only its own section; a second
-click on the active row clears it. No checkboxes; labels wrap, never truncate. Product is
+click on the active row clears it. No checkboxes; labels wrap, never truncate. `ORDER TIMING` reads
+the earliest calculated Order By and never blocks an otherwise authorised early issue. Product is
 the CATALOG's category; Supplier is the demand line's Catalog-derived supplier, never chosen
 by Operation. **Banned from this rail, never to return:** `Supplier not selected` ·
 `No supplier` · `Not in catalog` · `Need price` · `Ordered` · `Part received` · `Received` ·
-`Arrived` · `Cancelled` · `My drafts` · `Need correction` · `Queues` · `ORDER TIMING` · any
-safety-days row. A missing SKU or supplier is named inside the affected request and fixed at
+`Arrived` · `Cancelled` · `My drafts` · `Need correction` · `Queues` · any safety-days row. A
+missing SKU or supplier is named inside the affected request and fixed at
 its owning Catalog boundary — never a rail facet. Price is not a rail state or filter.
 
-**The approval owner (Card 03 §3).** The rail says `Need approval`; the Register row and the
+**The approval owner (Card 03 §3).** The rail says `Approve purchase`; the Register row and the
 object print the REAL action owner beside `Waiting for approval` as `{name} approves` — the
 resolved `ops_manager` duty holder(s); several print `{name} or {name} approves`; a robot or
 shared-password login never prints while a named person holds the duty; nothing resolved

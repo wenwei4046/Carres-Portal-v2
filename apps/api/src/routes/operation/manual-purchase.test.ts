@@ -404,7 +404,13 @@ describe("Card 03 · the doors speak the approved purpose vocabulary", () => {
       new Request("https://api.test/api/operation/purchasing/requests", {
         method: "POST",
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ purpose, destinationId: DEST, ...extra }),
+        /* Card 06 — a new request always carries its Delivery Date. */
+        body: JSON.stringify({
+          purpose,
+          destinationId: DEST,
+          requiredBy: "2026-09-15",
+          ...extra,
+        }),
       }),
       env as never,
       { waitUntil() {}, passThroughException() {} } as never,
@@ -476,6 +482,12 @@ describe("Card 03 · the doors speak the approved purpose vocabulary", () => {
 
   it("refuses an invented value — Management folds under Internal Staff Purchase", async () => {
     const { res, rpc } = await createHeader("management_purchase");
+    expect(res.status).toBe(400);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("Card 06 · a new request without its Delivery Date is refused before the RPC", async () => {
+    const { res, rpc } = await createHeader("ready_stock", { requiredBy: undefined });
     expect(res.status).toBe(400);
     expect(rpc).not.toHaveBeenCalled();
   });
@@ -1061,5 +1073,332 @@ describe("Card 05 · GET /purchasing/requests/detail/:id", () => {
     expect(body.lines[0].item_label).toBe("Ohana 2 Seater");
     expect(body.lines[0].po_ids).toEqual([PO_D]);
     expect(body.lines[0].destination_id).toBe(DEST);
+  });
+});
+
+/**
+ * PURCHASING CARD 06 — the server date projection, the create form's plan
+ * read, and the Delivery-Date document partition. The arithmetic itself is
+ * the shared planners' (tested in packages/shared); these tests pin the
+ * WIRING: the route calls the one arithmetic, stamps every line, and never
+ * invents a date.
+ */
+import { loadPurchasingSettings } from "../../lib/purchasing-settings";
+import { expectedArrivalOf, orderByFromDeliveryDate } from "@carres/shared";
+
+const CARD06_SETTINGS = {
+  orderByBufferDays: 7,
+  earliestSellDays: 21,
+  logisticsCallWorkingDays: 1,
+  poDays: [1, 3, 5],
+  suppliers: [
+    { id: SUP, name: "Hooka", categories: ["sofa"], offDays: [0], transitDays: 1 },
+  ],
+  productionDays: [{ supplierId: SUP, category: "sofa", workingDays: 5 }],
+  destinations: [],
+  lastChanges: [],
+} as Awaited<ReturnType<typeof loadPurchasingSettings>>;
+
+describe("Card 06 · GET /purchasing/requests — the server date projection", () => {
+  const LINE_1 = "dddddddd-0000-0000-0000-0000000000c1";
+  const DATED_REQUESTS = [
+    {
+      id: REQ_A, req_no: "MPR-20260830-0001", purpose: "ready_stock",
+      destination_id: DEST, required_by: "2026-10-16",
+      approval_required: true, approved_at: "2026-08-30T03:00:00Z", refused_at: null,
+      created_at: "2026-08-30T01:00:00Z",
+    },
+  ];
+  function makeDatedSb(sends: Array<Record<string, unknown>> = []) {
+    return {
+      from: vi.fn((table: string) => {
+        switch (table) {
+          case "purchase_requests":
+            return tableStub(DATED_REQUESTS);
+          case "purchase_demands":
+            return tableStub(
+              [
+                // The line's own required_by is null — the header's Delivery
+                // Date is its fallback (Card 06 §3.2).
+                { id: LINE_1, request_id: REQ_A, sku: "5539-2NA", supplier_id: SUP,
+                  destination_id: DEST, qty: 2, approved_qty: 2, issued_qty: 1,
+                  remaining_qty: 1, required_by: null, remark: null, po_id: "PO-20260830-0001",
+                  cancelled_at: null, cancel_reason: null },
+              ],
+              { filterInBy: "request_id" },
+            );
+          case "product_skus":
+            return tableStub([
+              { sku: "5539-2NA", variant: null, variant_kind: null,
+                product_models: { category: "sofa", name: "Sonic" } },
+            ]);
+          case "purchase_order_lines":
+            return tableStub([
+              { po_id: "PO-20260830-0001", sku: "5539-2NA", qty: 1, received_qty: 0,
+                demand_id: LINE_1 },
+            ]);
+          case "purchase_orders":
+            return tableStub([{ id: "PO-20260830-0001", version: 2 }]);
+          case "po_sends":
+            return tableStub(sends);
+          case "suppliers":
+            return tableStub([{ id: SUP, name: "Hooka", kind: "own_logistics" }]);
+          default:
+            return tableStub([]);
+        }
+      }),
+      rpc: vi.fn().mockResolvedValue({ data: {}, error: null }),
+    } as unknown as ReturnType<typeof userClient>;
+  }
+
+  async function readRegister() {
+    const jwt = await makeJwt("operation");
+    return app.fetch(
+      new Request("https://api.test/api/operation/purchasing/requests", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env as never,
+      { waitUntil() {}, passThroughException() {} } as never,
+    );
+  }
+
+  it("stamps delivery_date (header fallback) and order_by via the ONE inverse planner", async () => {
+    vi.mocked(loadPurchasingSettings).mockResolvedValueOnce(CARD06_SETTINGS);
+    vi.mocked(userClient).mockReturnValue(makeDatedSb());
+    const res = await readRegister();
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      lines: Array<{
+        delivery_date: string | null; order_by: string | null;
+        production_days_missing: boolean; transit_days_missing: boolean;
+      }>;
+      todayIso: string;
+      planUnavailable: boolean;
+    };
+    expect(body.planUnavailable).toBe(false);
+    expect(body.todayIso).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(body.lines[0].delivery_date).toBe("2026-10-16");
+    // The wiring calls the same shared arithmetic — agreement, not a copy.
+    expect(body.lines[0].order_by).toBe(
+      orderByFromDeliveryDate(CARD06_SETTINGS, {
+        supplierId: SUP,
+        category: "sofa",
+        deliveryDateIso: "2026-10-16",
+      }),
+    );
+    expect(body.lines[0].order_by).not.toBeNull();
+    expect(body.lines[0].production_days_missing).toBe(false);
+    expect(body.lines[0].transit_days_missing).toBe(false);
+  });
+
+  it("missing Settings produce NO guessed date — the exact gap is named instead", async () => {
+    vi.mocked(loadPurchasingSettings).mockResolvedValueOnce({
+      ...CARD06_SETTINGS,
+      suppliers: [
+        { id: SUP, name: "Hooka", categories: ["sofa"], offDays: [0], transitDays: null },
+      ],
+      productionDays: [],
+    } as Awaited<ReturnType<typeof loadPurchasingSettings>>);
+    vi.mocked(userClient).mockReturnValue(makeDatedSb());
+    const body = (await (await readRegister()).json()) as {
+      lines: Array<{
+        order_by: string | null;
+        production_days_missing: boolean; transit_days_missing: boolean;
+      }>;
+    };
+    expect(body.lines[0].order_by).toBeNull();
+    expect(body.lines[0].production_days_missing).toBe(true);
+    expect(body.lines[0].transit_days_missing).toBe(true);
+  });
+
+  it("a numbered PO is not `sent` — only the CURRENT version's confirmed-sent evidence", async () => {
+    vi.mocked(loadPurchasingSettings).mockResolvedValueOnce(CARD06_SETTINGS);
+    // Version 1 was confirmed sent, but the document is at Version 2 now:
+    // the older evidence completes nothing.
+    vi.mocked(userClient).mockReturnValue(
+      makeDatedSb([{ po_id: "PO-20260830-0001", po_version: 1, kind: "confirmed_sent" }]),
+    );
+    let body = (await (await readRegister()).json()) as {
+      pos: Array<{ id: string; sent: boolean }>;
+    };
+    expect(body.pos[0].sent).toBe(false);
+
+    vi.mocked(loadPurchasingSettings).mockResolvedValueOnce(CARD06_SETTINGS);
+    vi.mocked(userClient).mockReturnValue(
+      makeDatedSb([{ po_id: "PO-20260830-0001", po_version: 2, kind: "confirmed_sent" }]),
+    );
+    body = (await (await readRegister()).json()) as {
+      pos: Array<{ id: string; sent: boolean }>;
+    };
+    expect(body.pos[0].sent).toBe(true);
+  });
+});
+
+describe("Card 06 · POST /purchasing/requests/plan — the create form's date plan", () => {
+  async function plan(skus: string[]) {
+    const jwt = await makeJwt("operation");
+    return app.fetch(
+      new Request("https://api.test/api/operation/purchasing/requests/plan", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ skus }),
+      }),
+      env as never,
+      { waitUntil() {}, passThroughException() {} } as never,
+    );
+  }
+
+  function makePlanSb() {
+    return {
+      from: vi.fn((table: string) => {
+        switch (table) {
+          case "product_skus":
+            return tableStub([
+              { sku: "5539-2NA", supplier_id: SUP, product_models: { category: "sofa" } },
+              { sku: "NO-CATALOG", supplier_id: null, product_models: null },
+            ]);
+          case "suppliers":
+            return tableStub([{ id: SUP, name: "Hooka" }]);
+          default:
+            return tableStub([]);
+        }
+      }),
+      rpc: vi.fn(),
+    } as unknown as ReturnType<typeof userClient>;
+  }
+
+  it("no SKUs still answers the Proceed Date preview — the server's own date", async () => {
+    vi.mocked(userClient).mockReturnValue(makePlanSb());
+    const res = await plan([]);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { proceedDate: string; deliveryDateDefault: null };
+    expect(body.proceedDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(body.deliveryDateDefault).toBeNull();
+  });
+
+  it("complete Settings propose the arrival from the ONE forward planner", async () => {
+    vi.mocked(loadPurchasingSettings).mockResolvedValueOnce(CARD06_SETTINGS);
+    vi.mocked(userClient).mockReturnValue(makePlanSb());
+    const res = await plan(["5539-2NA"]);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      proceedDate: string;
+      lines: Array<{
+        sku: string; supplierName: string | null; category: string | null;
+        productionDays: number | null; transitDays: number | null; arrival: string | null;
+      }>;
+      deliveryDateDefault: string | null;
+    };
+    expect(body.lines[0]).toMatchObject({
+      sku: "5539-2NA",
+      supplierName: "Hooka",
+      category: "sofa",
+      productionDays: 5,
+      transitDays: 1,
+    });
+    // Agreement with the shared arithmetic from the same Proceed Date.
+    expect(body.lines[0].arrival).toBe(
+      expectedArrivalOf(CARD06_SETTINGS, {
+        supplierId: SUP,
+        category: "sofa",
+        fromIso: body.proceedDate,
+      }),
+    );
+    expect(body.deliveryDateDefault).toBe(body.lines[0].arrival);
+  });
+
+  it("an incomplete line proposes NOTHING — no default, nulls named, never a guess", async () => {
+    vi.mocked(loadPurchasingSettings).mockResolvedValueOnce(CARD06_SETTINGS);
+    vi.mocked(userClient).mockReturnValue(makePlanSb());
+    const res = await plan(["5539-2NA", "NO-CATALOG"]);
+    const body = (await res.json()) as {
+      lines: Array<{ sku: string; arrival: string | null }>;
+      deliveryDateDefault: string | null;
+    };
+    expect(body.lines.find((l) => l.sku === "NO-CATALOG")?.arrival).toBeNull();
+    // One incomplete line means the form cannot be defaulted truthfully.
+    expect(body.deliveryDateDefault).toBeNull();
+  });
+});
+
+describe("Card 06 · POST /issue — Delivery Date joins the document partition", () => {
+  const DATED_REQS = [
+    {
+      id: REQ_A, req_no: "MPR-1", purpose: "ready_stock", destination_id: DEST,
+      required_by: "2026-10-10",
+      approval_required: true, approved_at: "2026-08-30T03:00:00Z", refused_at: null,
+    },
+    {
+      id: REQ_B, req_no: "MPR-2", purpose: "ready_stock", destination_id: DEST,
+      required_by: "2026-10-20",
+      approval_required: false, approved_at: null, refused_at: null,
+    },
+  ];
+  const DATED_LINES = [
+    { id: "dddddddd-0000-0000-0000-0000000000a1", request_id: REQ_A, sku: "5539-2NA",
+      supplier_id: SUP, destination_id: DEST, qty: 1, approved_qty: null, issued_qty: 0,
+      required_by: null, cancelled_at: null },
+    { id: "dddddddd-0000-0000-0000-0000000000a2", request_id: REQ_B, sku: "5539-CNR",
+      supplier_id: SUP, destination_id: DEST, qty: 1, approved_qty: null, issued_qty: 0,
+      required_by: null, cancelled_at: null },
+  ];
+  function makeDatedIssueSb(rpc: ReturnType<typeof vi.fn>) {
+    return {
+      from: vi.fn((table: string) => {
+        switch (table) {
+          case "purchase_requests":
+            return tableStub(DATED_REQS, { filterInBy: "id" });
+          case "purchase_demands":
+            return tableStub(DATED_LINES, { filterInBy: "request_id" });
+          case "product_skus":
+            return tableStub([
+              { sku: "5539-2NA", supplier_id: SUP, cost: 850, product_models: { category: "sofa" } },
+              { sku: "5539-CNR", supplier_id: SUP, cost: 400, product_models: { category: "sofa" } },
+            ]);
+          case "suppliers":
+            return tableStub([{ id: SUP, kind: "own_logistics" }]);
+          case "warehouses":
+            return tableStub([
+              { id: "eeeeeeee-0000-0000-0000-000000000001", name: "Carres Klang", kind: "own" },
+            ]);
+          default:
+            return tableStub([]);
+        }
+      }),
+      rpc: vi.fn((fn: string, args: unknown) => {
+        if (fn === "purchasing_actor_may_issue") {
+          return Promise.resolve({ data: true, error: null });
+        }
+        return rpc(fn, args);
+      }),
+    } as unknown as ReturnType<typeof userClient>;
+  }
+
+  it("two Delivery Dates create two POs, each saving its approved date as eta_date", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: { po_ids: ["PO-1", "PO-2"] }, error: null });
+    vi.mocked(userClient).mockReturnValue(makeDatedIssueSb(rpc));
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("https://api.test/api/operation/purchasing/requests/issue", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          requestIds: [REQ_A, REQ_B],
+          together: true,
+          expectedCosts: REVIEWED,
+        }),
+      }),
+      env as never,
+      { waitUntil() {}, passThroughException() {} } as never,
+    );
+    expect(res.status).toBe(200);
+    const pos = rpc.mock.calls[0][1].p_pos as Array<Record<string, unknown>>;
+    // Same supplier × category × destination × purpose — but two approved
+    // Delivery Dates are two supplier commitments (Card 06 §7).
+    expect(pos).toHaveLength(2);
+    expect(new Set(pos.map((p) => p.eta_date))).toEqual(
+      new Set(["2026-10-10", "2026-10-20"]),
+    );
+    expect((await res.json() as { documents: number }).documents).toBe(2);
   });
 });
