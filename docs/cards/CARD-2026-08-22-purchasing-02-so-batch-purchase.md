@@ -268,15 +268,16 @@ full-screen `Review Purchase Orders` surface and preserves selection and allocat
 ├────────────────────── 50% ─────────────────┬──────────────────── 50% ────────┤
 │ HOOKA → CARRES KLANG                       │ LIVE PURCHASE ORDER PDF          │
 │ Lines / source / quantity                   │                                 │
-│ Transaction Cost or Free of Charge          │ PO number appears after Issue PO│
-│ Procurement Partner, only when required     │ Supplier · Deliver To           │
+│ Governed collection fact, when required     │ PO number appears after Issue PO│
 │ Deliver To and actual date                  │ Lines · source SO · Unit IDs    │
 │                                             │                                 │
 │ [Back to buying]                 [Issue PO] │                                 │
 └─────────────────────────────────────────────┴─────────────────────────────────┘
 ```
 
-- Left is the only editable issue surface. Right uses the existing money-free PO template.
+- Left reviews the PO facts. Cost remains governed Catalog data and supplier collection remains
+  governed Purchasing Settings data; neither is edited in this journey. Right uses the existing
+  money-free PO template.
 - Before creation, preview is visibly non-sendable and states the number is created by `Issue PO`.
 - `Issue PO` creates all validated POs through the one `purchasing_issue_pos_batch` authority, in
   one server transaction: all official POs are created or none.
@@ -440,12 +441,6 @@ export const soBatchIssueInput = z.object({
       qty: z.number().int().positive(),
     })).min(1),
   })).min(1).max(500),
-  documentDecisions: z.array(z.object({
-    supplierId: z.string().uuid(),
-    destinationId: z.string().uuid(),
-    procurementPartnerId: z.string().uuid().nullable(),
-    lineDecisions: z.array(issueLineDecisionSchema),
-  })).max(200),
 }).strict();
 ```
 
@@ -456,7 +451,7 @@ The server:
 3. rejects unknown, blocked, covered, cancelled or stale demand;
 4. validates destination and quantity allocation;
 5. groups supplier × destination itself;
-6. validates current cost/FOC/partner authority;
+6. reads Catalog cost and the supplier collection rule from governed master data;
 7. calls `purchasing_issue_pos_batch` once with every official PO; and
 8. returns PO IDs plus supplier/destination for the evidence step.
 
@@ -899,24 +894,13 @@ borrow), and the banned-word scan would have passed vacuously forever on the thi
 The three things §15.6 first listed as later scope were mandatory requirements of this Card. They
 are done, and the walk evidence was recaptured against the finished behaviour.
 
-**1 · The 50/50 collects and validates the governed decisions.** The left side is the only
-editable issue surface, so everything a purchase order needs is settled there:
-
-- **Transaction Cost** per SKU, seeded from Catalog so the common case needs no typing. An
-  untouched Catalog price is deliberately NOT sent — the server re-reads its own and stamps it;
-  echoing it back would only give the server a number to disagree with. A CHANGED one is sent as
-  `hand_entered`, because the operator changed it and it is theirs now.
-- **Free of Charge** with a required reason. Choosing it removes the price box entirely — a
-  disabled field beside a chosen alternative is a question already answered.
-- **Procurement Partner**, offered only on a factory-pickup document. An own-logistics document
-  that offered it would invite a fact the server refuses (`pickup_partner_not_allowed`).
-- A line with **no Catalog price starts EMPTY**. There is no safe default: `0` is a price nobody
-  set, and guessing one is how a supplier gets asked to deliver for nothing.
-- `documentDecisions` is now composed for **every** document, never `[]`. `Issue PO` is disabled
-  while anything is missing and the surface NAMES the blocker — including a blocker on a document
-  the operator is not looking at, because the request is atomic and a dead button with no
-  explanation is the defect this replaces. Walk view 4 proves exactly that: standing on document 1
-  of 2, the surface reads `Ohana → AL Sungai Buloh needs a procurement partner`.
+**1 · Owner correction, 2026-08-30 — Review is not a master-data editor.** The left side reviews
+the PO lines and the resolved delivery facts. Normal cost is read from Catalog; a missing cost is a
+Catalog blocker before review. A factory-pickup collector and fixed destination are read from
+`purchasing_supplier_settings`; Review prints the resolved sentence once and never offers a
+collector picker. The browser sends only demand IDs and destination allocations. The API
+recomputes Catalog cost and supplier collection, and the database enforces the same collection rule
+for every PO writer.
 
 **2 · The right side renders the real official PO PDF.** `renderPoPdf` — the same template
 Purchase Orders and the print path already use — over the `purchasing_po_document` payload, into a
@@ -1146,20 +1130,11 @@ silent:** an untouched catalog cost was re-read by the API and sent back as `cos
 so the RPC compared the live value **against itself** and always agreed. A supplier price that moved
 between review and Issue was adopted with nobody's approval and nobody's knowledge.
 
-- The reviewed price travels as `expected_catalog_cost` on every line, and the server compares. A
-  mismatch creates **zero** purchase orders — not this one, not the other nineteen.
-- **There is no "send nothing and let the server read Catalog" path left.** A line nobody checked is
-  refused (`cost_review_required`). The web declares what it SHOWED, including an untouched price;
-  the stored number is still the server's own read.
-- A hand-entered price or a Free of Charge is an EXCEPTION and needs an open `po_cost_approvals`
-  record. `purchasing_approve_po_cost` admits only `principal`/`finance` and refuses a manager who is
-  also today's actor. **An approval is spent when used.**
-- The 50/50 surface reads the open approvals and says, in advance, `This is not the Catalog price. /
-  Ask a manager to approve this price for {supplier}.` — or names the approver when one exists.
-  Meeting that rule only as a refusal, after eleven prices were typed, is the rule delivered too late.
-- Manual Purchase declares the same way: a new `GET /issue-costs` read shows the price of every SKU
-  the issue will commit to (including the sibling requests `Issue as one PO` pulls in), and the
-  request carries those exact numbers. A SKU with no catalog price is NAMED, never declared as RM0.
+- The server reads Catalog cost; a missing cost blocks the demand before Review. SQL compares the
+  live Catalog expectation inside the atomic creation transaction.
+- The server reads the configured collector and fixed destination for a factory-pickup supplier;
+  the database trigger enforces the same facts for SO Batch, Manual Purchase and any future writer.
+- The browser carries no price, Free-of-Charge or procurement-partner decision.
 
 ### 17.3 One exact document partition, and the split that used to double the order
 
@@ -1247,7 +1222,7 @@ supplier.
 
 | Width | Measured |
 |---|---|
-| 1440 × 880 | `720px` + `720px`; document 2 offers its procurement partner; three sofa module costs each editable |
+| 1440 × 880 | `720px` + `720px`; governed collection fact is visible once; no cost or collector controls |
 | **1130** × 860 | `grid-template-columns: 565px 565px`; no sideways scroll; `Issue PO` visible and shut with its two-line blocker |
 | **1129** × 860 | stacked, work first (`50→426`), document below (`426→1028`), split scrolls, nothing clipped |
 | 768 × 900 | stacked; both buttons inside the pane, no overlap, no sideways scroll |
@@ -1255,15 +1230,12 @@ supplier.
 
 Two defects the green suite had not caught, both found by the walk and both fixed:
 
-- 🔴 **1129px CLIPPED THE DECISION PANE.** A one-column grid compressed it to 208px and cut off the
-  Transaction Cost block, the blocker and both buttons **with no scrollbar** — the row reported that
-  it fitted. Stacked, the surface is a flex COLUMN with `shrink-0` panes.
+- 🔴 **1129px CLIPPED THE REVIEW PANE.** A one-column grid compressed it and cut off the review and
+  both buttons **with no scrollbar**. Stacked, the surface is a flex COLUMN with `shrink-0` panes.
 - 🟡 **375px clipped the surface title**, which wrapped into a fixed 50px header. It truncates now;
   the row keeps its height.
 
-And walked in the browser: changing a price shows
-`This is not the Catalog price. / Ask a manager to approve this price for Ohana.` and `Issue PO`
-stays shut.
+The 2026-08-30 owner correction supersedes the earlier editable-price walk evidence.
 
 ### 17.9 Gates
 

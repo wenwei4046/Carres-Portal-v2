@@ -89,6 +89,7 @@ export type PurchaseDemandBlockerState =
   | "no_customer_date"
   | "no_sku"
   | "no_supplier"
+  | "no_cost"
   | "no_production_days";
 
 export type PurchaseDemandState = PurchaseDemandTimingState | PurchaseDemandBlockerState;
@@ -107,6 +108,7 @@ export const PURCHASE_DEMAND_STATES: readonly PurchaseDemandState[] = [
   "no_customer_date",
   "no_sku",
   "no_supplier",
+  "no_cost",
   "no_production_days",
 ] as const;
 
@@ -140,6 +142,7 @@ export function purchaseDemandStateWords(
     no_customer_date: "Customer delivery date is missing",
     no_sku: "SKU not found",
     no_supplier: "Supplier not assigned",
+    no_cost: "Catalog cost is missing",
     no_production_days: "Production days are missing",
   };
 }
@@ -178,6 +181,7 @@ export const PURCHASE_DEMAND_OWNER_DUTY: Record<PurchaseDemandState, string | nu
   no_customer_date: "Responsible Salesperson",
   no_sku: "PO duty",
   no_supplier: "PO duty",
+  no_cost: "PO duty",
   no_production_days: "Purchasing Settings",
 };
 
@@ -265,7 +269,7 @@ export interface PurchaseDemandRow {
    *
    * A row is one BUILD, and a build can be a matched set: a sofa is one row and
    * three module codes. The row itself can only name the set, so this is where
-   * the modules live — the expand lists them, and the issue surface prices them.
+   * the modules live and the issue authority can validate their Catalog cost.
    *
    * It was called `costs` and carried only the price, so the expand had no
    * quantity to print and re-stated the row's own numbers instead. One list,
@@ -273,11 +277,16 @@ export interface PurchaseDemandRow {
    */
   parts: Array<{ sku: string; qty: number; unitCost: number | null }>;
   /**
-   * Whether this supplier's goods are collected from the factory. A
-   * factory-pickup document needs a procurement partner before it can be
-   * issued, and the operator has to be able to choose one on the same screen.
+   * Whether this supplier's goods are collected from the factory. The
+   * collector is resolved from Purchasing Settings, never chosen per PO.
    */
   supplierKind: "own_logistics" | "factory_pickup" | null;
+  /** The governed factory-collection rule from Purchasing Settings. */
+  supplierCollection?: {
+    procurementPartnerId: string;
+    procurementPartnerName: string;
+    fixedDestinationId: string | null;
+  } | null;
   /** WHO fixes the blocker — a real person when a stored fact names one. */
   ownerName: string | null;
   /** The duty word, when no person resolves. */
@@ -325,6 +334,7 @@ const ACTION_OWNER_RULE: Record<PurchaseDemandState, string> = {
   no_customer_date: "Responsible Salesperson",
   no_sku: "Catalog/Master Data through Current PO Duty",
   no_supplier: "Current PO Duty",
+  no_cost: "Catalog/Master Data through Current PO Duty",
   no_production_days: "Purchasing Settings authority",
 };
 
@@ -343,6 +353,7 @@ const ACTION_COMPLETION_FACT: Record<PurchaseDemandState, string> = {
   no_customer_date: "Requested Delivery Date exists",
   no_sku: "Approved SKU exists",
   no_supplier: "Approved supplier relationship exists",
+  no_cost: "Approved Catalog cost exists",
   no_production_days: "Governed supplier/category days exist",
 };
 
@@ -532,6 +543,8 @@ export function purchaseDemandHelpLine(row: {
       return "Add this item to the SKU catalog";
     case "no_supplier":
       return `Check the supplier for ${row.item}`;
+    case "no_cost":
+      return `Set the cost of ${row.item} in Catalog`;
     case "no_production_days":
       return `Add production days for ${row.supplier ?? "the supplier"} · ${
         row.category ? categoryLabel(row.category) : "the category"
@@ -696,6 +709,7 @@ export const purchaseDemandStateSchema = z.enum([
   "no_customer_date",
   "no_sku",
   "no_supplier",
+  "no_cost",
   "no_production_days",
 ]);
 
@@ -753,6 +767,14 @@ export const purchaseDemandRowSchema = z.object({
   action: soBatchPurchaseActionSchema.nullable(),
   parts: z.array(z.object({ sku: z.string(), qty: z.number(), unitCost: z.number().nullable() })),
   supplierKind: z.enum(["own_logistics", "factory_pickup"]).nullable(),
+  supplierCollection: z
+    .object({
+      procurementPartnerId: z.string(),
+      procurementPartnerName: z.string(),
+      fixedDestinationId: z.string().nullable(),
+    })
+    .nullable()
+    .optional(),
   ownerName: z.string().nullable(),
   ownerDuty: z.string().nullable(),
 });

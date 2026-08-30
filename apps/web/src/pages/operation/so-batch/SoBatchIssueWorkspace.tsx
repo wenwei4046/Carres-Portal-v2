@@ -48,8 +48,6 @@ import PoIssueEvidence, {
 export interface SoBatchIssueWorkspaceProps {
   documents: readonly SoBatchDocument[];
   destinations: readonly PurchasingDestination[];
-  /** Who may collect from a factory, for the documents that need one. */
-  procurementPartners: readonly { id: string; name: string }[];
   onBack: () => void;
   /** Every document confirmed — the Register refetches and the journey ends. */
   onDone: () => void;
@@ -64,47 +62,9 @@ type Mode = "review" | "evidence";
  * turn a half-typed `4` into a price of four ringgit; it becomes a number only
  * at the boundary, and only after it is valid.
  */
-type LineDecision = { treatment: "normal"; cost: string } | {
-  treatment: "free_of_charge";
-  reason: string;
-};
-
-/** One priced line, exactly as `soBatchIssueInput` expects it on the wire. */
-type WireLineDecision =
-  | {
-      sku: string;
-      treatment: "normal";
-      unitCost: number;
-      /**
-       * `catalog` = the operator accepted the Catalog price they were shown.
-       * `hand_entered` = they changed it, which is a commercial EXCEPTION and
-       * needs a manager's approval on file (0380).
-       */
-      costSource: "catalog" | "hand_entered";
-      /** The Catalog price this line was REVIEWED against. */
-      expectedCatalogCost: number | null;
-    }
-  | { sku: string; treatment: "free_of_charge"; reason: string };
-
-/** Every distinct SKU on a document, with the Catalog price behind it. */
-function documentSkus(
-  doc: SoBatchDocument,
-): Array<{ sku: string; catalogCost: number | null }> {
-  const out = new Map<string, number | null>();
-  for (const line of doc.lines) {
-    for (const c of line.parts) {
-      if (!out.has(c.sku)) out.set(c.sku, c.unitCost);
-    }
-  }
-  return [...out].map(([sku, catalogCost]) => ({ sku, catalogCost }));
-}
-
-const money = (n: number | null) => (n == null ? "" : String(n));
-
 export default function SoBatchIssueWorkspace({
   documents,
   destinations,
-  procurementPartners,
   onBack,
   onDone,
 }: SoBatchIssueWorkspaceProps) {
@@ -117,25 +77,6 @@ export default function SoBatchIssueWorkspace({
    *  the evidence. The evidence is read from the server (closure §8). */
   const [, setConfirmed] = useState<Set<string>>(new Set());
 
-  /* ── THE COMMERCIAL DECISIONS ─────────────────────────────────────────────
-   *
-   * Seeded from the Catalog so the common case needs no typing at all, and
-   * keyed `documentKey::sku` because the same SKU on two documents is two
-   * decisions — one supplier may give it free while another charges.
-   *
-   * A line whose Catalog price is unknown starts EMPTY on purpose. There is no
-   * safe default: `0` is a price nobody set, and guessing one is how a supplier
-   * gets asked to deliver for nothing. */
-  const [decisions, setDecisions] = useState<Record<string, LineDecision>>(() => {
-    const seed: Record<string, LineDecision> = {};
-    for (const doc of documents) {
-      for (const { sku, catalogCost } of documentSkus(doc)) {
-        seed[`${doc.key}::${sku}`] = { treatment: "normal", cost: money(catalogCost) };
-      }
-    }
-    return seed;
-  });
-  const [partners, setPartners] = useState<Record<string, string>>({});
 
   /**
    * THE OFFICIAL PDF, RENDERED.
@@ -158,95 +99,12 @@ export default function SoBatchIssueWorkspace({
      a list row, a second fetch — would reintroduce the race. */
   const [pdfVersion, setPdfVersion] = useState<number | null>(null);
 
-  const setDecision = useCallback((key: string, next: LineDecision) => {
-    setDecisions((prev) => ({ ...prev, [key]: next }));
-  }, []);
-
   const destinationName = useCallback(
     (id: string) => destinations.find((d) => d.id === id)?.name ?? "",
     [destinations],
   );
 
   const current = documents[Math.min(at, Math.max(documents.length - 1, 0))];
-
-  /**
-   * WHICH EXCEPTIONS A MANAGER HAS ALREADY APPROVED (closure §2; 0380).
-   *
-   * A changed price or a Free of Charge needs an approval record PO Duty cannot
-   * write for itself. Without this read the operator meets that rule only as a
-   * refusal, after typing everything, and cannot tell "nobody has approved this
-   * yet" from "somebody already did".
-   *
-   * Keyed `supplierId::sku` because an approval is for one supplier's price.
-   */
-  const [approvals, setApprovals] = useState<
-    Record<string, { treatment: string; unitCost: number | null; approvedBy: string | null }>
-  >({});
-  useEffect(() => {
-    const bySupplier = new Map<string, Set<string>>();
-    for (const doc of documents) {
-      const set = bySupplier.get(doc.supplierId) ?? new Set<string>();
-      for (const { sku } of documentSkus(doc)) set.add(sku);
-      bySupplier.set(doc.supplierId, set);
-    }
-    let dead = false;
-    void (async () => {
-      const found: Record<
-        string,
-        { treatment: string; unitCost: number | null; approvedBy: string | null }
-      > = {};
-      for (const [supplierId, skus] of bySupplier) {
-        if (skus.size === 0) continue;
-        try {
-          const res = await apiFetch<{
-            approvals: {
-              sku: string;
-              treatment: string;
-              unitCost: number | null;
-              approvedBy: string | null;
-            }[];
-          }>(
-            `/api/operation/purchase/to-order/cost-approvals?supplierId=${encodeURIComponent(
-              supplierId,
-            )}&skus=${encodeURIComponent([...skus].join(","))}`,
-          );
-          for (const a of res.approvals ?? []) {
-            found[`${supplierId}::${a.sku}`] = {
-              treatment: a.treatment,
-              unitCost: a.unitCost,
-              approvedBy: a.approvedBy,
-            };
-          }
-        } catch {
-          /* An approval that cannot be READ is not an approval that exists.
-             The server refuses the issue either way; this only costs the
-             advance warning. */
-        }
-      }
-      if (!dead) setApprovals(found);
-    })();
-    return () => {
-      dead = true;
-    };
-  }, [documents]);
-
-  /**
-   * IS THIS EXCEPTION APPROVED? A changed price must match the approved amount;
-   * a Free of Charge only needs a Free of Charge approval.
-   */
-  const approvalFor = useCallback(
-    (doc: SoBatchDocument, sku: string, d: LineDecision, catalogCost: number | null) => {
-      const hit = approvals[`${doc.supplierId}::${sku}`];
-      if (!hit) return null;
-      if (d.treatment === "free_of_charge") {
-        return hit.treatment === "free_of_charge" ? hit : null;
-      }
-      const n = Number(d.cost);
-      if (catalogCost != null && n === catalogCost) return null; // not an exception
-      return hit.treatment === "hand_entered" && hit.unitCost === n ? hit : null;
-    },
-    [approvals],
-  );
 
   /**
    * WHAT IS STOPPING THE WHOLE BATCH, named.
@@ -259,105 +117,26 @@ export default function SoBatchIssueWorkspace({
    */
   const blocker = useMemo<{ wrong: string; todo: string } | null>(() => {
     for (const doc of documents) {
-      const supplier = doc.supplierName ?? null;
-      if (doc.supplierKind === "factory_pickup" && !partners[doc.key]) {
-        return purchasingRefusal("pickup_partner_required", { supplier });
+      if (doc.supplierKind === "factory_pickup" && !doc.supplierCollection) {
+        return purchasingRefusal("pickup_partner_required", {
+          supplier: doc.supplierName ?? null,
+        });
       }
-      for (const { sku, catalogCost } of documentSkus(doc)) {
-        const d = decisions[`${doc.key}::${sku}`];
-        if (!d) return purchasingRefusal("cost_review_required", { sku, supplier });
-        if (d.treatment === "free_of_charge") {
-          if (d.reason.trim() === "") {
-            return purchasingRefusal("free_of_charge_reason_required", { sku, supplier });
-          }
-          /* ⭐ AND SOMEBODY ELSE MUST HAVE APPROVED IT (0380). Operations
-             executes the buy; it does not decide what Carres agrees to pay. */
-          if (!approvalFor(doc, sku, d, catalogCost)) {
-            return purchasingRefusal("commercial_approval_required", { sku, supplier });
-          }
-          continue;
-        }
-        const n = Number(d.cost);
-        if (d.cost.trim() === "" || !Number.isFinite(n) || n <= 0) {
-          return purchasingRefusal("cost_required", { sku, supplier });
-        }
-        const changed = catalogCost == null || n !== catalogCost;
-        if (changed && !approvalFor(doc, sku, d, catalogCost)) {
-          return purchasingRefusal("commercial_approval_required", { sku, supplier });
-        }
+      if (
+        doc.supplierCollection?.fixedDestinationId &&
+        doc.supplierCollection.fixedDestinationId !== doc.destinationId
+      ) {
+        return purchasingRefusal("supplier_collection_destination_mismatch", {
+          supplier: doc.supplierName ?? null,
+        });
       }
     }
     return null;
-  }, [documents, decisions, partners, approvalFor]);
+  }, [documents]);
 
   /**
-   * The decisions, on the wire.
-   *
-   * ⭐ EVERY LINE IS DECLARED, INCLUDING AN UNTOUCHED CATALOG PRICE
-   * (Card closure §2; 0380).
-   *
-   * An untouched price used to be OMITTED, on the reasoning that the server
-   * would re-read its own catalog and stamp it. That was the defect: the server
-   * then compared the live value against itself and agreed every time, so a
-   * supplier price that moved between the review and `Issue PO` was adopted with
-   * nobody's approval and nobody's knowledge.
-   *
-   * What the operator SAW now travels with the line. The number that is STORED
-   * is still the server's own read — the declaration is only what makes the
-   * comparison possible at all.
-   */
-  const documentDecisions = useMemo(
-    () =>
-      documents.map((doc) => ({
-        /* ⭐ THE EXACT DOCUMENT (Card closure §4). Both sides compute this key
-           from the same facts, so a decision cannot attach to a document the
-           server never creates — and the server refuses one that does not
-           name a partition it built. */
-        documentKey: doc.key,
-        supplierId: doc.supplierId,
-        destinationId: doc.destinationId,
-        procurementPartnerId:
-          doc.supplierKind === "factory_pickup" ? (partners[doc.key] ?? null) : null,
-        lineDecisions: documentSkus(doc).flatMap<WireLineDecision>(({ sku, catalogCost }) => {
-          const d = decisions[`${doc.key}::${sku}`];
-          if (!d) return [];
-          if (d.treatment === "free_of_charge") {
-            return [{ sku, treatment: "free_of_charge" as const, reason: d.reason.trim() }];
-          }
-          const n = Number(d.cost);
-          if (!Number.isFinite(n) || n <= 0) return [];
-          /* UNCHANGED — the operator accepted the price they were shown. */
-          if (catalogCost != null && n === catalogCost) {
-            return [
-              {
-                sku,
-                treatment: "normal" as const,
-                costSource: "catalog" as const,
-                unitCost: n,
-                expectedCatalogCost: catalogCost,
-              },
-            ];
-          }
-          /* CHANGED — theirs now, and an exception a manager must approve. */
-          return [
-            {
-              sku,
-              treatment: "normal" as const,
-              unitCost: n,
-              costSource: "hand_entered" as const,
-              /* The catalog price this was reviewed against, so the server can
-                 tell "the operator agreed a different price" from "the supplier
-                 moved the price after they looked" (0380). */
-              expectedCatalogCost: catalogCost,
-            },
-          ];
-        }),
-      })),
-    [documents, decisions, partners],
-  );
-
-  /**
-   * ONE REQUEST FOR EVERY DOCUMENT (§7.3). The selections are rebuilt from the
+   * ONE REQUEST FOR EVERY DOCUMENT (§7.3), carrying selections only. The
+   * selections are rebuilt from the
    * documents rather than carried through the screen: the grouping the operator
    * saw and the allocation the server will check must come from the same place,
    * and the server regroups it all anyway.
@@ -383,7 +162,7 @@ export default function SoBatchIssueWorkspace({
         "/api/operation/purchase/to-order/issue-batch",
         {
           method: "POST",
-          body: JSON.stringify({ selections, documentDecisions }),
+          body: JSON.stringify({ selections }),
         },
       );
       setPos(res.pos ?? []);
@@ -549,8 +328,8 @@ export default function SoBatchIssueWorkspace({
         <div
           /* ⭐ `shrink-0` UNTIL THE BREAKPOINT, and that is not cosmetic.
              Walked at 1129px on 2026-08-24: a two-row GRID compressed this pane
-             to 208px and CLIPPED it — the Transaction Cost block, the blocker
-             and both buttons were cut off with no scrollbar, because the row
+             to 208px and CLIPPED it — the PO facts, blocker and both buttons
+             were cut off with no scrollbar, because the row
              reported that it fitted. Stacked, the surface is a flex COLUMN and
              this pane is as tall as its content; the split scrolls. Side by side
              it is a grid item and `min-h-0` again, so the pane scrolls inside a
@@ -598,139 +377,13 @@ export default function SoBatchIssueWorkspace({
                 </tbody>
               </table>
 
-              {/* ── THE COMMERCIAL DECISIONS ─────────────────────────────
-                  The only editable issue surface (§5.2). Everything a purchase
-                  order needs before it can exist is settled here, so an
-                  operator never meets `cost_required` as an error message when
-                  it could have been a field. */}
-              <div className="mt-4 flex flex-col gap-2 border-t border-kit-slate-5 pt-3">
-                <span className="text-label uppercase tracking-wide text-kit-slate-11">
-                  Transaction cost
-                </span>
-                {documentSkus(current).map(({ sku, catalogCost }) => {
-                  const key = `${current.key}::${sku}`;
-                  const d = decisions[key] ?? { treatment: "normal" as const, cost: "" };
-                  const foc = d.treatment === "free_of_charge";
-                  /* ⭐ IS THIS AN EXCEPTION, AND HAS A MANAGER APPROVED IT?
-                     (0380). Answered here, before Issue PO, because "ask a
-                     manager" is work somebody has to start — meeting it only as
-                     a refusal after typing eleven prices is the same rule
-                     delivered too late. */
-                  const changed =
-                    !foc &&
-                    d.treatment === "normal" &&
-                    d.cost.trim() !== "" &&
-                    (catalogCost == null || Number(d.cost) !== catalogCost);
-                  const isException = foc || changed;
-                  const approved = isException
-                    ? approvalFor(current, sku, d, catalogCost)
-                    : null;
-                  return (
-                    <div key={sku} className="flex flex-col gap-1">
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="min-w-0 truncate font-mono text-meta">{sku}</span>
-                        <span className="flex shrink-0 items-center gap-2">
-                          {foc ? null : (
-                            <input
-                              type="number"
-                              min={0}
-                              step="0.01"
-                              className="h-7 w-28 rounded-control border border-kit-slate-6 px-1.5 text-right text-meta tabular-nums"
-                              data-testid={`so-batch-cost-${sku}`}
-                              placeholder={catalogCost == null ? "No catalog price" : ""}
-                              value={d.treatment === "normal" ? d.cost : ""}
-                              onChange={(e) =>
-                                setDecision(key, { treatment: "normal", cost: e.target.value })
-                              }
-                            />
-                          )}
-                          <button
-                            type="button"
-                            data-testid={`so-batch-foc-${sku}`}
-                            className={`h-7 rounded-control border px-2 text-meta ${
-                              foc
-                                ? "border-kit-blue-9 bg-kit-blue-3 text-kit-blue-11"
-                                : "border-kit-slate-6"
-                            }`}
-                            onClick={() =>
-                              setDecision(
-                                key,
-                                foc
-                                  ? { treatment: "normal", cost: money(catalogCost) }
-                                  : { treatment: "free_of_charge", reason: "" },
-                              )
-                            }
-                          >
-                            Free of Charge
-                          </button>
-                        </span>
-                      </div>
-                      {foc ? (
-                        <input
-                          className="h-7 w-full rounded-control border border-kit-slate-6 px-1.5 text-meta"
-                          data-testid={`so-batch-foc-reason-${sku}`}
-                          placeholder="Why is this free of charge?"
-                          value={d.reason}
-                          onChange={(e) =>
-                            setDecision(key, { treatment: "free_of_charge", reason: e.target.value })
-                          }
-                        />
-                      ) : null}
-                      {isException ? (
-                        approved ? (
-                          <span
-                            className="text-meta text-kit-green-11"
-                            data-testid={`so-batch-approved-${sku}`}
-                          >
-                            {approved.approvedBy
-                              ? `${approved.approvedBy} approved this price.`
-                              : "A manager approved this price."}
-                          </span>
-                        ) : (
-                          <span
-                            className="flex flex-col"
-                            data-testid={`so-batch-needs-approval-${sku}`}
-                          >
-                            <span className="text-meta text-kit-slate-12">
-                              This is not the Catalog price.
-                            </span>
-                            <span className="text-meta text-kit-slate-11">
-                              Ask a manager to approve this price for{" "}
-                              {current.supplierName ?? "this supplier"}.
-                            </span>
-                          </span>
-                        )
-                      ) : null}
-                    </div>
-                  );
-                })}
-
-                {/* Only a factory-pickup document asks. An own-logistics one
-                    that offered the control would invite a fact the server
-                    refuses (`pickup_partner_not_allowed`). */}
-                {current.supplierKind === "factory_pickup" ? (
-                  <label className="mt-2 flex items-center justify-between gap-3">
-                    <span className="text-label uppercase tracking-wide text-kit-slate-11">
-                      Procurement partner
-                    </span>
-                    <select
-                      className="h-7 min-w-[180px] rounded-control border border-kit-slate-6 px-1.5 text-meta"
-                      data-testid="so-batch-partner"
-                      value={partners[current.key] ?? ""}
-                      onChange={(e) =>
-                        setPartners((prev) => ({ ...prev, [current.key]: e.target.value }))
-                      }
-                    >
-                      <option value="">Choose who collects</option>
-                      {procurementPartners.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                ) : null}
-              </div>
+              {current.supplierKind === "factory_pickup" && current.supplierCollection ? (
+                <p className="mt-4 border-t border-kit-slate-5 pt-3 text-meta text-kit-slate-12">
+                  {current.supplierCollection.procurementPartnerName} collects from{" "}
+                  {current.supplierName ?? "the supplier"} and delivers to{" "}
+                  {destinationName(current.destinationId)}.
+                </p>
+              ) : null}
 
               {/* ⭐ FAIL CLOSED, AND SAY WHAT TO DO (closure §9). LINE 1 is the
                   fact, LINE 2 the act — never `Needs attention`, never a code,

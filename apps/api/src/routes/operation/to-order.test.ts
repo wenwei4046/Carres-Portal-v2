@@ -1589,6 +1589,32 @@ describe("POST …/to-order/issue-batch — one door, one transaction", () => {
     expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(1);
   });
 
+  it("derives Catalog cost and the fixed collection partner from governed data", async () => {
+    const tables = TABLES();
+    (tables.suppliers.data as Record<string, unknown>[])[0]!.kind = "factory_pickup";
+    tables.purchasing_supplier_settings = {
+      data: [{
+        supplier_id: OHANA,
+        off_days: [0],
+        transit_days: 1,
+        fixed_destination_id: KLANG,
+        collected_by_partner_id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+      }],
+      error: null,
+    };
+    const sb = makeSb(tables);
+    const demands = await readyDemands(sb);
+    sb.rpcCalls.length = 0;
+
+    const res = await postBatch({ selections: allTo(demands, KLANG) });
+
+    expect(res.status).toBe(200);
+    const pos = sb.rpcCalls.find((c) => c.fn === "purchasing_issue_pos_batch")!.args
+      .p_pos as Array<{ procurement_partner_id: string; lines: Array<Record<string, unknown>> }>;
+    expect(pos.every((po) => po.procurement_partner_id === "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")).toBe(true);
+    expect(pos.flatMap((po) => po.lines).every((line) => line.cost_source === "catalog")).toBe(true);
+  });
+
   it("the server groups by supplier × Deliver To — the client's grouping is a hint", async () => {
     const sb = makeSb(TABLES());
     const demands = await readyDemands(sb);
@@ -1989,7 +2015,7 @@ describe("the retired door's laws, re-asked of the batch door", () => {
     expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
   });
 
-  it("factory pickup requires one VALID procurement partner", async () => {
+  it("a browser collector cannot replace a missing governed collection rule", async () => {
     const tables = TABLES();
     (tables.suppliers.data as Record<string, unknown>[])[0]!.kind = "factory_pickup";
     const { sb, demands } = await ready(tables);
@@ -2003,10 +2029,8 @@ describe("the retired door's laws, re-asked of the batch door", () => {
       selections: allTo(d2, KLANG),
       documentDecisions: decisionsForAll(demands, KLANG, { orderId: "o1", procurementPartnerId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", lineDecisions: [] }),
     });
-    expect(ok.status).toBe(200);
-    for (const po of batchArgs(sb2)) {
-      expect(po.procurement_partner_id).toBe("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
-    }
+    expect(ok.status).toBe(422);
+    expect(sb2.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
   });
 
   it("a partner nobody governs is refused even on a pickup document", async () => {
@@ -2021,15 +2045,14 @@ describe("the retired door's laws, re-asked of the batch door", () => {
     expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
   });
 
-  it("an own-logistics document cannot smuggle a procurement partner", async () => {
+  it("an obsolete browser collector is ignored for own logistics", async () => {
     const { sb, demands } = await ready();
     const res = await postBatch({
       selections: allTo(demands, KLANG),
       documentDecisions: decisionsForAll(demands, KLANG, { orderId: "o1", procurementPartnerId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", lineDecisions: [] }),
     });
-    expect(res.status).toBe(422);
-    expect(((await res.json()) as { code?: string }).code).toBe("pickup_partner_not_allowed");
-    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
+    expect(res.status).toBe(200);
+    expect(batchArgs(sb).every((po) => po.procurement_partner_id == null)).toBe(true);
   });
 
   it("⭐ the client may never send a quantity, a SKU or a price for a LINE", async () => {
@@ -2353,7 +2376,7 @@ describe("closure §2 · commercial authority", () => {
     }
   });
 
-  it("refuses a line nobody priced instead of filling it from Catalog", async () => {
+  it("fills an undeclared normal line from governed Catalog", async () => {
     const sb = makeSb(TABLES());
     const demands = await readyDemands(sb);
     sb.rpcCalls.length = 0;
@@ -2366,11 +2389,11 @@ describe("closure §2 · commercial authority", () => {
         pricedDoc("o2", KLANG, ["5539-1A(LHF)"]),
       ],
     });
-    expect(res.status).toBe(422);
-    const body = (await res.json()) as { code?: string; sku?: string; action?: string };
-    expect(body.code).toBe("cost_review_required");
-    expect(body.action).toMatch(/Check the cost of/);
-    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
+    expect(res.status).toBe(200);
+    const pos = sb.rpcCalls.find((c) => c.fn === "purchasing_issue_pos_batch")!.args
+      .p_pos as Array<{ lines: Array<Record<string, unknown>> }>;
+    const lines = pos.flatMap((po) => po.lines);
+    expect(lines.every((line) => line.cost_source === "catalog")).toBe(true);
   });
 
   it("sends a hand-entered price as an EXCEPTION, with no catalog expectation", async () => {

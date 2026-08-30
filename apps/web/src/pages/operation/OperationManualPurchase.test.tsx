@@ -1168,22 +1168,23 @@ describe("the control band (2026-08-19)", () => {
  * time. A price nobody was shown is a price nobody reviewed, so the surface
  * shows them and the request carries them.
  */
-describe("closure §2 · the Register's selected issue declares the price it showed", () => {
+describe("closure §2 · Catalog remains the selected issue price authority", () => {
   async function tickReady() {
     await loaded();
     fireEvent.click(screen.getByTestId(`mp-select-${REQ2}`));
     await screen.findByTestId("mp-selection-bar");
   }
 
-  it("names a SKU Catalog has no price for, and never declares it as zero", async () => {
-    apiFetch.mockImplementation((url: string) => {
-      if (url.includes("/purchasing/requests/issue-costs")) {
-        return Promise.resolve({
-          costs: [
-            { sku: "5539-2NA", unitCost: 850 },
-            { sku: "X-NEW-K", unitCost: null },
-          ],
-        });
+  it("names a Catalog cost refusal returned by the governed issue API", async () => {
+    apiFetch.mockImplementation((url: string, init?: RequestInit) => {
+      if (init?.method === "POST" && url.endsWith("/purchasing/requests/issue")) {
+        return Promise.reject(Object.assign(new Error("refused"), {
+          body: {
+            code: "cost_required",
+            message: "X-NEW-K has no transaction cost.",
+            action: "Set the cost of X-NEW-K in Catalog.",
+          },
+        }));
       }
       return Promise.resolve(respond(url));
     });
@@ -1191,11 +1192,8 @@ describe("closure §2 · the Register's selected issue declares the price it sho
     fireEvent.click(screen.getByTestId("mp-issue-selected"));
     const err = await screen.findByTestId("mp-issue-selected-error");
     /* The hole is named, and NOTHING was issued at RM0. */
-    expect(err).toHaveTextContent("Catalog has no price.");
-    expect(err).toHaveTextContent("Ask Catalog to set the cost of X-NEW-K.");
-    expect(
-      apiFetch.mock.calls.find((c) => String(c[0]).endsWith("/purchasing/requests/issue")),
-    ).toBeUndefined();
+    expect(err).toHaveTextContent("X-NEW-K has no transaction cost.");
+    expect(err).toHaveTextContent("Set the cost of X-NEW-K in Catalog.");
   });
 
   it("reports a refusal in the approved two lines", async () => {
@@ -1442,15 +1440,11 @@ describe("Card 04 · selection and PO Duty", () => {
     expect(screen.queryByTestId("mp-po-duty")).toBeNull();
   });
 
-  it("Issue PO declares the reviewed prices and issues the selection together", async () => {
+  it("Issue PO sends only the selected requests and consolidation answer", async () => {
     await loaded();
     fireEvent.click(screen.getByTestId(`mp-select-${REQ2}`));
     fireEvent.click(await screen.findByTestId("mp-issue-selected"));
     await waitFor(() => {
-      const costsRead = apiFetch.mock.calls.find((c) =>
-        String(c[0]).includes("/issue-costs"),
-      );
-      expect(costsRead).toBeTruthy();
       const post = apiFetch.mock.calls.find((c) =>
         String(c[0]).endsWith("/purchasing/requests/issue"),
       );
@@ -1458,7 +1452,7 @@ describe("Card 04 · selection and PO Duty", () => {
       const sent = JSON.parse(String((post![1] as RequestInit).body));
       expect(sent.requestIds).toEqual([REQ2]);
       expect(sent.together).toBe(true);
-      expect(sent.expectedCosts).toEqual({ "5539-2NA": 850 });
+      expect(Object.keys(sent).sort()).toEqual(["requestIds", "together"]);
     });
   });
 

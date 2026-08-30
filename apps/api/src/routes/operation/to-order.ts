@@ -1295,13 +1295,30 @@ toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
     (g) => g.proposal.supplierKind === "factory_pickup",
   );
   let validPartners = new Set<string>();
+  const collectionBySupplier = new Map<
+    string,
+    { partnerId: string; fixedDestinationId: string | null }
+  >();
   if (anyPickup) {
-    const partners = await sb.from("delivery_partners").select("id");
-    if (partners.error) {
-      const m = mapPgError(partners.error);
+    const [partners, configured] = await Promise.all([
+      sb.from("delivery_partners").select("id"),
+      sb
+        .from("purchasing_supplier_settings")
+        .select("supplier_id, fixed_destination_id, collected_by_partner_id"),
+    ]);
+    if (partners.error || configured.error) {
+      const m = mapPgError(partners.error ?? configured.error!);
       return c.json(m.body, m.status);
     }
     validPartners = new Set((partners.data ?? []).map((p) => p.id as string));
+    for (const row of (configured.data ?? []) as Record<string, unknown>[]) {
+      const partnerId = row.collected_by_partner_id as string | null;
+      if (!partnerId || !validPartners.has(partnerId)) continue;
+      collectionBySupplier.set(row.supplier_id as string, {
+        partnerId,
+        fixedDestinationId: (row.fixed_destination_id as string | null) ?? null,
+      });
+    }
   }
 
   /* ⭐ A DECISION BELONGS TO ONE DOCUMENT (Card closure §4). Keyed by
@@ -1368,15 +1385,20 @@ toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
     ];
 
     const decision = decisionsFor(group.key);
-    const partnerId = decision?.procurementPartnerId ?? null;
     const needsPartner = group.proposal.supplierKind === "factory_pickup";
-    if (needsPartner && (!partnerId || !validPartners.has(partnerId))) {
+    const collection = collectionBySupplier.get(group.proposal.supplierId) ?? null;
+    const partnerId = needsPartner ? (collection?.partnerId ?? null) : null;
+    if (needsPartner && !partnerId) {
       return refuse(c, 422, "pickup_partner_required", {
         supplier: group.proposal.supplierName ?? null,
       });
     }
-    if (!needsPartner && partnerId) {
-      return refuse(c, 422, "pickup_partner_not_allowed", {
+    if (
+      needsPartner &&
+      collection?.fixedDestinationId &&
+      collection.fixedDestinationId !== group.destinationId
+    ) {
+      return refuse(c, 422, "supplier_collection_destination_mismatch", {
         supplier: group.proposal.supplierName ?? null,
       });
     }
@@ -1398,18 +1420,31 @@ toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
        * between review and Issue was adopted with nobody's approval. There is
        * no such fallback now: a line nobody checked is a line nobody may buy.
        */
-      if (!d) {
-        return refuse(c, 422, "cost_review_required", {
-          sku: line.sku,
-          supplier: group.proposal.supplierName ?? null,
-        });
-      }
       const sources = line.sources.map((src) => ({
         order_id: src.orderId,
         so: src.so,
         order_line_id: src.orderLineId,
         qty: src.qty,
       }));
+      const liveCost = res.data.catalog.get(line.sku)?.cost ?? null;
+      /* Issue review is not a cost-maintenance screen. With no legacy
+         exception declaration, Catalog is the only commercial input; SQL
+         rechecks the same live value inside the creation transaction. */
+      if (!d) {
+        const facts = { sku: line.sku, supplier: group.proposal.supplierName ?? null };
+        if (liveCost == null || liveCost <= 0) return refuse(c, 422, "cost_required", facts);
+        lines.push({
+          sku: line.sku,
+          qty: line.qty,
+          cost: liveCost,
+          cost_source: "catalog",
+          commercial_treatment: "normal",
+          commercial_reason: null,
+          expected_catalog_cost: liveCost,
+          sources,
+        });
+        continue;
+      }
       if (d.treatment === "free_of_charge") {
         lines.push({
           sku: line.sku,
@@ -1425,7 +1460,6 @@ toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
         });
         continue;
       }
-      const liveCost = res.data.catalog.get(line.sku)?.cost ?? null;
       if (d.costSource === "catalog") {
         /* A CATALOG PRICE THAT MOVED IS A COMMERCIAL DECISION, NOT A RETRY.
            Refused here for the words, and again in SQL for the authority

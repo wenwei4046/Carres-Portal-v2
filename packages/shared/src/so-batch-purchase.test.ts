@@ -662,7 +662,7 @@ describe("documents are grouped by supplier × Deliver To", () => {
     expect(Object.keys(doc!).sort()).toEqual(
       [
         "destinationId", "key", "lines", "qty", "supplierId", "supplierName",
-        "supplierKind", "category", "orderId",
+        "supplierKind", "supplierCollection", "category", "orderId",
       ].sort(),
     );
     // Still no price, no number and no arrival date on the GROUPING itself —

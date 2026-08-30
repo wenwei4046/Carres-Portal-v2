@@ -622,7 +622,10 @@ export function defaultAllocations(
 ): DestinationAllocation[] {
   const qty = row.toBuy ?? 0;
   if (qty <= 0) return [];
-  return [{ destinationId: defaultDestinationId, qty }];
+  return [{
+    destinationId: row.supplierCollection?.fixedDestinationId ?? defaultDestinationId,
+    qty,
+  }];
 }
 
 /**
@@ -722,13 +725,13 @@ export function validateAllocations(
  *
  * Measured 2026-08-24: the browser grouped by supplier × destination and the
  * server grouped by all four. So the operator could review ONE document, press
- * Issue, and be handed THREE — and `documentDecisions`, keyed the browser's
- * way, could attach a price to a document that was never created.
+ * Issue, and be handed THREE. The reviewed PO count did not match what the
+ * server created.
  *
  * A shared function is the only fix that stays fixed. Both sides now compute
- * the same key from the same facts, so `Issue N POs`, `1 of N`,
- * `documentDecisions`, the server's grouping and `pos.length` cannot drift
- * apart. The server still recomputes it from its own recomputation — this is
+ * the same key from the same facts, so `Issue N POs`, `1 of N`, the server's
+ * grouping and `pos.length` cannot drift apart. The server still recomputes it
+ * from its own recomputation — this is
  * agreement, not trust.
  */
 export function documentPartitionKey(f: {
@@ -777,6 +780,8 @@ export interface SoBatchDocument {
   lines: SoBatchDocumentLine[];
   /** Factory pickup needs a procurement partner before this can be issued. */
   supplierKind: "own_logistics" | "factory_pickup" | null;
+  /** The governed factory-collection rule, shown as a read-only fact. */
+  supplierCollection?: PurchaseDemandRow["supplierCollection"];
 }
 
 /**
@@ -817,6 +822,7 @@ export function groupSelectionsIntoDocuments(
           qty: 0,
           lines: [],
           supplierKind: row.supplierKind,
+          supplierCollection: row.supplierCollection ?? null,
         };
         docs.set(key, doc);
       }

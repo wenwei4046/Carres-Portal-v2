@@ -475,6 +475,7 @@ describe("grouping, filtering, counting", () => {
       no_customer_date: 0,
       no_sku: 1,
       no_supplier: 0,
+      no_cost: 0,
       no_production_days: 0,
     });
   });

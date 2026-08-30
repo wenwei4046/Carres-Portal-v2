@@ -470,30 +470,9 @@ export default function OperationManualPurchase() {
       return;
     }
     try {
-      /* ⭐ THE PRICES THIS ISSUE COMMITS TO (0380) — read, then DECLARED, so
-         the door has two numbers to compare instead of one number compared
-         with itself. A SKU Catalog has no price for is named, not zeroed. */
-      const costs = await apiFetch<{ costs: { sku: string; unitCost: number | null }[] }>(
-        `/api/operation/purchasing/requests/issue-costs?requestIds=${encodeURIComponent(
-          ids.join(","),
-        )}`,
-      );
-      const missing = costs.costs.find((c) => c.unitCost == null);
-      if (missing) {
-        setIssueError(
-          `Catalog has no price. Ask Catalog to set the cost of ${missing.sku}.`,
-        );
-        return;
-      }
-      const expectedCosts: Record<string, number> = {};
-      for (const c of costs.costs) {
-        if (c.unitCost != null) expectedCosts[c.sku] = c.unitCost;
-      }
       await issue.mutateAsync({
         requestIds: ids,
         together: true,
-        partners: null,
-        expectedCosts,
       });
       setSelected(new Set());
       void q.refetch();

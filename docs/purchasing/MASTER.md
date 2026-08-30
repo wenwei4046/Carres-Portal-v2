@@ -337,11 +337,17 @@ does not decide it.
   SQL locks the purchase order, compares, and refuses `stale_po_version` writing nothing. Reading
   the current version at confirmation time recorded a revision as sent that the supplier never
   received.
-- **THE PRICE IS DECLARED TOO.** Every line carries `expected_catalog_cost` — the price the operator
-  reviewed — and `purchasing_check_line_commercials` compares it with Catalog. A mismatch is
-  `supplier_price_changed` and creates ZERO purchase orders, because the batch is atomic and a
-  half-priced batch is worse than a refusal. The API used to re-read Catalog and hand the value back
-  as `cost_source: catalog`, so the check compared the live value against itself and always agreed.
+- **CATALOG IS THE NORMAL PRICE AUTHORITY.** Issue review is not a second cost-maintenance screen.
+  The server reads the governed Catalog cost and sends that value as both the line cost and
+  `expected_catalog_cost`; `purchasing_check_line_commercials` re-reads it inside the creation
+  transaction. A missing or changed Catalog cost creates ZERO purchase orders. Commercial
+  exceptions are approved and maintained in their governed Catalog/approval flow, never typed into
+  SO Batch or Manual Purchase Issue review.
+- **SUPPLIER COLLECTION IS MASTER DATA.** A factory-pickup supplier's collector and optional fixed
+  destination come from `purchasing_supplier_settings`. SO Batch Purchase, Manual Purchase, the API
+  and the `purchase_orders` database guard all use that same rule. Review may print the resolved
+  sentence (for example `NETS collects from Nice Future and delivers to Carres Klang.`), but it may
+  not ask the operator to choose a collector for one PO.
 - **AN EXCEPTION NEEDS SOMEBODY ELSE'S APPROVAL.** A hand-entered cost and a Free of Charge each
   require an open, unexpired `po_cost_approvals` record. `purchasing_approve_po_cost` admits only
   `principal` or `finance`, and refuses a manager who is also today's PO actor: one person cannot be
