@@ -5,7 +5,8 @@
 **Page:** Manual Purchase
 **Surface:** Create form dates, daily-work/filter rail, permanent Register, object facts,
 Work Engine hand-off and PO Delivery Date hand-off
-**Status:** READY FOR BUILD — owner-corrected 2026-08-29
+**Status:** EXECUTED — SHIPPED AND DEPLOYED 2026-08-30; production-verified on merge
+`87ef0e2812fc80271d1e527f74513571b32466e9` (completion evidence in §12)
 **Lane:** BUILD / DELIVERY
 **Depends on:** Card 05 production truth (PR #984, merge `a43de3b7`) and latest `main`
 `69600271`; the shared Purchasing/Receiving seam dated 2026-08-29
@@ -281,3 +282,100 @@ Settings lead days. Existing stores, calendars, permissions and one-writer bound
 rest. If implementation discovers that a date cannot be projected from these existing facts
 without a migration or a second authority, stop and return that concrete contradiction; do not
 invent a fallback.
+
+---
+
+## 12 · Completion evidence — 2026-08-30
+
+**Built on this Card's own branch** `codex/manual-purchase-06-date-plan` from `f9a586bd`
+(= `main@69600271` + the Card). Implementation commit `002bd48d`; PR
+[#987](https://github.com/wenwei4046/Carres-Portal-v2/pull/987); merge
+`87ef0e2812fc80271d1e527f74513571b32466e9`. **No migration** — `created_at` and
+`required_by` carry both facts; `Order By` is derived; no store, status column or
+second writer was added.
+
+### What shipped, against the boundary (§9)
+
+- `packages/shared/src/purchasing-settings.ts` — `orderByFromDeliveryDate`, the ONE
+  inverse of the frozen `expectedArrivalOf` (transit on the Office week, production
+  on the factory week, same injected holiday set; round-trip tested against the
+  forward planner). Null is a real answer.
+- `packages/shared/src/manual-purchase.ts` — the corrected words (`Proceed Date` ·
+  `Delivery Date`; `Requested Date`/`Needed By` retired; `Send — lead days are not
+  set` · `Not recorded` · `Order date passed` · `Order by {date}` · the two
+  missing-Settings facts), the seven-section rail contract with unique-MPR
+  AND-combined counts, the timing arithmetic, the earliest-line `Order By`, the
+  work/timing lens order, the Delivery-Date document partition, and the two Work
+  action contracts (`manualPurchaseWorkItems`).
+- `apps/api/src/routes/operation/manual-purchase.ts` — the server date projection
+  (`withDatePlan` stamps every line's `delivery_date` · `order_by` · exact missing
+  Settings facts; `todayIso` is the server's Malaysia date), the create form's
+  `POST /plan` (Proceed preview + slowest-line Delivery Date proposal, ONLY when
+  every asked SKU resolves with complete Settings), Delivery Date required on the
+  header door, per-PO current-version confirmed-sent evidence, and issue
+  revalidation: partition `Supplier × Category × Deliver To × Purpose × Delivery
+  Date`, with each PO's official `eta_date` = the approved Manual Delivery Date —
+  the issue-day recalculation is deleted.
+- `apps/web/src/pages/operation/OperationManualPurchase.tsx` — the corrected create
+  header (read-only server Proceed preview, one Delivery Date input that defaults
+  from the plan and preserves a chosen date, named lead-day facts deep-linking
+  Settings), the seven-section rail, the eleven corrected columns (null Delivery
+  Date prints `Not recorded`), the work/timing lens sort, the object's corrected
+  Request facts with the quiet timing line, and the `?mpr=` deep-link entry.
+- `apps/web/src/pages/operation/use-open-work.ts` + `OperationWork.tsx` — the two
+  Manual Purchase actions join My Work / Team Work through the one existing
+  `WorkItem` grammar; a row deep-links the exact MPR. No manual Done, no local
+  queue, no second completion store.
+
+### Acceptance gates (§10)
+
+1–9 covered by focused tests: shared **2,801**, api **2,583**, web **3,631** — all
+green; plus typecheck, `ci:migrations` (416 filenames, 0 changes),
+design-standard lint, production build and `git diff --check` (gate 10). GitHub CI
+`verify` passed on PR #987 (run 33291911202).
+
+### Production verification (gate 11) — merge SHA, authenticated
+
+All five entry points converged on the exact merge SHA
+`87ef0e2812fc80271d1e527f74513571b32466e9` (`__carres_deploy.json` on
+carres-portal/carres-pos Pages + both canonical domains; API `/health`), and the
+served ERP bundle carries the Card's words (`Proceed Date`, `Send — lead days are
+not set`, `Order date passed`, `SETUP TO FIX`, `Transit days not set`,
+`Issue the purchase order for `, `Not recorded`).
+
+Walked authenticated on the live `operation@carres.com` account, 2026-08-30:
+
+- **Register** — the eleven corrected columns; the real `MPR-20260829-2779` reads
+  `Proceed Date Sat, 29 Aug` · `Delivery Date Mon, 31 Aug` · `Not ordered yet` ·
+  `Need approval` with `Jess approves`.
+- **Rail** — the exact seven sections at 240px; `WORK TO DO` shows all five rows
+  with live counts (`Approve purchase 1`, zeros included); `ORDER TIMING` derived
+  `Order date passed 1` from the live Settings lead days, and clicking it filtered
+  to exactly that request (late-timing walk). `SETUP TO FIX` honestly absent — no
+  affected request exists.
+- **Object** — Request reads the Card's six facts in order with `Order date
+  passed` then `Order by Tue, 11 Aug` under Delivery Date; the shared login sees
+  the approval facts with NO controls and NO money (the §8 boundary rendering
+  exactly as the SQL door would answer); `Requested By` stays
+  `Staff identity not recorded`.
+- **Create default** — the form previews the server's `Proceed Date Sun, 30 Aug`
+  read-only and blocks with `Send — pick a date`; picking `5539-1NA · Booqit`
+  (Supplier: Ohana) made the SERVER propose `Delivery Date Fri, 18 Sep` from the
+  configured production + transit days with no typed date, and
+  `Send for approval` went live. Cancelled — no walk row was minted.
+- **Work hand-off** — Team Work groups **Jess · 1 action to do · 1 late** with
+  `Approve MPR-20260829-2779 · Late — was due Tue, 11 Aug` (due = Order By,
+  Office-calendar lateness), and the row deep-links the exact MPR object.
+
+### Owner walks that remain Jess's (per the governed acceptance boundary)
+
+The role-gated acts cannot be truthfully performed from the shared login — the
+walk itself proved they do not render for it. Their doors are covered by the API/
+SQL contract tests and Card 05's production-verified approval authority:
+
+1. Jess approves (or refuses) `MPR-20260829-2779` on the object — the approved
+   Delivery Date will then drive `Issue PO`.
+2. PO Duty selects requests with two different Delivery Dates — the bar reads
+   `Issue 2 POs` and each PO saves its own approved `PO Delivery Date`.
+3. The issued Manual PO appears in `Purchase Orders` and is received through the
+   one Receiving engine — no Manual receipt lane exists to find.

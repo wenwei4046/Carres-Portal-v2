@@ -909,7 +909,15 @@ blank `SO NO`.
 asks `What is this for?`).
 
 **Left rail — OWNER-CORRECTED 2026-08-29 (Card 06 supersedes Card 03's four-section
-shape; Card 03 remains the shipped shell/count history).** The vocabulary's applied door authority is
+shape; Card 03 remains the shipped shell/count history); PRODUCTION-VERIFIED on merge
+`87ef0e2812fc80271d1e527f74513571b32466e9` 2026-08-30** (PR #987; no migration; walked
+authenticated on the live `operation@carres.com` account: the exact seven sections with
+live unique-MPR counts, `ORDER TIMING` deriving `Order date passed 1` for the real
+`MPR-20260829-2779` from the configured lead days, the timing filter narrowing to exactly
+that request, and `SETUP TO FIX` honestly absent with no affected request — Card 06 §12
+holds the complete evidence, including the create form's server-proposed Delivery Date
+and the `Approve {MPR}` Work hand-off grouped under Jess, due on Order By, deep-linking
+the exact object).** The vocabulary's applied door authority is
 migration 0399 (2026-08-28), widened by 0401 (Card 04) with `other_purchase`; the sixth
 rail row arrives through the one shared `DEMAND_PURPOSES` list, so the rail and the doors
 cannot drift. The shared 240px
@@ -1023,7 +1031,11 @@ rail). The default population is the COMPLETE permanent history, ordered records
 newest `Proceed Date` (`created_at`) first. A work/timing lens sorts earliest calculated
 `Order By` first, then newest Proceed Date.
 
-**Columns, exactly and in this order — owner correction 2026-08-29 (Card 06):** Proceed Date ·
+**Columns, exactly and in this order — owner correction 2026-08-29 (Card 06);
+PRODUCTION-VERIFIED on `87ef0e28` 2026-08-30 together with the date contract below (the
+issued PO's `eta_date` now IS the approved Manual Delivery Date, and the issue partition
+adds Delivery Date — different approved dates create different POs through the one
+`purchasing_issue_pos_batch` door):** Proceed Date ·
 Approval Status · Manual Purchase No · PO No · Delivery Date · For · Items · Qty · Supplier ·
 Deliver To · Requested By.
 
