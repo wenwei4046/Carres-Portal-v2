@@ -203,10 +203,10 @@ export type DataGridProps<T> = {
    * its unit passes it — `1 delivery scope selected` (owner ruling 2026-08-24).
    */
   selectionSummary?: (n: number) => string;
-  /** Page-owned context/actions at the right edge of the selected toolbar.
-   *  Use this for structured ownership beside the one governed action; it is
-   *  rendered only while the grid has a checked or indeterminate row. */
-  selectionEnd?: ReactNode;
+  /** Page-owned primary action beside the selection summary and Clear.
+   *  Use this for structured ownership beside the governed work action;
+   *  outputs remain separated at the toolbar's right edge. */
+  selectionPrimary?: ReactNode;
   /** Hover/title on the disclosure chevron — what OPENS, not the mechanic. */
   expandTitle?: string;
   /** Hide the built-in Excel pill on the selection bar. */
@@ -445,7 +445,7 @@ function DataGridInner<T>({
   toolbarEnd,
   selectionActions,
   selectionSummary,
-  selectionEnd,
+  selectionPrimary,
   expandTitle,
   hideSelectionExport,
   statusSummary,
@@ -1853,6 +1853,7 @@ function DataGridInner<T>({
           >
             Clear
           </button>
+          {selectionPrimary}
           <div className={styles.toolbarSpacer} />
           {!hideSelectionExport && (
             <button
@@ -1888,7 +1889,6 @@ function DataGridInner<T>({
                 <span>{a.label(selectedOrIndeterminateVisibleRows.length)}</span>
               </button>
             ))}
-          {selectionEnd}
         </div>
       )}
 

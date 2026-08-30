@@ -454,6 +454,11 @@ describe("selection — the parent checkbox is ALL eligible child demand", () =>
     );
     expect(within(bar).getByTestId("so-batch-issue")).toBeEnabled();
     expect(bar).not.toHaveTextContent("Yu Jun holds PO duty");
+    expect(within(bar).getAllByRole("button").map((button) => button.textContent)).toEqual([
+      "Clear",
+      "Issue PO",
+      "Export Excel (1)",
+    ]);
     expect(screen.queryByTestId("so-batch-selection-bar")).not.toBeInTheDocument();
   });
 

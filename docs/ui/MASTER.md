@@ -950,14 +950,16 @@ row of pills. Header-column filters remain the direct per-column filter door; th
 add a duplicate generic Filters button. `Reset layout` remains inside Columns.
 
 Selecting rows **replaces** the normal Toolbar within the same 45px height; it never adds a third
-permanent band. Left = truthful selected count + Clear. Right = only actions valid for that exact
-selection. A one-record action disappears for multi-selection rather than pretending to apply to
-many. Normal and selection states preserve the table's position and width.
+permanent band. Left = truthful selected count + Clear + the primary work action and any structured
+owner context it needs. Right = outputs such as Export, followed only by secondary actions valid for
+that exact selection. A one-record action disappears for multi-selection rather than pretending to
+apply to many. Normal and selection states preserve the table's position and width.
 
 On SO Batch Purchase, PO Duty ownership is shown only beside the selected `Issue PO` action as one
 compact initials avatar chip (`YJ`, or the current dated cover), with full identity and duty context
 in title/accessible name. There is no permanent PO Duty toolbar/rail block and no owner repetition
-on rows. The chip states work ownership; it does not imply that the current actor is the owner.
+on rows. The left-side order is summary · Clear · owner chip · `Issue PO`; `Export Excel` stays at
+the far right. The chip states work ownership; it does not imply that the current actor is the owner.
 
 **REGISTER EXPORT AND OVERFLOW ROUTING — APPROVED / LOCKED (Loo, 2026-08-11).** A Register uses
 one visible `Export ▾` control for its supported current-view outputs: Excel · PDF · Print. Output

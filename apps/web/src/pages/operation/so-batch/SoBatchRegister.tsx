@@ -750,7 +750,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
                 testId: (o: SoBatchOrderRow) => `so-batch-select-${o.orderId}`,
               }}
               selectionSummary={() => summary.text}
-              selectionEnd={summary.lines > 0 ? (
+              selectionPrimary={summary.lines > 0 ? (
                 <span
                   className="flex shrink-0 items-center gap-2"
                   data-testid="so-batch-selection-actions"

@@ -257,9 +257,9 @@ above the column headings and does not create a second action surface at the bot
 4 selected · 7 units · Issue 3 POs
 ```
 
-The same top bar carries `Clear`, valid selection outputs, the compact PO Duty/cover chip and
-`Issue PO`. `Issue PO` opens the full-screen `Review Purchase Orders` surface and preserves
-selection and allocations.
+The same top bar carries summary · `Clear` · compact PO Duty/cover chip · `Issue PO` on the left;
+valid selection outputs such as `Export Excel` stay at the far right. `Issue PO` opens the
+full-screen `Review Purchase Orders` surface and preserves selection and allocations.
 
 ### 5.2 50% work + 50% live PDF
 

@@ -663,8 +663,9 @@ Module Register rails remain factual filters and do not copy central Work action
 shared Register Kit's complete light four-sided frame around its Work Toolbar, table and fixed status
 footer. It does not add a page-local second frame. This is not a card around the page and not a box
 around every row. Selecting a row replaces the Register's top Work Toolbar in the same fixed-height
-band with the summary, `Clear`, valid outputs, PO Duty chip and `Issue PO`. The primary action is
-never placed in a second bar below the table or at the bottom of the viewport.
+band with the summary, `Clear`, PO Duty chip and `Issue PO` on the left, and valid outputs such as
+`Export Excel` at the far right. The primary action is never placed in a second bar below the table
+or at the bottom of the viewport.
 
 **Left rail — APPROVED / LOCKED, latest owner ruling 2026-08-29.** The rail lets an operator inspect
 what remains unordered, when each order should be placed, which product category and which actual
@@ -742,7 +743,8 @@ SETUP TO FIX              ← the whole section renders only when at least one a
 - **PO Duty appears only in the selected Issue action, never as a permanent toolbar/rail block and
   never repeated on rows.** Selection replaces the Register's top Work Toolbar; it never adds a
   bottom action bar. The selected bar direction is
-  `1 selected · 1 unit · Issue 1 PO          [YJ]  [Issue PO]`. `[YJ]` is a compact structured owner
+  `1 selected · 1 unit · Issue 1 PO  [Clear]  [YJ]  [Issue PO]          [Export Excel (1)]`.
+  `[YJ]` is a compact structured owner
   avatar chip; hover/title reads `Yu Jun · PO Duty`. A dated cover replaces the initials and title
   with the cover identity. The action sentence never names Yu Jun. The chip states normal ownership;
   button authority comes from §5.3, so duty/cover, Jess and `operation@carres.com` see the live action.
