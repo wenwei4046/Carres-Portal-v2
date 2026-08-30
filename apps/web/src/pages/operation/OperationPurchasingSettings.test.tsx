@@ -20,6 +20,7 @@ const setProduction = vi.fn();
 const setWorkWeek = vi.fn();
 const createDestination = vi.fn();
 const updateDestination = vi.fn();
+const setSupplierCollection = vi.fn();
 
 function mutation(mutateAsync: ReturnType<typeof vi.fn>) {
   return { mutateAsync, isPending: false, isError: false, error: null };
@@ -36,6 +37,7 @@ vi.mock("@/lib/queries", async () => {
     useSetSupplierWorkWeek: () => mutation(setWorkWeek),
     useCreatePurchasingDestination: () => mutation(createDestination),
     useUpdatePurchasingDestination: () => mutation(updateDestination),
+    useSetPurchasingSupplierCollection: () => mutation(setSupplierCollection),
   };
 });
 
@@ -50,6 +52,8 @@ function wrap(node: React.ReactNode) {
 
 const NICE = "11111111-0000-0000-0000-000000000001";
 const OHANA = "22222222-0000-0000-0000-000000000002";
+const KLANG = "33333333-0000-0000-0000-000000000003";
+const NETS = "66666666-0000-0000-0000-000000000006";
 
 function settings(over: Partial<PurchasingSettingsResponse> = {}): PurchasingSettingsResponse {
   return {
@@ -68,7 +72,7 @@ function settings(over: Partial<PurchasingSettingsResponse> = {}): PurchasingSet
     ],
     destinations: [
       {
-        id: "33333333-0000-0000-0000-000000000003",
+        id: KLANG,
         name: "Carres Klang",
         address: "Lot 12, Klang",
         isDefault: true,
@@ -92,6 +96,15 @@ function settings(over: Partial<PurchasingSettingsResponse> = {}): PurchasingSet
         warehouseLinked: false,
       },
     ],
+    supplierCollections: [
+      {
+        supplierId: NICE,
+        supplierName: "Nice Future",
+        destinationId: KLANG,
+        partnerId: NETS,
+      },
+    ],
+    deliveryPartners: [{ id: NETS, name: "NETS" }],
     lastChanges: [
       {
         settingKey: "production_days",
@@ -116,6 +129,7 @@ beforeEach(() => {
   setPoDays.mockResolvedValue(settings());
   createDestination.mockResolvedValue(settings());
   updateDestination.mockResolvedValue(settings());
+  setSupplierCollection.mockResolvedValue(settings());
 });
 
 describe("Purchasing → Settings", () => {
@@ -135,6 +149,32 @@ describe("Purchasing → Settings", () => {
     expect(within(section).getByText("AL Sungai Buloh")).toBeInTheDocument();
     expect(within(section).getByText("Ohana")).toBeInTheDocument();
     expect(within(section).getByText("Address not set")).toBeInTheDocument();
+  });
+
+  it("keeps the factory collector and destination in Settings, not Issue review", () => {
+    render(wrap(<OperationPurchasingSettings />));
+    const section = screen.getByTestId("supplier-collection-settings");
+    expect(within(section).getByText("Nice Future")).toBeInTheDocument();
+    expect(within(section).getByLabelText("Collector for Nice Future")).toHaveValue(NETS);
+    expect(within(section).getByLabelText("Deliver To for Nice Future")).toHaveValue(KLANG);
+    expect(within(section).getByText("NETS collects from Nice Future and delivers to Carres Klang.")).toBeInTheDocument();
+  });
+
+  it("saves one complete supplier collection rule", async () => {
+    render(wrap(<OperationPurchasingSettings />));
+    const section = screen.getByTestId("supplier-collection-settings");
+    fireEvent.change(within(section).getByLabelText("Deliver To for Nice Future"), {
+      target: { value: "44444444-0000-0000-0000-000000000004" },
+    });
+    fireEvent.click(within(section).getByRole("button", { name: "Save" }));
+
+    await waitFor(() =>
+      expect(setSupplierCollection).toHaveBeenCalledWith({
+        supplierId: NICE,
+        destinationId: "44444444-0000-0000-0000-000000000004",
+        partnerId: NETS,
+      }),
+    );
   });
 
   it("adds a future Deliver To from Settings", async () => {

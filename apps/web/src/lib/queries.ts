@@ -234,6 +234,7 @@ import {
   type PurchasingSetProductionDaysInput,
   type PurchasingSetWorkWeekInput,
   type PurchasingUpdateDestinationInput,
+  type PurchasingSetSupplierCollectionInput,
   // 0244/0245 — HR commission portal (GET /api/hr/report + config writes).
   type CommissionReport,
   type CommissionStaff,
@@ -4940,6 +4941,26 @@ export function useUpdatePurchasingDestination() {
       void qc.invalidateQueries({ queryKey: ["so-batch-purchase"] });
       void qc.invalidateQueries({ queryKey: ["to-order", "pick-items"] });
       void qc.invalidateQueries({ queryKey: ["operation", "pos"] });
+    },
+  });
+}
+
+export function useSetPurchasingSupplierCollection() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      supplierId,
+      ...input
+    }: PurchasingSetSupplierCollectionInput & { supplierId: string }) =>
+      apiFetch<PurchasingSettingsResponse>(
+        `/api/operation/purchasing/settings/supplier-collection/${encodeURIComponent(supplierId)}`,
+        { method: "PUT", body: JSON.stringify(input) },
+      ),
+    onSuccess: (data) => {
+      qc.setQueryData(qk.operation.purchasingSettings(), data);
+      void qc.invalidateQueries({ queryKey: ["so-batch-purchase"] });
+      void qc.invalidateQueries({ queryKey: ["to-order", "pick-items"] });
+      void qc.invalidateQueries({ queryKey: ["operation", "manual-purchase"] });
     },
   });
 }

@@ -494,6 +494,46 @@ describe("selection — the parent checkbox is ALL eligible child demand", () =>
     expect(screen.getByTestId("so-batch-select-o6")).toBeDisabled();
   });
 
+  it("an unselectable Catalog-cost row says why on the affected order", async () => {
+    const blocked = leaf({
+      id: "build::cost::b1",
+      state: "no_cost",
+      lineIds: ["cost-line"],
+      orderId: "cost-order",
+      so: 1500,
+      item: "B1201S",
+      issueRef: null,
+      parts: [{ sku: "B1201S-K", qty: 1, unitCost: null }],
+      action: soBatchAction({
+        state: "no_cost",
+        item: "B1201S",
+        supplier: "Nice Future",
+        category: "mattress",
+        ownerId: null,
+        ownerName: null,
+        orderId: "cost-order",
+        so: 1500,
+        dueDate: "2026-08-19",
+      }),
+    });
+    const order = orderRow({
+      orderId: "cost-order",
+      so: 1500,
+      lines: [
+        { orderLineId: "cost-line", sku: "B1201S-K", qty: 1, stockTaken: 0,
+          item: "B1201S", variant: "King", category: "mattress", pos: [] },
+      ],
+      outstandingSuppliers: ["Nice Future"],
+    });
+    renderRegister({ rows: [blocked], registerRows: [order] });
+
+    expect(screen.getByTestId("so-batch-select-cost-order")).toBeDisabled();
+    fireEvent.click(screen.getByTestId("so-batch-expand-cost-order"));
+    const box = await screen.findByTestId("so-batch-inspector-cost-order");
+    expect(within(box).getByText("Catalog cost is missing")).toBeInTheDocument();
+    expect(within(box).getByText("Set the cost of B1201S in Catalog")).toBeInTheDocument();
+  });
+
   it("a Partial order selects only its uncovered eligible remainder", () => {
     renderRegister();
     fireEvent.click(screen.getByTestId("so-batch-select-o3"));

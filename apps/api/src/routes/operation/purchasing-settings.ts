@@ -5,6 +5,7 @@ import {
   purchasingSetNumberInput,
   purchasingSetPoDaysInput,
   purchasingSetProductionDaysInput,
+  purchasingSetSupplierCollectionInput,
   purchasingSetWorkWeekInput,
   purchasingSettingsResponseSchema,
   purchasingUpdateDestinationInput,
@@ -167,6 +168,30 @@ purchasingSettingsRouter.put(
       p_address: parsed.data.address,
       p_active: parsed.data.active,
       p_is_default: parsed.data.isDefault,
+    });
+    if (error) {
+      const m = mapPgError(error);
+      return c.json(m.body, m.status);
+    }
+    return respondWithSettings(c);
+  },
+);
+
+purchasingSettingsRouter.put(
+  "/supplier-collection/:supplierId",
+  requireOperationOrPrincipal,
+  async (c) => {
+    const supplierId = z.string().uuid().safeParse(c.req.param("supplierId"));
+    if (!supplierId.success) {
+      return c.json({ error: "invalid_supplier", message: "Invalid supplier." }, 422);
+    }
+    const parsed = await parseJsonBody(c, purchasingSetSupplierCollectionInput);
+    if (!parsed.ok) return c.json(parsed.body, parsed.status);
+    const sb = userClient(c.env, c.var.auth.jwt);
+    const { error } = await sb.rpc("purchasing_set_supplier_collection", {
+      p_supplier_id: supplierId.data,
+      p_destination_id: parsed.data.destinationId,
+      p_partner_id: parsed.data.partnerId,
     });
     if (error) {
       const m = mapPgError(error);

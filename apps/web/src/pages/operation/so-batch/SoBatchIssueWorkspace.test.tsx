@@ -472,9 +472,9 @@ describe("the issue review only reviews the purchase order", () => {
     expect(screen.queryByRole("button", { name: "Free of Charge" })).not.toBeInTheDocument();
   });
 
-  it("shows the governed collection rule as a fact instead of asking who collects", () => {
+  it("keeps the governed collection rule in Settings instead of repeating it in Issue review", () => {
     renderWorkspace([fixedPickup]);
-    expect(screen.getByText("NETS collects from Nice Future and delivers to Carres Klang.")).toBeInTheDocument();
+    expect(screen.queryByText("NETS collects from Nice Future and delivers to Carres Klang.")).not.toBeInTheDocument();
     expect(screen.queryByRole("combobox", { name: "Procurement partner" })).not.toBeInTheDocument();
     expect(screen.getByTestId("so-batch-issue-create")).toBeEnabled();
   });

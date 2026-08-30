@@ -594,6 +594,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
       onSplitLeaf={setLeafAllocations}
       destinations={data.destinations}
       destinationName={destinationName}
+      safetyDays={data.safetyDays}
     />
   );
 
@@ -858,6 +859,7 @@ function SoBatchOrderExpansion({
   onSplitLeaf,
   destinations,
   destinationName,
+  safetyDays,
 }: {
   order: SoBatchOrderRow;
   leafs: PurchaseDemandRow[];
@@ -868,6 +870,7 @@ function SoBatchOrderExpansion({
   onSplitLeaf: (leafId: string, allocations: DestinationAllocation[]) => void;
   destinations: SoBatchPurchaseResponse["destinations"];
   destinationName: (id: string | null) => string;
+  safetyDays: number;
 }) {
   const expansion = useSalesOrderExpansion(order.orderId);
   const unitIdsByLine = useMemo(
@@ -900,7 +903,7 @@ function SoBatchOrderExpansion({
       linePos.map((p) => destinationName(p!.destinationId)),
     );
     const supplier = soBatchCellSummary([
-      ...(eligible ? [leaf.supplier] : []),
+      ...(leaf ? [leaf.supplier] : []),
       ...linePos.map((p) => p!.supplierName),
     ]);
     const poDate = soBatchCellSummary(linePos.map((p) => p!.etaDate));
@@ -975,6 +978,7 @@ function SoBatchOrderExpansion({
         deliverTo: [],
         deliverToAbsence: "—",
         supplierAbsence: "—",
+        supplier: leaf.supplier ?? undefined,
         poDeliveryDateAbsence: "—",
         sku: part.sku,
         qty: part.qty,
@@ -988,8 +992,29 @@ function SoBatchOrderExpansion({
     return <div className="px-2 py-2 text-body text-kit-slate-11">No items on this order</div>;
   }
 
+  const stateWords = purchaseDemandStateWords(safetyDays);
+  const blockers = leafs.filter(
+    (leaf) => !isSelectableForBuying(leaf) && leaf.action != null,
+  );
+
   return (
     <div data-testid={`so-batch-inspector-${order.orderId}`}>
+      {blockers.length > 0 && (
+        <div className="mb-2 overflow-hidden rounded-control border border-warning/40 bg-warning-soft/40">
+          {blockers.map((leaf) => (
+            <div
+              key={leaf.id}
+              className="border-b border-warning/30 px-3 py-2 last:border-b-0"
+              data-testid={`so-batch-blocker-${leaf.id}`}
+            >
+              <div className="text-body font-medium text-kit-slate-12">
+                {stateWords[leaf.state]}
+              </div>
+              <div className="text-meta text-kit-slate-11">{leaf.action!.action}</div>
+            </div>
+          ))}
+        </div>
+      )}
       <GoodsMiniTable
         label={order.so == null ? "Goods on this order" : `Goods on SO-${order.so}`}
         lines={lines}

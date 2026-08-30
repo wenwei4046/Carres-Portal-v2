@@ -345,9 +345,10 @@ does not decide it.
   SO Batch or Manual Purchase Issue review.
 - **SUPPLIER COLLECTION IS MASTER DATA.** A factory-pickup supplier's collector and optional fixed
   destination come from `purchasing_supplier_settings`. SO Batch Purchase, Manual Purchase, the API
-  and the `purchase_orders` database guard all use that same rule. Review may print the resolved
-  sentence (for example `NETS collects from Nice Future and delivers to Carres Klang.`), but it may
-  not ask the operator to choose a collector for one PO.
+  and the `purchase_orders` database guard all use that same rule. Review neither repeats the
+  collection arrangement nor asks the operator to choose a collector for one PO. Managers maintain
+  both fields in `Settings → Purchasing → Supplier collection`; future factory-pickup suppliers appear from master
+  data and future destinations continue to come from the adjacent `Deliver To` setting.
 - **AN EXCEPTION NEEDS SOMEBODY ELSE'S APPROVAL.** A hand-entered cost and a Free of Charge each
   require an open, unexpired `po_cost_approvals` record. `purchasing_approve_po_cost` admits only
   `principal` or `finance`, and refuses a manager who is also today's PO actor: one person cannot be
@@ -682,6 +683,10 @@ or at the bottom of the viewport.
 what remains unordered, when each order should be placed, which product category and which actual
 supplier — with every label fully readable. It does not repeat central Work or expose Sales/Catalog
 actions to Operation. Five sections, in this exact order:
+
+An unavailable row explains its own blocker inside that Sales Order's framed expansion. Missing
+Catalog cost therefore reads `Catalog cost is missing` plus `Set the cost of {item} in Catalog` on
+the affected order; it never returns as a `WORK TO DO` rail panel or as an editor in Issue review.
 
 ```text
 TO ORDER
