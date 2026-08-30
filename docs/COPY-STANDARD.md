@@ -640,7 +640,7 @@ sidebar page. Existing implementation constants do not override these approved p
 |---|---|
 | Page | No page — use `SO Batch Purchase` or the source object |
 | Search | `Search Sales Order, customer, SKU or supplier…` |
-| Rail headings | `TO ORDER` · `ORDER TIMING` · `PRODUCT` · `SUPPLIER` · `SETUP TO FIX` |
+| Rail headings | `TO ORDER` · `ORDER TIMING` · `PRODUCT` · `SUPPLIER` · `REGION` · `SETUP TO FIX` |
 | Empty state | `No proceeded Sales Orders.` |
 | Register columns (Card 02-B, 2026-08-27 — exactly, in this order) | `Status` · `Proceed Date` · `PO No` · `SO No` · `Customer` · `Delivery Location` · `Requested Delivery Date` · `Supplier` · `Deliver To` · `PO Delivery Date` |
 | `Proceed Date` on SO Batch Purchase | The actual date Sales handed the complete order to Operations (`orders.proceeded_at`). Never the planned production-start field (`orders.proceed_date`) |
@@ -673,7 +673,7 @@ No recorded business date is silently moved to fit a calendar. Purchasing/Operat
 Office calendar (Mon–Fri); Receiving/GRN/Warehouse uses the Warehouse calendar (Mon–Sat); Sunday
 and Selangor public holidays are excluded.
 
-**The SO Batch Purchase rail — latest owner ruling 2026-08-29.** Five purchasing fact sections,
+**The SO Batch Purchase rail — latest owner ruling 2026-08-30.** Six purchasing fact sections,
 in this order. Central Work actions do not appear here. `SETUP TO FIX` renders only when at least
 one affected Sales Order exists:
 
@@ -683,17 +683,21 @@ one affected Sales Order exists:
 | `ORDER TIMING` | `Can order early` · `14 safety days left` · `1–13 safety days left` · `No safety days left` · `Not enough production days` |
 | `PRODUCT` | `All products` · `Mattress` · `Bedframe` · `Sofa` |
 | `SUPPLIER` | `All suppliers` · actual supplier names, alphabetical — never hardcoded, never a placeholder, and no `No supplier` row |
+| `REGION` | `All regions` · `Klang Valley` first · actual outstation Delivery State names, alphabetical · `Others` last and only when Delivery State is not recorded |
 | `SETUP TO FIX` | `Production days not set` |
 
 `My Work` / `Team Work` are the only daily-work surfaces. The SO Batch rail must not copy
 `Issue PO`, customer-information, Catalog or supplier-setup actions into a local work panel.
 Counts are UNIQUE Sales Orders, never documents, notifications, leaf lines, SKU quantities or
 PO counts, and each section's counts update against the other selected sections. The fixed
-fact rows print their live count, zero included; a supplier row exists only while it matches —
-except the selected supplier, which stays visible with `0`. The default no-filter Register
+fact rows print their live count, zero included; a supplier or region row exists only while it
+matches — except the selected row, which stays visible with `0`. Region reads the server's
+recorded Delivery State: Kuala Lumpur, Selangor and Putrajaya group as `Klang Valley`; every
+outstation state keeps its own name; an absent state is `Others`. The default no-filter Register
 shows every proceeded record; `All not ordered` is a real outstanding-only filter that
 excludes fully Ordered records. One filter per section; sections combine; a second click on
-the selected timing row clears it; `All products` and `All suppliers` clear their sections.
+the selected timing row clears it; `All products`, `All suppliers` and `All regions` clear
+their sections.
 The rail carries NO checkboxes — filters are `NavRow` rows; the only checkboxes on the page
 are the Register's `Issue PO` selection. Every `ORDER TIMING` row stays orderable — the words
 say timing risk, never `Cannot buy`, and Order By is a planned date, never an unlock date.

@@ -103,10 +103,10 @@ export const SO_BATCH_PURCHASE_WORDS = {
 // ─── The rail ────────────────────────────────────────────────────────────────
 
 /**
- * THE RAIL CONTRACT — latest Owner ruling 2026-08-29;
+ * THE RAIL CONTRACT — latest Owner ruling 2026-08-30;
  * `docs/COPY-STANDARD.md` — the rail; `docs/purchasing/MASTER.md` §9.1).
  *
- * Five purchasing fact sections, in this exact order. Work remains in the
+ * Purchasing fact sections, in their governed order. Work remains in the
  * central owner-resolved `My Work` / `Team Work` surfaces; the local rail must
  * not copy Sales, Catalog or Purchasing actions into a second work lens.
  * `TO ORDER` holds the one `All not
@@ -114,9 +114,11 @@ export const SO_BATCH_PURCHASE_WORDS = {
  * every one of them orderable. `PRODUCT` holds the three Catalog categories —
  * the CATALOG's answer, never SKU-text inference. `SUPPLIER` holds the actual
  * supplier names the Register itself projects, alphabetical and never
- * hardcoded. `SETUP TO FIX` holds the one Purchasing-owned setup blocker and
- * renders ONLY while an affected Sales Order exists — an exception section
- * with nothing in it is noise wearing a heading.
+ * hardcoded. `REGION` groups the order's recorded Delivery State using the
+ * established operator vocabulary. `SETUP TO FIX` holds the one
+ * Purchasing-owned setup blocker and renders ONLY while an affected Sales
+ * Order exists — an exception section with nothing in it is noise wearing a
+ * heading.
  *
  * The rail is NAVIGATION, not batch selection: one filter per section,
  * sections combine, and no rail row ever grows a checkbox — the page's only
@@ -136,6 +138,7 @@ export const SO_BATCH_RAIL = {
     ],
   },
   supplier: { heading: "SUPPLIER", all: "All suppliers" },
+  region: { heading: "REGION", all: "All regions" },
   setup: {
     heading: "SETUP TO FIX",
     states: ["no_production_days"] as readonly PurchaseDemandState[],
@@ -163,6 +166,8 @@ export interface SoBatchRailFilter {
   product: SoBatchProductCategory | null;
   /** One supplier name; `null` is `All suppliers`. */
   supplier: string | null;
+  /** One delivery-region label; `null` is `All regions`. */
+  region: string | null;
   /** The one `SETUP TO FIX` row. */
   setup: boolean;
 }
@@ -172,8 +177,27 @@ export const SO_BATCH_RAIL_CLEAR: SoBatchRailFilter = {
   timing: null,
   product: null,
   supplier: null,
+  region: null,
   setup: false,
 };
+
+const SO_BATCH_KLANG_VALLEY = "Klang Valley";
+const SO_BATCH_OTHER_REGION = "Others";
+const SO_BATCH_KLANG_VALLEY_STATES = new Set(["kuala lumpur", "selangor", "putrajaya"]);
+
+/**
+ * The Register already receives the server's parsed Delivery State. Region is
+ * a presentation grouping over that fact: Klang Valley is grouped, every
+ * outstation state keeps its own name, and an absent state stays findable as
+ * `Others`. No address text or postcode is guessed in the browser.
+ */
+function soBatchRegionName(state: string | null): string {
+  const recorded = state?.trim();
+  if (!recorded) return SO_BATCH_OTHER_REGION;
+  return SO_BATCH_KLANG_VALLEY_STATES.has(recorded.toLowerCase())
+    ? SO_BATCH_KLANG_VALLEY
+    : recorded;
+}
 
 /**
  * THE ONE SUPPLIER PROJECTION (Card 02-C §7). The `Supplier` column and the
@@ -202,6 +226,8 @@ export interface SoBatchRailFacts {
   categories: ReadonlySet<ProductCategory>;
   /** `soBatchOrderSupplierNames`, deduplicated. */
   suppliers: ReadonlySet<string>;
+  /** Region derived only from the order's recorded Delivery State. */
+  region: string;
 }
 
 export function soBatchRailFacts(
@@ -229,10 +255,17 @@ export function soBatchRailFacts(
     suppliers: new Set(
       soBatchOrderSupplierNames(o).filter((s): s is string => s != null && s !== ""),
     ),
+    region: soBatchRegionName(o.deliveryState),
   }));
 }
 
-type SoBatchRailSection = "toOrder" | "timing" | "product" | "supplier" | "setup";
+type SoBatchRailSection =
+  | "toOrder"
+  | "timing"
+  | "product"
+  | "supplier"
+  | "region"
+  | "setup";
 
 /** Does this order pass every selected section — except, optionally, one? */
 function railMatches(
@@ -250,6 +283,7 @@ function railMatches(
   if (except !== "supplier" && filter.supplier != null && !f.suppliers.has(filter.supplier)) {
     return false;
   }
+  if (except !== "region" && filter.region != null && f.region !== filter.region) return false;
   if (except !== "setup" && filter.setup && !f.states.has("no_production_days")) return false;
   return true;
 }
@@ -270,6 +304,8 @@ export interface SoBatchRailModel {
   productCounts: Record<SoBatchProductCategory, number>;
   /** Actual names, alphabetical. Never hardcoded, never a placeholder. */
   suppliers: Array<{ name: string; count: number }>;
+  /** Delivery regions, Klang Valley first and missing state last. */
+  regions: Array<{ name: string; count: number }>;
   setupCount: number;
   /** Whether `SETUP TO FIX` renders at all: any affected Sales Order exists. */
   setupExists: boolean;
@@ -305,6 +341,20 @@ export function soBatchRailModel(
     supplierCounts.set(filter.supplier, 0);
   }
 
+  const regionCounts = new Map<string, number>();
+  for (const f of facts) {
+    if (!railMatches(f, filter, "region")) continue;
+    regionCounts.set(f.region, (regionCounts.get(f.region) ?? 0) + 1);
+  }
+  if (filter.region != null && !regionCounts.has(filter.region)) {
+    regionCounts.set(filter.region, 0);
+  }
+  const regionOrder = (name: string) => {
+    if (name === SO_BATCH_KLANG_VALLEY) return -1;
+    if (name === SO_BATCH_OTHER_REGION) return 1;
+    return 0;
+  };
+
   return {
     visibleOrderIds: new Set(
       facts.filter((f) => railMatches(f, filter)).map((f) => f.orderId),
@@ -315,6 +365,9 @@ export function soBatchRailModel(
     suppliers: [...supplierCounts]
       .map(([name, n]) => ({ name, count: n }))
       .sort((a, b) => a.name.localeCompare(b.name)),
+    regions: [...regionCounts]
+      .map(([name, n]) => ({ name, count: n }))
+      .sort((a, b) => regionOrder(a.name) - regionOrder(b.name) || a.name.localeCompare(b.name)),
     setupCount: count("setup", (f) => f.states.has("no_production_days")),
     setupExists: facts.some((f) => f.states.has("no_production_days")),
   };

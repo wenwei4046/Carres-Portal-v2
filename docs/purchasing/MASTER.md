@@ -679,10 +679,10 @@ band with the summary, `Clear`, PO Duty chip and `Issue PO` on the left, and val
 `Export Excel` at the far right. The primary action is never placed in a second bar below the table
 or at the bottom of the viewport.
 
-**Left rail — APPROVED / LOCKED, latest owner ruling 2026-08-29.** The rail lets an operator inspect
+**Left rail — APPROVED / LOCKED, latest owner ruling 2026-08-30.** The rail lets an operator inspect
 what remains unordered, when each order should be placed, which product category and which actual
-supplier — with every label fully readable. It does not repeat central Work or expose Sales/Catalog
-actions to Operation. Five sections, in this exact order:
+supplier and delivery region — with every label fully readable. It does not repeat central Work or
+expose Sales/Catalog actions to Operation. Six sections, in this exact order:
 
 An unavailable row explains its own blocker inside that Sales Order's framed expansion. Missing
 Catalog cost therefore reads `Catalog cost is missing` plus `Set the cost of {item} in Catalog` on
@@ -709,6 +709,12 @@ SUPPLIER
   All suppliers
   [actual supplier names, alphabetical — never hardcoded]
 
+REGION
+  All regions
+  Klang Valley
+  [actual outstation Delivery State names, alphabetical]
+  Others                    ← only when Delivery State is not recorded
+
 SETUP TO FIX              ← the whole section renders only when at least one affected SO exists
   Production days not set
 ```
@@ -717,15 +723,15 @@ SETUP TO FIX              ← the whole section renders only when at least one a
   governed `NavRow` active treatment; the only checkboxes on the page are the Register's own
   `Issue PO` selection. One filter may be selected per section; filters from different
   sections combine; clicking a selected timing row again clears it; `All products` and
-  `All suppliers` clear their sections; clearing every filter restores the complete permanent
-  Register, Ordered records included. `All not ordered` remains the explicit
-  outstanding-only filter.
+  `All suppliers`, and `All regions` clear their sections; clearing every filter restores the
+  complete permanent Register, Ordered records included. `All not ordered` remains the
+  explicit outstanding-only filter.
 - **Counts are UNIQUE Sales Orders** — never documents, notifications, leaf lines, SKU
   quantities or PO counts. Each section's counts update against the other selected sections,
   so the printed number predicts the resulting SO rows. The fixed rows (`All not ordered`,
   the five timing rows, the three product rows and the setup row) print
-  their live count, zero included. A supplier appears only while it has a matching SO under the other active
-  filters — except the currently selected supplier, which stays visible with `0`.
+  their live count, zero included. A supplier or region appears only while it has a matching SO
+  under the other active filters — except the currently selected row, which stays visible with `0`.
 - **Product comes from the authoritative Catalog category** — never SKU text, model name,
   description, supplier, or a browser-only mapping. A multi-category Sales Order counts once
   under every matching category and still appears once in the Register. Records outside the
@@ -737,6 +743,9 @@ SETUP TO FIX              ← the whole section renders only when at least one a
   only, alphabetical. There is no `No supplier` fact category: an unexpectedly missing
   supplier fails at Catalog authority; its concrete `Check the supplier` action belongs to the
   responsible owner's central Work list, not this Operation rail.
+- **Region reads the server's recorded Delivery State** — never customer text, supplier address or
+  a postcode guessed on this page. Kuala Lumpur, Selangor and Putrajaya group as `Klang Valley`;
+  every outstation state keeps its own name; a missing state remains findable as `Others`.
 - Every timing row remains orderable. `Can order early`, `1–13 safety days left`,
   `No safety days left` and `Not enough production days` express timing risk, never
   `Cannot buy`. Order By is a planned date, never an unlock date.
