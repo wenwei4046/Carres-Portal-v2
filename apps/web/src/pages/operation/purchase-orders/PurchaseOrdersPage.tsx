@@ -760,7 +760,7 @@ function PurchaseOrderObject({
         ) : view === "Revisions" ? (
           <RecordList
             title="Revisions"
-            empty="No revised version is recorded. Version 1 is the original purchase order."
+            empty="No revised version is recorded. The original purchase order is shown in Document."
             problem={auditQ.isError ? "The PO revisions could not be loaded" : null}
             action="Try again. If it still fails, ask the system owner to check the PO history."
             onRetry={() => void auditQ.refetch()}
@@ -1155,7 +1155,7 @@ function OfficialPreview({ poId }: { poId: string }) {
     })();
     return () => { active = false; if (objectUrl && typeof URL.revokeObjectURL === "function") URL.revokeObjectURL(objectUrl); };
   }, [poId]);
-  return <section className="flex min-h-[640px] min-w-0 flex-col border border-kit-slate-5 bg-kit-slate-3"><div className="flex h-10 items-center justify-between border-b border-kit-slate-5 bg-white px-3"><span className="text-label font-semibold uppercase tracking-wide text-kit-slate-9">Official document</span><span className="font-mono text-meta text-kit-slate-9">{poId}</span></div>{error ? <div className="border-b border-kit-red-9 bg-kit-red-3 px-3 py-2"><div className="text-meta text-kit-red-11">The official PDF could not be opened</div><div className="text-meta text-kit-slate-11">Try again. If it still fails, ask the system owner to check the PO document.</div></div> : null}<iframe title="Official purchase order preview" aria-label="Official purchase order preview" className="min-h-[600px] w-full flex-1 bg-white" src={url ?? "about:blank"} /></section>;
+  return <section className="flex min-h-[640px] min-w-0 flex-col border border-kit-slate-5 bg-kit-slate-3"><div className="flex h-10 items-center justify-between border-b border-kit-slate-5 bg-white px-3"><span className="text-label font-semibold uppercase tracking-wide text-kit-slate-9">Official PO</span><span className="font-mono text-meta text-kit-slate-9">{poId}</span></div>{error ? <div className="border-b border-kit-red-9 bg-kit-red-3 px-3 py-2"><div className="text-meta text-kit-red-11">The official PDF could not be opened</div><div className="text-meta text-kit-slate-11">Try again. If it still fails, ask the system owner to check the PO document.</div></div> : null}<iframe title="Official purchase order preview" aria-label="Official purchase order preview" className="min-h-[600px] w-full flex-1 bg-white" src={url ?? "about:blank"} /></section>;
 }
 
 function RevisionForm({

@@ -327,6 +327,7 @@ describe("Purchase Order object", () => {
     fireEvent.click(screen.getByRole("button", { name: "Issue current PDF" }));
     expect(screen.getByTestId("po-document-split")).toHaveAttribute("data-layout", "50-50");
     expect(screen.getByTestId("po-issue-evidence")).toBeInTheDocument();
+    expect(screen.getByText("Official PO")).toBeInTheDocument();
     expect(screen.getByLabelText("Official purchase order preview")).toBeInTheDocument();
   });
 

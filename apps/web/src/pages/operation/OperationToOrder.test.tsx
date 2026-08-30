@@ -222,7 +222,7 @@ describe("the whole journey — tick, arrange, issue, prove it arrived", () => {
     fireEvent.click(screen.getByTestId("so-batch-issue-create"));
     await screen.findByTestId("so-batch-evidence-PO-2041");
     expect(screen.getByTestId("so-batch-evidence-PO-2041")).toHaveTextContent(
-      "PO-2041 · Version 1 has not reached Hooka",
+      "PO-2041 has not reached Hooka",
     );
 
     /* The confirm answers `ok`, and the REFETCH that follows answers a real

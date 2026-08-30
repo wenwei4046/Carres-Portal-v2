@@ -861,7 +861,8 @@ describe("closure §8 · outbound evidence is read back, never remembered", () =
       },
     ]);
     const panel = await screen.findByTestId(`so-batch-evidence-${PO.id}`);
-    await waitFor(() => expect(panel).toHaveTextContent("Version 1 reached Hooka"));
+    await waitFor(() => expect(panel).toHaveTextContent(`${PO.id} reached Hooka`));
+    expect(panel).not.toHaveTextContent("Version 1 reached Hooka");
     expect(panel).toHaveTextContent("WhatsApp to Hooka Purchasing Group by Shasha");
   });
 
@@ -890,7 +891,7 @@ describe("closure §8 · outbound evidence is read back, never remembered", () =
     await waitFor(() => expect(panel).toHaveTextContent("Version 2 has not reached Hooka"));
     expect(screen.getByTestId("so-batch-evidence-confirm")).toBeInTheDocument();
     expect(screen.getByTestId(`so-batch-evidence-history-${PO.id}`)).toHaveTextContent(
-      "Version 1 sent to Hooka Purchasing Group by WhatsApp · Shasha",
+      `${PO.id} sent to Hooka Purchasing Group by WhatsApp · Shasha`,
     );
     expect(onDone).not.toHaveBeenCalled();
   });
