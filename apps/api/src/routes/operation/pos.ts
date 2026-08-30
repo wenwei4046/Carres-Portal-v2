@@ -10,7 +10,8 @@ import {
   officeReceiveInput,
   recordBalanceDateInput,
   recordReadyDateInput,
-  recordTomorrowDeliveryInput,
+  recordSupplierAnswerInput,
+  signPoEvidenceUploadInput,
   confirmPoSentInput,
   recordSendInput,
   revisePoInput,
@@ -148,7 +149,7 @@ operationPosRouter.get("/", requireOperation, async (c) => {
       // factory holds, and when the current one was minted. The panel prints
       // `PO-2041 · Version 2` and derives "Version N has not reached the
       // supplier" from `revised_at` against the latest send; nothing stores it.
-        "id, supplier_id, warehouse_id, destination_id, status, sup_status, so, so_refs, eta_date, expected_ready_date, placed_at, purpose, version, revised_at",
+        "id, supplier_id, warehouse_id, destination_id, status, sup_status, so, so_refs, eta_date, po_delivery_date, expected_ready_date, placed_at, purpose, version, revised_at",
       );
 
     if (status !== "all") q = q.eq("status", status);
@@ -316,7 +317,7 @@ operationPosRouter.get("/", requireOperation, async (c) => {
           // client never received), and the date history prints `remarks` beside
           // the countable `reason` (0310). Found while wiring Q5's ready date;
           // fixed rather than left, since both are one word in this string.
-          "id, po_id, po_line_id, kind, answer, about_date, about_qty, previous_date, new_date, reason, remarks, recorded_at",
+          "id, po_id, po_line_id, kind, answer, about_date, about_qty, previous_date, new_date, reason, remarks, channel, evidence, supplier_answered_at, reported_by, recorded_by, recorded_at",
         )
         .in("po_id", ids)
         .order("recorded_at", { ascending: false })
@@ -1857,6 +1858,13 @@ const SUPPLIER_CALL_422: Record<string, string> = {
   new_date_required: "new_date_required",
   po_not_open: "po_not_open",
   no_expected_arrival: "no_expected_arrival",
+  po_delivery_date_required: "po_delivery_date_required",
+  current_version_not_sent: "current_version_not_sent",
+  evidence_required: "evidence_required",
+  reported_by_not_found: "reported_by_not_found",
+  same_as_po_mismatch: "same_as_po_mismatch",
+  changed_date_mismatch: "changed_date_mismatch",
+  invalid_evidence_path: "invalid_evidence_path",
   line_not_part_received: "line_not_part_received",
   // PO Revisions (0364): the SQL door's own refusals. The messages are the
   // governed sentences — the client prints them verbatim, inline.
@@ -1883,6 +1891,17 @@ function mapSupplierCallError(
       409,
     );
   }
+  if (detail === "stale_po_delivery_date") {
+    return c.json(
+      {
+        error: "stale_po_delivery_date",
+        code: "stale_po_delivery_date",
+        message: "The PO Delivery Date changed.",
+        action: "Reload the Purchase Order and record the supplier answer again.",
+      },
+      409,
+    );
+  }
   const named = SUPPLIER_CALL_422[detail];
   if (named) {
     return c.json({ error: named, code: named, message: error.message ?? named }, 422);
@@ -1894,34 +1913,89 @@ function mapSupplierCallError(
   return c.json(m.body, m.status);
 }
 
-// ----- POST /:id/tomorrow-delivery -----
-// `Call {supplier} — confirm tomorrow's delivery`, counted per PO. Two answers
-// and no third (§3): shipping, or delayed with a new date. A DELAYED answer
-// moves the PO's expected arrival AND reaches `ops_order_control.line_etas`,
-// which is what opens **Delay planning** by itself — the Orders flow's stage 1,
-// unchanged. Purchasing never invents a second delay conversation and never
-// opens a call to the customer.
+// ----- POST /:id/tomorrow-delivery — retired -----
+// 0401 removes this evidence-free writer. The exact Purchase Order object owns
+// the one answer form, including channel, evidence, reporter/recorder and both
+// times. Keeping a truthful 410 response is safer than leaving a second writer
+// behind a URL an old tab may still know.
 operationPosRouter.post("/:id/tomorrow-delivery", requireOperation, async (c) => {
-  const parsed = await parseJsonBody(c, recordTomorrowDeliveryInput);
+  return c.json({
+    error: "supplier_answer_moved",
+    code: "supplier_answer_moved",
+    message: "This supplier-answer form is no longer used.",
+    action: `Open ${c.req.param("id")} and record the answer with its evidence.`,
+  }, 410);
+});
+
+// ----- POST /:id/supplier-answer -----
+// The Purchase Order page owns this evidence. The official PO Delivery Date is
+// sent only for cross-checking; SQL reads its own value and never overwrites it.
+operationPosRouter.post("/:id/supplier-answer", requireOperation, async (c) => {
+  const parsed = await parseJsonBody(c, recordSupplierAnswerInput);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);
-  // Remarks + the first-confirm date ride the extended RPC (draft migration —
-  // until it is applied this door serves the 0306 signature only, which is why
-  // the extras are omitted when absent rather than sent as nulls).
-  const extras: Record<string, unknown> = {};
-  if (parsed.data.remarks != null) extras.p_remarks = parsed.data.remarks;
-  const { data, error } = await sb.rpc("purchasing_record_tomorrow_delivery", {
+  const isFile = parsed.data.channel === "whatsapp" || parsed.data.channel === "email";
+  const { data, error } = await sb.rpc("purchasing_record_supplier_answer", {
     p_po_id: c.req.param("id"),
     p_answer: parsed.data.answer,
-    p_new_date:
-      parsed.data.answer === "delayed"
-        ? parsed.data.newDate
-        : (parsed.data.firstDate ?? null),
+    p_po_delivery_date: parsed.data.poDeliveryDate,
+    p_supplier_delivery_date: parsed.data.supplierDeliveryDate,
+    p_channel: parsed.data.channel,
+    p_evidence: isFile
+      ? { kind: "file", path: parsed.data.evidencePath }
+      : { kind: "note", note: parsed.data.evidenceNote },
+    p_supplier_answered_at: parsed.data.supplierAnsweredAt,
+    p_reported_by: parsed.data.reportedByUserId,
     p_reason: parsed.data.reason ?? null,
-    ...extras,
+    p_remarks: parsed.data.remarks ?? null,
   });
   if (error) return mapSupplierCallError(c, error);
   return c.json({ ok: true, result: data });
+});
+
+// Short-lived upload door for immutable supplier-answer screenshots/files.
+// The bytes travel browser → private Storage and never pass through the Worker.
+operationPosRouter.post("/:id/supplier-answer/sign-upload", requireOperation, async (c) => {
+  const poId = c.req.param("id");
+  if (!/^PO-[A-Za-z0-9-]+$/.test(poId)) {
+    return c.json({ error: "invalid_po", code: "invalid_param", message: "Invalid PO number" }, 422);
+  }
+  const parsed = await parseJsonBody(c, signPoEvidenceUploadInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const ext = parsed.data.mimeType === "image/png"
+    ? "png"
+    : parsed.data.mimeType === "image/webp"
+      ? "webp"
+      : parsed.data.mimeType === "application/pdf"
+        ? "pdf"
+        : "jpg";
+  const path = `${poId}/${crypto.randomUUID()}-supplier-answer.${ext}`;
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.storage
+    .from("purchase-order-evidence")
+    .createSignedUploadUrl(path);
+  if (error) {
+    const mapped = mapPgError(error);
+    return c.json(mapped.body, mapped.status);
+  }
+  return c.json({ token: data.token, path: data.path });
+});
+
+operationPosRouter.get("/:id/supplier-answer/evidence", requireOperation, async (c) => {
+  const poId = c.req.param("id");
+  const path = c.req.query("path") ?? "";
+  if (!/^PO-[A-Za-z0-9-]+$/.test(poId) || !path.startsWith(`${poId}/`) || path.includes("..")) {
+    return c.json({ error: "invalid_evidence", code: "invalid_param", message: "Invalid evidence path" }, 422);
+  }
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.storage
+    .from("purchase-order-evidence")
+    .createSignedUrl(path, 300);
+  if (error) {
+    const mapped = mapPgError(error);
+    return c.json(mapped.body, mapped.status);
+  }
+  return c.json({ url: data.signedUrl });
 });
 
 // ----- POST /:id/ready-date -----
@@ -2133,6 +2207,7 @@ operationPosRouter.post("/:id/revise", requireOperation, async (c) => {
   const { data, error } = await sb.rpc("purchasing_revise_po", {
     p_po_id: c.req.param("id"),
     p_reason: parsed.data.reason,
+    p_po_delivery_date: parsed.data.poDeliveryDate,
     p_lines: parsed.data.lines.map((l) => ({
       line_id: l.lineId,
       qty: l.qty,

@@ -31,6 +31,7 @@ const strip = (sql: string) => sql.replace(/--[^\n]*/g, "");
 const ACTOR = read("0379_");
 const MONEY = read("0380_");
 const DOCUMENT = read("0383_");
+const OWNER_CORRECTION = read("0401_");
 
 describe("0379 · one actor authority for every PO door", () => {
   it("has ONE resolver, and it answers about the DUTY", () => {
@@ -85,6 +86,20 @@ describe("0379 · one actor authority for every PO door", () => {
     expect(ACTOR).toMatch(/add column if not exists duty_user_id uuid/);
     expect(ACTOR).toMatch(/add column if not exists acting_user_id uuid/);
     expect(ACTOR).toMatch(/kind, recipient, po_version,\s*\n\s*duty_user_id, acting_user_id/);
+  });
+});
+
+describe("0401 · Operations Superusers may cover without becoming the normal owner", () => {
+  it("admits the two Owner-ruled Operations Superusers at the SQL authority", () => {
+    expect(OWNER_CORRECTION).toMatch(/operation@carres\.com/);
+    expect(OWNER_CORRECTION).toMatch(/jess@carres\.com/);
+    expect(OWNER_CORRECTION).toMatch(/purchasing_is_operations_superuser\(p_user\)/);
+  });
+
+  it("still returns normal duty and dated cover as separate metadata", () => {
+    expect(OWNER_CORRECTION).toMatch(/public\.purchasing_po_actor\(\)/);
+    expect(OWNER_CORRECTION).toMatch(/'normal_user_id'/);
+    expect(OWNER_CORRECTION).toMatch(/'acting_user_id'/);
   });
 });
 

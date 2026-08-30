@@ -25,8 +25,13 @@
 import { useMemo } from "react";
 import {
   deliveryQueueLeads,
+  countWorkingDays,
   myHolidaySet,
   orderActionLine,
+  poDateHistoryOf,
+  purchaseOrderIdentity,
+  purchaseOrderRegisterFacts,
+  purchaseOrderWork,
   workItemsForOrder,
   type OpsStaffMember,
   type WorkItem,
@@ -37,8 +42,10 @@ import {
   useDeliveryPartners,
   useOperationOrders,
   useOperationPoDuty,
+  useOperationPos,
   useOperationStaff,
   useOperationStock,
+  useOperationSuppliers,
   usePurchasingSettings,
 } from "@/lib/queries";
 import {
@@ -59,6 +66,8 @@ export interface WorkRow extends WorkItem {
    *  the PO-duty holder for Purchasing's work, else the PIC. Null for a named
    *  non-account owner (a salesperson) and for a duty word. */
   ownerId: string | null;
+  /** Exact module object door. Work never owns the completion form. */
+  href: string;
 }
 
 /** One person's share of the open set. `overdue` is a subset of `open`. */
@@ -86,6 +95,8 @@ export function useOpenWorkSet(): OpenWorkSet {
   // resolves to the month's PO-duty holder. Fails soft exactly as the duty
   // hook always has: dormant layer → no holder → the duty word stands.
   const poDutyQ = useOperationPoDuty();
+  const purchaseOrdersQ = useOperationPos({ status: "all" });
+  const suppliersQ = useOperationSuppliers();
 
   const orders = useMemo(() => ordersQ.data?.orders ?? [], [ordersQ.data]);
   const staff = useMemo(() => staffQ.data?.staff ?? [], [staffQ.data]);
@@ -119,6 +130,11 @@ export function useOpenWorkSet(): OpenWorkSet {
       name: personLabel(holder.name, holder.email),
     };
   }, [poDutyQ.data]);
+
+  const supplierNameById = useMemo(
+    () => new Map((suppliersQ.data?.suppliers ?? []).map((supplier) => [supplier.id, supplier.name])),
+    [suppliersQ.data],
+  );
 
   const holidayOpts = useMemo(() => ({ holidays: myHolidaySet() }), []);
   const queueLeads = useMemo(
@@ -195,20 +211,77 @@ export function useOpenWorkSet(): OpenWorkSet {
              for Purchasing's work, else the PIC; never the PIC borrowed for
              another rule's item. */
           ownerId: it.ownerUserId,
+          href: `/operation/orders/so/${o.id}`,
         });
       }
+    }
+    for (const po of purchaseOrdersQ.data?.pos ?? []) {
+      const supplierName = supplierNameById.get(po.supplier_id) ?? "Supplier not recorded";
+      const supplierDeliveryDate = poDateHistoryOf(po.promises ?? []).currentDate;
+      const input = {
+        id: po.id,
+        supplierName,
+        status: po.status,
+        version: po.version ?? 1,
+        placedAt: po.placed_at,
+        poDeliveryDate: po.po_delivery_date ?? null,
+        supplierDeliveryDate,
+        expectedReadyDate: po.expected_ready_date ?? null,
+        lines: po.purchase_order_lines.map((line) => ({
+          qty: line.qty,
+          receivedQty: line.received_qty,
+          damagedQty: line.damaged_qty ?? 0,
+          wrongItemQty: line.wrong_item_qty ?? 0,
+        })),
+        sends: (po.sends ?? []).map((send) => ({
+          kind: send.kind ?? null,
+          channel: send.channel,
+          recipient: send.recipient ?? null,
+          sentAt: send.sent_at,
+          poVersion: send.po_version ?? null,
+          sentByName: send.sent_by_name ?? null,
+          dutyName: send.duty_name ?? null,
+          actingName: send.acting_name ?? null,
+        })),
+      };
+      const facts = purchaseOrderRegisterFacts(input, today);
+      const work = purchaseOrderWork(input, facts, holidayOpts);
+      if (!work) continue;
+      const due = work.dueOn;
+      const late = due && today > due
+        ? countWorkingDays(due, today, { offDays: [0, 6], holidays: holidayOpts.holidays })
+        : 0;
+      out.push({
+        ruleKey: `po_${work.kind}`,
+        module: "purchasing",
+        soRef: purchaseOrderIdentity(po.id, facts.version),
+        orderId: po.id,
+        action: work.action,
+        ownerName: poDuty?.name ?? null,
+        ownerUserId: poDuty?.userId ?? null,
+        ...(poDuty ? {} : { ownerDuty: "PO Duty" }),
+        tone: late > 0 ? "danger" : "warning",
+        locked: false,
+        broken: false,
+        dueIso: due,
+        workingDaysLate: late,
+        line: work.problem,
+        customer: supplierName,
+        ownerId: poDuty?.userId ?? null,
+        href: `/operation/procurement?po=${encodeURIComponent(po.id)}`,
+      });
     }
     return out;
   }, [
     orders, availableBySku, staffById, partnerNameById,
-    holidayOpts, queueLeads, today, poDuty,
+    holidayOpts, queueLeads, today, poDuty, purchaseOrdersQ.data, supplierNameById,
   ]);
 
   return {
     items,
     staff,
     staffById,
-    loading: ordersQ.isLoading || staffQ.isLoading,
+    loading: ordersQ.isLoading || staffQ.isLoading || purchaseOrdersQ.isLoading || suppliersQ.isLoading,
   };
 }
 

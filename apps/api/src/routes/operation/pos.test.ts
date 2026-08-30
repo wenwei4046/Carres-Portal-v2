@@ -2714,3 +2714,163 @@ describe("opening an app records an OPEN, and completes nothing", () => {
     expect(openBlock).not.toContain("purchasing_confirm_po_sent");
   });
 });
+
+describe("recording the supplier's delivery answer", () => {
+  it("retires the old evidence-free supplier-date writer", async () => {
+    const rpc = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("http://t/api/operation/pos/PO-2032/tomorrow-delivery", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ answer: "shipping", firstDate: "2026-09-10" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(410);
+    await expect(res.json()).resolves.toMatchObject({
+      message: "This supplier-answer form is no longer used.",
+      action: "Open PO-2032 and record the answer with its evidence.",
+    });
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("signs an immutable evidence upload with the caller's own storage client", async () => {
+    const createSignedUploadUrl = vi.fn().mockResolvedValue({
+      data: { token: "signed-token", path: "PO-2032/answer.png" },
+      error: null,
+    });
+    const from = vi.fn(() => ({ createSignedUploadUrl }));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ storage: { from } } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("http://t/api/operation/pos/PO-2032/supplier-answer/sign-upload", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ mimeType: "image/png", sizeBytes: 1234 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(from).toHaveBeenCalledWith("purchase-order-evidence");
+    expect(createSignedUploadUrl).toHaveBeenCalledWith(expect.stringMatching(/^PO-2032\/.+-supplier-answer\.png$/));
+  });
+
+  it("opens only evidence filed under the exact Purchase Order", async () => {
+    const createSignedUrl = vi.fn().mockResolvedValue({
+      data: { signedUrl: "https://storage.test/evidence" },
+      error: null,
+    });
+    const from = vi.fn(() => ({ createSignedUrl }));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ storage: { from } } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("http://t/api/operation/pos/PO-2032/supplier-answer/evidence?path=PO-2032%2Fanswer.png", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(createSignedUrl).toHaveBeenCalledWith("PO-2032/answer.png", 300);
+  });
+
+  it("sends the official date, supplier date, channel, evidence, reporter and both times to one RPC", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: { id: "answer-1" }, error: null });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("http://t/api/operation/pos/PO-2032/supplier-answer", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          answer: "changed_date",
+          poDeliveryDate: "2026-09-10",
+          supplierDeliveryDate: "2026-09-12",
+          channel: "whatsapp",
+          evidencePath: "PO-2032/answer.png",
+          supplierAnsweredAt: "2026-08-30T09:20:00+08:00",
+          reportedByUserId: "00000000-0000-0000-0000-000000000101",
+          reason: "Factory needs two more days",
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("purchasing_record_supplier_answer", {
+      p_po_id: "PO-2032",
+      p_answer: "changed_date",
+      p_po_delivery_date: "2026-09-10",
+      p_supplier_delivery_date: "2026-09-12",
+      p_channel: "whatsapp",
+      p_evidence: { kind: "file", path: "PO-2032/answer.png" },
+      p_supplier_answered_at: "2026-08-30T09:20:00+08:00",
+      p_reported_by: "00000000-0000-0000-0000-000000000101",
+      p_reason: "Factory needs two more days",
+      p_remarks: null,
+    });
+  });
+
+  it("does not accept an answer without evidence", async () => {
+    const rpc = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("http://t/api/operation/pos/PO-2032/supplier-answer", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          answer: "same_as_po",
+          poDeliveryDate: "2026-09-10",
+          supplierDeliveryDate: "2026-09-10",
+          channel: "whatsapp",
+          supplierAnsweredAt: "2026-08-30T09:20:00+08:00",
+          reportedByUserId: "00000000-0000-0000-0000-000000000101",
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("tells the operator to reload when the official PO Delivery Date changed", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: null,
+      error: {
+        code: "P0001",
+        message: "The PO Delivery Date changed",
+        details: "stale_po_delivery_date",
+      },
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("http://t/api/operation/pos/PO-2032/supplier-answer", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          answer: "same_as_po",
+          poDeliveryDate: "2026-09-10",
+          supplierDeliveryDate: "2026-09-10",
+          channel: "phone",
+          evidenceNote: "Supplier confirmed the date by phone.",
+          supplierAnsweredAt: "2026-08-30T09:20:00+08:00",
+          reportedByUserId: "00000000-0000-0000-0000-000000000101",
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(409);
+    await expect(res.json()).resolves.toMatchObject({
+      message: "The PO Delivery Date changed.",
+      action: "Reload the Purchase Order and record the supplier answer again.",
+    });
+  });
+});
