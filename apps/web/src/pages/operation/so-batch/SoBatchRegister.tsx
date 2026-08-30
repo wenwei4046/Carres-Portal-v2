@@ -121,7 +121,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
     return m;
   }, [orders, leafsByOrder]);
 
-  /* ── The rail (five fact sections, one selection per section) ───────────
+  /* ── The rail (fact sections, one selection per section) ────────────────
    *
    * The DEFAULT no-filter view shows every proceeded record, Ordered ones
    * included — the Register is permanent. One filter per section; sections
@@ -159,6 +159,9 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
   }, []);
   const toggleSupplier = useCallback((name: string) => {
     setFilter((prev) => ({ ...prev, supplier: prev.supplier === name ? null : name }));
+  }, []);
+  const toggleRegion = useCallback((name: string) => {
+    setFilter((prev) => ({ ...prev, region: prev.region === name ? null : name }));
   }, []);
   const stateWords = useMemo(() => purchaseDemandStateWords(data.safetyDays), [data.safetyDays]);
   const railWords = useMemo(() => purchaseDemandRailWords(data.safetyDays), [data.safetyDays]);
@@ -676,6 +679,24 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
                 testId={`so-batch-supplier-${s.name}`}
                 label={s.name}
                 count={s.count}
+              />
+            ))}
+          </FilterRailGroup>
+          <FilterRailGroup title={SO_BATCH_RAIL.region.heading}>
+            <FilterRailRow
+              active={filter.region == null}
+              onClick={() => setFilter((prev) => ({ ...prev, region: null }))}
+              testId="so-batch-region-all"
+              label={SO_BATCH_RAIL.region.all}
+            />
+            {rail.regions.map((region) => (
+              <FilterRailRow
+                key={region.name}
+                active={filter.region === region.name}
+                onClick={() => toggleRegion(region.name)}
+                testId={`so-batch-region-${region.name}`}
+                label={region.name}
+                count={region.count}
               />
             ))}
           </FilterRailGroup>

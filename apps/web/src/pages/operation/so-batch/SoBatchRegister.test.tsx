@@ -146,6 +146,8 @@ const ORDER_O3 = orderRow({
   orderId: "o3",
   so: 1330,
   customer: "ANNE",
+  deliveryCity: "Johor Bahru",
+  deliveryState: "Johor",
   status: "partial",
   requestedDeliveryDate: "2026-09-20",
   pos: [
@@ -192,6 +194,8 @@ const ORDER_O6 = orderRow({
   so: 1410,
   customer: "STOCKED ONE",
   status: "blank",
+  deliveryCity: "Kuala Lumpur",
+  deliveryState: "Kuala Lumpur",
   lines: [
     { orderLineId: "l61", sku: "B1201S-Q", qty: 2, stockTaken: 2,
       item: "Booqit", variant: "Queen", category: "mattress", pos: [] },
@@ -627,7 +631,7 @@ describe("the rail — Card 02-A wording, Card 02-B counting", () => {
   });
 });
 
-describe("the rail — five purchasing fact sections, navigation not selection", () => {
+describe("the rail — purchasing fact sections, navigation not selection", () => {
   const rail = () => screen.getByTestId("so-batch-rail");
 
   it("hides completely, reopens from the Register toolbar, and remembers the choice", () => {
@@ -645,10 +649,10 @@ describe("the rail — five purchasing fact sections, navigation not selection",
     expect(localStorage.getItem("carres.soBatchPurchase.filters.open")).toBe("1");
   });
 
-  it("renders only the five purchasing fact sections", () => {
+  it("renders REGION immediately after SUPPLIER", () => {
     renderRegister();
     const text = rail().textContent ?? "";
-    const order = ["TO ORDER", "ORDER TIMING", "PRODUCT", "SUPPLIER", "SETUP TO FIX"];
+    const order = ["TO ORDER", "ORDER TIMING", "PRODUCT", "SUPPLIER", "REGION", "SETUP TO FIX"];
     const positions = order.map((h) => text.indexOf(h));
     expect(positions.every((p) => p >= 0)).toBe(true);
     expect([...positions].sort((a, b) => a - b)).toEqual(positions);
@@ -664,6 +668,10 @@ describe("the rail — five purchasing fact sections, navigation not selection",
       "Bedframe",
       "Sofa",
       "All suppliers",
+      "All regions",
+      "Klang Valley",
+      "Johor",
+      "Others",
       "Production days not set",
     ]) {
       expect(text, word).toContain(word);
@@ -767,6 +775,17 @@ describe("the rail — five purchasing fact sections, navigation not selection",
     expect(screen.getByTestId("so-batch-row-o8")).toBeInTheDocument();
     expect(screen.queryByTestId("so-batch-row-o1")).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId("so-batch-supplier-all"));
+    expect(screen.getByTestId("so-batch-row-o1")).toBeInTheDocument();
+  });
+
+  it("the region filter uses Delivery State and All regions clears it", () => {
+    renderRegister();
+    expect(screen.getByTestId("so-batch-region-Klang Valley").textContent).toContain("2");
+    expect(screen.getByTestId("so-batch-region-Johor").textContent).toContain("1");
+    fireEvent.click(screen.getByTestId("so-batch-region-Johor"));
+    expect(screen.getByTestId("so-batch-row-o3")).toBeInTheDocument();
+    expect(screen.queryByTestId("so-batch-row-o1")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("so-batch-region-all"));
     expect(screen.getByTestId("so-batch-row-o1")).toBeInTheDocument();
   });
 
