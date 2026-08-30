@@ -116,6 +116,20 @@ export interface PurchasingDestinationSetting {
   warehouseLinked: boolean;
 }
 
+/** A supplier Carres must collect from. The rule is maintained once in
+ *  Purchasing Settings and then read by every PO issue door. */
+export interface PurchasingSupplierCollectionSetting {
+  supplierId: string;
+  supplierName: string;
+  destinationId: string | null;
+  partnerId: string | null;
+}
+
+export interface PurchasingDeliveryPartnerSetting {
+  id: string;
+  name: string;
+}
+
 export interface PurchasingSettings {
   orderByBufferDays: number;
   earliestSellDays: number;
@@ -124,6 +138,10 @@ export interface PurchasingSettings {
   suppliers: readonly PurchasingSupplierRow[];
   productionDays: readonly PurchasingProductionDays[];
   destinations: readonly PurchasingDestinationSetting[];
+  /** Optional on the TypeScript shape for compatibility with older internal
+   *  consumers; the live Settings response always supplies both arrays. */
+  supplierCollections?: readonly PurchasingSupplierCollectionSetting[];
+  deliveryPartners?: readonly PurchasingDeliveryPartnerSetting[];
   /** The most recent change per setting — the line under each row. */
   lastChanges: readonly PurchasingSettingChange[];
   /** May THIS caller edit? Hiding a control is a courtesy; the RPC gate
@@ -428,6 +446,19 @@ export const purchasingSettingsResponseSchema = z.object({
       warehouseLinked: z.boolean(),
     }),
   ),
+  supplierCollections: z
+    .array(
+      z.object({
+        supplierId: z.string().uuid(),
+        supplierName: z.string(),
+        destinationId: z.string().uuid().nullable(),
+        partnerId: z.string().uuid().nullable(),
+      }),
+    )
+    .optional(),
+  deliveryPartners: z
+    .array(z.object({ id: z.string().uuid(), name: z.string() }))
+    .optional(),
   lastChanges: z.array(
     z.object({
       settingKey: z.string(),
@@ -472,6 +503,16 @@ export const purchasingUpdateDestinationInput = z
   });
 export type PurchasingUpdateDestinationInput = z.infer<
   typeof purchasingUpdateDestinationInput
+>;
+
+export const purchasingSetSupplierCollectionInput = z
+  .object({
+    destinationId: z.string().uuid(),
+    partnerId: z.string().uuid(),
+  })
+  .strict();
+export type PurchasingSetSupplierCollectionInput = z.infer<
+  typeof purchasingSetSupplierCollectionInput
 >;
 
 export const purchasingSetNumberInput = z

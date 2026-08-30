@@ -377,14 +377,6 @@ export default function SoBatchIssueWorkspace({
                 </tbody>
               </table>
 
-              {current.supplierKind === "factory_pickup" && current.supplierCollection ? (
-                <p className="mt-4 border-t border-kit-slate-5 pt-3 text-meta text-kit-slate-12">
-                  {current.supplierCollection.procurementPartnerName} collects from{" "}
-                  {current.supplierName ?? "the supplier"} and delivers to{" "}
-                  {destinationName(current.destinationId)}.
-                </p>
-              ) : null}
-
               {/* ⭐ FAIL CLOSED, AND SAY WHAT TO DO (closure §9). LINE 1 is the
                   fact, LINE 2 the act — never `Needs attention`, never a code,
                   and never a Postgres sentence. */}

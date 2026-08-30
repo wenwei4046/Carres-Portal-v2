@@ -268,8 +268,8 @@ full-screen `Review Purchase Orders` surface and preserves selection and allocat
 ├────────────────────── 50% ─────────────────┬──────────────────── 50% ────────┤
 │ HOOKA → CARRES KLANG                       │ LIVE PURCHASE ORDER PDF          │
 │ Lines / source / quantity                   │                                 │
-│ Governed collection fact, when required     │ PO number appears after Issue PO│
-│ Deliver To and actual date                  │ Lines · source SO · Unit IDs    │
+│ Deliver To and PO Delivery Date             │ PO number appears after Issue PO│
+│                                             │ Lines · source SO · Unit IDs    │
 │                                             │                                 │
 │ [Back to buying]                 [Issue PO] │                                 │
 └─────────────────────────────────────────────┴─────────────────────────────────┘
@@ -900,7 +900,9 @@ Catalog blocker before review. A factory-pickup collector and fixed destination 
 `purchasing_supplier_settings`; Review prints the resolved sentence once and never offers a
 collector picker. The browser sends only demand IDs and destination allocations. The API
 recomputes Catalog cost and supplier collection, and the database enforces the same collection rule
-for every PO writer.
+for every PO writer. Managers maintain the collector and fixed destination in
+`Settings → Purchasing → Supplier collection`; the unavailable SO row names a missing Catalog cost
+inside its own expansion instead of failing as an unexplained disabled checkbox.
 
 **2 · The right side renders the real official PO PDF.** `renderPoPdf` — the same template
 Purchase Orders and the print path already use — over the `purchasing_po_document` payload, into a
@@ -1222,7 +1224,7 @@ supplier.
 
 | Width | Measured |
 |---|---|
-| 1440 × 880 | `720px` + `720px`; governed collection fact is visible once; no cost or collector controls |
+| 1440 × 880 | `720px` + `720px`; no cost, collection arrangement or collector controls |
 | **1130** × 860 | `grid-template-columns: 565px 565px`; no sideways scroll; `Issue PO` visible and shut with its two-line blocker |
 | **1129** × 860 | stacked, work first (`50→426`), document below (`426→1028`), split scrolls, nothing clipped |
 | 768 × 900 | stacked; both buttons inside the pane, no overlap, no sideways scroll |

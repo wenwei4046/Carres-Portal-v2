@@ -24,6 +24,7 @@ import {
   useSetPurchasingNumber,
   useSetPurchasingPoDays,
   useSetSupplierWorkWeek,
+  useSetPurchasingSupplierCollection,
   useUpdatePurchasingDestination,
 } from "@/lib/queries";
 import { fmtDate } from "@/lib/fmt-date";
@@ -231,6 +232,11 @@ type DestinationDraft = {
   warehouseLinked: boolean;
 };
 
+type CollectionDraft = {
+  destinationId: string;
+  partnerId: string;
+};
+
 const newDestinationDraft = (): DestinationDraft => ({
   mode: "add",
   id: null,
@@ -269,11 +275,13 @@ export default function OperationPurchasingSettings({
   const setWorkWeek = useSetSupplierWorkWeek();
   const createDestination = useCreatePurchasingDestination();
   const updateDestination = useUpdatePurchasingDestination();
+  const setSupplierCollection = useSetPurchasingSupplierCollection();
 
   const [poDraft, setPoDraft] = useState<number[] | null>(null);
   const [weekDraft, setWeekDraft] = useState<Record<string, number[]>>({});
   const [prodDraft, setProdDraft] = useState<Record<string, string>>({});
   const [destinationDraft, setDestinationDraft] = useState<DestinationDraft | null>(null);
+  const [collectionDrafts, setCollectionDrafts] = useState<Record<string, CollectionDraft>>({});
 
   const canEdit = data?.canEdit ?? false;
 
@@ -487,6 +495,136 @@ export default function OperationPurchasingSettings({
                   )}
                 </div>
               ))
+            )}
+          </div>
+        </section>
+
+        <section className="mb-8 max-w-[860px]" data-testid="supplier-collection-settings">
+          <h2 className="text-strong font-semibold text-base-900 mb-1">
+            Supplier collection
+          </h2>
+          <p className="text-meta text-base-500 mb-3">
+            Who collects from a supplier that does not deliver, and where those goods always go.
+            Issue review reads this rule; it does not ask again.
+          </p>
+          <div className="overflow-hidden rounded-[10px] border border-base-200 bg-white">
+            {(data.supplierCollections ?? []).length === 0 ? (
+              <div className="p-4 text-body text-base-600">
+                No supplier needs Carres to arrange collection.
+              </div>
+            ) : (
+              (data.supplierCollections ?? []).map((rule) => {
+                const draft = collectionDrafts[rule.supplierId] ?? {
+                  destinationId: rule.destinationId ?? "",
+                  partnerId: rule.partnerId ?? "",
+                };
+                const partnerName = (data.deliveryPartners ?? []).find(
+                  (partner) => partner.id === draft.partnerId,
+                )?.name;
+                const destinationName = data.destinations.find(
+                  (destination) => destination.id === draft.destinationId,
+                )?.name;
+                const dirty =
+                  draft.destinationId !== (rule.destinationId ?? "") ||
+                  draft.partnerId !== (rule.partnerId ?? "");
+                const complete = draft.destinationId !== "" && draft.partnerId !== "";
+                return (
+                  <div
+                    key={rule.supplierId}
+                    className="border-b border-base-100 px-4 py-3 last:border-b-0"
+                  >
+                    <div className="text-body font-semibold text-base-900">
+                      {rule.supplierName}
+                    </div>
+                    <div className="mt-2 grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+                      <label className="text-meta font-semibold text-base-700">
+                        Collector
+                        <select
+                          aria-label={`Collector for ${rule.supplierName}`}
+                          value={draft.partnerId}
+                          disabled={!canEdit}
+                          onChange={(event) =>
+                            setCollectionDrafts((current) => ({
+                              ...current,
+                              [rule.supplierId]: {
+                                ...draft,
+                                partnerId: event.target.value,
+                              },
+                            }))
+                          }
+                          className={`${INPUT_CLS} mt-1 disabled:bg-base-50 disabled:text-base-500`}
+                        >
+                          <option value="">Choose collector</option>
+                          {(data.deliveryPartners ?? []).map((partner) => (
+                            <option key={partner.id} value={partner.id}>{partner.name}</option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="text-meta font-semibold text-base-700">
+                        Deliver To
+                        <select
+                          aria-label={`Deliver To for ${rule.supplierName}`}
+                          value={draft.destinationId}
+                          disabled={!canEdit}
+                          onChange={(event) =>
+                            setCollectionDrafts((current) => ({
+                              ...current,
+                              [rule.supplierId]: {
+                                ...draft,
+                                destinationId: event.target.value,
+                              },
+                            }))
+                          }
+                          className={`${INPUT_CLS} mt-1 disabled:bg-base-50 disabled:text-base-500`}
+                        >
+                          <option value="">Choose Deliver To</option>
+                          {data.destinations
+                            .filter((destination) => destination.active || destination.id === draft.destinationId)
+                            .map((destination) => (
+                              <option key={destination.id} value={destination.id}>{destination.name}</option>
+                            ))}
+                        </select>
+                      </label>
+                      {canEdit && (
+                        <button
+                          type="button"
+                          disabled={!dirty || !complete || setSupplierCollection.isPending}
+                          className="btn-primary text-meta disabled:opacity-40"
+                          onClick={() =>
+                            setSupplierCollection
+                              .mutateAsync({
+                                supplierId: rule.supplierId,
+                                destinationId: draft.destinationId,
+                                partnerId: draft.partnerId,
+                              })
+                              .then(() => {
+                                setCollectionDrafts((current) => {
+                                  const next = { ...current };
+                                  delete next[rule.supplierId];
+                                  return next;
+                                });
+                                toast.success("Saved");
+                              })
+                              .catch(fail)
+                          }
+                        >
+                          Save
+                        </button>
+                      )}
+                    </div>
+                    <div className="mt-2 text-meta text-base-500">
+                      {partnerName && destinationName
+                        ? `${partnerName} collects from ${rule.supplierName} and delivers to ${destinationName}.`
+                        : "Set both the collector and Deliver To before issuing a PO."}
+                    </div>
+                    <ChangeLine
+                      settings={data}
+                      settingKey="supplier_collection"
+                      supplierId={rule.supplierId}
+                    />
+                  </div>
+                );
+              })
             )}
           </div>
         </section>
