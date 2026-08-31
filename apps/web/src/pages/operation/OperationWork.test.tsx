@@ -33,6 +33,8 @@ let stockState: { data: operationStockResponse | undefined };
 let staffState: { data: OpsStaffListResponse | undefined; isLoading: boolean };
 let settingsState: { data: undefined };
 let poDutyState: { data: { month: string; holder: { userId: string; email: string; name: string | null; assignedBy: string | null } | null } | undefined };
+let purchaseOrdersState: { data: { pos: unknown[] } | undefined; isLoading: boolean };
+let suppliersState: { data: { suppliers: Array<{ id: string; name: string }> } | undefined; isLoading: boolean };
 let authState: { role: string; email: string | null };
 
 vi.mock("@/lib/queries", async () => {
@@ -45,6 +47,8 @@ vi.mock("@/lib/queries", async () => {
     useOperationStaff: () => staffState,
     usePurchasingSettings: () => settingsState,
     useOperationPoDuty: () => poDutyState,
+    useOperationPos: () => purchaseOrdersState,
+    useOperationSuppliers: () => suppliersState,
   };
 });
 
@@ -147,6 +151,8 @@ beforeEach(() => {
   staffState = { data: STAFF, isLoading: false };
   settingsState = { data: undefined };
   poDutyState = { data: undefined };
+  purchaseOrdersState = { data: { pos: [] }, isLoading: false };
+  suppliersState = { data: { suppliers: [] }, isLoading: false };
   authState = { role: "operation", email: "sha@carres.co" };
   vi.useFakeTimers();
   vi.setSystemTime(new Date(`${TODAY}T09:00:00`));
@@ -220,6 +226,34 @@ describe("OperationWork — two filters over the one open work set", () => {
     wrap(<OperationWork />);
     fireEvent.click(screen.getByTestId("work-row-SO-1201-assign_logistics"));
     expect(navigateSpy).toHaveBeenCalledWith("/operation/orders/so/a");
+  });
+
+  it("shows the same PO work in My Work and opens the exact Purchase Order", () => {
+    poDutyState = { data: { month: "2026-07", holder: { userId: OP_UID, email: "sha@carres.co", name: "Shasha", assignedBy: null } } };
+    suppliersState = { data: { suppliers: [{ id: "supplier-1", name: "Hooka" }] }, isLoading: false };
+    purchaseOrdersState = { data: { pos: [{
+      id: "PO-2032",
+      supplier_id: "supplier-1",
+      warehouse_id: "warehouse-1",
+      status: "open",
+      sup_status: "pending",
+      so: null,
+      so_refs: null,
+      eta_date: null,
+      po_delivery_date: "2026-08-10",
+      placed_at: "2026-07-27T08:00:00Z",
+      version: 1,
+      purchase_order_lines: [{ id: "line-1", sku: "MAT-K-001", qty: 2, received_qty: 0 }],
+      sends: [],
+      promises: [],
+    }] }, isLoading: false };
+    wrap(<OperationWork />);
+    const row = screen.getByTestId("work-row-PO-2032-po_issue");
+    expect(row).toHaveTextContent("The PO PDF has not been sent");
+    expect(row).toHaveTextContent("Issue PO");
+    expect(row).toHaveTextContent("Hooka · PO-2032");
+    fireEvent.click(row);
+    expect(navigateSpy).toHaveBeenCalledWith("/operation/procurement?po=PO-2032");
   });
 
   it("no open work → the quiet clear sentence, never an invented item", () => {

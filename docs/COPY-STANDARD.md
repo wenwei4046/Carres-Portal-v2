@@ -245,7 +245,7 @@ required result. Shape:
 
 Examples (all pass):
 
-    ✔ Yu Jun · Send PO-86 to Ohana · Ask them to confirm delivery · Wed 12 Aug.
+    ✔ Yu Jun · Issue PO-86 to Ohana · Ask them to confirm delivery · Wed 12 Aug.
     ✔ Khor Yee · Check in PO-2041 goods for Purchasing · Record full or partial · Thu 13 Aug.
     ✔ Shasha · Call AL about SO-1318 · Record the delivery date · Fri 14 Aug.
 
@@ -591,7 +591,7 @@ stay on record.` — a discrepancy keeps both facts and overwrites neither.
 
 **PURCHASING** (docs/purchasing/MASTER.md):
 
-### Purchasing navigation words — owner ruling 2026-08-22
+### Purchasing navigation words — owner ruling 2026-08-22, corrected 2026-08-29
 
 These are the exact visible words for the Purchasing sidebar tree. They name doors only; they
 do not create a second business status, work queue or source of truth.
@@ -607,14 +607,16 @@ do not create a second business status, work queue or source of truth.
 Purchasing has no Home, module-specific Work, Purchase Demands, New Supplier/New SKU request,
 Consignment Overview, Consignment Receipts, Report or Settings sidebar destination. The capability
 lives in its authority home: Registers, central Work/Reports/Settings, in-context Catalog governance
-or the one Receiving engine. `purchase_demand` remains an authoritative record, not a page.
+or the one Receiving engine. `Goods Receipt` and `GRN` name records/documents produced after physical
+check-in; neither is the navigation/workspace word. `purchase_demand` remains an authoritative
+record, not a page.
 
 | Queue tile | Row line | Button | Done message | Empty state |
 |---|---|---|---|---|
 | `Issue PO` | `Issue PO to {supplier}` | `Issue PO` | `PO issued to {supplier}` | `No purchase orders to issue.` |
-| `Supplier Delivery Date missing` | `Ask {supplier} for the delivery date` | `Record supplier answer` | `Supplier answer recorded` | `Every issued order has a supplier delivery answer.` |
-| `Supplier Delivery Date passed` | `Ask {supplier} when the goods will arrive` | `Record supplier answer` | `Supplier answer recorded` | `No Supplier Delivery Date has passed.` |
-| `Goods to receive` | `Check in {document} from {supplier}` | `Start receiving` | `GRN posted · {n} received · {m} pending delivery` | `No supplier delivery is ready to receive.` |
+| `Supplier date missing` | `Ask {supplier} for the delivery date` | `Record supplier date` | `Supplier date recorded` | `Every issued order has a supplier date.` |
+| `Supplier date passed` | `Ask {supplier} when the goods will arrive` | `Record supplier answer` | `Supplier answer recorded` | `No supplier date has passed.` |
+| `Check in` | `Check in {document} from {supplier}` | `Start Receiving` | `Received {n} of {m}` | `No supplier delivery is ready to check in.` |
 | `Balance date missing` | `Ask {supplier} for the balance delivery date` | `Record balance date` | `Balance date recorded` | `Every part receipt has a balance date.` |
 | `Confirm what happens next` | `Call {supplier} — confirm what happens next` | `Record what happens next` | `Supplier answer recorded` | `No claim is waiting for a supplier answer.` |
 | `Issue consignment order` | `Issue consignment order to {supplier}` | `Issue consignment order` | `Consignment order issued to {supplier}` | `No showroom is waiting for stock.` |
@@ -842,7 +844,8 @@ nothing was lost.**
 has always read `Issue PO to {supplier}`: getting the document to the factory was never a second
 act, and a document the factory has not seen is not issued. **`Issue` stays open until an operator
 confirms which version went to whom on which channel**, and the button inside the form changes to
-`Record what you sent` — a form button, which needs no verb from the table. The same holds for a
+`Record the PDF sent` — a form button, which records evidence and needs no second business action.
+The same holds for a
 consignment order, a purchase return and a repair order. *(A separate `Check what was sent` was
 drafted and dropped: `Send` is banned, and stretching `Check` over it would have taught staff that
 `Check` means two different jobs.)*
@@ -1817,6 +1820,68 @@ later concrete exceptions.
 **Supplier Status is a SEPARATE axis** — what the factory and the logistics partner report.
 It is never merged into the five above, and it is not Purchasing's to redefine: two external
 roles run their whole lifecycle on it.
+
+### Purchase Orders Register and object words — owner ruling 2026-08-30
+
+The date column is **`PO Issued`**, never `PO Date`. It reads the formal
+`purchase_orders.placed_at` fact and sits immediately beside `PO No`. This date and the Operation
+Status `Issued` are deliberately different answers:
+
+```text
+PO Issued   when the formal PO document was dated
+Issued      the current version actually reached the supplier, with outbound evidence
+```
+
+A numbered current version without that evidence prints the concrete fact **`The PO PDF has not
+been sent`**. It is never `Draft`, `Prepared`, `Pending`, `Not issued`, `Send Status` or
+`Receiving Status`.
+
+| Concept | Use exactly | Do NOT use |
+|---|---|---|
+| PO identity, first version | **`{po}`** | `{po} · Version 1` · `{po}.V1` |
+| PO identity, later version | **`{po} · Version {n}`** | `V2` · `PO.V2` · a separate `Current Version` column |
+| Formal document date | **`PO Issued`** | PO Date · Created · Issued At |
+| Official supplier-facing delivery date on the current PO version | **`PO Delivery Date`** | Expected Arrival · ETA · Required For |
+| What the supplier later said about delivery | **`Supplier Delivery Date`** | Supplier Date · Supplier ETA · Expected Arrival |
+| Supplier confirmed the official PO date | **`Same as PO`** | Same · No change · repeat the same date |
+| No supplier answer is recorded | **`Not recorded`** in the field; Work says **`Supplier date is missing`** | No answer yet · Unknown · a dash |
+| Governed source relationship | **`Related To`** | Source · Origin · From |
+| Quantity ordered on the PO | **`Order Qty`** | Ordered · Expected · PO Qty |
+| Good quantity physically received | **`Received Qty`** | Accepted · Received (as the column noun) |
+| Quantity physically received damaged | **`Damaged Qty`** | Rejected · Damaged (as the column noun) |
+| Quantity physically received as the wrong item | **`Wrong Item Qty`** | Wrong Qty · Rejected |
+| Good quantity the supplier still owes | **`Pending Delivery Qty`** | Open Balance · Pending Qty · Outstanding Qty · balance as the column label |
+| Physical receipt date | **`Goods Received At`** | Arrival Date · Received Date · Posted At |
+| Current document preview | **`Official PO`** | Preview as a section title · Document preview |
+
+The default Purchase Orders Register columns are, in order:
+
+```text
+PO No · PO Issued · Supplier · Items · Related To · Deliver To ·
+PO Delivery Date · Supplier Delivery Date · Order Qty · Received Qty ·
+Pending Delivery Qty · Status · Work
+```
+
+`Damaged Qty` and `Wrong Item Qty` appear in the goods-line expansion and Columns catalogue.
+Damaged, wrong or extra goods never reduce `Pending Delivery Qty` and never create available Stock.
+
+The Purchasing page/workspace word is **`Receiving`**. `Check in` is the physical act, `Goods
+Receipt` is the record, `GRN` is the numbered document, and `Supplier DO` is the supplier's own
+document. These four words never replace one another.
+
+The one issue surface uses these exact controls:
+
+```text
+Issue PO / Issue Version {n}
+Open WhatsApp / Open WhatsApp group / Open email / Download PDF
+Record the PDF sent
+```
+
+Opening a channel or downloading a PDF completes nothing. `Record the PDF sent` requires the exact
+current version, recipient, channel, actual actor and time; an outbound screenshot may be attached.
+The supplier-answer action completes only when the concrete answer, channel, evidence,
+received/reported by, recorded by and both times exist. `Record supplier date` is the first-date
+button; `Record supplier answer` is the later changed/passed-date button.
 
 ### The Purchasing nouns and facts
 

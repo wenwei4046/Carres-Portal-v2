@@ -11,8 +11,8 @@
  * What stays the PO's own (unchanged business):
  * - MONEY-FREE, structurally: the payload is the `purchasing_po_document`
  *   RPC (0307) — no RM figure ever reaches this component.
- * - `Delivery by` is the supplier's 3-second fact — first row of PO DETAILS,
- *   bold value.
+ * - `PO Delivery Date` is the supplier's 3-second fact in PO DETAILS, with a
+ *   bold value and the same date name used throughout Purchasing.
  * - Item ID = ops_stock_items.unit_code (0153), minted at PO-open — the
  *   column the old law reserved is now LIVE: supplier labels each unit by
  *   id, the warehouse scans on receive. Prints `—` until codes arrive.
@@ -202,13 +202,13 @@ export function PoTemplate(data: PoTemplateData) {
   const multipleDestinations = uniqueDestinations.length > 1;
 
   // No SO No row here — a bulk PO can carry dozens; the table's SO NO
-  // column is the one home (owner round, 2026-08-09). `Deliver by` is the
-  // frozen term's paper form: the reader IS the supplier, imperative.
+  // column is the one home (owner round, 2026-08-09). The official document
+  // uses the Purchasing date dictionary too: PO Issued and PO Delivery Date.
   const detailRows: Array<[string, string | null, boolean?]> = [
     ["PO No", po_number],
     ["Version", versionLabel.replace("Version ", "")],
-    ["Issued", niceDate(issue_date)],
-    ["Deliver by", niceDate(eta_date), true],
+    ["PO Issued", niceDate(issue_date)],
+    ["PO Delivery Date", niceDate(eta_date), true],
   ];
 
   return (

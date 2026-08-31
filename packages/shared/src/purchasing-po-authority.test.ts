@@ -37,6 +37,7 @@ const ACTOR = read("0379_");
 const MONEY = read("0380_");
 const DOCUMENT = read("0383_");
 const SUPERUSER = readNamed("operations_superuser_po_issue_authority.sql");
+const SUPPLIER_ANSWER = readNamed("the_supplier_answer_never_rewrites_the_po.sql");
 
 describe("0379 · one actor authority for every PO door", () => {
   it("has ONE resolver, and it answers about the DUTY", () => {
@@ -125,6 +126,20 @@ describe("Operations Superuser uses the same PO authority", () => {
     expect(SUPERUSER).toMatch(/by_user_id,\s*issue_duty_user_id,\s*issue_cover_user_id/);
     expect(SUPERUSER).toMatch(/v_actor,\s*v_normal,\s*v_cover/);
     expect(SUPERUSER).toMatch(/'operations_superuser'/);
+  });
+});
+
+describe("0406 · supplier evidence reuses the same PO authority", () => {
+  it("checks the shared duty, cover or Operations Superuser gate", () => {
+    expect(SUPPLIER_ANSWER).toMatch(/public\.purchasing_actor_may_issue\(v_actor\)/);
+    expect(SUPPLIER_ANSWER).not.toMatch(/purchasing_is_operations_superuser/);
+  });
+
+  it("keeps normal duty, dated cover and actual actor as separate send facts", () => {
+    expect(SUPPLIER_ANSWER).toMatch(/public\.purchasing_po_actor\(\)/);
+    expect(SUPPLIER_ANSWER).toMatch(/'normal_user_id'/);
+    expect(SUPPLIER_ANSWER).toMatch(/'acting_user_id'/);
+    expect(SUPPLIER_ANSWER).toMatch(/p_po_id, p_channel[^;]+v_actor/s);
   });
 });
 

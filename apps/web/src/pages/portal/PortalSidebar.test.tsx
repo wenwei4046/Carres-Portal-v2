@@ -585,7 +585,7 @@ describe("PortalSidebar — the Purchasing map", () => {
       "SO Batch Purchase",
       "Manual Purchase",
       "Purchase Orders",
-      "Goods Receipts",
+      "Receiving",
       "Supplier Claims",
       "Purchase Returns",
       "Repair Orders",
@@ -655,8 +655,7 @@ describe("PortalSidebar — the Purchasing map", () => {
 
   it("the rail word is `Manual Purchase`, in BUY, and the old word is gone", () => {
     renderAt("/operation?tab=receiving");
-    expect(screen.getByText("Goods Receipts")).toBeInTheDocument();
-    expect(screen.queryByText("Receiving")).not.toBeInTheDocument();
+    expect(screen.getByText("Receiving")).toBeInTheDocument();
     expect(screen.queryByText(/GRN/)).not.toBeInTheDocument();
     fireEvent.click(group_("purchasing-buy"));
     const buy = screen.getByTestId("nav-group-children-purchasing-buy");
@@ -980,7 +979,7 @@ describe("PortalSidebar — the Purchasing drawers", () => {
       expect(screen.getByTitle("Purchasing")).toBeInTheDocument();
       expect(screen.queryByTestId("nav-group-purchasing-buy")).not.toBeInTheDocument();
       expect(screen.queryByText("BUY")).not.toBeInTheDocument();
-      expect(screen.queryByText("Goods Receipts")).not.toBeInTheDocument();
+      expect(screen.queryByText("Receiving")).not.toBeInTheDocument();
       expect(screen.queryByText("Manual Purchase")).not.toBeInTheDocument();
       expect(screen.queryByText("SHOWROOM")).not.toBeInTheDocument();
     } finally {

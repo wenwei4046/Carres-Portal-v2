@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { purchasingRefusal } from "@carres/shared";
+import { purchaseOrderIdentity, purchasingRefusal } from "@carres/shared";
 import { apiFetch } from "@/lib/api";
 import { fmtDate } from "@/lib/fmt-date";
 import { renderPoPdf } from "@/lib/pdf/render";
@@ -287,8 +287,8 @@ export default function PoIssueEvidence({
     <div className="flex h-full flex-col" data-testid={`so-batch-evidence-${po.id}`}>
       <h2 className="text-body font-semibold">
         {confirmed
-          ? `${po.id} · Version ${version} reached ${supplier}`
-          : `${po.id} · Version ${version} has not reached ${supplier}`}
+          ? `${purchaseOrderIdentity(po.id, version)} reached ${supplier}`
+          : `${purchaseOrderIdentity(po.id, version)} has not reached ${supplier}`}
       </h2>
       <p className="mt-0.5 text-meta text-kit-slate-11">
         {confirmed
@@ -427,7 +427,7 @@ export default function PoIssueEvidence({
                   proof that the current document reached the supplier — which
                   is the whole point of a revision (0378; closure §8). */}
               {e.kind === "confirmed_sent"
-                ? `Version ${e.po_version ?? "?"} sent to ${e.recipient ?? "supplier"} by ${
+                ? `${e.po_version == null ? "Unknown PO version" : purchaseOrderIdentity(po.id, e.po_version)} sent to ${e.recipient ?? "supplier"} by ${
                     CHANNEL_WORD[e.channel] ?? e.channel
                   }${e.sent_by_name ? ` · ${e.sent_by_name}` : ""}`
                 : `${CHANNEL_WORD[e.channel] ?? e.channel} opened${

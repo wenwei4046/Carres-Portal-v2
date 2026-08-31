@@ -260,9 +260,9 @@ The right Quick Rail is governed by `ui/MASTER.md`; it never adds duplicate modu
 business truth.
 
 **`Receiving` is the exact Purchasing destination/workspace word** (owner correction 2026-08-29).
-It names the physical operation. The supplier provides the delivery date and Supplier DO; Carres
-creates the Goods Receipt and numbered GRN only after physical receiving. Neither document word
-replaces the navigation word, and `Goods Receipts` is retired as navigation.
+`Check in` names the physical act. The supplier provides the delivery date and Supplier DO; Carres
+creates the Goods Receipt and numbered GRN only after physical receiving. These words never replace
+one another or the navigation word, and `Goods Receipts` is retired as navigation.
 
 **This is navigation, not workflow.** How the operator moves between these pages — which one
 feeds which — is the module MASTER's, and it changes when the business changes.
@@ -467,8 +467,8 @@ amend it · void it · return a count for a re-check.
 **LINKS TO** — Purchasing (the PO) · Stock (where the units landed) · Supplier Claim (what the
 count opened).
 
-Supplier-consignment receipt preserves supplier ownership and creates no payable. Receiving
-is the one receipt engine; a separate Consignment Receipt page would duplicate the physical act.
+Supplier-consignment receipt preserves supplier ownership and creates no payable. Receiving is the
+one receipt engine; a separate Consignment Receipt page would duplicate the physical act.
 
 > **ONE DOOR. This is the boundary D2 restored**, and it is the sharpest example of Law C in the
 > whole system: a second receive form did not create a second door onto one act — **it created a
@@ -792,9 +792,9 @@ that already exist. Until that fact exists, a trip table is an unowned record �
 
 **③ Purchasing / customer-order seam — RESOLVED FROM AUTHORITY 2026-08-22.**
 The customer order owns the reason and promise. Purchasing owns the generated `purchase_demand`
-remainder, supplier commitment and `Deliver To`; Receiving owns the physical receipt; Stock
-then owns Unit custody/location. The Sales Order reads risk and connected documents but cannot mark
-goods ordered or received.
+remainder, supplier commitment and `Deliver To`; Receiving owns the physical check-in and creates
+the Goods Receipt/GRN; Stock then owns valid Unit custody/location. The Sales Order reads risk and
+connected documents but cannot mark goods ordered or received.
 
 **④ Supplier Claim entrance — RESOLVED FROM AUTHORITY 2026-08-22.**
 There is one problem intake through Service Case or the authoritative receiving exception. The

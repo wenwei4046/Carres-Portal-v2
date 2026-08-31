@@ -30,7 +30,7 @@ money or supplier payment.
 |---|---|
 | Customer order, customer promise and cancellation | Sales Orders |
 | Buy reason, purchase demand remainder, supplier, PO, supplier date and `Deliver To` | Purchasing |
-| Physical count, condition, Supplier DO and Goods Receipt/numbered GRN evidence | Receiving — ERP Architecture §3.4; seam in §9.4 |
+| Count, condition, Supplier DO and physical receipt evidence | Receiving under this MASTER; the act creates the Goods Receipt and numbered GRN |
 | Exact Unit, ownership, custody, location and availability | Stock / Warehouse |
 | Actual customer handover and delivery proof | Delivery |
 | Customer money | Payment |
@@ -142,13 +142,13 @@ Primary references: [Dynamics purchase requisitions](https://learn.microsoft.com
 | SO buying | Staff rely on Sales messages and personal memory | 2990 computes SO/MRP need and groups supplier lines | **ADAPT + IMPROVE** | SO uncovered quantity becomes demand; stock/PO coverage reduces it; ready lines batch by supplier | Open dated work, fix named blockers, set/split `Deliver To`, issue | `SO Batch Purchase` Register + row inspector + issue surface | Sales Order source; Stock coverage; Delivery required-arrival date |
 | Non-SO buying | Requests are informal and may omit the business reason | Mature requisition separates internal approval from external PO | **ADAPT** | Staff create Manual Purchase; approval produces demand; rejection ends it | Select purpose, goods, quantity, date and destination; system routes approval | `Manual Purchase` Register and object; no separate request page | Catalog, Stock planning, approved Display Request, Finance approval boundary |
 | Purchase demand | Staff may confuse “need” with a document to send | 2990 recomputes need; mature ERP keeps requisition/demand separate from PO | **KEEP + RELOCATE** | One hidden canonical line record stores required, covered, ordered and remaining quantity | Staff see demand facts through the correct work door; never create/send a demand document | No sidebar page; read in SO Batch, Manual Purchase, PO and Order Route | Source object creates/reduces/cancels demand; PO allocation covers it |
-| Purchase Order | PDF/WhatsApp means the real order; changes can be lost | 2990 retains line balance, version and documents | **KEEP + IMPROVE** | Current PO Duty checks, sends the actual PDF, records channel/time; later changes create a version | Use 50/50 check/preview; send; record supplier promise or exception | `Purchase Orders` Register; full-width view; 50/50 only while issuing/editing | Demand, supplier, Goods Receipt, Stock, Finance read-only |
-| Physical receipt / GRN | Supplier DO and Carres GRN can be confused; counts may hide damaged/wrong/extra goods | Mature ERP separates supplier delivery evidence, physical receipt and payable invoice | **ADAPT + IMPROVE** | Receiving starts from the PO/CO, records the supplier DO and physical counts, then Carres creates the numbered GRN once | Open the exact source, record Order/Received/Damaged/Wrong/Pending facts and evidence, finish once | Receiving-owned workspace and GRN record; no second receipt door | PO/CO source; Stock receives only valid goods; Supplier Claim consequence; no AP for consignment |
-| Supplier problem | Receipt differences and later defects can be mixed | Source-linked claim/return flows preserve evidence | **IMPROVE** | Receiving records damaged/wrong/extra separately without reducing pending delivery or making stock available; later discovery enters Service Case and creates Purchasing claim work | Check source, evidence, supplier response and authorised outcome | `Supplier Claims` Register; claim object and optional supplier claim pack | Service Case authority; GRN/Unit evidence; Finance credit read-only |
+| Purchase Order | PDF/WhatsApp means the real order; changes can be lost | 2990 retains line balance, version and documents | **KEEP + IMPROVE** | Current PO Duty or another authorised Operations actor checks the actual PDF, records outbound evidence, and creates a governed version for later official changes | Use 50/50 check/preview; issue the current version; record the supplier answer or exception | `Purchase Orders` Register; full-width view; 50/50 only while issuing/editing | Demand, supplier, Receiving/GRN, Stock, Finance read-only |
+| Goods receipt | Staff may sign without controlled count/evidence | Mature ERP separates receipt from invoice; 2990 supports partial receipt | **ADAPT + IMPROVE** | Start in Receiving from a due PO/CO; count exact goods; attach the Supplier DO; record problems; finish once | Select source, count lines/Units, record condition, upload evidence, finish | `Receiving` Register/workspace; the completed physical act creates the Goods Receipt and numbered GRN | Purchasing source; Stock movement/Unit; Supplier Claim trigger; no AP for consignment |
+| Supplier problem | On-spot rejection and later defect are mixed | Source-linked claim/return flows preserve evidence | **IMPROVE** | Reject at receipt if still with supplier; later discovery enters Service Case and creates Purchasing claim workstream | Check source, evidence, supplier response and authorised outcome | `Supplier Claims` Register; claim object and optional supplier claim pack | Service Case authority; GRN/Unit evidence; Finance credit read-only |
 | Purchase return | Staff may create a return because goods look wrong | 2990 can derive a return from GRN but also permits blank return | **ADAPT / REJECT blank create** | Only an approved claim/outcome creates a return; issue document; collection proof moves custody | Send return, obtain collection date, scan exact Units, record handover | `Purchase Returns` Register; formal object; 50/50 while issuing/revising | Claim source; Stock custody; Finance credit consequence |
 | Repair order | Repair can be confused with replacement | Mature service logistics preserves exact serial/Unit custody | **IMPROVE** | Approved repair outcome creates RO; same Unit leaves and must return; replacement gets a new Unit ID | Issue repair order, hand over, chase dated return, inspect same Unit | `Repair Orders` Register; formal object; 50/50 while issuing/revising | Service outcome; Stock custody; Goods Receipt/inspection on return |
 | Display request | Sales negotiates with supplier while Purchasing places/controls order | Requisition should state purpose before external commitment | **IMPROVE** | Showroom asks for a model/display change; Purchasing decides buy, consignment, swap or no action | Showroom enters simple request; Purchasing resolves supplier/SKU/path | `Display Requests` Register and internal object; no PDF preview | Showroom/Sales request; Catalog; Manual Purchase or CO; Stock location |
-| Consignment order | Supplier-owned sofas are hard to count; purchased Hooka/Ohana displays are mixed in | Mature ERP keeps supplier ownership on receipt; 2990 has documents but fragmented truth | **ADAPT + IMPROVE** | Approved display/claim swap creates CO; exact Units and supplier ownership are fixed before delivery | Issue CO, send Unit IDs, record promise, receive through the one Receiving engine | `Consignment Orders` Register; formal object; 50/50 while issuing/revising | Display Request; Stock Unit; Goods Receipt; Consignment Return |
+| Consignment order | Supplier-owned sofas are hard to count; purchased Hooka/Ohana displays are mixed in | Mature ERP keeps supplier ownership on receipt; 2990 has documents but fragmented truth | **ADAPT + IMPROVE** | Approved display/claim swap creates CO; exact Units and supplier ownership are fixed before delivery | Issue CO, send Unit IDs, record promise, check in through Receiving | `Consignment Orders` Register; formal object; 50/50 while issuing/revising | Display Request; Stock Unit; Goods Receipt/GRN; Consignment Return |
 | Consignment return | Removal/swap may be arranged informally | Physical handover, not document issue, changes custody | **IMPROVE** | Approved remove/swap/claim/overdelivery creates return; combined swap can share one CO PDF | Send standalone return if needed; obtain collection date; scan and prove handover | `Consignment Returns` Register; formal object; 50/50 while issuing/revising | CO swap, Stock custody, supplier proof; no refund/credit on unsold consignment |
 | Consignment sale notice | Staff may forget to tell supplier after a sale | Mature ERP creates consumption advice after actual consumption | **ADAPT + IMPROVE** | Successful delivery of exact supplier-owned Unit auto-creates one notice per supplier × attempt | Current PO Duty checks and sends; Finance later matches invoice | `Consignment Sale Notices` Register; no `+ New`; 50/50 while issuing/correcting | Delivery success; Stock ownership; source CO; Finance/AP continuation |
 
@@ -188,8 +188,8 @@ Rules:
 - There is no Purchase Demands page. Demand is a record, not a staff destination.
 - There are no New Supplier or New SKU request pages. A blocked buy opens an in-context governed
   supplier/SKU request to Catalog/Master Data and returns to the same buy.
-- There is no Consignment Overview or Consignment Receipts page. Receiving handles purchased
-  and consignment goods; Stock Register reports supplier-owned Units.
+- There is no Consignment Overview or Consignment Receipts page. Receiving checks in purchased and
+  consignment goods through one engine; Stock Register reports supplier-owned Units.
 - Settings stays behind the global header gear. Reports use the central Reports area and Register
   export, not permanent Purchasing sidebar rows.
 
@@ -1194,21 +1194,58 @@ missing governed Catalog/supplier relationship, refused/withdrawn request.
 
 **Purpose / source:** every numbered supplier purchase commitment and version. No blank independent
 PO; source is approved demand.
-**Left rail:** `PDF not sent`, `Supplier date missing`, `Supplier date passed`, `Version changed — supplier update required`, `Partly received`, `Completed`.
-**Date facts:** `PO Issued` sits beside `PO No` and means when Carres issued the current supplier
-commitment. `PO Delivery Date` is the original official supplier-facing date on the PO. A separate
-`Supplier Delivery Date` Register column appears only when the supplier has changed that date;
-unchanged rows read `Same as PO`. `Goods Received At` belongs to Receiving and never substitutes for
-any of these dates.
-**Columns:** PO No., PO Issued, Supplier, Source, Deliver To, PO Delivery Date, Supplier Delivery
-Date when changed, Ordered, Received, Pending Delivery Qty, Current Version, Supplier Has.
-**Journey:** open prepared issue → validate authority/price/Units/destination → send PDF → record
-outbound fact → record supplier date or exception → monitor receipt balance.
-**Object/placement:** full-width view; 50/50 check/preview for issue/change; Document, Revisions,
-History, Order Route.
+**Left rail:** factual filters only: `PDF not sent`, `Supplier date missing`, `Supplier date passed`,
+`Version changed — supplier update required`, `Partly received`, `Completed`. The rail never becomes a
+second Work Engine. It uses the governed 240px filter-rail shell and may hide completely.
+
+**Default columns, exactly and in this order:** `PO No` · `PO Issued` · `Supplier` · `Items` ·
+`Related To` · `Deliver To` · `PO Delivery Date` · `Supplier Delivery Date` · `Order Qty` ·
+`Received Qty` · `Pending Delivery Qty` · `Status` · `Work`.
+
+- `PO Issued`, never `PO Date`, reads the formal `purchase_orders.placed_at` fact and sits beside
+  `PO No`. The screen uses `fmtDate`; the official PDF always prints the year.
+- An unrevised PO prints only its number. A later version prints `{po} · Version {n}`; `V2`,
+  `Current Version` and `Supplier Has` are not separate UI fields.
+- `Related To`, never `Source`, shows the governed Sales Order and Manual Purchase lineage.
+- `PO Delivery Date` is the official supplier-facing date carried by the current PO version. A
+  supplier answer never overwrites it. `Supplier Delivery Date` prints `Not recorded` before an
+  answer, `Same as PO` when the supplier confirms the official date, or the supplier's changed
+  date. Changing the official date creates a governed PO version.
+- Parent rows print `Order Qty`, `Received Qty` and `Pending Delivery Qty`. The item expansion and
+  Columns catalogue additionally expose `Damaged Qty` and `Wrong Item Qty`. Damaged, wrong or extra
+  goods never reduce `Pending Delivery Qty` and never become available Stock.
+- A numbered current version with no confirmed outbound evidence shows `The PO PDF has not been
+  sent`. The five later Operation Status words remain `Issued`, `In Production`, `Receiving`,
+  `Completed`, `Cancelled`. There is no `Send Status`, `Receiving Status` or `Acknowledged` state.
+- `Work` is a projection of the one central My Work/Team Work action. Both central Work and the PO
+  Register deep-link the exact PO action. Completing either entrance closes the same action.
+
+**Journey:** open the numbered PO → validate authority/price/Units/destination in 50/50 beside the
+live official PDF → issue the current version → record version/recipient/channel/actor/time and
+optional outbound screenshot → record the supplier's concrete answer with channel, evidence,
+reporter/recorder and reported/recorded times → read Receiving/GRN results and pending quantity.
+
+**Object/placement:** normal read is one full-width object. The current official PO remains readable
+in `Document`; `Revisions` preserves every immutable version, `History` preserves append-only events,
+and `Order Route` links the true owners. Issue and governed revision use 50% check/edit + 50% live
+official PO preview. Below 1130px the decision work stacks above the readable document. There is one
+communication area. `Open WhatsApp`, `Open WhatsApp group`, `Open email` and `Download PDF` are
+doors only; `Record the PDF sent` records the outbound fact.
+
+**Supplier answer authority:** Purchase Orders owns the answer and its evidence. `Record supplier
+date` records the first answer; `Record supplier answer` records a later changed/passed-date answer.
+The evidence carries the concrete answer, channel, evidence file/note, who received/reported it,
+who recorded it, and both times. Opening a channel completes nothing.
+
+**Owner and permission:** monthly PO Duty and dated cover remain structured normal-owner metadata.
+The actual actor is always preserved separately. `operation@carres.com` and Jess are Operations
+Superusers and may act even when they are not today's duty holder/cover; other users follow the
+governed Purchasing permission. Work ownership is never misused as the whole permission model.
 **Exceptions:** supplier fabric/model unavailable, delayed/split promise, quantity change,
 overdelivery, price change, cancellation and post-send destination change.
-**Connections:** demand, supplier, GRN, Stock, claims, Finance read-only.
+**Connections:** demand, supplier, Receiving session, Supplier DO, Goods Receipt/GRN, Stock, claims,
+returns and Finance read-only. Purchase Orders reads those records and opens their exact doors; it
+does not create a second receiving or GRN writer.
 
 ### 9.4 Receiving / GRN seam — OWNER CORRECTION 2026-08-29
 
@@ -1232,6 +1269,8 @@ facts only:
   creates the GRN once and moves only valid received goods into Stock custody.
 - Receiving-owned work deep-links the exact PO/Receiving Session. A Purchasing supplier chase
   deep-links the exact PO. Merely opening WhatsApp/email completes nothing.
+- Purchasing work uses the Operation Mon–Fri calendar. Warehouse/Receiving/GRN uses Mon–Sat.
+  Sunday and Selangor public holidays are excluded; authoritative dates are never silently moved.
 
 No migration or Receiving implementation is authorised by this 2026-08-29 seam record.
 
@@ -1300,7 +1339,7 @@ no blank `+ New`.
 **Columns:** CO No., Supplier, Source Request, Coming In Units, Going Back Units, Showroom, Supplier
 Date, Received, Return Handover, Work.
 **Journey:** verify supplier ownership → allocate exact Unit IDs → check coming-in/going-back lines →
-send one PDF → record promise → receive through Receiving → prove outgoing handover.
+issue one PDF → record promise → check in through Receiving → prove outgoing handover.
 **Object/placement:** full-width view; 50/50 while issuing/revising. Ownership is locked.
 **Exceptions:** supplier cannot label physical Unit, package-only label, missing Unit source, partial
 swap, supplier changes model/date.

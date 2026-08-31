@@ -52,6 +52,8 @@ const LANE = [
   // was green. A lane list that does not grow with the lane is a lane list
   // that quietly stops being one.
   "pages/operation/OperationPurchaseOrders.tsx",
+  "pages/operation/purchase-orders/PurchaseOrdersPage.tsx",
+  "pages/operation/components/PoIssueEvidence.tsx",
   // Added by P14 (2026-08-04) as `CreatePurchaseDialog.tsx`; the dialog
   // retired on CARD-2026-08-18-manual-purchase and its door moved to the
   // Manual Purchase page — the scan follows the words to their new file for
@@ -77,7 +79,7 @@ function visibleSource(rel: string): string {
 
 describe("R8 · the Purchasing lane speaks the dictionary", () => {
   it("scans every lane file (a rename must not silently empty this suite)", () => {
-    expect(LANE.length).toBe(9);
+    expect(LANE.length).toBe(11);
     for (const f of LANE) expect(read(f).length, f).toBeGreaterThan(500);
   });
 
@@ -221,6 +223,23 @@ describe("R8 · the Purchasing lane speaks the dictionary", () => {
       visibleSource("pages/operation/OperationReceiving.tsx"),
       "Receiving must still call the facet Supplier",
     ).toMatch(/RailGroup title="Supplier"/);
+  });
+});
+
+describe("Purchase Orders · the Register, object and send surface share one dictionary", () => {
+  const register = visibleSource("pages/operation/purchase-orders/PurchaseOrdersPage.tsx");
+  const send = visibleSource("pages/operation/components/PoIssueEvidence.tsx");
+
+  it("uses the official date and document words", () => {
+    expect(register).toContain('label: "PO Issued"');
+    expect(register).toContain(">Official PO<");
+    expect(register).not.toMatch(/>Official document</);
+    expect(register).not.toMatch(/label: ["'`]PO Date["'`]/);
+  });
+
+  it("uses the governed PO identity instead of printing Version 1", () => {
+    expect(send).toContain("purchaseOrderIdentity(po.id, version)");
+    expect(send).not.toMatch(/· Version \$\{version\}/);
   });
 });
 
