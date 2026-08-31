@@ -22,10 +22,14 @@ vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 const PO = {
   po_id: "PO-2001",
+  scope_id: "PO-2001::destination-klang",
+  source_version: 2,
   supplier_name: "Ohana",
-  eta_date: "2026-07-30",
+  po_delivery_date: "2026-07-30",
+  supplier_delivery_date: "2026-08-01",
+  deliver_to: { id: "destination-klang", name: "Carres Klang", address: "Klang" },
   sup_status: "in_production",
-  open_receipt_id: null,
+  open_receipt: null,
   lines: [
     {
       id: "11111111-1111-1111-1111-111111111111",
@@ -35,6 +39,8 @@ const PO = {
       damaged_qty: 0,
       wrong_item_qty: 0,
       category: "mattress" as const,
+      destination_id: "destination-klang",
+      unit_ids: ["id-aaa000001", "id-aaa000002", "id-aaa000003", "id-aaa000004"],
     },
   ],
 };
@@ -64,7 +70,7 @@ describe("WarehouseIncoming", () => {
     mockIncoming([PO]);
     wrap(<WarehouseIncoming />);
     await screen.findByTestId("warehouse-incoming");
-    expect(screen.getByText("Carres Klang")).toBeInTheDocument();
+    expect(screen.getAllByText("Carres Klang")).toHaveLength(2);
     expect(screen.getByText("PO-2001")).toBeInTheDocument();
     expect(screen.getByText("Ohana")).toBeInTheDocument();
     // R1's own words, from R1's own module.
@@ -72,13 +78,21 @@ describe("WarehouseIncoming", () => {
   });
 
   it("says so and offers no second form when a count is already waiting", async () => {
-    mockIncoming([{ ...PO, open_receipt_id: "r1" }]);
+    mockIncoming([{ ...PO, open_receipt: { id: "r1", status: "submitted", lock_version: 2, do_number: "DO-1", do_file_path: "PO-2001/do.jpg", goods_received_timestamp: "2026-08-01T02:00:00Z", note: null, lines: [], return_reason: null } }]);
     wrap(<WarehouseIncoming />);
     await screen.findByTestId("warehouse-waiting-PO-2001");
     expect(screen.getByTestId("warehouse-waiting-PO-2001")).toHaveTextContent(
       "Waiting Carres check",
     );
     expect(screen.queryByTestId("warehouse-count-PO-2001")).not.toBeInTheDocument();
+  });
+
+  it("reopens the exact returned session instead of offering a second count", async () => {
+    mockIncoming([{ ...PO, open_receipt: { id: "r-returned", status: "returned", lock_version: 4, do_number: "DO-1", do_file_path: "PO-2001/do.jpg", goods_received_timestamp: "2026-08-01T02:00:00Z", note: "Recount carton", lines: [], return_reason: "Unit ID missing" } }]);
+    wrap(<WarehouseIncoming />);
+    fireEvent.click(await screen.findByRole("button", { name: "Recount" }));
+    expect(await screen.findByDisplayValue("DO-1")).toBeInTheDocument();
+    expect(screen.getByText("Unit ID missing")).toBeInTheDocument();
   });
 
   it("says nothing is on the way rather than showing an empty grid", async () => {
@@ -105,10 +119,26 @@ describe("the count form", () => {
     );
   });
 
+  it("uses the governed quantity facts and exposes the PO-issued Unit IDs", async () => {
+    await openForm();
+    for (const fact of ["Order Qty", "Received Qty", "Damaged Qty", "Wrong Item Qty", "Pending Delivery Qty", "Extra Qty"])
+      expect(screen.getByText(fact)).toBeInTheDocument();
+    expect(screen.getByText("PO Unit IDs: id-aaa000001, id-aaa000002, id-aaa000003, id-aaa000004")).toBeInTheDocument();
+  });
+
+  it("only Received Qty reduces Pending Delivery Qty", async () => {
+    await openForm();
+    fireEvent.change(screen.getByTestId("warehouse-good-MS01-K"), { target: { value: "1" } });
+    fireEvent.change(screen.getByTestId("warehouse-damaged-MS01-K"), { target: { value: "1" } });
+    fireEvent.change(screen.getByTestId("warehouse-wrong-MS01-K"), { target: { value: "1" } });
+    fireEvent.change(screen.getByTestId("warehouse-extra-MS01-K"), { target: { value: "1" } });
+    expect(screen.getByTestId("warehouse-pending-MS01-K")).toHaveTextContent("3");
+  });
+
   it("never offers 'Receive' as a verb — the portal's word is Check in", async () => {
     await openForm();
     // The DO number field is the only place a stray verb could hide.
-    expect(screen.queryByText(/^Receive/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Receive$/)).not.toBeInTheDocument();
   });
 
   it("refuses to save until the count is complete, and says what is missing", async () => {

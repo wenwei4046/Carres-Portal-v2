@@ -1,11 +1,15 @@
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
+  receivingProblemCopy,
+  receivingUnitIdProblems,
   warehouseReceiptProblems,
   warehouseReceiptProblemText,
   wrongItemClaimTypesFor,
   type WarehouseIncomingPo,
+  type WarehouseReceiptLine,
   type WarehouseReceiptLineDraft,
+  type ReceivingLineInput,
 } from "@carres/shared";
 import { ApiError } from "@/lib/api";
 import { useWarehouseSubmitReceiptMutation } from "@/lib/queries";
@@ -20,7 +24,7 @@ import {
 /**
  * WarehouseCountModal — R6: the receiving form, in the warehouse's own hands.
  *
- * This is R1's inspection, unchanged: three numbers per line under a
+ * This is the warehouse physical count: distinct quantity facts per line under a
  * **Pending delivery** column, and a claim panel that appears the moment a
  * problem is reported (R2's evidence law, asked by R2's own shared function).
  * The card says the inspection form must exist and be proven by ops first —
@@ -56,20 +60,57 @@ interface Props {
   onClose: () => void;
 }
 
-const GRID = "1fr 76px 78px 72px 76px";
+const GRID = "minmax(150px,1fr) repeat(6,82px)";
+
+function storedLine(po: WarehouseIncomingPo, lineId: string) {
+  return po.open_receipt?.lines.find((line) =>
+    ("poLineId" in line ? line.poLineId : line.id) === lineId,
+  ) ?? null;
+}
+
+function storedQty(line: WarehouseReceiptLine | ReceivingLineInput | null, current: keyof ReceivingLineInput, legacy: keyof WarehouseReceiptLine | null): number {
+  if (!line) return 0;
+  if ("poLineId" in line) return Number(line[current]) || 0;
+  return legacy ? Number(line[legacy]) || 0 : 0;
+}
 
 export default function WarehouseCountModal({ po, onClose }: Props) {
   const lines = po.lines ?? [];
 
-  const [recv, setRecv] = useState<Record<string, number>>({});
-  const [dmg, setDmg] = useState<Record<string, number>>({});
-  const [wrong, setWrong] = useState<Record<string, number>>({});
-  const [dmgPhotos, setDmgPhotos] = useState<Record<string, string[]>>({});
-  const [wrongType, setWrongType] = useState<Record<string, string>>({});
-  const [wrongPhotos, setWrongPhotos] = useState<Record<string, string[]>>({});
-  const [doNumber, setDoNumber] = useState("");
-  const [note, setNote] = useState("");
-  const [doFilePath, setDoFilePath] = useState<string | null>(null);
+  const [recv, setRecv] = useState<Record<string, number>>(() => Object.fromEntries(lines.map((line) => [line.id, storedQty(storedLine(po, line.id), "receivedQty", "received_now")])));
+  const [dmg, setDmg] = useState<Record<string, number>>(() => Object.fromEntries(lines.map((line) => [line.id, storedQty(storedLine(po, line.id), "damagedQty", "damaged_qty")])));
+  const [wrong, setWrong] = useState<Record<string, number>>(() => Object.fromEntries(lines.map((line) => [line.id, storedQty(storedLine(po, line.id), "wrongItemQty", "wrong_item_qty")])));
+  const [extra, setExtra] = useState<Record<string, number>>(() => Object.fromEntries(lines.map((line) => [line.id, storedQty(storedLine(po, line.id), "extraQty", null)])));
+  const [unitIds, setUnitIds] = useState<Record<string, string[]>>(() => Object.fromEntries(lines.map((line) => {
+    const stored = storedLine(po, line.id);
+    return [line.id, stored && "poLineId" in stored ? [...stored.unitIds] : []];
+  })));
+  const [dmgPhotos, setDmgPhotos] = useState<Record<string, string[]>>(() => Object.fromEntries(lines.map((line) => {
+    const stored = storedLine(po, line.id);
+    return [line.id, stored && "poLineId" in stored ? [...stored.damagedPhotos] : []];
+  })));
+  const [wrongType, setWrongType] = useState<Record<string, string>>(() => Object.fromEntries(lines.map((line) => {
+    const stored = storedLine(po, line.id);
+    return [line.id, stored && "poLineId" in stored ? stored.wrongItemReason ?? "" : stored?.wrong_item_claim_type ?? ""];
+  })));
+  const [wrongPhotos, setWrongPhotos] = useState<Record<string, string[]>>(() => Object.fromEntries(lines.map((line) => {
+    const stored = storedLine(po, line.id);
+    return [line.id, stored && "poLineId" in stored ? [...stored.wrongItemPhotos] : []];
+  })));
+  const [extraEvidence, setExtraEvidence] = useState<Record<string, string[]>>(() => Object.fromEntries(lines.map((line) => {
+    const stored = storedLine(po, line.id);
+    return [line.id, stored && "poLineId" in stored ? [...stored.extraEvidence] : []];
+  })));
+  const [doNumber, setDoNumber] = useState(po.open_receipt?.do_number ?? "");
+  const [note, setNote] = useState(po.open_receipt?.note ?? "");
+  const [doFilePath, setDoFilePath] = useState<string | null>(po.open_receipt?.do_file_path ?? null);
+  const [goodsReceivedAt, setGoodsReceivedAt] = useState(() => {
+    const value = po.open_receipt?.goods_received_timestamp;
+    if (!value) return "";
+    const date = new Date(value);
+    const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+    return local.toISOString().slice(0, 16);
+  });
 
   const submit = useWarehouseSubmitReceiptMutation();
 
@@ -102,19 +143,45 @@ export default function WarehouseCountModal({ po, onClose }: Props) {
     () => warehouseReceiptProblems({ doNumber, doFilePath, lines: draftLines }),
     [doNumber, doFilePath, draftLines],
   );
-  const ready = problems.length === 0 && !submit.isPending;
+  const sessionLines: ReceivingLineInput[] = lines.map((line) => ({
+    poLineId: line.id,
+    sku: line.sku,
+    receivedQty: recv[line.id] || 0,
+    damagedQty: dmg[line.id] || 0,
+    wrongItemQty: wrong[line.id] || 0,
+    extraQty: extra[line.id] || 0,
+    unitIds: unitIds[line.id] ?? [],
+    damagedPhotos: dmgPhotos[line.id] ?? [],
+    wrongItemPhotos: wrongPhotos[line.id] ?? [],
+    extraEvidence: extraEvidence[line.id] ?? [],
+    wrongItemReason: wrongType[line.id] || null,
+  }));
+  const sessionProblems = [
+    ...(!goodsReceivedAt ? [receivingProblemCopy("goods_received_at_missing")] : []),
+    ...sessionLines.flatMap((line) => {
+      const identity = receivingUnitIdProblems(line, { expectedUnitIds: lines.find((source) => source.id === line.poLineId)?.unit_ids ?? [], wrongSourceUnitIds: [] });
+      const facts = identity.map((key) => key === "unit_id_missing"
+        ? receivingProblemCopy("unit_id_missing", { item: line.sku, document: po.po_id })
+        : key === "duplicate_unit_id"
+          ? { fact: `A Unit ID is repeated for ${line.sku}`, action: "Scan each physical Unit once" }
+          : { fact: `A Unit ID for ${line.sku} is not on ${po.po_id}`, action: "Check the label and scan the correct Unit ID" });
+      if (line.extraQty > 0 && line.extraEvidence.length === 0) facts.push(receivingProblemCopy("extra_goods_found"));
+      return facts;
+    }),
+  ];
+  const ready = problems.length === 0 && sessionProblems.length === 0 && !submit.isPending;
 
   const totals = draftLines.reduce(
     (acc, l) => ({
       good: acc.good + l.receivedNow,
       damaged: acc.damaged + l.damagedQty,
       wrong: acc.wrong + l.wrongItemQty,
+      extra: acc.extra + (extra[l.id] || 0),
     }),
-    { good: 0, damaged: 0, wrong: 0 },
+    { good: 0, damaged: 0, wrong: 0, extra: 0 },
   );
-  const issueTotal = totals.damaged + totals.wrong;
 
-  /** The three numbers share ONE budget: a delivery may never account for more
+  /** Received, damaged and wrong share the ordered-line budget: a delivery may never account for more
    *  units than the line still owes. `field` is the box being typed into. */
   function allowance(
     id: string,
@@ -141,31 +208,18 @@ export default function WarehouseCountModal({ po, onClose }: Props) {
     if (!ready || !doFilePath) return;
     try {
       await submit.mutateAsync({
-        poId: po.po_id,
-        doNumber: doNumber.trim(),
-        doFilePath,
-        note: note.trim() || undefined,
-        lines: draftLines
-          .filter(
-            (l) => l.receivedNow > 0 || l.damagedQty > 0 || l.wrongItemQty > 0,
-          )
-          .map((l) => ({
-            id: l.id,
-            receivedNow: l.receivedNow,
-            ...(l.damagedQty > 0
-              ? {
-                  damagedQty: l.damagedQty,
-                  damagedPhotos: [...l.damagedPhotos],
-                }
-              : {}),
-            ...(l.wrongItemQty > 0
-              ? {
-                  wrongItemQty: l.wrongItemQty,
-                  wrongItemClaimType: l.wrongItemClaimType ?? undefined,
-                  wrongItemPhotos: [...l.wrongItemPhotos],
-                }
-              : {}),
-          })),
+        receiptId: po.open_receipt?.status === "draft" || po.open_receipt?.status === "returned" ? po.open_receipt.id : undefined,
+        expectedVersion: po.open_receipt?.lock_version ?? 0,
+        session: {
+          sourceKind: "purchase_order",
+          sourceId: po.po_id,
+          expectedVersion: po.source_version,
+          supplierDoNo: doNumber.trim(),
+          signedDoPath: doFilePath,
+          goodsReceivedAt: new Date(goodsReceivedAt).toISOString(),
+          note: note.trim() || null,
+          lines: sessionLines,
+        },
       });
       // COPY-STANDARD's done message for this direction of the pair, with the
       // PO and the DO it is about.
@@ -181,6 +235,9 @@ export default function WarehouseCountModal({ po, onClose }: Props) {
 
   return (
     <Modal title={`Count ${po.po_id}`} onClose={onClose} size="lg">
+      {po.open_receipt?.status === "returned" && po.open_receipt.return_reason ? (
+        <div className="mb-3 border-l-2 border-danger pl-3 text-body"><p className="font-semibold">Count returned to warehouse</p><p>{po.open_receipt.return_reason}</p></div>
+      ) : null}
       <div className="text-meta text-base-600 mb-3.5 font-body">
         Goods from <strong>{po.supplier_name ?? "the factory"}</strong>. For each
         item: how many arrived good, how many arrived damaged, how many are the
@@ -194,16 +251,19 @@ export default function WarehouseCountModal({ po, onClose }: Props) {
           style={{ gridTemplateColumns: GRID }}
         >
           <div className="label">Item</div>
-          <div className="label text-right">Pending delivery</div>
-          <div className="label text-right">Arrived good</div>
-          <div className="label text-right">Damaged</div>
-          <div className="label text-right">Wrong item</div>
+          <div className="label text-right">Order Qty</div>
+          <div className="label text-right">Received Qty</div>
+          <div className="label text-right">Damaged Qty</div>
+          <div className="label text-right">Wrong Item Qty</div>
+          <div className="label text-right">Pending Delivery Qty</div>
+          <div className="label text-right">Extra Qty</div>
         </div>
 
         {lines.map((l) => {
           const pending = pendingOf(l);
+          const pendingAfter = Math.max(0, pending - (recv[l.id] || 0));
           const disabled = pending === 0;
-          const hasIssue = (dmg[l.id] || 0) > 0 || (wrong[l.id] || 0) > 0;
+          const hasIssue = (dmg[l.id] || 0) > 0 || (wrong[l.id] || 0) > 0 || (extra[l.id] || 0) > 0;
           return (
             <div key={l.id} className="border-t border-base-100">
               <div
@@ -216,9 +276,7 @@ export default function WarehouseCountModal({ po, onClose }: Props) {
                     Ordered {l.qty} · already checked in {l.received_qty}
                   </div>
                 </div>
-                <div className="font-mono text-meta text-right font-semibold">
-                  {pending}
-                </div>
+                <div className="font-mono text-meta text-right">{l.qty}</div>
                 <input
                   type="number"
                   min={0}
@@ -273,6 +331,29 @@ export default function WarehouseCountModal({ po, onClose }: Props) {
                   data-testid={`warehouse-wrong-${l.sku}`}
                   className="px-2 py-1.5 border border-base-300 rounded-[4px] text-meta text-right bg-white outline-none focus:border-base-500"
                 />
+                <div className="font-mono text-meta text-right font-semibold" data-testid={`warehouse-pending-${l.sku}`}>{pendingAfter}</div>
+                <input
+                  type="number"
+                  min={0}
+                  value={extra[l.id] || 0}
+                  onChange={(e) => setNum(setExtra, l.id, parseInt(e.target.value, 10) || 0, 500)}
+                  aria-label={`Extra Qty for ${l.sku}`}
+                  data-testid={`warehouse-extra-${l.sku}`}
+                  className="px-2 py-1.5 border border-base-300 rounded-[4px] text-meta text-right bg-white outline-none focus:border-base-500"
+                />
+              </div>
+
+              <div className="grid gap-1 border-t border-base-100 px-3.5 py-2.5">
+                <label className="text-label text-base-600" htmlFor={`wh-unit-${l.id}`}>Unit ID — enter Received, Damaged, Wrong Item, then Extra labels</label>
+                <textarea
+                  id={`wh-unit-${l.id}`}
+                  aria-label={`Unit ID for ${l.sku}`}
+                  data-testid={`warehouse-unit-${l.sku}`}
+                  value={(unitIds[l.id] ?? []).join("\n")}
+                  onChange={(e) => setUnitIds((current) => ({ ...current, [l.id]: e.target.value.split(/[\n,]/).map((value) => value.trim()).filter(Boolean) }))}
+                  className={`${INPUT_CLS} min-h-16 font-mono`}
+                />
+                <p className="text-label text-base-500">PO Unit IDs: {l.unit_ids.length ? l.unit_ids.join(", ") : "None recorded"}</p>
               </div>
 
               {/* R2's claim panel, unchanged: it exists only once a problem has
@@ -340,6 +421,16 @@ export default function WarehouseCountModal({ po, onClose }: Props) {
                       />
                     </>
                   )}
+                  {(extra[l.id] || 0) > 0 && (
+                    <ClaimPhotoUploadField
+                      poId={po.po_id}
+                      doNumber={doNumber || "count"}
+                      paths={extraEvidence[l.id] ?? []}
+                      onChange={(paths) => setExtraEvidence((prev) => ({ ...prev, [l.id]: paths }))}
+                      label={`Extra goods evidence (${extra[l.id]} unit${(extra[l.id] || 0) === 1 ? "" : "s"})`}
+                      testId={`warehouse-extra-evidence-${l.sku}`}
+                    />
+                  )}
                 </div>
               )}
             </div>
@@ -354,11 +445,18 @@ export default function WarehouseCountModal({ po, onClose }: Props) {
             Σ {totals.good} good
             {totals.damaged > 0 ? ` · ${totals.damaged} damaged` : ""}
             {totals.wrong > 0 ? ` · ${totals.wrong} wrong item` : ""}
+            {totals.extra > 0 ? ` · ${totals.extra} extra` : ""}
           </div>
         </div>
       </div>
 
       <div className="grid gap-3 mb-4">
+        <div>
+          <label className="label mb-1.5 block" htmlFor="wh-goods-received-at">
+            Goods Received At *
+          </label>
+          <input id="wh-goods-received-at" type="datetime-local" value={goodsReceivedAt} onChange={(e) => setGoodsReceivedAt(e.target.value)} className={INPUT_CLS} />
+        </div>
         <div>
           <label className="label mb-1.5 block" htmlFor="wh-do-number">
             DO number *
@@ -381,6 +479,7 @@ export default function WarehouseCountModal({ po, onClose }: Props) {
             doNumber={doNumber || "count"}
             onUploaded={(path) => setDoFilePath(path)}
           />
+          {doFilePath ? <p className="mt-1 text-label text-base-500">Signed DO photo recorded</p> : null}
         </div>
         <div>
           <label className="label mb-1.5 block" htmlFor="wh-note">
@@ -405,13 +504,7 @@ export default function WarehouseCountModal({ po, onClose }: Props) {
         data-testid="warehouse-count-note"
       >
         Nothing moves yet. Carres checks this in, and the stock is booked then.
-        {issueTotal > 0 && (
-          <>
-            {" "}
-            The damaged and wrong-item units open a{" "}
-            <strong>claim against the factory</strong> with the photos above.
-          </>
-        )}
+        Damaged, wrong and extra Units stay out of available stock; their evidence continues in the governed supplier process.
       </div>
 
       {problems.length > 0 && (
@@ -420,6 +513,11 @@ export default function WarehouseCountModal({ po, onClose }: Props) {
           data-testid="warehouse-count-problems"
         >
           {problems.map(warehouseReceiptProblemText).join(" · ")}
+        </div>
+      )}
+      {sessionProblems.length > 0 && (
+        <div className="mb-3 grid gap-1 text-label font-body" data-testid="warehouse-session-problems">
+          {sessionProblems.map((problem, index) => <div key={`${problem.fact}-${index}`}><p className="font-semibold text-danger">{problem.fact}</p><p className="text-base-600">{problem.action}</p></div>)}
         </div>
       )}
 

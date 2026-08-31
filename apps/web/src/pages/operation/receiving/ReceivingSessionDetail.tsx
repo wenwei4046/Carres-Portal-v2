@@ -9,12 +9,15 @@ import DOFileUploadField from "@/components/DOFileUploadField";
 import ClaimPhotoUploadField from "@/components/ClaimPhotoUploadField";
 import {
   useSaveReceivingSessionMutation,
+  useSubmitReceivingSessionMutation,
   useWarehouseReceiptReviewMutation,
   type ReceivingEvent,
   type ReceivingSession,
 } from "@/lib/queries";
 import { fmtDateShort } from "@/lib/fmt-date";
 import GrnPreview from "./GrnPreview";
+
+// design-standard: not-a-list-page — embedded Receiving object workspace.
 
 type EditableLine = ReceivingLineInput;
 
@@ -79,10 +82,16 @@ export default function ReceivingSessionDetail({
   parent,
   session,
   events,
+  authority,
 }: {
   parent: ReceivingRegisterParent;
   session: ReceivingSession;
   events: readonly ReceivingEvent[];
+  authority: {
+    mayPost: boolean;
+    normalGrnDutyName: string | null;
+    datedCoverName: string | null;
+  };
 }) {
   const [doNo, setDoNo] = useState(session.do_number ?? "");
   const [signedDoPath, setSignedDoPath] = useState(session.do_file_path ?? "");
@@ -95,6 +104,7 @@ export default function ReceivingSessionDetail({
   const posted = session.status === "posted" || session.status === "amended" || session.status === "voided";
   const review = useWarehouseReceiptReviewMutation("check-in");
   const sendBack = useWarehouseReceiptReviewMutation("send-back");
+  const submit = useSubmitReceivingSessionMutation(parent.id, session.id);
   const save = useSaveReceivingSessionMutation(parent.id, session.id, {
     onSuccess: (result) => {
       setLockVersion(result.lock_version);
@@ -128,19 +138,20 @@ export default function ReceivingSessionDetail({
   };
 
   if (posted) {
+    const snapshot = session.grn_snapshot;
     return (
       <div className="grid min-h-0 gap-3 min-[1130px]:grid-cols-2" data-testid="posted-receiving-layout">
         <section className="min-w-0 bg-white p-4">
           <h2 className="text-strong font-semibold">Receiving facts</h2>
-          <Fact label="PO No."><span className="font-mono">{parent.sourceNumber}</span></Fact>
-          <Fact label="Supplier">{parent.supplier}</Fact>
-          <Fact label="Deliver To">{parent.deliverTo}</Fact>
-          <Fact label="PO Issued">{parent.poIssuedAt ? fmtDateShort(parent.poIssuedAt) : "—"}</Fact>
-          <Fact label="PO Delivery Date">{parent.poDeliveryDate ? fmtDateShort(parent.poDeliveryDate) : "—"}</Fact>
-          <Fact label="Supplier Delivery Date">{parent.sameAsPo ? "Same as PO" : parent.supplierDeliveryDate ? fmtDateShort(parent.supplierDeliveryDate) : "—"}</Fact>
-          <Fact label="Goods Received At">{session.goods_received_timestamp ? fmtDateShort(session.goods_received_timestamp) : "—"}</Fact>
+          <Fact label="PO No."><span className="font-mono">{snapshot?.sourceSnapshot.sourceId ?? "—"}</span></Fact>
+          <Fact label="Supplier">{snapshot?.supplierSnapshot.name ?? "—"}</Fact>
+          <Fact label="Deliver To">{snapshot?.destinationSnapshot.name ?? "—"}</Fact>
+          <Fact label="PO Issued">{snapshot?.sourceSnapshot.poIssuedAt ? fmtDateShort(snapshot.sourceSnapshot.poIssuedAt) : "—"}</Fact>
+          <Fact label="PO Delivery Date">{snapshot?.sourceSnapshot.poDeliveryDate ? fmtDateShort(snapshot.sourceSnapshot.poDeliveryDate) : "—"}</Fact>
+          <Fact label="Supplier Delivery Date">{snapshot?.supplierDeliveryDate ? fmtDateShort(snapshot.supplierDeliveryDate) : "—"}</Fact>
+          <Fact label="Goods Received At">{snapshot?.goodsReceivedAt ? fmtDateShort(snapshot.goodsReceivedAt) : "—"}</Fact>
         </section>
-        <GrnPreview parent={parent} session={session} />
+        <GrnPreview session={session} />
       </div>
     );
   }
@@ -148,16 +159,21 @@ export default function ReceivingSessionDetail({
   return (
     <div className="min-h-0 bg-white p-4" data-testid="receiving-session-detail">
       <div className="mb-3 flex min-h-10 flex-wrap items-center gap-2 border-b border-kit-slate-5 pb-3" data-testid="receiving-work-toolbar">
-        {session.status === "submitted" ? (
+        {session.status === "submitted" && authority.mayPost ? (
           <>
             <button type="button" disabled={Boolean(problem) || review.isPending} onClick={() => review.mutate({ receiptId: session.id, expectedVersion: lockVersion })} className="h-8 rounded-control bg-kit-blue-9 px-3 text-meta font-semibold text-white disabled:opacity-40">Check in</button>
             <label className="text-body"><span className="mr-2 text-kit-slate-9">Return reason</span><input value={returnReason} onChange={(e) => setReturnReason(e.target.value)} className="h-8 rounded-control border border-kit-slate-5 px-2" /></label>
             <button type="button" disabled={!returnReason.trim() || sendBack.isPending} onClick={() => sendBack.mutate({ receiptId: session.id, expectedVersion: lockVersion, reason: returnReason.trim() })} className="h-8 rounded-control border border-kit-slate-6 px-3 text-meta disabled:opacity-40">Return count to warehouse</button>
           </>
+        ) : session.status === "submitted" ? (
+          <div data-testid="receiving-authority-guidance">
+            <p className="text-body font-medium text-kit-slate-12">GRN review belongs to {authority.datedCoverName ?? authority.normalGrnDutyName ?? "the assigned GRN Duty"}</p>
+            <p className="text-meta text-kit-slate-9">Open the assigned action in My Work or Team Work.</p>
+          </div>
         ) : (
           <>
             <button type="button" onClick={() => save.mutate({ expectedVersion: lockVersion, session: payload })} disabled={save.isPending} className="h-8 rounded-control border border-kit-slate-6 px-3 text-meta font-medium">Save Receiving</button>
-            <button type="button" onClick={() => review.mutate({ receiptId: session.id, expectedVersion: lockVersion })} disabled={Boolean(problem) || review.isPending} className="h-8 rounded-control bg-kit-blue-9 px-3 text-meta font-semibold text-white disabled:opacity-40">Check in</button>
+            <button type="button" onClick={() => submit.mutate({ expectedVersion: lockVersion })} disabled={Boolean(problem) || submit.isPending} className="h-8 rounded-control bg-kit-blue-9 px-3 text-meta font-semibold text-white disabled:opacity-40">Send for GRN review</button>
           </>
         )}
       </div>
@@ -205,7 +221,7 @@ export default function ReceivingSessionDetail({
       <label className="mt-3 block text-body"><span className="text-kit-slate-9">Note</span><textarea value={note} onChange={(e) => { setNote(e.target.value); setDirty(true); }} className="mt-1 min-h-16 w-full rounded-control border border-kit-slate-5 px-2 py-1" /></label>
 
       {problem ? <div className="mt-3 border-l-2 border-kit-amber-9 pl-3 text-body"><p className="font-medium text-kit-slate-12">{problem.fact}</p><p className="text-kit-slate-9">{problem.action}</p></div> : null}
-      {(save.error || review.error || sendBack.error) ? <p className="mt-3 text-body text-kit-red-11">{(save.error ?? review.error ?? sendBack.error)?.message}</p> : null}
+      {(save.error || submit.error || review.error || sendBack.error) ? <p className="mt-3 text-body text-kit-red-11">{(save.error ?? submit.error ?? review.error ?? sendBack.error)?.message}</p> : null}
 
       <section className="mt-5 border-t border-kit-slate-5 pt-3">
         <h3 className="text-label font-semibold uppercase tracking-wide text-kit-slate-9">History</h3>

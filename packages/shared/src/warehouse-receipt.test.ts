@@ -440,6 +440,19 @@ describe("Receiving Unit IDs", () => {
       { unitId: "EXTRA-1", outcome: "extra" },
     ]);
   });
+
+  it("keeps an extra supplier label as evidence without pretending it is a PO Unit", () => {
+    expect(receivingUnitIdProblems({
+      receivedQty: 1,
+      damagedQty: 0,
+      wrongItemQty: 0,
+      extraQty: 1,
+      unitIds: ["PO-1-001", "SUPPLIER-LABEL-X"],
+    }, {
+      expectedUnitIds: ["PO-1-001"],
+      wrongSourceUnitIds: [],
+    })).toEqual([]);
+  });
 });
 
 describe("Receiving problem copy", () => {

@@ -146,7 +146,13 @@ export function receivingUnitIdProblems(
   const expected = new Set(source.expectedUnitIds);
   const wrongSource = new Set(source.wrongSourceUnitIds);
   if (ids.some((id) => wrongSource.has(id))) problems.push("unit_id_wrong_source");
-  if (ids.some((id) => !expected.has(id) && !wrongSource.has(id))) {
+  const orderedQty = Math.max(0, physicalQty - line.extraQty);
+  const orderedIds = ids.slice(0, orderedQty);
+  const extraIds = ids.slice(orderedQty, physicalQty);
+  if (
+    orderedIds.some((id) => !expected.has(id) && !wrongSource.has(id))
+    || extraIds.some((id) => expected.has(id))
+  ) {
     problems.push("unit_id_unexpected");
   }
   return problems;
@@ -431,16 +437,16 @@ export interface WarehouseReceiptTotals {
 }
 
 export function warehouseReceiptTotals(
-  lines: readonly WarehouseReceiptLine[] | null | undefined,
+  lines: readonly (WarehouseReceiptLine | ReceivingLineInput)[] | null | undefined,
 ): WarehouseReceiptTotals {
   let received = 0;
   let damaged = 0;
   let wrongItem = 0;
   const rows = lines ?? [];
   for (const l of rows) {
-    received += Math.max(0, num(l.received_now));
-    damaged += Math.max(0, num(l.damaged_qty));
-    wrongItem += Math.max(0, num(l.wrong_item_qty));
+    received += Math.max(0, num("receivedQty" in l ? l.receivedQty : l.received_now));
+    damaged += Math.max(0, num("damagedQty" in l ? l.damagedQty : l.damaged_qty));
+    wrongItem += Math.max(0, num("wrongItemQty" in l ? l.wrongItemQty : l.wrong_item_qty));
   }
   return {
     received,
@@ -465,7 +471,7 @@ function num(v: unknown): number {
  * is how two numbers start disagreeing.
  */
 export function warehouseReceiptSummary(
-  lines: readonly WarehouseReceiptLine[] | null | undefined,
+  lines: readonly (WarehouseReceiptLine | ReceivingLineInput)[] | null | undefined,
 ): string {
   const t = warehouseReceiptTotals(lines);
   const bits: string[] = [`${t.received} good`];
@@ -478,7 +484,7 @@ export function warehouseReceiptSummary(
 /** Does checking this receipt in open supplier claims? The ops reviewer must be
  *  told BEFORE they press it — a check-in files cases against a supplier. */
 export function warehouseReceiptOpensClaims(
-  lines: readonly WarehouseReceiptLine[] | null | undefined,
+  lines: readonly (WarehouseReceiptLine | ReceivingLineInput)[] | null | undefined,
 ): boolean {
   return warehouseReceiptTotals(lines).issue > 0;
 }
@@ -491,7 +497,7 @@ export interface WarehouseReceiptRow {
   supplier_name: string | null;
   do_number: string;
   status: WarehouseReceiptStatus;
-  lines: WarehouseReceiptLine[];
+  lines: Array<WarehouseReceiptLine | ReceivingLineInput>;
   note: string | null;
   submitted_at: string;
   reviewed_at: string | null;
@@ -514,6 +520,9 @@ export interface WarehouseReceiptRow {
    *  rather than printing a dead link. */
   do_file_url?: string | null;
   warehouse_name?: string | null;
+  source_version?: number;
+  lock_version?: number;
+  deliver_to?: { id?: string; name?: string; address?: string | null } | null;
   claims?: Array<{
     claim_no: string;
     claim_type: string;
@@ -534,17 +543,33 @@ export interface WarehouseIncomingLine {
   damaged_qty: number;
   wrong_item_qty: number;
   category: CaseProductCategory;
+  destination_id: string;
+  unit_ids: string[];
+}
+
+export interface WarehouseOpenReceivingSession {
+  id: string;
+  status: "draft" | "submitted" | "returned";
+  lock_version: number;
+  do_number: string | null;
+  do_file_path: string | null;
+  goods_received_timestamp: string | null;
+  note: string | null;
+  lines: Array<WarehouseReceiptLine | ReceivingLineInput>;
+  return_reason: string | null;
 }
 
 export interface WarehouseIncomingPo {
   po_id: string;
+  scope_id: string;
+  source_version: number;
   supplier_name: string | null;
-  eta_date: string | null;
+  po_delivery_date: string | null;
+  supplier_delivery_date: string | null;
+  deliver_to: { id: string; name: string; address: string | null };
   sup_status: string;
   lines: WarehouseIncomingLine[];
-  /** Non-null when a count is already waiting for Carres — the PO must not
-   *  offer a second form. */
-  open_receipt_id: string | null;
+  open_receipt: WarehouseOpenReceivingSession | null;
 }
 
 export interface WarehouseIncomingResponse {

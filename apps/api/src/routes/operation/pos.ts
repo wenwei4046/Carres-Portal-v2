@@ -7,7 +7,6 @@ import {
   listPurchaseOrdersQuery,
   normalizeSkuKey,
   reassignPoWarehouseInput,
-  receivingSessionInputSchema,
   recordBalanceDateInput,
   recordReadyDateInput,
   recordSupplierAnswerInput,
@@ -36,7 +35,6 @@ import type { AppEnv } from "../../types";
  * Endpoints:
  *   GET    /                          — list with status/supplier filters (M3)
  *   POST   /                          — create PO (M3)
- *   POST   /:id/receive               — receive line (M3)
  *   POST   /:id/cancel                — cancel (M3)
  *   POST   /:id/assign-pickup-partner — F1.A assign pickup (M3)
  *   POST   /:id/reassign-warehouse    — F1.A reassign WH (M3)
@@ -1462,8 +1460,9 @@ operationPosRouter.get("/:id/source-orders", requireOperation, async (c) => {
 // ----- POST /:id/receive — RETIRED 2026-08-03 (Card C1, Jess) -----
 //
 // This was the Office's direct stock door and it opened NO Receiving Session.
-// `POST /:id/office-receive` below is the compatibility entrance now: it saves
-// and posts the same durable session used by the Receiving page.
+// Its later `/office-receive` compatibility route is retired too: every current
+// browser uses `/operation/warehouse-receipts` and its explicit save, submit and
+// governed post transitions.
 //
 // Deleted rather than left standing: with `ReceivePOModal` gone this route had
 // zero callers, and a live route with no caller is a bypass one curl away. A
@@ -1472,64 +1471,6 @@ operationPosRouter.get("/:id/source-orders", requireOperation, async (c) => {
 //
 // The historical RPC may remain for old database compatibility, but no current
 // application route calls it.
-
-// ----- POST /:id/office-receive -----
-//
-// The Office Receiving Workspace's compatibility entrance. Every rule and
-// stock consequence belongs to the same save/post session functions.
-//
-// It opens one **Receiving Session** — one physical delivery, one stored GRN
-// after posting and one event ledger.
-//
-// Reshape at the boundary, the same discipline as `/receive`: the wire is
-// camelCase, `p_lines` is snake_case. `received_now` is a DELTA here, not a
-// new total — the Session stores what THIS delivery brought and the engine
-// derives the cumulative figure (RECEIVING-INFORMATION-MODEL §7.1).
-operationPosRouter.post("/:id/office-receive", requireOperation, async (c) => {
-  const parsed = await parseJsonBody(c, receivingSessionInputSchema);
-  if (!parsed.ok) return c.json(parsed.body, parsed.status);
-  if (parsed.data.sourceKind !== "purchase_order" || parsed.data.sourceId !== c.req.param("id")) {
-    return c.json({
-      error: "invalid_input",
-      code: "source_mismatch",
-      message: "The Receiving source must match the Purchase Order in the address.",
-    }, 422);
-  }
-  const sb = userClient(c.env, c.var.auth.jwt);
-  const saved = await sb.rpc("save_receiving_session", {
-    p_receipt_id: null,
-    p_expected_version: 0,
-    p_payload: parsed.data,
-  });
-  if (saved.error) {
-    const m = mapPgError(saved.error);
-    return c.json(m.body, m.status);
-  }
-  const draft = (saved.data ?? {}) as Record<string, unknown>;
-  const posted = await sb.rpc("post_receiving_session", {
-    p_receipt_id: String(draft.receipt_id ?? ""),
-    p_expected_version: Number(draft.lock_version ?? 1),
-  });
-  if (posted.error) {
-    const m = mapPgError(posted.error);
-    return c.json(m.body, m.status);
-  }
-  // The SAME post-receive step `/receive` runs. Without it, goods booked in
-  // through the Workspace would sit unreserved while goods booked in through
-  // the old modal were reserved — one act, two outcomes, decided by which
-  // screen the operator happened to use.
-  try {
-    await autoReserveReceivedToSourceOrder(sb, c.req.param("id"));
-  } catch (e) {
-    console.error("post-receive auto-reserve failed (non-fatal):", e);
-    await sb.rpc("record_receiving_continuation_failure", {
-      p_receipt_id: String(draft.receipt_id ?? ""),
-      p_code: "reservation_continuation_failed",
-      p_message: e instanceof Error ? e.message : "Reservation continuation failed",
-    });
-  }
-  return c.json(posted.data);
-});
 
 // ----- GET /:id/receiving -----
 //
@@ -1545,7 +1486,7 @@ operationPosRouter.get("/:id/receiving", requireOperation, async (c) => {
   const { data: rows, error } = await sb
     .from("warehouse_receipts")
     .select(
-      "id, po_id, warehouse_id, source_kind, source_id, source_version, source_snapshot, destination_snapshot, supplier_snapshot, do_number, do_file_path, note, lines, status, lock_version, submitted_from, goods_received_at, goods_received_timestamp, grn_number, grn_posting_date, submitted_by, submitted_at, posted_by, posted_at, normal_grn_duty_user_id, grn_cover_user_id, post_authority, return_reason",
+      "id, po_id, warehouse_id, source_kind, source_id, source_version, source_snapshot, destination_snapshot, supplier_snapshot, do_number, do_file_path, note, lines, status, lock_version, submitted_from, goods_received_at, goods_received_timestamp, grn_number, grn_posting_date, grn_snapshot, submitted_by, submitted_at, posted_by, posted_at, normal_grn_duty_user_id, grn_cover_user_id, post_authority, return_reason",
     )
     .eq("po_id", poId)
     .order("goods_received_at", { ascending: false })
@@ -1556,6 +1497,29 @@ operationPosRouter.get("/:id/receiving", requireOperation, async (c) => {
   }
   const sessions = (rows ?? []) as Array<Record<string, unknown>>;
   const ids = sessions.map((s) => s.id as string);
+
+  const dateParts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Kuala_Lumpur",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const dateByPart = Object.fromEntries(dateParts.map((part) => [part.type, part.value]));
+  const businessDate = `${dateByPart.year}-${dateByPart.month}-${dateByPart.day}`;
+  const [grnActorResult, mayPostResult] = await Promise.all([
+    sb.rpc("receiving_grn_actor", { p_business_date: businessDate }),
+    sb.rpc("receiving_actor_may_post", {
+      p_user: c.var.auth.id,
+      p_business_date: businessDate,
+    }),
+  ]);
+  if (grnActorResult.error || mayPostResult.error) {
+    const m = mapPgError(grnActorResult.error ?? mayPostResult.error!);
+    return c.json(m.body, m.status);
+  }
+  const grnActor = (grnActorResult.data ?? {}) as Record<string, unknown>;
+  const currentNormalDutyId = typeof grnActor.normal_user_id === "string" ? grnActor.normal_user_id : null;
+  const currentCoverId = typeof grnActor.cover_user_id === "string" ? grnActor.cover_user_id : null;
 
   const { data: evs } = ids.length
     ? await sb
@@ -1579,6 +1543,8 @@ operationPosRouter.get("/:id/receiving", requireOperation, async (c) => {
           s.grn_cover_user_id,
         ]),
         ...events.map((e) => e.actor_id),
+        currentNormalDutyId,
+        currentCoverId,
       ].filter((v): v is string => typeof v === "string" && v.length > 0),
     ),
   ];
@@ -1614,6 +1580,15 @@ operationPosRouter.get("/:id/receiving", requireOperation, async (c) => {
         ? (userNames.get(e.actor_id as string) ?? null)
         : null,
     })),
+    authority: {
+      mayPost: mayPostResult.data === true,
+      normalGrnDutyName: currentNormalDutyId
+        ? (userNames.get(currentNormalDutyId) ?? null)
+        : null,
+      datedCoverName: currentCoverId
+        ? (userNames.get(currentCoverId) ?? null)
+        : null,
+    },
   });
 });
 

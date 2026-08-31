@@ -27,7 +27,12 @@ export default function ReceivingWorkspace({
       </header>
       <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-4">
         {receivingQ.isLoading ? <p className="text-body text-kit-slate-9">Loading Receiving Session…</p> : session ? (
-          <ReceivingSessionDetail parent={parent} session={session} events={events} />
+          <ReceivingSessionDetail
+            parent={parent}
+            session={session}
+            events={events}
+            authority={receivingQ.data?.authority ?? { mayPost: false, normalGrnDutyName: null, datedCoverName: null }}
+          />
         ) : (
           <div className="bg-white p-4">
             <p className="text-body font-medium text-kit-slate-12">The Receiving Session could not be found</p>

@@ -165,21 +165,48 @@ describe("GET /api/warehouse/incoming", () => {
 });
 
 describe("GET /api/warehouse/receipts", () => {
-  it("wraps the RPC's array so the payload can grow a sibling key later", async () => {
-    const sb = makeSb({ data: [{ id: "r1", po_id: "PO-1001", claims: [] }] });
+  it("returns one bounded history page with a stable next cursor", async () => {
+    const sb = makeSb({ data: {
+      receipts: [{ id: "r1", po_id: "PO-1001", claims: [] }],
+      next: { before: "2026-08-31T02:00:00Z", beforeId: "11111111-1111-1111-1111-111111111111" },
+    } });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue(sb as any);
     const res = await req("/api/warehouse/receipts", "GET", await warehouseJwt());
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({
       receipts: [{ id: "r1", po_id: "PO-1001", claims: [] }],
+      nextCursor: { before: "2026-08-31T02:00:00Z", beforeId: "11111111-1111-1111-1111-111111111111" },
     });
-    expect(sb.rpc).toHaveBeenCalledWith("warehouse_my_receipts");
+    expect(sb.rpc).toHaveBeenCalledWith("warehouse_my_receipts", {
+      p_limit: 50,
+      p_before: null,
+      p_before_id: null,
+      p_exact: null,
+    });
+  });
+
+  it("passes exact PO, Receiving Session or GRN lookup without client-side filtering", async () => {
+    const sb = makeSb({ data: { receipts: [], next: null } });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await req(
+      "/api/warehouse/receipts?exact=GRN-20260831-0042&limit=25&before=2026-08-31T02%3A00%3A00Z&beforeId=11111111-1111-1111-1111-111111111111",
+      "GET",
+      await warehouseJwt(),
+    );
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("warehouse_my_receipts", {
+      p_limit: 25,
+      p_before: "2026-08-31T02:00:00Z",
+      p_before_id: "11111111-1111-1111-1111-111111111111",
+      p_exact: "GRN-20260831-0042",
+    });
   });
 });
 
 describe("POST /api/warehouse/receipts", () => {
-  it("saves then submits the same governed session and answers 201", async () => {
+  it("atomically saves and submits the same governed session and answers 201", async () => {
     const sb = makeSb({ data: { id: "r1", po_id: "PO-1001", status: "submitted" } });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue(sb as any);
@@ -191,15 +218,31 @@ describe("POST /api/warehouse/receipts", () => {
       validBody,
     );
     expect(res.status).toBe(201);
-    expect(sb.rpc).toHaveBeenNthCalledWith(1, "save_receiving_session", {
+    expect(sb.rpc).toHaveBeenCalledWith("save_and_submit_receiving_session", {
       p_receipt_id: null,
       p_expected_version: 0,
       p_payload: validBody,
     });
-    expect(sb.rpc).toHaveBeenNthCalledWith(2, "submit_receiving_session", {
+    expect(sb.rpc).toHaveBeenCalledTimes(1);
+  });
+
+  it("reopens a returned session and atomically saves and resubmits that exact version", async () => {
+    const sb = makeSb({ data: { receipt_id: "r1", status: "submitted", lock_version: 5 } });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await req(
+      "/api/warehouse/receipts/r1",
+      "PATCH",
+      await warehouseJwt(),
+      { expectedVersion: 4, session: validBody },
+    );
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("save_and_submit_receiving_session", {
       p_receipt_id: "r1",
-      p_expected_version: 1,
+      p_expected_version: 4,
+      p_payload: validBody,
     });
+    expect(sb.rpc).toHaveBeenCalledTimes(1);
   });
 
   it("never calls the receive engine — a submission moves no goods", async () => {

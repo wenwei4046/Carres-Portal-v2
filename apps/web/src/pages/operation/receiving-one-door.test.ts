@@ -82,16 +82,14 @@ describe("Card C1 · the Office has exactly ONE receiving door", () => {
   it("the API no longer serves the retired route", () => {
     const pos = read(join(REPO, "apps/api/src/routes/operation/pos.ts"));
     expect(pos).not.toMatch(/operationPosRouter\.post\("\/:id\/receive"/);
-    // …and the one that replaced it is there.
-    expect(pos).toMatch(/operationPosRouter\.post\("\/:id\/office-receive"/);
+    expect(pos).not.toMatch(/operationPosRouter\.post\("\/:id\/office-receive"/);
   });
 
-  it("every Office receiving call in the web app goes through office-receive", () => {
+  it("every Office receiving call in the web app goes through the Receiving Session routes", () => {
     const officeCallers = SOURCES.filter((f) => /office-receive/.test(code(f)));
-    // The hook that owns the door, and nothing else in pages/**.
-    expect(officeCallers.map((f) => f.replace(WEB_SRC + "/", "")).sort()).toEqual([
-      "lib/queries.ts",
-    ]);
+    expect(officeCallers).toEqual([]);
+    const sessionCallers = SOURCES.filter((f) => /\/operation\/warehouse-receipts/.test(code(f)));
+    expect(sessionCallers.map((f) => f.replace(WEB_SRC + "/", "")).sort()).toEqual(["lib/queries.ts"]);
   });
 
   it("the order drawer hands over instead of receiving in place", () => {
@@ -107,21 +105,13 @@ describe("Card C1 · the Office has exactly ONE receiving door", () => {
     expect(codeOf(drawer)).not.toMatch(/setReceivePo/);
   });
 
-  it("only the three Session-opening RPCs may move received_qty from the API", () => {
-    // `operation_receive_po_with_do` is the ONE receive engine and stays —
-    // but nothing may call it except the doors that open a Session first, plus
-    // the PARTNER leg, which is not an Office path.
+  it("no API route calls the retired direct receive RPC", () => {
     const api = slash(join(REPO, "apps/api/src"));
     const files = walk(api).filter((f) => /\.ts$/.test(f));
     const direct = files.filter((f) =>
       /rpc\("operation_receive_po_with_do"/.test(code(f)),
     );
-    expect(direct.map((f) => f.replace(api + "/", "")).sort()).toEqual([
-      // The partner confirming goods AT a warehouse — a different leg, and
-      // out of Card C1's frozen scope (Office only). Named here so the next
-      // chat inherits the fact instead of re-deriving it.
-      "routes/partner/pickups.ts",
-    ]);
+    expect(direct).toEqual([]);
   });
 });
 

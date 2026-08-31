@@ -850,18 +850,10 @@ describe("the Office has exactly ONE receiving door", () => {
     expect(rpc).not.toHaveBeenCalled();
   });
 
-  it("the surviving Office door saves then posts the same session, never a direct receive", async () => {
-    const rpc = vi.fn()
-      .mockResolvedValueOnce({ data: { receipt_id: "r1", status: "draft", lock_version: 1 }, error: null })
-      .mockResolvedValueOnce({ data: { receipt_id: "r1", status: "posted", grn_number: "GRN-20260831-0001" }, error: null });
-    // Make the continuation fail deliberately: posting stays successful and
-    // the durable event is the supervisor-visible repair fact.
-    const from = vi.fn(() => {
-      throw new Error("reservation continuation unavailable");
-    });
-    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+  it("the retired Office compatibility door is gone", async () => {
+    const rpc = vi.fn();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ rpc, from } as any);
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
     const jwt = await makeJwt("operation");
     const res = await app.fetch(
       new Request("http://t/api/operation/pos/PO-2050/office-receive", {
@@ -892,24 +884,8 @@ describe("the Office has exactly ONE receiving door", () => {
       }),
       env,
     );
-    expect(res.status).toBe(200);
-    expect(rpc.mock.calls[0][0]).toBe("save_receiving_session");
-    expect(rpc.mock.calls[1][0]).toBe("post_receiving_session");
-    expect(rpc.mock.calls[2]).toEqual([
-      "record_receiving_continuation_failure",
-      {
-        p_receipt_id: "r1",
-        p_code: "reservation_continuation_failed",
-        p_message: expect.any(String),
-      },
-    ]);
-    // DATA INTEGRITY (Jess): the Office may never reach the receive engine
-    // directly — that is the path that moves stock and opens no Session.
-    expect(
-      rpc.mock.calls.some((c: unknown[]) => c[0] === "operation_receive_po_with_do"),
-    ).toBe(false);
-    expect(rpc.mock.calls.some((c: unknown[]) => c[0] === "office_receive_post")).toBe(false);
-    consoleError.mockRestore();
+    expect(res.status).toBe(404);
+    expect(rpc).not.toHaveBeenCalled();
   });
 
   it("makes a refused reservation continuation observable to the posting door", async () => {

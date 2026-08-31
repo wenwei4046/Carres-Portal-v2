@@ -9,22 +9,20 @@ import WarehouseCountModal from "./WarehouseCountModal";
  * WarehouseIncoming — R6: what is coming to THIS warehouse, and the form to
  * count it.
  *
- * The list is the card's first bullet, and its scope is not a filter this page
- * applies: `warehouse_incoming_pos` (0302) only ever returns POs bound for the
- * caller's own warehouse, so there is no client-side narrowing to get wrong and
- * no other warehouse's PO can be reached by editing a URL.
+ * Scope is a server fact: `warehouse_incoming_pos` returns only PO lines whose
+ * governed Deliver To belongs to the caller's warehouse. Client filtering never
+ * decides access and editing a URL cannot expose another destination.
  *
- * A PO whose count is already waiting for Carres shows that state instead of
- * the button — one open receipt per PO is a unique index in the database, so
- * offering a second form would only produce an error the clerk cannot fix.
+ * A PO/destination scope whose count is waiting for Carres shows that state;
+ * Draft and Returned reopen the exact persistent Receiving Session.
  */
 export default function WarehouseIncoming() {
-  const [countPoId, setCountPoId] = useState<string | null>(null);
+  const [countScopeId, setCountScopeId] = useState<string | null>(null);
   const { data, isLoading, isError, error, refetch } = useWarehouseIncoming();
 
   const pos = data?.pos ?? [];
-  const countPo = countPoId
-    ? (pos.find((p) => p.po_id === countPoId) ?? null)
+  const countPo = countScopeId
+    ? (pos.find((p) => p.scope_id === countScopeId) ?? null)
     : null;
 
   if (isLoading) {
@@ -67,7 +65,7 @@ export default function WarehouseIncoming() {
 
   return (
     <div className="px-9 py-8 pb-14" data-testid="warehouse-incoming">
-      {/* The shared header bar (UI-KIT §A9) — nothing drawn by hand here. */}
+      {/* The shared page header keeps this route inside the common ERP shell. */}
       <PageHeader
         kicker={data?.warehouse?.name ?? "Warehouse"}
         title="Incoming"
@@ -87,15 +85,17 @@ export default function WarehouseIncoming() {
             <tr>
               <Th>PO</Th>
               <Th>Factory</Th>
+              <Th>Deliver To</Th>
               <Th>Items</Th>
-              <Th>Expected</Th>
+              <Th>PO Delivery Date</Th>
+              <Th>Supplier Delivery Date</Th>
               <Th> </Th>
             </tr>
           </thead>
           <tbody>
             {pos.length === 0 && (
               <tr>
-                <td colSpan={5} className="p-12 text-center text-meta text-base-500">
+                <td colSpan={7} className="p-12 text-center text-meta text-base-500">
                   Nothing is on its way here right now.
                 </td>
               </tr>
@@ -111,10 +111,11 @@ export default function WarehouseIncoming() {
                   wrong_item_qty: l.wrong_item_qty,
                 })),
               );
-              const waiting = !!po.open_receipt_id;
+              const waiting = po.open_receipt?.status === "submitted";
+              const recoverable = po.open_receipt?.status === "draft" || po.open_receipt?.status === "returned";
               return (
                 <tr
-                  key={po.po_id}
+                  key={po.scope_id}
                   className="border-t border-base-100 align-top hover:bg-primary/5"
                   data-testid="warehouse-incoming-row"
                 >
@@ -124,6 +125,7 @@ export default function WarehouseIncoming() {
                   <td className="px-4 py-3 text-base-800">
                     {po.supplier_name ?? "—"}
                   </td>
+                  <td className="px-4 py-3 text-base-800">{po.deliver_to.name}</td>
                   <td className="px-4 py-3 text-base-700">
                     <div className="text-meta">
                       {po.lines.length} item{po.lines.length === 1 ? "" : "s"}
@@ -135,11 +137,14 @@ export default function WarehouseIncoming() {
                     )}
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap text-base-700">
-                    {po.eta_date ? (
-                      fmtDate(po.eta_date)
+                    {po.po_delivery_date ? (
+                      fmtDate(po.po_delivery_date)
                     ) : (
                       <span className="text-base-400">—</span>
                     )}
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap text-base-700">
+                    {po.supplier_delivery_date ? fmtDate(po.supplier_delivery_date) : <span className="text-base-400">—</span>}
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap text-right">
                     {waiting ? (
@@ -152,11 +157,11 @@ export default function WarehouseIncoming() {
                     ) : (
                       <button
                         type="button"
-                        onClick={() => setCountPoId(po.po_id)}
+                        onClick={() => setCountScopeId(po.scope_id)}
                         className="btn-primary text-label py-1.5 px-3"
                         data-testid={`warehouse-count-${po.po_id}`}
                       >
-                        Count this delivery
+                        {recoverable ? po.open_receipt?.status === "returned" ? "Recount" : "Continue count" : "Count this delivery"}
                       </button>
                     )}
                   </td>
@@ -168,7 +173,7 @@ export default function WarehouseIncoming() {
       </div>
 
       {countPo && (
-        <WarehouseCountModal po={countPo} onClose={() => setCountPoId(null)} />
+        <WarehouseCountModal po={countPo} onClose={() => setCountScopeId(null)} />
       )}
     </div>
   );

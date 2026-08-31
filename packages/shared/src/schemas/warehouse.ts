@@ -4,10 +4,10 @@ import { z } from "zod";
  * R6 — the warehouse login's two inputs, and ops's one.
  *
  * These schemas refuse obvious junk before a round-trip; they are NOT the rule.
- * Every rule that matters — the PO belongs to this warehouse, the line still
- * owes these units, a damaged unit carries a photo, a wrong item carries its
- * kind — lives inside `warehouse_submit_receipt` (0302), which is the only door
- * that can write a receipt (`warehouse_receipts` has no write policy at all).
+ * Every rule that matters — the governed Deliver To is in scope, the line still
+ * owes these units, every physical Unit has evidence, and exception evidence is
+ * complete — lives inside the one Receiving Session authority. Warehouse saves
+ * and submits the same session atomically; the table has no browser write policy.
  *
  * `receivedNow` is a DELTA — good units off THIS truck — and that is the whole
  * reason a stored receipt survives a wait: the running total the receive engine

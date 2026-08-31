@@ -1,13 +1,12 @@
 import { useMemo, useState, type ReactNode } from "react";
-import type {
-  ReceivingRegisterChild,
-  ReceivingRegisterParent,
-} from "@carres/shared";
+import type { ReceivingRegisterParent } from "@carres/shared";
 import {
   DataGrid,
   type DataGridColumn,
 } from "@/components/register/DataGrid";
 import { fmtDateShort } from "@/lib/fmt-date";
+
+// design-standard: not-a-list-page — embedded register inside OperationReceiving's shared shell.
 
 const ACTION =
   "inline-flex h-7 items-center rounded-control bg-kit-blue-9 px-3 text-meta font-semibold text-white hover:opacity-90";
@@ -154,7 +153,7 @@ export default function ReceivingRegister({
           selectedKeys,
           onToggle: (id) => setSelectedKeys((current) => current.has(id) ? new Set() : new Set([id])),
           onToggleAll: (keys, allSelected) => setSelectedKeys(allSelected || keys.length === 0 ? new Set() : new Set([keys[0]])),
-          testId: (row) => `receiving-select-${row.id}`,
+          testId: (row) => `receiving-select-${(row as ReceivingRegisterParent).id}`,
         }}
         selectionSummary={(n) => `${n} delivery balance selected`}
         selectionPrimary={selected ? (

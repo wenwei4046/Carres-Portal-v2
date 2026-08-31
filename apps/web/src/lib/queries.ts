@@ -158,7 +158,6 @@ import {
   type OutletsListResponse,
   type ProcurementTabSlug,
   type ReassignPoWarehouseInput,
-  type OfficeReceiveInput,
   type RefundCreateInput,
   type RefundPayInput,
   type ReservedDrilldownResponse,
@@ -294,7 +293,6 @@ import {
   type WarehouseIncomingResponse,
   type WarehouseReceiptLine,
   type WarehouseReceiptRow,
-  type WarehouseSubmitReceiptInput,
   type ReceivingRegisterFilter,
   type ReceivingRegisterResult,
   type ReceivingSessionInput,
@@ -4051,13 +4049,30 @@ export function useWarehouseIncoming(
 
 /** What this warehouse filed, and what became of it — including the claims each
  *  check-in opened. */
+export interface WarehouseReceiptCursor {
+  before: string;
+  beforeId: string;
+}
+
+export interface WarehouseReceiptHistoryPage {
+  receipts: WarehouseReceiptRow[];
+  nextCursor: WarehouseReceiptCursor | null;
+}
+
 export function useWarehouseMyReceipts(
-  opts?: Partial<UseQueryOptions<{ receipts: WarehouseReceiptRow[] }>>,
+  input: { exact?: string; cursor?: WarehouseReceiptCursor | null } = {},
+  opts?: Partial<UseQueryOptions<WarehouseReceiptHistoryPage>>,
 ) {
+  const search = new URLSearchParams({ limit: "50" });
+  if (input.exact) search.set("exact", input.exact);
+  if (input.cursor) {
+    search.set("before", input.cursor.before);
+    search.set("beforeId", input.cursor.beforeId);
+  }
   return useQuery({
-    queryKey: qk.warehousePortal.receipts(),
+    queryKey: [...qk.warehousePortal.receipts(), input.exact ?? "", input.cursor?.before ?? "", input.cursor?.beforeId ?? ""],
     queryFn: () =>
-      apiFetch<{ receipts: WarehouseReceiptRow[] }>("/api/warehouse/receipts"),
+      apiFetch<WarehouseReceiptHistoryPage>(`/api/warehouse/receipts?${search.toString()}`),
     staleTime: 30_000,
     ...opts,
   });
@@ -4071,7 +4086,7 @@ export function useWarehouseSubmitReceiptMutation(
     UseMutationOptions<
       { id: string; po_id: string; status: string },
       ApiError,
-      WarehouseSubmitReceiptInput
+      { receiptId?: string; expectedVersion: number; session: ReceivingSessionInput }
     >
   >,
 ) {
@@ -4079,12 +4094,15 @@ export function useWarehouseSubmitReceiptMutation(
   return useMutation<
     { id: string; po_id: string; status: string },
     ApiError,
-    WarehouseSubmitReceiptInput
+    { receiptId?: string; expectedVersion: number; session: ReceivingSessionInput }
   >({
-    mutationFn: (body) =>
+    mutationFn: ({ receiptId, expectedVersion, session }) =>
       apiFetch<{ id: string; po_id: string; status: string }>(
-        "/api/warehouse/receipts",
-        { method: "POST", body: JSON.stringify(body) },
+        receiptId ? `/api/warehouse/receipts/${receiptId}` : "/api/warehouse/receipts",
+        {
+          method: receiptId ? "PATCH" : "POST",
+          body: JSON.stringify(receiptId ? { expectedVersion, session } : session),
+        },
       ),
     ...opts,
     onSuccess: async (...args) => {
@@ -7668,6 +7686,44 @@ export interface ReceivingSessionLine {
   wrongItemReason?: string | null;
 }
 
+export interface GrnSnapshot {
+  grnNumber: string;
+  grnPostingDate: string;
+  receivingSessionId: string;
+  sourceSnapshot: {
+    sourceKind: "purchase_order" | "consignment_order";
+    sourceId: string;
+    sourceVersion: number;
+    poIssuedAt?: string | null;
+    poDeliveryDate?: string | null;
+    lines?: Array<{
+      poLineId: string;
+      sku: string;
+      orderQty: number;
+      receivedQtyAtOpen: number;
+    }>;
+  };
+  supplierSnapshot: { id?: string; name?: string; address?: string | null; contact?: unknown };
+  destinationSnapshot: { id?: string; name?: string; address?: string | null; warehouseId?: string | null };
+  supplierDeliveryDate: string | null;
+  goodsReceivedAt: string;
+  supplierDoNo: string;
+  signedDoPath: string;
+  lines: ReceivingSessionLine[];
+  unitOutcomes: Array<{
+    poLineId: string;
+    unitId: string;
+    outcome: "received" | "damaged" | "wrong_item" | "extra";
+    evidence: Record<string, unknown>;
+  }>;
+  submission: { from: "office" | "warehouse"; submittedBy: string | null; submittedAt: string | null };
+  actualActor: { userId: string | null; name: string | null };
+  normalGrnDuty: { userId: string | null; name: string | null } | null;
+  datedCover: { userId: string | null; name: string | null; coverId?: string | null } | null;
+  postAuthority: "grn_duty" | "grn_duty_cover" | "operations_superuser" | "legacy";
+  postedAt: string;
+}
+
 /** A Receiving Session as the Workspace reads it. */
 export interface ReceivingSession {
   id: string;
@@ -7689,6 +7745,7 @@ export interface ReceivingSession {
   goods_received_timestamp?: string | null;
   grn_number?: string | null;
   grn_posting_date?: string | null;
+  grn_snapshot?: GrnSnapshot | null;
   submitted_at: string | null;
   posted_at: string | null;
   posted_by_name: string | null;
@@ -7725,6 +7782,11 @@ export interface ReceivingEvent {
 export interface PoReceivingResponse {
   sessions: ReceivingSession[];
   events: ReceivingEvent[];
+  authority: {
+    mayPost: boolean;
+    normalGrnDutyName: string | null;
+    datedCoverName: string | null;
+  };
 }
 
 /** GET /api/operation/pos/:id/receiving — the Workspace's Summary + Activity. */
@@ -7734,41 +7796,6 @@ export function usePoReceiving(poId: string | null) {
     queryFn: () =>
       apiFetch<PoReceivingResponse>(`/api/operation/pos/${poId}/receiving`),
     enabled: !!poId,
-  });
-}
-
-/**
- * POST /api/operation/pos/:id/office-receive — Save, in Receiving Mode.
- *
- * Invalidates exactly what the retired `/receive` mutation invalidated (the same
- * engine moved the same stock and opened the same claims) PLUS this PO's
- * Receiving Sessions, so the Workspace's Activity shows the new entry without
- * a reload.
- */
-export function useOfficeReceiveMutation(
-  poId: string,
-  opts?: Partial<UseMutationOptions<unknown, ApiError, OfficeReceiveInput>>,
-) {
-  const qc = useQueryClient();
-  return useMutation<unknown, ApiError, OfficeReceiveInput>({
-    mutationFn: (input) =>
-      apiFetch<unknown>(`/api/operation/pos/${poId}/office-receive`, {
-        method: "POST",
-        body: JSON.stringify(input),
-      }),
-    ...opts,
-    onSuccess: async (...args) => {
-      await qc.invalidateQueries({ queryKey: qk.operation.poReceiving(poId) });
-      await qc.invalidateQueries({ queryKey: qk.operation.po(poId), exact: true });
-      await qc.invalidateQueries({ queryKey: ["operation", "pos"] });
-      await qc.invalidateQueries({ queryKey: qk.operation.warehouse(), exact: true });
-      await qc.invalidateQueries({ queryKey: qk.operation.stockAlerts() });
-      await qc.invalidateQueries({ queryKey: ["operation", "movements"] });
-      await qc.invalidateQueries({ queryKey: ["operation", "supplier-claims"] });
-      await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
-      await qc.invalidateQueries({ queryKey: qk.operation.dashboard(), exact: true });
-      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
-    },
   });
 }
 

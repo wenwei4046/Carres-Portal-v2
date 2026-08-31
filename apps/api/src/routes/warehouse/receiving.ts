@@ -1,5 +1,8 @@
 import { Hono } from "hono";
-import { receivingSessionInputSchema } from "@carres/shared";
+import {
+  receivingSessionInputSchema,
+  receivingSessionSaveInput,
+} from "@carres/shared";
 import { requireWarehouse } from "../../lib/auth-guards";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
@@ -16,7 +19,8 @@ import type { AppEnv } from "../../types";
  *
  *   GET  /incoming  → open POs bound for this warehouse
  *   GET  /receipts  → what this warehouse filed, and what became of it
- *   POST /receipts  → save and send one count (goods do NOT move)
+ *   POST /receipts  → atomically save and send one new count (goods do NOT move)
+ *   PATCH /receipts/:id → atomically save and resend the same Draft/Returned count
  *
  * Every route is a SECURITY DEFINER RPC gated on `app_role() = 'warehouse'` and
  * scoped by `app_warehouse_id()` (0302). Not one table policy names the role,
@@ -43,13 +47,27 @@ warehouseReceivingRouter.get("/incoming", requireWarehouse, async (c) => {
 
 /** What this warehouse has filed and what became of it. */
 warehouseReceivingRouter.get("/receipts", requireWarehouse, async (c) => {
+  const rawLimit = Number(c.req.query("limit") ?? 50);
+  const limit = Number.isInteger(rawLimit) && rawLimit >= 1 && rawLimit <= 100 ? rawLimit : 50;
+  const before = c.req.query("before")?.trim() || null;
+  const beforeId = c.req.query("beforeId")?.trim() || null;
+  const exact = c.req.query("exact")?.trim() || null;
   const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb.rpc("warehouse_my_receipts");
+  const { data, error } = await sb.rpc("warehouse_my_receipts", {
+    p_limit: limit,
+    p_before: before,
+    p_before_id: beforeId,
+    p_exact: exact,
+  });
   if (error) {
     const m = mapPgError(error);
     return c.json(m.body, m.status);
   }
-  return c.json({ receipts: data ?? [] });
+  const page = (data ?? {}) as Record<string, unknown>;
+  return c.json({
+    receipts: Array.isArray(page.receipts) ? page.receipts : [],
+    nextCursor: page.next ?? null,
+  });
 });
 
 /**
@@ -63,27 +81,32 @@ warehouseReceivingRouter.post("/receipts", requireWarehouse, async (c) => {
   const parsed = await parseJsonBody(c, receivingSessionInputSchema);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);
-  const saved = await sb.rpc("save_receiving_session", {
+  const { data, error } = await sb.rpc("save_and_submit_receiving_session", {
     p_receipt_id: null,
     p_expected_version: 0,
     p_payload: parsed.data,
   });
-  if (saved.error) {
-    const m = mapPgError(saved.error);
+  if (error) {
+    const m = mapPgError(error);
     return c.json(m.body, m.status);
   }
-  const row = (saved.data ?? {}) as Record<string, unknown>;
-  const receiptId = String(row.receipt_id ?? row.id ?? "");
-  const lockVersion = Number(row.lock_version ?? 1);
-  const submitted = await sb.rpc("submit_receiving_session", {
-    p_receipt_id: receiptId,
-    p_expected_version: lockVersion,
+  return c.json(data ?? {}, 201);
+});
+
+warehouseReceivingRouter.patch("/receipts/:id", requireWarehouse, async (c) => {
+  const parsed = await parseJsonBody(c, receivingSessionSaveInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("save_and_submit_receiving_session", {
+    p_receipt_id: c.req.param("id"),
+    p_expected_version: parsed.data.expectedVersion,
+    p_payload: parsed.data.session,
   });
-  if (submitted.error) {
-    const m = mapPgError(submitted.error);
+  if (error) {
+    const m = mapPgError(error);
     return c.json(m.body, m.status);
   }
-  return c.json(submitted.data ?? saved.data ?? {}, 201);
+  return c.json(data ?? {});
 });
 
 export default warehouseReceivingRouter;

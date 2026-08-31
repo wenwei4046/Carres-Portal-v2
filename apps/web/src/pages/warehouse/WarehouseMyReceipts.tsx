@@ -30,7 +30,11 @@ const STATUS_PILL: Record<WarehouseReceiptStatus, string> = {
 };
 
 export default function WarehouseMyReceipts() {
-  const { data, isLoading, isError, error, refetch } = useWarehouseMyReceipts();
+  const [lookup, setLookup] = useState("");
+  const [exact, setExact] = useState("");
+  const [pages, setPages] = useState<Array<{ before: string; beforeId: string } | null>>([null]);
+  const cursor = pages[pages.length - 1];
+  const { data, isLoading, isError, error, refetch } = useWarehouseMyReceipts({ exact, cursor });
   const receipts = data?.receipts ?? [];
 
   if (isLoading) {
@@ -78,7 +82,26 @@ export default function WarehouseMyReceipts() {
         Every count we sent, and what Carres did with it.
       </div>
 
-      <div className="bg-white border border-base-200 rounded overflow-auto">
+      <form
+        className="mb-3 flex flex-wrap items-center gap-2 border-y border-base-200 py-2"
+        onSubmit={(event) => {
+          event.preventDefault();
+          setExact(lookup.trim());
+          setPages([null]);
+        }}
+      >
+        <input
+          value={lookup}
+          onChange={(event) => setLookup(event.target.value)}
+          aria-label="Exact PO, Receiving Session or GRN"
+          placeholder="Exact PO, Receiving Session or GRN"
+          className="h-8 min-w-[260px] flex-1 rounded border border-base-300 px-2 text-meta"
+        />
+        <button type="submit" className="btn-secondary px-3 py-1.5 text-label">Find</button>
+        {exact ? <button type="button" className="btn-ghost px-2 py-1.5 text-label" onClick={() => { setLookup(""); setExact(""); setPages([null]); }}>Clear</button> : null}
+      </form>
+
+      <div className="overflow-auto bg-white">
         <table
           className="w-full border-collapse text-body [&_tbody_tr:nth-child(even)]:bg-base-100/70"
           style={{ minWidth: 820 }}
@@ -165,6 +188,13 @@ export default function WarehouseMyReceipts() {
           </tbody>
         </table>
       </div>
+      <div className="mt-3 flex items-center justify-between border-t border-base-200 pt-2 text-label text-base-600">
+        <span>Page {pages.length} · {receipts.length} records</span>
+        <div className="flex gap-2">
+          <button type="button" className="btn-secondary px-3 py-1.5" disabled={pages.length === 1} onClick={() => setPages((current) => current.slice(0, -1))}>Previous</button>
+          <button type="button" className="btn-secondary px-3 py-1.5" disabled={!data?.nextCursor} onClick={() => data?.nextCursor && setPages((current) => [...current, data.nextCursor])}>Next</button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -176,3 +206,4 @@ function Th({ children }: { children: React.ReactNode }) {
     </th>
   );
 }
+import { useState } from "react";

@@ -27,7 +27,9 @@ export default function WarehouseSidebar() {
   const initials = email.slice(0, 2).toUpperCase();
 
   const { data } = useWarehouseIncoming();
-  const toCount = (data?.pos ?? []).filter((p) => !p.open_receipt_id).length;
+  const toCount = (data?.pos ?? []).filter((p) =>
+    !p.open_receipt || p.open_receipt.status === "draft" || p.open_receipt.status === "returned",
+  ).length;
   const warehouseName = data?.warehouse?.name ?? "Warehouse";
 
   return (

@@ -18,6 +18,7 @@ alter table public.warehouse_receipts
   add column if not exists goods_received_timestamp timestamptz,
   add column if not exists grn_number text,
   add column if not exists grn_posting_date date,
+  add column if not exists grn_snapshot jsonb,
   add column if not exists normal_grn_duty_user_id uuid references public.app_users(id),
   add column if not exists grn_cover_user_id uuid references public.app_users(id),
   add column if not exists post_authority text,
@@ -113,6 +114,38 @@ update public.warehouse_receipts wr
   from ranked
  where wr.id = ranked.id;
 
+-- Historical formal documents are frozen from the evidence that survives on
+-- the stored session. The migration never reconstructs a supplier promise or
+-- actor that the legacy row did not record.
+update public.warehouse_receipts wr
+   set grn_snapshot = jsonb_build_object(
+     'grnNumber', wr.grn_number,
+     'grnPostingDate', wr.grn_posting_date,
+     'receivingSessionId', wr.id,
+     'sourceSnapshot', wr.source_snapshot,
+     'supplierSnapshot', wr.supplier_snapshot,
+     'destinationSnapshot', wr.destination_snapshot,
+     'supplierDeliveryDate', null,
+     'goodsReceivedAt', wr.goods_received_timestamp,
+     'supplierDoNo', wr.do_number,
+     'signedDoPath', wr.do_file_path,
+     'lines', wr.lines,
+     'unitOutcomes', '[]'::jsonb,
+     'submission', jsonb_build_object(
+       'from', wr.submitted_from, 'submittedBy', wr.submitted_by,
+       'submittedAt', wr.submitted_at
+     ),
+     'actualActor', jsonb_build_object(
+       'userId', wr.posted_by,
+       'name', (select u.name from public.app_users u where u.id = wr.posted_by)
+     ),
+     'normalGrnDuty', null,
+     'datedCover', null,
+     'postAuthority', 'legacy',
+     'postedAt', wr.posted_at
+   )
+ where wr.status in ('posted', 'amended', 'voided') and wr.grn_snapshot is null;
+
 alter table public.warehouse_receipts
   drop constraint if exists warehouse_receipts_status_check,
   drop constraint if exists warehouse_receipts_lines_is_array,
@@ -129,11 +162,13 @@ alter table public.warehouse_receipts
       (status in ('posted', 'amended', 'voided')
         and grn_number is not null
         and grn_posting_date is not null
+        and grn_snapshot is not null
         and posted_at is not null)
       or
       (status in ('draft', 'submitted', 'returned')
         and grn_number is null
-        and grn_posting_date is null)
+        and grn_posting_date is null
+        and grn_snapshot is null)
     );
 
 drop index if exists public.wr_one_live_session_per_po_do;
@@ -148,6 +183,188 @@ comment on column public.warehouse_receipts.grn_number is
   '0407: allocated and stored only when posting succeeds. Retries return this same number; void never releases it.';
 comment on column public.warehouse_receipts.goods_received_timestamp is
   '0407: when the goods physically arrived. Separate from PO Issued, PO Delivery Date, Supplier Delivery Date and formal GRN posting time.';
+comment on column public.warehouse_receipts.grn_snapshot is
+  '0407: immutable official GRN evidence frozen at posting. Print/reprint reads this snapshot only.';
+
+create or replace function public.receiving_grn_snapshot_is_immutable()
+returns trigger
+language plpgsql
+set search_path = public, pg_temp
+as $$
+begin
+  if old.grn_snapshot is not null and new.grn_snapshot is distinct from old.grn_snapshot then
+    raise exception 'A posted GRN snapshot is immutable'
+      using errcode = 'P0001', detail = 'grn_snapshot_immutable';
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists warehouse_receipts_grn_snapshot_immutable on public.warehouse_receipts;
+create trigger warehouse_receipts_grn_snapshot_immutable
+before update of grn_snapshot on public.warehouse_receipts
+for each row execute function public.receiving_grn_snapshot_is_immutable();
+
+-- A Unit identity belongs to the exact PO line and governed Deliver To. Older
+-- rows only carried PO + SKU, which was ambiguous when one SKU was split.
+alter table public.ops_stock_items
+  add column if not exists po_line_id uuid references public.purchase_order_lines(id) on delete restrict,
+  add column if not exists purchasing_destination_id uuid references public.purchasing_destinations(id) on delete restrict;
+
+with line_slots as (
+  select l.po_id, l.sku, l.id as po_line_id,
+         coalesce(l.destination_id, po.destination_id) as destination_id,
+         row_number() over (
+           partition by l.po_id, l.sku order by l.id, slot.n
+         ) as position
+    from public.purchase_order_lines l
+    join public.purchase_orders po on po.id = l.po_id
+    cross join lateral generate_series(1, greatest(l.qty, 0)) slot(n)
+), unit_slots as (
+  select i.id, i.po_no, i.sku,
+         row_number() over (
+           partition by i.po_no, i.sku order by i.created_at, i.id
+         ) as position
+    from public.ops_stock_items i
+   where i.po_no is not null
+)
+update public.ops_stock_items i
+   set po_line_id = l.po_line_id,
+       purchasing_destination_id = l.destination_id
+  from unit_slots u
+  join line_slots l
+    on l.po_id = u.po_no and l.sku = u.sku and l.position = u.position
+ where i.id = u.id and i.po_line_id is null;
+
+update public.ops_stock_items i
+   set status = 'incoming', updated_at = now()
+  from public.purchase_orders po
+ where po.id = i.po_no and po.status = 'open'
+   and i.po_line_id is not null and i.status = 'voided'
+   and i.source_ref = 'po_mint';
+
+create index if not exists ops_stock_items_po_line_idx
+  on public.ops_stock_items(po_line_id);
+create index if not exists ops_stock_items_purchasing_destination_idx
+  on public.ops_stock_items(purchasing_destination_id);
+
+create or replace function public.purchasing_sync_po_unit_identity(p_po_id text)
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_po public.purchase_orders;
+  v_line record;
+  v_supplier_name text;
+  v_have integer;
+  v_reopened integer;
+  v_target_warehouse uuid;
+begin
+  select * into v_po from public.purchase_orders where id = p_po_id;
+  if not found then return; end if;
+  select name into v_supplier_name from public.suppliers where id = v_po.supplier_id;
+
+  for v_line in
+    select l.id, l.sku, l.qty,
+           coalesce(l.destination_id, v_po.destination_id) as destination_id,
+           d.warehouse_id as destination_warehouse_id
+      from public.purchase_order_lines l
+      join public.purchasing_destinations d
+        on d.id = coalesce(l.destination_id, v_po.destination_id)
+     where l.po_id = v_po.id
+     order by l.id
+  loop
+    v_target_warehouse := coalesce(v_line.destination_warehouse_id, v_po.warehouse_id);
+    if v_target_warehouse is null then
+      raise exception 'Deliver To has no Unit identity host'
+        using errcode = 'P0001', detail = 'destination_unit_host_missing';
+    end if;
+    update public.ops_stock_items
+       set purchasing_destination_id = v_line.destination_id,
+           warehouse_id = v_target_warehouse,
+           updated_at = now()
+     where po_line_id = v_line.id and status in ('incoming', 'voided');
+
+    select count(*) into v_have from public.ops_stock_items
+     where po_line_id = v_line.id and status = 'incoming';
+    if v_have < v_line.qty then
+      with reopen as (
+        select id from public.ops_stock_items
+         where po_line_id = v_line.id and status = 'voided' and source_ref = 'po_mint'
+         order by created_at, id limit v_line.qty - v_have
+      )
+      update public.ops_stock_items i
+         set status = 'incoming', updated_at = now()
+        from reopen r where i.id = r.id;
+      get diagnostics v_reopened = row_count;
+      v_have := v_have + v_reopened;
+    end if;
+    if v_have < v_line.qty then
+      insert into public.ops_stock_items (
+        unit_code, sku, warehouse_id, status, supplier, po_no, source_ref,
+        date_in, po_line_id, purchasing_destination_id
+      )
+      select public.gen_unit_code(), v_line.sku, v_target_warehouse, 'incoming',
+             v_supplier_name, v_po.id, 'po_mint', current_date,
+             v_line.id, v_line.destination_id
+        from generate_series(1, v_line.qty - v_have);
+    elsif v_have > v_line.qty then
+      update public.ops_stock_items
+         set status = 'voided', updated_at = now()
+       where id in (
+         select id from public.ops_stock_items
+          where po_line_id = v_line.id and status = 'incoming'
+          order by created_at desc, id desc limit v_have - v_line.qty
+       );
+    end if;
+  end loop;
+
+  update public.ops_stock_items i
+     set status = 'voided', updated_at = now()
+   where i.po_no = v_po.id and i.status = 'incoming'
+     and (i.po_line_id is null or not exists (
+       select 1 from public.purchase_order_lines l
+        where l.id = i.po_line_id and l.po_id = v_po.id
+     ));
+end;
+$$;
+
+create or replace function public.trg_po_units_follow_destination()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  perform public.purchasing_sync_po_unit_identity(new.id);
+  return null;
+end;
+$$;
+
+create or replace function public.trg_po_line_units_follow_destination()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  perform public.purchasing_sync_po_unit_identity(coalesce(new.po_id, old.po_id));
+  return null;
+end;
+$$;
+drop trigger if exists trg_po_line_units_follow_destination on public.purchase_order_lines;
+create constraint trigger trg_po_line_units_follow_destination
+after insert or update of qty, sku, destination_id or delete on public.purchase_order_lines
+deferrable initially deferred
+for each row execute function public.trg_po_line_units_follow_destination();
+
+do $$ declare v_po_id text;
+begin
+  for v_po_id in select id from public.purchase_orders where status = 'open' loop
+    perform public.purchasing_sync_po_unit_identity(v_po_id);
+  end loop;
+end $$;
 
 -- 2 · Every exact Unit has one physical outcome in this session.
 create table public.receiving_session_unit_outcomes (
@@ -371,6 +588,10 @@ declare
   v_prior public.warehouse_receipts;
   v_id uuid;
   v_destination jsonb;
+  v_destination_id uuid;
+  v_destination_warehouse_id uuid;
+  v_line jsonb;
+  v_line_destination_id uuid;
   v_supplier jsonb;
   v_source jsonb;
   v_lines jsonb := coalesce(p_payload->'lines', '[]'::jsonb);
@@ -406,8 +627,29 @@ begin
     raise exception 'The Purchase Order changed. Reload the Receiving Session.'
       using errcode = '40001', detail = 'stale_source_version';
   end if;
-  if v_role = 'warehouse' and v_po.warehouse_id is distinct from public.app_warehouse_id() then
-    raise exception 'this Purchase Order is not delivered to your warehouse'
+
+  for v_line in select * from jsonb_array_elements(v_lines) loop
+    select coalesce(l.destination_id, v_po.destination_id)
+      into v_line_destination_id
+      from public.purchase_order_lines l
+     where l.id = (v_line->>'poLineId')::uuid and l.po_id = v_po.id;
+    if not found then
+      raise exception 'The Purchase Order line changed'
+        using errcode = '40001', detail = 'stale_source_version';
+    end if;
+    if v_destination_id is null then
+      v_destination_id := v_line_destination_id;
+    elsif v_destination_id is distinct from v_line_destination_id then
+      raise exception 'One Receiving Session must use one Deliver To'
+        using errcode = 'P0001', detail = 'mixed_receiving_destination';
+    end if;
+  end loop;
+
+  select d.warehouse_id into v_destination_warehouse_id
+    from public.purchasing_destinations d where d.id = v_destination_id;
+  if v_role = 'warehouse'
+     and v_destination_warehouse_id is distinct from public.app_warehouse_id() then
+    raise exception 'this delivery is not for your warehouse'
       using errcode = '42501', detail = 'wrong_destination';
   end if;
 
@@ -417,7 +659,7 @@ begin
     ) into v_destination
     from public.purchasing_destinations d
     left join public.warehouses w on w.id = d.warehouse_id
-   where d.id = v_po.destination_id;
+   where d.id = v_destination_id;
   select jsonb_build_object('id', s.id, 'name', s.name, 'address', s.address, 'contact', s.contact)
     into v_supplier from public.suppliers s where s.id = v_po.supplier_id;
   select jsonb_build_object(
@@ -426,7 +668,8 @@ begin
       'poDeliveryDate', v_po.po_delivery_date,
       'lines', coalesce((select jsonb_agg(jsonb_build_object(
         'poLineId', l.id, 'sku', l.sku, 'orderQty', l.qty,
-        'receivedQtyAtOpen', l.received_qty
+        'receivedQtyAtOpen', l.received_qty,
+        'destinationId', coalesce(l.destination_id, v_po.destination_id)
       ) order by l.sku, l.id) from public.purchase_order_lines l where l.po_id = v_po.id), '[]'::jsonb)
     ) into v_source;
 
@@ -458,7 +701,8 @@ begin
       do_number, do_file_path, goods_received_at, goods_received_timestamp,
       note, lines, status, submitted_from, submitted_by, lock_version
     ) values (
-      v_po.id, v_po.warehouse_id, 'purchase_order', v_po.id, coalesce(v_po.version, 1),
+      v_po.id, coalesce(v_destination_warehouse_id, v_po.warehouse_id),
+      'purchase_order', v_po.id, coalesce(v_po.version, 1),
       v_source, v_destination, v_supplier,
       v_do, v_signed,
       coalesce((v_received_at at time zone 'Asia/Kuala_Lumpur')::date,
@@ -482,6 +726,10 @@ begin
     if v_receipt.source_id <> v_po.id or v_receipt.source_version <> coalesce(v_po.version, 1) then
       raise exception 'The source snapshot does not match this Purchase Order'
         using errcode = '40001', detail = 'stale_source_version';
+    end if;
+    if v_receipt.destination_snapshot->>'id' is distinct from v_destination_id::text then
+      raise exception 'The Deliver To changed. Reload the Receiving Session.'
+        using errcode = '40001', detail = 'stale_destination';
     end if;
     update public.warehouse_receipts
        set do_number = v_do, do_file_path = v_signed,
@@ -580,6 +828,180 @@ begin
 end;
 $$;
 
+-- Warehouse sends one count with one RPC and therefore one database
+-- transaction. If validation/submission fails, the preceding save rolls back;
+-- a retry edits the exact Draft/Returned session instead of stranding a row.
+create or replace function public.save_and_submit_receiving_session(
+  p_receipt_id uuid,
+  p_expected_version integer,
+  p_payload jsonb
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_saved jsonb;
+  v_id uuid;
+  v_version integer;
+begin
+  if public.app_role() <> 'warehouse' then
+    raise exception 'Warehouse access required'
+      using errcode = '42501', detail = 'forbidden';
+  end if;
+  v_saved := public.save_receiving_session(p_receipt_id, p_expected_version, p_payload);
+  v_id := (v_saved->>'receipt_id')::uuid;
+  v_version := (v_saved->>'lock_version')::integer;
+  return public.submit_receiving_session(v_id, v_version);
+end;
+$$;
+
+-- Warehouse reads are scoped by the effective line Deliver To, never by the
+-- PO's legacy warehouse column. Draft/Returned carries the exact recovery
+-- identity; Submitted is visible but not editable.
+create or replace function public.warehouse_incoming_pos()
+returns jsonb
+language plpgsql
+stable security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_wh_id uuid := public.app_warehouse_id();
+begin
+  if public.app_role() <> 'warehouse' or v_wh_id is null then
+    raise exception 'Warehouse access required'
+      using errcode = '42501', detail = 'forbidden';
+  end if;
+  return jsonb_build_object(
+    'warehouse', (select jsonb_build_object('id', w.id, 'name', w.name)
+                    from public.warehouses w where w.id = v_wh_id),
+    'pos', coalesce((
+      select jsonb_agg(row_data order by row_data->>'po_id') from (
+        select jsonb_build_object(
+          'po_id', po.id,
+          'scope_id', po.id || '::' || d.id::text,
+          'source_version', coalesce(po.version, 1),
+          'supplier_name', s.name,
+          'po_delivery_date', po.po_delivery_date,
+          'supplier_delivery_date', (
+            select p.new_date from public.po_supplier_promises p
+             where p.po_id = po.id order by p.recorded_at desc, p.id desc limit 1
+          ),
+          'deliver_to', jsonb_build_object('id', d.id, 'name', d.name, 'address', w.address),
+          'sup_status', po.sup_status,
+          'lines', coalesce((
+            select jsonb_agg(jsonb_build_object(
+              'id', l.id, 'sku', l.sku, 'qty', l.qty,
+              'received_qty', l.received_qty,
+              'damaged_qty', l.damaged_qty,
+              'wrong_item_qty', l.wrong_item_qty,
+              'destination_id', d.id,
+              'category', public.claim_product_category(l.sku),
+              'unit_ids', coalesce((
+                select jsonb_agg(i.unit_code order by i.created_at, i.unit_code)
+                  from public.ops_stock_items i
+                 where i.po_line_id = l.id
+                   and i.purchasing_destination_id = d.id
+                   and i.status = 'incoming'
+              ), '[]'::jsonb)
+            ) order by l.sku, l.id)
+              from public.purchase_order_lines l
+             where l.po_id = po.id
+               and coalesce(l.destination_id, po.destination_id) = d.id
+          ), '[]'::jsonb),
+          'open_receipt', (
+            select jsonb_build_object(
+              'id', wr.id, 'status', wr.status, 'lock_version', wr.lock_version,
+              'do_number', wr.do_number, 'do_file_path', wr.do_file_path,
+              'goods_received_timestamp', wr.goods_received_timestamp,
+              'note', wr.note, 'lines', wr.lines, 'return_reason', wr.return_reason
+            ) from public.warehouse_receipts wr
+             where wr.source_id = po.id and wr.warehouse_id = v_wh_id
+               and wr.destination_snapshot->>'id' = d.id::text
+               and wr.status in ('draft', 'submitted', 'returned')
+             order by wr.updated_at desc limit 1
+          )
+        ) as row_data
+          from public.purchase_orders po
+          join public.suppliers s on s.id = po.supplier_id
+          join public.purchasing_destinations d on d.warehouse_id = v_wh_id
+          join public.warehouses w on w.id = d.warehouse_id
+         where po.status = 'open' and exists (
+           select 1 from public.purchase_order_lines l
+            where l.po_id = po.id
+              and coalesce(l.destination_id, po.destination_id) = d.id
+              and l.received_qty < l.qty
+         )
+      ) q
+    ), '[]'::jsonb)
+  );
+end;
+$$;
+
+drop function if exists public.warehouse_my_receipts();
+create or replace function public.warehouse_my_receipts(
+  p_limit integer default 50,
+  p_before timestamptz default null,
+  p_before_id uuid default null,
+  p_exact text default null
+)
+returns jsonb
+language plpgsql
+stable security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_wh_id uuid := public.app_warehouse_id();
+  v_limit integer := least(greatest(coalesce(p_limit, 50), 1), 100);
+  v_exact text := nullif(lower(btrim(coalesce(p_exact, ''))), '');
+  v_result jsonb;
+begin
+  if public.app_role() <> 'warehouse' or v_wh_id is null then
+    raise exception 'Warehouse access required'
+      using errcode = '42501', detail = 'forbidden';
+  end if;
+  with filtered as materialized (
+    select wr.*, coalesce(wr.submitted_at, wr.created_at) as cursor_at
+      from public.warehouse_receipts wr
+     where wr.warehouse_id = v_wh_id
+       and (v_exact is null
+         or lower(wr.source_id) = v_exact
+         or lower(wr.id::text) = v_exact
+         or lower(coalesce(wr.grn_number, '')) = v_exact)
+       and (p_before is null
+         or coalesce(wr.submitted_at, wr.created_at) < p_before
+         or (coalesce(wr.submitted_at, wr.created_at) = p_before
+           and (p_before_id is null or wr.id < p_before_id)))
+     order by coalesce(wr.submitted_at, wr.created_at) desc, wr.id desc
+     limit v_limit + 1
+  ), page as (
+    select * from filtered
+     order by cursor_at desc, id desc
+     limit v_limit
+  )
+  select jsonb_build_object(
+    'receipts', coalesce((select jsonb_agg(jsonb_build_object(
+      'id', wr.id, 'po_id', wr.source_id, 'source_version', wr.source_version,
+      'supplier_name', wr.supplier_snapshot->>'name',
+      'deliver_to', wr.destination_snapshot,
+      'do_number', wr.do_number, 'do_file_path', wr.do_file_path,
+      'goods_received_at', wr.goods_received_timestamp,
+      'status', wr.status, 'lock_version', wr.lock_version,
+      'lines', wr.lines, 'note', wr.note,
+      'submitted_at', wr.submitted_at, 'posted_at', wr.posted_at,
+      'grn_number', wr.grn_number, 'return_reason', wr.return_reason,
+      'claims', '[]'::jsonb
+    ) order by wr.cursor_at desc, wr.id desc) from page wr), '[]'::jsonb),
+    'next', case when (select count(*) from filtered) > v_limit then (
+      select jsonb_build_object('before', wr.cursor_at, 'beforeId', wr.id)
+        from page wr order by wr.cursor_at asc, wr.id asc limit 1
+    ) else null end
+  ) into v_result;
+  return v_result;
+end;
+$$;
+
 create or replace function public.return_receiving_session(
   p_receipt_id uuid,
   p_expected_version integer,
@@ -647,6 +1069,9 @@ declare
   v_physical integer;
   v_pending integer;
   v_outcome text;
+  v_destination_id uuid;
+  v_destination_warehouse_id uuid;
+  v_posts_stock boolean;
   v_grn text;
   v_posting_date date := (now() at time zone 'Asia/Kuala_Lumpur')::date;
   v_who jsonb := public.receiving_grn_actor((now() at time zone 'Asia/Kuala_Lumpur')::date);
@@ -733,6 +1158,17 @@ begin
         using errcode = 'P0001', detail = 'over_delivery_requires_exception';
     end if;
     v_physical := v_received + v_damaged + v_wrong + v_extra;
+    v_destination_id := coalesce(v_pol.destination_id, v_po.destination_id);
+    select d.warehouse_id,
+           coalesce(d.warehouse_id is not null and w.kind = 'own', false)
+      into v_destination_warehouse_id, v_posts_stock
+      from public.purchasing_destinations d
+      left join public.warehouses w on w.id = d.warehouse_id
+     where d.id = v_destination_id;
+    if v_destination_id::text is distinct from v_receipt.destination_snapshot->>'id' then
+      raise exception 'The Deliver To changed. Reload the Receiving Session.'
+        using errcode = '40001', detail = 'stale_destination';
+    end if;
     if jsonb_array_length(coalesce(v_line->'unitIds', '[]'::jsonb)) <> v_physical then
       raise exception 'Every counted Unit needs its governed Unit ID'
         using errcode = 'P0001', detail = 'unit_id_mismatch';
@@ -769,7 +1205,10 @@ begin
       if v_outcome <> 'extra' and not exists (
         select 1 from public.ops_stock_items i
          where i.unit_code = v_unit.unit_code
-           and i.po_no = v_po.id and i.sku = v_pol.sku and i.status = 'incoming'
+           and i.po_no = v_po.id and i.sku = v_pol.sku
+           and i.po_line_id = v_pol.id
+           and i.purchasing_destination_id = v_destination_id
+           and i.status = 'incoming'
       ) then
         raise exception 'Unit ID % is not an incoming Unit on %', v_unit.unit_code, v_po.id
           using errcode = 'P0001', detail = 'unit_id_mismatch';
@@ -796,13 +1235,15 @@ begin
     end loop;
 
     update public.ops_stock_items i
-       set status = 'free', source_ref = v_receipt.do_number,
+       set status = case when v_posts_stock then 'free' else 'transferred' end,
+           source_ref = v_receipt.do_number,
            date_in = v_receipt.goods_received_at, last_verified_at = now(), updated_at = now()
       from public.receiving_session_unit_outcomes o
      where o.receipt_id = v_receipt.id and o.po_line_id = v_pol.id
        and o.outcome = 'received' and i.unit_code = o.unit_code;
     update public.ops_stock_items i
-       set status = 'on_hold', hold_reason = o.outcome,
+       set status = case when v_posts_stock then 'on_hold' else 'transferred' end,
+           hold_reason = o.outcome,
            held_at = now(), last_verified_at = now(), updated_at = now()
       from public.receiving_session_unit_outcomes o
      where o.receipt_id = v_receipt.id and o.po_line_id = v_pol.id
@@ -826,6 +1267,54 @@ begin
   end;
   update public.warehouse_receipts
      set status = 'posted', grn_number = v_grn, grn_posting_date = v_posting_date,
+         grn_snapshot = jsonb_build_object(
+           'grnNumber', v_grn,
+           'grnPostingDate', v_posting_date,
+           'receivingSessionId', v_receipt.id,
+           'sourceSnapshot', v_receipt.source_snapshot,
+           'supplierSnapshot', v_receipt.supplier_snapshot,
+           'destinationSnapshot', v_receipt.destination_snapshot,
+           'supplierDeliveryDate', (
+             select p.new_date from public.po_supplier_promises p
+              where p.po_id = v_po.id
+              order by p.recorded_at desc, p.id desc limit 1
+           ),
+           'goodsReceivedAt', v_receipt.goods_received_timestamp,
+           'supplierDoNo', v_receipt.do_number,
+           'signedDoPath', v_receipt.do_file_path,
+           'lines', v_receipt.lines,
+           'unitOutcomes', coalesce((
+             select jsonb_agg(jsonb_build_object(
+               'poLineId', o.po_line_id, 'unitId', o.unit_code,
+               'outcome', o.outcome, 'evidence', o.evidence
+             ) order by o.po_line_id, o.created_at, o.unit_code)
+               from public.receiving_session_unit_outcomes o
+              where o.receipt_id = v_receipt.id
+           ), '[]'::jsonb),
+           'submission', jsonb_build_object(
+             'from', v_receipt.submitted_from,
+             'submittedBy', v_receipt.submitted_by,
+             'submittedAt', v_receipt.submitted_at
+           ),
+           'actualActor', jsonb_build_object(
+             'userId', auth.uid(),
+             'name', (select u.name from public.app_users u where u.id = auth.uid())
+           ),
+           'normalGrnDuty', jsonb_build_object(
+             'userId', nullif(v_who->>'normal_user_id', '')::uuid,
+             'name', (select u.name from public.app_users u
+                       where u.id = nullif(v_who->>'normal_user_id', '')::uuid)
+           ),
+           'datedCover', case when nullif(v_who->>'cover_user_id', '') is null then null
+             else jsonb_build_object(
+               'userId', nullif(v_who->>'cover_user_id', '')::uuid,
+               'name', (select u.name from public.app_users u
+                         where u.id = nullif(v_who->>'cover_user_id', '')::uuid),
+               'coverId', nullif(v_who->>'cover_id', '')::uuid
+             ) end,
+           'postAuthority', v_authority,
+           'postedAt', now()
+         ),
          posted_by = auth.uid(), posted_at = now(), reviewed_by = auth.uid(), reviewed_at = now(),
          normal_grn_duty_user_id = nullif(v_who->>'normal_user_id', '')::uuid,
          grn_cover_user_id = nullif(v_who->>'cover_user_id', '')::uuid,
@@ -910,14 +1399,22 @@ revoke all on function public.save_receiving_session(uuid, integer, jsonb) from 
 grant execute on function public.save_receiving_session(uuid, integer, jsonb) to authenticated;
 revoke all on function public.submit_receiving_session(uuid, integer) from public, anon;
 grant execute on function public.submit_receiving_session(uuid, integer) to authenticated;
+revoke all on function public.save_and_submit_receiving_session(uuid, integer, jsonb) from public, anon;
+grant execute on function public.save_and_submit_receiving_session(uuid, integer, jsonb) to authenticated;
+revoke all on function public.warehouse_my_receipts(integer, timestamptz, uuid, text) from public, anon;
+grant execute on function public.warehouse_my_receipts(integer, timestamptz, uuid, text) to authenticated;
 revoke all on function public.return_receiving_session(uuid, integer, text) from public, anon;
 grant execute on function public.return_receiving_session(uuid, integer, text) to authenticated;
 revoke all on function public.post_receiving_session(uuid, integer) from public, anon;
 grant execute on function public.post_receiving_session(uuid, integer) to authenticated;
 revoke all on function public.warehouse_receipt_check_in(uuid) from public, anon;
-grant execute on function public.warehouse_receipt_check_in(uuid) to authenticated;
 revoke all on function public.office_receive_post(text, text, text, text, jsonb, date) from public, anon;
-grant execute on function public.office_receive_post(text, text, text, text, jsonb, date) to authenticated;
+revoke all on function public.operation_receive_po_with_do(text,text,text,jsonb) from public, anon, authenticated;
+revoke all on function public.office_receive_post(text,text,text,text,jsonb,date) from public, anon, authenticated;
+revoke all on function public.warehouse_submit_receipt(text,text,text,text,jsonb,date) from public, anon, authenticated;
+revoke all on function public.warehouse_resubmit_receipt(uuid,text,text,text,jsonb,date) from public, anon, authenticated;
+revoke all on function public.warehouse_receipt_check_in(uuid) from public, anon, authenticated;
+revoke all on function public.warehouse_receipt_return(uuid,text) from public, anon, authenticated;
 
 -- 11 · Apply-time sanity. These guards execute in the same transaction; a bad
 -- authority shape rolls back the entire migration and allocates no number.
@@ -933,6 +1430,24 @@ begin
   end if;
   if has_function_privilege('authenticated', 'public.allocate_grn_number(date)', 'execute') then
     raise exception '0407: clients may not allocate GRN numbers';
+  end if;
+  if has_function_privilege('authenticated', 'public.operation_receive_po_with_do(text,text,text,jsonb)', 'execute') then
+    raise exception '0407: retired operation receive writer remains executable';
+  end if;
+  if has_function_privilege('authenticated', 'public.office_receive_post(text,text,text,text,jsonb,date)', 'execute') then
+    raise exception '0407: retired office receive writer remains executable';
+  end if;
+  if has_function_privilege('authenticated', 'public.warehouse_submit_receipt(text,text,text,text,jsonb,date)', 'execute') then
+    raise exception '0407: retired warehouse submit writer remains executable';
+  end if;
+  if has_function_privilege('authenticated', 'public.warehouse_resubmit_receipt(uuid,text,text,text,jsonb,date)', 'execute') then
+    raise exception '0407: retired warehouse resubmit writer remains executable';
+  end if;
+  if has_function_privilege('authenticated', 'public.warehouse_receipt_check_in(uuid)', 'execute') then
+    raise exception '0407: retired warehouse check-in writer remains executable';
+  end if;
+  if has_function_privilege('authenticated', 'public.warehouse_receipt_return(uuid,text)', 'execute') then
+    raise exception '0407: retired warehouse return writer remains executable';
   end if;
   if (select count(*) from pg_indexes
        where schemaname = 'public' and indexname = 'warehouse_receipts_grn_number_uq') <> 1 then

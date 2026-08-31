@@ -1,4 +1,4 @@
-import { type WarehouseReceiptRow } from "@carres/shared";
+import { type ReceivingLineInput, type WarehouseReceiptLine, type WarehouseReceiptRow } from "@carres/shared";
 import { fmtDateShort } from "@/lib/fmt-date";
 import { DOC_TH, DocSection, Prop } from "./workspace-doc";
 
@@ -32,14 +32,34 @@ import { DOC_TH, DocSection, Prop } from "./workspace-doc";
  * Nothing is built for it now; the shape simply leaves room.
  */
 
+function lineFacts(line: WarehouseReceiptLine | ReceivingLineInput) {
+  if ("poLineId" in line) {
+    return {
+      id: line.poLineId,
+      received: line.receivedQty,
+      damaged: line.damagedQty,
+      wrong: line.wrongItemQty,
+    };
+  }
+  return {
+    id: line.id,
+    received: line.received_now,
+    damaged: line.damaged_qty,
+    wrong: line.wrong_item_qty,
+  };
+}
+
 export default function ReceivingRecord({ record }: { record: WarehouseReceiptRow }) {
   const lines = record.lines ?? [];
   const total = lines.reduce(
-    (a, l) => ({
-      recv: a.recv + (l.received_now ?? 0),
-      dmg: a.dmg + (l.damaged_qty ?? 0),
-      wrong: a.wrong + (l.wrong_item_qty ?? 0),
-    }),
+    (a, line) => {
+      const facts = lineFacts(line);
+      return {
+        recv: a.recv + facts.received,
+        dmg: a.dmg + facts.damaged,
+        wrong: a.wrong + facts.wrong,
+      };
+    },
     { recv: 0, dmg: 0, wrong: 0 },
   );
   const anyProblem = total.dmg > 0 || total.wrong > 0;
@@ -108,9 +128,11 @@ export default function ReceivingRecord({ record }: { record: WarehouseReceiptRo
           {anyProblem && <span className="w-12 text-right font-medium">Dmgd</span>}
           {anyProblem && <span className="w-12 text-right font-medium">Wrong</span>}
         </div>
-        {lines.map((l, i) => (
+        {lines.map((l, i) => {
+          const facts = lineFacts(l);
+          return (
           <div
-            key={`${l.id}-${i}`}
+            key={`${facts.id}-${i}`}
             className="flex gap-2 py-1.5 text-body border-b border-kit-slate-4"
             data-testid={`receiving-record-item-${i + 1}`}
           >
@@ -118,28 +140,28 @@ export default function ReceivingRecord({ record }: { record: WarehouseReceiptRo
               {l.sku}
             </span>
             <span className="w-12 text-right tabular-nums text-kit-slate-12">
-              {l.received_now ?? 0}
+              {facts.received}
             </span>
             {anyProblem && (
               <span
                 className={`w-12 text-right tabular-nums ${
-                  (l.damaged_qty ?? 0) > 0 ? "text-kit-red-11" : "text-kit-slate-9"
+                  facts.damaged > 0 ? "text-kit-red-11" : "text-kit-slate-9"
                 }`}
               >
-                {l.damaged_qty ?? 0}
+                {facts.damaged}
               </span>
             )}
             {anyProblem && (
               <span
                 className={`w-12 text-right tabular-nums ${
-                  (l.wrong_item_qty ?? 0) > 0 ? "text-kit-red-11" : "text-kit-slate-9"
+                  facts.wrong > 0 ? "text-kit-red-11" : "text-kit-slate-9"
                 }`}
               >
-                {l.wrong_item_qty ?? 0}
+                {facts.wrong}
               </span>
             )}
           </div>
-        ))}
+        );})}
         <div className="flex gap-2 py-1.5 text-body border-b border-kit-slate-5">
           <span className="flex-1 text-label uppercase tracking-wide text-kit-slate-9">
             Total

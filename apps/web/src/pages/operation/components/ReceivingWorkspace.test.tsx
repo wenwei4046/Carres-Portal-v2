@@ -6,7 +6,8 @@ import ReceivingWorkspace from "./ReceivingWorkspace";
 const save = vi.fn();
 const submit = vi.fn();
 const review = vi.fn();
-let status: "draft" | "posted" = "draft";
+let status: "draft" | "submitted" | "posted" = "draft";
+let mayPost = true;
 
 const parent = {
   id: "PO-20260831-0001",
@@ -15,8 +16,8 @@ const parent = {
   sourceVersion: 3,
   grnNumber: null,
   poIssuedAt: "2026-08-20T02:00:00Z",
-  supplier: "Hooka",
-  deliverTo: "Carres Klang",
+  supplier: "CHANGED LIVE SUPPLIER",
+  deliverTo: "CHANGED LIVE DESTINATION",
   poDeliveryDate: "2026-08-30",
   supplierDeliveryDate: "2026-09-02",
   sameAsPo: false,
@@ -54,6 +55,23 @@ vi.mock("@/lib/queries", () => ({
         goods_received_timestamp: status === "posted" ? "2026-08-31T03:00:00Z" : null,
         grn_number: status === "posted" ? "GRN-20260831-0042" : null,
         grn_posting_date: status === "posted" ? "2026-08-31" : null,
+        grn_snapshot: status === "posted" ? {
+          grnNumber: "GRN-20260831-0042",
+          grnPostingDate: "2026-08-31",
+          receivingSessionId: "receipt-1",
+          sourceSnapshot: { sourceKind: "purchase_order", sourceId: parent.id, sourceVersion: 3, poIssuedAt: parent.poIssuedAt, poDeliveryDate: parent.poDeliveryDate, lines: [{ poLineId: parent.lines[0].id, sku: "MAT-K-001", orderQty: 2, receivedQtyAtOpen: 0 }] },
+          supplierSnapshot: { name: "Hooka" },
+          destinationSnapshot: { name: "Carres Klang" },
+          supplierDeliveryDate: parent.supplierDeliveryDate,
+          goodsReceivedAt: "2026-08-31T03:00:00Z",
+          supplierDoNo: "DO-7788",
+          signedDoPath: "PO-20260831-0001/do.jpg",
+          lines: [{ poLineId: parent.lines[0].id, sku: "MAT-K-001", receivedQty: 2, damagedQty: 0, wrongItemQty: 0, extraQty: 0, unitIds: ["UNIT-1", "UNIT-2"], damagedPhotos: [], wrongItemPhotos: [], extraEvidence: [], wrongItemReason: null }],
+          unitOutcomes: [],
+          submission: { from: "office", submittedBy: null, submittedAt: null },
+          actualActor: { userId: null, name: "Jess" }, normalGrnDuty: { userId: null, name: "Yee Jean" }, datedCover: null,
+          postAuthority: "operations_superuser", postedAt: "2026-08-31T04:00:00Z",
+        } : null,
         submitted_at: null,
         posted_at: status === "posted" ? "2026-08-31T04:00:00Z" : null,
         posted_by_name: status === "posted" ? "Jess" : null,
@@ -64,6 +82,7 @@ vi.mock("@/lib/queries", () => ({
         return_reason: null,
       }],
       events: [],
+      authority: { mayPost, normalGrnDutyName: "Yee Jean", datedCoverName: null },
     },
     isLoading: false,
   }),
@@ -83,6 +102,7 @@ vi.mock("@/components/ClaimPhotoUploadField", () => ({ default: () => <div>Excep
 describe("ReceivingWorkspace", () => {
   it("keeps all four dates and six quantities distinct in the full-width session", () => {
     status = "draft";
+    mayPost = true;
     render(<ReceivingWorkspace parent={parent} receiptId="receipt-1" onBack={vi.fn()} />);
     for (const label of ["PO Issued", "PO Delivery Date", "Supplier Delivery Date", "Goods Received At"])
       expect(screen.getByText(label)).toBeInTheDocument();
@@ -93,6 +113,7 @@ describe("ReceivingWorkspace", () => {
 
   it("saves the same persistent Draft and names the first posting gap", () => {
     status = "draft";
+    mayPost = true;
     render(<ReceivingWorkspace parent={parent} receiptId="receipt-1" onBack={vi.fn()} />);
     expect(screen.getByText("Supplier DO is missing")).toBeInTheDocument();
     expect(screen.getByText("Add the Supplier DO before you finish receiving")).toBeInTheDocument();
@@ -110,14 +131,30 @@ describe("ReceivingWorkspace", () => {
         lines: [expect.objectContaining({ receivedQty: 2, unitIds: ["UNIT-1", "UNIT-2"] })],
       }),
     }));
+    expect(screen.getByRole("button", { name: "Send for GRN review" })).toBeDisabled();
+  });
+
+  it("keeps formal GRN actions off an ordinary Operations browser", () => {
+    status = "submitted";
+    mayPost = false;
+    render(<ReceivingWorkspace parent={parent} receiptId="receipt-1" onBack={vi.fn()} />);
+    expect(screen.queryByRole("button", { name: "Check in" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Return count/ })).not.toBeInTheDocument();
+    expect(screen.getByText("GRN review belongs to Yee Jean")).toBeInTheDocument();
+    expect(screen.getByText("Open the assigned action in My Work or Team Work.")).toBeInTheDocument();
   });
 
   it("seals a posted session and shows the official GRN beside its facts", () => {
     status = "posted";
+    mayPost = true;
     render(<ReceivingWorkspace parent={parent} receiptId="receipt-1" onBack={vi.fn()} />);
     expect(screen.getByText("GOODS RECEIPT NOTE")).toBeInTheDocument();
     expect(screen.getByText("GRN-20260831-0042")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Save Receiving" })).not.toBeInTheDocument();
     expect(screen.getByTestId("posted-receiving-layout")).toHaveClass("min-[1130px]:grid-cols-2");
+    expect(screen.getAllByText("Hooka")).toHaveLength(2);
+    expect(screen.getAllByText("Carres Klang")).toHaveLength(2);
+    expect(screen.queryByText("CHANGED LIVE SUPPLIER")).not.toBeInTheDocument();
+    expect(screen.queryByText("CHANGED LIVE DESTINATION")).not.toBeInTheDocument();
   });
 });

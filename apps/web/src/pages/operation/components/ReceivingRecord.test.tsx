@@ -7,7 +7,6 @@ function record(grnNumber: string | null): WarehouseReceiptRow {
   return {
     id: "receipt-20260831",
     po_id: "PO-20260831-0001",
-    warehouse_id: "warehouse-1",
     supplier_name: "Hooka",
     do_number: "DO-7788",
     status: "posted",
@@ -32,5 +31,26 @@ describe("ReceivingRecord formal identity", () => {
     render(<ReceivingRecord record={record(null)} />);
     expect(screen.getByTestId("receiving-record-no")).toHaveTextContent("Legacy receipt");
     expect(screen.queryByText(/^GRN-/)).not.toBeInTheDocument();
+  });
+
+  it("reads the current Receiving Session quantity shape", () => {
+    const current = record("GRN-20260831-0042");
+    current.lines = [{
+      poLineId: "11111111-1111-1111-1111-111111111111",
+      sku: "MAT-K-001",
+      receivedQty: 2,
+      damagedQty: 1,
+      wrongItemQty: 0,
+      extraQty: 0,
+      unitIds: ["UNIT-1", "UNIT-2", "UNIT-3"],
+      damagedPhotos: ["damage.jpg"],
+      wrongItemPhotos: [],
+      extraEvidence: [],
+      wrongItemReason: null,
+    }];
+    render(<ReceivingRecord record={current} />);
+    expect(screen.getByTestId("receiving-record-item-1")).toHaveTextContent("MAT-K-001");
+    expect(screen.getByTestId("receiving-record-item-1")).toHaveTextContent("2");
+    expect(screen.getByTestId("receiving-record-item-1")).toHaveTextContent("1");
   });
 });
