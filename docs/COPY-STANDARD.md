@@ -5,7 +5,25 @@
 > line, empty state, error, or tooltip.** Locked with Jess (COO) 2026-07-22.
 >
 > If any older chat, memory, or doc contradicts this file, this file wins.
-> The UI-KIT points at this file as the authority for microcopy.
+> [`ui/MASTER.md`](ui/MASTER.md) points at this file as the authority for every visible business
+> word. `docs/UI-DICTIONARY.md` and `docs/UI-KIT.md` are retired paths and are not current authority.
+
+---
+
+## Dictionary ownership and change process — OWNER-APPROVED / LOCKED 2026-08-31
+
+This file **is** the current ERP UI Dictionary. There is no second dictionary file.
+
+A visible-word change must identify the one business fact and current writer, update the governed
+word here once, update every affected page/field/column catalogue in the same bounded change, add a
+guard against the retired synonym, and record production evidence. A module MASTER owns business
+meaning and flow; `ui/MASTER.md` owns placement; this file owns the exact English. A Card, task,
+open PR, code comment or production typo cannot establish a competing word.
+
+Every page-level action set must fill the governed strings that apply to it: fact/problem line,
+action line, button, completion feedback, blocker/error and empty state. Structured owner identity,
+object identity, due calendar and official document number stay in their governed metadata fields;
+they are not repeated to make an action sentence sound complete.
 
 ---
 

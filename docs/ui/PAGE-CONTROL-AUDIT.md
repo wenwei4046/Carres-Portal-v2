@@ -1,11 +1,12 @@
 # ERP Page Control Audit and Master Blueprint Proposal
 
-> **Status: PROPOSAL / NOT LAW — Owner review required.**
+> **Status: OWNER-APPROVED CONTROL EVIDENCE — confirmed 2026-08-31.**
 > **Audit cut:** 2026-08-31 · latest `origin/main` and production `cfc334f194781468fc35dc333603a9f6af916c69`.
 > **Authority:** this file is an auditable control ledger subordinate to [`MASTER.md`](MASTER.md),
 > [`../ERP-ARCHITECTURE.md`](../ERP-ARCHITECTURE.md), each module MASTER and
 > [`../COPY-STANDARD.md`](../COPY-STANDARD.md). It does not create a second UI MASTER or dictionary.
-> After Owner approval, accepted global laws are folded into `MASTER.md`; this ledger remains evidence.
+> The accepted global laws are folded into `MASTER.md` §1.3 and the dictionary ownership rule is in
+> `COPY-STANDARD.md`; this ledger remains the dated inventory, evidence and correction-control record.
 
 ## 1. Owner-visible result
 
@@ -69,7 +70,7 @@ deploy SHA and a production walk.
 | Production walk | governed Operations account, desktop 1440 and effective 1280 widths; no fake records created |
 | Narrow limitation | requested 768×900, browser remained 1280px; recorded as an evidence gap |
 
-## 3. Canonical Master Page Blueprint — proposed
+## 3. Canonical Master Page Blueprint — Owner-approved 2026-08-31
 
 ### 3.1 One anatomy
 
@@ -389,6 +390,16 @@ human-sized names; IDs are used above to avoid shortening those source titles in
 | [#986](https://github.com/wenwei4046/Carres-Portal-v2/pull/986) `docs(receiving): reconcile GRN authority` | OPEN; CI success; `CONFLICTING / DIRTY`; docs/spec/plan only | **APPROVED BLUEPRINT CLAIM / PR ONLY**, no application build | review-gated Receiving task; convergence owns integration |
 | [#860](https://github.com/wenwei4046/Carres-Portal-v2/pull/860) `A unit crosses a site only by transfer — custody, in two events (Warehouse item 8, slice 1)` | OPEN since 2026-08-19; CI success then; `CONFLICTING / DIRTY`; migration 0365 unapplied | **IDLE PR ONLY** | no active owner; cannot merge until current Stock truth/site data/migration are reconciled |
 
+### 6.4 Owner-approved seam handoff — 2026-08-31
+
+- Sent the exact approved Shell, Register, Work, owner metadata, date/quantity, writer, copy,
+  responsive and production-proof requirements to `Purchasing Flow Convergence Build`
+  (`01a0562c-1ea6-72e3-a52a-045033611cfd`). That task remains the single integration owner.
+- Sent a no-duplicate boundary to `Purchasing — Receiving & GRN Page`
+  (`01a04819-d997-7820-a23a-7475808405a7`): preserve its spec/review evidence, but do not separately
+  implement, rebase, merge or deploy #986; new seams go to the convergence owner.
+- No new Purchasing task, Card, PR or implementation branch was opened by this control handoff.
+
 ## 7. UI drift register
 
 | ID / severity | Production or authority evidence | Conflict/current truth | Responsible owner |
@@ -499,15 +510,27 @@ Order is based on staff harm and cross-module dependency, not appearance:
 8. **Complete role and narrow-width production evidence** for Finance, HR, Admin and external
    portals before any “all pages aligned” claim.
 
-## 12. Owner confirmation gate
+## 12. Owner confirmation and execution handoff
 
-Owner confirmation is required for the Master Blueprint as a whole. Until then:
+The Owner confirmed the Master Blueprint as a whole on 2026-08-31. The accepted global laws now
+live in the existing `docs/ui/MASTER.md` §1.3 and `docs/COPY-STANDARD.md`; this control audit did not
+create a competing MASTER or dictionary.
 
-- this document stays **PROPOSAL / NOT LAW**;
-- no implementation Cards are created;
-- no seam message is sent to another task owner;
-- no PR is merged and no migration/deployment is performed for this control task.
+**PLAN MISSION COMPLETE.** Approved READY boundaries, in dependency order:
 
-After confirmation, accepted laws are merged into the existing `docs/ui/MASTER.md` and
-`COPY-STANDARD.md`; the first bounded work is correction order items 1–3, coordinated with
-`Purchasing Flow Convergence Build` rather than duplicated.
+1. **READY FOR CARD — Restore Stock Register truth and Warehouse Unit deep links.** Acceptance:
+   Stock loads from the current production schema; every Unit link opens its exact object; route
+   tests cover direct load and refresh; no Stock/Receiving/Transfer writer is duplicated.
+2. **ACTIVE OWNER SEAM — Purchasing convergence.** `Purchasing Flow Convergence Build` owns the
+   integrated #993/#986 reconstruction and receives the exact Register, Work, writer, date,
+   quantity, owner metadata and production evidence requirements from this control task. No second
+   Purchasing Card/task is opened here.
+3. **READY FOR CARD — Retire stale UI authority entry points.** Acceptance: repository instructions,
+   code comments and governance scripts no longer point to `docs/UI-KIT.md` or
+   `docs/UI-DICTIONARY.md`; they resolve through `ui/MASTER.md`, `COPY-STANDARD.md` and 01/02/03;
+   no duplicate authority file is created.
+4. Later module page corrections remain dependency-ordered by §11 and require their own bounded
+   BUILD/DELIVERY takeover. No bulk visual rewrite is authorised.
+
+This authority-persistence step still performs no application change, migration, PR merge or
+deployment. Those belong to the owning BUILD/DELIVERY lane with the §10 acceptance gates.
