@@ -1042,17 +1042,18 @@ table** in the page Work Toolbar, selection bar or the relevant top popover; `Re
 belongs to Columns and never to the footer. Each Register MASTER owns its truthful summary
 vocabulary and arithmetic; the global template may not invent a KPI, status or unit.
 
-**REGISTER LISTING FRAME — APPROVED / LOCKED, Owner correction 2026-08-29.** Every current and
-future Register/listing kit draws one complete light structural border on all four sides. The frame
-contains the Work Toolbar, table states/rows and fixed status footer as one listing; it is never a
-border around the whole page and never one card per row. The shared engines own it:
-`register/DataGrid` frames every full grid and `kit/DataTable` frames every kit table; embedded child
-tables may use their governed child-box boundary. A page may not cancel the left/right edges or add a
-second wrapper frame. New UI kits inherit this rule rather than offering a frameless variant.
+**REGISTER LISTING BOUNDARY — APPROVED / LOCKED, Owner correction 2026-08-31; overwrites the
+2026-08-29 four-sided-frame ruling.** A full `register/DataGrid` has **no enclosing outer border**
+around its Work Toolbar + table + fixed status footer. The visible structure stays inside the
+listing: the toolbar keeps its bottom divider, the table keeps its header/row/column grid lines,
+and the status footer keeps its top divider. Removing the outer rectangle must never remove those
+listing lines. A page may not add a wrapper border to recreate the obsolete frame. Embedded child
+tables retain only their separately governed child-table treatment. This ruling changes the shared
+Register engine, not one Sales Orders page override.
 
-The table frame has an 8px outer gap above and an 8px outer gap below. The bottom gap is page
-breathing room outside the frame; the 32px footer remains inside it and never touches the browser
-edge. Available vertical space is filled with consecutive complete parent rows. There is no
+The Register work surface has 8px breathing room above and below. The 32px footer remains part of
+the listing and never touches the browser edge. Available vertical space is filled with consecutive
+complete parent rows. There is no
 designed blank data region while more results exist; genuine empty space is allowed only when the
 complete current result set is shorter than the viewport. When another full governed row does not
 fit, show one fewer complete row rather than compressing the locked 38px parent-row height. This
@@ -1078,7 +1079,7 @@ DataGrid-owned genuine-wide horizontal overflow · 1130 without another toolbar 
 column filters · Export · Columns · persistence · expansion all survive the migration.
 
 **The Sales Orders reference appearance follows the current Register Template:** 36px table
-header · 38px single-line parent rows · 32px fixed status footer · 8px outer frame gaps · flat
+header · 38px single-line parent rows · 32px fixed status footer · 8px work-surface gaps · flat
 zero-radius grid · faint structural dividers · no zebra. Frozen Carres typography tokens and
 the Register density law above own the text; older page-scoped 31/33/22px measurements no longer
 author this destination.
