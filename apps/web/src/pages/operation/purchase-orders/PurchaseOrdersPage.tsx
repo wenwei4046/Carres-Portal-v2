@@ -490,7 +490,7 @@ export default function PurchaseOrdersPage() {
                     >
                       {item.action ? (
                         <span className="flex min-w-0 flex-col">
-                          <span className="font-medium">{item.label}</span>
+                          <span className={filter === item.key ? "" : "font-medium"}>{item.label}</span>
                           <span className="text-[11px] font-normal leading-4 text-kit-slate-9">{item.action}</span>
                         </span>
                       ) : (
