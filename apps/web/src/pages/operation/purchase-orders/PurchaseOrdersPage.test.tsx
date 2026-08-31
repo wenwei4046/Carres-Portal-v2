@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -234,16 +234,58 @@ describe("Purchase Orders Register", () => {
     expect(screen.getByTestId("register-grid")).toHaveTextContent(
       "PO No. | PO Issued | Supplier | Source | Deliver To | PO Delivery Date | Supplier Delivery Date | Ordered | Received | Open Balance | Current Version | Supplier Has | Work",
     );
+    const rail = within(screen.getByTestId("po-filter-rail"));
     for (const word of [
+      "All purchase orders",
       "PDF not sent",
-      "Supplier Delivery Date missing",
-      "Supplier Delivery Date passed",
-      "Version changed — supplier update required",
+      "Supplier date missing",
+      "Supplier date passed",
       "Partly received",
       "Completed",
-    ]) expect(screen.getByRole("button", { name: new RegExp(word) })).toBeInTheDocument();
+    ]) expect(rail.getByRole("button", { name: new RegExp(word) })).toBeInTheDocument();
     expect(screen.getByTestId("grid-row-PO-20260828-4827")).toBeInTheDocument();
     expect(screen.getByTestId("grid-row-PO-LEGACY")).toHaveTextContent("Not recorded");
+  });
+
+  // Card 07 (owner correction 2026-08-31): business groups, no `Filters`
+  // heading, and the version row's deliberate two-line fact/action copy.
+  it("groups the rail by business dimension without a generic Filters heading", () => {
+    renderPage();
+    const railEl = screen.getByTestId("po-filter-rail");
+    expect(railEl.textContent).not.toContain("Filters");
+    expect(railEl.textContent).not.toContain("—");
+    expect(railEl.textContent).not.toContain("supplier update required");
+    const headings = ["PURCHASE ORDERS", "DOCUMENT", "DELIVERY DATE", "RECEIVING"];
+    for (const heading of headings) expect(within(railEl).getByText(heading)).toBeInTheDocument();
+    const order = headings.map((heading) => railEl.textContent!.indexOf(heading));
+    expect(order).toEqual([...order].sort((a, b) => a - b));
+  });
+
+  it("keeps the version row as one button with a fact line, an action line and one count", () => {
+    renderPage();
+    const rail = within(screen.getByTestId("po-filter-rail"));
+    const row = rail.getByRole("button", { name: /Version changed Send the new version to supplier/ });
+    expect(within(row).getByText("Version changed")).toBeInTheDocument();
+    expect(within(row).getByText("Send the new version to supplier")).toBeInTheDocument();
+    expect(within(row).getByText("1")).toBeInTheDocument();
+
+    fireEvent.click(row);
+    expect(screen.getByTestId("grid-row-PO-20260828-4827")).toBeInTheDocument();
+    expect(screen.queryByTestId("grid-row-PO-LEGACY")).not.toBeInTheDocument();
+
+    fireEvent.click(row);
+    expect(screen.getByTestId("grid-row-PO-LEGACY")).toBeInTheDocument();
+  });
+
+  it("filters from any grouped row and restores the full register from All purchase orders", () => {
+    renderPage();
+    const rail = within(screen.getByTestId("po-filter-rail"));
+    fireEvent.click(rail.getByRole("button", { name: /Partly received/ }));
+    expect(screen.queryByTestId("grid-row-PO-LEGACY")).not.toBeInTheDocument();
+
+    fireEvent.click(rail.getByRole("button", { name: /All purchase orders/ }));
+    expect(screen.getByTestId("grid-row-PO-LEGACY")).toBeInTheDocument();
+    expect(screen.getByTestId("grid-row-PO-20260828-4827")).toBeInTheDocument();
   });
 
   it("keeps the official PO Delivery Date and shows only a changed supplier date", () => {

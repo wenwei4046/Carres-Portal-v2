@@ -39,14 +39,42 @@ import {
 import PurchasingTabs from "../PurchasingTabs";
 import PoIssueEvidence, { doorsForIssuedPo } from "../components/PoIssueEvidence";
 
-const FILTERS: Array<{ key: PurchaseOrderRegisterFilter; label: string }> = [
-  { key: "pdf_not_sent", label: "PDF not sent" },
-  { key: "supplier_date_missing", label: "Supplier Delivery Date missing" },
-  { key: "supplier_date_passed", label: "Supplier Delivery Date passed" },
-  { key: "supplier_update_required", label: "Version changed — supplier update required" },
-  { key: "partly_received", label: "Partly received" },
-  { key: "completed", label: "Completed" },
+// Card 07 (owner correction 2026-08-31): the rail explains the business
+// dimension, never the UI mechanism — grouped rows, no visible `Filters`
+// heading. `action` renders a deliberate second line (fact, then the act),
+// not a wrapped sentence; the row stays ONE button with ONE count on the
+// same `supplier_update_required` key.
+type RailRow = { key: PurchaseOrderRegisterFilter; label: string; action?: string };
+
+const RAIL_GROUPS: Array<{ heading: string; rows: RailRow[] }> = [
+  {
+    heading: "DOCUMENT",
+    rows: [
+      { key: "pdf_not_sent", label: "PDF not sent" },
+      {
+        key: "supplier_update_required",
+        label: "Version changed",
+        action: "Send the new version to supplier",
+      },
+    ],
+  },
+  {
+    heading: "DELIVERY DATE",
+    rows: [
+      { key: "supplier_date_missing", label: "Supplier date missing" },
+      { key: "supplier_date_passed", label: "Supplier date passed" },
+    ],
+  },
+  {
+    heading: "RECEIVING",
+    rows: [
+      { key: "partly_received", label: "Partly received" },
+      { key: "completed", label: "Completed" },
+    ],
+  },
 ];
+
+const RAIL_ROWS: RailRow[] = RAIL_GROUPS.flatMap((group) => group.rows);
 
 type RegisterRow = {
   id: string;
@@ -248,7 +276,7 @@ export default function PurchaseOrdersPage() {
     ? allRows.filter((row) => row.facts.filters.includes(filter))
     : allRows;
   const counts = new Map(
-    FILTERS.map(({ key }) => [key, allRows.filter((row) => row.facts.filters.includes(key)).length]),
+    RAIL_ROWS.map(({ key }) => [key, allRows.filter((row) => row.facts.filters.includes(key)).length]),
   );
   const openObject = (row: RegisterRow) => {
     setParams((current) => {
@@ -420,36 +448,61 @@ export default function PurchaseOrdersPage() {
       <div className="relative flex min-h-0 flex-1 p-2">
         <aside
           className={[
-            "w-[240px] shrink-0 border border-r-0 border-kit-slate-5 bg-white p-3",
+            "w-[240px] shrink-0 overflow-y-auto border border-r-0 border-kit-slate-5 bg-white p-3",
             "max-md:absolute max-md:inset-y-2 max-md:left-2 max-md:z-30 max-md:shadow-lg",
             railOpen ? "max-md:block" : "max-md:hidden",
           ].join(" ")}
           aria-label="Purchase order filters"
           data-testid="po-filter-rail"
         >
-          <div className="mb-3 flex items-center justify-between">
-            <span className="text-label font-semibold uppercase tracking-wide text-kit-slate-9">Filters</span>
-            <button type="button" className="md:hidden" aria-label="Close filters" onClick={() => setRailOpen(false)}>
+          <div className="mb-2 flex items-center justify-end md:hidden">
+            <button type="button" aria-label="Close filters" onClick={() => setRailOpen(false)}>
               <X size={16} />
             </button>
           </div>
-          <button
-            type="button"
-            className={`mb-1 flex h-8 w-full items-center justify-between rounded-control px-2 text-left text-body ${filter == null ? "bg-kit-blue-3 font-semibold text-kit-blue-11" : "hover:bg-kit-slate-3"}`}
-            onClick={() => setFilter(null)}
-          >
-            <span>All Purchase Orders</span><span>{allRows.length}</span>
-          </button>
-          {FILTERS.map((item) => (
-            <button
-              key={item.key}
-              type="button"
-              className={`mb-1 flex min-h-8 w-full items-start justify-between gap-2 rounded-control px-2 py-1.5 text-left text-body ${filter === item.key ? "bg-kit-blue-3 font-semibold text-kit-blue-11" : "hover:bg-kit-slate-3"}`}
-              onClick={() => setFilter(filter === item.key ? null : item.key)}
-            >
-              <span>{item.label}</span><span className="tabular-nums">{counts.get(item.key) ?? 0}</span>
-            </button>
-          ))}
+          <div className="flex flex-col gap-5">
+            <div>
+              <div className="px-1.5 text-label font-semibold uppercase tracking-wide text-kit-slate-9">
+                PURCHASE ORDERS
+              </div>
+              <div className="mt-2 flex flex-col gap-0.5">
+                <button
+                  type="button"
+                  className={`flex h-8 w-full items-center justify-between rounded-control px-2 text-left text-body ${filter == null ? "bg-kit-blue-3 font-semibold text-kit-blue-11" : "hover:bg-kit-slate-3"}`}
+                  onClick={() => setFilter(null)}
+                >
+                  <span>All purchase orders</span><span className="tabular-nums">{allRows.length}</span>
+                </button>
+              </div>
+            </div>
+            {RAIL_GROUPS.map((group) => (
+              <div key={group.heading}>
+                <div className="px-1.5 text-label font-semibold uppercase tracking-wide text-kit-slate-9">
+                  {group.heading}
+                </div>
+                <div className="mt-2 flex flex-col gap-0.5">
+                  {group.rows.map((item) => (
+                    <button
+                      key={item.key}
+                      type="button"
+                      className={`flex min-h-8 w-full items-start justify-between gap-2 rounded-control px-2 py-1.5 text-left text-body ${filter === item.key ? "bg-kit-blue-3 font-semibold text-kit-blue-11" : "hover:bg-kit-slate-3"}`}
+                      onClick={() => setFilter(filter === item.key ? null : item.key)}
+                    >
+                      {item.action ? (
+                        <span className="flex min-w-0 flex-col">
+                          <span className="font-medium">{item.label}</span>
+                          <span className="text-[11px] font-normal leading-4 text-kit-slate-9">{item.action}</span>
+                        </span>
+                      ) : (
+                        <span className="min-w-0 break-words">{item.label}</span>
+                      )}
+                      <span className="shrink-0 tabular-nums">{counts.get(item.key) ?? 0}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
         </aside>
         <div className="flex min-w-0 flex-1 flex-col border border-kit-slate-5 bg-white">
           {pdfProblem ? (
