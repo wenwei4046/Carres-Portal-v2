@@ -1,8 +1,8 @@
 # PURCHASING — CARD 06 · RECEIVING / GRN AUTHORITY RECONCILIATION
 
 **Module:** Purchasing → Receiving  
-**Owner rulings:** 29 Aug 2026  
-**Status:** OWNER REVIEW — sections 1–5 approved; exception journeys and build remain unapproved  
+**Owner rulings:** 29–31 Aug 2026
+**Status:** OWNER-APPROVED DESIGN — implementation remains gated
 **Lane:** PLAN / AUTHORITY RECONCILIATION  
 **Branch:** `codex/receiving-grn`
 
@@ -25,7 +25,7 @@ migration.
 | operational object | `Receiving Session` — one physical delivery |
 | posted inventory transaction | `Goods Receipt` |
 | official document | `GRN`; formal title `GOODS RECEIPT NOTE` |
-| number label / format | `GRN No.` / stored `GRN-YYYYMMDD-RRRR` allocated at posting |
+| number label / format | `GRN No.` / stored `GRN-YYYYMMDD-RRRR` allocated at posting; date segment is Malaysia posting date, not `Goods Received At` |
 | supplier evidence | `Supplier DO No.` · `Signed DO photo` |
 | start / Carres station | `Start Receiving` · `Save Receiving` |
 | external Warehouse | `Send count` |
@@ -68,10 +68,11 @@ operational facts + 50% official GRN from 1130px; below that, the GRN stacks aft
 - [x] Latest main and PR #979 seam re-read
 - [x] Naming, flow, Register, date rail and Object Detail owner-approved
 - [x] Cross-authority contradictions reconciled in the working tree
-- [ ] Exception journeys owner-approved
-- [ ] Two-line action copy owner-approved
-- [ ] Permissions/evidence/numbering/audit/external boundaries owner-approved
-- [ ] Complete Blueprint persisted and governance PR merged
+- [x] Exception journeys owner-approved
+- [x] Two-line action copy owner-approved
+- [x] Permissions/evidence/numbering/audit/external boundaries owner-approved
+- [x] Complete Blueprint persisted in `docs/superpowers/specs/2026-08-31-receiving-grn-owner-approved-design.md`
+- [ ] Governance PR merged
 - [ ] Receiving implementation recut from merged authority
 - [ ] CI, governed migration approval, deployment and real-account browser walk
 

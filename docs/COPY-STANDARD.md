@@ -60,10 +60,13 @@ English; complexity is never used to make an instruction sound official.
 - The official record is Simple English. Original customer, staff and partner words remain
   preserved; optional Chinese/Bahasa Malaysia help explains but never creates a second truth.
 
-`Send` is banned from Portal action labels, buttons and Current Action copy. It hides the actor,
-channel, object, recipient and required result. Name the real act instead: `Email PO-2041 to Hooka`,
-`Ask Lim for mattress photos`, `Add the Supplier DO`, or `Record TCF's reply`. `Open WhatsApp`
-names navigation only; opening the channel never proves that the business action is complete.
+`Send` is banned from Portal action labels, buttons and Current Action copy when it hides the actor,
+channel, object, recipient or required result. Name the real act instead: `Email PO-2041 to Hooka`,
+`Ask Lim for mattress photos`, `Add the Supplier DO`, or `Record TCF's reply`. The one governed
+exception is Warehouse Receiving's `Send count`: the actor, object and recipient are fixed by the
+assigned Receiving Session, and the act submits the count to Carres without posting a GRN.
+`Open WhatsApp` names navigation only; opening the channel never proves that the business action is
+complete.
 
 ## Two-Line Action Copy Standard — owner ruling 2026-08-14
 
@@ -109,7 +112,7 @@ PO-2041 Version 1 has not reached Hooka
 Email PO-2041 Version 1 to Hooka · Ask for delivery confirmation.
 
 Supplier DO is missing
-Upload Hooka's signed DO · Link it to PO-2041.
+Add the Supplier DO before you finish receiving.
 
 Hooka has not replied
 Call Hooka about PO-2041 · Record item availability.
@@ -630,7 +633,7 @@ confirmed-sent evidence.
 | `Issue PO` | `Issue PO to {supplier}` | `Issue PO` | `PO issued to {supplier}` | `No purchase orders to issue.` |
 | `Supplier Delivery Date missing` | `Ask {supplier} for the delivery date` | `Record supplier answer` | `Supplier answer recorded` | `Every issued order has a supplier delivery answer.` |
 | `Supplier Delivery Date passed` | `Ask {supplier} when the goods will arrive` | `Record supplier answer` | `Supplier answer recorded` | `No Supplier Delivery Date has passed.` |
-| `Goods to receive` | `Check in {document} from {supplier}` | `Start receiving` | `GRN posted · {n} received · {m} pending delivery` | `No supplier delivery is ready to receive.` |
+| `Goods to receive` | `Check in {document} from {supplier}` | `Start Receiving` | `GRN posted · {n} received · {m} pending delivery` | `No supplier delivery is ready to receive.` |
 | `Balance date missing` | `Ask {supplier} for the balance delivery date` | `Record balance date` | `Balance date recorded` | `Every part receipt has a balance date.` |
 | `Confirm what happens next` | `Call {supplier} — confirm what happens next` | `Record what happens next` | `Supplier answer recorded` | `No claim is waiting for a supplier answer.` |
 | `Issue consignment order` | `Issue consignment order to {supplier}` | `Issue consignment order` | `Consignment order issued to {supplier}` | `No showroom is waiting for stock.` |
@@ -1250,6 +1253,34 @@ do not take the five-string shape.
 | `Pending Delivery Qty after save: {n}` | beside Save | Quiet, never a popup: a short receipt is normal, the number stays on the source PO, and routine confirms train people to click OK. |
 | `No receiving activity yet.` | Activity empty state | **Never `Nothing received yet`** (Jess, 2026-08-03) — that reads as *the goods have not come*, which is a different fact and usually a false one. What is empty is the RECORD. |
 | `Open in Claims` | Exceptions section | A DOOR, never a form. The claim already exists; the receive that recorded the problem opened it. |
+
+**OWNER-APPROVED TWO-LINE RECEIVING COPY — 31 Aug 2026.** These are exact pairs. The owner avatar,
+normal Duty, dated cover, due date and late state remain structured metadata, never sentence text.
+
+| Current fact / problem | Exact action |
+|---|---|
+| `Supplier Delivery Date is missing` | `Ask {supplier} for the delivery date` |
+| `The goods are due on {weekday, date}` | `Confirm {supplier}'s {weekday, date} arrival` |
+| `The Supplier Delivery Date passed on {weekday, date}` | `Ask {supplier} when the goods will arrive` |
+| `Supplier answer evidence is missing` | `Upload the WhatsApp or email, or write the call note` |
+| `The balance delivery date is missing` | `Ask {supplier} for the balance delivery date` |
+| `The warehouse count is ready` | `Check in {document} from {supplier}` |
+| `Supplier DO is missing` | `Add the Supplier DO before you finish receiving` |
+| `Signed DO photo is missing` | `Upload the signed DO photo` |
+| `Goods Received At is missing` | `Enter when the goods arrived` |
+| `Unit ID is missing for {item}` | `Scan the Unit ID shown on {document}` |
+| `Unit ID {unit id} is not on {document}` | `Check the label and scan the correct Unit ID` |
+| `The count needs changes` | `Fix the named items and return the count to Carres` |
+| `Damage evidence is missing` | `Take photos and say what is damaged` |
+| `Wrong item details are missing` | `Choose what is wrong and take photos` |
+| `Extra goods were found` | `Record the Unit IDs and keep them out of available stock` |
+| `The extra goods need a supplier answer` | `Ask {supplier} what to do with the extra goods` |
+| `Supplier DO {do number} was already used for {grn number}` | `Open {grn number}. Do not create another GRN` |
+| `Damage was found after {grn number} was posted` | `Open a Service Case for {unit id}` |
+| `The supplier claim has no reply` | `Ask {supplier} to reply to the supplier claim` |
+| `The supplier collection date is missing` | `Ask {supplier} for the collection date` |
+| `Return handover proof is missing` | `Upload the signed proof and record who collected the Units` |
+| `Some return Units are still with Carres` | `Ask {supplier} when the remaining Units will be collected` |
 
 ### The Claims decision words (ruled by Loo, 2026-08-05 — transcribed here 2026-08-06)
 
