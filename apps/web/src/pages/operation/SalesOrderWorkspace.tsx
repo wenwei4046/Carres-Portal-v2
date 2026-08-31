@@ -2189,7 +2189,7 @@ export default function SalesOrderWorkspace() {
           a read-only date is the "reduce descriptions" Jess asked for. */}
       <Block title="Order info">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <Fact label="Ordered" value={isNew ? fmtDate(new Date().toISOString().slice(0, 10)) : fmtDate(order?.placed_at ?? null)} />
+          <Fact label="SO Date" value={isNew ? fmtDate(new Date().toISOString().slice(0, 10)) : fmtDate(order?.placed_at ?? null)} />
           {mode === "create" ? (
             <div data-pos-field="deliveryDate">
               <DatePicker id="so-promised" label="Requested Delivery Date" value={draft.delivery_date}

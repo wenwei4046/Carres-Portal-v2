@@ -10,6 +10,10 @@ import {
 } from "./sales-order-maintenance";
 
 describe("SO_GRID_COLUMNS catalog", () => {
+  it("names placed_at as SO Date so Purchasing can keep Ordered for its status and quantity", () => {
+    expect(SO_GRID_COLUMNS.find((column) => column.key === "placed_at")?.label).toBe("SO Date");
+  });
+
   it("has unique keys", () => {
     const keys = SO_GRID_COLUMNS.map((c) => c.key);
     expect(new Set(keys).size).toBe(keys.length);

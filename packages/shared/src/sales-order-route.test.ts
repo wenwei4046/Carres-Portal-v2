@@ -122,7 +122,7 @@ describe("the node map", () => {
 
   it("carries the SO number and its labelled ordered date, and no circular door", () => {
     const so = node(resolveSalesOrderRoute(input()), "sales-order");
-    expect(so.lines).toEqual(["SO-1319", "Ordered: 2026-08-12"]);
+    expect(so.lines).toEqual(["SO-1319", "SO Date: 2026-08-12"]);
     expect(so.door).toBeNull();
     expect(so.mark).toBe("complete");
   });

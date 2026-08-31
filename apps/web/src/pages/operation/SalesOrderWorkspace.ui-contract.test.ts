@@ -496,6 +496,12 @@ describe("Sales Order object template contract", () => {
 
   /* ── THE WRITE BOUNDARY ────────────────────────────────────────────────── */
 
+  it("calls the Sales Order creation fact SO Date, never Purchasing's Ordered", () => {
+    expect(workspace).toContain('<Fact label="SO Date"');
+    expect(workspace).toContain("order?.placed_at");
+    expect(workspace).not.toContain('<Fact label="Ordered"');
+  });
+
   it("keeps goods, price and Requested Delivery Date out of the direct writer", () => {
     expect(workspace).toContain('<Fact label="Requested Delivery Date"');
     /* One promised-date picker exists, and it is CREATE's — an existing

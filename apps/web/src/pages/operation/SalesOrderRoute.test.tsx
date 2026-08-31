@@ -194,7 +194,7 @@ describe("Order Route — the nodes", () => {
 
   it("spells a date through the one date format and never ships a bare ISO string", () => {
     draw();
-    expect(nodeEl("sales-order")).toHaveTextContent("Ordered: Wed, 12 Aug");
+    expect(nodeEl("sales-order")).toHaveTextContent("SO Date: Wed, 12 Aug");
     expect(nodeEl("sales-order")).not.toHaveTextContent("2026-08-12");
   });
 

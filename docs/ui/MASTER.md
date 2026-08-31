@@ -1109,14 +1109,18 @@ compact destination header / work toolbar
 
 breathing gap
 
-  ▸ | SO No | Ordered | Requested Delivery Date | Customer |
+  ▸ | SO No | SO Date | Requested Delivery Date | Customer |
     | Delivery Location | Showroom | PO No | DO No
 ```
 
-- **THE COMPLETE REGISTER FRAME IS INHERITED FROM THE KIT — Owner correction 2026-08-29.** The
-  earlier text falsely attributed a global `NO OUTER FRAME` ruling to the Owner and is withdrawn.
-  Sales Orders must show the same four-sided light boundary as every Register; missing left/right
-  edges are a defect, not a page-scoped appearance. The engine supplies the frame once.
+- **NO ENCLOSING REGISTER FRAME — Owner correction 2026-08-31; overwrites the 2026-08-29
+  four-sided-frame ruling.** Sales Orders inherits the shared Register engine's frameless outer
+  boundary. The Work Toolbar divider, table header/row/column grid and status-footer divider stay;
+  only the rectangle enclosing all three is absent. A page-local wrapper may not add it back.
+- **DATE DICTIONARY — Owner correction 2026-08-31.** `orders.placed_at` is labelled **`SO Date`**
+  everywhere in Sales Orders: Register, Order info, Order Route and field catalogs. `Ordered`
+  remains Purchasing's state/quantity word (`Ordered` · `Ordered Qty`) and must not label an SO
+  creation date.
 - Sales Orders is a truth Register, not Work and not a dashboard. No KPI-card preamble, no
   giant card around the page.
 - The seven business columns above are the governed default and exact order. `▸` is chrome.
@@ -1255,7 +1259,7 @@ its own tools, and nothing that is not needed is on screen.*
 └────────────────────────────────────────────────────────────────────┘
      make a new thing  ←                      → how I look at this page
 ┌─────────────────────────────────────────────────────────────────────────┐
-│ ▸ │ SO No   │ Ordered     │ Requested Delivery Date │ Customer          │  36
+│ ▸ │ SO No   │ SO Date     │ Requested Delivery Date │ Customer          │  36
 ├───┼─────────┼─────────────┼─────────────────────────┼───────────────────┤
 │ ▸ │ SO-1319 │ Wed, 12 Aug │ Thu, 24 Sep 26          │ LIM KUAN YANG     │  38
 │ ▸ │ SO-1318 │ Tue, 11 Aug │ Customer not sure       │ CARD-1            │  38

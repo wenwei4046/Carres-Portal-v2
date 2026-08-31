@@ -208,7 +208,7 @@ export const REGISTER_FIELDS: readonly RegisterField[] = [
   /* The eight owner-ruled defaults, in their governed order. */
   { key: "so", label: "SO No", width: "85px", group: "Document", on: true,
     text: (r) => `SO-${r.so}`, sortBy: (r) => r.so },
-  { key: "ordered", label: "Ordered", width: "113px", group: "Dates", on: true,
+  { key: "ordered", label: "SO Date", width: "113px", group: "Dates", on: true,
     text: (r) => fmtDate(r.ordered), sortBy: (r) => r.ordered,
     kind: "date", iso: (r) => r.ordered },
   { key: "customer_delivery", label: "Requested Delivery Date", width: "192px", group: "Dates", on: true,
