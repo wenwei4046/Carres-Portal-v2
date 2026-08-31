@@ -281,7 +281,7 @@ export const PORTAL_NAV: PortalNavGroup[] = [
        *   `Purchase Demands`       `purchase_demand` is hidden canonical truth,
        *                            not a page an operator is sent to
        *   `Consignment Overview`   the Stock Register reports supplier-owned
-       *   `Consignment Receipts`   Units, and `Goods Receipts` is the ONE
+       *   `Consignment Receipts`   Units, and `Receiving` is the ONE
        *                            physical receipt engine
        *   `Report` + its hairline  reports are central / Register exports
        *
@@ -329,7 +329,7 @@ export const PORTAL_NAV: PortalNavGroup[] = [
        * the rest of receiving (returns to warehouse, put-away) will land. It
        * receives purchased AND consignment goods — there is no second receipt
        * engine (`docs/purchasing/MASTER.md` §4). */
-      { key: "receiving", label: "Goods Receipts", icon: PackageCheck, section: "Purchasing", pageGroup: "purchasing-receive" },
+      { key: "receiving", label: "Receiving", icon: PackageCheck, section: "Purchasing", pageGroup: "purchasing-receive" },
 
       /* PROBLEMS — what you open when the goods are wrong. */
       { key: "claims", label: "Supplier Claims", icon: Scale, section: "Purchasing", pageGroup: "purchasing-problems" },

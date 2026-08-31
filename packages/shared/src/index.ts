@@ -480,6 +480,8 @@ export {
   chasePoEventInput,
   // P3 (0306) — the two supplier calls' answer bodies.
   recordTomorrowDeliveryInput,
+  recordSupplierAnswerInput,
+  signPoEvidenceUploadInput,
   // Q5 (0318) — the supplier's promised READY date, the third answer body.
   recordReadyDateInput,
   recordSendInput,
@@ -523,6 +525,8 @@ export {
   type AssignPartnerInput,
   type ChasePoEventInput,
   type RecordTomorrowDeliveryInput,
+  type RecordSupplierAnswerInput,
+  type SignPoEvidenceUploadInput,
   type RecordBalanceDateInput,
   type RecordReadyDateInput,
   type AttachDoInput,
@@ -2878,3 +2882,6 @@ export * from "./sales-order-completion";
 export * from "./work-engine";
 // Purchase Orders — one evidence-derived Register state and Work vocabulary.
 export * from "./purchase-order-register";
+// Purchase Orders — a supplier answer is complete only with its channel,
+// evidence, reporter and the supplier's own answer time.
+export * from "./purchase-order-evidence";

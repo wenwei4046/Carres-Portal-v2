@@ -14,11 +14,10 @@
  *                    per key · working-days-late over a due that never moves
  *
  * THE TWO-LINE GRAMMAR (card §7, sizes 13/11 — ui/MASTER.md §5):
- *   line 1  the SHORT action sentence — the dictionary's own QUEUE word,
- *           which IS the registered display of the act (one mapping, no
- *           second definition)
- *   line 2  names · document numbers · the due date — `due Wed, 20 Aug`,
- *           or `Late — was due Mon, 18 Aug`. Never stuffed into line 1.
+ *   Sales Order line 1 keeps its registered queue action; line 2 carries
+ *   names, document numbers and due date. Purchase Order work states the
+ *   concrete problem first, then the exact action plus metadata. This is the
+ *   owner-approved Purchasing grammar, not another work set.
  *
  * MY WORK shows only the signed-in person's actions (the scope answers who —
  * no repeated avatar). TEAM WORK groups per staff: avatar · full name ·
@@ -73,6 +72,7 @@ function WorkRowButton({
   item: WorkRow;
   onOpen: (i: WorkRow) => void;
 }) {
+  const purchasing = item.module === "purchasing";
   return (
     <button
       type="button"
@@ -85,12 +85,13 @@ function WorkRowButton({
         className={`h-2 w-2 rounded-full shrink-0 ${TONE_DOT[item.broken ? "danger" : item.tone] ?? "bg-base-300"}`}
       />
       <span className="flex-1 min-w-0">
-        {/* Line 1 — the short action sentence: the dictionary's queue word. */}
-        <span className={`${cjkClassName(item.action)} text-body font-semibold text-base-900 block truncate`}>
+        {/* Purchasing names the problem before the exact action. Other modules
+            keep the existing registered action-first row grammar. */}
+        <span className={`${cjkClassName(purchasing ? item.line : item.action)} text-body font-semibold text-base-900 block truncate`}>
           {item.locked && (
             <Lock size={11} strokeWidth={2.5} className="inline mr-1 -mt-0.5" aria-label="Held by Finance" />
           )}
-          {item.action}
+          {purchasing ? item.line : item.action}
         </span>
         {/* Line 2 — names · numbers · the due date, 11px regular. */}
         <span
@@ -98,7 +99,7 @@ function WorkRowButton({
             item.workingDaysLate > 0 ? "text-danger" : "text-base-600"
           }`}
         >
-          {supportingLine(item)}
+          {purchasing ? `${item.action} · ${supportingLine(item)}` : supportingLine(item)}
         </span>
       </span>
     </button>
@@ -192,13 +193,7 @@ export default function OperationWork() {
   const visible = activeView === "mine" ? mine : allItems;
   const lateCount = visible.filter((i) => i.workingDaysLate > 0).length;
 
-  /* A row is a DOOR to its exact source (Card 06 §7): an order-track item
-     opens the Sales Order Workspace; a Manual Purchase action deep-links
-     the exact MPR object. */
-  const openRow = (i: WorkRow) =>
-    i.ruleKey.startsWith("manual_purchase.")
-      ? navigate(`/operation?tab=manual-purchase&mpr=${i.orderId}`)
-      : navigate(`/operation/orders/so/${i.orderId}`);
+  const openRow = (i: WorkRow) => navigate(i.href);
 
   return (
     <ListPageShell

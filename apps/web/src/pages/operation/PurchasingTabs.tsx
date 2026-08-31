@@ -80,7 +80,7 @@ const PAGE_WORD: Record<PurchasingPage, string> = {
   "to-order": "SO Batch Purchase",
   "manual-purchase": "Manual Purchase",
   "purchase-orders": "Purchase Orders",
-  receiving: "Goods Receipts",
+  receiving: "Receiving",
   claims: "Supplier Claims",
   "purchasing-report": PO_REPORT_WORDS.tab,
   "purchasing-settings": "Settings",

@@ -226,6 +226,7 @@ import {
   // Q3 — Purchasing → Report (GET /api/operation/pos/report). Facts only; the
   // figures are computed by `buildPoReport`.
   type PoReportResponse,
+  type RecordSupplierAnswerInput,
   // P1 (0303) — Purchasing → Settings.
   type PurchasingSettingsResponse,
   type PurchasingCreateDestinationInput,
@@ -3349,6 +3350,9 @@ export interface operationPoListRow {
   so: number | null;
   so_refs: number[] | null;
   eta_date: string | null;
+  /** The date printed on the current official PO version. Legacy rows remain
+   * null rather than copying a mutable planning date. */
+  po_delivery_date?: string | null;
   /** `Supplier Ready Date` (§12.2 ①) — the day the FACTORY says it has finished
    *  making the goods, written only by `purchasing_record_ready_date` (0318)
    *  after a supplier answered. It is NOT `eta_date`, which is our own
@@ -3478,6 +3482,11 @@ export interface operationPoListRow {
     reason: string | null;
     /** The free-text story beside the countable `reason` (0310). */
     remarks?: string | null;
+    channel?: "whatsapp" | "email" | "phone" | "in_person" | null;
+    evidence?: { kind: "file"; path: string } | { kind: "note"; note: string } | null;
+    supplier_answered_at?: string | null;
+    reported_by?: string | null;
+    recorded_by?: string | null;
     recorded_at: string;
   }[];
   /** 2026-05-18 (Loo C+D) — per-source-SO enrichment. One entry per SO this
@@ -4852,10 +4861,26 @@ export function useRevisePo(poId: string | null) {
   return useMutation({
     mutationFn: (input: {
       reason: string;
+      poDeliveryDate: string | null;
       lines: { lineId: string; qty: number; destinationId: string | null }[];
     }) =>
       apiFetch<{ ok: true; result: { version: number } }>(
         `/api/operation/pos/${encodeURIComponent(poId ?? "")}/revise`,
+        { method: "POST", body: JSON.stringify(input) },
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["operation", "pos"] });
+    },
+  });
+}
+
+/** The one supplier-answer evidence door owned by the Purchase Order object. */
+export function useRecordSupplierAnswer(poId: string | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: RecordSupplierAnswerInput) =>
+      apiFetch<{ ok: true; result: unknown }>(
+        `/api/operation/pos/${encodeURIComponent(poId ?? "")}/supplier-answer`,
         { method: "POST", body: JSON.stringify(input) },
       ),
     onSuccess: () => {

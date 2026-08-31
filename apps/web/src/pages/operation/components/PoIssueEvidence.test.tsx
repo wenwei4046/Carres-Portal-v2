@@ -106,7 +106,8 @@ describe("confirmed evidence is bound to ONE version", () => {
   it("Version 1 evidence completes Version 1", () => {
     renderIt(1, [sentV1, opened]);
     const panel = screen.getByTestId(`so-batch-evidence-${PO.id}`);
-    expect(panel).toHaveTextContent("PO-20260823-4041 · Version 1 reached Hooka");
+    expect(panel).toHaveTextContent("PO-20260823-4041 reached Hooka");
+    expect(panel).not.toHaveTextContent("Version 1");
     expect(panel).toHaveTextContent("Hooka Purchasing Group");
     expect(screen.queryByTestId("so-batch-evidence-confirm")).not.toBeInTheDocument();
   });
@@ -120,7 +121,7 @@ describe("confirmed evidence is bound to ONE version", () => {
     expect(screen.getByTestId("so-batch-evidence-confirm")).toBeInTheDocument();
     // ...and Version 1's send stays as history rather than disappearing.
     expect(screen.getByTestId(`so-batch-evidence-history-${PO.id}`)).toHaveTextContent(
-      "Version 1 sent to Hooka Purchasing Group",
+      "PO-20260823-4041 sent to Hooka Purchasing Group",
     );
   });
 

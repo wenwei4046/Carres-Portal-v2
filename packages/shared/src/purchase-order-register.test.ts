@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  purchaseOrderIdentity,
   purchaseOrderRegisterFacts,
   purchaseOrderWork,
   type PurchaseOrderRegisterInput,
@@ -10,13 +11,20 @@ const base: PurchaseOrderRegisterInput = {
   supplierName: "Hooka",
   status: "open",
   version: 1,
-  supplierDate: null,
+  placedAt: "2026-08-28T08:00:00Z",
+  poDeliveryDate: "2026-09-01",
+  supplierDeliveryDate: null,
   expectedReadyDate: null,
-  lines: [{ qty: 3, receivedQty: 0 }],
+  lines: [{ qty: 3, receivedQty: 0, damagedQty: 0, wrongItemQty: 0 }],
   sends: [],
 };
 
 describe("Purchase Order Register authority", () => {
+  it("prints Version only after the first official document", () => {
+    expect(purchaseOrderIdentity("PO-2032", 1)).toBe("PO-2032");
+    expect(purchaseOrderIdentity("PO-2032", 2)).toBe("PO-2032 · Version 2");
+  });
+
   it("an external app opening never means the current PDF was sent", () => {
     const facts = purchaseOrderRegisterFacts({
       ...base,
@@ -32,7 +40,7 @@ describe("Purchase Order Register authority", () => {
 
     expect(facts.currentSend).toBeNull();
     expect(facts.filters).toContain("pdf_not_sent");
-    expect(facts.documentState).toBe("Not sent to supplier");
+    expect(facts.documentState).toBe("The PO PDF has not been sent");
   });
 
   it("a confirmed old version does not prove the current version reached the supplier", () => {
@@ -51,20 +59,21 @@ describe("Purchase Order Register authority", () => {
     }, "2026-08-28");
 
     expect(facts.filters).toContain("supplier_update_required");
-    expect(facts.supplierHas).toBe("Version 1");
     expect(purchaseOrderWork({ ...base, version: 2, sends: base.sends }, facts)).toEqual({
+      kind: "issue",
       problem: "Version 2 has not been sent",
-      action: "Issue Version 2 to Hooka",
+      action: "Issue Version 2",
+      dueOn: "2026-08-28",
     });
   });
 
-  it("derives ordered, received and open balance from governed line quantities", () => {
+  it("keeps damaged and wrong quantities separate from good received and pending delivery", () => {
     const facts = purchaseOrderRegisterFacts({
       ...base,
-      supplierDate: "2026-09-01",
+      supplierDeliveryDate: "2026-09-01",
       lines: [
-        { qty: 3, receivedQty: 1 },
-        { qty: 2, receivedQty: 2 },
+        { qty: 3, receivedQty: 1, damagedQty: 1, wrongItemQty: 0 },
+        { qty: 2, receivedQty: 2, damagedQty: 0, wrongItemQty: 1 },
       ],
       sends: [
         {
@@ -76,7 +85,13 @@ describe("Purchase Order Register authority", () => {
       ],
     }, "2026-08-28");
 
-    expect(facts.quantities).toEqual({ ordered: 5, received: 3, open: 2 });
+    expect(facts.quantities).toMatchObject({
+      orderQty: 5,
+      receivedQty: 3,
+      damagedQty: 1,
+      wrongItemQty: 1,
+      pendingDeliveryQty: 2,
+    });
     expect(facts.filters).toContain("partly_received");
     expect(facts.operationStatus).toBe("Receiving");
   });
@@ -84,7 +99,7 @@ describe("Purchase Order Register authority", () => {
   it("a passed supplier date remains work while an open balance exists", () => {
     const input = {
       ...base,
-      supplierDate: "2026-08-27",
+      supplierDeliveryDate: "2026-08-27",
       sends: [
         {
           kind: "confirmed_sent" as const,
@@ -98,8 +113,31 @@ describe("Purchase Order Register authority", () => {
 
     expect(facts.filters).toContain("supplier_date_passed");
     expect(purchaseOrderWork(input, facts)).toEqual({
-      problem: "The supplier date has passed and 3 are still open",
-      action: "Ask Hooka when the goods will arrive",
+      kind: "supplier_date_passed",
+      problem: "The supplier delivery date has passed and 3 are still due",
+      action: "Ask when the goods will arrive",
+      dueOn: "2026-08-27",
+    });
+  });
+
+  it("gives missing supplier-date work a governed Mon–Fri due date without a supplier name", () => {
+    const input = {
+      ...base,
+      placedAt: "2026-08-28T08:00:00Z", // Friday
+      sends: [{
+        kind: "confirmed_sent" as const,
+        channel: "email",
+        sentAt: "2026-08-28T09:00:00Z",
+        poVersion: 1,
+      }],
+    };
+    const facts = purchaseOrderRegisterFacts(input, "2026-08-28");
+
+    expect(purchaseOrderWork(input, facts)).toEqual({
+      kind: "supplier_date",
+      problem: "The supplier delivery date is missing",
+      action: "Ask for the delivery date",
+      dueOn: "2026-08-31",
     });
   });
 
@@ -107,7 +145,7 @@ describe("Purchase Order Register authority", () => {
     const completed = purchaseOrderRegisterFacts({
       ...base,
       status: "received",
-      lines: [{ qty: 3, receivedQty: 3 }],
+      lines: [{ qty: 3, receivedQty: 3, damagedQty: 0, wrongItemQty: 0 }],
     }, "2026-08-28");
     const cancelled = purchaseOrderRegisterFacts({ ...base, status: "cancelled" }, "2026-08-28");
 
@@ -115,6 +153,7 @@ describe("Purchase Order Register authority", () => {
     expect(completed.filters).toContain("completed");
     expect(purchaseOrderWork(base, completed)).toBeNull();
     expect(cancelled.operationStatus).toBe("Cancelled");
+    expect(cancelled.filters).toContain("cancelled");
     expect(purchaseOrderWork(base, cancelled)).toBeNull();
   });
 });

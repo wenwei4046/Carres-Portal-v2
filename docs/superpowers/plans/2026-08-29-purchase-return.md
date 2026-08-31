@@ -110,4 +110,3 @@ export type PurchaseReturnStatus =
 - [ ] Verify `rg -n "Purchase Returns" apps/web/src/pages/portal` shows an active route and no `soon: true` entry.
 - [ ] Verify no Stock mutation exists in issue or collection-promise handlers.
 - [ ] Commit verification corrections with `git commit -m "test(purchasing): verify purchase return custody"`.
-

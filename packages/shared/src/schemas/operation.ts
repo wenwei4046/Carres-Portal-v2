@@ -73,6 +73,47 @@ export const recordTomorrowDeliveryInput = z.discriminatedUnion('answer', [
 export type RecordTomorrowDeliveryInput = z.infer<typeof recordTomorrowDeliveryInput>;
 
 /**
+ * The governed supplier answer on the Purchase Order object. The official PO
+ * date and the supplier's answer remain separate, and the answer is incomplete
+ * without its channel, evidence, reporter and the supplier's own answer time.
+ */
+export const recordSupplierAnswerInput = z.object({
+  answer: z.enum(["same_as_po", "changed_date"]),
+  poDeliveryDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  supplierDeliveryDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  channel: z.enum(["whatsapp", "email", "phone", "in_person"]),
+  evidencePath: z.string().trim().min(1).max(500).optional(),
+  evidenceNote: z.string().trim().min(1).max(1000).optional(),
+  supplierAnsweredAt: z.string().datetime({ offset: true }),
+  reportedByUserId: z.string().uuid(),
+  reason: z.string().trim().min(1).max(300).optional(),
+  remarks: z.string().trim().max(500).optional(),
+}).strict().superRefine((value, context) => {
+  if (value.answer === "same_as_po" && value.supplierDeliveryDate !== value.poDeliveryDate) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["supplierDeliveryDate"], message: "Same as PO must match the PO Delivery Date" });
+  }
+  if (value.answer === "changed_date" && value.supplierDeliveryDate === value.poDeliveryDate) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["supplierDeliveryDate"], message: "Changed date must differ from the PO Delivery Date" });
+  }
+  if (value.answer === "changed_date" && !value.reason) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["reason"], message: "Reason is required" });
+  }
+  if ((value.channel === "whatsapp" || value.channel === "email") && !value.evidencePath) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["evidencePath"], message: "Screenshot or file evidence is required" });
+  }
+  if ((value.channel === "phone" || value.channel === "in_person") && !value.evidenceNote) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["evidenceNote"], message: "A structured note is required" });
+  }
+});
+export type RecordSupplierAnswerInput = z.infer<typeof recordSupplierAnswerInput>;
+
+export const signPoEvidenceUploadInput = z.object({
+  mimeType: z.enum(["image/png", "image/jpeg", "image/webp", "application/pdf"]),
+  sizeBytes: z.number().int().positive().max(10 * 1024 * 1024),
+}).strict();
+export type SignPoEvidenceUploadInput = z.infer<typeof signPoEvidenceUploadInput>;
+
+/**
  * Q5 · `recordReadyDateInput` — POST /api/operation/pos/:id/ready-date.
  * Maps to `purchasing_record_ready_date(p_po_id, p_new_date, p_reason)`
  * (migration **0318**, applied 2026-08-03).
@@ -148,6 +189,7 @@ export type ConfirmPoSentInput = z.infer<typeof confirmPoSentInput>;
  */
 export const revisePoInput = z.object({
   reason: z.string().min(1).max(300),
+  poDeliveryDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
   lines: z.array(
     z.object({
       lineId: z.string().uuid(),

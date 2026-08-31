@@ -2643,7 +2643,11 @@ function ReviseForm({
     if (gap != null || save.isPending) return;
     setErr(null);
     save.mutate(
-      { reason: reason.trim(), lines: changes },
+      {
+        reason: reason.trim(),
+        poDeliveryDate: po.po_delivery_date ?? null,
+        lines: changes,
+      },
       {
         onSuccess: onClose,
         onError: (e) => setErr(e instanceof Error ? e.message : String(e)),
