@@ -20,6 +20,14 @@
 
 ---
 
+> **ERP PAGE-CONTROL AUDIT — OWNER-APPROVED 2026-08-31.** The repository/production/task/PR
+> evidence, current-state page matrix, drift register, ownership map and supersession record live in
+> [`PAGE-CONTROL-AUDIT.md`](PAGE-CONTROL-AUDIT.md). That file remains subordinate evidence; the
+> accepted global page law lives in this MASTER, including §1.3 below. A chat or open PR never
+> overrides either current authority or verified main/production truth.
+
+---
+
 # §1 · Overview
 
 ### MISSION
@@ -229,6 +237,71 @@ Only after this gate does the chat present the complete Blueprint and ask Jess f
 genuine owner decision or correction. Approved complete truth is persisted immediately under the
 Constitution's Plan Decision Persistence law. Continuous production-build governance remains §1.1
 and is not part of this Plan gate.
+
+## §1.3 · ERP MASTER PAGE CONTROL LAW — OWNER-APPROVED / LOCKED 2026-08-31
+
+Every ERP destination and governed object is controlled by one auditable page model. A page is not
+aligned merely because it looks similar to another page or because a task says `Implemented`.
+Alignment requires current authority, current main, the relevant writer and permissions, tests,
+exact deploy SHA and real-role production evidence to agree.
+
+**EVERY PAGE ANSWERS THE SAME SEVEN QUESTIONS:** who acts · which working day/calendar applies ·
+where the act happens · what evidence proves completion · how My Work/Team Work supervises it ·
+what downstream fact changes · which one API/database writer owns that truth. A missing answer is a
+design gap, even when the page already exists.
+
+**EVERY PAGE DECLARES ONE PRIMARY PATTERN:** Dashboard/Projection · Work · Register · Object Detail ·
+Workspace · Settings · Report · Document. The pattern names the page's operator purpose; a module
+may not invent a new page grammar to preserve an old implementation. Approved business capability
+is kept while presentation is migrated into the current pattern.
+
+**ONE GLOBAL ANATOMY:** portal navigation → one 50px Destination Header → optional one-row Work
+Toolbar → optional 240px business filter rail → governed page surface → 32px Register footer where
+applicable. Pages do not redraw global chrome, repeat their destination title, place KPI bands above
+a Register, or create local copies of Settings, My Work or Team Work.
+
+**REGISTER CONTROL:** the rail carries factual business groups/filters only. Counts predict the
+filtered records and name records versus quantities when both matter. Selection replaces the same
+toolbar row; the operational primary action stays above the listing and output actions remain
+separate. The listing has no enclosing outer frame while header, row, column and footer dividers
+remain visible. The complete density, rail, toolbar and responsive laws remain §6.5–§6.7.
+
+**OBJECT / DOCUMENT CONTROL:** identity, current truth and the primary operational action are visible
+at the top. Use 50% facts/edit + 50% official-document preview only when staff must compare or revise
+a governed document; a physical count/review workspace remains full-width. Preview, Print and
+Download never become a second editor or replace the operational action. Related objects deep-link
+their one owner instead of admitting a duplicate form. §4.1 owns the detailed surface contract.
+
+**WORK / OWNER CONTROL:** My Work and Team Work are the only complete work queues. A module may show
+the current fact and exact action for its object, but not a local work queue. Normal duty owner,
+dated cover, actual actor and object PIC/case owner remain separate structured facts. Owner identity
+uses the governed avatar chip; it is not written into the action sentence. A superuser act preserves
+the actual actor and normal duty/cover context. §5 and `ACTION-FLOW-STANDARD.md` own the detailed
+contract.
+
+**SETTINGS / WRITER CONTROL:** expandable people, calendar, supplier, site, location, `Deliver To`,
+reason and permission facts come from governed Settings/People/Catalog owners. Runtime pages never
+hardcode sample staff, suppliers, locations, orders or sites. Browser, API, database/RLS and the one
+SQL writer must agree; a browser-only permission or second writer is prohibited.
+
+**RESPONSIVE / ACCESSIBILITY CONTROL:** at narrower desktop widths global navigation collapses and
+the local rail hides through `Show filters`; the governed Register may scroll horizontally rather
+than erase required facts, and its primary action remains in the top toolbar. Small-screen Object
+Detail stacks facts before preview and a multi-pane Workspace exposes one primary pane at a time.
+Every control is keyboard reachable with visible focus; colour is not the only state signal; no fact
+or action exists only on hover. A page cannot claim responsive acceptance without a real production
+walk below 1280px as well as automated width tests.
+
+**CURRENT-STATE CLASSIFICATION IS MANDATORY:** `PRODUCTION LIVE` · `OPEN PR ONLY` · `APPROVED
+BLUEPRINT ONLY` · `MISSING` · `CONTRADICTORY` · `BROKEN`. Chats, Cards and specs are evidence/history;
+they never promote a page between classes. The audit ledger records the 2026-08-31 baseline and is
+updated when a correction changes live truth, ownership or supersession.
+
+**BUILD ACCEPTANCE:** authority/writer map · route and navigation · pattern anatomy · Shell · copy ·
+permission parity · governed runtime data · interaction/accessibility states · desktop and genuine
+sub-1280 production walks · focused/full tests · typecheck · design/copy/migration guards · merged
+commit ancestry · exact deploy SHA. No `all pages aligned` claim is valid while any applicable gate
+is missing.
 
 ### MISSION / CARD / CHAT BOUNDARIES — APPROVED / LOCKED (Jess, 2026-08-12)
 
