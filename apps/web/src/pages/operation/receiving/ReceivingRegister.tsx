@@ -11,7 +11,7 @@ import { fmtDateShort } from "@/lib/fmt-date";
 const ACTION =
   "inline-flex h-7 items-center rounded-control bg-kit-blue-9 px-3 text-meta font-semibold text-white hover:opacity-90";
 const DOCUMENT_ACTION =
-  "font-mono font-semibold text-kit-blue-11 underline decoration-kit-blue-6 underline-offset-2 hover:text-kit-blue-12";
+  "font-mono font-semibold text-kit-blue-11 underline-offset-2 hover:underline";
 
 function displayDate(value: string | null): string {
   return value ? fmtDateShort(value.slice(0, 10)) : "—";
@@ -37,7 +37,7 @@ function ChildRows({
       <table className="min-w-[1500px] w-full border-collapse text-body">
         <tbody>
           {parent.children.map((child) => (
-            <tr key={child.id} className="bg-kit-slate-2 [&>td]:border-r [&>td]:border-kit-slate-5 [&>td]:px-2 [&>td]:py-2 last:[&>td]:border-r-0">
+            <tr key={child.id} className="bg-kit-slate-3 [&>td]:border-r [&>td]:border-kit-slate-5 [&>td]:px-2 [&>td]:py-2 last:[&>td]:border-r-0">
               <td className="w-[160px]">
                 <button
                   type="button"

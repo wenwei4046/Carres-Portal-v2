@@ -199,7 +199,7 @@ describe("R8 · the Purchasing lane speaks the dictionary", () => {
     expect(src).not.toMatch(/shrink-0 px-6 pt-3 text-\[13px\]/);
   });
 
-  it("names the supplier facet the SAME way on every Purchasing tab that has one", () => {
+  it("names the supplier business fact the SAME way on every Purchasing surface", () => {
     // COPY-STANDARD's facet-heading table lists `Supplier` and no `Factory`.
     // `Factory` is banned on the whole lane; the positive half only binds the
     // tabs that carry a facet rail (To Order stopped having one 2026-07-30).
@@ -216,13 +216,17 @@ describe("R8 · the Purchasing lane speaks the dictionary", () => {
     expect(
       visibleSource("pages/operation/OperationSupplierClaims.tsx"),
     ).toMatch(/Supplier: /);
-    // Receiving names it as the RAIL GROUP's title instead — the Workspace
-    // template has a navigation rail, not filter chips, so the word moved but
-    // the law did not: it is `Supplier`, never `Factory`.
+    // Receiving's current page-control rail is a business-date filter. It must
+    // not grow a duplicate Supplier rail merely to satisfy a historical source
+    // scan; the Register keeps the governed business fact as `Supplier`.
     expect(
-      visibleSource("pages/operation/OperationReceiving.tsx"),
-      "Receiving must still call the facet Supplier",
-    ).toMatch(/RailGroup title="Supplier"/);
+      visibleSource("pages/operation/receiving/ReceivingDateRail.tsx"),
+      "Receiving must name its current business filter",
+    ).toMatch(/FilterRailGroup title="RECEIVING DATE"/);
+    expect(
+      visibleSource("pages/operation/receiving/ReceivingRegister.tsx"),
+      "Receiving must still call the business fact Supplier",
+    ).toMatch(/label: "Supplier"/);
   });
 });
 

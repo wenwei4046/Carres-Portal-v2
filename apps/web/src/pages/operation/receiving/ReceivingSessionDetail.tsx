@@ -220,7 +220,7 @@ export default function ReceivingSessionDetail({
 
       <label className="mt-3 block text-body"><span className="text-kit-slate-9">Note</span><textarea value={note} onChange={(e) => { setNote(e.target.value); setDirty(true); }} className="mt-1 min-h-16 w-full rounded-control border border-kit-slate-5 px-2 py-1" /></label>
 
-      {problem ? <div className="mt-3 border-l-2 border-kit-amber-9 pl-3 text-body"><p className="font-medium text-kit-slate-12">{problem.fact}</p><p className="text-kit-slate-9">{problem.action}</p></div> : null}
+      {problem ? <div className="mt-3 border-l-2 border-kit-amber-11 pl-3 text-body"><p className="font-medium text-kit-slate-12">{problem.fact}</p><p className="text-kit-slate-9">{problem.action}</p></div> : null}
       {(save.error || submit.error || review.error || sendBack.error) ? <p className="mt-3 text-body text-kit-red-11">{(save.error ?? submit.error ?? review.error ?? sendBack.error)?.message}</p> : null}
 
       <section className="mt-5 border-t border-kit-slate-5 pt-3">
