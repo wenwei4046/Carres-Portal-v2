@@ -597,6 +597,32 @@ describe("the rail — Card 02-A wording, Card 02-B counting", () => {
     expect(screen.getByTestId("so-batch-row-o5")).toBeInTheDocument();
   });
 
+  it("keeps a not-yet-ordered Register line in `All not ordered` when no issue leaf exists", () => {
+    const uncovered = orderRow({
+      orderId: "open-po-pool-mismatch",
+      so: 1297,
+      lines: [
+        {
+          orderLineId: "uncovered-line",
+          sku: "5539-1A(LHF)",
+          qty: 1,
+          stockTaken: 0,
+          item: "Booqit",
+          variant: null,
+          category: "sofa",
+          pos: [],
+        },
+      ],
+      outstandingSuppliers: ["Ohana"],
+    });
+    renderRegister({ rows: [], registerRows: [uncovered] });
+
+    const all = screen.getByTestId("so-batch-all-not-ordered");
+    expect(all.textContent).toContain("1");
+    fireEvent.click(all);
+    expect(screen.getByTestId("so-batch-row-open-po-pool-mismatch")).toBeInTheDocument();
+  });
+
   it("timing facets count unique Sales Orders and filter the parent rows", () => {
     renderRegister();
     /* o1 · o3 · o8 are `can_order_early` — three ORDERS, not four leafs. */

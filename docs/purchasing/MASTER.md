@@ -732,6 +732,11 @@ SETUP TO FIX              ← the whole section renders only when at least one a
   the five timing rows, the three product rows and the setup row) print
   their live count, zero included. A supplier or region appears only while it has a matching SO
   under the other active filters — except the currently selected row, which stays visible with `0`.
+- **`All not ordered` reads the permanent Register's exact coverage facts** — for each SO line,
+  customer quantity less Ready Stock already taken and less non-cancelled PO lineage. A generic
+  Open PO SKU pool may prevent the same units being issued twice today, but it does not make that
+  Sales Order ordered and must not remove it from this count without exact `po_line_sources`
+  evidence. The issue leaf is an action contract, never the count authority.
 - **Product comes from the authoritative Catalog category** — never SKU text, model name,
   description, supplier, or a browser-only mapping. A multi-category Sales Order counts once
   under every matching category and still appears once in the Register. Records outside the
