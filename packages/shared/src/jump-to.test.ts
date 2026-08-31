@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  grnDateFromQuery,
+  grnSearchTerm,
   numericPrefixRanges,
   parseJumpQuery,
   rankJumpDocuments,
@@ -76,16 +76,15 @@ describe("numericPrefixRanges", () => {
   });
 });
 
-describe("grnDateFromQuery", () => {
-  it("reads the document date back out of the number", () => {
-    expect(grnDateFromQuery("020826-4417")).toBe("2026-08-02");
-    expect(grnDateFromQuery("-020826")).toBe("2026-08-02");
+describe("grnSearchTerm", () => {
+  it("normalises exact and partial stored GRN identity without deriving a date", () => {
+    expect(grnSearchTerm("GRN-20260831-0042")).toBe("GRN-20260831-0042");
+    expect(grnSearchTerm("20260831-00")).toBe("GRN-20260831-00");
   });
 
-  it("returns null until the date is complete or when it is impossible", () => {
-    expect(grnDateFromQuery("0208")).toBeNull();
-    expect(grnDateFromQuery("021326")).toBeNull(); // month 13
-    expect(grnDateFromQuery("003826")).toBeNull(); // day 0
+  it("refuses characters that cannot belong to the stored number", () => {
+    expect(grnSearchTerm("2026/08/31")).toBeNull();
+    expect(grnSearchTerm("GRN-%")).toBeNull();
   });
 });
 

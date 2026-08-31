@@ -65,7 +65,189 @@ export type WarehouseReceiptStatus =
   | "submitted"
   | "returned"
   | "posted"
+  | "amended"
   | "voided";
+
+export type ReceivingSourceKind = "purchase_order" | "consignment_order";
+
+export interface ReceivingLineInput {
+  poLineId: string;
+  sku: string;
+  receivedQty: number;
+  damagedQty: number;
+  wrongItemQty: number;
+  extraQty: number;
+  unitIds: readonly string[];
+  damagedPhotos: readonly string[];
+  wrongItemPhotos: readonly string[];
+  extraEvidence: readonly string[];
+  wrongItemReason: string | null;
+}
+
+export interface ReceivingSessionInput {
+  sourceKind: ReceivingSourceKind;
+  sourceId: string;
+  expectedVersion: number;
+  supplierDoNo: string;
+  signedDoPath: string;
+  goodsReceivedAt: string;
+  note: string | null;
+  lines: readonly ReceivingLineInput[];
+}
+
+export interface ReceivingQuantities {
+  orderQty: number;
+  receivedQty: number;
+  damagedQty: number;
+  wrongItemQty: number;
+  extraQty: number;
+  pendingDeliveryQty: number;
+}
+
+export function receivingQuantities(input: Omit<ReceivingQuantities, "pendingDeliveryQty">): ReceivingQuantities {
+  return {
+    ...input,
+    pendingDeliveryQty: Math.max(0, input.orderQty - input.receivedQty),
+  };
+}
+
+export type ReceivingUnitIdProblem =
+  | "duplicate_unit_id"
+  | "unit_id_missing"
+  | "unit_id_wrong_source"
+  | "unit_id_unexpected";
+
+export type ReceivingUnitOutcome = "received" | "damaged" | "wrong_item" | "extra";
+
+export function receivingUnitOutcomes(
+  line: Pick<
+    ReceivingLineInput,
+    "receivedQty" | "damagedQty" | "wrongItemQty" | "extraQty" | "unitIds"
+  >,
+): Array<{ unitId: string; outcome: ReceivingUnitOutcome }> {
+  const outcomes: ReceivingUnitOutcome[] = [
+    ...Array(Math.max(0, line.receivedQty)).fill("received" as const),
+    ...Array(Math.max(0, line.damagedQty)).fill("damaged" as const),
+    ...Array(Math.max(0, line.wrongItemQty)).fill("wrong_item" as const),
+    ...Array(Math.max(0, line.extraQty)).fill("extra" as const),
+  ];
+  return line.unitIds.map((unitId, index) => ({
+    unitId,
+    outcome: outcomes[index] ?? "extra",
+  }));
+}
+
+export function receivingUnitIdProblems(
+  line: Pick<
+    ReceivingLineInput,
+    "receivedQty" | "damagedQty" | "wrongItemQty" | "extraQty" | "unitIds"
+  >,
+  source: {
+    expectedUnitIds: readonly string[];
+    wrongSourceUnitIds: readonly string[];
+  },
+): ReceivingUnitIdProblem[] {
+  const problems: ReceivingUnitIdProblem[] = [];
+  const ids = line.unitIds.map((id) => id.trim()).filter(Boolean);
+  const physicalQty =
+    line.receivedQty + line.damagedQty + line.wrongItemQty + line.extraQty;
+  if (new Set(ids).size !== ids.length) problems.push("duplicate_unit_id");
+  if (ids.length < physicalQty) problems.push("unit_id_missing");
+  const expected = new Set(source.expectedUnitIds);
+  const wrongSource = new Set(source.wrongSourceUnitIds);
+  if (ids.some((id) => wrongSource.has(id))) problems.push("unit_id_wrong_source");
+  if (ids.some((id) => !expected.has(id) && !wrongSource.has(id))) {
+    problems.push("unit_id_unexpected");
+  }
+  return problems;
+}
+
+export type ReceivingProblemKey =
+  | "supplier_do_missing"
+  | "signed_do_missing"
+  | "goods_received_at_missing"
+  | "unit_id_missing"
+  | "unit_id_wrong_source"
+  | "count_needs_changes"
+  | "damage_evidence_missing"
+  | "wrong_item_details_missing"
+  | "extra_goods_found";
+
+export function receivingProblemCopy(
+  key: ReceivingProblemKey,
+  context: { item?: string; document?: string; unitId?: string } = {},
+): { fact: string; action: string } {
+  const document = context.document ?? "Purchase Order";
+  const copies: Record<ReceivingProblemKey, { fact: string; action: string }> = {
+    supplier_do_missing: {
+      fact: "Supplier DO is missing",
+      action: "Add the Supplier DO before you finish receiving",
+    },
+    signed_do_missing: {
+      fact: "Signed DO photo is missing",
+      action: "Upload the signed DO photo",
+    },
+    goods_received_at_missing: {
+      fact: "Goods Received At is missing",
+      action: "Enter when the goods arrived",
+    },
+    unit_id_missing: {
+      fact: `Unit ID is missing for ${context.item ?? "this item"}`,
+      action: `Scan the Unit ID shown on the ${document}`,
+    },
+    unit_id_wrong_source: {
+      fact: `Unit ID ${context.unitId ?? "—"} is not on the ${document}`,
+      action: "Check the label and scan the correct Unit ID",
+    },
+    count_needs_changes: {
+      fact: "The count needs changes",
+      action: "Fix the named items and return the count to Carres",
+    },
+    damage_evidence_missing: {
+      fact: "Damage evidence is missing",
+      action: "Take photos and say what is damaged",
+    },
+    wrong_item_details_missing: {
+      fact: "Wrong item details are missing",
+      action: "Choose what is wrong and take photos",
+    },
+    extra_goods_found: {
+      fact: "Extra goods were found",
+      action: "Record the Unit IDs and keep them out of available stock",
+    },
+  };
+  return copies[key];
+}
+
+export type ReceivingSessionIdentityProblem =
+  | "grn_number_required"
+  | "grn_number_before_posting"
+  | "grn_number_invalid";
+
+export function formalGrnNumber(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const match = /^GRN-(\d{4})(\d{2})(\d{2})-(\d{4})$/.exec(value);
+  if (!match) return null;
+  const [, year, month, day] = match;
+  const iso = `${year}-${month}-${day}`;
+  const date = new Date(`${iso}T00:00:00Z`);
+  if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== iso) return null;
+  return value;
+}
+
+export function receivingSessionIdentityProblems(input: {
+  status: WarehouseReceiptStatus;
+  grnNumber: string | null;
+}): ReceivingSessionIdentityProblem[] {
+  const hasNumber = input.grnNumber !== null;
+  const isFormal = formalGrnNumber(input.grnNumber) !== null;
+  const isPostedHistory =
+    input.status === "posted" || input.status === "amended" || input.status === "voided";
+  if (!isPostedHistory && hasNumber) return ["grn_number_before_posting"];
+  if (isPostedHistory && !hasNumber) return ["grn_number_required"];
+  if (hasNumber && !isFormal) return ["grn_number_invalid"];
+  return [];
+}
 
 /** The words on screen. `Waiting Carres check` names WHO the receipt is waiting
  *  for — "Pending" would leave a warehouse clerk wondering whether they still
@@ -78,6 +260,7 @@ export const WAREHOUSE_RECEIPT_STATUS_LABEL: Record<
   submitted: "Waiting Carres check",
   returned: "Sent back to recount",
   posted: "Checked in by Carres",
+  amended: "Amended",
   voided: "Reversed",
 };
 
@@ -226,6 +409,27 @@ export interface WarehouseReceiptLine {
   wrong_item_photos?: unknown[];
 }
 
+/** Read-only bridge for receipts stored before the governed session contract. */
+export function historicalReceivingLineInput(line: WarehouseReceiptLine): ReceivingLineInput {
+  return {
+    poLineId: line.id,
+    sku: line.sku,
+    receivedQty: Math.max(0, num(line.received_now)),
+    damagedQty: Math.max(0, num(line.damaged_qty)),
+    wrongItemQty: Math.max(0, num(line.wrong_item_qty)),
+    extraQty: 0,
+    unitIds: [],
+    damagedPhotos: (line.damaged_photos ?? []).filter(
+      (value): value is string => typeof value === "string",
+    ),
+    wrongItemPhotos: (line.wrong_item_photos ?? []).filter(
+      (value): value is string => typeof value === "string",
+    ),
+    extraEvidence: [],
+    wrongItemReason: line.wrong_item_claim_type,
+  };
+}
+
 export interface WarehouseReceiptTotals {
   /** Good units this receipt claims. */
   received: number;
@@ -372,7 +576,7 @@ export interface WarehouseIncomingResponse {
  * name the piece of paper, the act, or neither — never both". The act stays
  * `Check in`; the queue that lists these is `Goods Received`.
  */
-export function receivingRecordNo(
+export function historicalReceivingRecordNo(
   r: { id: string; goods_received_at?: string; submitted_at?: string },
   revision = 0,
 ): string {
@@ -380,3 +584,6 @@ export function receivingRecordNo(
   if (!date) return "—";
   return docNumber({ prefix: "GRN", date, seed: r.id, revision });
 }
+
+/** @deprecated Historical pre-migration display only. New receiving code reads grn_number. */
+export const receivingRecordNo = historicalReceivingRecordNo;

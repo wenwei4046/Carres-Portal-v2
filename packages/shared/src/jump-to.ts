@@ -144,14 +144,17 @@ export function numericPrefixRanges(
  * number and ask the database for that day. Without this an exact GRN lookup
  * would depend on how far back the recent-records window happens to reach.
  */
-export function grnDateFromQuery(term: string): string | null {
-  const m = /^(\d{2})(\d{2})(\d{2})(?:\D|$)/.exec(term.replace(/^[\s-]+/, ""));
-  if (!m) return null;
-  const [, dd, mm, yy] = m;
-  const day = Number(dd);
-  const month = Number(mm);
-  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
-  return `20${yy}-${mm}-${dd}`;
+export function grnSearchTerm(term: string): string | null {
+  const value = term.trim().toUpperCase();
+  if (!/^(?:GRN[- ]?)?[0-9-]*$/.test(value)) return null;
+  const body = value.replace(/^GRN[- ]?/, "").replace(/^[- ]+/, "");
+  if (!body) return "GRN-";
+  return `GRN-${body}`;
+}
+
+/** @deprecated Stored GRN identity no longer derives a physical date. */
+export function grnDateFromQuery(_term: string): null {
+  return null;
 }
 
 /**

@@ -1,6 +1,13 @@
 import { describe, it, expect } from "vitest";
 import {
-  receivingRecordNo,
+  formalGrnNumber,
+  historicalReceivingRecordNo,
+  historicalReceivingLineInput,
+  receivingQuantities,
+  receivingProblemCopy,
+  receivingSessionIdentityProblems,
+  receivingUnitIdProblems,
+  receivingUnitOutcomes,
   countedOnLine,
   warehouseReceiptProblems,
   warehouseReceiptProblemText,
@@ -12,6 +19,7 @@ import {
   type WarehouseReceiptDraft,
   type WarehouseReceiptLineDraft,
 } from "./warehouse-receipt";
+import { receivingSessionInputSchema } from "./schemas/warehouse";
 
 /**
  * R6 — the gate the warehouse's Send button asks, and the ops queue's words.
@@ -292,30 +300,229 @@ describe("status words", () => {
   });
 });
 
-describe("receivingRecordNo — the Receiving Record's document number", () => {
+describe("formal GRN identity", () => {
   const R = { id: "5b34f513-58c3-4913-9198-d513f17a6ceb", goods_received_at: "2026-08-02" };
 
-  it("prints PREFIX-DDMMYY-NNNN off the BUSINESS date", () => {
-    expect(receivingRecordNo(R)).toMatch(/^GRN-020826-\d{4}$/);
+  it("keeps draft and submitted sessions unnumbered", () => {
+    expect(receivingSessionIdentityProblems({ status: "draft", grnNumber: null })).toEqual([]);
+    expect(receivingSessionIdentityProblems({ status: "submitted", grnNumber: null })).toEqual([]);
   });
 
-  it("is stable — a reprint matches the original", () => {
-    expect(receivingRecordNo(R)).toBe(receivingRecordNo(R));
+  it("requires a stored number after posting", () => {
+    expect(receivingSessionIdentityProblems({ status: "posted", grnNumber: null })).toEqual([
+      "grn_number_required",
+    ]);
+    expect(
+      receivingSessionIdentityProblems({
+        status: "posted",
+        grnNumber: "GRN-20260831-0042",
+      }),
+    ).toEqual([]);
+    expect(
+      receivingSessionIdentityProblems({
+        status: "amended",
+        grnNumber: "GRN-20260831-0042",
+      }),
+    ).toEqual([]);
   });
 
-  it("carries no counter — two records on one day differ by their own id", () => {
-    const other = { ...R, id: "11111111-1111-4111-8111-111111111111" };
-    expect(receivingRecordNo(other)).not.toBe(receivingRecordNo(R));
-    // Same day, so the date half is shared and only the hashed tail moves:
-    // volume stays private (a counter would tell a supplier how many
-    // deliveries we take in a month).
-    expect(receivingRecordNo(other).slice(0, 11)).toBe(receivingRecordNo(R).slice(0, 11));
+  it("accepts only a real GRN-YYYYMMDD-RRRR document number", () => {
+    expect(formalGrnNumber("GRN-20260831-0042")).toBe("GRN-20260831-0042");
+    expect(formalGrnNumber("grn-20260831-0042")).toBeNull();
+    expect(formalGrnNumber("GRN-310826-0042")).toBeNull();
+    expect(formalGrnNumber("GRN-20260230-0042")).toBeNull();
+    expect(formalGrnNumber("GRN-20260831-42")).toBeNull();
   });
 
-  it("falls back to the submitted stamp, and says nothing when it has no date", () => {
-    expect(receivingRecordNo({ id: R.id, submitted_at: "2026-07-31T10:00:00Z" })).toMatch(
+  it("labels the old derived number as historical fallback only", () => {
+    expect(historicalReceivingRecordNo({ id: R.id, submitted_at: "2026-07-31T10:00:00Z" })).toMatch(
       /^GRN-310726-\d{4}$/,
     );
-    expect(receivingRecordNo({ id: R.id })).toBe("—");
+    expect(historicalReceivingRecordNo({ id: R.id })).toBe("—");
+  });
+});
+
+describe("Receiving quantities", () => {
+  it.each([
+    {
+      name: "full",
+      input: { orderQty: 5, receivedQty: 5, damagedQty: 0, wrongItemQty: 0, extraQty: 0 },
+      pending: 0,
+    },
+    {
+      name: "partial",
+      input: { orderQty: 5, receivedQty: 2, damagedQty: 0, wrongItemQty: 0, extraQty: 0 },
+      pending: 3,
+    },
+    {
+      name: "damaged does not reduce pending",
+      input: { orderQty: 5, receivedQty: 2, damagedQty: 3, wrongItemQty: 0, extraQty: 0 },
+      pending: 3,
+    },
+    {
+      name: "wrong item does not reduce pending",
+      input: { orderQty: 5, receivedQty: 2, damagedQty: 0, wrongItemQty: 3, extraQty: 0 },
+      pending: 3,
+    },
+    {
+      name: "extra does not reduce pending",
+      input: { orderQty: 5, receivedQty: 2, damagedQty: 0, wrongItemQty: 0, extraQty: 4 },
+      pending: 3,
+    },
+    {
+      name: "zero count",
+      input: { orderQty: 5, receivedQty: 0, damagedQty: 0, wrongItemQty: 0, extraQty: 0 },
+      pending: 5,
+    },
+  ])("keeps the source balance honest for $name", ({ input, pending }) => {
+    expect(receivingQuantities(input)).toEqual({ ...input, pendingDeliveryQty: pending });
+  });
+});
+
+describe("Receiving Unit IDs", () => {
+  const base = {
+    receivedQty: 2,
+    damagedQty: 0,
+    wrongItemQty: 0,
+    extraQty: 0,
+    unitIds: ["PO-1-001", "PO-1-002"],
+  } as const;
+
+  it("accepts the exact governed source Units", () => {
+    expect(
+      receivingUnitIdProblems(base, {
+        expectedUnitIds: ["PO-1-001", "PO-1-002"],
+        wrongSourceUnitIds: [],
+      }),
+    ).toEqual([]);
+  });
+
+  it("names duplicate, missing, wrong-source and unexpected IDs separately", () => {
+    expect(
+      receivingUnitIdProblems({ ...base, unitIds: ["PO-1-001", "PO-1-001"] }, {
+        expectedUnitIds: ["PO-1-001", "PO-1-002"],
+        wrongSourceUnitIds: [],
+      }),
+    ).toContain("duplicate_unit_id");
+    expect(
+      receivingUnitIdProblems({ ...base, unitIds: ["PO-1-001"] }, {
+        expectedUnitIds: ["PO-1-001", "PO-1-002"],
+        wrongSourceUnitIds: [],
+      }),
+    ).toContain("unit_id_missing");
+    expect(
+      receivingUnitIdProblems({ ...base, unitIds: ["PO-1-001", "PO-2-001"] }, {
+        expectedUnitIds: ["PO-1-001", "PO-1-002"],
+        wrongSourceUnitIds: ["PO-2-001"],
+      }),
+    ).toContain("unit_id_wrong_source");
+    expect(
+      receivingUnitIdProblems({ ...base, unitIds: ["PO-1-001", "UNKNOWN"] }, {
+        expectedUnitIds: ["PO-1-001", "PO-1-002"],
+        wrongSourceUnitIds: [],
+      }),
+    ).toContain("unit_id_unexpected");
+  });
+
+  it("binds each scanned ID to one explicit quantity outcome", () => {
+    expect(
+      receivingUnitOutcomes({
+        receivedQty: 1,
+        damagedQty: 1,
+        wrongItemQty: 1,
+        extraQty: 1,
+        unitIds: ["GOOD-1", "DAMAGED-1", "WRONG-1", "EXTRA-1"],
+      }),
+    ).toEqual([
+      { unitId: "GOOD-1", outcome: "received" },
+      { unitId: "DAMAGED-1", outcome: "damaged" },
+      { unitId: "WRONG-1", outcome: "wrong_item" },
+      { unitId: "EXTRA-1", outcome: "extra" },
+    ]);
+  });
+});
+
+describe("Receiving problem copy", () => {
+  it("keeps the fact and next action as separate fields", () => {
+    expect(receivingProblemCopy("supplier_do_missing")).toEqual({
+      fact: "Supplier DO is missing",
+      action: "Add the Supplier DO before you finish receiving",
+    });
+    expect(receivingProblemCopy("signed_do_missing")).toEqual({
+      fact: "Signed DO photo is missing",
+      action: "Upload the signed DO photo",
+    });
+  });
+
+  it("names the exact item when a Unit ID is missing", () => {
+    expect(receivingProblemCopy("unit_id_missing", { item: "MS01 King" })).toEqual({
+      fact: "Unit ID is missing for MS01 King",
+      action: "Scan the Unit ID shown on the Purchase Order",
+    });
+  });
+});
+
+describe("Receiving session wire contract", () => {
+  const input = {
+    sourceKind: "purchase_order",
+    sourceId: "PO-2053",
+    expectedVersion: 2,
+    supplierDoNo: "DO-8891",
+    signedDoPath: "PO-2053/do.jpg",
+    goodsReceivedAt: "2026-08-31T02:15:00.000Z",
+    note: null,
+    lines: [
+      {
+        poLineId: "11111111-1111-1111-1111-111111111111",
+        sku: "MS01-K",
+        receivedQty: 1,
+        damagedQty: 0,
+        wrongItemQty: 0,
+        extraQty: 0,
+        unitIds: ["PO-2053-001"],
+        damagedPhotos: [],
+        wrongItemPhotos: [],
+        extraEvidence: [],
+        wrongItemReason: null,
+      },
+    ],
+  } as const;
+
+  it("accepts the governed save/submit shape", () => {
+    expect(receivingSessionInputSchema.parse(input)).toEqual(input);
+  });
+
+  it("refuses the historical receivedNow spelling at the new door", () => {
+    expect(
+      receivingSessionInputSchema.safeParse({
+        ...input,
+        lines: [{ ...input.lines[0], receivedQty: undefined, receivedNow: 1 }],
+      }).success,
+    ).toBe(false);
+  });
+
+  it("maps a historical stored line read-only without allocating Unit IDs", () => {
+    expect(
+      historicalReceivingLineInput({
+        id: "11111111-1111-1111-1111-111111111111",
+        sku: "MS01-K",
+        received_now: 2,
+        damaged_qty: 1,
+        wrong_item_qty: 0,
+        wrong_item_claim_type: null,
+      }),
+    ).toEqual({
+      poLineId: "11111111-1111-1111-1111-111111111111",
+      sku: "MS01-K",
+      receivedQty: 2,
+      damagedQty: 1,
+      wrongItemQty: 0,
+      extraQty: 0,
+      unitIds: [],
+      damagedPhotos: [],
+      wrongItemPhotos: [],
+      extraEvidence: [],
+      wrongItemReason: null,
+    });
   });
 });

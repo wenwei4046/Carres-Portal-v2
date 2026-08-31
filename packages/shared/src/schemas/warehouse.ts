@@ -19,6 +19,41 @@ import { z } from "zod";
  *  write an unbounded jsonb array of photo paths. */
 const CLAIM_PHOTO_PATHS = z.array(z.string().min(1).max(400)).max(12);
 
+const RECEIVING_EVIDENCE_PATHS = z.array(z.string().trim().min(1).max(500)).max(24);
+
+export const receivingSessionInputSchema = z
+  .object({
+    sourceKind: z.enum(["purchase_order", "consignment_order"]),
+    sourceId: z.string().trim().min(1).max(100),
+    expectedVersion: z.number().int().positive(),
+    supplierDoNo: z.string().trim().min(3).max(64),
+    signedDoPath: z.string().trim().min(1).max(500),
+    goodsReceivedAt: z.string().datetime({ offset: true }),
+    note: z.string().trim().max(500).nullable(),
+    lines: z
+      .array(
+        z
+          .object({
+            poLineId: z.string().uuid(),
+            sku: z.string().trim().min(1).max(100),
+            receivedQty: z.number().int().nonnegative(),
+            damagedQty: z.number().int().nonnegative(),
+            wrongItemQty: z.number().int().nonnegative(),
+            extraQty: z.number().int().nonnegative(),
+            unitIds: z.array(z.string().trim().min(1).max(100)).max(500),
+            damagedPhotos: RECEIVING_EVIDENCE_PATHS,
+            wrongItemPhotos: RECEIVING_EVIDENCE_PATHS,
+            extraEvidence: RECEIVING_EVIDENCE_PATHS,
+            wrongItemReason: z.string().trim().min(1).max(500).nullable(),
+          })
+          .strict(),
+      )
+      .min(1),
+  })
+  .strict();
+
+export type ReceivingSessionPayload = z.infer<typeof receivingSessionInputSchema>;
+
 export const warehouseSubmitReceiptInput = z
   .object({
     poId: z.string().min(1).max(100),
