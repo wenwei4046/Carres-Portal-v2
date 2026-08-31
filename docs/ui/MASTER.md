@@ -20,6 +20,14 @@
 
 ---
 
+> **CURRENT PAGE-CONTROL REVIEW — PROPOSAL / NOT LAW (2026-08-31).** The repository/production/
+> task/PR audit and proposed Master Page Blueprint are recorded in
+> [`PAGE-CONTROL-AUDIT.md`](PAGE-CONTROL-AUDIT.md). It is subordinate to this MASTER and does not
+> override any current law until Owner review. No page Card may be derived from that proposal before
+> the Owner confirmation gate recorded there.
+
+---
+
 # §1 · Overview
 
 ### MISSION
