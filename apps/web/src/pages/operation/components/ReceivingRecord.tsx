@@ -1,4 +1,4 @@
-import { receivingRecordNo, type WarehouseReceiptRow } from "@carres/shared";
+import { type WarehouseReceiptRow } from "@carres/shared";
 import { fmtDateShort } from "@/lib/fmt-date";
 import { DOC_TH, DocSection, Prop } from "./workspace-doc";
 
@@ -24,9 +24,8 @@ import { DOC_TH, DocSection, Prop } from "./workspace-doc";
  *    here at all. `submitted` and `returned` are REVIEW states, which is
  *    exactly what she told this page not to carry.
  *
- * The document number is DERIVED (`receivingRecordNo`) — one shared function,
- * so the register's column and this pane cannot print two different numbers
- * for one delivery.
+ * The document number is the stored posting fact. An unmigrated row is named
+ * `Legacy receipt`; a date/id reconstruction must never impersonate a GRN.
  *
  * When Void lands in its own slice, a voided record must still appear here and
  * in the list — history never deletes — with a quiet marker beside the number.
@@ -52,7 +51,7 @@ export default function ReceivingRecord({ record }: { record: WarehouseReceiptRo
           className="text-page font-semibold font-mono text-kit-slate-12"
           data-testid="receiving-record-no"
         >
-          {receivingRecordNo(record)}
+          {record.grn_number ?? "Legacy receipt"}
         </span>
       </div>
 

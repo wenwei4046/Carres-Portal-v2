@@ -64,7 +64,6 @@ import {
   minDeliveryDateISO,
   orderMoney,
   parseEmergencyContact,
-  receivingRecordNo,
   resolveFormTab,
   resolveSalesOrderRoute,
   supplierClaimStatusLabel,
@@ -1640,11 +1639,7 @@ export default function SalesOrderWorkspace() {
       })),
       receivingRecords: facts.receiving.map((record) => ({
         id: record.id,
-        recordNo: receivingRecordNo({
-          id: record.id,
-          goods_received_at: record.goods_received_at ?? undefined,
-          submitted_at: record.submitted_at,
-        }),
+        recordNo: record.grn_number ?? "Legacy receipt",
         poId: record.po_id,
         receivedAt: record.goods_received_at,
       })),

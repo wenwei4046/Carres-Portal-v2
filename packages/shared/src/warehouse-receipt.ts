@@ -503,6 +503,8 @@ export interface WarehouseReceiptRow {
   /** The BUSINESS date: when the goods physically arrived. Friday's truck keyed
    *  in on Monday reads Received Friday, Submitted Monday — both true. */
   goods_received_at?: string;
+  /** Stored formal document identity. Missing only on an unmigrated legacy row. */
+  grn_number?: string | null;
   posted_at?: string | null;
   posted_by_name?: string | null;
   do_file_path?: string | null;

@@ -1545,7 +1545,7 @@ operationPosRouter.get("/:id/receiving", requireOperation, async (c) => {
   const { data: rows, error } = await sb
     .from("warehouse_receipts")
     .select(
-      "id, po_id, warehouse_id, do_number, do_file_path, note, lines, status, submitted_from, goods_received_at, submitted_by, submitted_at, posted_by, posted_at, return_reason",
+      "id, po_id, warehouse_id, do_number, do_file_path, note, lines, status, submitted_from, goods_received_at, grn_number, submitted_by, submitted_at, posted_by, posted_at, return_reason",
     )
     .eq("po_id", poId)
     .order("goods_received_at", { ascending: false })
