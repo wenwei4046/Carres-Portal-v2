@@ -637,7 +637,7 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     const business = headers.filter(Boolean);
     expect(business.map((h) => h.replace(/[AV]$/, "").trim())).toEqual([
       "SO No",
-      "Ordered",
+      "SO Date",
       "Requested Delivery Date",
       "Customer",
       "Delivery Location",

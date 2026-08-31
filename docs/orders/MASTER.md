@@ -192,8 +192,13 @@ No deposit · Online order
 The approved default columns remain:
 
 ```
-SO No | Ordered | Requested Delivery Date | Customer | Delivery Location | Showroom | PO No | DO No
+SO No | SO Date | Requested Delivery Date | Customer | Delivery Location | Showroom | PO No | DO No
 ```
+
+**Sales Order date vocabulary — Owner correction 2026-08-31.** `SO Date` is the date the Sales
+Order was created (`orders.placed_at`). It is one read-only fact and uses that exact label in the
+Register, Order info, Order Route and field catalogs. The bare word `Ordered` is not an SO date:
+Purchasing retains it only for an ordered state or quantity (`Ordered` · `Ordered Qty`).
 
 Search, filters, sorting, Columns and Export remain. Selection scopes output only. The Register
 contains no owner, avatar, next-action sentence, Priority or workflow button. A document number is
@@ -247,7 +252,7 @@ CUSTOMER                name · phone · email · demographics
   ├ Delivery address    the MY cascade · building type · billing
   └ Emergency contact   name · phone · relationship
 MONEY                   Total · paid · outstanding · Open Payments →
-ORDER INFO              Ordered · Requested Delivery Date · Proceed date · floor · stair carry · lift
+ORDER INFO              SO Date · Requested Delivery Date · Proceed date · floor · stair carry · lift
   ├ Sales ownership     Dealer · Showroom · Salesperson
   └ Amend delivery date the governed three fields · creates a Revision · needs approval
 GOODS                   the six-column truth
@@ -628,15 +633,15 @@ read only as implementation history.
 ## Register
 
 - The default business columns are exactly, in order:
-  `SO No | Ordered | Requested Delivery Date | Customer | Delivery Location | Showroom | PO No | DO No`
+  `SO No | SO Date | Requested Delivery Date | Customer | Delivery Location | Showroom | PO No | DO No`
   (re-ruled to EIGHT by the owner on 2026-08-15 — see REGISTER AND OBJECT COMPOSITION below).
   The small `▸` is UI chrome, not a business column. There is no invented overall `Current` or
   combined status column.
-- The page has a compact destination header/work toolbar, then a breathing gap, then one light,
-  clearly bordered Register. It is neither a borderless continuous slab nor a giant dashboard
-  card. KPI cards do not precede it. **Owner correction 2026-08-29:** all four outer edges,
-  including the left and right side frame, must be visible. The shared Register engine owns this
-  boundary; Sales Orders does not add or cancel it page-locally.
+- The page has a compact destination header/work toolbar, then breathing room, then one flat
+  Register. It is neither a giant dashboard card nor one box per row. **Owner correction
+  2026-08-31 overwrites the 2026-08-29 four-sided-frame record:** there is no rectangle enclosing
+  the toolbar + table + footer. The toolbar divider, table grid and footer divider remain visible;
+  the shared Register engine owns this rule and Sales Orders does not override it page-locally.
 - Default widths are governed and usable without staff resizing. Optional columns may widen the
   sheet and create horizontal scroll; default columns are never squeezed unnaturally to make an
   added column fit.
@@ -735,7 +740,7 @@ name: edges carry no route captions. Colour still belongs to STATE alone (blue C
 done · amber exception); routes are told apart by band and spacing, never by hue.
 
 **The Sales Order is the ONLY root**, and goods, delivery and money leave it simultaneously. The
-origin carries its number and labelled Ordered date as evidence but **no circular `Open SO-{n} →`
+origin carries its number and labelled SO Date as evidence but **no circular `Open SO-{n} →`
 door** back to the object already open.
 
 ### Node anatomy
@@ -1134,7 +1139,7 @@ query.**
 ### Register
 
 - **The default columns are exactly EIGHT**, in order:
-  `SO No | Ordered | Requested Delivery Date | Customer | Delivery Location | Showroom | PO No | DO No`.
+  `SO No | SO Date | Requested Delivery Date | Customer | Delivery Location | Showroom | PO No | DO No`.
   This overwrites the seven-column default in §0.1. `Showroom` READS the Sales-ownership fact the
   order already carries (`outlets.name`); it has been a declaration in the register's catalog since
   Stage 1 and is promoted, not invented. It is read-only and the register may never gain a writer
@@ -1323,7 +1328,7 @@ the amendment machinery, the goods truth and the Order Route architecture are un
   type and the operator's custom fields). `entry_fields` MERGES — a config field retired last month
   is not erased by an unrelated save.
 - **The write boundary is unchanged.** Goods, price and `Requested Delivery Date` are never a direct
-  write here; `Ordered` and `Requested Delivery Date` render as read-only facts. Attribution still moves
+  write here; `SO Date` and `Requested Delivery Date` render as read-only facts. Attribution still moves
   by request (0329). `Customer type (auto)` is derived from the same phone probe the POS runs and
   is read-only on both surfaces.
 
@@ -1466,7 +1471,7 @@ official Card numbers.
    `carres-pos` `db39d1c6`) and all four canonicals converged on that exact asset. Production Worker
    version `5c669747-8a6b-4998-9643-fcc39604c69d` serves the API change at 100%. Authenticated
    production verification on `erp.carresofficial.com/operation/orders` proved the exact default
-   order **SO No / Ordered / Requested Delivery Date / Customer / Delivery Location / PO No / DO No**,
+   order **SO No / SO Date / Requested Delivery Date / Customer / Delivery Location / PO No / DO No**,
    bounded bordered surface, preserved Search / typed filters / Columns / Export,
    inline goods-only grouped disclosure (SKU/model/size/quantity), direct SO document
    navigation, and the 2990-style right-click actions **View / Edit / Preview PDF / Print PDF / Copy

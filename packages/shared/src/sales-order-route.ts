@@ -293,7 +293,7 @@ export interface SalesOrderRouteInput {
     id: string;
     so: number;
     customerName: string | null;
-    /** `orders.placed_at` — printed as `Ordered:`. */
+    /** `orders.placed_at` — printed as `SO Date:`. */
     placedAt: string | null;
     /** The customer's promise — printed as `Customer requested:`. */
     deliveryDate: string | null;
@@ -1262,7 +1262,7 @@ export function resolveSalesOrderRoute(input: SalesOrderRouteInput): SalesOrderR
     kind: "sales-order",
     title: "SALES ORDER",
     complete: true,
-    lines: [soNumber, dated("Ordered", input.order.placedAt)],
+    lines: [soNumber, dated("SO Date", input.order.placedAt)],
     /* Order Route already sits inside this Sales Order object. A door back to
        the same object is circular navigation, not useful evidence (§0.1). */
     door: null,
