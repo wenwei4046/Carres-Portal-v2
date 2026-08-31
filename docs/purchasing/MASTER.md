@@ -672,11 +672,11 @@ Module Register rails remain factual filters and do not copy central Work action
 
 **Purpose / source:** system-generated uncovered SO lines only; no `+ New`.
 
-**Table listing frame — APPROVED / LOCKED, Owner correction 2026-08-29.** SO Batch inherits the
-shared Register Kit's complete light four-sided frame around its Work Toolbar, table and fixed status
-footer. It does not add a page-local second frame. This is not a card around the page and not a box
-around every row. Selecting a row replaces the Register's top Work Toolbar in the same fixed-height
-band with the summary, `Clear`, PO Duty chip and `Issue PO` on the left, and valid outputs such as
+**Table listing boundary — APPROVED / LOCKED, superseded by UI MASTER 2026-08-31.** SO Batch follows
+the shared Register Kit's no-outer-frame boundary: the Work Toolbar keeps its bottom divider, the
+table keeps its grid lines and the fixed status footer keeps its top divider. It does not add a
+page-local frame or a box around every row. Selecting a row replaces the Register's top Work Toolbar
+in the same fixed-height band with the summary, `Clear`, PO Duty chip and `Issue PO` on the left, and valid outputs such as
 `Export Excel` at the far right. The primary action is never placed in a second bar below the table
 or at the bottom of the viewport.
 

@@ -224,7 +224,8 @@ The complete release is not fixed until all of the following are true on the exa
 - Audit shows actual actor and normal duty/dated-cover context separately.
 - `AL Sungai Buloh` and `Ohana` are governed destination settings, and future locations use the same
   door.
-- SO Batch Purchase and Sales Orders show the shared four-sided Register frame.
+- SO Batch Purchase and Sales Orders follow the shared no-outer-frame Register boundary: toolbar
+  bottom divider, table grid lines and footer top divider remain.
 - Owner browser walk uses the real Operation account and real eligible records; screenshots and
   history/GRN evidence are retained.
 

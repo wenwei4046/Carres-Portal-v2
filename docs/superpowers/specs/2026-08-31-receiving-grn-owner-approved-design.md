@@ -69,6 +69,9 @@ The page header is 50px, toolbar 45px and `RECEIVING DATE` rail 240px. A row ins
 inline. Actual receiving work opens the full object workspace. At narrow width the same hierarchy
 stacks; it never becomes a different mobile information model.
 
+The full Register has no enclosing four-sided outer border. The toolbar bottom divider, table grid
+lines and footer top divider preserve the governed Register structure.
+
 ## 4 · Register and date rail
 
 The Register parent is one open PO/CO delivery balance. Each physical Receiving Session or posted
