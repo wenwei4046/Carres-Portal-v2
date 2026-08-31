@@ -25,6 +25,13 @@
     "pnpm": ">=9"
   },
   "packageManager": "pnpm@10.33.0",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "sharp",
+      "workerd"
+    ]
+  },
   "devDependencies": {
     "@playwright/test": "^1.48.2",
     "@supabase/supabase-js": "^2.105.4",
