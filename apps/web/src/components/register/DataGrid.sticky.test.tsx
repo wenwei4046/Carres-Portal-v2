@@ -56,8 +56,8 @@ function pinnedCells(): HTMLElement[] {
   );
 }
 
-describe("DataGrid · Register listing frame", () => {
-  it("paints a complete four-sided frame for every reference Register", () => {
+describe("DataGrid · Register listing structure", () => {
+  it("has no enclosing frame while keeping the toolbar, table grid and footer dividers", () => {
     render(
       <DataGrid<Row>
         rows={ROWS}
@@ -67,10 +67,19 @@ describe("DataGrid · Register listing frame", () => {
         appearance="reference"
       />,
     );
-    const frame = screen.getByTestId("sales-orders-grid");
-    // jsdom does not paint CSS Modules. The module class is the real visual
-    // boundary the component ships; removing it is the production regression.
-    expect(frame).toHaveClass(styles.rootFramed);
+    const register = screen.getByTestId("sales-orders-grid");
+    // A full reference Register has only the base engine + reference geometry.
+    // A third root class was the obsolete four-sided outer frame.
+    expect(register.className.trim().split(/\s+/)).toEqual([
+      styles.root,
+      styles.rootReference,
+    ]);
+
+    // Removing the outside rectangle must not flatten the listing itself.
+    expect(screen.getByTestId("work-toolbar")).toHaveClass(styles.toolbar);
+    expect(screen.getByRole("columnheader", { name: "SO No" })).toHaveClass(styles.th);
+    expect(screen.getByRole("cell", { name: "SO-1301" })).toHaveClass(styles.td);
+    expect(screen.getByTestId("grid-footer")).toHaveClass(styles.statusLine);
   });
 });
 

@@ -1594,9 +1594,13 @@ function DataGridInner<T>({
 
   return (
     <div
-      className={`${styles.root} ${embedded ? styles.rootEmbedded : styles.rootFramed} ${
-        isReference ? styles.rootReference : ""
-      }`}
+      className={[
+        styles.root,
+        embedded ? styles.rootEmbedded : null,
+        isReference ? styles.rootReference : null,
+      ]
+        .filter(Boolean)
+        .join(" ")}
       data-testid={isReference ? "sales-orders-grid" : undefined}
     >
       {/* Toolbar — search LEFT (REGISTER LAW 2: always left, compact ~200px;

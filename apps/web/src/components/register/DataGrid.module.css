@@ -37,10 +37,10 @@
   --radius-pill: 999px;
   --shadow-3: 0 8px 24px rgba(0, 0, 0, 0.16);
 
-  /* Owner correction 2026-08-29: a Register listing always carries one
-     complete structural frame. It is still a flat sheet, never a rounded
-     brochure card and never one box per row. Keeping the frame here makes
-     every current and future caller inherit all four sides from the engine. */
+  /* Owner correction 2026-08-31: the full Register has no enclosing border
+     around the Work Toolbar + table + status footer. Structure comes from
+     the toolbar divider, table cell grid and footer divider below — never a
+     second outside rectangle. */
   display: flex;
   flex-direction: column;
   background: var(--c-paper);
@@ -55,12 +55,6 @@
      calc(100vh − 150px) viewport math. */
   flex: 1 1 auto;
   min-height: 0;
-}
-
-/* One shared boundary for every full Register. Kept as a named engine class
-   so the guard test proves no page or future caller can silently omit it. */
-.rootFramed {
-  border: 1px solid var(--line);
 }
 
 /* Embedded (drill-down) mode — no card chrome. The grid sits inside a
@@ -96,9 +90,8 @@
 
    No px font-size literal lives in this scope: the sizes are the `.root`
    token aliases, never a token redefined to a different value. */
-/* Reference geometry inherits the engine's mandatory complete listing frame.
-   Do not cancel any edge: Sales Orders exposed the missing side frame that
-   led to the Owner's 2026-08-29 correction. */
+/* Reference geometry keeps the shared internal listing structure. It does not
+   add an enclosing border around the toolbar, table and footer. */
 .rootReference .toolbar {
   box-sizing: border-box;
   height: 45px;
