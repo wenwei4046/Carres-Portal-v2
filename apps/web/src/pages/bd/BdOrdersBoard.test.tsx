@@ -58,7 +58,16 @@ function order(over: Partial<Order> & { so: number; status: Order["status"] }): 
     doNote: null,
     invoiceNo: null,
     invoicedAt: null,
-    placedAt: new Date(NOW - 86_400_000).toISOString(),
+    /* THE CLOCK, NOT A DATE. The board shows the CURRENT month
+       (`inPeriod` = `sameMonth(o.placedAt, monthAnchor)`), and this fixture
+       used `NOW - 1 day`. On the 1st of any month "yesterday" is LAST month,
+       every card falls out of scope and ten assertions fail on a product that
+       is working. It failed on 2026-09-01, having passed on 2026-08-31.
+
+       `NOW` is always inside the month the component anchors to, so the test
+       asks what it means to ask. Nothing here depends on the order being a day
+       old - the board filters by month and by source, never by age. */
+    placedAt: new Date(NOW).toISOString(),
     lineCount: 2,
     totalAmount: 3000,
     ...over,
