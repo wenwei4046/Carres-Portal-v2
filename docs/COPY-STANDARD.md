@@ -609,6 +609,22 @@ Consignment Overview, Consignment Receipts, Report or Settings sidebar destinati
 lives in its authority home: Registers, central Work/Reports/Settings, in-context Catalog governance
 or the one Receiving engine. `purchase_demand` remains an authoritative record, not a page.
 
+**PURCHASE ORDERS LEFT RAIL — owner correction 2026-08-31 (Card 07).** The visible rail never
+calls itself `Filters`; that is the UI mechanism, not the business meaning. Exact groups and rows:
+
+| Group | Visible rows |
+|---|---|
+| `PURCHASE ORDERS` | `All purchase orders` |
+| `DOCUMENT` | `PDF not sent` · one two-line row: `Version changed` then `Send the new version to supplier` |
+| `DELIVERY DATE` | `Supplier date missing` · `Supplier date passed` |
+| `RECEIVING` | `Partly received` · `Completed` |
+
+The version wording is ONE selectable row and ONE count. The two lines are intentional fact/action
+ranks, not a wrapped sentence. Never render `Version changed — supplier update required`, its em
+dash, or the ambiguous phrase `supplier update required`; it sounds like Supplier master data must
+be edited. The row only filters; the actual send still completes through current-version
+confirmed-sent evidence.
+
 | Queue tile | Row line | Button | Done message | Empty state |
 |---|---|---|---|---|
 | `Issue PO` | `Issue PO to {supplier}` | `Issue PO` | `PO issued to {supplier}` | `No purchase orders to issue.` |
