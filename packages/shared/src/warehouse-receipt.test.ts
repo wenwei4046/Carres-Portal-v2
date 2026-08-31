@@ -14,7 +14,7 @@ import {
   warehouseReceiptStatusLabel,
   warehouseReceiptSummary,
   warehouseReceiptTotals,
-  warehouseReceiptOpensClaims,
+  warehouseReceiptHasExceptions,
   WAREHOUSE_RECEIPT_STATUS_LABEL,
   type WarehouseReceiptDraft,
   type WarehouseReceiptLineDraft,
@@ -256,10 +256,10 @@ describe("warehouseReceiptTotals / summary", () => {
     ).toBe("0 good · 1 wrong item");
   });
 
-  it("warns the reviewer when a check-in will open claims", () => {
-    expect(warehouseReceiptOpensClaims(lines)).toBe(true);
+  it("reports Receiving exceptions without claiming they opened a Supplier Claim", () => {
+    expect(warehouseReceiptHasExceptions(lines)).toBe(true);
     expect(
-      warehouseReceiptOpensClaims([
+      warehouseReceiptHasExceptions([
         {
           id: "a",
           sku: "X",

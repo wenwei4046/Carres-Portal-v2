@@ -82,9 +82,7 @@ function ReceiptRow({ receipt: r }: { receipt: WarehouseReceiptQueueRow }) {
     try {
       await checkIn.mutateAsync({ receiptId: r.id, expectedVersion: r.lock_version });
       toast.success(
-        `${r.po_id} checked in · DO ${r.do_number}${
-          r.opens_claims ? " · supplier claim opened" : ""
-        }`,
+        `${r.po_id} checked in · DO ${r.do_number}`,
       );
     } catch (e: unknown) {
       toast.error(
@@ -139,14 +137,14 @@ function ReceiptRow({ receipt: r }: { receipt: WarehouseReceiptQueueRow }) {
         {r.note && (
           <div className="text-label text-base-600 mt-1 italic">{r.note}</div>
         )}
-        {/* Said BEFORE the button is pressed: a check-in with an issue files a
-            case against a supplier, and somebody then has to chase it. */}
-        {r.opens_claims && (
+        {/* The count preserves observable exceptions. Claim responsibility is
+            decided later by its governed source outcome. */}
+        {r.has_exceptions && (
           <div
             className="text-label text-danger mt-1"
             data-testid={`warehouse-receipt-claims-${r.po_id}`}
           >
-            Checking this in opens a supplier claim.
+            Exceptions stay on this Receiving Session.
           </div>
         )}
       </div>

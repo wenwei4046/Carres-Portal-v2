@@ -122,6 +122,12 @@ describe("OperationReceiving — approved one-register page", () => {
     expect(screen.queryByTestId("receiving-workspace-pane")).not.toBeInTheDocument();
   });
 
+  it("records receiving facts without a direct Supplier Claim or Purchase Return writer", () => {
+    wrap();
+    expect(screen.queryByRole("button", { name: /supplier claim/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /purchase return/i })).not.toBeInTheDocument();
+  });
+
   it("keeps every Warehouse date row visible even when its count is zero", () => {
     wrap();
     expect(screen.getByTestId("receiving-date-2026-08-31")).toHaveTextContent("0");

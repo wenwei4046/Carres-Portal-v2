@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import {
   buildReceivingRegister,
   historicalReceivingLineInput,
-  warehouseReceiptOpensClaims,
+  warehouseReceiptHasExceptions,
   warehouseReceiptSummary,
   warehouseReceiptReturnInput,
   receivingMutationVersionInput,
@@ -465,9 +465,9 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
         // Composed by the shared module so the ops queue and the warehouse's
         // own list describe one receipt with one sentence.
         summary: warehouseReceiptSummary(lines),
-        // Said out loud BEFORE the button is pressed: a check-in with an issue
-        // files cases against a supplier.
-        opens_claims: warehouseReceiptOpensClaims(lines),
+        // Receiving owns the observed exception only. A Supplier Claim starts
+        // later from an authorised supplier-responsible outcome.
+        has_exceptions: warehouseReceiptHasExceptions(lines),
       };
     }),
     counts: { waiting: waiting ?? 0 },

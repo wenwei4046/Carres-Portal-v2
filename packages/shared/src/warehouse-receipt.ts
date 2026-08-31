@@ -481,9 +481,10 @@ export function warehouseReceiptSummary(
   return bits.join(" · ");
 }
 
-/** Does checking this receipt in open supplier claims? The ops reviewer must be
- *  told BEFORE they press it — a check-in files cases against a supplier. */
-export function warehouseReceiptOpensClaims(
+/** Whether the physical count contains damaged or wrong-item exceptions.
+ * Receiving records this evidence; it never claims that a Supplier Claim or
+ * Purchase Return already exists. */
+export function warehouseReceiptHasExceptions(
   lines: readonly (WarehouseReceiptLine | ReceivingLineInput)[] | null | undefined,
 ): boolean {
   return warehouseReceiptTotals(lines).issue > 0;

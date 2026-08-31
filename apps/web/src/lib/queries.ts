@@ -4133,9 +4133,9 @@ export interface WarehouseReceiptQueueRow {
   return_reason: string | null;
   /** "4 good · 1 damaged" — composed by the shared module, never typed. */
   summary: string;
-  /** True when checking this in will file supplier claims. Said BEFORE the
-   *  button is pressed. */
-  opens_claims: boolean;
+  /** Receiving evidence only; this does not assert that a Supplier Claim or
+   * Purchase Return exists. */
+  has_exceptions: boolean;
 }
 
 export interface WarehouseReceiptsQueueResponse {

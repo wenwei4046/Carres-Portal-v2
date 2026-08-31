@@ -47,7 +47,7 @@ const RECEIPT = {
     },
   ],
   summary: "4 good · 1 damaged",
-  opens_claims: true,
+  has_exceptions: true,
 };
 
 function wrap(node: React.ReactNode) {
@@ -90,16 +90,17 @@ describe("WarehouseReceiptsPanel", () => {
     ).toBeInTheDocument();
   });
 
-  it("warns that a check-in will open a supplier claim", async () => {
+  it("keeps exceptions as Receiving evidence instead of promising an automatic claim", async () => {
     mockQueue([RECEIPT]);
     wrap(<WarehouseReceiptsPanel />);
     expect(
       await screen.findByTestId("warehouse-receipt-claims-PO-2001"),
-    ).toHaveTextContent("opens a supplier claim");
+    ).toHaveTextContent("Exceptions stay on this Receiving Session");
+    expect(screen.queryByText(/supplier claim opened/i)).not.toBeInTheDocument();
   });
 
   it("says nothing about claims for a clean count", async () => {
-    mockQueue([{ ...RECEIPT, opens_claims: false, summary: "4 good" }]);
+    mockQueue([{ ...RECEIPT, has_exceptions: false, summary: "4 good" }]);
     wrap(<WarehouseReceiptsPanel />);
     await screen.findByTestId("warehouse-receipts-panel");
     expect(

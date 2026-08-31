@@ -51,4 +51,10 @@ describe("0407 Receiving database authority", () => {
     expect(sql).toMatch(/wr\.source_id[\s\S]*wr\.id::text[\s\S]*wr\.grn_number/i);
     expect(sql).toContain("'next'");
   });
+
+  it("posts Receiving evidence without inventing a Supplier Claim or Purchase Return", () => {
+    expect(sql).not.toMatch(/insert\s+into\s+public\.supplier_claims/i);
+    expect(sql).not.toMatch(/insert\s+into\s+public\.purchase_returns/i);
+    expect(sql).not.toMatch(/create_supplier_claim|create_purchase_return/i);
+  });
 });

@@ -228,12 +228,12 @@ describe("GET /api/operation/warehouse-receipts", () => {
       supplier_name: "Ohana",
       submitted_by_name: "Klang counter",
       summary: "4 good · 1 damaged",
-      opens_claims: true,
+      has_exceptions: true,
     });
     expect(body.counts.waiting).toBe(1);
   });
 
-  it("says a clean count opens no claims", async () => {
+  it("says a clean count has no receiving exceptions", async () => {
     const clean = {
       ...RECEIPT_ROW,
       lines: [
@@ -255,7 +255,8 @@ describe("GET /api/operation/warehouse-receipts", () => {
       await makeJwt("operation"),
     );
     const body = (await res.json()) as { receipts: Array<Record<string, unknown>> };
-    expect(body.receipts[0].opens_claims).toBe(false);
+    expect(body.receipts[0].has_exceptions).toBe(false);
+    expect(body.receipts[0]).not.toHaveProperty("opens_claims");
     expect(body.receipts[0].summary).toBe("4 good");
   });
 

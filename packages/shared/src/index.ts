@@ -1131,7 +1131,7 @@ export {
   warehouseReceiptProblemText,
   warehouseReceiptTotals,
   warehouseReceiptSummary,
-  warehouseReceiptOpensClaims,
+  warehouseReceiptHasExceptions,
   countedOnLine,
   type WarehouseReceiptStatus,
   type WarehouseReceiptDraft,
