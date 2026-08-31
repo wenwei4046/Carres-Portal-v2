@@ -137,3 +137,43 @@ Receiving page or global rail redesign is authorised.
 No owner question remains. The Owner rejected `Filters`, rejected the dash compound, approved the
 business groups and approved the two-line fact/action wording. Build must implement those exact
 words without proposing alternatives or expanding the page.
+
+---
+
+## 8 · Completion evidence — SHIPPED AND PRODUCTION-VERIFIED 2026-08-31
+
+**Status: COMPLETE.** Built from `codex/purchase-orders-rail-copy` @ `63580f9f`, merged to `main`
+via PR #997 (`build/purchasing-07-rail-copy`), merge commit `00adbb6f`.
+
+**Release gate (all pass before merge):**
+
+- Focused `PurchaseOrdersPage.test.tsx`: 21/21.
+- Full web suite: 282 files / 3,627 tests, exit 0.
+- `tsc --noEmit` typecheck · design-standard lint · production `vite build` · `git diff --check`.
+- GitHub CI `verify`: pass (run 33357645574).
+
+**Production convergence (deploy run 33358235564, success):** all five canonical surfaces report
+`commit 00adbb6f20cce221dae2d53818c470844618890b` — carres-portal Pages, carres-pos Pages,
+`erp.carresofficial.com`, `pos.carresofficial.com` (`__carres_deploy.json`) and
+`api.carresofficial.com/health`.
+
+**Served-bundle proof (`/assets/index-CSxikwOh.js`):** `Send the new version to supplier`,
+`Supplier date missing`, `Supplier date passed`, `All purchase orders` each present once;
+`supplier update required` and the em-dash compound absent (0 matches).
+
+**Authenticated production walk (operation@carres.com, 2026-08-31):**
+
+- The open desktop rail shows no `Filters` heading; the four headings render in order:
+  `PURCHASE ORDERS · DOCUMENT · DELIVERY DATE · RECEIVING`.
+- The version row is one button, one count, one active state, with the two deliberate lines
+  `Version changed` / `Send the new version to supplier` — no dash, no wrapped sentence.
+- Populations unchanged and equal to the rail counts: `All purchase orders` 24 · `PDF not sent`
+  22 (footer `22 purchase orders · Ordered 43 · Received 0 · Open 43`) · `Completed` 2 (footer
+  `2 purchase orders · Ordered 4 · Received 4 · Open 0`, rows PO-2054 and PO-2052) ·
+  `Version changed` 0 · both supplier-date rows 0 · `Partly received` 0.
+- Clicking the active row clears the selection back to the full permanent Register (24); clicking
+  `All purchase orders` restores it likewise.
+- Active treatment, right-aligned counts, register table and narrow-width mechanics unchanged.
+
+`docs/purchasing/MASTER.md` and `docs/COPY-STANDARD.md` already carry the governed law from
+`63580f9f`; no further MASTER change is owed by this Card.
