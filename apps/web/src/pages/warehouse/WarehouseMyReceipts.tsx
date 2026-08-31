@@ -23,6 +23,7 @@ import PageHeader from "@/components/PageHeader";
 const STATUS_PILL: Record<WarehouseReceiptStatus, string> = {
   submitted: "pill-warning",
   posted: "pill-confirmed",
+  amended: "pill-confirmed",
   draft: "pill-neutral",
   voided: "pill-neutral",
   returned: "pill-overdue",

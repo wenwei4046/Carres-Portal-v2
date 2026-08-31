@@ -1154,9 +1154,13 @@ export {
 } from "./warehouse-receipt";
 export {
   receivingSessionInputSchema,
+  receivingMutationVersionInput,
+  receivingSessionSaveInput,
   warehouseSubmitReceiptInput,
   warehouseReceiptReturnInput,
   type ReceivingSessionPayload,
+  type ReceivingMutationVersionInput,
+  type ReceivingSessionSaveInput,
   type WarehouseSubmitReceiptInput,
   type WarehouseReceiptReturnInput,
 } from "./schemas/warehouse";

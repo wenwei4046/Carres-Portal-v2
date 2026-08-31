@@ -177,4 +177,30 @@ describe("PartnerFactoryPickupsPage — Task 11 multi-select pickup", () => {
     const cards = screen.getAllByText(PO_ID);
     expect(cards.length).toBeGreaterThanOrEqual(2);
   });
+
+  it("records arrival only and leaves Goods Receipt to governed Receiving", async () => {
+    vi.mocked(apiFetch)
+      .mockResolvedValueOnce([{
+        ...poWithThreads({ readyCount: 0, total: 0 }),
+        threads: [],
+        sup_status: "picked_up",
+      }])
+      .mockImplementation(async (path) =>
+        String(path).endsWith("/arrived") ? {} : [],
+      );
+    render(wrap(<PartnerFactoryPickupsPage />));
+
+    const arrived = await screen.findByRole("button", { name: "Arrived at WH" });
+    fireEvent.click(arrived);
+
+    await waitFor(() => expect(apiFetch).toHaveBeenCalledWith(
+      `/api/partner/pickups/${PO_ID}/arrived`,
+      { method: "POST" },
+    ));
+    expect(apiFetch).not.toHaveBeenCalledWith(
+      `/api/partner/pickups/${PO_ID}/receive`,
+      expect.anything(),
+    );
+    expect(screen.queryByText(/Receive PO/i)).not.toBeInTheDocument();
+  });
 });

@@ -481,7 +481,7 @@ describe("POST /api/partner/pickups/reject-rfd", () => {
   });
 });
 
-describe("POST /api/partner/pickups/:id/receive — Loo 2026-05-11 collapse arrived+receive", () => {
+describe("POST /api/partner/pickups/:id/receive — retired duplicate posting door", () => {
   const VALID_BODY = {
     doNumber: "DO-9001",
     doFilePath: "delivery-orders/PO-9001/2026-05-11/DO-9001.pdf",
@@ -490,11 +490,8 @@ describe("POST /api/partner/pickups/:id/receive — Loo 2026-05-11 collapse arri
     ],
   };
 
-  it("calls operation_receive_po_with_do RPC and returns the result", async () => {
-    const rpc = vi.fn().mockResolvedValue({
-      data: { po_id: "PO-9001", po_status: "received", sup_status: "delivered" },
-      error: null,
-    });
+  it("sends the physical delivery to governed Receiving without calling a stock writer", async () => {
+    const rpc = vi.fn();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue({ rpc } as any);
     const jwt = await makeJwt("partner", "11111111-1111-1111-1111-aaaaaaaaaaaa");
@@ -506,16 +503,15 @@ describe("POST /api/partner/pickups/:id/receive — Loo 2026-05-11 collapse arri
       }),
       env,
     );
-    expect(res.status).toBe(200);
-    expect(rpc).toHaveBeenCalledWith("operation_receive_po_with_do", {
-      p_po_id: "PO-9001",
-      p_do_file_path: VALID_BODY.doFilePath,
-      p_do_number: VALID_BODY.doNumber,
-      p_lines: [{ id: VALID_BODY.lines[0].id, received_qty: 6 }],
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({
+      code: "receiving_session_required",
+      message: expect.stringContaining("Receiving"),
     });
+    expect(rpc).not.toHaveBeenCalled();
   });
 
-  it("422 on invalid body shape (missing doNumber)", async () => {
+  it("does not revive the old writer even when an old client sends an invalid body", async () => {
     const rpc = vi.fn();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue({ rpc } as any);
@@ -528,7 +524,7 @@ describe("POST /api/partner/pickups/:id/receive — Loo 2026-05-11 collapse arri
       }),
       env,
     );
-    expect(res.status).toBe(422);
+    expect(res.status).toBe(409);
     expect(rpc).not.toHaveBeenCalled();
   });
 
@@ -566,11 +562,8 @@ describe("POST /api/partner/pickups/:id/receive — Loo 2026-05-11 collapse arri
     expect(rpc).not.toHaveBeenCalled();
   });
 
-  it("maps RPC 42501 (cross-partner) to 403", async () => {
-    const rpc = vi.fn().mockResolvedValue({
-      data: null,
-      error: { code: "42501", message: "forbidden: cross-partner receive", details: "forbidden" },
-    });
+  it("never calls a receive RPC for a partner payload", async () => {
+    const rpc = vi.fn();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue({ rpc } as any);
     const jwt = await makeJwt("partner", "11111111-1111-1111-1111-aaaaaaaaaaaa");
@@ -582,6 +575,7 @@ describe("POST /api/partner/pickups/:id/receive — Loo 2026-05-11 collapse arri
       }),
       env,
     );
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(409);
+    expect(rpc).not.toHaveBeenCalled();
   });
 });

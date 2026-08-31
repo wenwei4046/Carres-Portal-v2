@@ -3,7 +3,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { ApiError, apiFetch } from "@/lib/api";
 import { qk, usePartnerMarkPickupCollected } from "@/lib/queries";
-import PartnerReceiveAtWhModal from "./components/PartnerReceiveAtWhModal";
 import PickupBatchDialog from "./components/PickupBatchDialog";
 
 /**
@@ -22,9 +21,8 @@ import PickupBatchDialog from "./components/PickupBatchDialog";
  *   Scheduled       → "Mark collected"           (partner_mark_picked_up)
  *   In transit      → "Arrived at WH"            (partner_arrived_at_warehouse)
  *
- * After "Arrived at WH" the PO drops into the delivered tail and the
- * warehouse-side receive flow (operation_receive_po_with_do, migration
- * 0076) takes over to close it (status='received').
+ * After "Arrived at WH" the PO drops into the delivered tail. Warehouse staff
+ * then count it in Receiving; GRN authority alone posts Goods Receipt.
  *
  * Customer-leg deliveries (RFD pending / customer dispatch / POD) live on
  * the separate Deliveries page — completely different leg, completely
@@ -34,9 +32,7 @@ type PickupLine = {
   id: string;
   sku: string;
   qty: number;
-  // 2026-05-11 (Loo): receive-at-arrival flow needs current received_qty so
-  // PartnerReceiveAtWhModal can compute pending = qty - received_qty.
-  // Server SELECT widened in lockstep.
+  // Kept for the delivered tail and Receiving hand-off context.
   received_qty?: number | null;
   attrs: Record<string, unknown> | null;
 };
@@ -225,7 +221,6 @@ export default function PartnerFactoryPickupsPage() {
   const [openId, setOpenId] = useState<string | null>(null);
   // Loo 2026-05-11: "Arrived at WH" now opens a full receive modal that
   // uploads DO + ticks per-line qty, atomically flipping the PO to received.
-  const [receivingPoId, setReceivingPoId] = useState<string | null>(null);
   // 2026-05-15 (Task 11) — per-thread multi-select pickup state. Keyed by
   // poId because each PO has its own thread checklist; clearing on dialog
   // close resets the entire pickup queue so the next batch starts clean.
@@ -300,6 +295,18 @@ export default function PartnerFactoryPickupsPage() {
       await qc.invalidateQueries({ queryKey: qk.partner.dashboard() });
     },
   });
+  const markArrived = useMutation({
+    mutationFn: (poId: string) =>
+      apiFetch(`/api/partner/pickups/${poId}/arrived`, { method: "POST" }),
+    onSuccess: async (_data, poId) => {
+      await qc.invalidateQueries({ queryKey: qk.partner.pickups() });
+      await qc.invalidateQueries({ queryKey: qk.partner.dashboard() });
+      toast.success(`${poId} arrived · Warehouse can count it in Receiving`);
+    },
+    onError: (err: unknown) => {
+      toast.error(err instanceof ApiError ? err.message : "Arrival failed");
+    },
+  });
   // 2026-05-17 (migration 0119) — per-thread "Mark collected" stamps
   // po_pickup_events.departed_at. Drives the SCHEDULED → IN TRANSIT
   // transition for the per-thread flow.
@@ -320,10 +327,6 @@ export default function PartnerFactoryPickupsPage() {
       toast.error(err instanceof ApiError ? err.message : "Mark collected failed");
     }
   }
-  // markArrived RPC kept on the API (POST /:id/arrived → partner_arrived_at_warehouse)
-  // for the rare "I'm here but don't have DO yet" case, but no UI trigger now —
-  // every code path goes through the receive modal instead.
-
   const buckets = useMemo(() => {
     const out = {
       upcoming: [] as PickupRow[],
@@ -628,11 +631,12 @@ export default function PartnerFactoryPickupsPage() {
                     <DateBadge label="Picked up" date={date} tone="info" />
                     <button
                       type="button"
-                      onClick={() => setReceivingPoId(po.id)}
+                      onClick={() => markArrived.mutate(po.id)}
+                      disabled={markArrived.isPending}
                       className="w-full px-3 py-1.5 bg-primary text-white rounded text-meta font-semibold"
-                      data-testid={`receive-at-wh-${po.id}`}
+                      data-testid={`arrived-at-wh-${po.id}`}
                     >
-                      🏢 Arrived at WH · Receive
+                      Arrived at WH
                     </button>
                   </>
                 );
@@ -710,28 +714,14 @@ export default function PartnerFactoryPickupsPage() {
             });
           }}
           onMarkArrived={() => {
-            // Drawer's In-transit CTA now opens the receive modal too — same
-            // pivot as the kanban-card button.
             const id = openPo.id;
             setOpenId(null);
-            setReceivingPoId(id);
+            markArrived.mutate(id);
           }}
           accepting={accept.isPending}
           markingCollected={markCollected.isPending || markPickupCollected.isPending}
         />
       )}
-
-      {receivingPoId &&
-        (() => {
-          const po = rows.find((p) => p.id === receivingPoId);
-          if (!po) return null;
-          return (
-            <PartnerReceiveAtWhModal
-              po={po}
-              onClose={() => setReceivingPoId(null)}
-            />
-          );
-        })()}
 
       {openDialog && (
         <PickupBatchDialog
@@ -1201,7 +1191,7 @@ function PickupDrawer({
               onClick={onMarkArrived}
               className="px-5 py-2 bg-primary text-white rounded-md text-body font-semibold"
             >
-              🏢 Arrived at WH · Receive
+              Arrived at WH
             </button>
           )}
         </div>

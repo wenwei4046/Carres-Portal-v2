@@ -1,10 +1,9 @@
 import { Hono } from "hono";
 import {
-  grnDateFromQuery,
+  grnSearchTerm,
   numericPrefixRanges,
   parseJumpQuery,
   rankJumpDocuments,
-  receivingRecordNo,
   type JumpDocumentResult,
 } from "@carres/shared";
 import { requireOperation } from "../../lib/auth-guards";
@@ -53,18 +52,6 @@ const jumpRouter = new Hono<AppEnv>();
 const PER_TYPE = 5;
 /** Across all four. A list past this is scrolled, and scrolling is the Register's job. */
 const TOTAL = 12;
-
-/**
- * How far back an UNDATED `GRN` query looks.
- *
- * A Receiving Record's number is derived from its id, never stored
- * (`receivingRecordNo`), so a partial GRN query cannot become a SQL predicate —
- * the numbers have to be computed and compared. A query that reached a full
- * `DDMMYY` is answered exactly (see below) whatever the volume; only the
- * still-being-typed case reads this window, and it never silently truncates a
- * complete number.
- */
-const GRN_RECENT_WINDOW = 200;
 
 /**
  * Strip everything that is not part of a governed document number before the
@@ -155,57 +142,45 @@ jumpRouter.get("/", requireOperation, async (c) => {
   }
 
   // ── GRN ───────────────────────────────────────────────────────────────────
-  // `posted` only, because that is what the `Goods Received` register holds: a
-  // submitted or returned count has not entered the books, so it is not yet a
-  // record of goods received and has no document to jump to.
-  //
-  // A query carrying a full `DDMMYY` is answered EXACTLY — the date is read
-  // back out of the number and asked for directly — so an operator holding the
-  // paper always finds it. Only a half-typed query falls back to the recent
-  // window above.
+  // Only a posted document and its amended/voided history owns a formal stored
+  // GRN number. Draft, submitted and returned counts have no GRN to jump to.
+  // Search that indexed identity directly: the GRN posting date is deliberately
+  // independent from the physical Goods Received At fact.
   if (wants("GRN")) {
-    const onDate = grnDateFromQuery(parsed.types.length === 1 ? parsed.term : parsed.raw);
-    let q = sb
+    const storedNeedle = grnSearchTerm(
+      parsed.types.length === 1 ? parsed.term : parsed.raw,
+    );
+    if (storedNeedle) {
+      const { data, error } = await sb
       .from("warehouse_receipts")
-      .select("id, goods_received_at, submitted_at, purchase_orders(id, suppliers(name))")
-      .eq("status", "posted")
-      .order("goods_received_at", { ascending: false, nullsFirst: false });
-    q = onDate ? q.eq("goods_received_at", onDate) : q.limit(GRN_RECENT_WINDOW);
-    const { data, error } = await q;
-    if (error) {
-      const m = mapPgError(error);
-      return c.json(m.body, m.status);
+        .select("id, grn_number, purchase_orders(id, suppliers(name))")
+        .in("status", ["posted", "amended", "voided"])
+        .ilike("grn_number", `%${storedNeedle}%`)
+        .order("grn_number", { ascending: false })
+        .limit(PER_TYPE);
+      if (error) {
+        const m = mapPgError(error);
+        return c.json(m.body, m.status);
+      }
+      for (const row of (data ?? []) as Array<{
+        id: string;
+        grn_number: string | null;
+        purchase_orders:
+          | { id: string; suppliers: { name: string | null } | Array<{ name: string | null }> | null }
+          | Array<{ id: string; suppliers: { name: string | null } | Array<{ name: string | null }> | null }>
+          | null;
+      }>) {
+        if (!row.grn_number) continue;
+        const po = Array.isArray(row.purchase_orders) ? row.purchase_orders[0] : row.purchase_orders;
+        const sup = Array.isArray(po?.suppliers) ? po?.suppliers[0] : po?.suppliers;
+        documents.push({
+          type: "GRN",
+          number: row.grn_number,
+          party: sup?.name ?? null,
+          href: `/operation?tab=receiving&queue=received&receipt=${encodeURIComponent(row.id)}`,
+        });
+      }
     }
-    const matches: JumpDocumentResult[] = [];
-    for (const row of (data ?? []) as Array<{
-      id: string;
-      goods_received_at: string | null;
-      submitted_at: string | null;
-      purchase_orders:
-        | { id: string; suppliers: { name: string | null } | Array<{ name: string | null }> | null }
-        | Array<{ id: string; suppliers: { name: string | null } | Array<{ name: string | null }> | null }>
-        | null;
-    }>) {
-      const number = receivingRecordNo({
-        id: row.id,
-        goods_received_at: row.goods_received_at ?? undefined,
-        submitted_at: row.submitted_at ?? undefined,
-      });
-      if (number === "—") continue;
-      /* The number carries its own `GRN-` prefix, so the raw query matches it
-       * whether or not the operator typed one. */
-      if (!number.includes(needle) && !number.includes(docNumberSafe(parsed.raw))) continue;
-      const po = Array.isArray(row.purchase_orders) ? row.purchase_orders[0] : row.purchase_orders;
-      const sup = Array.isArray(po?.suppliers) ? po?.suppliers[0] : po?.suppliers;
-      matches.push({
-        type: "GRN",
-        number,
-        party: sup?.name ?? null,
-        href: `/operation?tab=receiving&queue=received&receipt=${encodeURIComponent(row.id)}`,
-      });
-      if (matches.length >= PER_TYPE) break;
-    }
-    documents.push(...matches);
   }
 
   // ── INV ───────────────────────────────────────────────────────────────────

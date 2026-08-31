@@ -161,22 +161,36 @@ describe("GET /api/operation/jump", () => {
     expect(calls.some((c) => c.table === "purchase_orders" && c.method === "ilike")).toBe(true);
   });
 
-  it("a GRN query asks for the date the number itself names", async () => {
+  it("a GRN query searches the stored formal number without deriving a physical date", async () => {
     const calls = wire({
       warehouse_receipts: [
         {
           id: RECEIPT_ID,
+          grn_number: "GRN-20260831-0042",
           goods_received_at: "2026-08-02",
-          submitted_at: "2026-08-02T02:00:00Z",
           purchase_orders: { id: "PO-2051", suppliers: { name: "Ohana" } },
         },
       ],
     });
-    await req("/api/operation/jump?q=GRN-020826", await makeJwt("operation"));
+    const res = await req("/api/operation/jump?q=GRN-20260831-00", await makeJwt("operation"));
+    const body = (await res.json()) as { documents: Array<Record<string, unknown>> };
+    expect(body.documents[0]).toMatchObject({
+      type: "GRN",
+      number: "GRN-20260831-0042",
+      href: `/operation?tab=receiving&queue=received&receipt=${RECEIPT_ID}`,
+    });
     const eqs = calls.filter((c) => c.table === "warehouse_receipts" && c.method === "eq");
-    expect(eqs.map((c) => c.args)).toContainEqual(["goods_received_at", "2026-08-02"]);
-    /* Only a POSTED count is a record of goods received. */
-    expect(eqs.map((c) => c.args)).toContainEqual(["status", "posted"]);
+    expect(eqs.some((c) => c.args[0] === "goods_received_at")).toBe(false);
+    expect(calls).toContainEqual(expect.objectContaining({
+      table: "warehouse_receipts",
+      method: "ilike",
+      args: ["grn_number", "%GRN-20260831-00%"],
+    }));
+    expect(calls).toContainEqual(expect.objectContaining({
+      table: "warehouse_receipts",
+      method: "in",
+      args: ["status", ["posted", "amended", "voided"]],
+    }));
   });
 
   it("an invoice opens the order it belongs to", async () => {

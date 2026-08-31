@@ -1,26 +1,16 @@
 /**
- * R6 · The warehouse files its own receiving
- * (docs/receiving-claim-execution-queue.md, locked with Jess 2026-07-27).
+ * One governed Receiving Session contract shared by Office and Warehouse.
  *
  * The third-party warehouse stops reporting by WhatsApp: it logs in, counts the
- * pallet on R1's own form and files what it found. Nothing moves when it does —
- * the submission is a QUEUED CALL to the receive engine, and ops check-in is
- * what replays it through `operation_receive_po_with_do` (0302). So this module
- * describes a receipt, never a second way of receiving.
+ * pallet and files what it found. Saving or sending the count moves nothing;
+ * GRN authority later posts the same persistent session through one engine.
  *
- * ── The number is a DELTA, and that is load-bearing ─────────────────────────
- * The receive RPC takes `received_qty` as a NEW TOTAL. A receipt can sit for
- * hours before ops opens it, and another DO can land in between — so a stored
- * total would be true when it was typed and wrong when it was replayed. What
- * the warehouse observed is `receivedNow`: how many good units came off THIS
- * truck. The check-in adds it to whatever the line has received by then.
+ * Quantities belong to this physical session. Only `receivedQty` reduces PO
+ * pending quantity; damaged, wrong and extra stay separate custody facts.
  *
  * ── One gate, three readers ─────────────────────────────────────────────────
- * `warehouseReceiptProblems` is what the warehouse's Send button asks, what the
- * ops queue reads to explain a receipt, and — mirrored statement for statement
- * inside `warehouse_submit_receipt` — what the server refuses. The button and
- * the 422 therefore cannot disagree about what "complete" means (the same law
- * S1's `caseIntakeComplete` and R2's `receiveLineClaimProblems` follow).
+ * New writes use `ReceivingSessionInput`. Historical readers retain a narrow
+ * compatibility mapper for pre-0407 `received_now` payloads.
  *
  * The claim rules are NOT re-implemented here: a damaged/wrong line is checked
  * by R2's own `receiveLineClaimProblems`, so the evidence law has exactly one

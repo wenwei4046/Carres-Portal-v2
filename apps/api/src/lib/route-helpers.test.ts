@@ -20,6 +20,16 @@ describe("mapPgError", () => {
     expect(m.body.message).toBe("forbidden");
   });
 
+  it("keeps the governed GRN authority refusal code", () => {
+    const m = mapPgError({
+      code: "42501",
+      details: "grn_authority_required",
+      message: "GRN authority is required",
+    });
+    expect(m.status).toBe(403);
+    expect(m.body.code).toBe("grn_authority_required");
+  });
+
   it("maps SQLSTATE 42P01 to 404 not_found", () => {
     const m = mapPgError({ code: "42P01", message: "relation x does not exist" });
     expect(m.status).toBe(404);
@@ -50,6 +60,16 @@ describe("mapPgError", () => {
     const m = mapPgError({ code: "22023" });
     expect(m.status).toBe(422);
     expect(m.body.message).toBe("invalid param");
+  });
+
+  it("keeps the receiving evidence detail on a 422", () => {
+    const m = mapPgError({
+      code: "22023",
+      details: "evidence_missing",
+      message: "Signed DO photo is missing",
+    });
+    expect(m.status).toBe(422);
+    expect(m.body.code).toBe("evidence_missing");
   });
 
   it("maps SQLSTATE P0001 to 422 rule_violation with details as code", () => {
@@ -84,6 +104,16 @@ describe("mapPgError", () => {
       code: "rpc_failed",
       message: "duplicate key",
     });
+  });
+
+  it("maps the named duplicate Supplier DO guard to 409", () => {
+    const m = mapPgError({
+      code: "23505",
+      details: "duplicate_supplier_do",
+      message: "Supplier DO DO-1 was already used for GRN-20260831-0001",
+    });
+    expect(m.status).toBe(409);
+    expect(m.body.code).toBe("duplicate_supplier_do");
   });
 
   // v3-active.1 (migration 0037): the batch RPC's _v3_claim_threads_for_po

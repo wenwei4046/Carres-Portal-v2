@@ -54,6 +54,20 @@ export const receivingSessionInputSchema = z
 
 export type ReceivingSessionPayload = z.infer<typeof receivingSessionInputSchema>;
 
+export const receivingMutationVersionInput = z
+  .object({ expectedVersion: z.number().int().positive() })
+  .strict();
+
+export const receivingSessionSaveInput = z
+  .object({
+    expectedVersion: z.number().int().positive(),
+    session: receivingSessionInputSchema,
+  })
+  .strict();
+
+export type ReceivingMutationVersionInput = z.infer<typeof receivingMutationVersionInput>;
+export type ReceivingSessionSaveInput = z.infer<typeof receivingSessionSaveInput>;
+
 export const warehouseSubmitReceiptInput = z
   .object({
     poId: z.string().min(1).max(100),
@@ -89,6 +103,7 @@ export type WarehouseSubmitReceiptInput = z.infer<
  */
 export const warehouseReceiptReturnInput = z
   .object({
+    expectedVersion: z.number().int().positive(),
     reason: z.string().trim().min(1, "Say what the warehouse must fix").max(500),
   })
   .strict();

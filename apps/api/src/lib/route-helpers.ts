@@ -25,7 +25,7 @@ import type { ZodTypeAny, infer as ZodInfer } from "zod";
 export function mapPgError(error: { code?: string; message?: string; details?: string }) {
   switch (error.code) {
     case "42501":
-      return { status: 403 as const, body: { error: "forbidden", code: "forbidden", message: error.message ?? "forbidden" } };
+      return { status: 403 as const, body: { error: "forbidden", code: error.details ?? "forbidden", message: error.message ?? "forbidden" } };
     case "42P01":
       return { status: 404 as const, body: { error: "not_found", code: "not_found", message: error.message ?? "not found" } };
     /* P0002 is Postgres's `no_data_found`, and it is what THIS CODEBASE's RPCs
@@ -42,11 +42,16 @@ export function mapPgError(error: { code?: string; message?: string; details?: s
     case "P0002":
       return { status: 404 as const, body: { error: "not_found", code: "not_found", message: error.message ?? "not found" } };
     case "22023":
-      return { status: 422 as const, body: { error: "invalid_param", code: "invalid_param", message: error.message ?? "invalid param" } };
+      return { status: 422 as const, body: { error: "invalid_param", code: error.details ?? "invalid_param", message: error.message ?? "invalid param" } };
     case "P0001":
       return { status: 422 as const, body: { error: "rule_violation", code: error.details ?? "invalid_param", message: error.message ?? "rule violation" } };
     case "40001":
       return { status: 409 as const, body: { error: "conflict", code: error.details ?? "concurrent_claim", message: error.message ?? "conflict" } };
+    case "23505":
+      if (error.details === "duplicate_supplier_do") {
+        return { status: 409 as const, body: { error: "conflict", code: "duplicate_supplier_do", message: error.message ?? "Supplier DO was already used" } };
+      }
+      return { status: 500 as const, body: { error: "rpc_failed", code: "rpc_failed", message: error.message ?? "rpc failed" } };
     default:
       return { status: 500 as const, body: { error: "rpc_failed", code: "rpc_failed", message: error.message ?? "rpc failed" } };
   }

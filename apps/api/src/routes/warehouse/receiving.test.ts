@@ -87,10 +87,26 @@ function req(path: string, method: string, jwt: string | null, body?: unknown) {
 }
 
 const validBody = {
-  poId: "PO-1001",
-  doNumber: "DO-5512",
-  doFilePath: "PO-1001/abc-do.jpg",
-  lines: [{ id: LINE, receivedNow: 4 }],
+  sourceKind: "purchase_order",
+  sourceId: "PO-1001",
+  expectedVersion: 2,
+  supplierDoNo: "DO-5512",
+  signedDoPath: "PO-1001/abc-do.jpg",
+  goodsReceivedAt: "2026-08-31T02:00:00.000Z",
+  note: null,
+  lines: [{
+    poLineId: LINE,
+    sku: "MS01-K",
+    receivedQty: 4,
+    damagedQty: 0,
+    wrongItemQty: 0,
+    extraQty: 0,
+    unitIds: ["id-aaa000001", "id-aaa000002", "id-aaa000003", "id-aaa000004"],
+    damagedPhotos: [],
+    wrongItemPhotos: [],
+    extraEvidence: [],
+    wrongItemReason: null,
+  }],
 };
 
 describe("who may reach the warehouse portal", () => {
@@ -163,7 +179,7 @@ describe("GET /api/warehouse/receipts", () => {
 });
 
 describe("POST /api/warehouse/receipts", () => {
-  it("files the count through warehouse_submit_receipt and answers 201", async () => {
+  it("saves then submits the same governed session and answers 201", async () => {
     const sb = makeSb({ data: { id: "r1", po_id: "PO-1001", status: "submitted" } });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue(sb as any);
@@ -175,22 +191,14 @@ describe("POST /api/warehouse/receipts", () => {
       validBody,
     );
     expect(res.status).toBe(201);
-    expect(sb.rpc).toHaveBeenCalledWith("warehouse_submit_receipt", {
-      p_po_id: "PO-1001",
-      p_do_number: "DO-5512",
-      p_do_file_path: "PO-1001/abc-do.jpg",
-      p_note: null,
-      p_lines: [
-        {
-          id: LINE,
-          received_now: 4,
-          damaged_qty: 0,
-          wrong_item_qty: 0,
-          wrong_item_claim_type: null,
-          damaged_photos: [],
-          wrong_item_photos: [],
-        },
-      ],
+    expect(sb.rpc).toHaveBeenNthCalledWith(1, "save_receiving_session", {
+      p_receipt_id: null,
+      p_expected_version: 0,
+      p_payload: validBody,
+    });
+    expect(sb.rpc).toHaveBeenNthCalledWith(2, "submit_receiving_session", {
+      p_receipt_id: "r1",
+      p_expected_version: 1,
     });
   });
 
@@ -211,28 +219,28 @@ describe("POST /api/warehouse/receipts", () => {
 
     await req("/api/warehouse/receipts", "POST", await warehouseJwt(), {
       ...validBody,
-      note: "  pallet 3 crushed  ",
+      note: "pallet 3 crushed",
       lines: [
         {
-          id: LINE,
-          receivedNow: 1,
+          ...validBody.lines[0],
+          receivedQty: 1,
           damagedQty: 2,
           damagedPhotos: ["PO-1001/x-claim.jpg"],
           wrongItemQty: 1,
-          wrongItemClaimType: "wrong_sku",
+          wrongItemReason: "wrong sku",
           wrongItemPhotos: ["PO-1001/y-claim.jpg"],
+          unitIds: ["id-aaa000001", "id-aaa000002", "id-aaa000003", "id-aaa000004"],
         },
       ],
     });
 
     const args = sb.rpc.mock.calls[0][1] as {
-      p_note: string;
-      p_lines: Array<Record<string, unknown>>;
+      p_payload: typeof validBody;
     };
-    expect(args.p_note).toBe("pallet 3 crushed");
-    expect(args.p_lines[0].damaged_photos).toEqual(["PO-1001/x-claim.jpg"]);
-    expect(args.p_lines[0].wrong_item_photos).toEqual(["PO-1001/y-claim.jpg"]);
-    expect(args.p_lines[0].wrong_item_claim_type).toBe("wrong_sku");
+    expect(args.p_payload.note).toBe("pallet 3 crushed");
+    expect(args.p_payload.lines[0].damagedPhotos).toEqual(["PO-1001/x-claim.jpg"]);
+    expect(args.p_payload.lines[0].wrongItemPhotos).toEqual(["PO-1001/y-claim.jpg"]);
+    expect(args.p_payload.lines[0].wrongItemReason).toBe("wrong sku");
   });
 
   it("422 on a DO number the RPC would refuse anyway", async () => {
@@ -240,7 +248,7 @@ describe("POST /api/warehouse/receipts", () => {
     vi.mocked(userClient).mockReturnValue(makeSb() as any);
     const res = await req("/api/warehouse/receipts", "POST", await warehouseJwt(), {
       ...validBody,
-      doNumber: "DO",
+      supplierDoNo: "DO",
     });
     expect(res.status).toBe(422);
   });

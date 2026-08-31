@@ -158,7 +158,6 @@ import {
   type OutletsListResponse,
   type ProcurementTabSlug,
   type ReassignPoWarehouseInput,
-  type ReceivePoWithDoInput,
   type OfficeReceiveInput,
   type RefundCreateInput,
   type RefundPayInput,
@@ -3619,23 +3618,6 @@ export interface operationStockResponse {
   }[];
   summary: { totalSkus: number; lowStockCount: number; openPos: number };
 }
-export interface operationReceivePoWithDoResponse {
-  po_id: string;
-  do_file_path: string;
-  do_number: string;
-  lines_updated: number;
-  threads_advanced: number;
-  po_status: "open" | "received" | "cancelled";
-  sup_status: string;
-  was_relocated: boolean;
-  // R1 (0284) / R2 (0288) — what the inspection found, and how many supplier
-  // claims it opened. OPTIONAL so a browser on this build talking to a
-  // pre-0288 Worker degrades instead of crashing.
-  damaged_qty?: number;
-  wrong_item_qty?: number;
-  claims_created?: number;
-}
-
 // --- Filter → query string helpers -----------------------------------------
 
 function operationOrdersSearch(f?: operationOrderFilters): string {
@@ -7658,53 +7640,6 @@ export function useOfficeReceiveMutation(
       await qc.invalidateQueries({ queryKey: qk.operation.stockAlerts() });
       await qc.invalidateQueries({ queryKey: ["operation", "movements"] });
       await qc.invalidateQueries({ queryKey: ["operation", "supplier-claims"] });
-      await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
-      await qc.invalidateQueries({ queryKey: qk.operation.dashboard(), exact: true });
-      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
-    },
-  });
-}
-
-/**
- * The PARTNER leg of receiving — a partner confirming goods at a warehouse.
- * (Was "the partner-side variant of useReceivePoWithDoMutation"; that Office
- * hook was retired 2026-08-03, Card C1.) Loo 2026-05-11.
- *
- * Posts to /api/partner/pickups/:id/receive, which calls the SAME
- * `operation_receive_po_with_do` RPC under the hood (the RPC's role gate
- * already admits partners + checks procurement_partner_id matches caller).
- * Replaces the "Arrived at WH → wait for operation Receive" two-step with
- * one atomic move: partner uploads DO + ticks qty → PO flips straight to
- * status='received'.
- *
- * Cache invalidation differs from the operation version: blast the partner
- * sub-tree (so dashboard + pickups kanban refresh) AND the operation tree
- * (so the procurement view sees the PO arrive in the Received tab).
- */
-export function useReceivePoAsPartnerMutation(
-  poId: string,
-  opts?: Partial<
-    UseMutationOptions<operationReceivePoWithDoResponse, ApiError, ReceivePoWithDoInput>
-  >,
-) {
-  const qc = useQueryClient();
-  return useMutation<operationReceivePoWithDoResponse, ApiError, ReceivePoWithDoInput>({
-    mutationFn: (input) =>
-      apiFetch<operationReceivePoWithDoResponse>(
-        `/api/partner/pickups/${poId}/receive`,
-        { method: "POST", body: JSON.stringify(input) },
-      ),
-    ...opts,
-    onSuccess: async (...args) => {
-      // Partner-side caches.
-      await qc.invalidateQueries({ queryKey: ["partner"] });
-      // operation-side caches (PO appears in Received tab; warehouse stock
-      // bumped; orders may unblock in_production).
-      await qc.invalidateQueries({ queryKey: qk.operation.po(poId), exact: true });
-      await qc.invalidateQueries({ queryKey: ["operation", "pos"] });
-      await qc.invalidateQueries({ queryKey: qk.operation.warehouse(), exact: true });
-      await qc.invalidateQueries({ queryKey: qk.operation.stockAlerts() });
-      await qc.invalidateQueries({ queryKey: ["operation", "movements"] });
       await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
       await qc.invalidateQueries({ queryKey: qk.operation.dashboard(), exact: true });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));

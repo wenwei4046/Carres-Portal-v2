@@ -3,9 +3,8 @@ import { HTTPException } from "hono/http-exception";
 import {
   partnerAcceptRfdInput,
   partnerRejectRfdInput,
-  receivePoWithDoInput,
 } from "@carres/shared";
-import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
+import { mapPgError } from "../../lib/route-helpers";
 import { adminClient, userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 import type { DoTemplateData } from "../../lib/pdf/types";
@@ -304,49 +303,23 @@ partnerPickupsRouter.post("/:id/arrived", async (c) => {
 });
 
 /**
- * POST /api/partner/pickups/:id/receive — Loo 2026-05-11
+ * POST /api/partner/pickups/:id/receive — retired compatibility address.
  *
- * Collapses the old two-step "Arrived at WH" → "operation Receive" flow into
- * one. Partner driver at the warehouse uploads the signed DO + ticks per-line
- * received_qty; the PO flips straight to status='received' (atomic).
- *
- * Wraps the same `operation_receive_po_with_do` RPC the operation route uses
- * (migration 0076). The RPC's role gate already admits partners and verifies
- * `purchase_orders.procurement_partner_id = auth.app_partner_id()` — so a
- * cross-partner call returns 42501 → 403, matching the cross-partner guard
- * on /accept, /mark-picked-up, /arrived.
- *
- * Body shape: receivePoWithDoInput (camelCase, same as the operation route)
- * — { doNumber, doFilePath, lines: [{ id, receivedQty }] }. Reshaped to
- * snake_case for the RPC's `p_lines` jsonb at the boundary.
- *
- * operation still has /api/operation/pos/:id/receive (different auth gate)
- * for the Direct-receive escape hatch when DO arrives via supplier or
- * warehouse-direct channels (skipping the partner entirely).
+ * A partner may record arrival through `/:id/arrived`, but may not turn an LP
+ * payload into Goods Receipt or Stock. Warehouse/showroom staff count in one
+ * Receiving Session and GRN authority posts it. Old clients receive an
+ * actionable conflict and no writer is called.
  */
 partnerPickupsRouter.post("/:id/receive", async (c) => {
   const auth = c.var.auth;
   if (auth.role !== "partner" || !auth.partnerId) {
     throw new HTTPException(403, { message: "Only partner role with partner_id" });
   }
-  const parsed = await parseJsonBody(c, receivePoWithDoInput);
-  if (!parsed.ok) return c.json(parsed.body, parsed.status);
-
-  const sb = userClient(c.env, auth.jwt);
-  const { data, error } = await sb.rpc("operation_receive_po_with_do", {
-    p_po_id: c.req.param("id"),
-    p_do_file_path: parsed.data.doFilePath,
-    p_do_number: parsed.data.doNumber,
-    p_lines: parsed.data.lines.map((l) => ({
-      id: l.id,
-      received_qty: l.receivedQty,
-    })),
-  });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
-  return c.json(data);
+  return c.json({
+    error: "conflict",
+    code: "receiving_session_required",
+    message: `Record arrival for ${c.req.param("id")}, then let Warehouse count it in Receiving.`,
+  }, 409);
 });
 
 /**

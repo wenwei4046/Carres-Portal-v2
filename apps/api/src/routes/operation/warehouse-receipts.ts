@@ -3,30 +3,24 @@ import {
   warehouseReceiptOpensClaims,
   warehouseReceiptSummary,
   warehouseReceiptReturnInput,
+  receivingMutationVersionInput,
+  receivingSessionInputSchema,
+  receivingSessionSaveInput,
   type WarehouseReceiptLine,
 } from "@carres/shared";
 import { requireOperation } from "../../lib/auth-guards";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { adminClient, userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
+import { autoReserveReceivedToSourceOrder } from "./pos";
 
 /**
- * /api/operation/warehouse-receipts — the ops half of R6.
+ * /api/operation/warehouse-receipts — the governed Receiving Session door.
  *
- * The card's done-when is "a Klang receiving lands in the system with zero ops
- * typing — ops only reviews", so this router has exactly two moves and neither
- * of them re-enters a number:
- *
- *   GET  /              what the warehouse filed and is waiting on
- *   POST /:id/check-in  replay it through the receive engine
- *   POST /:id/send-back return it with a reason to recount
- *
- * Check-in does NOT receive the PO here. `warehouse_receipt_check_in` (0302)
- * rebuilds the payload and calls `operation_receive_po_with_do` — the one
- * receive implementation in the database — so R1's counters, R2's claim
- * minting and its guard trigger, R4's quarantine and the thread/stock cascade
- * all happen exactly as they do when ops receives a PO by hand. A second
- * receive path here is the thing this card must not create.
+ * Every door saves, submits, returns or posts the same durable session. Check-in
+ * calls the single posting engine; it never rebuilds a second payload and never
+ * writes stock itself. Damaged, wrong and extra outcomes remain visible facts —
+ * posting does not silently turn them into supplier claims.
  *
  * Role: operation + principal, matching the Receiving station this queue lives
  * on. The RPCs gate on `is_operation()` independently — defence in depth, not
@@ -39,6 +33,53 @@ const DEFAULT_LIMIT = 200;
 const SIGNED_URL_TTL_SECONDS = 3600;
 
 type ReceiptRow = Record<string, unknown>;
+
+warehouseReceiptsRouter.post("/", requireOperation, async (c) => {
+  const parsed = await parseJsonBody(c, receivingSessionInputSchema);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("save_receiving_session", {
+    p_receipt_id: null,
+    p_expected_version: 0,
+    p_payload: parsed.data,
+  });
+  if (error) {
+    const mapped = mapPgError(error);
+    return c.json(mapped.body, mapped.status);
+  }
+  return c.json(data ?? {}, 201);
+});
+
+warehouseReceiptsRouter.patch("/:id", requireOperation, async (c) => {
+  const parsed = await parseJsonBody(c, receivingSessionSaveInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("save_receiving_session", {
+    p_receipt_id: c.req.param("id"),
+    p_expected_version: parsed.data.expectedVersion,
+    p_payload: parsed.data.session,
+  });
+  if (error) {
+    const mapped = mapPgError(error);
+    return c.json(mapped.body, mapped.status);
+  }
+  return c.json(data ?? {});
+});
+
+warehouseReceiptsRouter.post("/:id/submit", requireOperation, async (c) => {
+  const parsed = await parseJsonBody(c, receivingMutationVersionInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("submit_receiving_session", {
+    p_receipt_id: c.req.param("id"),
+    p_expected_version: parsed.data.expectedVersion,
+  });
+  if (error) {
+    const mapped = mapPgError(error);
+    return c.json(mapped.body, mapped.status);
+  }
+  return c.json(data ?? {});
+});
 
 /**
  * GET / — `?status=submitted|returned|posted|voided|all` (default `submitted`).
@@ -211,15 +252,33 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
  * BACK, with a reason, to the only people who can look at the goods again.
  */
 warehouseReceiptsRouter.post("/:id/check-in", requireOperation, async (c) => {
+  const parsed = await parseJsonBody(c, receivingMutationVersionInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb.rpc("warehouse_receipt_check_in", {
+  const { data, error } = await sb.rpc("post_receiving_session", {
     p_receipt_id: c.req.param("id"),
+    p_expected_version: parsed.data.expectedVersion,
   });
   if (error) {
     const m = mapPgError(error);
     return c.json(m.body, m.status);
   }
-  return c.json(data ?? {});
+  const posted = (data ?? {}) as Record<string, unknown>;
+  const poId = String(posted.po_id ?? posted.source_id ?? "");
+  if (poId) {
+    try {
+      await autoReserveReceivedToSourceOrder(sb, poId);
+    } catch (continuationError) {
+      await sb.rpc("record_receiving_continuation_failure", {
+        p_receipt_id: c.req.param("id"),
+        p_code: "reservation_continuation_failed",
+        p_message: continuationError instanceof Error
+          ? continuationError.message
+          : "Reservation continuation failed",
+      });
+    }
+  }
+  return c.json(posted);
 });
 
 /** POST /:id/send-back — return it to be recounted. The reason is required in
@@ -230,8 +289,9 @@ warehouseReceiptsRouter.post("/:id/send-back", requireOperation, async (c) => {
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
 
   const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb.rpc("warehouse_receipt_return", {
+  const { data, error } = await sb.rpc("return_receiving_session", {
     p_receipt_id: c.req.param("id"),
+    p_expected_version: parsed.data.expectedVersion,
     p_reason: parsed.data.reason,
   });
   if (error) {

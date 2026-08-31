@@ -4,6 +4,7 @@ import { dirname, join } from "node:path";
 import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
 import { SignJWT, createLocalJWKSet, exportJWK, generateKeyPair, type JWK, type KeyLike } from "jose";
 import app from "../../index";
+import { autoReserveReceivedToSourceOrder } from "./pos";
 import { _setJwksForTesting } from "../../middleware/auth";
 import { assertRpcCallShape } from "../../test-utils/assert-rpc";
 
@@ -849,20 +850,16 @@ describe("the Office has exactly ONE receiving door", () => {
     expect(rpc).not.toHaveBeenCalled();
   });
 
-  it("the surviving Office door goes through office_receive_post, never the bare receive engine", async () => {
-    const rpc = vi.fn().mockResolvedValue({
-      data: { receipt_id: "r1", status: "posted", units_counted: 1 },
-      error: null,
+  it("the surviving Office door saves then posts the same session, never a direct receive", async () => {
+    const rpc = vi.fn()
+      .mockResolvedValueOnce({ data: { receipt_id: "r1", status: "draft", lock_version: 1 }, error: null })
+      .mockResolvedValueOnce({ data: { receipt_id: "r1", status: "posted", grn_number: "GRN-20260831-0001" }, error: null });
+    // Make the continuation fail deliberately: posting stays successful and
+    // the durable event is the supervisor-visible repair fact.
+    const from = vi.fn(() => {
+      throw new Error("reservation continuation unavailable");
     });
-    // The route also runs the post-receive auto-reserve, which reads tables.
-    const from = vi.fn().mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          eq: vi.fn().mockResolvedValue({ data: [], error: null }),
-          in: vi.fn().mockResolvedValue({ data: [], error: null }),
-        }),
-      }),
-    });
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue({ rpc, from } as any);
     const jwt = await makeJwt("operation");
@@ -871,20 +868,87 @@ describe("the Office has exactly ONE receiving door", () => {
         method: "POST",
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
         body: JSON.stringify({
-          doNumber: "DO-1234",
-          doFilePath: "x/y.pdf",
-          lines: [{ id: LINE, receivedNow: 1 }],
+          sourceKind: "purchase_order",
+          sourceId: "PO-2050",
+          expectedVersion: 2,
+          supplierDoNo: "DO-1234",
+          signedDoPath: "x/y.pdf",
+          goodsReceivedAt: "2026-08-31T02:00:00.000Z",
+          note: null,
+          lines: [{
+            poLineId: LINE,
+            sku: "MS01-K",
+            receivedQty: 1,
+            damagedQty: 0,
+            wrongItemQty: 0,
+            extraQty: 0,
+            unitIds: ["id-abc123456"],
+            damagedPhotos: [],
+            wrongItemPhotos: [],
+            extraEvidence: [],
+            wrongItemReason: null,
+          }],
         }),
       }),
       env,
     );
     expect(res.status).toBe(200);
-    expect(rpc.mock.calls[0][0]).toBe("office_receive_post");
+    expect(rpc.mock.calls[0][0]).toBe("save_receiving_session");
+    expect(rpc.mock.calls[1][0]).toBe("post_receiving_session");
+    expect(rpc.mock.calls[2]).toEqual([
+      "record_receiving_continuation_failure",
+      {
+        p_receipt_id: "r1",
+        p_code: "reservation_continuation_failed",
+        p_message: expect.any(String),
+      },
+    ]);
     // DATA INTEGRITY (Jess): the Office may never reach the receive engine
     // directly — that is the path that moves stock and opens no Session.
     expect(
       rpc.mock.calls.some((c: unknown[]) => c[0] === "operation_receive_po_with_do"),
     ).toBe(false);
+    expect(rpc.mock.calls.some((c: unknown[]) => c[0] === "office_receive_post")).toBe(false);
+    consoleError.mockRestore();
+  });
+
+  it("makes a refused reservation continuation observable to the posting door", async () => {
+    const rows: Record<string, unknown[]> = {
+      purchase_orders: [{ so: 1307, warehouse_id: null }],
+      orders: [{ id: "order-1" }],
+      order_lines: [{ sku: "MS01-K", qty: 1 }],
+      ops_stock_items: [
+        { id: "unit-1", sku: "MS01-K", status: "free", po_no: "PO-2050" },
+      ],
+    };
+    let stockRead = 0;
+    const sb = {
+      from: vi.fn((table: string) => {
+        const builder: Record<string, unknown> = {};
+        for (const method of ["select", "eq", "order"]) {
+          builder[method] = vi.fn(() => builder);
+        }
+        builder.maybeSingle = vi.fn(async () => ({
+          data: rows[table]?.[0] ?? null,
+          error: null,
+        }));
+        builder.then = (resolve: (value: unknown) => unknown) => {
+          const data = table === "ops_stock_items"
+            ? (stockRead++ === 0 ? [] : rows[table])
+            : rows[table] ?? [];
+          return Promise.resolve({ data, error: null }).then(resolve);
+        };
+        return builder;
+      }),
+      rpc: vi.fn(async () => ({
+        data: null,
+        error: { message: "bind refused", details: "unit_changed" },
+      })),
+    };
+
+    await expect(
+      autoReserveReceivedToSourceOrder(sb, "PO-2050"),
+    ).rejects.toThrow("unit_changed");
   });
 });
 

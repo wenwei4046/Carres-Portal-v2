@@ -136,13 +136,8 @@ export function numericPrefixRanges(
 }
 
 /**
- * The ISO date a `GRN-DDMMYY-NNNN` query names, or null when the query has not
- * reached a full date yet.
- *
- * A Receiving Record's number is DERIVED, never stored (`receivingRecordNo`),
- * so the only way to look one up exactly is to read its date back out of the
- * number and ask the database for that day. Without this an exact GRN lookup
- * would depend on how far back the recent-records window happens to reach.
+ * Normalise exact or partial stored `GRN-YYYYMMDD-RRRR` identity for lookup.
+ * The document's posting date never stands in for Goods Received At.
  */
 export function grnSearchTerm(term: string): string | null {
   const value = term.trim().toUpperCase();

@@ -7,7 +7,7 @@ import {
   listPurchaseOrdersQuery,
   normalizeSkuKey,
   reassignPoWarehouseInput,
-  officeReceiveInput,
+  receivingSessionInputSchema,
   recordBalanceDateInput,
   recordReadyDateInput,
   recordSupplierAnswerInput,
@@ -1461,61 +1461,57 @@ operationPosRouter.get("/:id/source-orders", requireOperation, async (c) => {
 
 // ----- POST /:id/receive — RETIRED 2026-08-03 (Card C1, Jess) -----
 //
-// This was the Office's receiving door and it opened NO Receiving Session:
-// it called `operation_receive_po_with_do` directly, so stock moved and the
-// delivery left no record, no event and no GRN. `POST /:id/office-receive`
-// below is the one Office door now, and it goes through `office_receive_post`
-// (0315) — Session, event and stock in one transaction.
+// This was the Office's direct stock door and it opened NO Receiving Session.
+// `POST /:id/office-receive` below is the compatibility entrance now: it saves
+// and posts the same durable session used by the Receiving page.
 //
 // Deleted rather than left standing: with `ReceivePOModal` gone this route had
 // zero callers, and a live route with no caller is a bypass one curl away. A
 // browser still holding the old bundle now meets a loud 404 instead of quietly
 // writing a receive nobody can trace.
 //
-// The RPC itself stays — it is the ONE receive engine, called by
-// `office_receive_post`, `warehouse_receipt_check_in` and the partner's
-// arrive-at-warehouse route.
+// The historical RPC may remain for old database compatibility, but no current
+// application route calls it.
 
 // ----- POST /:id/office-receive -----
 //
-// Slice B — the Office Receiving Workspace's ONE write door (migration 0315
-// `office_receive_post`). A thin door: every rule lives in the RPC, which
-// shares `warehouse_receipt_validate_lines` with the warehouse's door and
-// hands the stock movement to the same `operation_receive_po_with_do`.
+// The Office Receiving Workspace's compatibility entrance. Every rule and
+// stock consequence belongs to the same save/post session functions.
 //
-// What this route does that `/receive` above does NOT: it opens a **Receiving
-// Session** — one physical delivery, one record, one `posted` event. Ops
-// receiving through `/receive` leaves no document at all, which is why the
-// Workspace never calls it.
+// It opens one **Receiving Session** — one physical delivery, one stored GRN
+// after posting and one event ledger.
 //
 // Reshape at the boundary, the same discipline as `/receive`: the wire is
 // camelCase, `p_lines` is snake_case. `received_now` is a DELTA here, not a
 // new total — the Session stores what THIS delivery brought and the engine
 // derives the cumulative figure (RECEIVING-INFORMATION-MODEL §7.1).
 operationPosRouter.post("/:id/office-receive", requireOperation, async (c) => {
-  const parsed = await parseJsonBody(c, officeReceiveInput);
+  const parsed = await parseJsonBody(c, receivingSessionInputSchema);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  if (parsed.data.sourceKind !== "purchase_order" || parsed.data.sourceId !== c.req.param("id")) {
+    return c.json({
+      error: "invalid_input",
+      code: "source_mismatch",
+      message: "The Receiving source must match the Purchase Order in the address.",
+    }, 422);
+  }
   const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb.rpc("office_receive_post", {
-    p_po_id: c.req.param("id"),
-    p_do_number: parsed.data.doNumber,
-    p_do_file_path: parsed.data.doFilePath,
-    p_note: parsed.data.note ?? null,
-    // Omitted → the RPC stamps today in MYT. The browser's clock never
-    // decides a business date.
-    p_goods_received_at: parsed.data.goodsReceivedAt ?? null,
-    p_lines: parsed.data.lines.map((l) => ({
-      id: l.id,
-      received_now: l.receivedNow,
-      damaged_qty: l.damagedQty ?? 0,
-      wrong_item_qty: l.wrongItemQty ?? 0,
-      damaged_photos: l.damagedPhotos ?? [],
-      wrong_item_claim_type: l.wrongItemClaimType ?? null,
-      wrong_item_photos: l.wrongItemPhotos ?? [],
-    })),
+  const saved = await sb.rpc("save_receiving_session", {
+    p_receipt_id: null,
+    p_expected_version: 0,
+    p_payload: parsed.data,
   });
-  if (error) {
-    const m = mapPgError(error);
+  if (saved.error) {
+    const m = mapPgError(saved.error);
+    return c.json(m.body, m.status);
+  }
+  const draft = (saved.data ?? {}) as Record<string, unknown>;
+  const posted = await sb.rpc("post_receiving_session", {
+    p_receipt_id: String(draft.receipt_id ?? ""),
+    p_expected_version: Number(draft.lock_version ?? 1),
+  });
+  if (posted.error) {
+    const m = mapPgError(posted.error);
     return c.json(m.body, m.status);
   }
   // The SAME post-receive step `/receive` runs. Without it, goods booked in
@@ -1526,8 +1522,13 @@ operationPosRouter.post("/:id/office-receive", requireOperation, async (c) => {
     await autoReserveReceivedToSourceOrder(sb, c.req.param("id"));
   } catch (e) {
     console.error("post-receive auto-reserve failed (non-fatal):", e);
+    await sb.rpc("record_receiving_continuation_failure", {
+      p_receipt_id: String(draft.receipt_id ?? ""),
+      p_code: "reservation_continuation_failed",
+      p_message: e instanceof Error ? e.message : "Reservation continuation failed",
+    });
   }
-  return c.json(data);
+  return c.json(posted.data);
 });
 
 // ----- GET /:id/receiving -----
@@ -1625,7 +1626,7 @@ operationPosRouter.get("/:id/receiving", requireOperation, async (c) => {
  * reserved to this SO, so a partial / repeat receive can never over-reserve.
  * The operator can release any of it from On Hand.
  */
-async function autoReserveReceivedToSourceOrder(
+export async function autoReserveReceivedToSourceOrder(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   sb: any,
   poId: string,
@@ -1711,9 +1712,11 @@ async function autoReserveReceivedToSourceOrder(
   });
   if (bindErr) {
     // Labelling is a consequence of receiving, not the receipt itself: the
-    // goods ARE here. Surfacing this as a failed receive would be a lie, so
-    // it is logged and the units stay free for the operator to bind by hand.
-    console.error("autoReserveReceivedToSourceOrder: bind refused", bindErr);
+    // goods ARE here. Throw to the posting door so it records a visible
+    // continuation failure while the units stay free for manual binding.
+    throw new Error(
+      String(bindErr.details ?? bindErr.message ?? "Stock reservation continuation was refused"),
+    );
   }
 }
 

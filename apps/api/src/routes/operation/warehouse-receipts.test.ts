@@ -11,7 +11,7 @@ import app from "../../index";
 import { _setJwksForTesting } from "../../middleware/auth";
 
 vi.mock("../../lib/supabase", () => ({ userClient: vi.fn(), adminClient: vi.fn() }));
-import { userClient } from "../../lib/supabase";
+import { adminClient, userClient } from "../../lib/supabase";
 
 /**
  * R6 — /api/operation/warehouse-receipts (the ops half).
@@ -34,6 +34,29 @@ let publicJwk: JWK;
 const WH = "00000000-0000-0000-0000-000000000c03";
 const USER = "00000000-0000-0000-0000-0000000000aa";
 const RECEIPT = "22222222-2222-2222-2222-222222222222";
+const LINE = "11111111-1111-1111-1111-111111111111";
+const SESSION_INPUT = {
+  sourceKind: "purchase_order",
+  sourceId: "PO-1001",
+  expectedVersion: 2,
+  supplierDoNo: "DO-5512",
+  signedDoPath: "PO-1001/abc-do.jpg",
+  goodsReceivedAt: "2026-08-31T02:00:00.000Z",
+  note: null,
+  lines: [{
+    poLineId: LINE,
+    sku: "MS01-K",
+    receivedQty: 1,
+    damagedQty: 0,
+    wrongItemQty: 0,
+    extraQty: 0,
+    unitIds: ["id-abc123456"],
+    damagedPhotos: [],
+    wrongItemPhotos: [],
+    extraEvidence: [],
+    wrongItemReason: null,
+  }],
+};
 
 async function makeJwt(role: string) {
   return new SignJWT({ email: `${role}@x`, app_metadata: { role } })
@@ -94,6 +117,14 @@ beforeAll(async () => {
 beforeEach(() => {
   _setJwksForTesting(createLocalJWKSet({ keys: [publicJwk] }));
   vi.mocked(userClient).mockReset();
+  vi.mocked(adminClient).mockReset();
+  vi.mocked(adminClient).mockReturnValue({
+    storage: {
+      from: vi.fn(() => ({
+        createSignedUrls: vi.fn(async () => ({ data: [], error: null })),
+      })),
+    },
+  } as never);
 });
 
 afterAll(() => _setJwksForTesting(null));
@@ -272,7 +303,7 @@ describe("GET /api/operation/warehouse-receipts", () => {
 });
 
 describe("POST /:id/check-in", () => {
-  it("delegates to the one check-in RPC and sends no numbers of its own", async () => {
+  it("delegates to the one posting RPC with optimistic version", async () => {
     const sb = makeSb(opsTables(), {
       data: { receipt_id: RECEIPT, po_id: "PO-1001", status: "checked_in" },
     });
@@ -283,11 +314,18 @@ describe("POST /:id/check-in", () => {
       `/api/operation/warehouse-receipts/${RECEIPT}/check-in`,
       "POST",
       await makeJwt("operation"),
+      { expectedVersion: 3 },
     );
     expect(res.status).toBe(200);
-    expect(sb.rpc).toHaveBeenCalledTimes(1);
-    expect(sb.rpc).toHaveBeenCalledWith("warehouse_receipt_check_in", {
+    expect(sb.rpc).toHaveBeenCalledTimes(2);
+    expect(sb.rpc).toHaveBeenCalledWith("post_receiving_session", {
       p_receipt_id: RECEIPT,
+      p_expected_version: 3,
+    });
+    expect(sb.rpc).toHaveBeenCalledWith("record_receiving_continuation_failure", {
+      p_receipt_id: RECEIPT,
+      p_code: "reservation_continuation_failed",
+      p_message: expect.any(String),
     });
     // "ops only reviews" — this router must never call the receive engine
     // directly, or there would be two receive paths to keep in step.
@@ -304,6 +342,7 @@ describe("POST /:id/check-in", () => {
       `/api/operation/warehouse-receipts/${RECEIPT}/check-in`,
       "POST",
       await makeJwt("principal"),
+      { expectedVersion: 3 },
     );
     expect(res.status).toBe(200);
   });
@@ -322,6 +361,7 @@ describe("POST /:id/check-in", () => {
       `/api/operation/warehouse-receipts/${RECEIPT}/check-in`,
       "POST",
       await makeJwt("operation"),
+      { expectedVersion: 3 },
     );
     expect(res.status).toBeGreaterThanOrEqual(400);
     expect(JSON.stringify(await res.json())).toContain("already been reviewed");
@@ -338,11 +378,12 @@ describe("POST /:id/send-back", () => {
       `/api/operation/warehouse-receipts/${RECEIPT}/send-back`,
       "POST",
       await makeJwt("operation"),
-      { reason: "  DO photo is unreadable — send it again  " },
+      { expectedVersion: 3, reason: "  DO photo is unreadable — send it again  " },
     );
     expect(res.status).toBe(200);
-    expect(sb.rpc).toHaveBeenCalledWith("warehouse_receipt_return", {
+    expect(sb.rpc).toHaveBeenCalledWith("return_receiving_session", {
       p_receipt_id: RECEIPT,
+      p_expected_version: 3,
       p_reason: "DO photo is unreadable — send it again",
     });
   });
@@ -351,7 +392,7 @@ describe("POST /:id/send-back", () => {
     const sb = makeSb(opsTables());
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue(sb as any);
-    for (const body of [{}, { reason: "" }, { reason: "   " }]) {
+    for (const body of [{}, { expectedVersion: 3, reason: "" }, { expectedVersion: 3, reason: "   " }]) {
       const res = await req(
         `/api/operation/warehouse-receipts/${RECEIPT}/send-back`,
         "POST",
@@ -361,5 +402,56 @@ describe("POST /:id/send-back", () => {
       expect(res.status).toBe(422);
     }
     expect(sb.rpc).not.toHaveBeenCalled();
+  });
+});
+
+describe("governed Receiving Session mutation doors", () => {
+  it("creates a persistent Draft through the one save RPC", async () => {
+    const sb = makeSb(opsTables(), { data: { receipt_id: RECEIPT, status: "draft", lock_version: 1 } });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await req("/api/operation/warehouse-receipts", "POST", await makeJwt("operation"), SESSION_INPUT);
+    expect(res.status).toBe(201);
+    expect(sb.rpc).toHaveBeenCalledWith("save_receiving_session", {
+      p_receipt_id: null,
+      p_expected_version: 0,
+      p_payload: SESSION_INPUT,
+    });
+  });
+
+  it("saves and submits the same session with expectedVersion on every mutation", async () => {
+    const sb = makeSb(opsTables(), { data: { receipt_id: RECEIPT } });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    await req(`/api/operation/warehouse-receipts/${RECEIPT}`, "PATCH", await makeJwt("operation"), {
+      expectedVersion: 4,
+      session: SESSION_INPUT,
+    });
+    expect(sb.rpc).toHaveBeenLastCalledWith("save_receiving_session", {
+      p_receipt_id: RECEIPT,
+      p_expected_version: 4,
+      p_payload: SESSION_INPUT,
+    });
+
+    await req(`/api/operation/warehouse-receipts/${RECEIPT}/submit`, "POST", await makeJwt("operation"), {
+      expectedVersion: 5,
+    });
+    expect(sb.rpc).toHaveBeenLastCalledWith("submit_receiving_session", {
+      p_receipt_id: RECEIPT,
+      p_expected_version: 5,
+    });
+  });
+
+  it("never calls either retired direct receive writer", async () => {
+    const sb = makeSb(opsTables(), { data: { receipt_id: RECEIPT } });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    await req(`/api/operation/warehouse-receipts/${RECEIPT}/check-in`, "POST", await makeJwt("operation"), {
+      expectedVersion: 3,
+    });
+    const called = sb.rpc.mock.calls.map((call) => call[0]);
+    expect(called).not.toContain("operation_receive_po_with_do");
+    expect(called).not.toContain("office_receive_post");
+    expect(called).not.toContain("warehouse_receipt_check_in");
   });
 });
