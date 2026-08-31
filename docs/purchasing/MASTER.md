@@ -1199,7 +1199,30 @@ missing governed Catalog/supplier relationship, refused/withdrawn request.
 
 **Purpose / source:** every numbered supplier purchase commitment and version. No blank independent
 PO; source is approved demand.
-**Left rail:** `PDF not sent`, `Supplier date missing`, `Supplier date passed`, `Version changed — supplier update required`, `Partly received`, `Completed`.
+**Left rail — OWNER-CORRECTED 2026-08-31 (Card 07):** the open 240px rail has no visible generic
+`Filters` title. It uses business groups and the existing filter truth/counts:
+
+```text
+PURCHASE ORDERS
+  All purchase orders
+
+DOCUMENT
+  PDF not sent
+  Version changed
+  Send the new version to supplier   ← line 2 of the same row/count
+
+DELIVERY DATE
+  Supplier date missing
+  Supplier date passed
+
+RECEIVING
+  Partly received
+  Completed
+```
+
+The version row is one `supplier_update_required` filter, not two rows. Its fact and action are
+deliberate separate lines; the em dash and the ambiguous phrase `supplier update required` never
+render. Grouping changes no population, filter key, count, permission or completion fact.
 **Date facts:** `PO Issued` sits beside `PO No` and means when Carres issued the current supplier
 commitment. `PO Delivery Date` is the original official supplier-facing date on the PO. A separate
 `Supplier Delivery Date` Register column appears only when the supplier has changed that date;
