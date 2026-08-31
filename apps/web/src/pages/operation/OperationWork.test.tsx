@@ -215,11 +215,93 @@ describe("OperationWork — two filters over the one open work set", () => {
     expect(screen.getByTestId("work-empty")).toHaveTextContent("not in the staff list");
   });
 
-  it("a row is a DOOR — clicking opens the order workspace, the page writes nothing", () => {
+  it("Assign logistics opens the exact Delivery arrangement, not the Sales Order", () => {
     listState.data = { orders: [makeRow({ id: "a", so: 1201 })] };
     wrap(<OperationWork />);
     fireEvent.click(screen.getByTestId("work-row-SO-1201-assign_logistics"));
-    expect(navigateSpy).toHaveBeenCalledWith("/operation/orders/so/a");
+    expect(navigateSpy).toHaveBeenCalledWith("/operation/delivery/edit/a");
+  });
+
+  it("Record Delivery Result opens the active DO object", () => {
+    stockState.data = {
+      warehouses: [],
+      skus: [
+        {
+          sku: "B1201S-K",
+          name: "Mattress",
+          category: "mattress",
+          price: 0,
+          available: 1,
+          lowThreshold: 0,
+          incoming: 0,
+          perWarehouse: {},
+        },
+      ],
+      summary: { totalSkus: 1, lowStockCount: 0, openPos: 0 },
+    };
+    listState.data = {
+      orders: [
+        makeRow({
+          id: "trip-a",
+          so: 1205,
+          operation_stage: "ready_to_dispatch",
+          do_number: "DO-260731-1205",
+          order_lines: [{ sku: "B1201S-K", qty: 1 }],
+          delivery_partners: { id: "lp-1", name: "NETS" },
+          ops_order_control: [
+            {
+              assigned_staff: OP_UID,
+              booking_stage: "confirmed",
+              confirmed_date: "2026-07-27",
+              confirmed_time_slot: "Morning (9am–12pm)",
+            } as never,
+          ],
+        }),
+      ],
+    };
+    wrap(<OperationWork />, "/operation?tab=work&scope=team");
+    fireEvent.click(screen.getByTestId("work-row-SO-1205-deliver_today"));
+    expect(navigateSpy).toHaveBeenCalledWith(
+      "/operation/delivery-orders/DO-260731-1205",
+    );
+  });
+
+  it("Delivery Order work with no issued DO opens the exact Delivery scope", () => {
+    stockState.data = {
+      warehouses: [],
+      skus: [{
+        sku: "B1201S-K",
+        name: "Mattress",
+        category: "mattress",
+        price: 0,
+        available: 1,
+        lowThreshold: 0,
+        incoming: 0,
+        perWarehouse: {},
+      }],
+      summary: { totalSkus: 1, lowStockCount: 0, openPos: 0 },
+    };
+    listState.data = {
+      orders: [
+        makeRow({
+          id: "trip-without-do",
+          so: 1206,
+          do_number: null,
+          order_lines: [{ sku: "B1201S-K", qty: 1 }],
+          delivery_partners: { id: "lp-1", name: "NETS" },
+          ops_order_control: [{
+            assigned_staff: OP_UID,
+            booking_stage: "confirmed",
+            confirmed_date: "2026-07-27",
+          } as never],
+        }),
+      ],
+    };
+    wrap(<OperationWork />, "/operation?tab=work&scope=team");
+    fireEvent.click(screen.getByTestId("work-row-SO-1206-deliver_today"));
+    expect(navigateSpy).toHaveBeenCalledWith(
+      "/operation/delivery/edit/trip-without-do",
+    );
   });
 
   it("no open work → the quiet clear sentence, never an invented item", () => {
@@ -354,9 +436,31 @@ describe("OperationWork — a duty row belongs to its duty, not to the order's o
     wrap(<OperationWork />, "/operation?tab=work&scope=team");
 
     const delivery = screen.getByTestId("work-owner-group-duty:Delivery staff");
-    expect(
-      delivery.querySelector('[data-testid="work-row-SO-1204-collect_loan_item"]'),
-    ).toBeTruthy();
+    const row = delivery.querySelector(
+      '[data-testid="work-row-SO-1204-collect_loan_item"]',
+    ) as HTMLElement;
+    expect(row).toBeTruthy();
+    fireEvent.click(row);
+    expect(navigateSpy).toHaveBeenCalledWith("/operation/orders/so/a");
+  });
+
+  it("delivery-photo work keeps the exact existing upload writer reachable", () => {
+    listState.data = {
+      orders: [
+        makeRow({
+          id: "photo-order",
+          so: 1207,
+          status: "delivered",
+          operation_stage: "delivered",
+          delivered_at: "2026-07-20T00:00:00Z",
+          do_number: "DO-260720-1207",
+          ops_order_control: [{ assigned_staff: OP_UID, delivery_photos: [] } as never],
+        }),
+      ],
+    };
+    wrap(<OperationWork />, "/operation?tab=work&scope=team");
+    fireEvent.click(screen.getByTestId("work-row-SO-1207-upload_delivery_photo"));
+    expect(navigateSpy).toHaveBeenCalledWith("/operation/orders/so/photo-order");
   });
 
   it("Finance's exception stays out of the salesperson's My Work", () => {

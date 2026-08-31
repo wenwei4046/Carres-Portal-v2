@@ -35,6 +35,7 @@ import {
 } from "./purchasing-sidebar";
 
 const COLLAPSE_KEY = "ops-sidebar-collapsed";
+const NARROW_DESKTOP_QUERY = "(max-width: 1279px)";
 
 /* ⭐ THE MEASURED RAIL (CARD-2026-08-19-sidebar-expandable-modules §3).
  *
@@ -161,11 +162,23 @@ export default function PortalSidebar() {
   // Collapse — self-owned, persisted. Icon rail = more room for wide tables.
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     try {
-      return localStorage.getItem(COLLAPSE_KEY) === "1";
+      return (
+        localStorage.getItem(COLLAPSE_KEY) === "1" ||
+        window.matchMedia?.(NARROW_DESKTOP_QUERY).matches === true
+      );
     } catch {
       return false;
     }
   });
+  useEffect(() => {
+    const media = window.matchMedia?.(NARROW_DESKTOP_QUERY);
+    if (!media) return;
+    const collapseAtNarrowDesktop = (event: MediaQueryListEvent) => {
+      if (event.matches) setCollapsed(true);
+    };
+    media.addEventListener("change", collapseAtNarrowDesktop);
+    return () => media.removeEventListener("change", collapseAtNarrowDesktop);
+  }, []);
   const toggleCollapse = () =>
     setCollapsed((c) => {
       const next = !c;

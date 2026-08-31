@@ -197,10 +197,28 @@ describe("the shape", () => {
     ).toBe("Delivery");
   });
 
-  it("draws the 200px local rail and one listing beside it", () => {
+  it("draws the governed 240px local rail and one listing beside it", () => {
     wrap(<OperationDelivery />);
-    expect(screen.getByTestId("delivery-work-rail").className).toContain("w-[200px]");
+    expect(screen.getByTestId("delivery-work-rail").className).toContain("w-[240px]");
     expect(screen.getByTestId("delivery-work-listing")).toBeTruthy();
+  });
+
+  it("hides the local rail below 1280 until staff choose Show filters", () => {
+    wrap(<OperationDelivery />);
+    const rail = screen.getByTestId("delivery-work-rail");
+    expect(rail.className).toContain("hidden");
+    expect(rail.className).toContain("xl:flex");
+
+    const toggle = screen.getByRole("button", { name: "Show filters" });
+    expect(toggle.className).toContain("xl:hidden");
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(toggle);
+
+    expect(rail.className).toContain("flex");
+    expect(screen.getByRole("button", { name: "Hide filters" })).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
   });
 
   it("orders the DELIVERY SCHEDULE rail: no confirmed date, Overdue, then real days", () => {
@@ -698,9 +716,10 @@ describe("the rail says Overdue, and shows the days ahead", () => {
     ordersState.data = { orders: [order({ id: "a", so: 1322 })] };
     wrap(<OperationDelivery />);
     const rail = screen.getByTestId("delivery-work-rail");
-    // TODAY is Fri 21 Aug 2026 — the window runs to Thu 27 Aug.
+    // TODAY is Fri 21 Aug 2026 — seven operating days run to Fri 28 Aug.
     expect(within(rail).getByText("Fri, 21 Aug")).toBeInTheDocument();
-    expect(within(rail).getByText("Thu, 27 Aug")).toBeInTheDocument();
+    expect(within(rail).getByText("Fri, 28 Aug")).toBeInTheDocument();
+    expect(within(rail).queryByText("Sun, 23 Aug")).toBeNull();
     expect(within(rail).queryByText("Today")).toBeNull();
     expect(within(rail).queryByText("Tomorrow")).toBeNull();
   });

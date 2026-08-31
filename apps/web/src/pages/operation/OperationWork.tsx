@@ -45,6 +45,17 @@ import { useOpenWorkSet, type WorkRow } from "./use-open-work";
 
 type ViewKey = "mine" | "team";
 
+const DELIVERY_ARRANGEMENT_ACTIONS = new Set([
+  "assign_logistics",
+  "confirm_delivery_date",
+  "arrange_new_delivery_date",
+]);
+
+const DELIVERY_ORDER_ACTIONS = new Set([
+  "deliver_today",
+  "issue_delivery_order",
+]);
+
 const TONE_DOT: Record<string, string> = {
   danger: "bg-danger",
   warning: "bg-warning",
@@ -192,13 +203,29 @@ export default function OperationWork() {
   const visible = activeView === "mine" ? mine : allItems;
   const lateCount = visible.filter((i) => i.workingDaysLate > 0).length;
 
-  /* A row is a DOOR to its exact source (Card 06 §7): an order-track item
-     opens the Sales Order Workspace; a Manual Purchase action deep-links
-     the exact MPR object. */
-  const openRow = (i: WorkRow) =>
-    i.ruleKey.startsWith("manual_purchase.")
-      ? navigate(`/operation?tab=manual-purchase&mpr=${i.orderId}`)
-      : navigate(`/operation/orders/so/${i.orderId}`);
+  /* A row is a DOOR to the object that owns the act. Delivery arrangement
+     work opens Delivery's editor; trip/result work opens the active DO. The
+     photo and loan rows retain the Sales Order until their existing governed
+     writers are mounted on the DO; a precise working door beats a dead one. */
+  const openRow = (i: WorkRow) => {
+    if (i.ruleKey.startsWith("manual_purchase.")) {
+      navigate(`/operation?tab=manual-purchase&mpr=${i.orderId}`);
+      return;
+    }
+    if (DELIVERY_ARRANGEMENT_ACTIONS.has(i.ruleKey)) {
+      navigate(`/operation/delivery/edit/${encodeURIComponent(i.orderId)}`);
+      return;
+    }
+    if (DELIVERY_ORDER_ACTIONS.has(i.ruleKey)) {
+      navigate(
+        i.deliveryDoNumber
+          ? `/operation/delivery-orders/${encodeURIComponent(i.deliveryDoNumber)}`
+          : `/operation/delivery/edit/${encodeURIComponent(i.orderId)}`,
+      );
+      return;
+    }
+    navigate(`/operation/orders/so/${i.orderId}`);
+  };
 
   return (
     <ListPageShell
