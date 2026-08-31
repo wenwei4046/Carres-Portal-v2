@@ -300,7 +300,15 @@ const RAIL_OC = railOrder({
   deliveryState: "Johor",
   status: "ordered",
   pos: [po("PO-1", "Nice Future")],
-  lines: [line({ orderLineId: "c1", sku: "S9-2A", item: "Sofa", category: "sofa" })],
+  lines: [
+    line({
+      orderLineId: "c1",
+      sku: "S9-2A",
+      item: "Sofa",
+      category: "sofa",
+      pos: [{ poId: "PO-1", qty: 1 }],
+    }),
+  ],
 });
 /* oD — the one setup blocker, on a sofa from Ohana. */
 const RAIL_OD = railOrder({
@@ -315,7 +323,14 @@ const RAIL_OE = railOrder({
   orderId: "oE",
   status: "ordered",
   pos: [po("PO-2", "Hooka")],
-  lines: [line({ orderLineId: "e1", sku: "MATTRESS-SPECIAL-K", category: null })],
+  lines: [
+    line({
+      orderLineId: "e1",
+      sku: "MATTRESS-SPECIAL-K",
+      category: null,
+      pos: [{ poId: "PO-2", qty: 1 }],
+    }),
+  ],
 });
 const RAIL_ORDERS = [RAIL_OA, RAIL_OB, RAIL_OC, RAIL_OD, RAIL_OE];
 const RAIL_LEAFS = [
@@ -346,6 +361,23 @@ describe("the rail model — unique-SO counts that cross-update between sections
     expect(m.timingCounts.can_order_early).toBe(1);
     expect(m.productCounts.mattress).toBe(2); // oA + oB, not four lines
     expect(m.notOrderedCount).toBe(3); // oA · oB · oD — outstanding only
+  });
+
+  it("counts an uncovered Register line even when the issue leaf is absent", () => {
+    const uncovered = railOrder({
+      orderId: "open-po-pool-mismatch",
+      lines: [line({ orderLineId: "uncovered-line", qty: 1, stockTaken: 0, pos: [] })],
+      outstandingSuppliers: ["Ohana"],
+    });
+    const m = soBatchRailModel(soBatchRailFacts([uncovered], []), SO_BATCH_RAIL_CLEAR);
+
+    expect(m.notOrderedCount).toBe(1);
+    expect(
+      soBatchRailModel(soBatchRailFacts([uncovered], []), {
+        ...SO_BATCH_RAIL_CLEAR,
+        notOrderedOnly: true,
+      }).visibleOrderIds,
+    ).toEqual(new Set(["open-po-pool-mismatch"]));
   });
 
   it("every timing band is present, zero included — an empty band prints 0, not silence", () => {

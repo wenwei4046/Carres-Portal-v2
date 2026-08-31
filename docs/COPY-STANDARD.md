@@ -695,7 +695,10 @@ matches — except the selected row, which stays visible with `0`. Region reads 
 recorded Delivery State: Kuala Lumpur, Selangor and Putrajaya group as `Klang Valley`; every
 outstation state keeps its own name; an absent state is `Others`. The default no-filter Register
 shows every proceeded record; `All not ordered` is a real outstanding-only filter that
-excludes fully Ordered records. One filter per section; sections combine; a second click on
+reads customer quantity less Ready Stock already taken and less exact, non-cancelled PO lineage.
+A generic Open PO SKU pool is not proof that this SO was ordered; without exact
+`po_line_sources`, the SO remains in `All not ordered`. The issue leaf is not the count
+authority. One filter per section; sections combine; a second click on
 the selected timing row clears it; `All products`, `All suppliers` and `All regions` clear
 their sections.
 The rail carries NO checkboxes — filters are `NavRow` rows; the only checkboxes on the page

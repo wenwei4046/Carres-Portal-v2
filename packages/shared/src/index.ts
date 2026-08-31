@@ -2193,6 +2193,7 @@ export {
   SO_BATCH_RAIL,
   SO_BATCH_RAIL_CLEAR,
   soBatchOrderSupplierNames,
+  soBatchOrderLineOutstandingQty,
   soBatchRailFacts,
   soBatchRailModel,
   type SoBatchProductCategory,

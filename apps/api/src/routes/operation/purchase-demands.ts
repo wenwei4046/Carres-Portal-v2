@@ -5,6 +5,7 @@ import {
   purchaseDemandQuantities,
   purchaseDemandTimingOf,
   soBatchAction,
+  soBatchOrderLineOutstandingQty,
   soBatchOrderStatusOf,
   PURCHASE_DEMAND_OWNER_DUTY,
   type ProductCategory,
@@ -210,15 +211,13 @@ async function loadRegisterRows(
         .map(([poId, qty]) => ({ poId, qty }))
         .sort((a, b) => a.poId.localeCompare(b.poId));
       const required = Math.max(0, l.qty - l.stockTaken);
-      const linked = pos.reduce((s, p) => s + p.qty, 0);
       const sent = pos.reduce(
         (s, p) => (sentCurrent(poById.get(p.poId)!) ? s + p.qty : s),
         0,
       );
       buyingRequiredQty += required;
       sentCoveredQty += Math.min(required, sent);
-      if (required > linked && l.supplierId) outstandingSupplierIds.add(l.supplierId);
-      return {
+      const lineFact: SoBatchOrderLineFact = {
         orderLineId: l.lineId,
         sku: l.sku,
         qty: l.qty,
@@ -228,6 +227,10 @@ async function loadRegisterRows(
         category: (l.category as ProductCategory | null) ?? null,
         pos,
       };
+      if (soBatchOrderLineOutstandingQty(lineFact) > 0 && l.supplierId) {
+        outstandingSupplierIds.add(l.supplierId);
+      }
+      return lineFact;
     });
     lines.sort((a, b) => a.sku.localeCompare(b.sku) || a.orderLineId.localeCompare(b.orderLineId));
 
