@@ -17,6 +17,7 @@
 import { describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { DataGrid, type DataGridColumn } from "./DataGrid";
+import styles from "./DataGrid.module.css";
 
 interface Row {
   id: string;
@@ -54,6 +55,24 @@ function pinnedCells(): HTMLElement[] {
     (el) => el.style.position === "sticky" || el.style.left !== "",
   );
 }
+
+describe("DataGrid · Register listing frame", () => {
+  it("paints a complete four-sided frame for every reference Register", () => {
+    render(
+      <DataGrid<Row>
+        rows={ROWS}
+        columns={COLUMNS}
+        storageKey="test.frame.reference"
+        rowKey={(r) => r.id}
+        appearance="reference"
+      />,
+    );
+    const frame = screen.getByTestId("sales-orders-grid");
+    // jsdom does not paint CSS Modules. The module class is the real visual
+    // boundary the component ships; removing it is the production regression.
+    expect(frame).toHaveClass(styles.rootFramed);
+  });
+});
 
 describe("DataGrid · stickyIdentity", () => {
   it("pins NOTHING by default — an unwired power must stay invisible", () => {

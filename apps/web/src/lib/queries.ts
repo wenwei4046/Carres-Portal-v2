@@ -28,6 +28,7 @@ import {
   type SkuImportRow,
   type SkuImportResult,
   type StockEtaImportRow,
+  type ManualPurchaseHistoryEvent,
   type AppendMissingLinesInput,
   type AppendMissingLinesResult,
   type StorageFeeImportRow,
@@ -228,10 +229,13 @@ import {
   type RecordSupplierAnswerInput,
   // P1 (0303) — Purchasing → Settings.
   type PurchasingSettingsResponse,
+  type PurchasingCreateDestinationInput,
   type PurchasingSetNumberInput,
   type PurchasingSetPoDaysInput,
   type PurchasingSetProductionDaysInput,
   type PurchasingSetWorkWeekInput,
+  type PurchasingUpdateDestinationInput,
+  type PurchasingSetSupplierCollectionInput,
   // 0244/0245 — HR commission portal (GET /api/hr/report + config writes).
   type CommissionReport,
   type CommissionStaff,
@@ -4435,6 +4439,11 @@ export interface PurchaseRequestRow {
   refused_at: string | null;
   refused_by: string | null;
   refuse_reason: string | null;
+  /** Card 04 — the STRUCTURED For fact, per purpose; null on other
+   *  purposes and on pre-0401 history. */
+  for_service_case_id: string | null;
+  for_staff_user_id: string | null;
+  for_subsidiary_name: string | null;
   created_by: string | null;
   created_at: string;
 }
@@ -4444,6 +4453,8 @@ export interface PurchaseRequestLineRow {
   request_id: string;
   sku: string;
   supplier_id: string | null;
+  /** The line's governed Purchasing destination (register read, Card 04). */
+  destination_id?: string | null;
   qty: number;
   approved_qty: number | null;
   issued_qty: number;
@@ -4460,11 +4471,32 @@ export interface PurchaseRequestLineRow {
    *  Card 03) — the rail's `PRODUCT` authority, never SKU-text inference.
    *  `null` when Catalog has no category for the SKU. */
   category?: string | null;
+  /** Card 04 — the ONE item-label arithmetic's answer (`railItemLabel`
+   *  over the Catalog model name); falls back to the SKU when Catalog has
+   *  no model words. */
+  item_label?: string;
+  /** Card 04 — the line's REAL PO lineage (`purchase_order_lines.demand_id`
+   *  plus the demand's own po_id), never an inference. */
+  po_ids?: string[];
+  /** Card 06 — the SERVER date projection (the browser performs no
+   *  working-day arithmetic): the line's effective Delivery Date, its
+   *  derived Order By (null is a real answer, never a guessed one), and the
+   *  exact missing Settings facts the rail/setup lens names. */
+  delivery_date?: string | null;
+  order_by?: string | null;
+  production_days_missing?: boolean;
+  transit_days_missing?: boolean;
 }
 
 export interface ManualPurchaseRegisterPayload {
   requests: PurchaseRequestRow[];
   lines: PurchaseRequestLineRow[];
+  /** Every PO the lines' lineage names — id → the actual po_no — plus the
+   *  Card 06 issuance-completion fact: whether the CURRENT version has
+   *  confirmed-sent evidence (`po_sends`, 0378). */
+  pos: Array<{ id: string; po_no: string; sent?: boolean }>;
+  /** The linked Service Cases behind `for_service_case_id`. */
+  serviceCases: Array<{ id: string; case_no: string }>;
   destinations: Array<{ id: string; name: string }>;
   suppliers: Array<{ id: string; name: string; kind?: string | null }>;
   users: Array<{ id: string; name: string | null }>;
@@ -4473,19 +4505,94 @@ export interface ManualPurchaseRegisterPayload {
   approvers: Array<{ id: string; name: string | null }>;
   /** The Settings manager gate — decides what RENDERS (money, Approve). */
   canApprove: boolean;
+  /** Card 04 — PO Duty, shown ONLY beside a selection's issue action. */
+  currentPoDuty: { userId: string; name: string } | null;
+  actingPoDuty: { userId: string; name: string } | null;
+  poDutyUnavailable: boolean;
+  mayIssue: boolean;
+  /** Card 06 — the Malaysia calendar date the timing lens compares against,
+   *  and whether the server date plan could be loaded at all. */
+  todayIso?: string;
+  planUnavailable?: boolean;
 }
 
 export interface ManualPurchaseDetailPayload {
   request: PurchaseRequestRow;
+  /** The linked Service Case's readable identity, when the purpose names one. */
+  serviceCaseNo: string | null;
+  /** Card 05 §3.2 — the real individual who raised it, resolved server-side;
+   *  `null` when the record was written by a shared account and the reader
+   *  states `Staff identity not recorded`. A person is never invented. */
+  requested_by_name: string | null;
   /** `unit_cost` is present ONLY for the approver — the same screen renders
    *  for both roles, minus the money, never a permission error. */
   lines: Array<PurchaseRequestLineRow & { unit_cost?: number | null }>;
+  /** Card 05 §3.6 — the EXACT linked documents' facts, read from each PO and
+   *  its promise ledger, never inferred from SKU/supplier/date matching. */
+  pos: Array<{
+    id: string;
+    po_no: string;
+    placed_at: string | null;
+    po_delivery_date: string | null;
+    /** Non-null ONLY when the promise ledger proves the supplier changed
+     *  the date; absent change reads `Same as PO`. */
+    supplier_delivery_date: string | null;
+    ordered_qty: number;
+  }>;
+  /** Card 05 §3.7 — stored-fact events only; words live in the shared
+   *  `manualPurchaseHistoryRecord` arithmetic. */
+  history: ManualPurchaseHistoryEvent[];
   destinations: Array<{ id: string; name: string }>;
   suppliers: Array<{ id: string; name: string; kind?: string | null }>;
   users: Array<{ id: string; name: string | null }>;
   /** Card 03 §3 — the real action owner's name on the object too. */
   approvers: Array<{ id: string; name: string | null }>;
   canApprove: boolean;
+  /** Card 06 — the same server date plan the Register reads. */
+  todayIso?: string;
+  planUnavailable?: boolean;
+}
+
+/** Card 06 §3 — one line of the create form's server date plan. */
+export interface ManualPurchasePlanLine {
+  sku: string;
+  supplierId: string | null;
+  supplierName: string | null;
+  category: string | null;
+  productionDays: number | null;
+  transitDays: number | null;
+  /** `expectedArrivalOf` from the preview Proceed Date — null is a real
+   *  answer (missing Catalog relationship or Settings), never a guess. */
+  arrival: string | null;
+}
+
+export interface ManualPurchasePlanPayload {
+  /** The server's Malaysia date — the read-only Proceed Date preview. */
+  proceedDate: string;
+  lines: ManualPurchasePlanLine[];
+  /** The latest line arrival — proposed ONLY when every asked SKU resolves
+   *  and has complete Settings. */
+  deliveryDateDefault: string | null;
+  planUnavailable: boolean;
+}
+
+/**
+ * The create form's date plan (Card 06 §3) — the SERVER proposes Delivery
+ * Date and names missing lead facts; the browser never guesses a date. A
+ * POST only because live SKUs carry free text (`Leg 4"`); it reads, creates
+ * nothing and reserves nothing.
+ */
+export function useManualPurchasePlan(skus: string[]) {
+  const sorted = [...skus].sort();
+  return useQuery<ManualPurchasePlanPayload, ApiError>({
+    queryKey: ["operation", "purchasing", "requests", "plan", sorted.join("|")],
+    queryFn: () =>
+      apiFetch<ManualPurchasePlanPayload>(
+        "/api/operation/purchasing/requests/plan",
+        { method: "POST", body: JSON.stringify({ skus: sorted }) },
+      ),
+    staleTime: 30_000,
+  });
 }
 
 export function useManualPurchaseDetail(id: string | null) {
@@ -4506,10 +4613,6 @@ export function useIssuePurchaseRequests() {
     mutationFn: (input: {
       requestIds: string[];
       together: boolean;
-      partners?: Record<string, string> | null;
-      /** ⭐ The Catalog price the operator REVIEWED, per SKU (0380). Without it
-       *  the server has only its own live value to compare against itself. */
-      expectedCosts: Record<string, number>;
     }) =>
       apiFetch<{ poIds: string[]; documents: number }>(
         "/api/operation/purchasing/requests/issue",
@@ -4561,7 +4664,12 @@ export function useCreatePurchaseRequest() {
       purpose: string;
       destinationId: string;
       requiredBy?: string | null;
-      why: string;
+      /** Card 04: ONLY `other_purchase` answers `What is this for?`. */
+      why?: string | null;
+      /** The structured For fact, required on its own purpose (Card 04). */
+      serviceCaseId?: string | null;
+      staffUserId?: string | null;
+      subsidiaryName?: string | null;
     }) =>
       apiFetch<{ id: string; req_no: string; approval_required: boolean }>(
         "/api/operation/purchasing/requests",
@@ -4823,6 +4931,63 @@ export function useSetProductionDays() {
 }
 export function useSetSupplierWorkWeek() {
   return usePurchasingSettingsMutation<PurchasingSetWorkWeekInput>("/work-week");
+}
+
+export function useCreatePurchasingDestination() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: PurchasingCreateDestinationInput) =>
+      apiFetch<PurchasingSettingsResponse>("/api/operation/purchasing/settings/destinations", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: (data) => {
+      qc.setQueryData(qk.operation.purchasingSettings(), data);
+      void qc.invalidateQueries({ queryKey: ["so-batch-purchase"] });
+      void qc.invalidateQueries({ queryKey: ["to-order", "pick-items"] });
+      void qc.invalidateQueries({ queryKey: ["operation", "pos"] });
+    },
+  });
+}
+
+export function useUpdatePurchasingDestination() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      destinationId,
+      ...input
+    }: PurchasingUpdateDestinationInput & { destinationId: string }) =>
+      apiFetch<PurchasingSettingsResponse>(
+        `/api/operation/purchasing/settings/destinations/${encodeURIComponent(destinationId)}`,
+        { method: "PUT", body: JSON.stringify(input) },
+      ),
+    onSuccess: (data) => {
+      qc.setQueryData(qk.operation.purchasingSettings(), data);
+      void qc.invalidateQueries({ queryKey: ["so-batch-purchase"] });
+      void qc.invalidateQueries({ queryKey: ["to-order", "pick-items"] });
+      void qc.invalidateQueries({ queryKey: ["operation", "pos"] });
+    },
+  });
+}
+
+export function useSetPurchasingSupplierCollection() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      supplierId,
+      ...input
+    }: PurchasingSetSupplierCollectionInput & { supplierId: string }) =>
+      apiFetch<PurchasingSettingsResponse>(
+        `/api/operation/purchasing/settings/supplier-collection/${encodeURIComponent(supplierId)}`,
+        { method: "PUT", body: JSON.stringify(input) },
+      ),
+    onSuccess: (data) => {
+      qc.setQueryData(qk.operation.purchasingSettings(), data);
+      void qc.invalidateQueries({ queryKey: ["so-batch-purchase"] });
+      void qc.invalidateQueries({ queryKey: ["to-order", "pick-items"] });
+      void qc.invalidateQueries({ queryKey: ["operation", "manual-purchase"] });
+    },
+  });
 }
 
 /** Purchase §6 · Snooze PO — defer a whole supplier's PO planning until

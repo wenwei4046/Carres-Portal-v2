@@ -46,8 +46,8 @@ import PoIssueEvidence, { doorsForIssuedPo } from "../components/PoIssueEvidence
 
 const FILTERS: Array<{ key: PurchaseOrderRegisterFilter; label: string }> = [
   { key: "pdf_not_sent", label: "PDF not sent" },
-  { key: "supplier_date_missing", label: "Supplier date missing" },
-  { key: "supplier_date_passed", label: "Supplier date passed" },
+  { key: "supplier_date_missing", label: "Supplier Delivery Date missing" },
+  { key: "supplier_date_passed", label: "Supplier Delivery Date passed" },
   { key: "supplier_update_required", label: "Version changed — supplier update required" },
   { key: "partly_received", label: "Partly received" },
   { key: "completed", label: "Completed" },

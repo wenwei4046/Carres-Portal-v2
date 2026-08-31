@@ -571,10 +571,10 @@ operationPosRouter.get("/", requireOperation, async (c) => {
            detail page has to be able to tell them apart. `kind`, `recipient` and
            `po_version` ride with the row so the evidence surface reads persisted
            truth rather than whatever it happens to remember. */
-        /* 0379 — and WHO. `sent_by` is the person who pressed it, `duty_user_id`
-           the month's holder and `acting_user_id` the authorised cover when one
-           acted. Three facts, because `Team Work` groups by the holder while the
-           audit trail must name the actor. */
+        /* 0379/0403 — and WHO. `sent_by` is the person who pressed it,
+           `duty_user_id` the month's holder and `acting_user_id` the dated cover
+           in force. Three facts: a Superuser action never turns the cover into
+           the actor, while `Team Work` still groups by normal ownership. */
         .select(
           "id, po_id, channel, note, sent_at, kind, recipient, po_version, sent_by, duty_user_id, acting_user_id, po_revisions(rev_no)",
         )
@@ -2076,7 +2076,7 @@ operationPosRouter.post("/:id/ready-date", requireOperation, async (c) => {
 //
 // Every row carries what makes it evidence: the kind (an OPEN completes
 // nothing), the exact version, the recipient, the channel, the time, and WHO —
-// the actor, the month's duty holder and the authorised cover when one acted.
+// the actual actor, the month's duty holder and the dated cover in force.
 operationPosRouter.get("/:id/sends", requireOperation, async (c) => {
   const poId = c.req.param("id");
   const sb = userClient(c.env, c.var.auth.jwt);

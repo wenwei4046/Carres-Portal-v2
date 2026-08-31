@@ -95,7 +95,7 @@ describe("purchasing refusals", () => {
       "This item has no transaction cost.",
     );
     expect(purchasingRefusal("pickup_partner_required", { supplier: null }).wrong).toBe(
-      "the supplier does not deliver. Nobody is collecting.",
+      "the supplier collection is not configured.",
     );
   });
 

@@ -121,7 +121,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
     return m;
   }, [orders, leafsByOrder]);
 
-  /* ── The rail (Card 02-C: five sections, one selection per section) ───────
+  /* ── The rail (fact sections, one selection per section) ────────────────
    *
    * The DEFAULT no-filter view shows every proceeded record, Ordered ones
    * included — the Register is permanent. One filter per section; sections
@@ -159,6 +159,9 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
   }, []);
   const toggleSupplier = useCallback((name: string) => {
     setFilter((prev) => ({ ...prev, supplier: prev.supplier === name ? null : name }));
+  }, []);
+  const toggleRegion = useCallback((name: string) => {
+    setFilter((prev) => ({ ...prev, region: prev.region === name ? null : name }));
   }, []);
   const stateWords = useMemo(() => purchaseDemandStateWords(data.safetyDays), [data.safetyDays]);
   const railWords = useMemo(() => purchaseDemandRailWords(data.safetyDays), [data.safetyDays]);
@@ -594,6 +597,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
       onSplitLeaf={setLeafAllocations}
       destinations={data.destinations}
       destinationName={destinationName}
+      safetyDays={data.safetyDays}
     />
   );
 
@@ -678,6 +682,24 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
               />
             ))}
           </FilterRailGroup>
+          <FilterRailGroup title={SO_BATCH_RAIL.region.heading}>
+            <FilterRailRow
+              active={filter.region == null}
+              onClick={() => setFilter((prev) => ({ ...prev, region: null }))}
+              testId="so-batch-region-all"
+              label={SO_BATCH_RAIL.region.all}
+            />
+            {rail.regions.map((region) => (
+              <FilterRailRow
+                key={region.name}
+                active={filter.region === region.name}
+                onClick={() => toggleRegion(region.name)}
+                testId={`so-batch-region-${region.name}`}
+                label={region.name}
+                count={region.count}
+              />
+            ))}
+          </FilterRailGroup>
           {/* The one Purchasing-owned setup exception, and only while it
               exists — an empty exception section is noise wearing a heading. */}
           {rail.setupExists && (
@@ -698,7 +720,10 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
         </FilterRail>}
 
         <div className="flex min-w-0 flex-1 flex-col p-2">
-          <div className="min-h-0 flex-1" data-testid="so-batch-grid">
+          <div
+            className="min-h-0 flex-1"
+            data-testid="so-batch-grid"
+          >
             <DataGrid<SoBatchOrderRow>
               appearance="reference"
               rows={shown}
@@ -722,7 +747,6 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
                   </button>
                 ) : null
               }
-              toolbarEnd={<SoBatchPoDuty data={data} />}
               isLoading={isLoading}
               emptyMessage={W.empty}
               groupBanner={false}
@@ -747,6 +771,25 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
                   orderSelection(o.orderId).indeterminate,
                 testId: (o: SoBatchOrderRow) => `so-batch-select-${o.orderId}`,
               }}
+              selectionSummary={() => summary.text}
+              selectionPrimary={summary.lines > 0 ? (
+                <span
+                  className="flex shrink-0 items-center gap-2"
+                  data-testid="so-batch-selection-actions"
+                >
+                  <SoBatchPoDutyChip data={data} />
+                  {data.mayIssue ? (
+                    <button
+                      type="button"
+                      data-testid="so-batch-issue"
+                      className="inline-flex h-7 shrink-0 items-center rounded-control bg-kit-blue-9 px-3 text-meta font-medium text-white hover:opacity-90"
+                      onClick={() => onIssue(selections)}
+                    >
+                      {W.issuePo}
+                    </button>
+                  ) : null}
+                </span>
+              ) : null}
               statusSummary={(filtered) => {
                 /* `not ordered` is the RAIL's word for outstanding demand —
                    printing a second, status-based "not ordered" number here
@@ -763,45 +806,13 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
               }}
             />
           </div>
-
-          {summary.lines > 0 ? (
-            <div
-              className="mt-2 flex shrink-0 items-center justify-between gap-3 rounded-control border border-kit-slate-6 bg-white px-3 py-2"
-              data-testid="so-batch-selection-bar"
-            >
-              <span className="truncate text-body">{summary.text}</span>
-              {data.mayIssue ? (
-                <button
-                  type="button"
-                  data-testid="so-batch-issue"
-                  className="inline-flex h-7 shrink-0 items-center rounded-control bg-kit-blue-9 px-3 text-meta font-medium text-white hover:opacity-90"
-                  onClick={() => onIssue(selections)}
-                >
-                  {W.issuePo}
-                </button>
-              ) : (
-                /* NOT a disabled button. A control the operator cannot use
-                   should say WHO can, not grey itself out and stay silent. */
-                /* ⭐ AND IT NAMES WHOEVER MAY ACT TODAY (0379; closure §1).
-                   A dated buddy cover is the person to ask, not the holder they
-                   are covering — a chip that named the absent holder sent the
-                   operator to somebody who is on leave. */
-                <span
-                  className="shrink-0 truncate text-meta text-kit-slate-11"
-                  data-testid="so-batch-duty-chip"
-                >
-                  {poDutyLabel(data)}
-                </span>
-              )}
-            </div>
-          ) : null}
         </div>
       </div>
     </div>
   );
 }
 
-function SoBatchPoDuty({ data }: { data: SoBatchPurchaseResponse }) {
+function SoBatchPoDutyChip({ data }: { data: SoBatchPurchaseResponse }) {
   const person = data.poDutyUnavailable || data.poDutyNameUnavailable
     ? null
     : (data.actingPoDuty ?? data.currentPoDuty);
@@ -810,7 +821,7 @@ function SoBatchPoDuty({ data }: { data: SoBatchPurchaseResponse }) {
   if (!person) {
     return (
       <span
-        data-testid="so-batch-po-duty"
+        data-testid="so-batch-duty-chip"
         aria-label={label}
         title={label}
         className="shrink-0 text-meta text-kit-red-11"
@@ -823,28 +834,25 @@ function SoBatchPoDuty({ data }: { data: SoBatchPurchaseResponse }) {
   const colour = avatarColor(person.userId);
   return (
     <span
-      data-testid="so-batch-po-duty"
+      data-testid="so-batch-duty-chip"
       aria-label={label}
       title={label}
-      className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-control border border-kit-slate-6 bg-white px-2 text-meta text-kit-slate-11"
+      className="inline-flex h-7 min-w-7 shrink-0 items-center justify-center rounded-full border border-kit-slate-6 px-2 text-label font-semibold leading-none"
+      style={{ background: colour.bg, color: colour.fg }}
     >
-      <span
-        aria-hidden
-        className="grid h-5 w-5 place-items-center rounded-full text-label font-semibold leading-none"
-        style={{ background: colour.bg, color: colour.fg }}
-      >
-        {personInitials(person.name, person.name)}
-      </span>
-      <span>{label}</span>
+      {personInitials(person.name, person.name)}
     </span>
   );
 }
 
 function poDutyLabel(data: SoBatchPurchaseResponse): string {
   if (data.poDutyUnavailable) return "PO duty could not be checked.";
-  if (data.actingPoDuty) return `${data.actingPoDuty.name} is covering PO duty`;
+  if (data.actingPoDuty) {
+    const normal = data.currentPoDuty ? ` for ${data.currentPoDuty.name}` : "";
+    return `${data.actingPoDuty.name} · PO Duty cover${normal}`;
+  }
   if (data.poDutyNameUnavailable) return "PO duty name is missing.";
-  if (data.currentPoDuty) return `${data.currentPoDuty.name} holds PO duty`;
+  if (data.currentPoDuty) return `${data.currentPoDuty.name} · PO Duty`;
   return "Nobody holds PO duty this month.";
 }
 
@@ -872,6 +880,7 @@ function SoBatchOrderExpansion({
   onSplitLeaf,
   destinations,
   destinationName,
+  safetyDays,
 }: {
   order: SoBatchOrderRow;
   leafs: PurchaseDemandRow[];
@@ -882,6 +891,7 @@ function SoBatchOrderExpansion({
   onSplitLeaf: (leafId: string, allocations: DestinationAllocation[]) => void;
   destinations: SoBatchPurchaseResponse["destinations"];
   destinationName: (id: string | null) => string;
+  safetyDays: number;
 }) {
   const expansion = useSalesOrderExpansion(order.orderId);
   const unitIdsByLine = useMemo(
@@ -914,7 +924,7 @@ function SoBatchOrderExpansion({
       linePos.map((p) => destinationName(p!.destinationId)),
     );
     const supplier = soBatchCellSummary([
-      ...(eligible ? [leaf.supplier] : []),
+      ...(leaf ? [leaf.supplier] : []),
       ...linePos.map((p) => p!.supplierName),
     ]);
     const poDate = soBatchCellSummary(linePos.map((p) => p!.etaDate));
@@ -989,6 +999,7 @@ function SoBatchOrderExpansion({
         deliverTo: [],
         deliverToAbsence: "—",
         supplierAbsence: "—",
+        supplier: leaf.supplier ?? undefined,
         poDeliveryDateAbsence: "—",
         sku: part.sku,
         qty: part.qty,
@@ -1002,8 +1013,29 @@ function SoBatchOrderExpansion({
     return <div className="px-2 py-2 text-body text-kit-slate-11">No items on this order</div>;
   }
 
+  const stateWords = purchaseDemandStateWords(safetyDays);
+  const blockers = leafs.filter(
+    (leaf) => !isSelectableForBuying(leaf) && leaf.action != null,
+  );
+
   return (
     <div data-testid={`so-batch-inspector-${order.orderId}`}>
+      {blockers.length > 0 && (
+        <div className="mb-2 overflow-hidden rounded-control border border-warning/40 bg-warning-soft/40">
+          {blockers.map((leaf) => (
+            <div
+              key={leaf.id}
+              className="border-b border-warning/30 px-3 py-2 last:border-b-0"
+              data-testid={`so-batch-blocker-${leaf.id}`}
+            >
+              <div className="text-body font-medium text-kit-slate-12">
+                {stateWords[leaf.state]}
+              </div>
+              <div className="text-meta text-kit-slate-11">{leaf.action!.action}</div>
+            </div>
+          ))}
+        </div>
+      )}
       <GoodsMiniTable
         label={order.so == null ? "Goods on this order" : `Goods on SO-${order.so}`}
         lines={lines}

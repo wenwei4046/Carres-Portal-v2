@@ -24,6 +24,7 @@ import {
   type RegisterOrderFact,
 } from "../../lib/purchase-demand-read";
 import { mapPgError } from "../../lib/route-helpers";
+import { purchasingActorMayIssue } from "../../lib/purchasing-po-authority";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -315,16 +316,16 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
   let actingId: string | null = null;
   let actingName: string | null = null;
   let poDutyUnavailable = false;
-  /** Who may act TODAY — the holder, or the dated cover when one is open. */
-  let actorId: string | null = null;
+  let mayIssue = false;
   const nameById = new Map<string, string>();
   try {
     /* ⭐ ONE ACTOR RESOLVER (0379). This read used to ask `ops_po_duty` itself,
        which meant the Register knew nothing about buddy cover: a covering
        operator was shown a page with no Issue PO on it, and the door would have
        let them through. One resolver, one answer, on every surface. */
-    const [actorRes, people] = await Promise.all([
+    const [actorRes, authorityRes, people] = await Promise.all([
       sb.rpc("purchasing_po_actor"),
+      purchasingActorMayIssue(sb, me),
       salespersonIds.length > 0
         ? sb.from("app_users").select("id, name, email").in("id", salespersonIds)
         : Promise.resolve({ data: [] as Record<string, unknown>[], error: null }),
@@ -334,6 +335,11 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
     for (const u of (people.data ?? []) as Record<string, unknown>[]) {
       const l = label(u);
       if (l) nameById.set(u.id as string, l);
+    }
+    if (authorityRes.error) {
+      console.error("purchase demands — PO issue authority unavailable", authorityRes.error.message);
+    } else {
+      mayIssue = authorityRes.mayIssue;
     }
     if (actorRes.error) {
       poDutyUnavailable = true;
@@ -346,7 +352,6 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
       };
       poDutyId = actor.normal_user_id ?? null;
       actingId = actor.acting_user_id ?? null;
-      actorId = actor.actor_user_id ?? null;
       const wanted = [poDutyId, actingId].filter((v): v is string => v != null);
       if (wanted.length > 0) {
         const who = await sb
@@ -380,6 +385,48 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
 
   const rows: PurchaseDemandRow[] = [];
 
+  /* Factory collection is governed supplier master data. The buying screen
+     carries the resolved fact so Review can state it; it never offers an
+     ad-hoc collector choice. */
+  const collectionBySupplier = new Map<
+    string,
+    {
+      procurementPartnerId: string;
+      procurementPartnerName: string;
+      fixedDestinationId: string | null;
+    }
+  >();
+  try {
+    const [configured, partners] = await Promise.all([
+      sb
+        .from("purchasing_supplier_settings")
+        .select("supplier_id, fixed_destination_id, collected_by_partner_id"),
+      sb.from("delivery_partners").select("id, name"),
+    ]);
+    if (configured.error || partners.error) {
+      const m = mapPgError(configured.error ?? partners.error!);
+      return c.json(m.body, m.status);
+    }
+    const partnerNames = new Map(
+      ((partners.data ?? []) as Record<string, unknown>[]).map((p) => [
+        p.id as string,
+        (p.name as string) ?? "",
+      ]),
+    );
+    for (const setting of (configured.data ?? []) as Record<string, unknown>[]) {
+      const partnerId = setting.collected_by_partner_id as string | null;
+      const partnerName = partnerId ? partnerNames.get(partnerId) : null;
+      if (!partnerId || !partnerName) continue;
+      collectionBySupplier.set(setting.supplier_id as string, {
+        procurementPartnerId: partnerId,
+        procurementPartnerName: partnerName,
+        fixedDestinationId: (setting.fixed_destination_id as string | null) ?? null,
+      });
+    }
+  } catch (e) {
+    console.error("so batch — supplier collection rules unavailable", (e as Error).message);
+  }
+
   /* ── 1 · the demand the engine CARRIED ──────────────────────────────────── */
   for (const proposal of proposals) {
     for (const row of proposal.rows) {
@@ -398,6 +445,10 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
         /* THE ENGINE'S OWN ARRIVAL DATE. `stockReady` IS `arriveBy` — the day
            the goods must be at Carres for this customer promise to hold. */
         const goodsMustArrive = row.stockReady;
+        const catalogCostMissing = build.lines.some((l) => {
+          const cost = catalog.get(l.sku)?.cost ?? null;
+          return cost == null || cost <= 0;
+        });
         /* A carried build has its SKU, supplier and production days by
            construction — the read refuses the others line by line into
            `registerFacts` below. The one blocker it can still carry is the
@@ -405,6 +456,8 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
         const state: PurchaseDemandState =
           row.delivery == null
             ? "no_customer_date"
+            : catalogCostMissing
+              ? "no_cost"
             : build.readyIfOrderedToday != null
               ? purchaseDemandTimingOf({
                   today,
@@ -446,7 +499,9 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
           /* A CARRIED build can be issued, so it carries the reference the
              issue endpoint recomputes against. A refused line below cannot,
              and says so by having none. */
-          issueRef: { proposalKey: proposal.key, buildKey: build.key },
+          issueRef: state === "no_cost"
+            ? null
+            : { proposalKey: proposal.key, buildKey: build.key },
           /* The CATALOG's price per SKU, carried so the 50/50 can ask for the
              one it does not have. `null` is load-bearing: a SKU with no price
              cannot be issued until somebody states a cost or marks it Free of
@@ -460,6 +515,7 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
             unitCost: catalog.get(l.sku)?.cost ?? null,
           })),
           supplierKind: supplierKinds.get(proposal.supplierId) ?? "own_logistics",
+          supplierCollection: collectionBySupplier.get(proposal.supplierId) ?? null,
           action: soBatchAction({
             state,
             item: build.model,
@@ -528,6 +584,9 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
       parts: [{ sku: line.sku, qty: line.qty, unitCost: catalog.get(line.sku)?.cost ?? null }],
       supplierKind: line.supplierId
         ? (supplierKinds.get(line.supplierId) ?? "own_logistics")
+        : null,
+      supplierCollection: line.supplierId
+        ? (collectionBySupplier.get(line.supplierId) ?? null)
         : null,
       action: soBatchAction({
         state,
@@ -612,12 +671,10 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
     poDutyNameUnavailable:
       (actingId ?? poDutyId) != null && (actingId != null ? actingName : poDutyName) == null,
     poDutyUnavailable,
-    /* Convenience only. `mayIssue` decides whether the browser OFFERS the act;
-       the issue endpoint asks the same resolver again and the creation RPC asks
-       it a third time (Card §6 — UI hiding is convenience, API/RPC is
-       authority). It answers about the ACTOR, so an authorised cover is offered
-       the act and a principal who holds neither role is not. */
-    mayIssue: actorId != null && actorId === me,
+    /* Convenience only. The browser, issue routes and SQL ask the same governed
+       capability. Duty/cover remains the owner fact; a superuser is not
+       relabelled as that owner. */
+    mayIssue,
     procurementPartners,
     /* Card 02-A — the governed Safety days value, so the rail words follow
        the one setting. The browser prints it; the arithmetic stayed here. */

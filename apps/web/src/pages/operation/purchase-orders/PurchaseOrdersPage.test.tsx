@@ -13,6 +13,15 @@ let requiredLoading = false;
 let connectionLoading = false;
 let connectionEmpty = false;
 let receivingReturnReason: string | null = null;
+type TestPromise = {
+  kind: string;
+  answer: string;
+  about_date: string | null;
+  previous_date: string | null;
+  new_date: string | null;
+  reason: string | null;
+  recorded_at: string;
+};
 const queryData = {
   pos: [
     {
@@ -24,7 +33,7 @@ const queryData = {
       sup_status: "pending",
       so: null,
       so_refs: null,
-      eta_date: null,
+      eta_date: "2026-09-10",
       po_delivery_date: "2026-09-10",
       expected_ready_date: null,
       purpose: "customer_sales",
@@ -49,7 +58,15 @@ const queryData = {
           po_revisions: null,
         },
       ],
-      promises: [],
+      promises: [{
+        kind: "tomorrow_delivery",
+        answer: "shipping",
+        about_date: "2026-09-10",
+        previous_date: null,
+        new_date: null,
+        reason: null,
+        recorded_at: "2026-09-09T09:00:00Z",
+      }] as TestPromise[],
       purchase_order_lines: [
         {
           id: "line-1",
@@ -90,7 +107,7 @@ const queryData = {
       placed_at: "2025-01-01T08:00:00Z",
       sources: [],
       sends: [],
-      promises: [],
+      promises: [] as TestPromise[],
       purchase_order_lines: [],
     },
   ],
@@ -214,6 +231,16 @@ beforeEach(() => {
     { id: "destination-2", name: "Carres Penang", is_default: false },
   );
   queryData.pos[0]!.purchase_order_lines[0]!.destination_id = "destination-1";
+  queryData.pos[0]!.eta_date = "2026-09-10";
+  queryData.pos[0]!.promises.splice(0, queryData.pos[0]!.promises.length, {
+    kind: "tomorrow_delivery",
+    answer: "shipping",
+    about_date: "2026-09-10",
+    previous_date: null,
+    new_date: null,
+    reason: null,
+    recorded_at: "2026-09-09T09:00:00Z",
+  });
   vi.mocked(apiFetch).mockResolvedValue({});
 });
 
@@ -225,8 +252,8 @@ describe("Purchase Orders Register", () => {
     );
     for (const word of [
       "PDF not sent",
-      "Supplier date missing",
-      "Supplier date passed",
+      "Supplier Delivery Date missing",
+      "Supplier Delivery Date passed",
       "Version changed — supplier update required",
       "Partly received",
       "Completed",
@@ -240,6 +267,24 @@ describe("Purchase Orders Register", () => {
     const page = screen.getByTestId("purchase-orders-register");
     expect(page).not.toHaveTextContent(/PO Date|Supplier Date|Current Version|Supplier Has|Open Balance/);
     expect(page).not.toHaveTextContent(/Goods Receipts|Arrival Date|Accepted Qty|Rejected Qty/);
+  });
+
+  it("keeps the official PO Delivery Date and shows only a changed supplier date", () => {
+    renderPage();
+    expect(screen.getByTestId("grid-row-PO-20260828-4827")).toHaveTextContent("Same as PO");
+
+    queryData.pos[0]!.promises.push({
+      kind: "tomorrow_delivery",
+      answer: "delayed",
+      about_date: "2026-09-10",
+      previous_date: "2026-09-10",
+      new_date: "2026-09-14",
+      reason: "Production Delay",
+      recorded_at: "2026-09-09T10:00:00Z",
+    });
+    const changed = renderPage();
+    expect(screen.getAllByTestId("grid-row-PO-20260828-4827").at(-1)).toHaveTextContent("Mon, 14 Sep");
+    changed.unmount();
   });
 
   it("shows two-line work copy with structured real-roster owner metadata", () => {
@@ -333,6 +378,7 @@ describe("Purchase Order object", () => {
 
   it("records a supplier date only with channel, file evidence, reporter and both times", async () => {
     queryData.pos[0]!.sends[0]!.po_version = 2;
+    queryData.pos[0]!.promises.splice(0, queryData.pos[0]!.promises.length);
     renderPage("/operation/procurement?po=PO-20260828-4827");
     fireEvent.click(screen.getByRole("button", { name: "Record supplier date" }));
     fireEvent.change(screen.getByLabelText("Reported by"), { target: { value: "user-duty" } });

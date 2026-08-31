@@ -94,8 +94,8 @@ const sel = (r: PurchaseDemandRow, allocations: DestinationAllocation[]): SoBatc
   allocations,
 });
 
-describe("the rail — owner ruling 2026-08-27 (Card 02-C)", () => {
-  it("is TO ORDER · ORDER TIMING · PRODUCT · SUPPLIER · SETUP TO FIX, in the approved order", () => {
+describe("the rail — latest Owner ruling 2026-08-30", () => {
+  it("puts REGION after SUPPLIER in the purchasing fact rail", () => {
     /* Section ORDER is the object's key order — a reader of this contract
        sees the rail top to bottom. */
     expect(Object.keys(SO_BATCH_RAIL)).toEqual([
@@ -103,8 +103,10 @@ describe("the rail — owner ruling 2026-08-27 (Card 02-C)", () => {
       "timing",
       "product",
       "supplier",
+      "region",
       "setup",
     ]);
+    expect(SO_BATCH_RAIL).not.toHaveProperty("work");
     expect(SO_BATCH_RAIL.toOrder.heading).toBe("TO ORDER");
     expect(SO_BATCH_RAIL.toOrder.all).toBe("All not ordered");
     expect(SO_BATCH_RAIL.timing.heading).toBe("ORDER TIMING");
@@ -126,6 +128,8 @@ describe("the rail — owner ruling 2026-08-27 (Card 02-C)", () => {
     ]);
     expect(SO_BATCH_RAIL.supplier.heading).toBe("SUPPLIER");
     expect(SO_BATCH_RAIL.supplier.all).toBe("All suppliers");
+    expect(SO_BATCH_RAIL.region.heading).toBe("REGION");
+    expect(SO_BATCH_RAIL.region.all).toBe("All regions");
     expect(SO_BATCH_RAIL.setup.heading).toBe("SETUP TO FIX");
     expect(SO_BATCH_RAIL.setup.states).toEqual(["no_production_days"]);
   });
@@ -216,7 +220,6 @@ describe("the rail — owner ruling 2026-08-27 (Card 02-C)", () => {
       "Ready to buy",
       "Covered",
       "BUYING RECORDS",
-      "WORK TO DO",
       "All lines",
       "No buying needed",
       "Cannot buy",
@@ -277,12 +280,14 @@ const po = (poId: string, supplierName: string | null): SoBatchOrderRow["pos"][n
 /* oA — outstanding mattress, Hooka, can order early. */
 const RAIL_OA = railOrder({
   orderId: "oA",
+  deliveryState: "Selangor",
   lines: [line({ orderLineId: "a1" }), line({ orderLineId: "a2" })],
   outstandingSuppliers: ["Hooka"],
 });
 /* oB — outstanding, MULTI-category (mattress + bedframe), Ohana, low band. */
 const RAIL_OB = railOrder({
   orderId: "oB",
+  deliveryState: "Kuala Lumpur",
   lines: [
     line({ orderLineId: "b1" }),
     line({ orderLineId: "b2", sku: "BF-01", item: "Frame", category: "bedframe" }),
@@ -292,6 +297,7 @@ const RAIL_OB = railOrder({
 /* oC — fully Ordered sofa; its supplier comes from the PO lineage alone. */
 const RAIL_OC = railOrder({
   orderId: "oC",
+  deliveryState: "Johor",
   status: "ordered",
   pos: [po("PO-1", "Nice Future")],
   lines: [line({ orderLineId: "c1", sku: "S9-2A", item: "Sofa", category: "sofa" })],
@@ -299,6 +305,7 @@ const RAIL_OC = railOrder({
 /* oD — the one setup blocker, on a sofa from Ohana. */
 const RAIL_OD = railOrder({
   orderId: "oD",
+  deliveryState: "Pahang",
   lines: [line({ orderLineId: "d1", sku: "5539-1B", item: "Chelsea", category: "sofa" })],
   outstandingSuppliers: ["Ohana"],
 });
@@ -325,6 +332,10 @@ const model = (over: Partial<SoBatchRailFilter> = {}) =>
   });
 
 describe("the rail model — unique-SO counts that cross-update between sections", () => {
+  it("does not expose a second local work lens", () => {
+    expect(model()).not.toHaveProperty("workCounts");
+  });
+
   it("no filter shows the complete permanent Register, Ordered records included", () => {
     expect([...model().visibleOrderIds].sort()).toEqual(["oA", "oB", "oC", "oD", "oE"]);
   });
@@ -368,6 +379,28 @@ describe("the rail model — unique-SO counts that cross-update between sections
       { name: "Nice Future", count: 1 }, // oC lineage
       { name: "Ohana", count: 2 }, // oB + oD outstanding
     ]);
+  });
+
+  it("regions use Delivery State, group Klang Valley, and count unique Sales Orders", () => {
+    expect(model().regions).toEqual([
+      { name: "Klang Valley", count: 2 },
+      { name: "Johor", count: 1 },
+      { name: "Pahang", count: 1 },
+      { name: "Others", count: 1 },
+    ]);
+    expect([...model({ region: "Klang Valley" }).visibleOrderIds].sort()).toEqual(["oA", "oB"]);
+    expect([...model({ region: "Others" }).visibleOrderIds]).toEqual(["oE"]);
+  });
+
+  it("region counts cross-update and the selected empty region remains available to clear", () => {
+    const underSofa = model({ product: "sofa" });
+    expect(underSofa.regions).toEqual([
+      { name: "Johor", count: 1 },
+      { name: "Pahang", count: 1 },
+    ]);
+    const selected = model({ product: "mattress", region: "Johor" });
+    expect(selected.regions).toContainEqual({ name: "Johor", count: 0 });
+    expect([...selected.visibleOrderIds]).toEqual([]);
   });
 
   it("each section's counts update under the OTHER sections' selections", () => {
@@ -658,7 +691,7 @@ describe("documents are grouped by supplier × Deliver To", () => {
     expect(Object.keys(doc!).sort()).toEqual(
       [
         "destinationId", "key", "lines", "qty", "supplierId", "supplierName",
-        "supplierKind", "category", "orderId",
+        "supplierKind", "supplierCollection", "category", "orderId",
       ].sort(),
     );
     // Still no price, no number and no arrival date on the GROUPING itself —

@@ -1,5 +1,5 @@
 -- ============================================================================
--- 0401 — the supplier answer never rewrites the official PO
+-- 0406 — the supplier answer never rewrites the official PO
 --
 -- `placed_at` is the PO Issued fact. `po_delivery_date` is the supplier-facing
 -- date printed on the current official document. A supplier's later answer is
@@ -15,7 +15,7 @@ alter table public.purchase_orders
   add column if not exists po_delivery_date date;
 
 comment on column public.purchase_orders.po_delivery_date is
-  '0401: the delivery date printed on the current official PO version. Legacy rows stay NULL because eta_date may already contain a later supplier answer.';
+  '0406: the delivery date printed on the current official PO version. Legacy rows stay NULL because eta_date may already contain a later supplier answer.';
 
 -- Every governed PO creation door ultimately inserts `eta_date` through
 -- `_operation_create_po_inner`. For NEW rows only, that reviewed input is also
@@ -78,13 +78,13 @@ alter table public.po_supplier_promises
   );
 
 comment on column public.po_supplier_promises.channel is
-  '0401: how the supplier gave this answer. NULL only on legacy rows.';
+  '0406: how the supplier gave this answer. NULL only on legacy rows.';
 comment on column public.po_supplier_promises.evidence is
-  '0401: immutable file evidence for WhatsApp/email, or a structured note for phone/in-person. NULL only on legacy rows.';
+  '0406: immutable file evidence for WhatsApp/email, or a structured note for phone/in-person. NULL only on legacy rows.';
 comment on column public.po_supplier_promises.supplier_answered_at is
-  '0401: when the supplier actually answered; separate from recorded_at.';
+  '0406: when the supplier actually answered; separate from recorded_at.';
 comment on column public.po_supplier_promises.reported_by is
-  '0401: who heard or saw the supplier answer; separate from recorded_by, the actual Portal actor.';
+  '0406: who heard or saw the supplier answer; separate from recorded_by, the actual Portal actor.';
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values (
@@ -119,42 +119,8 @@ with check (
 -- No UPDATE or DELETE policy: a supplier answer screenshot is evidence.
 
 -- ---------------------------------------------------------------------------
--- 3 · Operations Superusers may cover, without replacing normal duty
+-- 3 · every evidence door reuses the one PO authority from 0403
 -- ---------------------------------------------------------------------------
-create or replace function public.purchasing_is_operations_superuser(p_user uuid)
-returns boolean
-language sql
-stable security definer
-set search_path = public
-as $$
-  select p_user is not null and exists (
-    select 1
-      from public.app_users u
-     where u.id = p_user
-       and lower(u.email) in ('operation@carres.com', 'jess@carres.com')
-       and u.role in ('operation', 'principal')
-  );
-$$;
-
-revoke all on function public.purchasing_is_operations_superuser(uuid) from public;
-grant execute on function public.purchasing_is_operations_superuser(uuid) to authenticated;
-
-create or replace function public.purchasing_actor_may_issue(p_user uuid)
-returns boolean
-language sql
-stable security definer
-set search_path = public
-as $$
-  select p_user is not null
-     and (
-       public.purchasing_is_operations_superuser(p_user)
-       or (public.purchasing_po_actor()->>'actor_user_id')::uuid = p_user
-     );
-$$;
-
-revoke all on function public.purchasing_actor_may_issue(uuid) from public;
-grant execute on function public.purchasing_actor_may_issue(uuid) to authenticated;
-
 -- Preserve the normal owner and dated cover as metadata. The actual actor is
 -- always `sent_by`. A Superuser who helps does not become a fictional cover.
 create or replace function public.purchasing_confirm_po_sent(
@@ -526,7 +492,7 @@ grant execute on function public.purchasing_record_supplier_answer(
 comment on function public.purchasing_record_supplier_answer(
   text, text, date, date, text, jsonb, timestamptz, uuid, text, text
 ) is
-  '0401: the ONE evidence door for the supplier delivery answer. It appends channel, evidence, reporter, recorder and both times; it never rewrites purchase_orders.';
+  '0406: the ONE evidence door for the supplier delivery answer. It appends channel, evidence, reporter, recorder and both times; it never rewrites purchase_orders.';
 
 -- 0310's supplier-call writer rewrites eta_date and has no governed evidence.
 -- Keep it only as migration history; browsers must use the one door above.
@@ -665,7 +631,7 @@ end;
 $po_document$;
 
 comment on function public.purchasing_po_document(text) is
-  '0401: the official PO prints placed_at as PO Issued and po_delivery_date as PO Delivery Date. Supplier answers never alter it.';
+  '0406: the official PO prints placed_at as PO Issued and po_delivery_date as PO Delivery Date. Supplier answers never alter it.';
 
 revoke execute on function public.purchasing_po_document(text) from public, anon;
 grant execute on function public.purchasing_po_document(text) to authenticated;
@@ -904,6 +870,6 @@ begin
       join pg_namespace n on n.oid = p.pronamespace
      where n.nspname = 'public' and p.proname = 'purchasing_revise_po'
   ) <> 1 then
-    raise exception '0401: purchasing_revise_po must have exactly ONE signature';
+    raise exception '0406: purchasing_revise_po must have exactly ONE signature';
   end if;
 end $$;

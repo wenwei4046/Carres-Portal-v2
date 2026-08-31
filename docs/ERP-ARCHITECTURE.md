@@ -66,6 +66,15 @@ live once in [`orders/MASTER.md`](orders/MASTER.md), immediately after the Card 
 record. Architecture owns this boundary; the Orders MASTER owns the build sequence and business
 flow.
 
+**PURCHASING → RECEIVING → GRN → CLAIM / RETURN WORK SLICE — OWNER-APPROVED / LOCKED
+2026-08-29.** Module writers remain separate; one shared Work projection composes their open
+actions. Purchase Orders owns supplier commitment and evidenced response, Receiving owns the
+physical session/posting/formal GRN, Stock owns accepted Unit consequences, and Supplier Claim /
+Return owns the authorised continuation. `My Work` and `Team Work` read the same stable action
+identities and write no completion. Module filter rails do not copy those actions into a local
+`WORK TO DO` panel; SO Batch Purchase is the ruled example. The complete contract is
+[`purchasing/MASTER.md` §2.3 and §7](purchasing/MASTER.md) and its approved design record.
+
 ---
 
 # §1 · The five ownership laws
@@ -127,6 +136,11 @@ roster, duty and buddy/cover facts; the Work Engine applies them so absence chan
 work without changing the underlying business record or rewriting its history. A manager may see or
 filter the resolved owner, but Work never creates a second assignment truth.
 
+An action owner and an action capability are separate facts. A governed Operations Superuser may
+perform the operational action without replacing the resolved owner. The event records both the
+actual actor and the normal duty/dated-cover context; UI owner chips continue to show the owner, not
+an invented reassignment.
+
 Keep these identities separate: object PIC/accountability · action owner · fault owner · cost
 bearer · service provider. A module may summarise another module's action and owner, but the module
 that owns the trigger and completion fact owns the owner rule. `ACTION-FLOW-STANDARD.md` defines the
@@ -170,8 +184,11 @@ invent Catalog truth.** Receiving and Supplier Claim remain responsibilities gov
 Purchasing MASTER until an approved re-ruling gives either a separate MASTER.
 
 Workspace is deliberately absent from this ownership table. Dashboard and Work are cross-module
-projections and own no business outcome. Their current complete design is still
-`docs/workspace/BLUEPRINT.md` **PROPOSAL FOR OWNER REVIEW**, not approved module law.
+projections and own no business outcome. The complete Workspace document remains
+`docs/workspace/BLUEPRINT.md` **PROPOSAL FOR OWNER REVIEW**, except for the approved
+Purchasing/Receiving/GRN/Claim/Return projection slice recorded in this Architecture and the
+Purchasing MASTER. Approval of that slice does not approve unrelated Dashboard or Workspace
+proposal sections.
 
 ---
 
@@ -242,9 +259,10 @@ a second settings home. `Old Orders` is a temporary cutover door and is not part
 The right Quick Rail is governed by `ui/MASTER.md`; it never adds duplicate module destinations or
 business truth.
 
-**`Receiving` is the exact Purchasing destination and workspace word.** `Check in` names the
-physical act; `Goods Receipt` names the Carres record and `GRN` its numbered document after physical
-receiving; `Supplier DO` names the supplier's document. These words never replace one another.
+**`Receiving` is the exact Purchasing destination/workspace word** (owner correction 2026-08-29).
+`Check in` names the physical act. The supplier provides the delivery date and Supplier DO; Carres
+creates the Goods Receipt and numbered GRN only after physical receiving. These words never replace
+one another or the navigation word, and `Goods Receipts` is retired as navigation.
 
 **This is navigation, not workflow.** How the operator moves between these pages — which one
 feeds which — is the module MASTER's, and it changes when the business changes.
@@ -434,11 +452,14 @@ Case outcomes · Finance/AP read-only continuation.
 
 **OWNS**
 - The **Receiving Session / Goods Receipt** — ONE physical delivery, one session, from a PO or CO.
+- The supplier's DO reference/evidence and Carres's numbered GRN. The supplier provides its DO;
+  Carres creates the GRN only after physical receiving — one cannot substitute for the other.
 - The three times (goods received at · submitted at · posted at) and the append-only event
   ledger. **Amend and Void are its acts; history is never edited in place.**
 - **`purchase_order_lines.received_qty` moves only through this module.**
 
-**ACTIONS** — start a receiving · count the lines · record damaged and wrong · post it ·
+**ACTIONS** — start from the exact PO/CO · count Order/Received/Pending quantities · record damaged,
+wrong and extra separately · attach Supplier DO/evidence · post it ·
 amend it · void it · return a count for a re-check.
 
 **SUMMARISES** — the purchase order it is receiving against · the customer orders waiting on it.
@@ -612,8 +633,9 @@ Supplier Claim · Payment/Refund · Guarantee, as applicable.
 
 **LINKS TO** — the customer order (as its PIC).
 
-> **Duty, not email, decides permission** — V1's law, kept. **And the PIC on an order is a
-> POINTER to a person, never a copy of them.**
+> **Duty or a governed capability — never a runtime email check — decides permission.** Duty stays
+> the normal owner; an Operations Superuser capability permits action without changing ownership.
+> **And the PIC on an order is a POINTER to a person, never a copy of them.**
 
 ---
 
@@ -771,7 +793,7 @@ that already exist. Until that fact exists, a trip table is an unowned record �
 **③ Purchasing / customer-order seam — RESOLVED FROM AUTHORITY 2026-08-22.**
 The customer order owns the reason and promise. Purchasing owns the generated `purchase_demand`
 remainder, supplier commitment and `Deliver To`; Receiving owns the physical check-in and creates
-the Goods Receipt/GRN; Stock then owns Unit custody/location. The Sales Order reads risk and
+the Goods Receipt/GRN; Stock then owns valid Unit custody/location. The Sales Order reads risk and
 connected documents but cannot mark goods ordered or received.
 
 **④ Supplier Claim entrance — RESOLVED FROM AUTHORITY 2026-08-22.**

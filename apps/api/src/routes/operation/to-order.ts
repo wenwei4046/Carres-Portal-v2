@@ -24,6 +24,7 @@ import {
 } from "@carres/shared";
 import { validateIssuePlan } from "@carres/shared";
 import { requireOperation } from "../../lib/auth-guards";
+import { purchasingActorMayIssue } from "../../lib/purchasing-po-authority";
 import { mapPgError } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import {
@@ -1119,27 +1120,22 @@ toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
   const { selections, documentDecisions } = parsed.data;
 
   /* ── 1 · WHO ────────────────────────────────────────────────────────────
-   *
-   * ⭐ ONE ACTOR AUTHORITY (0379; MASTER §5.3). This route used to read
-   * `ops_po_duty` for itself, which made it the only door that checked — Manual
-   * Purchase and a direct RPC call both walked past it. `purchasing_po_actor()`
-   * is now the single resolver, it knows dated buddy cover, and
-   * `purchasing_issue_pos_batch` asks it again in SQL. This check exists so the
-   * operator gets WORDS instead of a database error, not because it is the
-   * boundary. */
-  const actorRes = await sb.rpc("purchasing_po_actor");
-  if (actorRes.error) {
-    const m = mapPgError(actorRes.error);
+   * The application and SQL both ask the governed capability. Duty/cover is
+   * still resolved below when a refusal needs to name the normal owner. */
+  const authority = await purchasingActorMayIssue(sb, c.var.auth.id);
+  if (authority.error) {
+    const m = mapPgError(authority.error);
     return c.json(m.body, m.status);
   }
-  const actor = (actorRes.data ?? {}) as {
-    actor_user_id?: string | null;
-    normal_user_id?: string | null;
-    acting_user_id?: string | null;
-  };
-  const actorId = actor.actor_user_id ?? null;
-  if (!actorId) return refuse(c, 403, "no_po_duty_holder");
-  if (actorId !== c.var.auth.id) {
+  if (!authority.mayIssue) {
+    const actorRes = await sb.rpc("purchasing_po_actor");
+    if (actorRes.error) {
+      const m = mapPgError(actorRes.error);
+      return c.json(m.body, m.status);
+    }
+    const actor = (actorRes.data ?? {}) as { actor_user_id?: string | null };
+    const actorId = actor.actor_user_id ?? null;
+    if (!actorId) return refuse(c, 403, "no_po_duty_holder");
     let holder: string | null = null;
     const who = await sb
       .from("app_users")
@@ -1299,13 +1295,30 @@ toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
     (g) => g.proposal.supplierKind === "factory_pickup",
   );
   let validPartners = new Set<string>();
+  const collectionBySupplier = new Map<
+    string,
+    { partnerId: string; fixedDestinationId: string | null }
+  >();
   if (anyPickup) {
-    const partners = await sb.from("delivery_partners").select("id");
-    if (partners.error) {
-      const m = mapPgError(partners.error);
+    const [partners, configured] = await Promise.all([
+      sb.from("delivery_partners").select("id"),
+      sb
+        .from("purchasing_supplier_settings")
+        .select("supplier_id, fixed_destination_id, collected_by_partner_id"),
+    ]);
+    if (partners.error || configured.error) {
+      const m = mapPgError(partners.error ?? configured.error!);
       return c.json(m.body, m.status);
     }
     validPartners = new Set((partners.data ?? []).map((p) => p.id as string));
+    for (const row of (configured.data ?? []) as Record<string, unknown>[]) {
+      const partnerId = row.collected_by_partner_id as string | null;
+      if (!partnerId || !validPartners.has(partnerId)) continue;
+      collectionBySupplier.set(row.supplier_id as string, {
+        partnerId,
+        fixedDestinationId: (row.fixed_destination_id as string | null) ?? null,
+      });
+    }
   }
 
   /* ⭐ A DECISION BELONGS TO ONE DOCUMENT (Card closure §4). Keyed by
@@ -1372,15 +1385,20 @@ toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
     ];
 
     const decision = decisionsFor(group.key);
-    const partnerId = decision?.procurementPartnerId ?? null;
     const needsPartner = group.proposal.supplierKind === "factory_pickup";
-    if (needsPartner && (!partnerId || !validPartners.has(partnerId))) {
+    const collection = collectionBySupplier.get(group.proposal.supplierId) ?? null;
+    const partnerId = needsPartner ? (collection?.partnerId ?? null) : null;
+    if (needsPartner && !partnerId) {
       return refuse(c, 422, "pickup_partner_required", {
         supplier: group.proposal.supplierName ?? null,
       });
     }
-    if (!needsPartner && partnerId) {
-      return refuse(c, 422, "pickup_partner_not_allowed", {
+    if (
+      needsPartner &&
+      collection?.fixedDestinationId &&
+      collection.fixedDestinationId !== group.destinationId
+    ) {
+      return refuse(c, 422, "supplier_collection_destination_mismatch", {
         supplier: group.proposal.supplierName ?? null,
       });
     }
@@ -1402,18 +1420,31 @@ toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
        * between review and Issue was adopted with nobody's approval. There is
        * no such fallback now: a line nobody checked is a line nobody may buy.
        */
-      if (!d) {
-        return refuse(c, 422, "cost_review_required", {
-          sku: line.sku,
-          supplier: group.proposal.supplierName ?? null,
-        });
-      }
       const sources = line.sources.map((src) => ({
         order_id: src.orderId,
         so: src.so,
         order_line_id: src.orderLineId,
         qty: src.qty,
       }));
+      const liveCost = res.data.catalog.get(line.sku)?.cost ?? null;
+      /* Issue review is not a cost-maintenance screen. With no legacy
+         exception declaration, Catalog is the only commercial input; SQL
+         rechecks the same live value inside the creation transaction. */
+      if (!d) {
+        const facts = { sku: line.sku, supplier: group.proposal.supplierName ?? null };
+        if (liveCost == null || liveCost <= 0) return refuse(c, 422, "cost_required", facts);
+        lines.push({
+          sku: line.sku,
+          qty: line.qty,
+          cost: liveCost,
+          cost_source: "catalog",
+          commercial_treatment: "normal",
+          commercial_reason: null,
+          expected_catalog_cost: liveCost,
+          sources,
+        });
+        continue;
+      }
       if (d.treatment === "free_of_charge") {
         lines.push({
           sku: line.sku,
@@ -1429,7 +1460,6 @@ toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
         });
         continue;
       }
-      const liveCost = res.data.catalog.get(line.sku)?.cost ?? null;
       if (d.costSource === "catalog") {
         /* A CATALOG PRICE THAT MOVED IS A COMMERCIAL DECISION, NOT A RETRY.
            Refused here for the words, and again in SQL for the authority
@@ -1531,30 +1561,6 @@ toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
   const ids = ((batch as { po_ids?: unknown } | null)?.po_ids ??
     []) as string[];
   if (ids.length !== governedPos.length) return refuse(c, 500, "po_not_created");
-
-  /**
-   * WHO RAISED IT. `purchasing_issue_pos_batch` writes no audit row of any
-   * kind, so without this a purchase order could not say who issued it or when.
-   * `po_history` has existed since 0001 for exactly that, so nothing new is
-   * invented and no migration is needed.
-   *
-   * Best-effort ON PURPOSE, and it moved across from the retired `/issue` door
-   * unchanged: the purchase orders already exist and the supplier is about to
-   * be sent them. Failing the whole issue because a history line could not be
-   * written would destroy real work to protect a note about it.
-   */
-  await sb.from("po_history").insert(
-    ids.map((id, i) => {
-      const po = governedPos[i] as { lines?: unknown[]; eta_date?: string | null };
-      const eta = po?.eta_date;
-      return {
-        po_id: id,
-        text: `Issued from SO Batch Purchase · ${po?.lines?.length ?? 0} line(s)${
-          eta ? ` · expected arrival ${eta}` : " · no expected arrival (transit days not set)"
-        }`,
-      };
-    }),
-  );
 
   /* ⭐ THE DOORS THE EVIDENCE STEP WILL NEED (closure §7).
    *

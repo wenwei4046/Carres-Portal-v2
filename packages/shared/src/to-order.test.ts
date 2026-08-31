@@ -1213,14 +1213,15 @@ describe("P13 · the take path speaks the drawer's word", () => {
  * word the server refuses BY NAME.
  */
 describe("P15 · the Source a typed demand may carry", () => {
-  it("holds exactly the approved five, in the approved order (Card 03, 2026-08-28)", () => {
-    // The owner-approved vocabulary; the 0398 doors admit exactly these.
+  it("holds exactly the approved six, in the approved order (Cards 03/04)", () => {
+    // The owner-approved vocabulary; the 0399/0401 doors admit exactly these.
     expect(DEMAND_PURPOSES.map((p) => p.value)).toEqual([
       "ready_stock",
       "showroom_display",
       "service_case",
       "internal_staff_purchase",
       "subsidiary_purchase",
+      "other_purchase",
     ]);
     expect(DEMAND_PURPOSES.map((p) => p.label)).toEqual([
       "Ready Stock",
@@ -1228,6 +1229,7 @@ describe("P15 · the Source a typed demand may carry", () => {
       "Service Case",
       "Internal Staff Purchase",
       "Subsidiary Purchase",
+      "Other Purchase",
     ]);
   });
 

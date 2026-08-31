@@ -146,6 +146,8 @@ const ORDER_O3 = orderRow({
   orderId: "o3",
   so: 1330,
   customer: "ANNE",
+  deliveryCity: "Johor Bahru",
+  deliveryState: "Johor",
   status: "partial",
   requestedDeliveryDate: "2026-09-20",
   pos: [
@@ -192,6 +194,8 @@ const ORDER_O6 = orderRow({
   so: 1410,
   customer: "STOCKED ONE",
   status: "blank",
+  deliveryCity: "Kuala Lumpur",
+  deliveryState: "Kuala Lumpur",
   lines: [
     { orderLineId: "l61", sku: "B1201S-Q", qty: 2, stockTaken: 2,
       item: "Booqit", variant: "Queen", category: "mattress", pos: [] },
@@ -269,7 +273,7 @@ function data(over: Partial<SoBatchPurchaseResponse> = {}): SoBatchPurchaseRespo
       { id: BULOH, name: "AL Sungai Buloh", isDefault: false, active: true },
     ],
     defaultDestinationId: KLANG,
-    currentPoDuty: { userId: "u1", name: "Yee Jean" },
+    currentPoDuty: { userId: "u-duty", name: "Yu Jun" },
     actingPoDuty: null,
     poDutyNameUnavailable: false,
     poDutyUnavailable: false,
@@ -435,10 +439,51 @@ describe("one permanent row per proceeded Sales Order", () => {
 });
 
 describe("selection — the parent checkbox is ALL eligible child demand", () => {
+  it("offers the governed Operations Superuser the duty owner chip and Issue PO action", () => {
+    renderRegister({
+      currentPoDuty: { userId: "u-duty", name: "Yu Jun" },
+      actingPoDuty: null,
+      mayIssue: true,
+    });
+
+    expect(screen.queryByTestId("so-batch-po-duty")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("so-batch-select-o1"));
+
+    const bar = screen.getByTestId("selection-bar");
+    expect(within(bar).getByText("1 selected · 2 units · Issue 1 PO")).toBeVisible();
+    expect(within(bar).getByTestId("so-batch-duty-chip")).toHaveTextContent("YJ");
+    expect(within(bar).getByTestId("so-batch-duty-chip")).toHaveAttribute(
+      "title",
+      "Yu Jun · PO Duty",
+    );
+    expect(within(bar).getByTestId("so-batch-issue")).toBeEnabled();
+    expect(bar).not.toHaveTextContent("Yu Jun holds PO duty");
+    expect(within(bar).getAllByRole("button").map((button) => button.textContent)).toEqual([
+      "Clear",
+      "Issue PO",
+      "Export Excel (1)",
+    ]);
+    expect(screen.queryByTestId("so-batch-selection-bar")).not.toBeInTheDocument();
+  });
+
+  it("shows the dated cover as the selected action owner without pretending they hold the month", () => {
+    renderRegister({
+      currentPoDuty: { userId: "u-duty", name: "Yu Jun" },
+      actingPoDuty: { userId: "u-cover", name: "Shasha" },
+      mayIssue: true,
+    });
+
+    fireEvent.click(screen.getByTestId("so-batch-select-o1"));
+    const chip = screen.getByTestId("so-batch-duty-chip");
+    expect(chip).toHaveTextContent("SH");
+    expect(chip).toHaveAttribute("title", "Shasha · PO Duty cover for Yu Jun");
+    expect(screen.getByTestId("so-batch-issue")).toBeEnabled();
+  });
+
   it("ticking the parent selects the order's eligible demand and offers the issue", () => {
     renderRegister();
     fireEvent.click(screen.getByTestId("so-batch-select-o1"));
-    expect(screen.getByTestId("so-batch-selection-bar")).toHaveTextContent(
+    expect(screen.getByTestId("selection-bar")).toHaveTextContent(
       "1 selected · 2 units · Issue 1 PO",
     );
     fireEvent.click(screen.getByTestId("so-batch-issue"));
@@ -453,11 +498,51 @@ describe("selection — the parent checkbox is ALL eligible child demand", () =>
     expect(screen.getByTestId("so-batch-select-o6")).toBeDisabled();
   });
 
+  it("an unselectable Catalog-cost row says why on the affected order", async () => {
+    const blocked = leaf({
+      id: "build::cost::b1",
+      state: "no_cost",
+      lineIds: ["cost-line"],
+      orderId: "cost-order",
+      so: 1500,
+      item: "B1201S",
+      issueRef: null,
+      parts: [{ sku: "B1201S-K", qty: 1, unitCost: null }],
+      action: soBatchAction({
+        state: "no_cost",
+        item: "B1201S",
+        supplier: "Nice Future",
+        category: "mattress",
+        ownerId: null,
+        ownerName: null,
+        orderId: "cost-order",
+        so: 1500,
+        dueDate: "2026-08-19",
+      }),
+    });
+    const order = orderRow({
+      orderId: "cost-order",
+      so: 1500,
+      lines: [
+        { orderLineId: "cost-line", sku: "B1201S-K", qty: 1, stockTaken: 0,
+          item: "B1201S", variant: "King", category: "mattress", pos: [] },
+      ],
+      outstandingSuppliers: ["Nice Future"],
+    });
+    renderRegister({ rows: [blocked], registerRows: [order] });
+
+    expect(screen.getByTestId("so-batch-select-cost-order")).toBeDisabled();
+    fireEvent.click(screen.getByTestId("so-batch-expand-cost-order"));
+    const box = await screen.findByTestId("so-batch-inspector-cost-order");
+    expect(within(box).getByText("Catalog cost is missing")).toBeInTheDocument();
+    expect(within(box).getByText("Set the cost of B1201S in Catalog")).toBeInTheDocument();
+  });
+
   it("a Partial order selects only its uncovered eligible remainder", () => {
     renderRegister();
     fireEvent.click(screen.getByTestId("so-batch-select-o3"));
     /* The leaf's own remainder — 1 unit, never the 2 already on the PO. */
-    expect(screen.getByTestId("so-batch-selection-bar")).toHaveTextContent(
+    expect(screen.getByTestId("selection-bar")).toHaveTextContent(
       "1 selected · 1 unit · Issue 1 PO",
     );
   });
@@ -472,6 +557,7 @@ describe("selection — the parent checkbox is ALL eligible child demand", () =>
     const parent = screen.getByTestId("so-batch-select-o8") as HTMLInputElement;
     expect(parent.checked).toBe(false);
     expect(parent.indeterminate).toBe(true);
+    expect(within(screen.getByTestId("selection-bar")).getByTestId("so-batch-issue")).toBeEnabled();
     /* The other child completes the set. */
     const second = within(box).getAllByRole("checkbox")[1]!;
     fireEvent.click(second);
@@ -485,7 +571,7 @@ describe("selection — the parent checkbox is ALL eligible child demand", () =>
     expect(screen.queryByTestId("so-batch-row-o1")).not.toBeInTheDocument();
     const header = screen.getAllByRole("checkbox")[0]!;
     fireEvent.click(header);
-    expect(screen.queryByTestId("so-batch-selection-bar")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("selection-bar")).not.toBeInTheDocument();
   });
 });
 
@@ -545,7 +631,7 @@ describe("the rail — Card 02-A wording, Card 02-B counting", () => {
   });
 });
 
-describe("the rail — Card 02-C: five readable sections, navigation not selection", () => {
+describe("the rail — purchasing fact sections, navigation not selection", () => {
   const rail = () => screen.getByTestId("so-batch-rail");
 
   it("hides completely, reopens from the Register toolbar, and remembers the choice", () => {
@@ -563,10 +649,10 @@ describe("the rail — Card 02-C: five readable sections, navigation not selecti
     expect(localStorage.getItem("carres.soBatchPurchase.filters.open")).toBe("1");
   });
 
-  it("renders the five sections in the approved order, with the approved words", () => {
+  it("renders REGION immediately after SUPPLIER", () => {
     renderRegister();
     const text = rail().textContent ?? "";
-    const order = ["TO ORDER", "ORDER TIMING", "PRODUCT", "SUPPLIER", "SETUP TO FIX"];
+    const order = ["TO ORDER", "ORDER TIMING", "PRODUCT", "SUPPLIER", "REGION", "SETUP TO FIX"];
     const positions = order.map((h) => text.indexOf(h));
     expect(positions.every((p) => p >= 0)).toBe(true);
     expect([...positions].sort((a, b) => a - b)).toEqual(positions);
@@ -582,13 +668,25 @@ describe("the rail — Card 02-C: five readable sections, navigation not selecti
       "Bedframe",
       "Sofa",
       "All suppliers",
+      "All regions",
+      "Klang Valley",
+      "Johor",
+      "Others",
       "Production days not set",
     ]) {
       expect(text, word).toContain(word);
     }
+    expect(text).not.toContain("WORK TO DO");
+    expect(text).not.toContain("Ask customer for a delivery date");
     /* The retired wording never returns. */
     expect(text).not.toContain("Not enough production time");
     expect(text).not.toContain("Production time not set");
+  });
+
+  it("does not expose central Work actions as local rail filters", () => {
+    renderRegister();
+    expect(screen.queryByTestId("so-batch-work-issue_po")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("so-batch-work-ask_customer_date")).not.toBeInTheDocument();
   });
 
   it("all five timing rows stay visible, and an empty band prints 0, not silence", () => {
@@ -677,6 +775,17 @@ describe("the rail — Card 02-C: five readable sections, navigation not selecti
     expect(screen.getByTestId("so-batch-row-o8")).toBeInTheDocument();
     expect(screen.queryByTestId("so-batch-row-o1")).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId("so-batch-supplier-all"));
+    expect(screen.getByTestId("so-batch-row-o1")).toBeInTheDocument();
+  });
+
+  it("the region filter uses Delivery State and All regions clears it", () => {
+    renderRegister();
+    expect(screen.getByTestId("so-batch-region-Klang Valley").textContent).toContain("2");
+    expect(screen.getByTestId("so-batch-region-Johor").textContent).toContain("1");
+    fireEvent.click(screen.getByTestId("so-batch-region-Johor"));
+    expect(screen.getByTestId("so-batch-row-o3")).toBeInTheDocument();
+    expect(screen.queryByTestId("so-batch-row-o1")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("so-batch-region-all"));
     expect(screen.getByTestId("so-batch-row-o1")).toBeInTheDocument();
   });
 
@@ -824,7 +933,7 @@ describe("the arrangement on the parent row", () => {
     const select = screen.getByTestId("so-batch-deliver-to-select-o8");
     fireEvent.change(select, { target: { value: BULOH } });
     /* Arranging TICKS — both leafs are now selected for Sungai Buloh. */
-    expect(screen.getByTestId("so-batch-selection-bar")).toHaveTextContent(
+    expect(screen.getByTestId("selection-bar")).toHaveTextContent(
       "2 selected · 2 units",
     );
     fireEvent.click(screen.getByTestId("so-batch-issue"));
@@ -846,7 +955,7 @@ describe("the arrangement on the parent row", () => {
       target: { value: "1" },
     });
     fireEvent.click(within(box).getByTestId("so-batch-split-apply-build::o1::b1"));
-    expect(screen.getByTestId("so-batch-selection-bar")).toHaveTextContent(
+    expect(screen.getByTestId("selection-bar")).toHaveTextContent(
       "1 selected · 2 units · Issue 2 POs",
     );
   });
@@ -858,37 +967,24 @@ describe("what this page refuses to be", () => {
     expect(screen.getByText("No proceeded Sales Orders.")).toBeInTheDocument();
   });
 
-  it("names whoever may act today instead of a silent grey button", () => {
+  it("keeps an ordinary non-duty operator refused and shows only the owner chip", () => {
     renderRegister({ mayIssue: false });
     fireEvent.click(screen.getByTestId("so-batch-select-o1"));
-    expect(screen.getByTestId("so-batch-duty-chip")).toHaveTextContent(
-      "Yee Jean holds PO duty",
+    expect(screen.getByTestId("so-batch-duty-chip")).toHaveTextContent("YJ");
+    expect(screen.getByTestId("so-batch-duty-chip")).toHaveAttribute(
+      "title",
+      "Yu Jun · PO Duty",
     );
     expect(screen.queryByTestId("so-batch-issue")).not.toBeInTheDocument();
   });
 
-  it("shows the real resolved PO Duty once in the Register toolbar", () => {
+  it("does not add a permanent PO Duty block to the Register toolbar", () => {
     renderRegister({
-      currentPoDuty: { userId: "real-op-1", name: "Tan Qu Qu" },
+      currentPoDuty: { userId: "real-op-1", name: "Yu Jun" },
       actingPoDuty: null,
     });
-    expect(screen.getByTestId("so-batch-po-duty")).toHaveTextContent(
-      "Tan Qu Qu holds PO duty",
-    );
-    expect(screen.getByTestId("so-batch-po-duty")).toHaveAccessibleName(
-      "Tan Qu Qu holds PO duty",
-    );
-  });
-
-  it("shows the real dated cover instead of the absent holder", () => {
-    renderRegister({
-      currentPoDuty: { userId: "real-op-1", name: "Tan Qu Qu" },
-      actingPoDuty: { userId: "real-op-2", name: "Shasha" },
-    });
-    expect(screen.getByTestId("so-batch-po-duty")).toHaveTextContent(
-      "Shasha is covering PO duty",
-    );
-    expect(screen.getByTestId("so-batch-po-duty")).not.toHaveTextContent("Tan Qu Qu");
+    expect(screen.queryByTestId("so-batch-po-duty")).not.toBeInTheDocument();
+    expect(screen.queryByText(/holds PO duty|covering PO duty/)).not.toBeInTheDocument();
   });
 
   it("says the PO duty name is missing instead of saying nobody is on duty", () => {
@@ -902,9 +998,6 @@ describe("what this page refuses to be", () => {
     } as Partial<SoBatchPurchaseResponse> & { poDutyNameUnavailable: boolean };
     renderRegister(unresolvedDuty);
 
-    expect(screen.getByTestId("so-batch-po-duty")).toHaveTextContent(
-      "PO duty name is missing.",
-    );
     fireEvent.click(screen.getByTestId("so-batch-select-o1"));
     expect(screen.getByTestId("so-batch-duty-chip")).toHaveTextContent(
       "PO duty name is missing.",
@@ -922,7 +1015,8 @@ describe("what this page refuses to be", () => {
       mayIssue: false,
     });
 
-    expect(screen.getByTestId("so-batch-po-duty")).toHaveTextContent(
+    fireEvent.click(screen.getByTestId("so-batch-select-o1"));
+    expect(screen.getByTestId("so-batch-duty-chip")).toHaveTextContent(
       "PO duty could not be checked.",
     );
     expect(screen.queryByText("Nobody holds PO duty this month.")).not.toBeInTheDocument();

@@ -41,6 +41,8 @@ export interface PurchasingRefusalFacts {
   toBuy?: number | null;
   version?: number | null;
   actor?: string | null;
+  /** The line's own requested quantity — the approved-quantity ceiling. */
+  qty?: number | null;
 }
 
 const some = (v: string | null | undefined, fallback: string) =>
@@ -71,6 +73,41 @@ export function purchasingRefusal(
       return {
         wrong: "Nobody holds PO duty this month.",
         todo: "Ask management to set this month's PO duty holder.",
+      };
+    case "not_purchase_approver":
+      return {
+        wrong: "Only the approver may decide this purchase.",
+        todo: `Ask ${some(facts.actor, "a manager")} to approve or refuse it.`,
+      };
+
+    // ── THE DECISION (0360 · Card 05) — the Manual Purchase approval door ─
+    case "no_purchase_approver":
+      return {
+        wrong: "No purchase approver is set.",
+        todo: "Ask management to set the purchase approver.",
+      };
+    case "already_decided":
+      return {
+        wrong: "This purchase was already decided.",
+        todo: "Reload the Manual Purchase to see the decision.",
+      };
+    case "reason_required":
+      return {
+        wrong: "The decision reason is missing.",
+        todo: "Type why this purchase is not going ahead.",
+      };
+    case "invalid_cut_qty":
+      return {
+        wrong: "The approved quantity is not valid.",
+        todo: `Enter a whole number from 0 to ${some(
+          facts.qty == null ? null : String(facts.qty),
+          "the requested quantity",
+        )}.`,
+      };
+    case "decision_not_recorded":
+      return {
+        wrong: "The decision was not recorded.",
+        todo: "Reload the Manual Purchase and try once more. Tell IT if it happens again.",
       };
 
     // ── THE MONEY (0380) ──────────────────────────────────────────────────
@@ -201,9 +238,20 @@ export function purchasingRefusal(
         todo: `Ask Catalog to set the supplier of ${sku}, then issue again.`,
       };
     case "pickup_partner_required":
+    case "supplier_collection_not_configured":
       return {
-        wrong: `${supplier} does not deliver. Nobody is collecting.`,
-        todo: "Choose who collects the goods, then issue again.",
+        wrong: `${supplier} collection is not configured.`,
+        todo: "Set its collector and destination in Purchasing Settings, then issue again.",
+      };
+    case "supplier_collection_mismatch":
+      return {
+        wrong: `${supplier} has a different collector in Purchasing Settings.`,
+        todo: "Reload the purchase, then issue it with the configured collector.",
+      };
+    case "supplier_collection_destination_mismatch":
+      return {
+        wrong: `${supplier} must be collected to its configured destination.`,
+        todo: "Reload the purchase, then issue it to the destination in Purchasing Settings.",
       };
     case "pickup_partner_not_allowed":
       return {
@@ -301,6 +349,12 @@ export function purchasingRefusalLine(
 export const PURCHASING_REFUSAL_CODES = [
   "not_po_duty",
   "no_po_duty_holder",
+  "not_purchase_approver",
+  "no_purchase_approver",
+  "already_decided",
+  "reason_required",
+  "invalid_cut_qty",
+  "decision_not_recorded",
   "supplier_price_changed",
   "stale_catalog_cost",
   "expected_cost_required",
@@ -331,6 +385,9 @@ export const PURCHASING_REFUSAL_CODES = [
   "production_days_required",
   "unresolved_supplier",
   "pickup_partner_required",
+  "supplier_collection_not_configured",
+  "supplier_collection_mismatch",
+  "supplier_collection_destination_mismatch",
   "pickup_partner_not_allowed",
   "no_warehouse",
   "unknown_source_order",

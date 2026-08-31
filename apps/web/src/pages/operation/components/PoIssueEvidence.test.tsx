@@ -147,6 +147,37 @@ describe("persisted evidence survives a reload", () => {
     expect(screen.getByTestId("so-batch-evidence-channel")).toHaveValue("email");
     expect(screen.getByTestId("so-batch-evidence-recipient")).toBeDisabled();
   });
+
+  it("keeps a superuser actor distinct from the normal duty and dated cover", () => {
+    renderIt(1, [
+      {
+        ...sentV1,
+        sent_by_name: "Operation Superuser",
+        duty_name: "Yu Jun",
+        acting_name: "Shasha",
+      },
+    ]);
+
+    const panel = screen.getByTestId(`so-batch-evidence-${PO.id}`);
+    expect(panel).toHaveTextContent("by Operation Superuser");
+    expect(panel).toHaveTextContent("PO Duty cover Shasha for Yu Jun");
+    expect(panel).not.toHaveTextContent("Operation Superuser (covering Yu Jun)");
+  });
+
+  it("keeps the normal duty context when a superuser acts without a cover", () => {
+    renderIt(1, [
+      {
+        ...sentV1,
+        sent_by_name: "Operation Superuser",
+        duty_name: "Yu Jun",
+        acting_name: null,
+      },
+    ]);
+
+    expect(screen.getByTestId(`so-batch-evidence-${PO.id}`)).toHaveTextContent(
+      "by Operation Superuser · PO Duty Yu Jun",
+    );
+  });
 });
 
 describe("the confirmation declares the version it is looking at", () => {

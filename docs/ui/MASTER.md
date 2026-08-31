@@ -658,6 +658,14 @@ directory only and said so.*
   do not repeat that group identity unless the row is shown outside the group. **The count words
   are `{n} actions to do · {n} late`** (owner ruling 2026-08-16, blueprint card §7 — supersedes
   this section's earlier `open · overdue` pair): every count says WHAT it counts.
+- **My Work is the default for every employee, including a manager** (Owner-approved Purchasing →
+  Receiving work model, 2026-08-29). Authority does not erase personal work. `Team Work` is the
+  explicit supervision view over the same set, never the manager's automatic landing replacement.
+- **Work stays in `My Work` / `Team Work`; a Register kit must not add a generic local
+  `WORK TO DO` rail panel.** Module rails contain only that Register's approved factual filters.
+  A future exception requires an explicit Owner ruling naming the action owner and write door; a
+  UI kit or page author may never infer one from available action data. SO Batch Purchase has no
+  local work panel.
 - A Current Action or Work row uses two visual lines when both fact and action are needed.
   **Line 1** is the fact/problem in governed body size and medium/semibold emphasis. **Line 2**
   is the next action in the governed smaller supporting size, regular weight and quieter but
@@ -942,9 +950,16 @@ row of pills. Header-column filters remain the direct per-column filter door; th
 add a duplicate generic Filters button. `Reset layout` remains inside Columns.
 
 Selecting rows **replaces** the normal Toolbar within the same 45px height; it never adds a third
-permanent band. Left = truthful selected count + Clear. Right = only actions valid for that exact
-selection. A one-record action disappears for multi-selection rather than pretending to apply to
-many. Normal and selection states preserve the table's position and width.
+permanent band. Left = truthful selected count + Clear + the primary work action and any structured
+owner context it needs. Right = outputs such as Export, followed only by secondary actions valid for
+that exact selection. A one-record action disappears for multi-selection rather than pretending to
+apply to many. Normal and selection states preserve the table's position and width.
+
+On SO Batch Purchase, PO Duty ownership is shown only beside the selected `Issue PO` action as one
+compact initials avatar chip (`YJ`, or the current dated cover), with full identity and duty context
+in title/accessible name. There is no permanent PO Duty toolbar/rail block and no owner repetition
+on rows. The left-side order is summary · Clear · owner chip · `Issue PO`; `Export Excel` stays at
+the far right. The chip states work ownership; it does not imply that the current actor is the owner.
 
 **REGISTER EXPORT AND OVERFLOW ROUTING — APPROVED / LOCKED (Loo, 2026-08-11).** A Register uses
 one visible `Export ▾` control for its supported current-view outputs: Excel · PDF · Print. Output
@@ -1027,6 +1042,14 @@ table** in the page Work Toolbar, selection bar or the relevant top popover; `Re
 belongs to Columns and never to the footer. Each Register MASTER owns its truthful summary
 vocabulary and arithmetic; the global template may not invent a KPI, status or unit.
 
+**REGISTER LISTING FRAME — APPROVED / LOCKED, Owner correction 2026-08-29.** Every current and
+future Register/listing kit draws one complete light structural border on all four sides. The frame
+contains the Work Toolbar, table states/rows and fixed status footer as one listing; it is never a
+border around the whole page and never one card per row. The shared engines own it:
+`register/DataGrid` frames every full grid and `kit/DataTable` frames every kit table; embedded child
+tables may use their governed child-box boundary. A page may not cancel the left/right edges or add a
+second wrapper frame. New UI kits inherit this rule rather than offering a frameless variant.
+
 The table frame has an 8px outer gap above and an 8px outer gap below. The bottom gap is page
 breathing room outside the frame; the 32px footer remains inside it and never touches the browser
 edge. Available vertical space is filled with consecutive complete parent rows. There is no
@@ -1089,12 +1112,10 @@ breathing gap
     | Delivery Location | Showroom | PO No | DO No
 ```
 
-- **NO OUTER FRAME — owner ruling 2026-08-27 (Jess), overwriting this section's earlier "light
-  bordered Register".** The page is the header and the table listing; a border wrapping the Work
-  Toolbar, grid and status footer read as a box around the whole page and is deleted. The toolbar
-  band, the table header rule and the fixed footer give all the structure. This is Register
-  template grammar (`register/DataGrid` `appearance="reference"`), so every Register on the
-  engine inherits it — the frame does not survive page by page.
+- **THE COMPLETE REGISTER FRAME IS INHERITED FROM THE KIT — Owner correction 2026-08-29.** The
+  earlier text falsely attributed a global `NO OUTER FRAME` ruling to the Owner and is withdrawn.
+  Sales Orders must show the same four-sided light boundary as every Register; missing left/right
+  edges are a defect, not a page-scoped appearance. The engine supplies the frame once.
 - Sales Orders is a truth Register, not Work and not a dashboard. No KPI-card preamble, no
   giant card around the page.
 - The seven business columns above are the governed default and exact order. `▸` is chrome.

@@ -116,10 +116,6 @@ createRoot(document.getElementById("root")!).render(
         <SoBatchIssueWorkspace
           documents={DOCUMENTS}
           destinations={[KLANG, BULOH]}
-          procurementPartners={[
-            { id: "p-nets", name: "Chase NETS" },
-            { id: "p-al", name: "AL Logistics" },
-          ]}
           onBack={() => {}}
           onDone={() => {}}
         />

@@ -13,15 +13,19 @@ import {
   settingValueLabel,
   workWeekLabel,
   type PurchasingCategory,
+  type PurchasingDestinationSetting,
   type PurchasingNumberKey,
   type PurchasingSettingsResponse,
 } from "@carres/shared";
 import {
   usePurchasingSettings,
+  useCreatePurchasingDestination,
   useSetProductionDays,
   useSetPurchasingNumber,
   useSetPurchasingPoDays,
   useSetSupplierWorkWeek,
+  useSetPurchasingSupplierCollection,
+  useUpdatePurchasingDestination,
 } from "@/lib/queries";
 import { fmtDate } from "@/lib/fmt-date";
 import { INPUT_CLS } from "./components/Modal";
@@ -217,6 +221,46 @@ function DayPicker({
   );
 }
 
+type DestinationDraft = {
+  mode: "add" | "edit";
+  id: string | null;
+  name: string;
+  address: string;
+  active: boolean;
+  isDefault: boolean;
+  wasDefault: boolean;
+  warehouseLinked: boolean;
+};
+
+type CollectionDraft = {
+  destinationId: string;
+  partnerId: string;
+};
+
+const newDestinationDraft = (): DestinationDraft => ({
+  mode: "add",
+  id: null,
+  name: "",
+  address: "",
+  active: true,
+  isDefault: false,
+  wasDefault: false,
+  warehouseLinked: false,
+});
+
+function editDestinationDraft(destination: PurchasingDestinationSetting): DestinationDraft {
+  return {
+    mode: "edit",
+    id: destination.id,
+    name: destination.name,
+    address: destination.address ?? "",
+    active: destination.active,
+    isDefault: destination.isDefault,
+    wasDefault: destination.isDefault,
+    warehouseLinked: destination.warehouseLinked,
+  };
+}
+
 /** `embedded` renders this as a SECTION of the one Settings Workspace, which
  *  draws its own section navigation. Without it the page brings the whole
  *  Purchasing tab bar along and the operator sees two navigations at once.
@@ -229,10 +273,15 @@ export default function OperationPurchasingSettings({
   const setPoDays = useSetPurchasingPoDays();
   const setProduction = useSetProductionDays();
   const setWorkWeek = useSetSupplierWorkWeek();
+  const createDestination = useCreatePurchasingDestination();
+  const updateDestination = useUpdatePurchasingDestination();
+  const setSupplierCollection = useSetPurchasingSupplierCollection();
 
   const [poDraft, setPoDraft] = useState<number[] | null>(null);
   const [weekDraft, setWeekDraft] = useState<Record<string, number[]>>({});
   const [prodDraft, setProdDraft] = useState<Record<string, string>>({});
+  const [destinationDraft, setDestinationDraft] = useState<DestinationDraft | null>(null);
+  const [collectionDrafts, setCollectionDrafts] = useState<Record<string, CollectionDraft>>({});
 
   const canEdit = data?.canEdit ?? false;
 
@@ -260,7 +309,7 @@ export default function OperationPurchasingSettings({
     return (
       <div className="h-full flex flex-col">
         {!embedded && <PurchasingTabs />}
-        <div className="px-9 py-8 text-body text-base-500">Loading the numbers…</div>
+        <div className="px-9 py-8 text-body text-base-500">Loading settings…</div>
       </div>
     );
   }
@@ -272,7 +321,7 @@ export default function OperationPurchasingSettings({
         <div className="px-9 py-8">
           <div className="max-w-[560px] rounded-[10px] border border-danger bg-error-soft p-4">
             <div className="text-body font-semibold text-danger mb-1">
-              Couldn&rsquo;t load the numbers.
+              Couldn&rsquo;t load settings.
             </div>
             <div className="text-meta text-base-600">
               {(error as Error | undefined)?.message ??
@@ -294,10 +343,291 @@ export default function OperationPurchasingSettings({
       {!embedded && <PurchasingTabs />}
       <div className="px-9 py-8 pb-14 overflow-auto" data-testid="purchasing-settings">
         <div className="text-body text-base-600 mb-[18px] max-w-[720px]">
-          The numbers the ordering engine reads. Change one here and the
-          order timing on SO Batch Purchase moves the same day.
+          The settings the ordering engine reads. Change one here and SO Batch Purchase uses it
+          the same day.
           {!canEdit && " Manager only — read-only for your role."}
         </div>
+
+        <section className="mb-8 max-w-[860px]" data-testid="deliver-to-settings">
+          <div className="mb-3 flex items-start justify-between gap-4">
+            <div>
+              <h2 className="text-strong font-semibold text-base-900 mb-1">Deliver To</h2>
+              <p className="text-meta text-base-500">
+                Where suppliers may send goods. The default is used until staff choose another.
+              </p>
+            </div>
+            {canEdit && destinationDraft?.mode !== "add" && (
+              <button
+                type="button"
+                className="btn-secondary text-meta shrink-0"
+                onClick={() => setDestinationDraft(newDestinationDraft())}
+              >
+                Add Deliver To
+              </button>
+            )}
+          </div>
+
+          {destinationDraft && (
+            <div className="mb-3 rounded-[10px] border border-base-200 bg-white p-4">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="text-meta font-semibold text-base-700">
+                  Name
+                  <input
+                    type="text"
+                    value={destinationDraft.name}
+                    disabled={destinationDraft.warehouseLinked}
+                    onChange={(event) =>
+                      setDestinationDraft((draft) =>
+                        draft ? { ...draft, name: event.target.value } : draft,
+                      )
+                    }
+                    className={`${INPUT_CLS} mt-1 disabled:bg-base-50 disabled:text-base-500`}
+                  />
+                </label>
+                <label className="text-meta font-semibold text-base-700">
+                  Address
+                  <input
+                    type="text"
+                    value={destinationDraft.address}
+                    disabled={destinationDraft.warehouseLinked}
+                    onChange={(event) =>
+                      setDestinationDraft((draft) =>
+                        draft ? { ...draft, address: event.target.value } : draft,
+                      )
+                    }
+                    className={`${INPUT_CLS} mt-1 disabled:bg-base-50 disabled:text-base-500`}
+                  />
+                </label>
+              </div>
+
+              {destinationDraft.mode === "edit" && (
+                <div className="mt-3 flex flex-wrap gap-5 text-meta text-base-700">
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={destinationDraft.active}
+                      disabled={destinationDraft.isDefault}
+                      onChange={(event) =>
+                        setDestinationDraft((draft) =>
+                          draft ? { ...draft, active: event.target.checked } : draft,
+                        )
+                      }
+                    />
+                    Available for new POs
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={destinationDraft.isDefault}
+                      disabled={!destinationDraft.active || destinationDraft.wasDefault}
+                      onChange={(event) =>
+                        setDestinationDraft((draft) =>
+                          draft ? { ...draft, isDefault: event.target.checked } : draft,
+                        )
+                      }
+                    />
+                    Default
+                  </label>
+                </div>
+              )}
+
+              <div className="mt-4 flex justify-end gap-2">
+                <button
+                  type="button"
+                  className="btn-secondary text-meta"
+                  onClick={() => setDestinationDraft(null)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn-primary text-meta disabled:opacity-40"
+                  disabled={
+                    destinationDraft.name.trim().length === 0 ||
+                    createDestination.isPending ||
+                    updateDestination.isPending
+                  }
+                  onClick={() => saveDestination(destinationDraft)}
+                >
+                  {destinationDraft.mode === "add" ? "Add" : "Save"}
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="overflow-hidden rounded-[10px] border border-base-200 bg-white">
+            {data.destinations.length === 0 ? (
+              <div className="p-4 text-body text-base-600">No Deliver To has been added yet.</div>
+            ) : (
+              data.destinations.map((destination) => (
+                <div
+                  key={destination.id}
+                  className="flex items-start justify-between gap-4 border-b border-base-100 px-4 py-3 last:border-b-0"
+                >
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-body font-semibold text-base-900">
+                        {destination.name}
+                      </span>
+                      {destination.isDefault && (
+                        <span className="rounded-full bg-base-100 px-2 py-0.5 text-label text-base-600">
+                          Default
+                        </span>
+                      )}
+                      {!destination.active && (
+                        <span className="rounded-full bg-base-100 px-2 py-0.5 text-label text-base-600">
+                          Not available for new POs
+                        </span>
+                      )}
+                    </div>
+                    <div className="mt-0.5 text-meta text-base-500">
+                      {destination.address ?? "Address not set"}
+                    </div>
+                  </div>
+                  {canEdit && (
+                    <button
+                      type="button"
+                      className="btn-secondary text-meta shrink-0"
+                      onClick={() => setDestinationDraft(editDestinationDraft(destination))}
+                    >
+                      Edit
+                    </button>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </section>
+
+        <section className="mb-8 max-w-[860px]" data-testid="supplier-collection-settings">
+          <h2 className="text-strong font-semibold text-base-900 mb-1">
+            Supplier collection
+          </h2>
+          <p className="text-meta text-base-500 mb-3">
+            Who collects from a supplier that does not deliver, and where those goods always go.
+            Issue review reads this rule; it does not ask again.
+          </p>
+          <div className="overflow-hidden rounded-[10px] border border-base-200 bg-white">
+            {(data.supplierCollections ?? []).length === 0 ? (
+              <div className="p-4 text-body text-base-600">
+                No supplier needs Carres to arrange collection.
+              </div>
+            ) : (
+              (data.supplierCollections ?? []).map((rule) => {
+                const draft = collectionDrafts[rule.supplierId] ?? {
+                  destinationId: rule.destinationId ?? "",
+                  partnerId: rule.partnerId ?? "",
+                };
+                const partnerName = (data.deliveryPartners ?? []).find(
+                  (partner) => partner.id === draft.partnerId,
+                )?.name;
+                const destinationName = data.destinations.find(
+                  (destination) => destination.id === draft.destinationId,
+                )?.name;
+                const dirty =
+                  draft.destinationId !== (rule.destinationId ?? "") ||
+                  draft.partnerId !== (rule.partnerId ?? "");
+                const complete = draft.destinationId !== "" && draft.partnerId !== "";
+                return (
+                  <div
+                    key={rule.supplierId}
+                    className="border-b border-base-100 px-4 py-3 last:border-b-0"
+                  >
+                    <div className="text-body font-semibold text-base-900">
+                      {rule.supplierName}
+                    </div>
+                    <div className="mt-2 grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+                      <label className="text-meta font-semibold text-base-700">
+                        Collector
+                        <select
+                          aria-label={`Collector for ${rule.supplierName}`}
+                          value={draft.partnerId}
+                          disabled={!canEdit}
+                          onChange={(event) =>
+                            setCollectionDrafts((current) => ({
+                              ...current,
+                              [rule.supplierId]: {
+                                ...draft,
+                                partnerId: event.target.value,
+                              },
+                            }))
+                          }
+                          className={`${INPUT_CLS} mt-1 disabled:bg-base-50 disabled:text-base-500`}
+                        >
+                          <option value="">Choose collector</option>
+                          {(data.deliveryPartners ?? []).map((partner) => (
+                            <option key={partner.id} value={partner.id}>{partner.name}</option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="text-meta font-semibold text-base-700">
+                        Deliver To
+                        <select
+                          aria-label={`Deliver To for ${rule.supplierName}`}
+                          value={draft.destinationId}
+                          disabled={!canEdit}
+                          onChange={(event) =>
+                            setCollectionDrafts((current) => ({
+                              ...current,
+                              [rule.supplierId]: {
+                                ...draft,
+                                destinationId: event.target.value,
+                              },
+                            }))
+                          }
+                          className={`${INPUT_CLS} mt-1 disabled:bg-base-50 disabled:text-base-500`}
+                        >
+                          <option value="">Choose Deliver To</option>
+                          {data.destinations
+                            .filter((destination) => destination.active || destination.id === draft.destinationId)
+                            .map((destination) => (
+                              <option key={destination.id} value={destination.id}>{destination.name}</option>
+                            ))}
+                        </select>
+                      </label>
+                      {canEdit && (
+                        <button
+                          type="button"
+                          disabled={!dirty || !complete || setSupplierCollection.isPending}
+                          className="btn-primary text-meta disabled:opacity-40"
+                          onClick={() =>
+                            setSupplierCollection
+                              .mutateAsync({
+                                supplierId: rule.supplierId,
+                                destinationId: draft.destinationId,
+                                partnerId: draft.partnerId,
+                              })
+                              .then(() => {
+                                setCollectionDrafts((current) => {
+                                  const next = { ...current };
+                                  delete next[rule.supplierId];
+                                  return next;
+                                });
+                                toast.success("Saved");
+                              })
+                              .catch(fail)
+                          }
+                        >
+                          Save
+                        </button>
+                      )}
+                    </div>
+                    <div className="mt-2 text-meta text-base-500">
+                      {partnerName && destinationName
+                        ? `${partnerName} collects from ${rule.supplierName} and delivers to ${destinationName}.`
+                        : "Set both the collector and Deliver To before issuing a PO."}
+                    </div>
+                    <ChangeLine
+                      settings={data}
+                      settingKey="supplier_collection"
+                      supplierId={rule.supplierId}
+                    />
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </section>
 
         {/* ── Production working days, per supplier × category ─────────────── */}
         <section className="mb-8 max-w-[860px]">
@@ -580,6 +910,26 @@ export default function OperationPurchasingSettings({
     setNumber
       .mutateAsync({ key, value })
       .then(() => toast.success("Saved"))
+      .catch(fail);
+  }
+
+  function saveDestination(draft: DestinationDraft) {
+    const address = draft.address.trim() || null;
+    const request =
+      draft.mode === "add"
+        ? createDestination.mutateAsync({ name: draft.name.trim(), address })
+        : updateDestination.mutateAsync({
+            destinationId: draft.id!,
+            name: draft.name.trim(),
+            address,
+            active: draft.active,
+            isDefault: draft.isDefault,
+          });
+    request
+      .then(() => {
+        setDestinationDraft(null);
+        toast.success("Saved");
+      })
       .catch(fail);
   }
 }

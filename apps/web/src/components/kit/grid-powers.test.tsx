@@ -538,10 +538,11 @@ describe('P16 · sizing="content" — nothing but the filler grows', () => {
   });
 });
 
-describe("P16 · the kit draws no top corner", () => {
-  it("leaves the frame to the page — a list grid is a sheet, not a card", () => {
+describe("P16 · the kit draws one flat complete listing frame", () => {
+  it("frames all four sides without turning the sheet into a rounded card", () => {
     render(<DataTable {...base} />);
     const root = document.querySelector('[data-kit="data-table"]')!;
+    expect(root.className).toMatch(/(?:^|\s)border(?:\s|$)/);
     expect(root.className).not.toMatch(/rounded/);
   });
 });

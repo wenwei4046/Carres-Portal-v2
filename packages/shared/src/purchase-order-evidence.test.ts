@@ -76,7 +76,7 @@ describe("supplier answer evidence", () => {
 });
 
 describe("0401 keeps the official PO date separate", () => {
-  const sql = migration("0401_");
+  const sql = migration("0406_");
 
   it("adds a separate official date without backfilling legacy rows", () => {
     expect(sql).toContain("add column if not exists po_delivery_date date");

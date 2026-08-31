@@ -85,7 +85,7 @@ git commit -m "feat(purchasing): align purchase order register facts"
 ### Task 2: Governed Date, Evidence and Superuser Authority
 
 **Files:**
-- Create: `supabase/migrations/0401_the_supplier_answer_never_rewrites_the_po.sql`
+- Create: `supabase/migrations/0406_the_supplier_answer_never_rewrites_the_po.sql`
 - Modify: `packages/shared/src/purchasing-po-authority.test.ts`
 - Create: `packages/shared/src/purchase-order-evidence.test.ts`
 
@@ -137,7 +137,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit the additive migration**
 
 ```bash
-git add supabase/migrations/0401_the_supplier_answer_never_rewrites_the_po.sql packages/shared/src/purchasing-po-authority.test.ts packages/shared/src/purchase-order-evidence.test.ts
+git add supabase/migrations/0406_the_supplier_answer_never_rewrites_the_po.sql packages/shared/src/purchasing-po-authority.test.ts packages/shared/src/purchase-order-evidence.test.ts
 git commit -m "feat(purchasing): govern PO dates and supplier evidence"
 ```
 

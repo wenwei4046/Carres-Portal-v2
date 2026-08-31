@@ -2,20 +2,39 @@ import { useEffect, useMemo, useState } from "react";
 import {
   DEMAND_PURPOSES,
   DEMAND_PURPOSE_DEFAULT,
+  MANUAL_PURCHASE_APPROVAL_WORDS,
   MANUAL_PURCHASE_RAIL,
   MANUAL_PURCHASE_RAIL_CLEAR,
   MANUAL_PURCHASE_STATUS_WORDS,
   MANUAL_PURCHASE_WORDS as MW,
   TO_ORDER_WORDS as W,
+  categoryLabel,
   demandPurposeLabelOf,
+  manualPurchaseApprovalOf,
   manualPurchaseApproverLine,
+  manualPurchaseHistoryRecord,
+  manualPurchaseDeliverToSummary,
+  manualPurchaseForOf,
+  manualPurchaseIssueGroupCount,
+  manualPurchaseIssueSentence,
+  manualPurchaseItemsSummary,
+  manualPurchaseLeadDayFacts,
+  manualPurchaseLineRemainingOf,
+  manualPurchaseOrderByLine,
+  manualPurchaseOrderByOf,
+  manualPurchasePoSummary,
   manualPurchaseRailFacts,
   manualPurchaseRailModel,
+  manualPurchaseSelectable,
   manualPurchaseStatusOf,
+  manualPurchaseSupplierSummary,
+  manualPurchaseTimingOf,
+  manualPurchaseWorkOrder,
   purchasingRefusal,
   stillNeededOf,
   type DemandPickItem,
   type DemandPurpose,
+  type ManualPurchaseApprovalKind,
   type ManualPurchaseRailFilter,
   type ManualPurchaseStatus,
   type ManualPurchaseStatusKind,
@@ -23,11 +42,14 @@ import {
   type ProductCategory,
 } from "@carres/shared";
 import { useQuery } from "@tanstack/react-query";
-import { PanelLeftOpen } from "lucide-react";
+import { ChevronLeft, ChevronRight, PanelLeftOpen } from "lucide-react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import Button from "@/components/kit/Button";
 import DataTable, { type Column } from "@/components/kit/DataTable";
 import DatePicker from "@/components/kit/DatePicker";
+import EmptyState from "@/components/kit/EmptyState";
 import Input from "@/components/kit/Input";
+import Loading from "@/components/kit/Loading";
 import SearchInput from "@/components/kit/SearchInput";
 import Select from "@/components/kit/Select";
 import StatusPill from "@/components/kit/StatusPill";
@@ -43,15 +65,24 @@ import {
   useCreatePurchaseRequest,
   useCreatePurchaseRequestLine,
   useDecidePurchaseRequest,
-  useDeliveryPartners,
   useIssuePurchaseRequests,
   useManualPurchaseDetail,
+  useManualPurchasePlan,
   useManualPurchaseRegister,
+  type ManualPurchasePlanLine,
   type ManualPurchaseRegisterPayload,
   type PurchaseRequestLineRow,
   type PurchaseRequestRow,
 } from "@/lib/queries";
+import { avatarColor, personInitials } from "@/lib/staff-avatar";
 import PurchasingTabs from "./PurchasingTabs";
+import SalesOrderTabs from "./SalesOrderTabs";
+import { Block } from "./SalesOrderWorkspace";
+import {
+  RecordRanks,
+  groupHistoryChronology,
+  historyActorWords,
+} from "./SalesOrderLedger";
 import {
   FilterRail,
   FilterRailGroup,
@@ -60,19 +91,21 @@ import {
 
 /**
  * MANUAL PURCHASE — the request, the approval, the order
- * (CARD-2026-08-18-manual-purchase; docs/purchasing/MASTER.md §3).
+ * (PURCHASING CARD 04 — the permanent Register;
+ *  docs/purchasing/MASTER.md §9.2; docs/COPY-STANDARD.md).
  *
- * The typed lane's ONE page: purchases nobody's customer asked for. The
- * register lists requests (one per row, Excel-row law — a row never owns
- * workflow); `+ New request` opens the FULL-PAGE create workspace, never a
- * dialog. The 600px `CreatePurchaseDialog` is retired by this page: its
- * proven header/lines split and per-row submit contract move here, its
- * container does not.
+ * The permanent right-side Register: one Manual Purchase request per parent
+ * row, complete history by default (ordered records included — `All not
+ * ordered` is Card 03's explicit rail filter, never a silent default), the
+ * eleven governed columns in the Card's exact order, the read-only
+ * expansion, and selection that admits ONLY `Ready to order` remainder.
+ * PO Duty appears nowhere until a selection exists, then once, beside the
+ * issue action (the SO Batch sibling grammar).
  *
  * Status is ONE arithmetic — `manualPurchaseStatusOf` in packages/shared
  * (Law D) — over facts the register read returns. Nothing here computes a
- * second version, and `Arrived` has no button anywhere (the Observation Law:
- * the system reads the linked PO's posted receipt — slice 3).
+ * second version, and `Arrived` has no button anywhere (the Observation
+ * Law: the system reads the linked PO's posted receipt).
  *
  * Money appears NOWHERE on this page: Purchasing has no money, and the
  * approver-only money surface is the approval slice's, server-gated.
@@ -82,7 +115,15 @@ import {
  *  LOCAL FILTER RAIL COLLAPSE). Per staff browser, like SO Batch's. */
 const FILTER_RAIL_STORAGE_KEY = "carres.manualPurchase.filterRail.v1";
 
-/** Register pill tones — decided states quiet, waiting states louder. */
+/** Approval pills — the waiting state louder, decided states quiet. */
+const APPROVAL_TONE: Record<ManualPurchaseApprovalKind, OrderActionTone> = {
+  need_approval: "warning",
+  approved: "success",
+  refused: "neutral",
+  not_needed: "neutral",
+};
+
+/** Detail pills keep the request-status tones (unchanged from Card 03). */
 const STATUS_TONE: Record<ManualPurchaseStatusKind, OrderActionTone> = {
   waiting_approval: "warning",
   waiting_sku: "warning",
@@ -92,24 +133,70 @@ const STATUS_TONE: Record<ManualPurchaseStatusKind, OrderActionTone> = {
   not_going_ahead: "neutral",
 };
 
+/** One expansion line — exact per-line quantities and lineage (Card 04). */
+interface ExpansionLine {
+  id: string;
+  sku: string;
+  item: string;
+  requestedQty: number;
+  approvedQty: number | null;
+  orderedQty: number;
+  stillToOrder: number;
+  supplier: string;
+  deliverTo: string;
+  poNos: string[];
+  cancelled: boolean;
+  cancelReason: string | null;
+}
+
 interface RequestRegisterRow {
   id: string;
   reqNo: string;
   purpose: string;
-  purposeLabel: string;
-  what: string;
+  /** Card 06 §3.1 — the actual hand-off fact (`created_at`), immutable. */
+  proceedDate: string;
+  approval: { kind: ManualPurchaseApprovalKind; label: string };
+  poNos: string[];
+  /** Card 06 §3.2 — when supplier goods must reach Deliver To
+   *  (`required_by`); a historical null prints `Not recorded`. */
+  deliveryDate: string | null;
+  /** The SERVER-derived earliest line Order By (Card 06 §3.3), or null. */
+  orderBy: string | null;
+  forText: string;
+  itemsText: string;
   qty: number;
-  deliverTo: string;
-  neededBy: string | null;
-  raisedBy: string;
+  supplierText: string;
+  deliverToText: string;
+  requestedBy: string;
   status: ManualPurchaseStatus;
-  createdAt: string;
+  /** Live remainder still issuable — the selection gate's other half. */
+  remainingQty: number;
   /** The CATALOG's categories on the request's live lines (Card 03) —
    *  the rail's `PRODUCT` facts, never SKU-text inference. */
   lineCategories: (ProductCategory | null)[];
   /** Actual supplier names behind the live lines — the demand line's
    *  Catalog-derived supplier (0323/0359), never chosen by Operation. */
   lineSupplierNames: (string | null)[];
+  /** Per live line: the server's Order By — the rail's timing facts. */
+  lineOrderBys: (string | null)[];
+  /** Card 06 §5 — the named configuration gaps the rail's work/setup
+   *  lenses filter by, straight from the server's own plan. */
+  supplierGap: boolean;
+  productionDaysMissing: boolean;
+  transitDaysMissing: boolean;
+  /** The document-partition facts behind `Issue {n} PO{s}` — Card 06 adds
+   *  Delivery Date: one PO has ONE official supplier-facing date. */
+  issueWalls: Array<{
+    supplierId: string | null;
+    category: string | null;
+    destinationId: string;
+    purpose: string;
+    deliveryDate: string | null;
+    remainingQty: number;
+  }>;
+  lines: ExpansionLine[];
+  /** Every searchable token the columns cannot carry alone (SKUs). */
+  skuTokens: string;
 }
 
 /** ONE label arithmetic (Law D) — approved and retired values both answer;
@@ -122,6 +209,8 @@ function buildRows(data: ManualPurchaseRegisterPayload): RequestRegisterRow[] {
   const destName = new Map(data.destinations.map((d) => [d.id, d.name]));
   const userName = new Map(data.users.map((u) => [u.id, u.name ?? ""]));
   const supplierName = new Map(data.suppliers.map((s) => [s.id, s.name]));
+  const poNo = new Map(data.pos.map((p) => [p.id, p.po_no]));
+  const caseNo = new Map(data.serviceCases.map((sc) => [sc.id, sc.case_no]));
   const linesByReq = new Map<string, PurchaseRequestLineRow[]>();
   for (const l of data.lines) {
     const list = linesByReq.get(l.request_id) ?? [];
@@ -129,49 +218,132 @@ function buildRows(data: ManualPurchaseRegisterPayload): RequestRegisterRow[] {
     linesByReq.set(l.request_id, list);
   }
 
-  return data.requests.map((r: PurchaseRequestRow) => {
+  /* Newest request first BY DEFAULT (Card 04 §3.1) — the actual
+     `created_at`, asserted here rather than trusted to payload order. */
+  const requests = [...data.requests].sort((a, b) =>
+    b.created_at.localeCompare(a.created_at),
+  );
+  return requests.map((r: PurchaseRequestRow) => {
     const lines = linesByReq.get(r.id) ?? [];
     const live = lines.filter((l) => l.cancelled_at === null);
-    const first = live[0] ?? lines[0] ?? null;
-    const what =
-      first === null
-        ? ""
-        : live.length > 1
-          ? `${first.sku} + ${live.length - 1} more`
-          : first.sku;
+    const linePoNos = (l: PurchaseRequestLineRow): string[] =>
+      [
+        ...new Set(
+          (l.po_ids ?? (l.po_id ? [l.po_id] : [])).map((id) => poNo.get(id) ?? ""),
+        ),
+      ].filter((n) => n !== "");
+    const remainingOf = (l: PurchaseRequestLineRow) =>
+      manualPurchaseLineRemainingOf({
+        qty: l.qty,
+        approvedQty: l.approved_qty,
+        issuedQty: l.issued_qty,
+      });
+    const status = manualPurchaseStatusOf({
+      approvalRequired: r.approval_required,
+      approvedAt: r.approved_at,
+      refusedAt: r.refused_at,
+      refuseReason: r.refuse_reason,
+      lines: lines.map((l) => ({
+        qty: l.qty,
+        issuedQty: l.issued_qty,
+        remainingQty: l.remaining_qty,
+        cancelledAt: l.cancelled_at,
+        poId: l.po_id,
+        received: l.received,
+      })),
+    });
+    const deliverNames = live.map(
+      (l) => destName.get(l.destination_id ?? r.destination_id) ?? "",
+    );
     return {
+      id: r.id,
+      reqNo: r.req_no,
+      purpose: r.purpose,
+      proceedDate: r.created_at,
+      approval: manualPurchaseApprovalOf({
+        approvalRequired: r.approval_required,
+        approvedAt: r.approved_at,
+        refusedAt: r.refused_at,
+      }),
+      poNos: [...new Set(live.flatMap(linePoNos))],
+      deliveryDate: r.required_by,
+      /* The earliest server-derived line Order By governs the request —
+         the first item that must start (Card 06 §3.3). */
+      orderBy: manualPurchaseOrderByOf(live.map((l) => l.order_by ?? null)),
+      forText: manualPurchaseForOf({
+        purpose: r.purpose,
+        destinationName: destName.get(r.destination_id) ?? null,
+        serviceCaseNo: r.for_service_case_id
+          ? (caseNo.get(r.for_service_case_id) ?? null)
+          : null,
+        staffName: r.for_staff_user_id
+          ? (userName.get(r.for_staff_user_id) || null)
+          : null,
+        subsidiaryName: r.for_subsidiary_name,
+        why: r.why,
+      }),
+      itemsText: manualPurchaseItemsSummary(
+        live.map((l) => l.item_label ?? l.sku),
+      ),
+      qty: live.reduce((n, l) => n + l.qty, 0),
+      supplierText: manualPurchaseSupplierSummary(
+        live.map((l) =>
+          l.supplier_id ? (supplierName.get(l.supplier_id) ?? "") : "",
+        ),
+      ),
+      deliverToText: manualPurchaseDeliverToSummary(
+        deliverNames.length > 0 ? deliverNames : [destName.get(r.destination_id) ?? ""],
+      ),
+      requestedBy: userName.get(r.created_by ?? "") ?? "",
+      status,
+      remainingQty: live.reduce((n, l) => n + remainingOf(l), 0),
       lineCategories: live.map(
         (l) => (l.category as ProductCategory | null | undefined) ?? null,
       ),
       lineSupplierNames: live.map((l) =>
         l.supplier_id ? (supplierName.get(l.supplier_id) ?? null) : null,
       ),
-      id: r.id,
-      reqNo: r.req_no,
-      purpose: r.purpose,
-      purposeLabel: purposeLabelOf(r.purpose),
-      what,
-      qty: live.reduce((n, l) => n + l.qty, 0),
-      deliverTo: destName.get(r.destination_id) ?? "",
-      neededBy: r.required_by,
-      raisedBy: userName.get(r.created_by ?? "") ?? "",
-      status: manualPurchaseStatusOf({
-        approvalRequired: r.approval_required,
-        approvedAt: r.approved_at,
-        refusedAt: r.refused_at,
-        refuseReason: r.refuse_reason,
-        lines: lines.map((l) => ({
-          qty: l.qty,
-          issuedQty: l.issued_qty,
-          remainingQty: l.remaining_qty,
-          cancelledAt: l.cancelled_at,
-          poId: l.po_id,
-          received: l.received,
-        })),
-      }),
-      createdAt: r.created_at,
+      lineOrderBys: live.map((l) => l.order_by ?? null),
+      /* Card 06 §5 — the named gaps, straight from the server's plan:
+         a live line without its Catalog supplier, or with a supplier whose
+         Settings numbers nobody set. */
+      supplierGap: live.some((l) => l.supplier_id == null),
+      productionDaysMissing: live.some((l) => l.production_days_missing === true),
+      transitDaysMissing: live.some((l) => l.transit_days_missing === true),
+      issueWalls: live.map((l) => ({
+        supplierId: l.supplier_id,
+        category: (l.category as string | null | undefined) ?? null,
+        destinationId: l.destination_id ?? r.destination_id,
+        purpose: r.purpose,
+        deliveryDate: (l.delivery_date ?? l.required_by ?? r.required_by) || null,
+        remainingQty: remainingOf(l),
+      })),
+      lines: lines.map((l) => ({
+        id: l.id,
+        sku: l.sku,
+        item: l.item_label ?? l.sku,
+        requestedQty: l.qty,
+        approvedQty: l.approved_qty,
+        orderedQty: l.issued_qty,
+        stillToOrder: remainingOf(l),
+        supplier: l.supplier_id ? (supplierName.get(l.supplier_id) ?? "") : "",
+        deliverTo: destName.get(l.destination_id ?? r.destination_id) ?? "",
+        poNos: linePoNos(l),
+        cancelled: l.cancelled_at !== null,
+        cancelReason: l.cancel_reason,
+      })),
+      skuTokens: lines.map((l) => l.sku).join(" "),
     };
   });
+}
+
+/** The SO Batch sibling's own duty words — one grammar on both Purchasing
+ *  buying surfaces. */
+function poDutyLabel(data: ManualPurchaseRegisterPayload): string {
+  if (data.poDutyUnavailable) return "PO duty could not be checked.";
+  if (data.actingPoDuty) return `${data.actingPoDuty.name} is covering PO duty`;
+  if (data.currentPoDuty) return `${data.currentPoDuty.name} holds PO duty`;
+  return "Nobody holds PO duty this month.";
 }
 
 export default function OperationManualPurchase() {
@@ -179,31 +351,43 @@ export default function OperationManualPurchase() {
     "register",
   );
   const q = useManualPurchaseRegister();
+  const navigate = useNavigate();
+  const issue = useIssuePurchaseRequests();
+
+  /* Card 06 §7 — a Work action deep-links the exact MPR:
+     `?tab=manual-purchase&mpr={id}` opens the object directly. The param is
+     consumed so `‹ Manual Purchase` returns to the Register, not a loop. */
+  const [searchParams, setSearchParams] = useSearchParams();
+  const linkedMpr = searchParams.get("mpr");
+  useEffect(() => {
+    if (!linkedMpr) return;
+    setMode({ detail: linkedMpr });
+    const next = new URLSearchParams(searchParams);
+    next.delete("mpr");
+    setSearchParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [linkedMpr]);
 
   const rows = useMemo(
     () => (q.data ? buildRows(q.data) : []),
     [q.data],
   );
 
-  /** Card 03 §3 — the real action owner's name beside `Waiting for approval`. */
+  /** Card 03 §3 — the real action owner's name beside `Need approval`. */
   const approverLine = useMemo(
     () => manualPurchaseApproverLine((q.data?.approvers ?? []).map((a) => a.name)),
     [q.data?.approvers],
   );
 
   /**
-   * THE RAIL FILTER (Card 03) — one slot per section; sections combine with
-   * AND; the empty filter is the permanent Register, ordered history
-   * included. Counts are UNIQUE requests, cross-computed per section by the
-   * one shared model (Law D) so the printed number predicts the click.
+   * THE RAIL FILTER (Card 03 — unchanged by Card 04) — one slot per section;
+   * sections combine with AND; the empty filter is the permanent Register,
+   * ordered history included. Counts are UNIQUE requests, cross-computed per
+   * section by the one shared model (Law D).
    */
   const [railFilter, setRailFilter] = useState<ManualPurchaseRailFilter>(
     MANUAL_PURCHASE_RAIL_CLEAR,
   );
-  /* LOCAL FILTER RAIL COLLAPSE (`docs/ui/MASTER.md`, locked): one neutral
-     `Hide filters` panel-left control; hiding gives the Register the width;
-     the toolbar then carries `Show filters`; the browser remembers the
-     choice. Same grammar as SO Batch Purchase — one interaction language. */
   const [filterRailOpen, setFilterRailOpen] = useState(() => {
     try {
       return localStorage.getItem(FILTER_RAIL_STORAGE_KEY) !== "0";
@@ -227,29 +411,127 @@ export default function OperationManualPurchase() {
           requestId: r.id,
           status: r.status.kind,
           purpose: r.purpose,
+          remainingQty: r.remainingQty,
           lineCategories: r.lineCategories,
           lineSupplierNames: r.lineSupplierNames,
+          lineOrderBys: r.lineOrderBys,
+          supplierGap: r.supplierGap,
+          productionDaysMissing: r.productionDaysMissing,
+          transitDaysMissing: r.transitDaysMissing,
         })),
+        /* The SERVER's Malaysia date — the browser never reads its own clock
+           for a business classification (Card 06 §5). */
+        q.data?.todayIso ?? null,
       ),
-    [rows],
+    [rows, q.data?.todayIso],
   );
   const rail = useMemo(
     () => manualPurchaseRailModel(railFacts, railFilter),
     [railFacts, railFilter],
   );
 
-  const filtered = useMemo(
-    () => rows.filter((r) => rail.visibleRequestIds.has(r.id)),
-    [rows, rail],
+  const filtered = useMemo(() => {
+    const visible = rows.filter((r) => rail.visibleRequestIds.has(r.id));
+    /* Card 06 §6 — a work/timing lens sorts earliest Order By first, then
+       newest Proceed Date, so the most urgent visible request is first. The
+       no-filter default stays newest Proceed Date first (buildRows' order). */
+    return railFilter.work != null || railFilter.timing != null
+      ? manualPurchaseWorkOrder(visible)
+      : visible;
+  }, [rows, rail, railFilter.work, railFilter.timing]);
+
+  /* ── THE FILTERED REGISTER ORDER (Card 05 §3.1) — what the grid actually
+     shows after search + column filters, post-sort. The object header's
+     `‹ n of m ›` steps THIS list, so position is the operator's own filtered
+     Register truth, never a second ordering. ─────────────────────────── */
+  const [gridRows, setGridRows] = useState<RequestRegisterRow[]>([]);
+
+  /* ── SELECTION (Card 04) — only `Ready to order` remainder may be ticked;
+     PO Duty exists on this page ONLY beside a live selection. ─────────── */
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [issueError, setIssueError] = useState<string | null>(null);
+  const selectable = (r: RequestRegisterRow) =>
+    manualPurchaseSelectable(r.status.kind, r.remainingQty);
+  const selectedRows = useMemo(
+    () => filtered.filter((r) => selected.has(r.id) && selectable(r)),
+    [filtered, selected],
   );
+  const selectionUnits = selectedRows.reduce((n, r) => n + r.remainingQty, 0);
+  const selectionPos = manualPurchaseIssueGroupCount(
+    selectedRows.flatMap((r) => r.issueWalls),
+  );
+
+  async function issueSelected() {
+    setIssueError(null);
+    const ids = selectedRows.map((r) => r.id);
+    if (ids.length === 0) return;
+    if (ids.length > 20) {
+      setIssueError("Select at most 20 requests for one issue.");
+      return;
+    }
+    try {
+      await issue.mutateAsync({
+        requestIds: ids,
+        together: true,
+      });
+      setSelected(new Set());
+      void q.refetch();
+    } catch (e) {
+      /* THE APPROVED TWO LINES: the fact, then the act. */
+      const body = (e as { body?: { message?: string; action?: string; code?: string } })
+        .body;
+      const fallback = purchasingRefusal(body?.code);
+      setIssueError(
+        `${body?.message ?? fallback.wrong} ${body?.action ?? fallback.todo}`.trim(),
+      );
+    }
+  }
 
   const columns = useMemo<DataGridColumn<RequestRegisterRow>[]>(
     () => [
       {
-        key: "req_no",
-        label: MW.colRef,
-        width: 110,
+        key: "proceed_date",
+        label: MW.colProceedDate,
+        width: 118,
         sortable: true,
+        filterType: "date",
+        dateValue: (r) => r.proceedDate,
+        accessor: (r) => fmtDate(r.proceedDate.slice(0, 10)),
+        searchValue: (r) => fmtDate(r.proceedDate.slice(0, 10)),
+        filterValue: (r) => fmtDate(r.proceedDate.slice(0, 10)),
+        sortFn: (a, b) => a.proceedDate.localeCompare(b.proceedDate),
+      },
+      {
+        key: "approval",
+        label: MW.colApproval,
+        width: 168,
+        sortable: true,
+        accessor: (r) => (
+          <span className="block min-w-0">
+            <StatusPill tone={APPROVAL_TONE[r.approval.kind]}>
+              {r.approval.label}
+            </StatusPill>
+            {/* Card 03 §3 — while approval is needed the row names the REAL
+                action owner. Nothing resolved prints nothing. */}
+            {r.approval.kind === "need_approval" && approverLine ? (
+              <span
+                className="block truncate text-label font-normal text-base-600"
+                data-testid={`mp-approver-${r.id}`}
+              >
+                {approverLine}
+              </span>
+            ) : null}
+          </span>
+        ),
+        searchValue: (r) => r.approval.label,
+        filterValue: (r) => r.approval.label,
+      },
+      {
+        key: "mpr_no",
+        label: MW.colMprNo,
+        width: 168,
+        sortable: true,
+        filterType: "numbering",
         accessor: (r) => (
           <button
             type="button"
@@ -266,105 +548,139 @@ export default function OperationManualPurchase() {
         filterValue: (r) => r.reqNo,
       },
       {
-        key: "purpose",
-        label: MW.needFor,
-        width: 110,
+        key: "po_no",
+        label: MW.colPoNo,
+        width: 150,
         sortable: true,
-        accessor: (r) => r.purposeLabel,
-        searchValue: (r) => r.purposeLabel,
-        filterValue: (r) => r.purposeLabel,
+        accessor: (r) => {
+          /* ONLY real lineage (Card 04 §3.4): none / the clickable number /
+             `{n} POs` — the exact mapping lives in the expansion. */
+          if (r.poNos.length === 1) {
+            return (
+              <button
+                type="button"
+                className="font-mono text-kit-blue-11 underline-offset-2 hover:underline"
+                data-testid={`mp-po-link-${r.id}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate(`/operation/procurement?po=${encodeURIComponent(r.poNos[0])}`);
+                }}
+              >
+                {r.poNos[0]}
+              </button>
+            );
+          }
+          return manualPurchasePoSummary(r.poNos);
+        },
+        searchValue: (r) => r.poNos.join(" "),
+        filterValue: (r) => manualPurchasePoSummary(r.poNos),
+        /* Excel prints the CELL's truth, not the search tokens (§6.7: the
+           outputs derive their cells once). */
+        exportValue: (r) => manualPurchasePoSummary(r.poNos),
       },
       {
-        key: "what",
-        label: MW.colWhat,
+        key: "delivery_date",
+        label: MW.colDeliveryDate,
+        width: 113,
+        sortable: true,
+        filterType: "date",
+        dateValue: (r) => r.deliveryDate,
+        /* A historical null Delivery Date prints the honest sentence, never
+           a bare dash — and gains no invented Order By (Card 06 §6). */
+        accessor: (r) =>
+          r.deliveryDate ? (
+            fmtDate(r.deliveryDate)
+          ) : (
+            <span className="text-base-500">{MW.notRecorded}</span>
+          ),
+        searchValue: (r) => (r.deliveryDate ? fmtDate(r.deliveryDate) : MW.notRecorded),
+        filterValue: (r) => (r.deliveryDate ? fmtDate(r.deliveryDate) : MW.notRecorded),
+        exportValue: (r) => (r.deliveryDate ? fmtDate(r.deliveryDate) : MW.notRecorded),
+        sortFn: (a, b) => (a.deliveryDate ?? "").localeCompare(b.deliveryDate ?? ""),
+      },
+      {
+        key: "for",
+        label: MW.colFor,
+        width: 170,
+        sortable: true,
+        accessor: (r) => (
+          <span className="block truncate" title={r.forText}>
+            {r.forText}
+          </span>
+        ),
+        searchValue: (r) => r.forText,
+        filterValue: (r) => r.forText,
+      },
+      {
+        key: "items",
+        label: MW.colItems,
         width: 210,
         sortable: true,
         accessor: (r) => (
-          <span className="block truncate font-mono" title={r.what}>
-            {r.what}
+          <span className="block truncate" title={r.itemsText}>
+            {r.itemsText}
           </span>
         ),
-        searchValue: (r) => r.what,
-        filterValue: (r) => r.what,
+        /* SKU stays searchable even though the cell speaks Catalog words. */
+        searchValue: (r) => `${r.itemsText} ${r.skuTokens}`,
+        filterValue: (r) => r.itemsText,
+        exportValue: (r) => r.itemsText,
       },
       {
         key: "qty",
         label: MW.colQty,
         width: 60,
         sortable: true,
+        filterType: "number",
+        numberValue: (r) => r.qty,
         accessor: (r) => <span className="block text-right tabular-nums">{r.qty}</span>,
         searchValue: (r) => String(r.qty),
         filterValue: (r) => String(r.qty),
         sortFn: (a, b) => a.qty - b.qty,
       },
       {
-        key: "deliver_to",
-        label: MW.deliverTo,
+        key: "supplier",
+        label: MW.colSupplier,
         width: 150,
         sortable: true,
         accessor: (r) => (
-          <span className="block truncate" title={r.deliverTo}>
-            {r.deliverTo}
+          <span className="block truncate" title={r.supplierText}>
+            {r.supplierText}
           </span>
         ),
-        searchValue: (r) => r.deliverTo,
-        filterValue: (r) => r.deliverTo,
+        searchValue: (r) =>
+          [r.supplierText, ...r.lineSupplierNames.filter(Boolean)].join(" "),
+        filterValue: (r) => r.supplierText,
+        exportValue: (r) => r.supplierText,
       },
       {
-        key: "needed_by",
-        label: MW.neededBy,
-        width: 113,
-        sortable: true,
-        filterType: "date",
-        dateValue: (r) => r.neededBy,
-        accessor: (r) => (r.neededBy ? fmtDate(r.neededBy) : null),
-        searchValue: (r) => (r.neededBy ? fmtDate(r.neededBy) : ""),
-        filterValue: (r) => (r.neededBy ? fmtDate(r.neededBy) : ""),
-        sortFn: (a, b) => (a.neededBy ?? "").localeCompare(b.neededBy ?? ""),
-      },
-      {
-        key: "raised_by",
-        label: MW.raisedBy,
-        width: 120,
+        key: "deliver_to",
+        label: MW.colDeliverTo,
+        width: 150,
         sortable: true,
         accessor: (r) => (
-          <span className="block truncate" title={r.raisedBy}>
-            {r.raisedBy}
+          <span className="block truncate" title={r.deliverToText}>
+            {r.deliverToText}
           </span>
         ),
-        searchValue: (r) => r.raisedBy,
-        filterValue: (r) => r.raisedBy,
+        searchValue: (r) => r.deliverToText,
+        filterValue: (r) => r.deliverToText,
       },
       {
-        key: "status",
-        label: MW.colStatus,
-        width: 190,
+        key: "requested_by",
+        label: MW.colRequestedBy,
+        width: 130,
         sortable: true,
         accessor: (r) => (
-          <span className="block min-w-0">
-            <StatusPill tone={STATUS_TONE[r.status.kind]}>{r.status.label}</StatusPill>
-            {r.status.reasonLabel ? (
-              <span className="block truncate text-label font-normal text-base-600">
-                {r.status.reasonLabel}
-              </span>
-            ) : null}
-            {/* Card 03 §3 — the rail says `Need approval`; the row names the
-                REAL action owner. Nothing resolved prints nothing. */}
-            {r.status.kind === "waiting_approval" && approverLine ? (
-              <span
-                className="block truncate text-label font-normal text-base-600"
-                data-testid={`mp-approver-${r.id}`}
-              >
-                {approverLine}
-              </span>
-            ) : null}
+          <span className="block truncate" title={r.requestedBy}>
+            {r.requestedBy}
           </span>
         ),
-        searchValue: (r) => r.status.label,
-        filterValue: (r) => r.status.label,
+        searchValue: (r) => r.requestedBy,
+        filterValue: (r) => r.requestedBy,
       },
     ],
-    [approverLine],
+    [approverLine, navigate],
   );
 
   if (mode === "create") {
@@ -373,6 +689,7 @@ export default function OperationManualPurchase() {
         <PurchasingTabs />
         <CreateRequestWorkspace
           destinations={q.data?.destinations ?? []}
+          staff={q.data?.users ?? []}
           onDone={() => {
             setMode("register");
             void q.refetch();
@@ -382,78 +699,95 @@ export default function OperationManualPurchase() {
     );
   }
 
-  if (typeof mode === "object") {
-    return (
-      <div className="flex h-full min-h-0 flex-col">
-        <PurchasingTabs />
-        <RequestDetail
-          id={mode.detail}
-          readySiblingIds={(() => {
-            const mine = new Set(
-              (q.data?.lines ?? [])
-                .filter((l) => l.request_id === mode.detail && l.cancelled_at === null)
-                .map((l) => l.supplier_id),
-            );
-            return rows
-              .filter(
-                (r) =>
-                  r.id !== mode.detail &&
-                  r.status.kind === "ready_to_order" &&
-                  (q.data?.lines ?? []).some(
-                    (l) =>
-                      l.request_id === r.id &&
-                      l.cancelled_at === null &&
-                      mine.has(l.supplier_id),
-                  ),
-              )
-              .map((r) => r.id);
-          })()}
-          onBack={() => {
-            setMode("register");
-            void q.refetch();
-          }}
-        />
-      </div>
-    );
-  }
+  /* Card 05 §3 — clicking the MPR number opens WORK: the full-width object
+     replaces the Register content. The Register stays MOUNTED underneath
+     (visibility only), so `‹ Manual Purchase` restores the complete state
+     the operator left — rail filters, search, column filters, sort, scroll
+     and expansion — instead of a fresh grid. */
+  const detailId = typeof mode === "object" ? mode.detail : null;
+  const detailRow = detailId != null ? (rows.find((r) => r.id === detailId) ?? null) : null;
+  const gridIndex = detailId != null ? gridRows.findIndex((r) => r.id === detailId) : -1;
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <PurchasingTabs />
-      <div className="flex min-h-0 flex-1 overflow-hidden">
-        {/* Card 03 — the readable 240px shell Card 02-C built. Navigation,
-            not selection: no rail row carries a checkbox, one filter per
-            section, sections combine with AND, and each `All …` row clears
-            only its own section. The empty filter is the permanent Register,
-            ordered history included. */}
+      {detailId == null && <PurchasingTabs />}
+      <div className="relative min-h-0 flex-1">
+      <div
+        className={`absolute inset-0 flex overflow-hidden${detailId != null ? " invisible" : ""}`}
+        aria-hidden={detailId != null || undefined}
+        data-testid="mp-register-surface"
+      >
+        {/* Card 03 — the readable 240px shell, BYTE-BEHAVIOURALLY UNCHANGED
+            by Card 04 (the sixth purpose row arrives through the one shared
+            `DEMAND_PURPOSES` list, Law D). */}
         {filterRailOpen && (
         <FilterRail
           testId="manual-purchase-rail"
           onHide={() => setFilterRailVisible(false)}
         >
-          <FilterRailGroup title={MANUAL_PURCHASE_RAIL.toOrder.heading}>
-            {/* Three DERIVED request states (`manualPurchaseStatusOf`), never
-                a stored status. A second click clears the row. */}
-            {MANUAL_PURCHASE_RAIL.toOrder.rows.map((row) => (
+          <FilterRailGroup title={MANUAL_PURCHASE_RAIL.work.heading}>
+            {/* Card 06 §5 — the five concrete daily actions, all visible with
+                zero: an action LENS over the same server facts and central
+                Work identities, never a second queue. Clicking a filter never
+                grants approval or PO authority — the filtered row/object
+                names the real owner. A second click clears the row. */}
+            {MANUAL_PURCHASE_RAIL.work.actions.map((action) => (
               <FilterRailRow
-                key={row.state}
-                active={railFilter.toOrder === row.state}
+                key={action.key}
+                active={railFilter.work === action.key}
                 onClick={() =>
                   setRailFilter((prev) => ({
                     ...prev,
-                    toOrder: prev.toOrder === row.state ? null : row.state,
+                    work: prev.work === action.key ? null : action.key,
                   }))
                 }
-                testId={`mp-to-order-${row.state}`}
+                testId={`mp-work-${action.key}`}
+                label={action.word}
+                count={rail.workCounts[action.key]}
+              />
+            ))}
+          </FilterRailGroup>
+          <FilterRailGroup title={MANUAL_PURCHASE_RAIL.toOrder.heading}>
+            {/* `All not ordered` — live quantity not yet fully issued.
+                (`Need approval` / `Ready to order` retired into WORK TO DO,
+                Card 06 §5.) */}
+            <FilterRailRow
+              active={railFilter.notOrderedOnly}
+              onClick={() =>
+                setRailFilter((prev) => ({
+                  ...prev,
+                  notOrderedOnly: !prev.notOrderedOnly,
+                }))
+              }
+              testId="mp-to-order-not_ordered"
+              label={MANUAL_PURCHASE_RAIL.toOrder.all}
+              count={rail.notOrderedCount}
+            />
+          </FilterRailGroup>
+          <FilterRailGroup title={MANUAL_PURCHASE_RAIL.timing.heading}>
+            {/* The request's earliest server-derived Order By against the
+                server's Malaysia date — a filter and fact, never an issue
+                permission gate (an authorised person may buy early). */}
+            {MANUAL_PURCHASE_RAIL.timing.rows.map((row) => (
+              <FilterRailRow
+                key={row.state}
+                active={railFilter.timing === row.state}
+                onClick={() =>
+                  setRailFilter((prev) => ({
+                    ...prev,
+                    timing: prev.timing === row.state ? null : row.state,
+                  }))
+                }
+                testId={`mp-timing-${row.state}`}
                 label={row.word}
-                count={rail.toOrderCounts[row.state]}
+                count={rail.timingCounts[row.state]}
               />
             ))}
           </FilterRailGroup>
           <FilterRailGroup title={MANUAL_PURCHASE_RAIL.purpose.heading}>
-            {/* The five approved purposes — `DEMAND_PURPOSES`, the one
-                creatable list. A retired historical value matches no row and
-                lives under `All purposes` only (never falsely relabelled). */}
+            {/* The approved purposes — `DEMAND_PURPOSES`, the one creatable
+                list. A retired historical value matches no row and lives
+                under `All purposes` only (never falsely relabelled). */}
             <FilterRailRow
               active={railFilter.purpose == null}
               onClick={() => setRailFilter((prev) => ({ ...prev, purpose: null }))}
@@ -527,17 +861,39 @@ export default function OperationManualPurchase() {
               />
             ))}
           </FilterRailGroup>
+          {/* Card 06 §5 — SETUP TO FIX renders ONLY while an affected request
+              exists: it states the missing configuration; the owning action
+              (and its Settings deep link) stays in WORK TO DO. */}
+          {rail.setupExists && (
+            <FilterRailGroup title={MANUAL_PURCHASE_RAIL.setup.heading}>
+              {MANUAL_PURCHASE_RAIL.setup.rows.map((row) => (
+                <FilterRailRow
+                  key={row.key}
+                  active={railFilter.setup === row.key}
+                  onClick={() =>
+                    setRailFilter((prev) => ({
+                      ...prev,
+                      setup: prev.setup === row.key ? null : row.key,
+                    }))
+                  }
+                  testId={`mp-setup-${row.key}`}
+                  label={row.word}
+                  count={rail.setupCounts[row.key]}
+                />
+              ))}
+            </FilterRailGroup>
+          )}
         </FilterRail>
         )}
         <div
           className="flex min-h-0 min-w-0 flex-1 flex-col p-2"
           data-testid="register-column"
         >
+          <div className="min-h-0 flex-1">
           <DataGrid<RequestRegisterRow>
             appearance="reference"
-            /* `+ New request` is the register's PRIMARY action and lives in the
-               control band (corrections §4) — a whole empty row above the grid
-               was a band spent on one control. */
+            /* `+ Manual Purchase` is the register's PRIMARY action and lives
+               in the control band (ui/MASTER §6.7 Row 2). */
             toolbarStart={
               <>
                 {!filterRailOpen && (
@@ -563,18 +919,50 @@ export default function OperationManualPurchase() {
             }
             rows={filtered}
             columns={columns}
-            storageKey="carres.manualPurchase.register.v1"
+            /* The grid's own filtered+sorted order feeds the object header's
+               `‹ n of m ›` (Card 05 §3.1) — a STABLE setter, per the engine. */
+            onFilteredRowsChange={setGridRows}
+            storageKey="carres.manualPurchase.register.v3"
             rowKey={(r) => r.id}
+            rowTestId={(r) => `mp-row-${r.id}`}
             exportName="Manual Purchase"
             searchPlaceholder="Search requests…"
             isLoading={q.isLoading}
             emptyMessage={
-              rows.length === 0
-                ? "No requests yet — press + New request to raise the first one."
-                : "No matching requests."
+              rows.length === 0 ? MW.emptyRegister : "No matching requests."
             }
             groupBanner={false}
-            stickyIdentity
+            /* The identity survives horizontal scrolling — the DataGrid's
+               governed capability, pinned on the Manual Purchase No. */
+            stickyIdentity={{ columnKey: "mpr_no" }}
+            expandable={{
+              renderExpansion: (r) => <RequestExpansion row={r} />,
+              testId: (r) => `mp-expand-${r.id}`,
+            }}
+            selectable={{
+              selectedKeys: selected,
+              onToggle: (id) =>
+                setSelected((prev) => {
+                  const next = new Set(prev);
+                  if (next.has(id)) next.delete(id);
+                  else next.add(id);
+                  return next;
+                }),
+              onToggleAll: (keys, allSelected) =>
+                setSelected((prev) => {
+                  const next = new Set(prev);
+                  for (const k of keys) {
+                    if (allSelected) next.delete(k);
+                    else next.add(k);
+                  }
+                  return next;
+                }),
+              /* ONLY approved remainder (Card 04): `Ready to order` with live
+                 remaining quantity. Everything else refuses the tick. */
+              isSelectable: (r: RequestRegisterRow) => selectable(r),
+              testId: (r: RequestRegisterRow) => `mp-select-${r.id}`,
+            }}
+            selectionSummary={(n) => `${n} selected`}
             onRowDoubleClick={(r) => setMode({ detail: r.id })}
             statusSummary={(shown) => {
               const word = shown.length === 1 ? "request" : "requests";
@@ -589,9 +977,189 @@ export default function OperationManualPurchase() {
               );
             }}
           />
+          </div>
+
+          {/* ── PO DUTY EXISTS ONLY BESIDE A SELECTION (Card 04) — the SO
+              Batch sibling bar: the truthful sentence, the resolved person,
+              and the one issue action. Nothing renders while nothing is
+              ticked. ── */}
+          {selectedRows.length > 0 ? (
+            <div
+              className="mt-2 flex shrink-0 items-center justify-between gap-3 rounded-control border border-kit-slate-6 bg-white px-3 py-2"
+              data-testid="mp-selection-bar"
+            >
+              <span className="truncate text-body" data-testid="mp-selection-sentence">
+                {manualPurchaseIssueSentence(
+                  selectedRows.length,
+                  selectionUnits,
+                  selectionPos,
+                )}
+              </span>
+              <span className="flex shrink-0 items-center gap-2">
+                <PoDutyChip data={q.data!} />
+                {q.data?.mayIssue ? (
+                  <button
+                    type="button"
+                    data-testid="mp-issue-selected"
+                    className="inline-flex h-7 shrink-0 items-center rounded-control bg-kit-blue-9 px-3 text-meta font-medium text-white hover:opacity-90"
+                    onClick={() => void issueSelected()}
+                  >
+                    Issue PO
+                  </button>
+                ) : null}
+              </span>
+            </div>
+          ) : null}
+          {issueError && selectedRows.length > 0 ? (
+            <p className="mt-1 text-meta text-kit-red-11" data-testid="mp-issue-selected-error">
+              {issueError}
+            </p>
+          ) : null}
         </div>
 
       </div>
+
+      {detailId != null && (
+        <ManualPurchaseObject
+          key={detailId}
+          id={detailId}
+          registerReqNo={detailRow?.reqNo ?? null}
+          position={
+            gridIndex >= 0 ? { index: gridIndex + 1, total: gridRows.length } : null
+          }
+          onStep={(dir) => {
+            const next = gridRows[gridIndex + dir];
+            if (next) setMode({ detail: next.id });
+          }}
+          onBack={() => setMode("register")}
+        />
+      )}
+      </div>
+    </div>
+  );
+}
+
+/** The resolved PO duty person — initials + the sibling's own sentence. A
+ *  person who cannot be resolved prints the honest sentence instead. */
+function PoDutyChip({ data }: { data: ManualPurchaseRegisterPayload }) {
+  const person = data.poDutyUnavailable
+    ? null
+    : (data.actingPoDuty ?? data.currentPoDuty);
+  const label = poDutyLabel(data);
+  if (!person) {
+    return (
+      <span
+        data-testid="mp-po-duty"
+        title={label}
+        className="shrink-0 truncate text-meta text-kit-slate-11"
+      >
+        {label}
+      </span>
+    );
+  }
+  const colour = avatarColor(person.userId);
+  return (
+    <span
+      data-testid="mp-po-duty"
+      aria-label={label}
+      title={label}
+      className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-control border border-kit-slate-6 bg-white px-2 text-meta text-kit-slate-11"
+    >
+      <span
+        aria-hidden
+        className="grid h-5 w-5 place-items-center rounded-full text-label font-semibold leading-none"
+        style={{ background: colour.bg, color: colour.fg }}
+      >
+        {personInitials(person.name, person.name)}
+      </span>
+      <span>{label}</span>
+    </span>
+  );
+}
+
+/**
+ * ▸ THE REQUEST'S OWN LINES — read-only (Card 04): exact per-line
+ * quantities and lineage, nothing else. No Approve, no Refuse, no
+ * Receive, no price, no PO creation, no PDF. The quantities are the ONE
+ * governed arithmetic (`manualPurchaseLineRemainingOf`); the PO numbers
+ * are the line's real lineage.
+ */
+// design-standard: not-a-list-page — the raw <table> below is the CHILD of a
+// register row (the DataGrid expansion), not a page: it has no destination, no
+// toolbar and no header of its own; the register above it owns all three
+// (GoodsMiniTable's own precedent).
+/* Every column is a FIXED width (GoodsMiniTable's own alignment law: two
+   expansions opened together must read as one listing). The Card fixes the
+   ORDER with Item second, so Item gets a constant width rather than flex —
+   a flexible middle column would move every column after it. */
+const EXPANSION_COLUMNS = [
+  { key: "sku", label: MW.expSku, width: 152 },
+  { key: "item", label: MW.expItem, width: 220 },
+  { key: "requestedQty", label: MW.expRequestedQty, width: 110 },
+  { key: "approvedQty", label: MW.expApprovedQty, width: 104 },
+  { key: "orderedQty", label: MW.expOrderedQty, width: 100 },
+  { key: "stillToOrder", label: MW.expStillToOrder, width: 100 },
+  { key: "supplier", label: MW.expSupplier, width: 150 },
+  { key: "deliverTo", label: MW.expDeliverTo, width: 150 },
+  { key: "poNo", label: MW.expPoNo, width: 144 },
+] as const;
+
+function RequestExpansion({ row }: { row: RequestRegisterRow }) {
+  return (
+    <div
+      className="overflow-x-auto rounded-control border border-base-200 bg-white"
+      data-testid={`mp-expansion-${row.id}`}
+    >
+      <table className="w-full table-fixed text-left" style={{ minWidth: 1230 }}>
+        <colgroup>
+          {EXPANSION_COLUMNS.map((c) => (
+            <col key={c.key} style={c.width ? { width: c.width } : undefined} />
+          ))}
+        </colgroup>
+        <thead className="border-b border-base-200 bg-base-50">
+          <tr className="divide-x divide-base-200">
+            {EXPANSION_COLUMNS.map((c) => (
+              <th
+                key={c.key}
+                scope="col"
+                className="px-2 py-1.5 text-label font-semibold uppercase text-base-500"
+              >
+                {c.label}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-base-200 text-body">
+          {row.lines.map((l) => (
+            <tr
+              key={l.id}
+              className={`divide-x divide-base-200 align-top${l.cancelled ? " text-base-400" : ""}`}
+            >
+              <td className="px-2 py-2 font-mono">{l.sku}</td>
+              <td className="px-2 py-2">
+                {l.item}
+                {l.cancelled ? (
+                  <span className="block text-label text-base-400">
+                    {MANUAL_PURCHASE_STATUS_WORDS.not_going_ahead}
+                    {l.cancelReason ? ` — ${l.cancelReason}` : ""}
+                  </span>
+                ) : null}
+              </td>
+              <td className="px-2 py-2 tabular-nums">{l.requestedQty}</td>
+              <td className="px-2 py-2 tabular-nums">
+                {l.approvedQty == null ? null : l.approvedQty}
+              </td>
+              <td className="px-2 py-2 tabular-nums">{l.orderedQty}</td>
+              <td className="px-2 py-2 tabular-nums">{l.cancelled ? null : l.stillToOrder}</td>
+              <td className="px-2 py-2">{l.supplier}</td>
+              <td className="px-2 py-2">{l.deliverTo}</td>
+              <td className="px-2 py-2 font-mono">
+                {l.poNos.length > 0 ? l.poNos.join(", ") : MW.notOrderedYet}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -663,9 +1231,11 @@ const LINE_GRID = "minmax(0,1fr) 53px minmax(0,1fr) auto";
 
 function CreateRequestWorkspace({
   destinations,
+  staff,
   onDone,
 }: {
   destinations: Array<{ id: string; name: string }>;
+  staff: Array<{ id: string; name: string | null }>;
   onDone: () => void;
 }) {
   const email = useAuth((s) => s.session?.user?.email ?? "");
@@ -682,8 +1252,19 @@ function CreateRequestWorkspace({
 
   const [purpose, setPurpose] = useState<DemandPurpose>(DEMAND_PURPOSE_DEFAULT);
   const [dest, setDest] = useState<string | undefined>(undefined);
-  const [neededBy, setNeededBy] = useState("");
+  /** Card 06 §3.2 — `Delivery Date`: when supplier goods must reach the
+   *  selected Deliver To. The SERVER proposes it from the slowest selected
+   *  line once every lead fact is complete; a person may move it, and a
+   *  chosen date is preserved — adding/removing an item never silently
+   *  overwrites it. */
+  const [deliveryDate, setDeliveryDate] = useState("");
+  const [dateTouched, setDateTouched] = useState(false);
+  /** Only `Other Purchase` asks — and must answer — `What is this for?`. */
   const [why, setWhy] = useState("");
+  /** The per-purpose structured For fact (Card 04 §4). */
+  const [serviceCaseId, setServiceCaseId] = useState<string | undefined>(undefined);
+  const [staffUserId, setStaffUserId] = useState<string | undefined>(undefined);
+  const [subsidiaryName, setSubsidiaryName] = useState("");
   const [lines, setLines] = useState<LineDraft[]>(() => [blankLine()]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -691,11 +1272,81 @@ function CreateRequestWorkspace({
   const [requestId, setRequestId] = useState<string | null>(null);
   const [headerError, setHeaderError] = useState<string | null>(null);
 
+  /* The Service Case picker rides the existing governed list read — no
+     second door, no duplicate case store. Fetched only while the purpose
+     actually asks for it. */
+  const casesQ = useQuery({
+    queryKey: ["ops", "service-cases", "ongoing"],
+    queryFn: () =>
+      apiFetch<{ items: Array<{ id: string; caseNo?: string; case_no?: string }> }>(
+        "/api/ops/service-cases?state=ongoing",
+      ),
+    staleTime: 60_000,
+    enabled: purpose === "service_case",
+  });
+
   const createHeader = useCreatePurchaseRequest();
   const createLine = useCreatePurchaseRequestLine();
 
   const active = activeId ?? lines[0]?.id;
   const chosenDest = dest ?? destinations[0]?.id;
+
+  /* ── THE SERVER DATE PLAN (Card 06 §3) ─────────────────────────────────
+     The server previews Proceed Date (its Malaysia date) and, once every
+     picked line resolves Catalog Supplier × Category with complete
+     Settings, proposes Delivery Date from the slowest line. The browser
+     performs no working-day arithmetic and never guesses a date. */
+  const pickedSkus = useMemo(
+    () => [...new Set(lines.map((l) => l.sku).filter((s): s is string => s != null))],
+    [lines],
+  );
+  const plan = useManualPurchasePlan(pickedSkus);
+  const planBySku = useMemo(
+    () =>
+      new Map<string, ManualPurchasePlanLine>(
+        (plan.data?.lines ?? []).map((l) => [l.sku, l]),
+      ),
+    [plan.data],
+  );
+  /* The server's proposal fills the field only while the person has not
+     chosen a date; a chosen date is theirs and is preserved (§3.2). */
+  const planDefault = plan.data?.deliveryDateDefault ?? null;
+  useEffect(() => {
+    if (!dateTouched && planDefault != null) setDeliveryDate(planDefault);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [planDefault]);
+
+  /** The exact missing lead facts across picked lines — each names its
+   *  supplier and repair (§3.4). An unresolved Catalog supplier is named by
+   *  the line's own `No supplier yet` fact, not silently a lead-day gap. */
+  const leadGaps = useMemo(() => {
+    const gaps: Array<{ sku: string; wrong: string; todo: string }> = [];
+    for (const sku of pickedSkus) {
+      const p = planBySku.get(sku);
+      if (!p || p.supplierId == null || p.category == null) continue;
+      if (p.productionDays == null) {
+        const facts = manualPurchaseLeadDayFacts({
+          kind: "production",
+          supplierName: p.supplierName,
+          categoryLabel: categoryLabel(p.category),
+        });
+        gaps.push({ sku, ...facts });
+      }
+      if (p.transitDays == null) {
+        const facts = manualPurchaseLeadDayFacts({
+          kind: "transit",
+          supplierName: p.supplierName,
+        });
+        gaps.push({ sku, ...facts });
+      }
+    }
+    return gaps;
+  }, [pickedSkus, planBySku]);
+  /** Send stays blocked until every picked line's lead facts are complete —
+   *  and until the plan itself has answered (nothing is assumed). */
+  const leadDaysOk =
+    pickedSkus.length === 0 ||
+    (plan.data != null && !plan.data.planUnavailable && leadGaps.length === 0);
 
   const patch = (id: string, p: Partial<LineDraft>) =>
     setLines((ls) => ls.map((l) => (l.id === id ? { ...l, ...p } : l)));
@@ -704,17 +1355,25 @@ function CreateRequestWorkspace({
   const submittable = lines.filter((l) => l.sku != null && l.state !== "created");
   const everyStartedLineNamesAnItem = lines.every((l) => l.sku != null || isBlank(l));
 
-  /** `Why` may not be blank and the Send button stays off until it is filled
-   *  (card §3) — whitespace does not pass. The DOOR enforces it again. */
-  const whyOk = why.trim().length > 0;
-  /** `Needed by` is one of the request's six facts (MASTER §3) — a request
+  /** Card 04 — the per-purpose For gate. Routine purposes carry no extra
+   *  question; each exceptional purpose must name its object. */
+  const whyOk = purpose !== "other_purchase" || why.trim().length > 0;
+  const caseOk = purpose !== "service_case" || serviceCaseId != null;
+  const staffOk = purpose !== "internal_staff_purchase" || staffUserId != null;
+  const subsidiaryOk =
+    purpose !== "subsidiary_purchase" || subsidiaryName.trim().length > 0;
+  /** `Delivery Date` is one of the request's facts (MASTER §3) — a request
    *  with no date leaves the approver and the issuer with nothing to plan
    *  against. Found empty-but-sendable on the 2026-08-19 owner walk. */
-  const dateOk = neededBy !== "";
+  const dateOk = deliveryDate !== "";
 
   const canSend =
     !saving &&
+    leadDaysOk &&
     whyOk &&
+    caseOk &&
+    staffOk &&
+    subsidiaryOk &&
     dateOk &&
     chosenDest != null &&
     submittable.length > 0 &&
@@ -722,8 +1381,27 @@ function CreateRequestWorkspace({
     everyStartedLineNamesAnItem;
 
   /** The disabled button NAMES its gap (the Receiving law) — the first
-   *  missing header fact wins, in the form's own top-to-bottom order. */
-  const sendLabel = !dateOk ? MW.sendNeedsDate : !whyOk ? MW.sendNeedsWhy : MW.send;
+   *  missing fact wins, in the governed order: lead days first (Card 06),
+   *  then the header facts top-to-bottom. While the plan is still being
+   *  asked, the button is quiet rather than accusing Settings untruthfully. */
+  const leadBlocked =
+    pickedSkus.length > 0 &&
+    plan.data != null &&
+    (plan.data.planUnavailable || leadGaps.length > 0);
+  const sendLabel =
+    leadBlocked
+      ? MW.sendNeedsLeadDays
+      : !dateOk
+        ? MW.sendNeedsDate
+        : !caseOk
+          ? MW.sendNeedsServiceCase
+          : !staffOk
+            ? MW.sendNeedsStaff
+            : !subsidiaryOk
+              ? MW.sendNeedsSubsidiary
+              : !whyOk
+                ? MW.sendNeedsWhy
+                : MW.send;
 
   function addLine() {
     const l = blankLine();
@@ -756,8 +1434,13 @@ function CreateRequestWorkspace({
         const created = await createHeader.mutateAsync({
           purpose,
           destinationId: chosenDest,
-          requiredBy: neededBy || null,
-          why: why.trim(),
+          requiredBy: deliveryDate || null,
+          why: purpose === "other_purchase" ? why.trim() : null,
+          serviceCaseId: purpose === "service_case" ? (serviceCaseId ?? null) : null,
+          staffUserId:
+            purpose === "internal_staff_purchase" ? (staffUserId ?? null) : null,
+          subsidiaryName:
+            purpose === "subsidiary_purchase" ? subsidiaryName.trim() : null,
         });
         reqId = created.id;
         setRequestId(created.id);
@@ -785,7 +1468,7 @@ function CreateRequestWorkspace({
           sku: line.sku,
           qty: Number(line.qty),
           destinationId: chosenDest,
-          requiredBy: neededBy || null,
+          requiredBy: deliveryDate || null,
           note: line.note.trim() || null,
           purpose,
         });
@@ -801,6 +1484,8 @@ function CreateRequestWorkspace({
     setSaving(false);
     if (created === targets.length) onDone();
   }
+
+  const namedStaff = staff.filter((s) => (s.name ?? "").trim() !== "");
 
   return (
     <div
@@ -851,11 +1536,26 @@ function CreateRequestWorkspace({
             options={destinations.map((d) => ({ value: d.id, label: d.name }))}
           />
         </div>
+        {/* Card 06 §4 — `Proceed Date` is a read-only FACT: the server's
+            Malaysia-date preview before Send; the stored hand-off truth
+            after. Never an input, never a browser clock. */}
+        <div>
+          <span className="text-meta text-kit-slate-11">{MW.proceedDate}</span>
+          <p className="pt-1.5 text-body text-base-900" data-testid="mp-proceed-date">
+            {plan.data?.proceedDate ? fmtDate(plan.data.proceedDate) : null}
+          </p>
+        </div>
+        {/* `Delivery Date` — the ONE date input. The server proposes the
+            slowest selected line's arrival once lead facts are complete; a
+            chosen date is the person's and is never silently overwritten. */}
         <DatePicker
-          id="mp-needed"
-          label={MW.neededBy}
-          value={neededBy || null}
-          onChange={(v) => setNeededBy(v ?? "")}
+          id="mp-delivery-date"
+          label={MW.deliveryDate}
+          value={deliveryDate || null}
+          onChange={(v) => {
+            setDateTouched(true);
+            setDeliveryDate(v ?? "");
+          }}
         />
         <div>
           <span className="text-meta text-kit-slate-11">{MW.raisedBy}</span>
@@ -864,22 +1564,73 @@ function CreateRequestWorkspace({
             {email.split("@")[0]} (you)
           </p>
         </div>
+
+        {/* ── THE STRUCTURED FOR (Card 04 §4) — each exceptional purpose
+            names its object; routine purposes ask nothing extra. ── */}
+        {purpose === "service_case" ? (
+          <div data-testid="mp-for-service-case">
+            <label htmlFor="mp-service-case" className="text-meta text-kit-slate-11">
+              {MW.serviceCase}
+            </label>
+            <Select
+              id="mp-service-case"
+              value={serviceCaseId}
+              onValueChange={setServiceCaseId}
+              options={(casesQ.data?.items ?? []).map((sc) => ({
+                value: sc.id,
+                label: (sc.caseNo ?? sc.case_no ?? sc.id) as string,
+              }))}
+            />
+          </div>
+        ) : null}
+        {purpose === "internal_staff_purchase" ? (
+          <div data-testid="mp-for-staff">
+            <label htmlFor="mp-staff" className="text-meta text-kit-slate-11">
+              {MW.staffMember}
+            </label>
+            <Select
+              id="mp-staff"
+              value={staffUserId}
+              onValueChange={setStaffUserId}
+              options={namedStaff.map((s) => ({
+                value: s.id,
+                label: s.name ?? "",
+              }))}
+            />
+          </div>
+        ) : null}
+        {purpose === "subsidiary_purchase" ? (
+          <div data-testid="mp-for-subsidiary">
+            <label htmlFor="mp-subsidiary" className="text-meta text-kit-slate-11">
+              {MW.subsidiary}
+            </label>
+            <Input
+              id="mp-subsidiary"
+              value={subsidiaryName}
+              onChange={(e) => setSubsidiaryName(e.target.value)}
+            />
+          </div>
+        ) : null}
       </div>
 
-      <div className="max-w-[720px]">
-        <label htmlFor="mp-why" className="text-meta text-kit-slate-11">
-          {MW.why}
-        </label>
-        {/* The sentence the approver reads; "restock" answers nothing. */}
-        <textarea
-          id="mp-why"
-          data-testid="mp-why"
-          value={why}
-          onChange={(e) => setWhy(e.target.value)}
-          rows={2}
-          className="mt-1 w-full rounded-md border border-base-200 bg-white px-3 py-2 text-body text-base-900 outline-none focus:border-kit-blue-9"
-        />
-      </div>
+      {/* Card 04 — ONLY `Other Purchase` asks the question, and it must be
+          answered before Send unlocks. Routine purposes do not ask a
+          duplicate `Why`. */}
+      {purpose === "other_purchase" ? (
+        <div className="max-w-[720px]">
+          <label htmlFor="mp-why" className="text-meta text-kit-slate-11">
+            {MW.whatIsThisFor}
+          </label>
+          <textarea
+            id="mp-why"
+            data-testid="mp-why"
+            value={why}
+            onChange={(e) => setWhy(e.target.value)}
+            rows={2}
+            className="mt-1 w-full rounded-md border border-base-200 bg-white px-3 py-2 text-body text-base-900 outline-none focus:border-kit-blue-9"
+          />
+        </div>
+      ) : null}
 
       {headerError ? (
         <p className="text-meta text-kit-red-11" data-testid="mp-header-error">
@@ -966,6 +1717,30 @@ function CreateRequestWorkspace({
                   {W.supplierLabel}: {picked.supplier}
                 </p>
               ) : null}
+
+              {/* Card 06 §3.4 — a missing lead number is NAMED on its line in
+                  the governed two lines, and the act deep-links Settings.
+                  Send stays `Send — lead days are not set` until repaired;
+                  nothing substitutes zero or a browser date. */}
+              {leadGaps
+                .filter((g) => g.sku === line.sku)
+                .map((g) => (
+                  <span
+                    key={`${g.sku}-${g.wrong}`}
+                    className="flex min-w-0 flex-col"
+                    data-testid={`mp-lead-gap-${i}`}
+                  >
+                    <span className="text-body font-medium text-kit-red-11">
+                      {g.wrong}
+                    </span>
+                    <Link
+                      to="/operation?tab=purchasing-settings"
+                      className="text-label text-kit-blue-11 underline-offset-2 hover:underline"
+                    >
+                      {g.todo}
+                    </Link>
+                  </span>
+                ))}
 
               {picked ? (
                 <AlreadyHave
@@ -1085,469 +1860,164 @@ function LinePicker({
   );
 }
 
-/* ── The object detail — ONE SCROLL, no tabs (ui/MASTER §4.1; card §8) ────── */
-
-/**
- * One request, read top to bottom: the facts the card rules (raised by ·
- * what · how many · deliver to · needed by · WHY, never blank), then
- * `WHAT WE ALREADY HAVE` per line, then — for the APPROVER only — the money
- * and the decision. The same screen renders for both roles minus the money,
- * never a permission error.
+/* ══ THE MANUAL PURCHASE OBJECT — PURCHASING CARD 05 ═══════════════════════════
  *
- * The Approve control pre-fills `still needed`, NOT what was asked (card §4):
- * an approver who has to do the subtraction will not do it. Cutting is not
- * refusing. `Refuse` cannot be submitted without a reason.
+ * One full-width, calm, read-first object; ONE scroll; no tabs, no split
+ * preview, no floating 720/900px islands (ui/MASTER §4.1: Manual Purchase is
+ * ONE SCROLL and NEVER splits). Section order is the Card's, exactly:
+ * Request → Items Requested → What We Already Have → Approval →
+ * Purchase Orders → History.
+ *
+ * WHAT THIS OBJECT DOES NOT HOLD (Card 05 §7): no second `Issue PO`, no PO
+ * Duty block, no consolidation prompt, no price editor, no Receive button,
+ * no PDF preview. Approval makes the request eligible for the Register's
+ * selected `Issue PO` action — the ONE Manual Purchase issuance placement —
+ * and physical arrival belongs to the exact PO in `Receiving`.
+ *
+ * ONE APPROVAL AUTHORITY (PR 982, preserved): `canApprove` is the server's
+ * answer to exactly what `purchasing_decide_request`'s SQL gate asks —
+ * `principal` or the real `ops_manager` position duty. The same answer
+ * gates the approver-only money AND the Approve/Refuse controls; the shared
+ * operation@ login sees neither. The SQL door re-enforces in the decision
+ * transaction; a refusal leaves in the governed two lines.
  */
-function RequestDetail({
-  id,
-  onBack,
-  readySiblingIds,
+
+/** The three-rank identity line for one stored event — rank 2 is the
+ *  portal-wide `historyActorWords`; a missing individual states the governed
+ *  audit defect, never an invented person. */
+function mpEventIdentity(e: {
+  occurred_at: string;
+  actor: string | null;
+  actor_role: string | null;
+}): string {
+  return historyActorWords({
+    text: "",
+    occurred_at: e.occurred_at,
+    by_role: e.actor_role,
+    actor: e.actor,
+    actor_kind: e.actor ? "human" : "missing",
+  });
+}
+
+/** One quiet read-only fact table — the object's shared listing grammar
+ *  (GoodsMiniTable's alignment law: fixed columns, one visual listing). */
+function ObjectTable({
+  columns,
+  minWidth,
+  children,
+  testId,
 }: {
-  id: string;
-  onBack: () => void;
-  /** Other READY requests sharing a supplier with this one — the
-   *  consolidation OFFER's candidates (card §6). */
-  readySiblingIds: string[];
+  columns: ReadonlyArray<{ key: string; label: string; width?: number }>;
+  minWidth?: number;
+  children: React.ReactNode;
+  testId?: string;
 }) {
-  const q = useManualPurchaseDetail(id);
-  const pick = useQuery({
-    queryKey: ["to-order", "pick-items"],
-    queryFn: () =>
-      apiFetch<{ items: DemandPickItem[] }>(
-        "/api/operation/purchase/to-order/demand/pick-items",
-      ),
-    staleTime: 60_000,
-  });
-  const decide = useDecidePurchaseRequest();
-  const issue = useIssuePurchaseRequests();
-  const partnersQ = useDeliveryPartners();
-
-  /**
-   * ⭐ THE TRANSACTION COSTS THIS ISSUE WILL COMMIT TO (0380; Card 02 closure §2).
-   *
-   * This lane buys at the Catalog price, and the API used to read that price
-   * itself and hand it straight back to the creation authority as
-   * `cost_source: catalog` — so the database compared its own live value against
-   * itself and agreed every time. A supplier price that moved was adopted with
-   * nobody's approval and nobody's knowledge.
-   *
-   * The prices are therefore READ and SHOWN before `Issue PO`, and the same
-   * numbers are declared with the request. `Issue as one PO` can pull in sibling
-   * requests whose lines are not on this screen, so the read covers them too —
-   * otherwise the operator would be declaring a price they never saw.
-   */
-  const issueIds = useMemo(() => [id, ...readySiblingIds], [id, readySiblingIds]);
-  const costsQ = useQuery({
-    queryKey: ["operation", "purchasing", "requests", "issue-costs", issueIds],
-    queryFn: () =>
-      apiFetch<{ costs: { sku: string; unitCost: number | null }[] }>(
-        `/api/operation/purchasing/requests/issue-costs?requestIds=${encodeURIComponent(
-          issueIds.join(","),
-        )}`,
-      ),
-    staleTime: 15_000,
-  });
-
-  /** The approver's per-line numbers — seeded from `still needed` once the
-   *  stock facts land; the human may override before approving. */
-  const [cuts, setCuts] = useState<Record<string, string>>({});
-  const [refusing, setRefusing] = useState(false);
-  const [refuseReason, setRefuseReason] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [partnerId, setPartnerId] = useState<string | undefined>(undefined);
-  const [issueError, setIssueError] = useState<string | null>(null);
-
-  if (q.isLoading || !q.data) {
-    return (
-      <div className="flex min-h-0 flex-1 items-center justify-center text-meta text-base-500">
-        {q.isError ? (q.error as Error).message : "Loading…"}
-      </div>
-    );
-  }
-
-  const { request, lines, destinations, users, canApprove } = q.data;
-  const destName = destinations.find((d) => d.id === request.destination_id)?.name ?? "";
-  const raisedBy = users.find((u) => u.id === request.created_by)?.name ?? "";
-  const freeOf = (sku: string) =>
-    pick.data?.items.find((i) => i.sku === sku)?.free ?? 0;
-
-  const status = manualPurchaseStatusOf({
-    approvalRequired: request.approval_required,
-    approvedAt: request.approved_at,
-    refusedAt: request.refused_at,
-    refuseReason: request.refuse_reason,
-    lines: lines.map((l) => ({
-      qty: l.qty,
-      issuedQty: l.issued_qty,
-      remainingQty: l.remaining_qty,
-      cancelledAt: l.cancelled_at,
-      poId: l.po_id,
-      received: l.received,
-    })),
-  });
-  const undecided = request.approved_at === null && request.refused_at === null;
-  const showDecision = canApprove && request.approval_required && undecided;
-
-  async function submitIssue(together: boolean) {
-    setIssueError(null);
-    if (!q.data) return;
-    const liveSuppliers = new Set(
-      q.data.lines.filter((l) => l.cancelled_at === null).map((l) => l.supplier_id),
-    );
-    const partners: Record<string, string> = {};
-    for (const sp of q.data.suppliers) {
-      if (liveSuppliers.has(sp.id) && sp.kind === "factory_pickup") {
-        if (!partnerId) {
-          setIssueError("Select a procurement partner for this factory-pickup supplier.");
-          return;
-        }
-        partners[sp.id] = partnerId;
-      }
-    }
-    /* THE PRICES SHOWN ON THIS SCREEN, declared. A SKU with no Catalog price is
-       a configuration hole; it is not declared as zero, and the server refuses
-       the line by name. */
-    const expectedCosts: Record<string, number> = {};
-    for (const c of costsQ.data?.costs ?? []) {
-      if (c.unitCost != null) expectedCosts[c.sku] = c.unitCost;
-    }
-    if (Object.keys(expectedCosts).length === 0) {
-      setIssueError("The transaction costs are still loading. Wait, then issue again.");
-      return;
-    }
-    try {
-      await issue.mutateAsync({
-        requestIds: together ? [id, ...readySiblingIds] : [id],
-        together,
-        partners: Object.keys(partners).length > 0 ? partners : null,
-        expectedCosts,
-      });
-      onBack();
-    } catch (e) {
-      /* THE APPROVED TWO LINES (closure §9): the fact, then the act. */
-      const body = (e as { body?: { message?: string; action?: string; code?: string } }).body;
-      const fallback = purchasingRefusal(body?.code);
-      setIssueError(
-        `${body?.message ?? fallback.wrong} ${body?.action ?? fallback.todo}`.trim(),
-      );
-    }
-  }
-
-  async function submitDecision(decision: "approve" | "refuse") {
-    setError(null);
-    try {
-      await decide.mutateAsync({
-        id,
-        decision,
-        reason: decision === "refuse" ? refuseReason.trim() : null,
-        cuts:
-          decision === "approve"
-            ? lines
-                .filter((l) => l.cancelled_at === null)
-                .map((l) => ({ id: l.id, qty: Number(cuts[l.id] ?? l.qty) }))
-                .filter((c) => Number.isInteger(c.qty) && c.qty >= 0)
-            : null,
-      });
-      onBack();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "The decision was not recorded");
-    }
-  }
-
   return (
-    <div
-      className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto p-4"
-      data-testid="mp-detail"
-    >
-      <div className="flex items-center justify-between">
-        <h2 className="text-body font-semibold text-base-900">
-          <span className="font-mono">{request.req_no}</span>
-          <span className="pl-3">
-            <StatusPill tone={STATUS_TONE[status.kind]}>{status.label}</StatusPill>
-          </span>
-        </h2>
-        <Button variant="ghost" onClick={onBack}>
-          Back
-        </Button>
-      </div>
-
-      {status.reasonLabel ? (
-        <p className="text-meta text-base-700" data-testid="mp-detail-refuse-reason">
-          {status.reasonLabel}
-        </p>
-      ) : null}
-
-      {/* Card 03 §3 — the object names the REAL action owner while the
-          request waits. Nothing resolved prints nothing. */}
-      {status.kind === "waiting_approval"
-        ? (() => {
-            const line = manualPurchaseApproverLine(
-              (q.data?.approvers ?? []).map((a) => a.name),
-            );
-            return line ? (
-              <p className="text-meta text-base-700" data-testid="mp-detail-approver">
-                {line}
-              </p>
-            ) : null;
-          })()
-        : null}
-
-      {/* The facts, in the card's own order. */}
-      <dl className="grid max-w-[720px] grid-cols-2 gap-x-6 gap-y-2 text-body">
-        <div>
-          <dt className="text-meta text-kit-slate-11">{MW.raisedBy}</dt>
-          <dd className="text-base-900">{raisedBy}</dd>
-        </div>
-        <div>
-          <dt className="text-meta text-kit-slate-11">{MW.needFor}</dt>
-          <dd className="text-base-900">{purposeLabelOf(request.purpose)}</dd>
-        </div>
-        <div>
-          <dt className="text-meta text-kit-slate-11">{MW.deliverTo}</dt>
-          <dd className="text-base-900">{destName}</dd>
-        </div>
-        <div>
-          <dt className="text-meta text-kit-slate-11">{MW.neededBy}</dt>
-          <dd className="text-base-900">
-            {request.required_by ? fmtDate(request.required_by) : null}
-          </dd>
-        </div>
-        <div className="col-span-2">
-          <dt className="text-meta text-kit-slate-11">{MW.why}</dt>
-          <dd className="text-base-900" data-testid="mp-detail-why">
-            {request.why}
-          </dd>
-        </div>
-      </dl>
-
-      {/* The lines, each with WHAT WE ALREADY HAVE — and, for the approver,
-          the money and the pre-filled still-needed control. */}
-      <div className="flex max-w-[900px] flex-col gap-3">
-        <h3 className="text-label font-semibold uppercase tracking-[0.14em] text-base-500">
-          {MW.items}
-        </h3>
-        {lines.map((l, i) => {
-          const free = freeOf(l.sku);
-          return (
-            <div key={l.id} className="flex flex-col gap-1 border-b border-base-100 pb-3">
-              <div className="flex items-center gap-3">
-                <span className="font-mono text-body text-base-900">{l.sku}</span>
-                <span className="text-meta text-base-600">× {l.qty}</span>
-                {l.remark ? (
-                  <span className="text-meta text-base-600">· {l.remark}</span>
-                ) : null}
-                {l.cancelled_at ? (
-                  <span className="text-meta text-base-500">
-                    {MANUAL_PURCHASE_STATUS_WORDS.not_going_ahead}
-                    {l.cancel_reason ? ` — ${l.cancel_reason}` : ""}
-                  </span>
-                ) : null}
-                {"unit_cost" in l && l.unit_cost != null ? (
-                  /* THE MONEY — approver only; the server omits the key for
-                     everyone else, so nothing here can leak it. */
-                  <span
-                    className="ml-auto tabular-nums text-meta text-base-700"
-                    data-testid={`mp-detail-cost-${i}`}
-                  >
-                    RM {Number(l.unit_cost).toLocaleString()} × {l.qty}
-                  </span>
-                ) : null}
-              </div>
-
-              {l.cancelled_at === null ? (
-                <AlreadyHave sku={l.sku} free={free} qty={l.qty} index={i} />
-              ) : null}
-
-              {showDecision && l.cancelled_at === null ? (
-                <StillNeededControl
-                  line={l}
-                  free={free}
-                  value={cuts[l.id]}
-                  onChange={(v) => setCuts((c) => ({ ...c, [l.id]: v }))}
-                  index={i}
-                />
-              ) : null}
-            </div>
-          );
-        })}
-      </div>
-
-      {error ? (
-        <p className="text-meta text-kit-red-11" data-testid="mp-decide-error">
-          {error}
-        </p>
-      ) : null}
-
-      {showDecision ? (
-        <div className="flex max-w-[900px] items-center gap-3" data-testid="mp-decision">
-          <Button
-            variant="primary"
-            loading={decide.isPending}
-            onClick={() => void submitDecision("approve")}
-            data-testid="mp-approve"
-          >
-            Approve
-          </Button>
-          {refusing ? (
-            <span className="flex flex-1 items-center gap-2">
-              <Input
-                id="mp-refuse-reason"
-                aria-label="Refuse reason"
-                placeholder="Why is this not going ahead?"
-                value={refuseReason}
-                onChange={(e) => setRefuseReason(e.target.value)}
-                data-testid="mp-refuse-reason"
-              />
-              {/* The reason is REQUIRED — without it a refused request is
-                  simply never touched again (card §4). */}
-              <Button
-                variant="ghost"
-                disabled={refuseReason.trim().length === 0 || decide.isPending}
-                onClick={() => void submitDecision("refuse")}
-                data-testid="mp-refuse-submit"
+    <div className="overflow-x-auto" data-testid={testId}>
+      <table
+        className="w-full table-fixed text-left"
+        style={minWidth ? { minWidth } : undefined}
+      >
+        <colgroup>
+          {columns.map((c) => (
+            <col key={c.key} style={c.width ? { width: c.width } : undefined} />
+          ))}
+        </colgroup>
+        <thead className="border-b border-base-200 bg-base-50">
+          <tr className="divide-x divide-base-200">
+            {columns.map((c) => (
+              <th
+                key={c.key}
+                scope="col"
+                className="px-2 py-1.5 text-label font-semibold uppercase text-base-500"
               >
-                Refuse
-              </Button>
-            </span>
-          ) : (
-            <Button
-              variant="ghost"
-              onClick={() => setRefusing(true)}
-              data-testid="mp-refuse"
-            >
-              Refuse
-            </Button>
-          )}
-        </div>
-      ) : null}
-
-      {/* ── ISSUE — same day, no PO-day gate; consolidation is an OFFER
-          (card §6): issuing separately is ALWAYS available on the same
-          screen. An offer that cannot be declined is a gate wearing an
-          offer's clothes. */}
-      {status.kind === "ready_to_order" ? (
-        <div className="flex max-w-[900px] flex-col gap-2" data-testid="mp-issue">
-          {(() => {
-            const liveSuppliers = new Set(
-              lines.filter((l) => l.cancelled_at === null).map((l) => l.supplier_id),
-            );
-            const needsPartner = q.data!.suppliers.some(
-              (sp) => liveSuppliers.has(sp.id) && sp.kind === "factory_pickup",
-            );
-            return needsPartner ? (
-              <div className="flex items-center gap-2">
-                <label htmlFor="mp-issue-partner" className="text-meta text-kit-slate-11">
-                  Procurement partner
-                </label>
-                <span className="w-[220px]">
-                  <Select
-                    id="mp-issue-partner"
-                    value={partnerId}
-                    onValueChange={setPartnerId}
-                    options={(partnersQ.data?.partners ?? []).map(
-                      (dp: { id: string; name: string }) => ({
-                        value: dp.id,
-                        label: dp.name,
-                      }),
-                    )}
-                  />
-                </span>
-              </div>
-            ) : null;
-          })()}
-          {/* ⭐ THE PRICES THIS ISSUE COMMITS TO (0380; closure §2).
-              Shown before the button, because the request DECLARES them and a
-              number nobody was shown is not a number anybody reviewed. `Issue as
-              one PO` widens the set to the sibling requests, so this list does
-              too. A SKU Catalog has no price for is named, not defaulted. */}
-          {(costsQ.data?.costs ?? []).length > 0 ? (
-            <div className="flex flex-col gap-0.5" data-testid="mp-issue-costs">
-              <span className="text-label uppercase tracking-wide text-base-500">
-                Transaction cost
-              </span>
-              {(costsQ.data?.costs ?? []).map((c) => (
-                <span
-                  key={c.sku}
-                  className="flex items-center justify-between gap-3 text-meta"
-                  data-testid={`mp-issue-cost-${c.sku}`}
-                >
-                  <span className="min-w-0 truncate font-mono">{c.sku}</span>
-                  {c.unitCost == null ? (
-                    <span className="flex shrink-0 flex-col text-right">
-                      <span className="text-base-900">Catalog has no price.</span>
-                      <span className="text-base-500">
-                        Ask Catalog to set the cost of {c.sku}.
-                      </span>
-                    </span>
-                  ) : (
-                    <span className="shrink-0 tabular-nums text-base-900">
-                      RM {Number(c.unitCost).toLocaleString()}
-                    </span>
-                  )}
-                </span>
-              ))}
-            </div>
-          ) : null}
-          <div className="flex items-center gap-3">
-            {readySiblingIds.length > 0 ? (
-              <>
-                <span className="text-meta text-base-700" data-testid="mp-issue-offer">
-                  Issue as one PO? {readySiblingIds.length + 1} approved requests share
-                  this supplier.
-                </span>
-                <Button
-                  variant="primary"
-                  loading={issue.isPending}
-                  onClick={() => void submitIssue(true)}
-                  data-testid="mp-issue-together"
-                >
-                  Issue as one PO
-                </Button>
-                <Button
-                  variant="ghost"
-                  disabled={issue.isPending}
-                  onClick={() => void submitIssue(false)}
-                  data-testid="mp-issue-separate"
-                >
-                  Issue separately
-                </Button>
-              </>
-            ) : (
-              <Button
-                variant="primary"
-                loading={issue.isPending}
-                onClick={() => void submitIssue(false)}
-                data-testid="mp-issue-po"
-              >
-                Issue PO
-              </Button>
-            )}
-          </div>
-          {issueError ? (
-            <p className="text-meta text-kit-red-11" data-testid="mp-issue-error">
-              {issueError}
-            </p>
-          ) : null}
-        </div>
-      ) : null}
+                {c.label}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-base-200 text-body">{children}</tbody>
+      </table>
     </div>
   );
 }
 
+/** One REQUEST fact — label over value, the object's reading grammar. */
+function Fact({
+  label,
+  children,
+  testId,
+  wide,
+}: {
+  label: string;
+  children: React.ReactNode;
+  testId?: string;
+  wide?: boolean;
+}) {
+  return (
+    <div className={wide ? "col-span-full" : undefined}>
+      <dt className="text-meta text-kit-slate-11">{label}</dt>
+      <dd className="text-body text-base-900" data-testid={testId}>
+        {children}
+      </dd>
+    </div>
+  );
+}
+
+/** WHAT WE ALREADY HAVE — one row per live SKU. `free` rides the pick-items
+ *  read and `already on PO` the open-cover endpoint (the same reads the
+ *  create workspace uses — Law D); `Still Needed` is PRINTED. */
+function AlreadyHaveRow({
+  sku,
+  requestedQty,
+  free,
+  index,
+}: {
+  sku: string;
+  requestedQty: number;
+  free: number;
+  index: number;
+}) {
+  const onPo = useAlreadyOnPo(sku);
+  const already = onPo.data?.alreadyOnPo ?? 0;
+  return (
+    <tr className="divide-x divide-base-200" data-testid={`mp-object-have-${index}`}>
+      <td className="px-2 py-2 font-mono">{sku}</td>
+      <td className="px-2 py-2 tabular-nums">{free}</td>
+      <td className="px-2 py-2 tabular-nums">
+        {already}
+        {onPo.data?.firstPo ? (
+          <span className="pl-1 text-label text-base-600">
+            · {onPo.data.firstPo.id}
+            {onPo.data.firstPo.eta ? ` · ${fmtDate(onPo.data.firstPo.eta)}` : ""}
+          </span>
+        ) : null}
+      </td>
+      <td
+        className="px-2 py-2 font-semibold tabular-nums"
+        data-testid={`mp-object-still-${index}`}
+      >
+        {stillNeededOf(requestedQty, free, already)}
+      </td>
+    </tr>
+  );
+}
+
 /**
- * The approver's quantity — PRE-FILLED with `still needed`, never with what
- * was asked (card §4, `purchasing/MASTER.md`): an approver who has to do the
- * subtraction will not do it. The seed lands once the already-on-PO read
- * answers; a human edit afterwards is theirs and is not overwritten.
+ * One approver line — SKU · Requested Qty · Still Needed · Approved Qty ·
+ * Transaction Cost · Line Total (Card 05 §3.5). `Approved Qty` is prefilled
+ * ONCE from `Still Needed` when the open-cover read lands; a human edit is
+ * theirs and is never overwritten by a background refetch. The cost is
+ * read-only approval evidence, never an Operation price control.
  */
-function StillNeededControl({
+function ApprovalLineRow({
   line,
   free,
   value,
   onChange,
   index,
 }: {
-  line: { id: string; sku: string; qty: number };
+  line: { id: string; sku: string; qty: number; unit_cost?: number | null };
   free: number;
   value: string | undefined;
   onChange: (v: string) => void;
@@ -1560,23 +2030,754 @@ function StillNeededControl({
     if (!seeded && onPo.data) onChange(String(still));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onPo.data]);
+  const qty = Number(value);
+  const cost = line.unit_cost ?? null;
   return (
-    <div className="flex items-center gap-2 text-meta">
-      <label htmlFor={`mp-cut-${index}`} className="text-kit-slate-11">
-        Approve
-      </label>
-      <span className="w-[64px]">
-        <Input
-          id={`mp-cut-${index}`}
-          aria-label={`Approve quantity for ${line.sku}`}
-          value={value ?? ""}
-          onChange={(e) => onChange(e.target.value)}
-          data-testid={`mp-cut-${index}`}
-        />
-      </span>
-      <span className="text-base-600">
-        of {line.qty} asked — {MW.stillNeeded} {still}
-      </span>
+    <tr className="divide-x divide-base-200 align-middle">
+      <td className="px-2 py-2 font-mono">{line.sku}</td>
+      <td className="px-2 py-2 tabular-nums">{line.qty}</td>
+      <td className="px-2 py-2 tabular-nums">{still}</td>
+      <td className="px-2 py-1.5">
+        <span className="block w-[72px]">
+          <Input
+            id={`mp-cut-${index}`}
+            aria-label={`Approve quantity for ${line.sku}`}
+            value={value ?? ""}
+            onChange={(e) => onChange(e.target.value)}
+            data-testid={`mp-cut-${index}`}
+          />
+        </span>
+      </td>
+      <td className="px-2 py-2 tabular-nums" data-testid={`mp-detail-cost-${index}`}>
+        {cost == null ? (
+          <span className="text-base-600">Catalog has no price.</span>
+        ) : (
+          `RM ${Number(cost).toLocaleString()}`
+        )}
+      </td>
+      <td className="px-2 py-2 tabular-nums">
+        {cost == null || !Number.isInteger(qty) || qty < 0
+          ? null
+          : `RM ${(cost * qty).toLocaleString()}`}
+      </td>
+    </tr>
+  );
+}
+
+/** One missing lead-day fact on its own line (Card 06 §3.4) — the governed
+ *  two lines, with the act deep-linking Settings. */
+function LeadGapLine({ facts }: { facts: { wrong: string; todo: string } }) {
+  return (
+    <span className="flex min-w-0 flex-col">
+      <span className="text-label font-medium text-kit-red-11">{facts.wrong}</span>
+      <Link
+        to="/operation?tab=purchasing-settings"
+        className="text-label text-kit-blue-11 underline-offset-2 hover:underline"
+      >
+        {facts.todo}
+      </Link>
+    </span>
+  );
+}
+
+/** The governed two-line refusal/fact copy — Line 1 the fact, Line 2 the
+ *  smaller act (COPY-STANDARD's two-line law). */
+function TwoLines({
+  wrong,
+  todo,
+  testId,
+}: {
+  wrong: string;
+  todo: string;
+  testId?: string;
+}) {
+  return (
+    <span className="flex min-w-0 flex-col" data-testid={testId}>
+      <span className="text-body font-medium text-kit-red-11">{wrong}</span>
+      <span className="text-label text-base-600">{todo}</span>
+    </span>
+  );
+}
+
+function ManualPurchaseObject({
+  id,
+  registerReqNo,
+  position,
+  onStep,
+  onBack,
+}: {
+  id: string;
+  /** The Register row's own number — the header identity prints instantly
+   *  while the object read is in flight. */
+  registerReqNo: string | null;
+  /** The filtered Register position (`4 of 69`) — context, never truth;
+   *  null when the open object left the filtered list. */
+  position: { index: number; total: number } | null;
+  onStep: (dir: -1 | 1) => void;
+  onBack: () => void;
+}) {
+  const q = useManualPurchaseDetail(id);
+  const pick = useQuery({
+    queryKey: ["to-order", "pick-items"],
+    queryFn: () =>
+      apiFetch<{ items: DemandPickItem[] }>(
+        "/api/operation/purchase/to-order/demand/pick-items",
+      ),
+    staleTime: 60_000,
+  });
+  const navigate = useNavigate();
+  const decide = useDecidePurchaseRequest();
+
+  /** The approver's per-line numbers — seeded once from `Still Needed`. */
+  const [cuts, setCuts] = useState<Record<string, string>>({});
+  const [refusing, setRefusing] = useState(false);
+  const [refuseReason, setRefuseReason] = useState("");
+  const [decideError, setDecideError] = useState<{ wrong: string; todo: string } | null>(
+    null,
+  );
+
+  const d = q.data;
+  const reqNo = d?.request.req_no ?? registerReqNo ?? "";
+
+  const status = d
+    ? manualPurchaseStatusOf({
+        approvalRequired: d.request.approval_required,
+        approvedAt: d.request.approved_at,
+        refusedAt: d.request.refused_at,
+        refuseReason: d.request.refuse_reason,
+        lines: d.lines.map((l) => ({
+          qty: l.qty,
+          issuedQty: l.issued_qty,
+          remainingQty: l.remaining_qty,
+          cancelledAt: l.cancelled_at,
+          poId: l.po_id,
+          received: l.received,
+        })),
+      })
+    : null;
+
+  async function submitDecision(decision: "approve" | "refuse") {
+    if (!d) return;
+    setDecideError(null);
+    try {
+      await decide.mutateAsync({
+        id,
+        decision,
+        reason: decision === "refuse" ? refuseReason.trim() : null,
+        cuts:
+          decision === "approve"
+            ? d.lines
+                .filter((l) => l.cancelled_at === null)
+                .map((l) => ({ id: l.id, qty: Number(cuts[l.id]) }))
+            : null,
+      });
+      /* Success STAYS on the object (Card 05 §3.5): the mutation invalidates
+         the requests reads, the decided facts replace the controls and
+         History appends. The operator is not thrown back to the Register. */
+      setRefusing(false);
+      setRefuseReason("");
+    } catch (e) {
+      /* THE APPROVED TWO LINES — the fact, then the act; never a raw code. */
+      const body = (e as { body?: { message?: string; action?: string; code?: string } })
+        .body;
+      const fallback = purchasingRefusal(body?.code ?? "decision_not_recorded");
+      setDecideError({
+        wrong: body?.message ?? fallback.wrong,
+        todo: body?.action ?? fallback.todo,
+      });
+    }
+  }
+
+  /* ── The one Object Header (ui/MASTER §4.1) — the SAME implementation the
+     Sales Order and Delivery Order objects draw (Law C), with the Manual
+     Purchase Register as its one back destination. `‹ n of m ›` steps the
+     operator's own filtered Register order; position is context, never
+     another source of row truth. ─────────────────────────────────────── */
+  const header = (
+    <SalesOrderTabs
+      identity={reqNo}
+      status={
+        status ? (
+          <StatusPill tone={STATUS_TONE[status.kind]}>{status.label}</StatusPill>
+        ) : null
+      }
+      backTo="/operation?tab=manual-purchase"
+      backLabel={MW.backToRegister}
+      onBack={(event) => {
+        event.preventDefault();
+        onBack();
+      }}
+      docTitle={reqNo ? `${reqNo} — Carres` : undefined}
+      right={
+        position ? (
+          <span className="flex shrink-0 items-center gap-0.5" data-testid="mp-object-position">
+            <button
+              type="button"
+              onClick={() => onStep(-1)}
+              disabled={position.index <= 1}
+              aria-label="Previous Manual Purchase"
+              title="Previous Manual Purchase in the list"
+              className="grid size-7 place-items-center rounded-full text-base-600 hover:bg-hovertint disabled:opacity-30 disabled:hover:bg-transparent"
+            >
+              <ChevronLeft size={16} aria-hidden="true" />
+            </button>
+            <span className="whitespace-nowrap px-0.5 text-meta tabular-nums text-base-500">
+              {position.index} of {position.total}
+            </span>
+            <button
+              type="button"
+              onClick={() => onStep(1)}
+              disabled={position.index >= position.total}
+              aria-label="Next Manual Purchase"
+              title="Next Manual Purchase in the list"
+              className="grid size-7 place-items-center rounded-full text-base-600 hover:bg-hovertint disabled:opacity-30 disabled:hover:bg-transparent"
+            >
+              <ChevronRight size={16} aria-hidden="true" />
+            </button>
+          </span>
+        ) : null
+      }
+    />
+  );
+
+  if (q.isLoading || (!d && !q.isError)) {
+    return (
+      <div className="absolute inset-0 flex flex-col bg-kit-slate-3" data-testid="mp-detail-loading">
+        {header}
+        <div className="px-4 py-4">
+          <Loading label={MW.objectLoading} />
+        </div>
+      </div>
+    );
+  }
+  if (q.isError || !d || !status) {
+    return (
+      <div className="absolute inset-0 flex flex-col bg-kit-slate-3" data-testid="mp-detail-failed">
+        {header}
+        <div className="px-4 py-4">
+          <div className="rounded-card border border-kit-slate-5 bg-white">
+            <EmptyState
+              title={MW.objectLoadFailed}
+              detail={(q.error as Error | undefined)?.message}
+              action={
+                <Button variant="neutral" onClick={() => void q.refetch()}>
+                  {MW.tryAgain}
+                </Button>
+              }
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const { request, lines } = d;
+  const destName = new Map(d.destinations.map((dd) => [dd.id, dd.name]));
+  const supName = new Map(d.suppliers.map((s) => [s.id, s.name]));
+  const live = lines.filter((l) => l.cancelled_at === null);
+  /* Card 06 §6 — the SERVER-derived earliest live Order By and its timing
+     against the server's Malaysia date; the browser derives nothing. */
+  const orderBy = manualPurchaseOrderByOf(live.map((l) => l.order_by ?? null));
+  const timing = manualPurchaseTimingOf(orderBy, d.todayIso ?? null);
+  const freeOf = (sku: string) => pick.data?.items.find((i) => i.sku === sku)?.free ?? 0;
+
+  const forText = manualPurchaseForOf({
+    purpose: request.purpose,
+    destinationName: destName.get(request.destination_id) ?? null,
+    serviceCaseNo: d.serviceCaseNo,
+    staffName: request.for_staff_user_id
+      ? (d.users.find((u) => u.id === request.for_staff_user_id)?.name ?? null)
+      : null,
+    subsidiaryName: request.for_subsidiary_name,
+    why: request.why,
+  });
+
+  const approval = manualPurchaseApprovalOf({
+    approvalRequired: request.approval_required,
+    approvedAt: request.approved_at,
+    refusedAt: request.refused_at,
+  });
+  const undecided = request.approved_at === null && request.refused_at === null;
+  const showDecision = d.canApprove && request.approval_required && undecided;
+  const approverLine = manualPurchaseApproverLine(d.approvers.map((a) => a.name));
+  const decidedEvent = (d.history ?? []).find(
+    (e) => e.kind === (approval.kind === "refused" ? "refused" : "approved"),
+  );
+
+  /* The approver's Approve gate — every live line must carry a whole number
+     from 0 through its own ask before the one primary action unlocks. */
+  const cutInvalid = live.find((l) => {
+    const v = cuts[l.id];
+    if (v === undefined) return false; // still seeding — not yet an error
+    const n = Number(v);
+    return !Number.isInteger(n) || n < 0 || n > l.qty;
+  });
+  const cutsReady =
+    live.length > 0 &&
+    live.every((l) => {
+      const n = Number(cuts[l.id]);
+      return cuts[l.id] !== undefined && Number.isInteger(n) && n >= 0 && n <= l.qty;
+    });
+
+  /* WHAT WE ALREADY HAVE — one row per live SKU, quantities summed. */
+  const haveRows: Array<{ sku: string; requestedQty: number }> = [];
+  for (const l of live) {
+    const found = haveRows.find((r) => r.sku === l.sku);
+    if (found) found.requestedQty += l.qty;
+    else haveRows.push({ sku: l.sku, requestedQty: l.qty });
+  }
+
+  /* PURCHASE ORDERS — the exact linked documents; `Still To Order` uses the
+     ONE remainder arithmetic over the demand lines each document carries. */
+  const supplierChanged = d.pos.some((p) => p.supplier_delivery_date != null);
+  const stillToOrderOf = (poId: string) =>
+    live
+      .filter((l) => (l.po_ids ?? []).includes(poId))
+      .reduce(
+        (n, l) =>
+          n +
+          manualPurchaseLineRemainingOf({
+            qty: l.qty,
+            approvedQty: l.approved_qty,
+            issuedQty: l.issued_qty,
+          }),
+        0,
+      );
+
+  const historyGroups = groupHistoryChronology(d.history ?? []);
+
+  return (
+    <div className="absolute inset-0 flex flex-col bg-kit-slate-3" data-testid="mp-detail">
+      {header}
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+        <div className="flex flex-col gap-6">
+          {/* ① REQUEST — the six authoritative facts, in the Card 06 order:
+              Proceed Date · Delivery Date · Need for · For · Deliver To ·
+              Requested By. */}
+          <Block title={MW.secRequest}>
+            <dl className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3 lg:grid-cols-6">
+              <Fact label={MW.colProceedDate} testId="mp-detail-proceed-date">
+                {fmtDate(request.created_at.slice(0, 10))}
+              </Fact>
+              <Fact label={MW.colDeliveryDate} testId="mp-detail-delivery-date">
+                {request.required_by ? (
+                  fmtDate(request.required_by)
+                ) : (
+                  /* A historical null stays honest — never backfilled, never
+                     given an invented Order By (Card 06 §6). */
+                  <span className="text-base-600">{MW.notRecorded}</span>
+                )}
+                {/* The quiet derived timing fact — `Order by {date}`; when
+                    passed, the fact states `Order date passed` first. No
+                    Object Issue PO button arrives with it. */}
+                {orderBy != null ? (
+                  <span className="block text-label text-base-600" data-testid="mp-detail-order-by">
+                    {timing === "order_date_passed" ? (
+                      <span className="block text-kit-red-11">{MW.orderDatePassed}</span>
+                    ) : null}
+                    {manualPurchaseOrderByLine(fmtDate(orderBy))}
+                  </span>
+                ) : null}
+              </Fact>
+              <Fact label={MW.needFor}>{purposeLabelOf(request.purpose)}</Fact>
+              <Fact label={MW.colFor} testId="mp-detail-for">
+                {forText}
+              </Fact>
+              <Fact label={MW.colDeliverTo}>
+                {destName.get(request.destination_id) ?? ""}
+              </Fact>
+              {/* The real staff display name — never `operation`, an email, a
+                  role or `(you)`. A shared-account record whose individual
+                  cannot be recovered states the audit defect. */}
+              <Fact label={MW.colRequestedBy} testId="mp-detail-requested-by">
+                {d.requested_by_name ?? (
+                  <span className="text-base-600">{MW.staffIdentityNotRecorded}</span>
+                )}
+              </Fact>
+              {/* A pre-Card-04 routine request keeps its stored reason visible
+                  under the historical `Why`; Other Purchase answers through
+                  `For` above and never prints twice. */}
+              {request.why && request.purpose !== "other_purchase" ? (
+                <Fact label={MW.why} testId="mp-detail-why" wide>
+                  {request.why}
+                </Fact>
+              ) : null}
+            </dl>
+          </Block>
+
+          {/* ② ITEMS REQUESTED — read-only; Catalog human words beside the
+              explicit SKU; the supplier is Catalog-derived, never chosen. */}
+          <Block title={MW.secItemsRequested}>
+            <ObjectTable
+              testId="mp-object-items"
+              minWidth={860}
+              columns={[
+                { key: "sku", label: MW.expSku, width: 150 },
+                { key: "item", label: MW.expItem, width: 220 },
+                { key: "supplier", label: MW.expSupplier, width: 180 },
+                { key: "qty", label: MW.expRequestedQty, width: 110 },
+                { key: "deliver", label: MW.expDeliverTo, width: 170 },
+                { key: "note", label: MW.colNote },
+              ]}
+            >
+              {lines.map((l, i) => (
+                <tr
+                  key={l.id}
+                  className={`divide-x divide-base-200 align-top${l.cancelled_at ? " text-base-400" : ""}`}
+                  data-testid={`mp-object-item-${i}`}
+                >
+                  <td className="px-2 py-2 font-mono">{l.sku}</td>
+                  <td className="px-2 py-2">
+                    {l.item_label ?? l.sku}
+                    {l.cancelled_at ? (
+                      <span className="block text-label text-base-400">
+                        {MANUAL_PURCHASE_STATUS_WORDS.not_going_ahead}
+                        {l.cancel_reason ? ` — ${l.cancel_reason}` : ""}
+                      </span>
+                    ) : null}
+                  </td>
+                  <td className="px-2 py-2">
+                    {l.supplier_id ? (
+                      <span className="flex flex-col">
+                        <span>{supName.get(l.supplier_id) ?? ""}</span>
+                        {/* Card 06 §3.4 — a live line whose lead numbers
+                            nobody set names the exact Settings fact here and
+                            deep-links the repair; the engine invents no
+                            date. */}
+                        {l.production_days_missing ? (
+                          <LeadGapLine
+                            facts={manualPurchaseLeadDayFacts({
+                              kind: "production",
+                              supplierName: supName.get(l.supplier_id) ?? null,
+                              categoryLabel: l.category
+                                ? categoryLabel(l.category)
+                                : null,
+                            })}
+                          />
+                        ) : null}
+                        {l.transit_days_missing ? (
+                          <LeadGapLine
+                            facts={manualPurchaseLeadDayFacts({
+                              kind: "transit",
+                              supplierName: supName.get(l.supplier_id) ?? null,
+                            })}
+                          />
+                        ) : null}
+                      </span>
+                    ) : (
+                      /* A missing Catalog relationship is a NAMED fact on the
+                         affected line, fixed at its owning Catalog boundary —
+                         never a rail facet, never a guess. */
+                      <span className="flex flex-col">
+                        <span>{MW.noSupplierYet}</span>
+                        <Link
+                          to="/operation?tab=catalog"
+                          className="text-label text-kit-blue-11 underline-offset-2 hover:underline"
+                        >
+                          Ask Catalog to set the supplier of {l.sku}.
+                        </Link>
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-2 py-2 tabular-nums">{l.qty}</td>
+                  <td className="px-2 py-2">
+                    {destName.get(l.destination_id ?? request.destination_id) ?? ""}
+                  </td>
+                  <td className="px-2 py-2">{l.remark}</td>
+                </tr>
+              ))}
+            </ObjectTable>
+          </Block>
+
+          {/* ③ WHAT WE ALREADY HAVE — decision facts, not buttons; the one
+              shared arithmetic prints `Still Needed`. */}
+          <Block title={MW.secAlreadyHave}>
+            {haveRows.length === 0 ? (
+              <p className="text-body text-base-500">
+                {MANUAL_PURCHASE_STATUS_WORDS.not_going_ahead}
+              </p>
+            ) : (
+              <ObjectTable
+                testId="mp-object-have"
+                minWidth={620}
+                columns={[
+                  { key: "sku", label: MW.expSku, width: 150 },
+                  { key: "free", label: MW.colFreeStock, width: 110 },
+                  { key: "onpo", label: MW.colAlreadyOnPo },
+                  { key: "still", label: MW.colStillNeeded, width: 130 },
+                ]}
+              >
+                {haveRows.map((r, i) => (
+                  <AlreadyHaveRow
+                    key={r.sku}
+                    sku={r.sku}
+                    requestedQty={r.requestedQty}
+                    free={freeOf(r.sku)}
+                    index={i}
+                  />
+                ))}
+              </ObjectTable>
+            )}
+          </Block>
+
+          {/* ④ APPROVAL — always present: the decision is part of the object.
+              Content follows the fact and the caller's real authority. */}
+          <Block title={MW.secApproval}>
+            {approval.kind === "not_needed" ? (
+              <p className="text-body text-base-700" data-testid="mp-approval-fact">
+                {MW.noApprovalNeeded}
+              </p>
+            ) : approval.kind === "need_approval" && !showDecision ? (
+              <div className="flex flex-col gap-0.5" data-testid="mp-approval-fact">
+                <span className="text-body font-medium text-base-900">
+                  {MANUAL_PURCHASE_APPROVAL_WORDS.need_approval}
+                </span>
+                {approverLine ? (
+                  <span className="text-meta text-base-600" data-testid="mp-detail-approver">
+                    {approverLine}
+                  </span>
+                ) : null}
+              </div>
+            ) : approval.kind === "need_approval" && showDecision ? (
+              <div className="flex flex-col gap-3" data-testid="mp-decision">
+                <ObjectTable
+                  testId="mp-approval-table"
+                  minWidth={760}
+                  columns={[
+                    { key: "sku", label: MW.expSku, width: 150 },
+                    { key: "qty", label: MW.expRequestedQty, width: 110 },
+                    { key: "still", label: MW.colStillNeeded, width: 110 },
+                    { key: "approved", label: MW.expApprovedQty, width: 110 },
+                    { key: "cost", label: MW.colTransactionCost, width: 140 },
+                    { key: "total", label: MW.colLineTotal },
+                  ]}
+                >
+                  {live.map((l, i) => (
+                    <ApprovalLineRow
+                      key={l.id}
+                      line={l}
+                      free={freeOf(l.sku)}
+                      value={cuts[l.id]}
+                      onChange={(v) => setCuts((c) => ({ ...c, [l.id]: v }))}
+                      index={i}
+                    />
+                  ))}
+                </ObjectTable>
+                {cutInvalid ? (
+                  <TwoLines
+                    testId="mp-cut-invalid"
+                    wrong={purchasingRefusal("invalid_cut_qty", { qty: cutInvalid.qty }).wrong}
+                    todo={purchasingRefusal("invalid_cut_qty", { qty: cutInvalid.qty }).todo}
+                  />
+                ) : null}
+                {decideError ? (
+                  <TwoLines
+                    testId="mp-decide-error"
+                    wrong={decideError.wrong}
+                    todo={decideError.todo}
+                  />
+                ) : null}
+                <div className="flex items-center justify-end gap-3">
+                  {refusing ? (
+                    <span className="flex flex-1 items-center gap-2">
+                      <label
+                        htmlFor="mp-refuse-reason"
+                        className="shrink-0 text-meta text-kit-slate-11"
+                      >
+                        {MW.decisionReason}
+                      </label>
+                      <Input
+                        id="mp-refuse-reason"
+                        aria-label={MW.decisionReason}
+                        placeholder="Why is this not going ahead?"
+                        value={refuseReason}
+                        onChange={(e) => setRefuseReason(e.target.value)}
+                        data-testid="mp-refuse-reason"
+                      />
+                      {/* The reason is REQUIRED — without it a refused request
+                          is simply never touched again. */}
+                      <Button
+                        variant="neutral"
+                        disabled={refuseReason.trim().length === 0 || decide.isPending}
+                        onClick={() => void submitDecision("refuse")}
+                        data-testid="mp-refuse-submit"
+                      >
+                        {MW.refuse}
+                      </Button>
+                    </span>
+                  ) : (
+                    <Button
+                      variant="neutral"
+                      onClick={() => setRefusing(true)}
+                      data-testid="mp-refuse"
+                    >
+                      {MW.refuse}
+                    </Button>
+                  )}
+                  {/* The ONE primary action in this section (Card 05 §3.5). */}
+                  <Button
+                    variant="primary"
+                    disabled={!cutsReady}
+                    loading={decide.isPending}
+                    onClick={() => void submitDecision("approve")}
+                    data-testid="mp-approve"
+                  >
+                    {MW.approve}
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              /* Decided — the fact, the real actor and time, and (approved)
+                 the quantity per line; (refused) the decision reason. */
+              <div className="flex flex-col gap-2" data-testid="mp-approval-fact">
+                <div className="flex min-w-0 flex-col gap-0.5">
+                  <span className="text-body font-semibold text-base-900">
+                    {approval.label}
+                  </span>
+                  {decidedEvent ? (
+                    <span className="text-meta text-base-600" data-testid="mp-decided-by">
+                      {mpEventIdentity(decidedEvent)}
+                    </span>
+                  ) : null}
+                  {approval.kind === "refused" && request.refuse_reason ? (
+                    <span
+                      className="text-label text-base-600"
+                      data-testid="mp-detail-refuse-reason"
+                    >
+                      {request.refuse_reason}
+                    </span>
+                  ) : null}
+                </div>
+                {approval.kind === "approved" && live.length > 0 ? (
+                  <ObjectTable
+                    testId="mp-approved-lines"
+                    minWidth={380}
+                    columns={[
+                      { key: "sku", label: MW.expSku, width: 150 },
+                      { key: "qty", label: MW.expRequestedQty, width: 120 },
+                      { key: "approved", label: MW.expApprovedQty },
+                    ]}
+                  >
+                    {live.map((l) => (
+                      <tr key={l.id} className="divide-x divide-base-200">
+                        <td className="px-2 py-2 font-mono">{l.sku}</td>
+                        <td className="px-2 py-2 tabular-nums">{l.qty}</td>
+                        <td className="px-2 py-2 tabular-nums">
+                          {l.approved_qty ?? l.qty}
+                        </td>
+                      </tr>
+                    ))}
+                  </ObjectTable>
+                ) : null}
+              </div>
+            )}
+          </Block>
+
+          {/* ⑤ PURCHASE ORDERS — read-only exact lineage. No Issue PO, no PO
+              Duty, no consolidation, no price, no Receive, no PDF: issuance
+              is the Register's selected action; arrival is Receiving's. */}
+          <Block title={MW.secPurchaseOrders}>
+            {d.pos.length === 0 ? (
+              <p className="text-body text-base-500" data-testid="mp-object-not-ordered">
+                {MW.notOrderedYet}
+              </p>
+            ) : (
+              <ObjectTable
+                testId="mp-object-pos"
+                minWidth={supplierChanged ? 860 : 700}
+                columns={[
+                  { key: "po", label: MW.expPoNo, width: 160 },
+                  { key: "qty", label: MW.expOrderedQty, width: 110 },
+                  { key: "still", label: MW.expStillToOrder, width: 110 },
+                  { key: "issued", label: MW.colPoIssued, width: 130 },
+                  { key: "date", label: MW.colPoDeliveryDate },
+                  ...(supplierChanged
+                    ? [{ key: "supdate", label: MW.colSupplierDeliveryDate }]
+                    : []),
+                ]}
+              >
+                {d.pos.map((p, i) => (
+                  <tr
+                    key={p.id}
+                    className="divide-x divide-base-200"
+                    data-testid={`mp-object-po-${i}`}
+                  >
+                    <td className="px-2 py-2 font-mono">
+                      <button
+                        type="button"
+                        className="text-kit-blue-11 underline-offset-2 hover:underline"
+                        data-testid={`mp-object-po-link-${i}`}
+                        onClick={() =>
+                          navigate(
+                            `/operation/procurement?po=${encodeURIComponent(p.po_no)}`,
+                          )
+                        }
+                      >
+                        {p.po_no}
+                      </button>
+                    </td>
+                    <td className="px-2 py-2 tabular-nums">{p.ordered_qty}</td>
+                    <td className="px-2 py-2 tabular-nums">{stillToOrderOf(p.id)}</td>
+                    <td className="px-2 py-2">
+                      {p.placed_at ? fmtDate(p.placed_at.slice(0, 10)) : null}
+                    </td>
+                    <td className="px-2 py-2">
+                      {p.po_delivery_date ? fmtDate(p.po_delivery_date) : null}
+                    </td>
+                    {supplierChanged ? (
+                      <td className="px-2 py-2">
+                        {p.supplier_delivery_date
+                          ? fmtDate(p.supplier_delivery_date)
+                          : MW.sameAsPo}
+                      </td>
+                    ) : null}
+                  </tr>
+                ))}
+              </ObjectTable>
+            )}
+          </Block>
+
+          {/* ⑥ HISTORY — stored facts in the locked three-rank grammar,
+              grouped Today · Yesterday · Earlier. */}
+          <Block title={MW.secHistory}>
+            {historyGroups.length === 0 ? (
+              <p className="text-body text-base-500">No history recorded</p>
+            ) : (
+              <div className="flex flex-col gap-4" data-testid="mp-object-history">
+                {historyGroups.map((group) => (
+                  <section key={group.heading}>
+                    <h3
+                      className="mb-1.5 text-label font-semibold text-base-500"
+                      data-testid={`mp-history-group-${group.heading}`}
+                    >
+                      {group.heading}
+                    </h3>
+                    <ul className="flex flex-col divide-y divide-base-200">
+                      {group.events.map((event, i) => {
+                        const words = manualPurchaseHistoryRecord(event);
+                        return (
+                          <li
+                            key={`${event.kind}-${event.occurred_at}-${i}`}
+                            className="flex min-w-0 flex-col gap-0.5 py-2 first:pt-0 last:pb-0"
+                          >
+                            <RecordRanks
+                              words={{
+                                title: words.title,
+                                identity: mpEventIdentity(event),
+                                detail: words.detail,
+                              }}
+                            />
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </section>
+                ))}
+              </div>
+            )}
+          </Block>
+        </div>
+      </div>
     </div>
   );
 }
