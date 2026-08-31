@@ -33,6 +33,8 @@ let publicJwk: JWK;
 
 const WH = "00000000-0000-0000-0000-000000000c03";
 const USER = "00000000-0000-0000-0000-0000000000aa";
+const GRN_NORMAL = "00000000-0000-0000-0000-0000000000bb";
+const GRN_COVER = "00000000-0000-0000-0000-0000000000cc";
 const RECEIPT = "22222222-2222-2222-2222-222222222222";
 const LINE = "11111111-1111-1111-1111-111111111111";
 const SESSION_INPUT = {
@@ -327,9 +329,12 @@ describe("GET /api/operation/warehouse-receipts/register", () => {
         id: RECEIPT,
         source_id: "PO-1001",
         po_id: "PO-1001",
+        status: "submitted",
         grn_number: "GRN-20260831-0001",
         goods_received_timestamp: "2026-08-29T03:00:00Z",
         do_number: "DO-55",
+        do_file_path: "PO-1001/do.jpg",
+        return_reason: null,
         lines: [{
           poLineId: LINE,
           sku: "MS01-K",
@@ -338,9 +343,21 @@ describe("GET /api/operation/warehouse-receipts/register", () => {
           wrongItemQty: 1,
           extraQty: 1,
           unitIds: ["U1", "U2", "U3", "U4", "U5", "U6", "U7"],
+          damagedPhotos: ["damage.jpg"],
+          wrongItemPhotos: ["wrong.jpg"],
+          extraEvidence: ["extra.jpg"],
+          wrongItemReason: "Different model",
         }],
       }], error: null } },
-    });
+      app_users: { list: { data: [
+        { id: GRN_NORMAL, name: "Yu Jun", email: "yj@carres.com" },
+        { id: GRN_COVER, name: "Shasha", email: "sha@carres.com" },
+      ], error: null } },
+    }, { data: {
+      normal_user_id: GRN_NORMAL,
+      cover_user_id: GRN_COVER,
+      actor_user_id: GRN_COVER,
+    } });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue(sb as any);
 
@@ -350,7 +367,7 @@ describe("GET /api/operation/warehouse-receipts/register", () => {
       await makeJwt("operation"),
     );
     expect(res.status).toBe(200);
-    const body = await res.json() as { parents: Array<Record<string, unknown>>; rail: unknown[] };
+    const body = await res.json() as { parents: Array<Record<string, unknown>>; rail: unknown[]; authority: unknown };
     expect(body.parents[0]).toMatchObject({
       sourceNumber: "PO-1001",
       poDeliveryDate: "2026-09-02",
@@ -361,11 +378,17 @@ describe("GET /api/operation/warehouse-receipts/register", () => {
       wrongItemQty: 1,
       extraQty: 1,
       children: [expect.objectContaining({
+        status: "submitted",
         grnNumber: "GRN-20260831-0001",
         supplierDoNo: "DO-55",
+        signedDoPath: "PO-1001/do.jpg",
       })],
     });
     expect(body.rail).toHaveLength(9);
+    expect(body.authority).toEqual({
+      normalGrnDuty: { userId: GRN_NORMAL, name: "Yu Jun" },
+      datedCover: { userId: GRN_COVER, name: "Shasha" },
+    });
   });
 });
 

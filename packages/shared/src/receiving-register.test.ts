@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildReceivingRegister,
   receivingDateRail,
+  receivingWorkItems,
   type ReceivingRegisterInput,
 } from "./receiving-register";
 
@@ -22,9 +23,12 @@ const BASE: ReceivingRegisterInput = {
   sessions: [{
     id: "receipt-1",
     sourceId: "PO-1001",
+    status: "posted",
     grnNumber: "GRN-20260831-0001",
     goodsReceivedAt: "2026-08-29T03:00:00.000Z",
     supplierDoNo: "DO-55",
+    signedDoPath: "PO-1001/do.jpg",
+    returnReason: null,
     lines: [{
       poLineId: "line-1",
       sku: "MS01-K",
@@ -33,8 +37,16 @@ const BASE: ReceivingRegisterInput = {
       wrongItemQty: 1,
       extraQty: 1,
       unitIds: ["U1", "U2", "U3", "U4", "U5", "U6", "U7"],
+      damagedPhotos: ["damage.jpg"],
+      wrongItemPhotos: ["wrong.jpg"],
+      extraEvidence: ["extra.jpg"],
+      wrongItemReason: "Different model",
     }],
   }],
+  authority: {
+    normalGrnDuty: { userId: "normal", name: "Yu Jun" },
+    datedCover: { userId: "cover", name: "Shasha" },
+  },
 };
 
 describe("one Receiving Register projection", () => {
@@ -121,5 +133,72 @@ describe("one Receiving Register projection", () => {
       .toBe("PO-LATER");
     expect(buildReceivingRegister({ ...BASE, sources, sessions: [], filter: "none" }).parents[0]?.sourceNumber)
       .toBe("PO-NONE");
+  });
+});
+
+describe("central Receiving Work projection", () => {
+  it("projects a due PO with no session on the Warehouse calendar", () => {
+    const register = buildReceivingRegister({
+      ...BASE,
+      today: "2026-09-02",
+      holidays: [],
+      sessions: [],
+    });
+    expect(receivingWorkItems(register, "2026-09-02", [])).toEqual([
+      expect.objectContaining({
+        id: "receiving:PO-1001:start",
+        kind: "start",
+        fact: "The goods are due",
+        action: "Check in PO-1001 from Ohana",
+        dueIso: "2026-09-02",
+        workingDaysLate: 0,
+        destination: "/operation?tab=receiving&po=PO-1001",
+        owner: { userId: "cover", name: "Shasha" },
+        normalOwner: { userId: "normal", name: "Yu Jun" },
+        datedCover: { userId: "cover", name: "Shasha" },
+      }),
+    ]);
+  });
+
+  it("projects the first exact missing-evidence fact for a Draft session", () => {
+    const register = buildReceivingRegister({
+      ...BASE,
+      sessions: [{
+        ...BASE.sessions[0]!,
+        id: "draft-1",
+        status: "draft",
+        grnNumber: null,
+        supplierDoNo: null,
+        signedDoPath: null,
+        goodsReceivedAt: null,
+        lines: [{ ...BASE.sessions[0]!.lines[0]!, receivedQty: 1, damagedQty: 0, wrongItemQty: 0, extraQty: 0, unitIds: [] }],
+      }],
+    });
+    expect(receivingWorkItems(register, "2026-09-02", [])[0]).toMatchObject({
+      id: "receiving:draft-1:evidence",
+      kind: "evidence",
+      fact: "Supplier DO is missing",
+      action: "Add the Supplier DO before you finish receiving",
+      destination: "/operation?tab=receiving&po=PO-1001&receipt=draft-1",
+    });
+  });
+
+  it("projects a submitted Warehouse count for GRN review and ignores posted sessions", () => {
+    const register = buildReceivingRegister({
+      ...BASE,
+      sessions: [
+        BASE.sessions[0]!,
+        { ...BASE.sessions[0]!, id: "submitted-1", status: "submitted", grnNumber: null },
+      ],
+    });
+    expect(receivingWorkItems(register, "2026-09-02", [])).toEqual([
+      expect.objectContaining({
+        id: "receiving:submitted-1:review",
+        kind: "review",
+        fact: "The warehouse count is ready",
+        action: "Check in PO-1001 from Ohana",
+        destination: "/operation?tab=receiving&po=PO-1001&receipt=submitted-1",
+      }),
+    ]);
   });
 });

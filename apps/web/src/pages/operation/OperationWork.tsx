@@ -72,7 +72,7 @@ function WorkRowButton({
   item: WorkRow;
   onOpen: (i: WorkRow) => void;
 }) {
-  const purchasing = item.module === "purchasing";
+  const factFirst = item.module === "purchasing" || item.module === "receiving";
   return (
     <button
       type="button"
@@ -87,19 +87,29 @@ function WorkRowButton({
       <span className="flex-1 min-w-0">
         {/* Purchasing names the problem before the exact action. Other modules
             keep the existing registered action-first row grammar. */}
-        <span className={`${cjkClassName(purchasing ? item.line : item.action)} text-body font-semibold text-base-900 block truncate`}>
+        <span className={`${cjkClassName(factFirst ? item.line : item.action)} text-body font-semibold text-base-900 block truncate`}>
           {item.locked && (
             <Lock size={11} strokeWidth={2.5} className="inline mr-1 -mt-0.5" aria-label="Held by Finance" />
           )}
-          {purchasing ? item.line : item.action}
+          {factFirst ? item.line : item.action}
         </span>
         {/* Line 2 — names · numbers · the due date, 11px regular. */}
-        <span
-          className={`block truncate text-label font-normal ${
-            item.workingDaysLate > 0 ? "text-danger" : "text-base-600"
-          }`}
-        >
-          {purchasing ? `${item.action} · ${supportingLine(item)}` : supportingLine(item)}
+        <span className="flex min-w-0 items-center gap-1.5">
+          <span
+            className={`block min-w-0 truncate text-label font-normal ${
+              item.workingDaysLate > 0 ? "text-danger" : "text-base-600"
+            }`}
+          >
+            {factFirst ? `${item.action} · ${supportingLine(item)}` : supportingLine(item)}
+          </span>
+          {item.actingCoverName ? (
+            <span
+              data-testid={`work-cover-${item.orderId}-${item.ruleKey}`}
+              className="shrink-0 rounded-full border border-base-200 px-1.5 text-[9px] font-semibold text-base-600"
+            >
+              Cover · {item.actingCoverName}
+            </span>
+          ) : null}
         </span>
       </span>
     </button>
@@ -148,9 +158,9 @@ export default function OperationWork() {
     const byOwner = new Map<string, WorkRow[]>();
     for (const i of allItems) {
       const key =
-        i.ownerId ??
-        (i.ownerName
-          ? `person:${i.ownerName}`
+        i.teamOwnerId ?? i.ownerId ??
+        (i.teamOwnerName ?? i.ownerName
+          ? `person:${i.teamOwnerName ?? i.ownerName}`
           : `duty:${i.ownerDuty ?? "No owner yet"}`);
       const list = byOwner.get(key) ?? [];
       list.push(i);
@@ -166,7 +176,7 @@ export default function OperationWork() {
         ? personLabel(staffMember.name, staffMember.email)
         : key.startsWith("person:")
           ? key.slice(7)
-          : (items[0]?.ownerName ?? null);
+          : (items[0]?.teamOwnerName ?? items[0]?.ownerName ?? null);
       const dutyWord = key.startsWith("duty:") ? key.slice(5) : null;
       return {
         key,

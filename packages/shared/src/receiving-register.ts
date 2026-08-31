@@ -1,5 +1,9 @@
-import { addWorkingDays, isWorkingDay } from "./working-days";
+import { addWorkingDays, countWorkingDays, isWorkingDay } from "./working-days";
 import { myHolidaySet } from "./my-holidays";
+import {
+  receivingProblemCopy,
+  type WarehouseReceiptStatus,
+} from "./warehouse-receipt";
 
 export type ReceivingRegisterFilter = "late" | "later" | "none" | string;
 
@@ -35,14 +39,21 @@ export interface ReceivingRegisterSessionLine {
   wrongItemQty: number;
   extraQty: number;
   unitIds: readonly string[];
+  damagedPhotos: readonly string[];
+  wrongItemPhotos: readonly string[];
+  extraEvidence: readonly string[];
+  wrongItemReason: string | null;
 }
 
 export interface ReceivingRegisterSession {
   id: string;
   sourceId: string;
+  status: WarehouseReceiptStatus;
   grnNumber: string | null;
   goodsReceivedAt: string | null;
   supplierDoNo: string | null;
+  signedDoPath: string | null;
+  returnReason: string | null;
   lines: readonly ReceivingRegisterSessionLine[];
 }
 
@@ -65,6 +76,10 @@ export interface ReceivingRegisterChild {
   pendingDeliveryQty: number;
   supplierDoNo: string | null;
   unitIds: string[];
+  status: WarehouseReceiptStatus;
+  signedDoPath: string | null;
+  returnReason: string | null;
+  lines: readonly ReceivingRegisterSessionLine[];
 }
 
 export interface ReceivingRegisterParent {
@@ -107,11 +122,39 @@ export interface ReceivingRegisterInput {
   sources: readonly ReceivingRegisterSource[];
   supplierPromises: readonly ReceivingRegisterPromise[];
   sessions: readonly ReceivingRegisterSession[];
+  authority?: ReceivingRegisterAuthority | null;
 }
 
 export interface ReceivingRegisterResult {
   parents: ReceivingRegisterParent[];
   rail: ReceivingDateRailRow[];
+  authority: ReceivingRegisterAuthority | null;
+}
+
+export interface ReceivingAuthorityPerson {
+  userId: string;
+  name: string;
+}
+
+export interface ReceivingRegisterAuthority {
+  normalGrnDuty: ReceivingAuthorityPerson | null;
+  datedCover: ReceivingAuthorityPerson | null;
+}
+
+export interface ReceivingRegisterWorkItem {
+  id: string;
+  kind: "start" | "evidence" | "review" | "returned";
+  sourceId: string;
+  sessionId: string | null;
+  fact: string;
+  action: string;
+  dueIso: string | null;
+  workingDaysLate: number;
+  destination: string;
+  owner: ReceivingAuthorityPerson | null;
+  normalOwner: ReceivingAuthorityPerson | null;
+  datedCover: ReceivingAuthorityPerson | null;
+  completionFact: string;
 }
 
 function sum(lines: readonly ReceivingRegisterSessionLine[], key: "receivedQty" | "damagedQty" | "wrongItemQty" | "extraQty"): number {
@@ -205,6 +248,10 @@ export function buildReceivingRegister(input: ReceivingRegisterInput): Receiving
       pendingDeliveryQty,
       supplierDoNo: session.supplierDoNo,
       unitIds: session.lines.flatMap((line) => [...line.unitIds]),
+      status: session.status,
+      signedDoPath: session.signedDoPath,
+      returnReason: session.returnReason,
+      lines: session.lines,
     }));
     return {
       id: source.id,
@@ -244,5 +291,123 @@ export function buildReceivingRegister(input: ReceivingRegisterInput): Receiving
       if (b.receivingDate == null) return -1;
       return a.receivingDate.localeCompare(b.receivingDate) || a.sourceNumber.localeCompare(b.sourceNumber);
     });
-  return { parents, rail };
+  return { parents, rail, authority: input.authority ?? null };
+}
+
+function missingSessionWork(child: ReceivingRegisterChild): { fact: string; action: string } | null {
+  if (!child.supplierDoNo || child.supplierDoNo.trim().length < 3) {
+    return receivingProblemCopy("supplier_do_missing");
+  }
+  if (!child.signedDoPath?.trim()) return receivingProblemCopy("signed_do_missing");
+  if (!child.goodsReceivedAt) return receivingProblemCopy("goods_received_at_missing");
+  for (const line of child.lines) {
+    const physical = Math.max(0, line.receivedQty)
+      + Math.max(0, line.damagedQty)
+      + Math.max(0, line.wrongItemQty)
+      + Math.max(0, line.extraQty);
+    if (line.unitIds.length < physical) {
+      return receivingProblemCopy("unit_id_missing", {
+        item: line.sku,
+        document: child.sourceNumber,
+      });
+    }
+    if (line.damagedQty > 0 && line.damagedPhotos.length === 0) {
+      return receivingProblemCopy("damage_evidence_missing");
+    }
+    if (
+      line.wrongItemQty > 0
+      && (line.wrongItemPhotos.length === 0 || !line.wrongItemReason?.trim())
+    ) {
+      return receivingProblemCopy("wrong_item_details_missing");
+    }
+    if (line.extraQty > 0 && line.extraEvidence.length === 0) {
+      return receivingProblemCopy("extra_goods_found");
+    }
+  }
+  return null;
+}
+
+/**
+ * Receiving owns the trigger and completion fact; central Work only renders
+ * this projection. Ownership uses today's dated cover when present while Team
+ * supervision keeps the normal GRN Duty separately.
+ */
+export function receivingWorkItems(
+  register: ReceivingRegisterResult,
+  today: string,
+  holidays: readonly string[] = [...myHolidaySet()],
+): ReceivingRegisterWorkItem[] {
+  const authority = register.authority;
+  const owner = authority?.datedCover ?? authority?.normalGrnDuty ?? null;
+  const normalOwner = authority?.normalGrnDuty ?? null;
+  const datedCover = authority?.datedCover ?? null;
+  const out: ReceivingRegisterWorkItem[] = [];
+  for (const parent of register.parents) {
+    const active = parent.children.find((child) =>
+      child.status === "draft" || child.status === "returned" || child.status === "submitted",
+    );
+    const destination = `/operation?tab=receiving&po=${encodeURIComponent(parent.id)}${active ? `&receipt=${encodeURIComponent(active.id)}` : ""}`;
+    const base = {
+      sourceId: parent.id,
+      sessionId: active?.id ?? null,
+      dueIso: parent.receivingDate,
+      workingDaysLate: parent.receivingDate && today > parent.receivingDate
+        ? countWorkingDays(parent.receivingDate, today, { offDays: [0], holidays })
+        : 0,
+      destination,
+      owner,
+      normalOwner,
+      datedCover,
+    };
+    if (active?.status === "submitted") {
+      out.push({
+        ...base,
+        id: `receiving:${active.id}:review`,
+        kind: "review",
+        fact: "The warehouse count is ready",
+        action: `Check in ${parent.sourceNumber} from ${parent.supplier}`,
+        completionFact: "The same Receiving Session has a stored formal GRN number",
+      });
+      continue;
+    }
+    if (active?.status === "returned") {
+      const copy = receivingProblemCopy("count_needs_changes");
+      out.push({
+        ...base,
+        id: `receiving:${active.id}:returned`,
+        kind: "returned",
+        ...copy,
+        completionFact: "The same Receiving Session is corrected and resubmitted",
+      });
+      continue;
+    }
+    if (active?.status === "draft") {
+      const missing = missingSessionWork(active);
+      if (missing) {
+        out.push({
+          ...base,
+          id: `receiving:${active.id}:evidence`,
+          kind: "evidence",
+          ...missing,
+          completionFact: "The missing evidence is stored on the same Receiving Session",
+        });
+      }
+      continue;
+    }
+    if (
+      parent.pendingDeliveryQty > 0
+      && parent.receivingDate
+      && parent.receivingDate <= today
+    ) {
+      out.push({
+        ...base,
+        id: `receiving:${parent.id}:start`,
+        kind: "start",
+        fact: "The goods are due",
+        action: `Check in ${parent.sourceNumber} from ${parent.supplier}`,
+        completionFact: "A Receiving Session records the physical outcome and stored formal GRN",
+      });
+    }
+  }
+  return out;
 }

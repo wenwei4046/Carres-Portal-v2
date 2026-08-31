@@ -8,6 +8,7 @@ let requestedFilter: string | null | undefined;
 const createSession = vi.fn();
 
 const result: ReceivingRegisterResult = {
+  authority: null,
   rail: [
     { key: "late", label: "Late", count: 1 },
     { key: "2026-08-31", label: "2026-08-31", count: 0 },

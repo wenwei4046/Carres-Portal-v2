@@ -1155,6 +1155,7 @@ export {
 export {
   buildReceivingRegister,
   receivingDateRail,
+  receivingWorkItems,
   type ReceivingRegisterFilter,
   type ReceivingRegisterSourceLine,
   type ReceivingRegisterSource,
@@ -1166,6 +1167,9 @@ export {
   type ReceivingDateRailRow,
   type ReceivingRegisterInput,
   type ReceivingRegisterResult,
+  type ReceivingAuthorityPerson,
+  type ReceivingRegisterAuthority,
+  type ReceivingRegisterWorkItem,
 } from "./receiving-register";
 export {
   receivingSessionInputSchema,

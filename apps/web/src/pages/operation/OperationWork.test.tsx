@@ -21,7 +21,7 @@ import type {
   operationStockResponse,
   DeliveryPartnersListResponse,
 } from "@/lib/queries";
-import type { OpsStaffListResponse } from "@carres/shared";
+import type { OpsStaffListResponse, ReceivingRegisterResult } from "@carres/shared";
 
 let listState: {
   data: operationOrdersListResponse | undefined;
@@ -35,6 +35,8 @@ let settingsState: { data: undefined };
 let poDutyState: { data: { month: string; holder: { userId: string; email: string; name: string | null; assignedBy: string | null } | null } | undefined };
 let purchaseOrdersState: { data: { pos: unknown[] } | undefined; isLoading: boolean };
 let suppliersState: { data: { suppliers: Array<{ id: string; name: string }> } | undefined; isLoading: boolean };
+let receivingState: { data: ReceivingRegisterResult | undefined; isLoading: boolean };
+let manualState: { data: undefined; isLoading: boolean };
 let authState: { role: string; email: string | null };
 
 vi.mock("@/lib/queries", async () => {
@@ -49,6 +51,8 @@ vi.mock("@/lib/queries", async () => {
     useOperationPoDuty: () => poDutyState,
     useOperationPos: () => purchaseOrdersState,
     useOperationSuppliers: () => suppliersState,
+    useReceivingRegister: () => receivingState,
+    useManualPurchaseRegister: () => manualState,
   };
 });
 
@@ -153,6 +157,8 @@ beforeEach(() => {
   poDutyState = { data: undefined };
   purchaseOrdersState = { data: { pos: [] }, isLoading: false };
   suppliersState = { data: { suppliers: [] }, isLoading: false };
+  receivingState = { data: { parents: [], rail: [], authority: null }, isLoading: false };
+  manualState = { data: undefined, isLoading: false };
   authState = { role: "operation", email: "sha@carres.co" };
   vi.useFakeTimers();
   vi.setSystemTime(new Date(`${TODAY}T09:00:00`));
@@ -494,5 +500,54 @@ describe("OperationWork — owners resolve per RULE, not per order", () => {
     };
     wrap(<OperationWork />, "/operation?tab=work&scope=team");
     expect(screen.queryByTestId("work-row-SO-1303-ask_delivery_date")).toBeNull();
+  });
+
+  it("puts due Receiving work in today's cover My Work while Team Work stays under normal GRN Duty", () => {
+    receivingState.data = {
+      authority: {
+        normalGrnDuty: { userId: OTHER_UID, name: "Yu Jun" },
+        datedCover: { userId: OP_UID, name: "Shasha" },
+      },
+      rail: [],
+      parents: [{
+        id: "PO-7001",
+        sourceKind: "purchase_order",
+        sourceNumber: "PO-7001",
+        sourceVersion: 1,
+        grnNumber: null,
+        poIssuedAt: "2026-07-20T02:00:00Z",
+        supplier: "Ohana",
+        deliverTo: "Carres Klang",
+        poDeliveryDate: TODAY,
+        supplierDeliveryDate: TODAY,
+        sameAsPo: true,
+        receivingDate: TODAY,
+        goodsReceivedAt: null,
+        orderQty: 2,
+        receivedQty: 0,
+        damagedQty: 0,
+        wrongItemQty: 0,
+        extraQty: 0,
+        pendingDeliveryQty: 2,
+        supplierDoNo: null,
+        unitIds: [],
+        lines: [{ id: "line-7001", sku: "MS01-K", orderQty: 2, receivedQty: 0 }],
+        children: [],
+      }],
+    };
+    wrap(<OperationWork />);
+
+    const row = screen.getByTestId("work-row-PO-7001-receiving_start");
+    expect(row).toHaveTextContent("The goods are due on Mon, 27 Jul");
+    expect(row).toHaveTextContent("Check in PO-7001 from Ohana");
+    expect(screen.getByTestId("work-cover-PO-7001-receiving_start"))
+      .toHaveTextContent("Cover · Shasha");
+    fireEvent.click(row);
+    expect(navigateSpy).toHaveBeenCalledWith("/operation?tab=receiving&po=PO-7001");
+
+    fireEvent.click(screen.getByTestId("work-view-team"));
+    const normalDuty = screen.getByTestId(`work-owner-group-${OTHER_UID}`);
+    expect(normalDuty).toHaveTextContent("Yu Jun");
+    expect(normalDuty.querySelector('[data-testid="work-row-PO-7001-receiving_start"]')).toBeTruthy();
   });
 });

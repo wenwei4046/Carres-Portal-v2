@@ -13,6 +13,8 @@ import {
   type ReceivingRegisterSource,
   type ReceivingRegisterPromise,
   type ReceivingRegisterSession,
+  type ReceivingRegisterAuthority,
+  type WarehouseReceiptStatus,
   type WarehouseReceiptLine,
 } from "@carres/shared";
 import { requireOperation } from "../../lib/auth-guards";
@@ -81,10 +83,10 @@ function registerLine(raw: Record<string, unknown>): ReceivingLineInput {
       wrongItemQty: Number(raw.wrongItemQty ?? 0),
       extraQty: Number(raw.extraQty ?? 0),
       unitIds: Array.isArray(raw.unitIds) ? raw.unitIds.map(String) : [],
-      damagedPhotos: [],
-      wrongItemPhotos: [],
-      extraEvidence: [],
-      wrongItemReason: null,
+      damagedPhotos: Array.isArray(raw.damagedPhotos) ? raw.damagedPhotos.map(String) : [],
+      wrongItemPhotos: Array.isArray(raw.wrongItemPhotos) ? raw.wrongItemPhotos.map(String) : [],
+      extraEvidence: Array.isArray(raw.extraEvidence) ? raw.extraEvidence.map(String) : [],
+      wrongItemReason: typeof raw.wrongItemReason === "string" ? raw.wrongItemReason : null,
     };
   }
   return historicalReceivingLineInput(raw as unknown as WarehouseReceiptLine);
@@ -92,6 +94,42 @@ function registerLine(raw: Record<string, unknown>): ReceivingLineInput {
 
 warehouseReceiptsRouter.get("/register", requireOperation, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
+  const today = todayInMalaysia();
+  let authority: ReceivingRegisterAuthority | null = null;
+  const actorResult = await sb.rpc("receiving_grn_actor", { p_business_date: today });
+  if (actorResult.error) {
+    const mapped = mapPgError(actorResult.error);
+    return c.json(mapped.body, mapped.status);
+  }
+  const actor = (actorResult.data ?? {}) as {
+    normal_user_id?: string | null;
+    cover_user_id?: string | null;
+  };
+  const authorityIds = [actor.normal_user_id, actor.cover_user_id]
+    .filter((id): id is string => Boolean(id));
+  if (authorityIds.length > 0) {
+    const users = await sb.from("app_users")
+      .select("id, name, email")
+      .in("id", authorityIds);
+    if (users.error) {
+      const mapped = mapPgError(users.error);
+      return c.json(mapped.body, mapped.status);
+    }
+    const names = new Map(
+      (users.data ?? []).map((user) => [
+        String(user.id),
+        String(user.name ?? "").trim() || String(user.email ?? "").trim(),
+      ]),
+    );
+    const person = (userId: string | null | undefined) => {
+      const name = userId ? names.get(userId) : null;
+      return userId && name ? { userId, name } : null;
+    };
+    authority = {
+      normalGrnDuty: person(actor.normal_user_id),
+      datedCover: person(actor.cover_user_id),
+    };
+  }
   const exactSource = c.req.query("source")?.trim() || null;
   let sourceQuery = sb.from("purchase_orders")
     .select("id, version, placed_at, po_delivery_date, supplier_id, destination_id, status, suppliers(name)");
@@ -110,9 +148,10 @@ warehouseReceiptsRouter.get("/register", requireOperation, async (c) => {
   const sourceIds = sourceRows.data.map((row) => String(row.id));
   if (sourceIds.length === 0) {
     return c.json(buildReceivingRegister({
-      today: todayInMalaysia(),
+      today,
       filter: c.req.query("date") as ReceivingRegisterFilter | undefined,
       sources: [], supplierPromises: [], sessions: [],
+      authority,
     }));
   }
 
@@ -139,7 +178,7 @@ warehouseReceiptsRouter.get("/register", requireOperation, async (c) => {
     ),
     readRegisterRows<Record<string, unknown>>(
       sb.from("warehouse_receipts")
-        .select("id, source_id, po_id, grn_number, goods_received_timestamp, goods_received_at, do_number, lines")
+        .select("id, source_id, po_id, status, grn_number, goods_received_timestamp, goods_received_at, do_number, do_file_path, return_reason, lines")
         .in("source_id", sourceIds)
         .order("goods_received_timestamp", { ascending: false, nullsFirst: false }),
     ),
@@ -189,11 +228,16 @@ warehouseReceiptsRouter.get("/register", requireOperation, async (c) => {
   const sessions: ReceivingRegisterSession[] = sessionRows.data.map((row) => ({
     id: String(row.id),
     sourceId: String(row.source_id ?? row.po_id),
+    status: (typeof row.status === "string"
+      ? row.status
+      : row.grn_number ? "posted" : "draft") as WarehouseReceiptStatus,
     grnNumber: typeof row.grn_number === "string" ? row.grn_number : null,
     goodsReceivedAt: typeof row.goods_received_timestamp === "string"
       ? row.goods_received_timestamp
       : typeof row.goods_received_at === "string" ? row.goods_received_at : null,
     supplierDoNo: typeof row.do_number === "string" ? row.do_number : null,
+    signedDoPath: typeof row.do_file_path === "string" ? row.do_file_path : null,
+    returnReason: typeof row.return_reason === "string" ? row.return_reason : null,
     lines: (Array.isArray(row.lines) ? row.lines : []).map((line) => {
       const value = registerLine(line as Record<string, unknown>);
       return {
@@ -204,15 +248,20 @@ warehouseReceiptsRouter.get("/register", requireOperation, async (c) => {
         wrongItemQty: value.wrongItemQty,
         extraQty: value.extraQty,
         unitIds: value.unitIds,
+        damagedPhotos: value.damagedPhotos,
+        wrongItemPhotos: value.wrongItemPhotos,
+        extraEvidence: value.extraEvidence,
+        wrongItemReason: value.wrongItemReason,
       };
     }),
   }));
   return c.json(buildReceivingRegister({
-    today: todayInMalaysia(),
+    today,
     filter: c.req.query("date") as ReceivingRegisterFilter | undefined,
     sources,
     supplierPromises,
     sessions,
+    authority,
   }));
 });
 

@@ -36,11 +36,13 @@ import {
   purchaseOrderIdentity,
   purchaseOrderRegisterFacts,
   purchaseOrderWork,
+  receivingWorkItems,
   workItemsForOrder,
   type OpsStaffMember,
   type WorkItem,
 } from "@carres/shared";
 import { displayCustomerName } from "@/lib/customer-name";
+import { fmtDate } from "@/lib/fmt-date";
 import { personLabel } from "@/lib/staff-avatar";
 import {
   useDeliveryPartners,
@@ -52,6 +54,7 @@ import {
   useOperationStock,
   useOperationSuppliers,
   usePurchasingSettings,
+  useReceivingRegister,
 } from "@/lib/queries";
 import {
   logisticStateOf,
@@ -71,6 +74,11 @@ export interface WorkRow extends WorkItem {
    *  the PO-duty holder for Purchasing's work, else the PIC. Null for a named
    *  non-account owner (a salesperson) and for a duty word. */
   ownerId: string | null;
+  /** Normal duty remains the Team supervision group when today's dated cover
+   * receives the action in My Work. */
+  teamOwnerId?: string | null;
+  teamOwnerName?: string | null;
+  actingCoverName?: string | null;
   /** Exact module object door. Work never owns the completion form. */
   href: string;
 }
@@ -107,6 +115,7 @@ export function useOpenWorkSet(): OpenWorkSet {
   const poDutyQ = useOperationPoDuty();
   const purchaseOrdersQ = useOperationPos({ status: "all" });
   const suppliersQ = useOperationSuppliers();
+  const receivingQ = useReceivingRegister();
 
   const orders = useMemo(() => ordersQ.data?.orders ?? [], [ordersQ.data]);
   const staff = useMemo(() => staffQ.data?.staff ?? [], [staffQ.data]);
@@ -132,7 +141,7 @@ export function useOpenWorkSet(): OpenWorkSet {
     return m;
   }, [stockQ.data]);
 
-  const poDuty = useMemo(() => {
+  const rosterPoDuty = useMemo(() => {
     const holder = poDutyQ.data?.holder;
     if (!holder) return null;
     return {
@@ -140,6 +149,9 @@ export function useOpenWorkSet(): OpenWorkSet {
       name: personLabel(holder.name, holder.email),
     };
   }, [poDutyQ.data]);
+  const normalPoDuty = manualQ.data?.currentPoDuty ?? rosterPoDuty;
+  const datedPoCover = manualQ.data?.actingPoDuty ?? null;
+  const poDuty = datedPoCover ?? normalPoDuty;
 
   const supplierNameById = useMemo(
     () => new Map((suppliersQ.data?.suppliers ?? []).map((supplier) => [supplier.id, supplier.name])),
@@ -221,6 +233,13 @@ export function useOpenWorkSet(): OpenWorkSet {
              for Purchasing's work, else the PIC; never the PIC borrowed for
              another rule's item. */
           ownerId: it.ownerUserId,
+          ...(it.module === "purchasing" && normalPoDuty
+            ? {
+                teamOwnerId: normalPoDuty.userId,
+                teamOwnerName: normalPoDuty.name,
+                actingCoverName: datedPoCover?.name ?? null,
+              }
+            : {}),
           href: `/operation/orders/so/${o.id}`,
         });
       }
@@ -278,13 +297,17 @@ export function useOpenWorkSet(): OpenWorkSet {
         line: work.problem,
         customer: supplierName,
         ownerId: poDuty?.userId ?? null,
+        teamOwnerId: normalPoDuty?.userId ?? null,
+        teamOwnerName: normalPoDuty?.name ?? null,
+        actingCoverName: datedPoCover?.name ?? null,
         href: `/operation/procurement?po=${encodeURIComponent(po.id)}`,
       });
     }
     return out;
   }, [
     orders, availableBySku, staffById, partnerNameById,
-    holidayOpts, queueLeads, today, poDuty, purchaseOrdersQ.data, supplierNameById,
+    holidayOpts, queueLeads, today, poDuty, normalPoDuty, datedPoCover,
+    purchaseOrdersQ.data, supplierNameById,
   ]);
 
   /* ── The Manual Purchase actions (Card 06 §7) ──────────────────────────
@@ -364,23 +387,59 @@ export function useOpenWorkSet(): OpenWorkSet {
           line: it.action,
           customer: null,
           ownerId: it.ownerUserId,
+          ...(it.ruleKey === "manual_purchase.issue_po" && normalPoDuty
+            ? {
+                teamOwnerId: normalPoDuty.userId,
+                teamOwnerName: normalPoDuty.name,
+                actingCoverName: datedPoCover?.name ?? null,
+              }
+            : {}),
           href: `/operation?tab=manual-purchase&mpr=${encodeURIComponent(r.id)}`,
         });
       }
     }
     return out;
-  }, [manualQ.data, poDuty, holidayOpts, today]);
+  }, [manualQ.data, poDuty, normalPoDuty, datedPoCover, holidayOpts, today]);
+
+  const receivingItems = useMemo(() => {
+    if (!receivingQ.data) return [] as WorkRow[];
+    return receivingWorkItems(receivingQ.data, today).map((item): WorkRow => ({
+      ruleKey: `receiving_${item.kind}`,
+      module: "receiving",
+      soRef: item.sourceId,
+      orderId: item.sessionId ?? item.sourceId,
+      action: item.action,
+      ownerName: item.owner?.name ?? null,
+      ownerUserId: item.owner?.userId ?? null,
+      ...(item.owner ? {} : { ownerDuty: "GRN Duty" }),
+      tone: item.workingDaysLate > 0 ? "danger" : "warning",
+      locked: false,
+      broken: item.kind === "evidence" || item.kind === "returned",
+      dueIso: item.dueIso,
+      workingDaysLate: item.workingDaysLate,
+      line: item.kind === "start" && item.dueIso
+        ? `${item.fact} on ${fmtDate(item.dueIso)}`
+        : item.fact,
+      customer: null,
+      ownerId: item.owner?.userId ?? null,
+      teamOwnerId: item.normalOwner?.userId ?? null,
+      teamOwnerName: item.normalOwner?.name ?? null,
+      actingCoverName: item.datedCover?.name ?? null,
+      href: item.destination,
+    }));
+  }, [receivingQ.data, today]);
 
   const allItems = useMemo(
-    () => [...items, ...manualItems],
-    [items, manualItems],
+    () => [...items, ...manualItems, ...receivingItems],
+    [items, manualItems, receivingItems],
   );
 
   return {
     items: allItems,
     staff,
     staffById,
-    loading: ordersQ.isLoading || staffQ.isLoading || purchaseOrdersQ.isLoading || suppliersQ.isLoading,
+    loading: ordersQ.isLoading || staffQ.isLoading || purchaseOrdersQ.isLoading
+      || suppliersQ.isLoading || receivingQ.isLoading,
   };
 }
 
@@ -400,10 +459,11 @@ export function ownerWorkloads(
   const open = new Map<string, number>();
   const overdue = new Map<string, number>();
   for (const i of items) {
-    if (!i.ownerId) continue;
-    open.set(i.ownerId, (open.get(i.ownerId) ?? 0) + 1);
+    const ownerId = i.teamOwnerId ?? i.ownerId;
+    if (!ownerId) continue;
+    open.set(ownerId, (open.get(ownerId) ?? 0) + 1);
     if (i.workingDaysLate > 0) {
-      overdue.set(i.ownerId, (overdue.get(i.ownerId) ?? 0) + 1);
+      overdue.set(ownerId, (overdue.get(ownerId) ?? 0) + 1);
     }
   }
   return [...staff]
