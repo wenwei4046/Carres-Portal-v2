@@ -4,12 +4,15 @@ import type { ReceivingRegisterParent } from "@carres/shared";
 import ReceivingRegister from "./ReceivingRegister";
 
 vi.mock("@/components/register/DataGrid", () => ({
-  DataGrid: ({ rows, columns, expandable, toolbarStart, statusSummary, appearance, stickyIdentity }: any) => (
+  DataGrid: ({ rows, columns, expandable, toolbarStart, statusSummary, appearance, stickyIdentity, selectable, selectionSummary, selectionPrimary }: any) => (
     <div data-testid="receiving-data-grid" data-appearance={appearance} data-sticky={String(Boolean(stickyIdentity))}>
-      <div data-testid="receiving-toolbar">{toolbarStart}</div>
+      <div data-testid="receiving-toolbar">
+        {selectable.selectedKeys.size > 0 ? <><span>{selectionSummary(selectable.selectedKeys.size)}</span>{selectionPrimary}</> : toolbarStart}
+      </div>
       <div data-testid="receiving-columns">{columns.filter((c: any) => !c.defaultHidden).map((c: any) => c.label).join(" | ")}</div>
       {rows.map((row: any) => (
         <div key={row.id} data-testid={`receiving-parent-${row.id}`}>
+          <button type="button" aria-label={`Select ${row.sourceNumber}`} onClick={() => selectable.onToggle(row.id)}>Select</button>
           {columns.map((column: any) => <div key={column.key}>{column.accessor(row)}</div>)}
           {expandable?.renderExpansion(row)}
         </div>
@@ -42,6 +45,7 @@ const parents: ReceivingRegisterParent[] = [
     pendingDeliveryQty: 3,
     supplierDoNo: null,
     unitIds: [],
+    lines: [{ id: "11111111-1111-1111-1111-111111111111", sku: "MAT-K-001", orderQty: 5, receivedQty: 2 }],
     children: [
       {
         id: "receipt-1",
@@ -87,6 +91,7 @@ const parents: ReceivingRegisterParent[] = [
     pendingDeliveryQty: 3,
     supplierDoNo: null,
     unitIds: [],
+    lines: [{ id: "22222222-2222-2222-2222-222222222222", sku: "SOFA-001", orderQty: 3, receivedQty: 0 }],
     children: [],
   },
 ];
@@ -123,7 +128,28 @@ describe("ReceivingRegister", () => {
     const onStartReceiving = vi.fn();
     render(<ReceivingRegister parents={parents} loading={false} onOpenSession={vi.fn()} onStartReceiving={onStartReceiving} />);
 
-    fireEvent.click(within(screen.getByTestId("receiving-parent-PO-20260831-0002")).getByRole("button", { name: "Start Receiving" }));
+    expect(within(screen.getByTestId("receiving-parent-PO-20260831-0002")).queryByRole("button", { name: "Start Receiving" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Select PO-20260831-0002" }));
+    expect(screen.getByTestId("receiving-toolbar")).toHaveTextContent("1 delivery balance selected");
+    fireEvent.click(within(screen.getByTestId("receiving-toolbar")).getByRole("button", { name: "Start Receiving" }));
     expect(onStartReceiving).toHaveBeenCalledWith("PO-20260831-0002", 1);
+  });
+
+  it("opens an existing Draft from the same selected Work Toolbar state", () => {
+    const onOpenSession = vi.fn();
+    const withDraft: ReceivingRegisterParent[] = [{
+      ...parents[1],
+      children: [{
+        ...parents[0].children[0],
+        id: "receipt-draft",
+        grnNumber: null,
+        sourceNumber: parents[1].sourceNumber,
+      }],
+    }];
+    render(<ReceivingRegister parents={withDraft} loading={false} onOpenSession={onOpenSession} onStartReceiving={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Select PO-20260831-0002" }));
+    fireEvent.click(within(screen.getByTestId("receiving-toolbar")).getByRole("button", { name: "Open Receiving" }));
+    expect(onOpenSession).toHaveBeenCalledWith("receipt-draft", "PO-20260831-0002");
   });
 });

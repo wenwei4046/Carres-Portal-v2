@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import type { ReceivingRegisterFilter } from "@carres/shared";
-import { useReceivingRegister } from "@/lib/queries";
+import type { ReceivingRegisterFilter, ReceivingSessionInput } from "@carres/shared";
+import { useCreateReceivingSessionMutation, useReceivingRegister } from "@/lib/queries";
 import PurchasingTabs from "./PurchasingTabs";
+import ReceivingWorkspace from "./components/ReceivingWorkspace";
 import ReceivingDateRail from "./receiving/ReceivingDateRail";
 import ReceivingRegister from "./receiving/ReceivingRegister";
 
@@ -23,9 +24,13 @@ function filterFrom(params: URLSearchParams): ReceivingRegisterFilter | null {
 export default function OperationReceiving() {
   const [params, setParams] = useSearchParams();
   const [railOpen, setRailOpen] = useState(true);
-  const filter = filterFrom(params);
-  const registerQ = useReceivingRegister(filter);
+  const sourceId = params.get("po");
+  const receiptId = params.get("receipt");
+  const filter = sourceId ? null : filterFrom(params);
+  const registerQ = useReceivingRegister(filter, undefined, sourceId);
   const result = registerQ.data;
+  const selectedParent = result?.parents.find((parent) => parent.id === sourceId) ?? null;
+  const createSession = useCreateReceivingSessionMutation();
 
   const setFilter = (next: ReceivingRegisterFilter) => {
     setParams((previous) => {
@@ -48,15 +53,60 @@ export default function OperationReceiving() {
   };
 
   const startReceiving = (sourceId: string, sourceVersion: number) => {
-    setParams((previous) => {
-      const copy = new URLSearchParams(previous);
-      copy.set("po", sourceId);
-      copy.set("sourceVersion", String(sourceVersion));
-      copy.set("receiving", "new");
-      copy.delete("receipt");
-      return copy;
+    const source = result?.parents.find((parent) => parent.id === sourceId);
+    if (!source) return;
+    const draft: ReceivingSessionInput = {
+      sourceKind: source.sourceKind,
+      sourceId,
+      expectedVersion: sourceVersion,
+      supplierDoNo: "",
+      signedDoPath: "",
+      goodsReceivedAt: "",
+      note: null,
+      lines: source.lines.map((line) => ({
+        poLineId: line.id,
+        sku: line.sku,
+        receivedQty: 0,
+        damagedQty: 0,
+        wrongItemQty: 0,
+        extraQty: 0,
+        unitIds: [],
+        damagedPhotos: [],
+        wrongItemPhotos: [],
+        extraEvidence: [],
+        wrongItemReason: null,
+      })),
+    };
+    createSession.mutate(draft, {
+      onSuccess: (created) => {
+        setParams((previous) => {
+          const copy = new URLSearchParams(previous);
+          copy.set("po", sourceId);
+          copy.set("receipt", created.receipt_id);
+          copy.delete("date");
+          return copy;
+        });
+      },
     });
   };
+
+  const backToRegister = () => setParams((previous) => {
+    const copy = new URLSearchParams(previous);
+    copy.delete("po");
+    copy.delete("receipt");
+    return copy;
+  });
+
+  if (receiptId && selectedParent) {
+    return (
+      <div className="flex h-full min-h-0 flex-col bg-kit-canvas">
+        <PurchasingTabs />
+        <div className="min-h-0 flex-1">
+          <ReceivingWorkspace parent={selectedParent} receiptId={receiptId} onBack={backToRegister} />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-kit-canvas" data-testid="receiving-page">
@@ -90,13 +140,20 @@ export default function OperationReceiving() {
               </button>
             </div>
           ) : (
-            <ReceivingRegister
-              parents={result?.parents ?? []}
-              loading={registerQ.isLoading}
-              onOpenSession={openSession}
-              onStartReceiving={startReceiving}
-              onShowFilters={railOpen ? undefined : () => setRailOpen(true)}
-            />
+            <>
+              {createSession.error ? (
+                <div className="border-l-2 border-kit-red-9 bg-white px-3 py-2 text-body text-kit-red-11">
+                  {createSession.error.message}
+                </div>
+              ) : null}
+              <ReceivingRegister
+                parents={result?.parents ?? []}
+                loading={registerQ.isLoading}
+                onOpenSession={openSession}
+                onStartReceiving={startReceiving}
+                onShowFilters={railOpen ? undefined : () => setRailOpen(true)}
+              />
+            </>
           )}
         </main>
       </div>

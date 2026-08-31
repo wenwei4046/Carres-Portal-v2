@@ -297,6 +297,7 @@ import {
   type WarehouseSubmitReceiptInput,
   type ReceivingRegisterFilter,
   type ReceivingRegisterResult,
+  type ReceivingSessionInput,
   type StockRegisterUnit,
   // 0379 — Delivery's own arrangement (owner correction 2026-08-24).
   type DeliveryArrangementRow,
@@ -511,8 +512,8 @@ export const qk = {
      *  and this queue all move together. */
     warehouseReceipts: (status: string) =>
       ["operation", "warehouse-receipts", status] as const,
-    receivingRegister: (filter?: ReceivingRegisterFilter | null) =>
-      ["operation", "receiving", "register", filter ?? "all"] as const,
+    receivingRegister: (filter?: ReceivingRegisterFilter | null, sourceId?: string | null) =>
+      ["operation", "receiving", "register", filter ?? "all", sourceId ?? "all-sources"] as const,
     /** Slice B — one PO's Receiving Sessions + their event ledger. The
      *  Workspace's Summary and Activity both read this ONE call, so the two
      *  sections can never describe the same delivery differently. */
@@ -4143,15 +4144,93 @@ export function useOperationWarehouseReceipts(
 export function useReceivingRegister(
   filter?: ReceivingRegisterFilter | null,
   opts?: Partial<UseQueryOptions<ReceivingRegisterResult>>,
+  sourceId?: string | null,
 ) {
-  const query = filter ? `?date=${encodeURIComponent(filter)}` : "";
+  const search = new URLSearchParams();
+  if (filter) search.set("date", filter);
+  if (sourceId) search.set("source", sourceId);
+  const query = search.size ? `?${search.toString()}` : "";
   return useQuery({
-    queryKey: qk.operation.receivingRegister(filter),
+    queryKey: qk.operation.receivingRegister(filter, sourceId),
     queryFn: () => apiFetch<ReceivingRegisterResult>(
       `/api/operation/warehouse-receipts/register${query}`,
     ),
     staleTime: 30_000,
     ...opts,
+  });
+}
+
+export interface ReceivingMutationResult {
+  receipt_id: string;
+  po_id?: string;
+  status: string;
+  lock_version: number;
+  grn_number?: string | null;
+  grn_posting_date?: string | null;
+  idempotent?: boolean;
+}
+
+function invalidateReceivingSession(qc: ReturnType<typeof useQueryClient>, poId: string) {
+  return Promise.all([
+    qc.invalidateQueries({ queryKey: ["operation", "receiving"] }),
+    qc.invalidateQueries({ queryKey: qk.operation.poReceiving(poId) }),
+    qc.invalidateQueries({ queryKey: ["operation", "pos"] }),
+    qc.invalidateQueries({ queryKey: ["operation", "work"] }),
+  ]);
+}
+
+export function useCreateReceivingSessionMutation(
+  opts?: Partial<UseMutationOptions<ReceivingMutationResult, ApiError, ReceivingSessionInput>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<ReceivingMutationResult, ApiError, ReceivingSessionInput>({
+    mutationFn: (session) => apiFetch<ReceivingMutationResult>("/api/operation/warehouse-receipts", {
+      method: "POST",
+      body: JSON.stringify(session),
+    }),
+    ...opts,
+    onSuccess: async (...args) => {
+      await invalidateReceivingSession(qc, args[1].sourceId);
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+export function useSaveReceivingSessionMutation(
+  poId: string,
+  receiptId: string,
+  opts?: Partial<UseMutationOptions<ReceivingMutationResult, ApiError, { expectedVersion: number; session: ReceivingSessionInput }>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<ReceivingMutationResult, ApiError, { expectedVersion: number; session: ReceivingSessionInput }>({
+    mutationFn: (input) => apiFetch<ReceivingMutationResult>(`/api/operation/warehouse-receipts/${receiptId}`, {
+      method: "PATCH",
+      body: JSON.stringify(input),
+    }),
+    ...opts,
+    onSuccess: async (...args) => {
+      await invalidateReceivingSession(qc, poId);
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+export function useSubmitReceivingSessionMutation(
+  poId: string,
+  receiptId: string,
+  opts?: Partial<UseMutationOptions<ReceivingMutationResult, ApiError, { expectedVersion: number }>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<ReceivingMutationResult, ApiError, { expectedVersion: number }>({
+    mutationFn: (input) => apiFetch<ReceivingMutationResult>(`/api/operation/warehouse-receipts/${receiptId}/submit`, {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
+    ...opts,
+    onSuccess: async (...args) => {
+      await invalidateReceivingSession(qc, poId);
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
   });
 }
 
@@ -7571,29 +7650,52 @@ export function useRecordBalanceDateMutation(
 
 /** One line of a stored Receiving Session — the DELTA this delivery brought. */
 export interface ReceivingSessionLine {
-  id: string;
+  id?: string;
+  poLineId?: string;
   sku: string;
-  received_now: number;
-  damaged_qty: number;
-  wrong_item_qty: number;
-  wrong_item_claim_type: string | null;
+  received_now?: number;
+  damaged_qty?: number;
+  wrong_item_qty?: number;
+  wrong_item_claim_type?: string | null;
+  receivedQty?: number;
+  damagedQty?: number;
+  wrongItemQty?: number;
+  extraQty?: number;
+  unitIds?: string[];
+  damagedPhotos?: string[];
+  wrongItemPhotos?: string[];
+  extraEvidence?: string[];
+  wrongItemReason?: string | null;
 }
 
 /** A Receiving Session as the Workspace reads it. */
 export interface ReceivingSession {
   id: string;
   po_id: string;
+  source_kind?: "purchase_order" | "consignment_order";
+  source_id?: string;
+  source_version?: number;
+  source_snapshot?: Record<string, unknown>;
+  destination_snapshot?: Record<string, unknown>;
+  supplier_snapshot?: Record<string, unknown>;
   do_number: string | null;
   do_file_path: string | null;
   note: string | null;
   lines: ReceivingSessionLine[];
-  status: "draft" | "submitted" | "returned" | "posted" | "voided";
+  status: "draft" | "submitted" | "returned" | "posted" | "amended" | "voided";
+  lock_version?: number;
   submitted_from: "office" | "warehouse";
   goods_received_at: string;
+  goods_received_timestamp?: string | null;
+  grn_number?: string | null;
+  grn_posting_date?: string | null;
   submitted_at: string | null;
   posted_at: string | null;
   posted_by_name: string | null;
   submitted_by_name: string | null;
+  normal_grn_duty_name?: string | null;
+  grn_cover_name?: string | null;
+  post_authority?: "grn_duty" | "grn_duty_cover" | "operations_superuser" | null;
   return_reason: string | null;
 }
 

@@ -486,6 +486,30 @@ describe("governed Receiving Session mutation doors", () => {
     });
   });
 
+  it("creates the Draft immediately before DO evidence and the physical count exist", async () => {
+    const draft = {
+      ...SESSION_INPUT,
+      supplierDoNo: "",
+      signedDoPath: "",
+      goodsReceivedAt: "",
+      lines: SESSION_INPUT.lines.map((line) => ({
+        ...line,
+        receivedQty: 0,
+        unitIds: [],
+      })),
+    };
+    const sb = makeSb(opsTables(), { data: { receipt_id: RECEIPT, status: "draft", lock_version: 1 } });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await req("/api/operation/warehouse-receipts", "POST", await makeJwt("operation"), draft);
+    expect(res.status).toBe(201);
+    expect(sb.rpc).toHaveBeenCalledWith("save_receiving_session", {
+      p_receipt_id: null,
+      p_expected_version: 0,
+      p_payload: draft,
+    });
+  });
+
   it("saves and submits the same session with expectedVersion on every mutation", async () => {
     const sb = makeSb(opsTables(), { data: { receipt_id: RECEIPT } });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

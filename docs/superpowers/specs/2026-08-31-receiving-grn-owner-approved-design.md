@@ -72,6 +72,12 @@ stacks; it never becomes a different mobile information model.
 The full Register has no enclosing four-sided outer border. The toolbar bottom divider, table grid
 lines and footer top divider preserve the governed Register structure.
 
+The left rail contains Receiving business facts only: no generic `Filters`, local Work queue or
+permanent duty panel. `Start Receiving` and `Open Receiving` appear only after selecting the exact
+delivery balance and replace the same top Work Toolbar row; they never sit in a row cell or a
+bottom action bar. Export and Download remain separate outputs. My Work / Team Work is the only
+complete queue and deep-links the exact PO / Receiving Session with a stable action identity.
+
 ## 4 · Register and date rail
 
 The Register parent is one open PO/CO delivery balance. Each physical Receiving Session or posted

@@ -26,9 +26,12 @@ export const receivingSessionInputSchema = z
     sourceKind: z.enum(["purchase_order", "consignment_order"]),
     sourceId: z.string().trim().min(1).max(100),
     expectedVersion: z.number().int().positive(),
-    supplierDoNo: z.string().trim().min(3).max(64),
-    signedDoPath: z.string().trim().min(1).max(500),
-    goodsReceivedAt: z.string().datetime({ offset: true }),
+    // A Draft is created before the pallet is counted. Empty strings are the
+    // explicit, serialisable "not recorded yet" values; submit/post enforce
+    // the complete evidence gate in the one database authority.
+    supplierDoNo: z.union([z.literal(""), z.string().trim().min(3).max(64)]),
+    signedDoPath: z.union([z.literal(""), z.string().trim().min(1).max(500)]),
+    goodsReceivedAt: z.union([z.literal(""), z.string().datetime({ offset: true })]),
     note: z.string().trim().max(500).nullable(),
     lines: z
       .array(

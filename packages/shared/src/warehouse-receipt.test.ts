@@ -492,6 +492,21 @@ describe("Receiving session wire contract", () => {
     expect(receivingSessionInputSchema.parse(input)).toEqual(input);
   });
 
+  it("accepts an incomplete persistent Draft before evidence is collected", () => {
+    const draft = {
+      ...input,
+      supplierDoNo: "",
+      signedDoPath: "",
+      goodsReceivedAt: "",
+      lines: input.lines.map((line) => ({
+        ...line,
+        receivedQty: 0,
+        unitIds: [],
+      })),
+    };
+    expect(receivingSessionInputSchema.parse(draft)).toEqual(draft);
+  });
+
   it("refuses the historical receivedNow spelling at the new door", () => {
     expect(
       receivingSessionInputSchema.safeParse({

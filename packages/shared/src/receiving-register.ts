@@ -89,6 +89,8 @@ export interface ReceivingRegisterParent {
   pendingDeliveryQty: number;
   supplierDoNo: null;
   unitIds: string[];
+  /** Frozen source-line keys needed to start the one persistent session. */
+  lines: ReceivingRegisterSourceLine[];
   children: ReceivingRegisterChild[];
 }
 
@@ -226,6 +228,7 @@ export function buildReceivingRegister(input: ReceivingRegisterInput): Receiving
       pendingDeliveryQty,
       supplierDoNo: null,
       unitIds: [],
+      lines: source.lines.map((line) => ({ ...line })),
       children,
     };
   });

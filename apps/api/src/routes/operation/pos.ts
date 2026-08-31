@@ -1545,7 +1545,7 @@ operationPosRouter.get("/:id/receiving", requireOperation, async (c) => {
   const { data: rows, error } = await sb
     .from("warehouse_receipts")
     .select(
-      "id, po_id, warehouse_id, do_number, do_file_path, note, lines, status, submitted_from, goods_received_at, grn_number, submitted_by, submitted_at, posted_by, posted_at, return_reason",
+      "id, po_id, warehouse_id, source_kind, source_id, source_version, source_snapshot, destination_snapshot, supplier_snapshot, do_number, do_file_path, note, lines, status, lock_version, submitted_from, goods_received_at, goods_received_timestamp, grn_number, grn_posting_date, submitted_by, submitted_at, posted_by, posted_at, normal_grn_duty_user_id, grn_cover_user_id, post_authority, return_reason",
     )
     .eq("po_id", poId)
     .order("goods_received_at", { ascending: false })
@@ -1572,7 +1572,12 @@ operationPosRouter.get("/:id/receiving", requireOperation, async (c) => {
   const userIds = [
     ...new Set(
       [
-        ...sessions.flatMap((s) => [s.submitted_by, s.posted_by]),
+        ...sessions.flatMap((s) => [
+          s.submitted_by,
+          s.posted_by,
+          s.normal_grn_duty_user_id,
+          s.grn_cover_user_id,
+        ]),
         ...events.map((e) => e.actor_id),
       ].filter((v): v is string => typeof v === "string" && v.length > 0),
     ),
@@ -1592,6 +1597,12 @@ operationPosRouter.get("/:id/receiving", requireOperation, async (c) => {
       ...s,
       posted_by_name: s.posted_by
         ? (userNames.get(s.posted_by as string) ?? null)
+        : null,
+      normal_grn_duty_name: s.normal_grn_duty_user_id
+        ? (userNames.get(s.normal_grn_duty_user_id as string) ?? null)
+        : null,
+      grn_cover_name: s.grn_cover_user_id
+        ? (userNames.get(s.grn_cover_user_id as string) ?? null)
         : null,
       submitted_by_name: s.submitted_by
         ? (userNames.get(s.submitted_by as string) ?? null)

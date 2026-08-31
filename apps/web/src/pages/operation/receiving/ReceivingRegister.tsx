@@ -1,4 +1,4 @@
-import { useMemo, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import type {
   ReceivingRegisterChild,
   ReceivingRegisterParent,
@@ -10,7 +10,7 @@ import {
 import { fmtDateShort } from "@/lib/fmt-date";
 
 const ACTION =
-  "inline-flex h-7 items-center rounded-full bg-kit-blue-9 px-3 text-meta font-semibold text-white hover:opacity-90";
+  "inline-flex h-7 items-center rounded-control bg-kit-blue-9 px-3 text-meta font-semibold text-white hover:opacity-90";
 const DOCUMENT_ACTION =
   "font-mono font-semibold text-kit-blue-11 underline decoration-kit-blue-6 underline-offset-2 hover:text-kit-blue-12";
 
@@ -86,6 +86,9 @@ export default function ReceivingRegister({
   onStartReceiving: (sourceId: string, sourceVersion: number) => void;
   onShowFilters?: () => void;
 }) {
+  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(() => new Set());
+  const selected = parents.find((parent) => selectedKeys.has(parent.id)) ?? null;
+  const openSession = selected?.children.find((child) => child.grnNumber == null) ?? null;
   const columns = useMemo<DataGridColumn<ReceivingRegisterParent>[]>(() => [
     {
       key: "grn",
@@ -93,18 +96,7 @@ export default function ReceivingRegister({
       width: 170,
       sortable: false,
       searchValue: (row) => row.children.map((child) => child.grnNumber ?? "").join(" "),
-      accessor: (row) => {
-        const open = row.children.find((child) => child.grnNumber == null);
-        return open ? (
-          <button type="button" className={DOCUMENT_ACTION} onClick={() => onOpenSession(open.id, row.id)}>
-            Open Receiving
-          </button>
-        ) : (
-          <button type="button" className={ACTION} onClick={() => onStartReceiving(row.id, row.sourceVersion)}>
-            Start Receiving
-          </button>
-        );
-      },
+      accessor: (row) => row.children.map((child) => child.grnNumber).filter(Boolean).join(", ") || "—",
     },
     {
       key: "source",
@@ -136,7 +128,7 @@ export default function ReceivingRegister({
     { key: "pending", label: "Pending Delivery Qty", width: 145, align: "right", sortable: true, numberValue: (row) => row.pendingDeliveryQty, filterType: "number", accessor: (row) => quantity(row.pendingDeliveryQty) },
     { key: "do", label: "Supplier DO No.", width: 140, accessor: (row) => row.children.map((child) => child.supplierDoNo).filter(Boolean).join(", ") || "—", searchValue: (row) => row.children.map((child) => child.supplierDoNo ?? "").join(" ") },
     { key: "units", label: "Unit ID", width: 180, accessor: (row) => row.children.flatMap((child) => child.unitIds).join(", ") || "—", searchValue: (row) => row.children.flatMap((child) => child.unitIds).join(" ") },
-  ], [onOpenSession, onStartReceiving]);
+  ], []);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-white" data-testid="receiving-register">
@@ -158,6 +150,24 @@ export default function ReceivingRegister({
           testId: (row) => `receiving-expand-${row.id}`,
           renderExpansion: (row) => <ChildRows parent={row} onOpenSession={onOpenSession} />,
         }}
+        selectable={{
+          selectedKeys,
+          onToggle: (id) => setSelectedKeys((current) => current.has(id) ? new Set() : new Set([id])),
+          onToggleAll: (keys, allSelected) => setSelectedKeys(allSelected || keys.length === 0 ? new Set() : new Set([keys[0]])),
+          testId: (row) => `receiving-select-${row.id}`,
+        }}
+        selectionSummary={(n) => `${n} delivery balance selected`}
+        selectionPrimary={selected ? (
+          openSession ? (
+            <button type="button" className={ACTION} onClick={() => onOpenSession(openSession.id, selected.id)}>
+              Open Receiving
+            </button>
+          ) : (
+            <button type="button" className={ACTION} onClick={() => onStartReceiving(selected.id, selected.sourceVersion)}>
+              Start Receiving
+            </button>
+          )
+        ) : null}
         toolbarStart={onShowFilters ? (
           <button
             type="button"

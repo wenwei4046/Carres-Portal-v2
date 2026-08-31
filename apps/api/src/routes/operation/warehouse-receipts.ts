@@ -92,10 +92,14 @@ function registerLine(raw: Record<string, unknown>): ReceivingLineInput {
 
 warehouseReceiptsRouter.get("/register", requireOperation, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
+  const exactSource = c.req.query("source")?.trim() || null;
+  let sourceQuery = sb.from("purchase_orders")
+    .select("id, version, placed_at, po_delivery_date, supplier_id, destination_id, status, suppliers(name)");
+  sourceQuery = exactSource
+    ? sourceQuery.eq("id", exactSource)
+    : sourceQuery.eq("status", "open");
   const sourceRows = await readRegisterRows<Record<string, unknown>>(
-    sb.from("purchase_orders")
-      .select("id, version, placed_at, po_delivery_date, supplier_id, destination_id, status, suppliers(name)")
-      .eq("status", "open")
+    sourceQuery
       .order("po_delivery_date", { ascending: true, nullsFirst: false })
       .order("id", { ascending: true }),
   );

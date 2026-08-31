@@ -8,9 +8,11 @@
 
 **Tech Stack:** PostgreSQL/Supabase migrations, TypeScript, Zod, Hono, React Query, React, Vitest, Playwright.
 
-**Authority:** `docs/superpowers/specs/2026-08-31-receiving-grn-owner-approved-design.md`; `docs/receiving/MASTER.md`; `docs/purchasing/MASTER.md`; `docs/stock/MASTER.md`; `docs/ui/MASTER.md`; `docs/UI-DICTIONARY.md`; `docs/COPY-STANDARD.md`.
+**Authority:** `docs/superpowers/specs/2026-08-31-receiving-grn-owner-approved-design.md`; `docs/receiving/MASTER.md`; `docs/purchasing/MASTER.md`; `docs/stock/MASTER.md`; `docs/ui/MASTER.md` (§1.3, §4, §5 and §6.5–6.7); `docs/COPY-STANDARD.md`. `docs/UI-DICTIONARY.md` and `docs/UI-KIT.md` are retired and are not authorities.
 
 **Delivery states:** Report `authority/design aligned`, `code implemented and integrated`, and `production deployed/verified` separately. This plan authorises no production migration. Production application requires the repository's governed migration approval after CI.
+
+**ERP MASTER PAGE CONTROL seam received 2026-08-31:** Purchase Orders and Receiving use one ERP Shell. Register rails contain business facts only; the central My Work / Team Work engine is the sole complete queue. Selection replaces the same top Work Toolbar row and owns `Start Receiving` / `Open Receiving`; outputs remain separate and there is no bottom action bar. Counts distinguish filtered records from quantities. Normal duty, dated cover, actual actor and object PIC remain separate structured metadata. Acceptance includes stable exact deep-links, browser/API/RLS/SQL permission parity, desktop and genuine sub-1280 walks, merged ancestry and exact deployed SHA. The control-task drift evidence belongs in `docs/ui/PAGE-CONTROL-AUDIT.md` when that file lands; this plan does not create a competing copy.
 
 ## Non-negotiable boundaries
 
@@ -298,7 +300,6 @@ public.post_receiving_session(p_receipt_id uuid, p_expected_version integer) ret
 **Files:**
 - Modify: `apps/web/src/pages/operation/purchasing-words.test.ts`
 - Modify: `apps/web/src/pages/operation/OperationReceiving.test.tsx`
-- Modify: `docs/UI-DICTIONARY.md` only when implementation exposes a missing governed term; do not create synonyms.
 - Modify: `docs/COPY-STANDARD.md` only when an approved phrase is absent.
 
 - [ ] Assert navigation `Receiving`, object `Receiving Session`, transaction `Goods Receipt`, document `GRN`, `GRN No.`, actions and exact two-line copy.

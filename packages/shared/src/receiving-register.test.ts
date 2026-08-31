@@ -55,6 +55,7 @@ describe("one Receiving Register projection", () => {
       wrongItemQty: 1,
       extraQty: 1,
       pendingDeliveryQty: 6,
+      lines: [expect.objectContaining({ id: "line-1", sku: "MS01-K", orderQty: 10, receivedQty: 4 })],
     });
     expect(result.parents[0]?.children[0]).toMatchObject({
       id: "receipt-1",

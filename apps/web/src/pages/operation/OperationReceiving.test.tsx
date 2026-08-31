@@ -5,6 +5,7 @@ import type { ReceivingRegisterResult } from "@carres/shared";
 import OperationReceiving from "./OperationReceiving";
 
 let requestedFilter: string | null | undefined;
+const createSession = vi.fn();
 
 const result: ReceivingRegisterResult = {
   rail: [
@@ -40,6 +41,7 @@ const result: ReceivingRegisterResult = {
     pendingDeliveryQty: 3,
     supplierDoNo: null,
     unitIds: [],
+    lines: [{ id: "11111111-1111-1111-1111-111111111111", sku: "MAT-K-001", orderQty: 4, receivedQty: 1 }],
     children: [],
   }],
 };
@@ -49,15 +51,24 @@ vi.mock("@/lib/queries", () => ({
     requestedFilter = filter;
     return { data: result, isLoading: false, isError: false, error: null, refetch: vi.fn() };
   },
+  useCreateReceivingSessionMutation: () => ({
+    mutate: (input: unknown, options: { onSuccess?: (result: unknown) => void }) => {
+      createSession(input);
+      options.onSuccess?.({ receipt_id: "receipt-created", status: "draft", lock_version: 1 });
+    },
+    isPending: false,
+    error: null,
+  }),
 }));
 
 vi.mock("@/components/register/DataGrid", () => ({
-  DataGrid: ({ rows, columns, expandable, toolbarStart, statusSummary }: any) => (
+  DataGrid: ({ rows, columns, expandable, toolbarStart, statusSummary, selectable, selectionPrimary, selectionSummary }: any) => (
     <div data-testid="work-toolbar">
-      {toolbarStart}
+      {selectable.selectedKeys.size > 0 ? <><span>{selectionSummary(selectable.selectedKeys.size)}</span>{selectionPrimary}</> : toolbarStart}
       <div>{columns.map((column: any) => column.label).join(" | ")}</div>
       {rows.map((row: any) => (
         <div key={row.id}>
+          <button type="button" aria-label={`Select ${row.sourceNumber}`} onClick={() => selectable.onToggle(row.id)}>Select</button>
           {columns.map((column: any) => <div key={column.key}>{column.accessor(row)}</div>)}
           {expandable.renderExpansion(row)}
         </div>
@@ -73,6 +84,10 @@ vi.mock("./PurchasingTabs", () => ({
   ),
 }));
 
+vi.mock("./components/ReceivingWorkspace", () => ({
+  default: ({ receiptId }: { receiptId: string }) => <div data-testid="session-workspace">{receiptId}</div>,
+}));
+
 function LocationProbe() {
   const location = useLocation();
   return <output data-testid="location">{location.pathname}{location.search}</output>;
@@ -80,6 +95,7 @@ function LocationProbe() {
 
 function wrap() {
   requestedFilter = undefined;
+  createSession.mockReset();
   return render(
     <MemoryRouter initialEntries={["/operation?tab=receiving"]}>
       <OperationReceiving />
@@ -122,14 +138,21 @@ describe("OperationReceiving — approved one-register page", () => {
     expect(screen.getByTestId("location")).not.toHaveTextContent("date=");
   });
 
-  it("Start Receiving deep-links the exact source and its frozen version", async () => {
+  it("Start Receiving creates one persistent Draft then opens its exact identity", async () => {
     wrap();
+    fireEvent.click(screen.getByRole("button", { name: "Select PO-20260831-0001" }));
     fireEvent.click(screen.getByRole("button", { name: "Start Receiving" }));
     await waitFor(() => {
       expect(screen.getByTestId("location")).toHaveTextContent("po=PO-20260831-0001");
-      expect(screen.getByTestId("location")).toHaveTextContent("sourceVersion=3");
-      expect(screen.getByTestId("location")).toHaveTextContent("receiving=new");
+      expect(screen.getByTestId("location")).toHaveTextContent("receipt=receipt-created");
     });
+    expect(createSession).toHaveBeenCalledWith(expect.objectContaining({
+      sourceId: "PO-20260831-0001",
+      expectedVersion: 3,
+      supplierDoNo: "",
+      signedDoPath: "",
+      goodsReceivedAt: "",
+    }));
   });
 
   it("the narrow-width door restores the same date rail", () => {
