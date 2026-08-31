@@ -211,6 +211,22 @@ export function soBatchOrderSupplierNames(o: SoBatchOrderRow): (string | null)[]
 }
 
 /**
+ * Units on one Sales Order line that still have no committed coverage.
+ *
+ * This is the one `All not ordered` arithmetic: customer quantity less the
+ * Ready Stock ledger draw and less exact, non-cancelled PO lineage. A generic
+ * open-PO SKU pool may suppress today's issue leaf, but it cannot claim that a
+ * particular Sales Order was ordered when no `po_line_sources` row says so.
+ */
+export function soBatchOrderLineOutstandingQty(
+  line: Pick<SoBatchOrderLineFact, "qty" | "stockTaken" | "pos">,
+): number {
+  const required = Math.max(0, line.qty - line.stockTaken);
+  const linked = line.pos.reduce((sum, po) => sum + Math.max(0, po.qty), 0);
+  return Math.max(0, required - linked);
+}
+
+/**
  * One Sales Order's rail-relevant facts, derived once from the server's own
  * rows — the leaf states the engine computed, the Catalog categories on the
  * order's lines (never SKU-text inference), and the Register's own supplier
@@ -218,7 +234,7 @@ export function soBatchOrderSupplierNames(o: SoBatchOrderRow): (string | null)[]
  */
 export interface SoBatchRailFacts {
   orderId: string;
-  /** Has outstanding demand — any leaf at all. `All not ordered`'s meaning. */
+  /** Has quantity without Ready Stock or exact PO lineage. */
   outstanding: boolean;
   /** Every leaf state under this order. */
   states: ReadonlySet<PurchaseDemandState>;
@@ -245,7 +261,7 @@ export function soBatchRailFacts(
   }
   return orders.map((o) => ({
     orderId: o.orderId,
-    outstanding: statesByOrder.has(o.orderId),
+    outstanding: o.lines.some((line) => soBatchOrderLineOutstandingQty(line) > 0),
     states: statesByOrder.get(o.orderId) ?? new Set(),
     categories: new Set(
       o.lines

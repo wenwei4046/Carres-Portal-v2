@@ -609,7 +609,7 @@ export default function SalesOrdersRegister() {
         />
       )}
 
-      {/* 8px outer frame gap — REGISTER STATUS FOOTER law, docs/ui/MASTER.md. */}
+      {/* 8px work-surface breathing room — REGISTER STATUS FOOTER law, docs/ui/MASTER.md. */}
       <div className="flex min-h-0 flex-1 flex-col p-2" data-testid="register-column">
         {isError || deliveryOrdersQuery.isError ? (
           <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 bg-white">
