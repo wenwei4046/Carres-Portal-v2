@@ -1153,6 +1153,21 @@ export {
   type ReceivingSessionIdentityProblem,
 } from "./warehouse-receipt";
 export {
+  buildReceivingRegister,
+  receivingDateRail,
+  type ReceivingRegisterFilter,
+  type ReceivingRegisterSourceLine,
+  type ReceivingRegisterSource,
+  type ReceivingRegisterPromise,
+  type ReceivingRegisterSessionLine,
+  type ReceivingRegisterSession,
+  type ReceivingRegisterChild,
+  type ReceivingRegisterParent,
+  type ReceivingDateRailRow,
+  type ReceivingRegisterInput,
+  type ReceivingRegisterResult,
+} from "./receiving-register";
+export {
   receivingSessionInputSchema,
   receivingMutationVersionInput,
   receivingSessionSaveInput,

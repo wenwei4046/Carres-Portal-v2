@@ -83,7 +83,7 @@ function makeSb(
       const cfg = tables[table] ?? {};
       const builder: Record<string, unknown> = {};
       const chain = () => builder;
-      for (const m of ["eq", "in", "order", "limit"]) builder[m] = vi.fn(chain);
+      for (const m of ["eq", "in", "order", "limit", "range"]) builder[m] = vi.fn(chain);
       builder.select = vi.fn((_cols: string, opts?: { head?: boolean }) => {
         if (opts?.head) {
           // A head-count resolves straight to { count } — no rows.
@@ -299,6 +299,73 @@ describe("GET /api/operation/warehouse-receipts", () => {
     );
     const builder = spy.mock.results[0].value as { eq: ReturnType<typeof vi.fn> };
     expect(builder.eq).toHaveBeenCalledWith("status", "submitted");
+  });
+});
+
+describe("GET /api/operation/warehouse-receipts/register", () => {
+  it("returns one open-balance parent with its Receiving Session/GRN child", async () => {
+    const sb = makeSb({
+      purchase_orders: { list: { data: [{
+        id: "PO-1001",
+        version: 2,
+        placed_at: "2026-08-20T02:00:00Z",
+        po_delivery_date: "2026-09-02",
+        supplier_id: "s1",
+        destination_id: "d1",
+        status: "open",
+        suppliers: { name: "Ohana" },
+      }], error: null } },
+      purchase_order_lines: { list: { data: [{
+        id: LINE, po_id: "PO-1001", sku: "MS01-K", qty: 10, received_qty: 4,
+      }], error: null } },
+      purchasing_destinations: { list: { data: [{ id: "d1", name: "Carres Klang" }], error: null } },
+      po_supplier_promises: { list: { data: [{
+        po_id: "PO-1001", new_date: "2026-09-05", about_date: "2026-09-02",
+        recorded_at: "2026-08-29T02:00:00Z",
+      }], error: null } },
+      warehouse_receipts: { list: { data: [{
+        id: RECEIPT,
+        source_id: "PO-1001",
+        po_id: "PO-1001",
+        grn_number: "GRN-20260831-0001",
+        goods_received_timestamp: "2026-08-29T03:00:00Z",
+        do_number: "DO-55",
+        lines: [{
+          poLineId: LINE,
+          sku: "MS01-K",
+          receivedQty: 4,
+          damagedQty: 1,
+          wrongItemQty: 1,
+          extraQty: 1,
+          unitIds: ["U1", "U2", "U3", "U4", "U5", "U6", "U7"],
+        }],
+      }], error: null } },
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+
+    const res = await req(
+      "/api/operation/warehouse-receipts/register",
+      "GET",
+      await makeJwt("operation"),
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json() as { parents: Array<Record<string, unknown>>; rail: unknown[] };
+    expect(body.parents[0]).toMatchObject({
+      sourceNumber: "PO-1001",
+      poDeliveryDate: "2026-09-02",
+      supplierDeliveryDate: "2026-09-05",
+      sameAsPo: false,
+      pendingDeliveryQty: 6,
+      damagedQty: 1,
+      wrongItemQty: 1,
+      extraQty: 1,
+      children: [expect.objectContaining({
+        grnNumber: "GRN-20260831-0001",
+        supplierDoNo: "DO-55",
+      })],
+    });
+    expect(body.rail).toHaveLength(9);
   });
 });
 

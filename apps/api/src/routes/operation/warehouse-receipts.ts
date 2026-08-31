@@ -1,11 +1,18 @@
 import { Hono } from "hono";
 import {
+  buildReceivingRegister,
+  historicalReceivingLineInput,
   warehouseReceiptOpensClaims,
   warehouseReceiptSummary,
   warehouseReceiptReturnInput,
   receivingMutationVersionInput,
   receivingSessionInputSchema,
   receivingSessionSaveInput,
+  type ReceivingLineInput,
+  type ReceivingRegisterFilter,
+  type ReceivingRegisterSource,
+  type ReceivingRegisterPromise,
+  type ReceivingRegisterSession,
   type WarehouseReceiptLine,
 } from "@carres/shared";
 import { requireOperation } from "../../lib/auth-guards";
@@ -33,6 +40,177 @@ const DEFAULT_LIMIT = 200;
 const SIGNED_URL_TTL_SECONDS = 3600;
 
 type ReceiptRow = Record<string, unknown>;
+
+type RegisterReadError = { code?: string; message?: string; details?: string };
+type RegisterPagedRead<T> = {
+  range: (from: number, to: number) => PromiseLike<{
+    data: T[] | null;
+    error: RegisterReadError | null;
+  }>;
+};
+
+async function readRegisterRows<T>(query: RegisterPagedRead<T>) {
+  const data: T[] = [];
+  for (let from = 0; ; from += 1_000) {
+    const result = await query.range(from, from + 999);
+    if (result.error) return { data: [] as T[], error: result.error };
+    const page = result.data ?? [];
+    data.push(...page);
+    if (page.length < 1_000) return { data, error: null };
+  }
+}
+
+function todayInMalaysia(now = new Date()): string {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Kuala_Lumpur",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(now);
+  const value = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${value.year}-${value.month}-${value.day}`;
+}
+
+function registerLine(raw: Record<string, unknown>): ReceivingLineInput {
+  if ("poLineId" in raw) {
+    return {
+      poLineId: String(raw.poLineId ?? ""),
+      sku: String(raw.sku ?? ""),
+      receivedQty: Number(raw.receivedQty ?? 0),
+      damagedQty: Number(raw.damagedQty ?? 0),
+      wrongItemQty: Number(raw.wrongItemQty ?? 0),
+      extraQty: Number(raw.extraQty ?? 0),
+      unitIds: Array.isArray(raw.unitIds) ? raw.unitIds.map(String) : [],
+      damagedPhotos: [],
+      wrongItemPhotos: [],
+      extraEvidence: [],
+      wrongItemReason: null,
+    };
+  }
+  return historicalReceivingLineInput(raw as unknown as WarehouseReceiptLine);
+}
+
+warehouseReceiptsRouter.get("/register", requireOperation, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const sourceRows = await readRegisterRows<Record<string, unknown>>(
+    sb.from("purchase_orders")
+      .select("id, version, placed_at, po_delivery_date, supplier_id, destination_id, status, suppliers(name)")
+      .eq("status", "open")
+      .order("po_delivery_date", { ascending: true, nullsFirst: false })
+      .order("id", { ascending: true }),
+  );
+  if (sourceRows.error) {
+    const mapped = mapPgError(sourceRows.error);
+    return c.json(mapped.body, mapped.status);
+  }
+  const sourceIds = sourceRows.data.map((row) => String(row.id));
+  if (sourceIds.length === 0) {
+    return c.json(buildReceivingRegister({
+      today: todayInMalaysia(),
+      filter: c.req.query("date") as ReceivingRegisterFilter | undefined,
+      sources: [], supplierPromises: [], sessions: [],
+    }));
+  }
+
+  const [lineRows, destinationRows, promiseRows, sessionRows] = await Promise.all([
+    readRegisterRows<Record<string, unknown>>(
+      sb.from("purchase_order_lines")
+        .select("id, po_id, sku, qty, received_qty")
+        .in("po_id", sourceIds)
+        .order("po_id")
+        .order("id"),
+    ),
+    readRegisterRows<Record<string, unknown>>(
+      sb.from("purchasing_destinations")
+        .select("id, name")
+        .in("id", sourceRows.data.map((row) => String(row.destination_id)).filter(Boolean))
+        .order("name"),
+    ),
+    readRegisterRows<Record<string, unknown>>(
+      sb.from("po_supplier_promises")
+        .select("po_id, new_date, about_date, recorded_at")
+        .in("po_id", sourceIds)
+        .eq("kind", "tomorrow_delivery")
+        .order("recorded_at", { ascending: false }),
+    ),
+    readRegisterRows<Record<string, unknown>>(
+      sb.from("warehouse_receipts")
+        .select("id, source_id, po_id, grn_number, goods_received_timestamp, goods_received_at, do_number, lines")
+        .in("source_id", sourceIds)
+        .order("goods_received_timestamp", { ascending: false, nullsFirst: false }),
+    ),
+  ]);
+  const failed = [lineRows, destinationRows, promiseRows, sessionRows]
+    .find((result) => result.error)?.error;
+  if (failed) {
+    const mapped = mapPgError(failed);
+    return c.json(mapped.body, mapped.status);
+  }
+
+  const linesBySource = new Map<string, Record<string, unknown>[]>();
+  for (const line of lineRows.data) {
+    const sourceId = String(line.po_id);
+    const rows = linesBySource.get(sourceId) ?? [];
+    rows.push(line);
+    linesBySource.set(sourceId, rows);
+  }
+  const destinationById = new Map(
+    destinationRows.data.map((row) => [String(row.id), String(row.name ?? "")]),
+  );
+  const sources: ReceivingRegisterSource[] = sourceRows.data.map((row) => {
+    const supplier = Array.isArray(row.suppliers) ? row.suppliers[0] : row.suppliers;
+    return {
+      id: String(row.id),
+      kind: "purchase_order",
+      version: Number(row.version ?? 1),
+      issuedAt: typeof row.placed_at === "string" ? row.placed_at : null,
+      supplier: String((supplier as { name?: unknown } | null)?.name ?? ""),
+      deliverTo: destinationById.get(String(row.destination_id)) ?? "",
+      poDeliveryDate: typeof row.po_delivery_date === "string" ? row.po_delivery_date : null,
+      lines: (linesBySource.get(String(row.id)) ?? []).map((line) => ({
+        id: String(line.id),
+        sku: String(line.sku ?? ""),
+        orderQty: Number(line.qty ?? 0),
+        receivedQty: Number(line.received_qty ?? 0),
+      })),
+    };
+  });
+  const supplierPromises: ReceivingRegisterPromise[] = promiseRows.data.map((row) => ({
+    sourceId: String(row.po_id),
+    deliveryDate: typeof row.new_date === "string"
+      ? row.new_date
+      : typeof row.about_date === "string" ? row.about_date : null,
+    recordedAt: String(row.recorded_at ?? ""),
+  }));
+  const sessions: ReceivingRegisterSession[] = sessionRows.data.map((row) => ({
+    id: String(row.id),
+    sourceId: String(row.source_id ?? row.po_id),
+    grnNumber: typeof row.grn_number === "string" ? row.grn_number : null,
+    goodsReceivedAt: typeof row.goods_received_timestamp === "string"
+      ? row.goods_received_timestamp
+      : typeof row.goods_received_at === "string" ? row.goods_received_at : null,
+    supplierDoNo: typeof row.do_number === "string" ? row.do_number : null,
+    lines: (Array.isArray(row.lines) ? row.lines : []).map((line) => {
+      const value = registerLine(line as Record<string, unknown>);
+      return {
+        poLineId: value.poLineId,
+        sku: value.sku,
+        receivedQty: value.receivedQty,
+        damagedQty: value.damagedQty,
+        wrongItemQty: value.wrongItemQty,
+        extraQty: value.extraQty,
+        unitIds: value.unitIds,
+      };
+    }),
+  }));
+  return c.json(buildReceivingRegister({
+    today: todayInMalaysia(),
+    filter: c.req.query("date") as ReceivingRegisterFilter | undefined,
+    sources,
+    supplierPromises,
+    sessions,
+  }));
+});
 
 warehouseReceiptsRouter.post("/", requireOperation, async (c) => {
   const parsed = await parseJsonBody(c, receivingSessionInputSchema);
@@ -115,7 +293,7 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
       // are what the Goods Received register reads, and they are 0314/0315
       // columns this select predates. `reviewed_*` stays until the
       // reader-rename slice drops it (0314's own discipline).
-      "id, po_id, warehouse_id, do_number, do_file_path, note, lines, status, submitted_from, goods_received_at, submitted_by, submitted_at, posted_by, posted_at, reviewed_by, reviewed_at, return_reason",
+      "id, po_id, warehouse_id, do_number, do_file_path, note, lines, status, lock_version, submitted_from, goods_received_at, grn_number, submitted_by, submitted_at, posted_by, posted_at, reviewed_by, reviewed_at, return_reason",
     )
     // The register is a HISTORY, so it sorts by the BUSINESS date — when the
     // goods physically arrived — not by when somebody keyed them in. The

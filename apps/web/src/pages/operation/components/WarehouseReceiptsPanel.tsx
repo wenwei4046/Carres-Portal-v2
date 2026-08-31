@@ -80,7 +80,7 @@ function ReceiptRow({ receipt: r }: { receipt: WarehouseReceiptQueueRow }) {
 
   async function doCheckIn() {
     try {
-      await checkIn.mutateAsync({ receiptId: r.id });
+      await checkIn.mutateAsync({ receiptId: r.id, expectedVersion: r.lock_version });
       toast.success(
         `${r.po_id} checked in · DO ${r.do_number}${
           r.opens_claims ? " · supplier claim opened" : ""
@@ -98,7 +98,11 @@ function ReceiptRow({ receipt: r }: { receipt: WarehouseReceiptQueueRow }) {
   async function doSendBack() {
     if (reason.trim().length === 0) return;
     try {
-      await sendBack.mutateAsync({ receiptId: r.id, reason: reason.trim() });
+      await sendBack.mutateAsync({
+        receiptId: r.id,
+        expectedVersion: r.lock_version,
+        reason: reason.trim(),
+      });
       // COPY-STANDARD's done message for this row, with the PO it is about.
       toast.success(`Count returned to ${warehouse} · ${r.po_id}`);
       setSendingBack(false);

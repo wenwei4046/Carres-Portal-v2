@@ -295,6 +295,8 @@ import {
   type WarehouseReceiptLine,
   type WarehouseReceiptRow,
   type WarehouseSubmitReceiptInput,
+  type ReceivingRegisterFilter,
+  type ReceivingRegisterResult,
   type StockRegisterUnit,
   // 0379 — Delivery's own arrangement (owner correction 2026-08-24).
   type DeliveryArrangementRow,
@@ -509,6 +511,8 @@ export const qk = {
      *  and this queue all move together. */
     warehouseReceipts: (status: string) =>
       ["operation", "warehouse-receipts", status] as const,
+    receivingRegister: (filter?: ReceivingRegisterFilter | null) =>
+      ["operation", "receiving", "register", filter ?? "all"] as const,
     /** Slice B — one PO's Receiving Sessions + their event ledger. The
      *  Workspace's Summary and Activity both read this ONE call, so the two
      *  sections can never describe the same delivery differently. */
@@ -4102,6 +4106,7 @@ export interface WarehouseReceiptQueueRow {
   note: string | null;
   lines: WarehouseReceiptLine[];
   status: string;
+  lock_version: number;
   submitted_by_name: string | null;
   submitted_at: string;
   reviewed_by_name: string | null;
@@ -4135,6 +4140,21 @@ export function useOperationWarehouseReceipts(
   });
 }
 
+export function useReceivingRegister(
+  filter?: ReceivingRegisterFilter | null,
+  opts?: Partial<UseQueryOptions<ReceivingRegisterResult>>,
+) {
+  const query = filter ? `?date=${encodeURIComponent(filter)}` : "";
+  return useQuery({
+    queryKey: qk.operation.receivingRegister(filter),
+    queryFn: () => apiFetch<ReceivingRegisterResult>(
+      `/api/operation/warehouse-receipts/register${query}`,
+    ),
+    staleTime: 30_000,
+    ...opts,
+  });
+}
+
 /**
  * The two ops moves: check in, or send it back.
  *
@@ -4150,7 +4170,7 @@ export function useWarehouseReceiptReviewMutation(
     UseMutationOptions<
       Record<string, unknown>,
       ApiError,
-      { receiptId: string; reason?: string }
+      { receiptId: string; expectedVersion: number; reason?: string }
     >
   >,
 ) {
@@ -4158,7 +4178,7 @@ export function useWarehouseReceiptReviewMutation(
   return useMutation<
     Record<string, unknown>,
     ApiError,
-    { receiptId: string; reason?: string }
+    { receiptId: string; expectedVersion: number; reason?: string }
   >({
     mutationFn: ({ receiptId, ...body }) =>
       apiFetch<Record<string, unknown>>(
@@ -4169,9 +4189,11 @@ export function useWarehouseReceiptReviewMutation(
     onSuccess: async (...args) => {
       await Promise.all([
         qc.invalidateQueries({ queryKey: ["operation", "warehouse-receipts"] }),
+        qc.invalidateQueries({ queryKey: ["operation", "receiving"] }),
         qc.invalidateQueries({ queryKey: ["operation", "pos"] }),
         qc.invalidateQueries({ queryKey: ["operation", "supplier-claims"] }),
         qc.invalidateQueries({ queryKey: ["operation", "warehouse"] }),
+        qc.invalidateQueries({ queryKey: ["operation", "work"] }),
       ]);
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
@@ -5098,6 +5120,7 @@ export interface SalesOrderRouteCase {
 export interface SalesOrderRouteReceivingSession {
   id: string;
   po_id: string;
+  grn_number?: string | null;
   do_number: string | null;
   status: string;
   goods_received_at: string | null;
