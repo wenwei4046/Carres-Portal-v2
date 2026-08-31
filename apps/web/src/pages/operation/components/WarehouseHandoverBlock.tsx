@@ -13,6 +13,7 @@ import {
   useRecordHandoverEvent,
   type DeliveryHandoverEventRow,
 } from "@/lib/queries";
+import { Modal } from "./Modal";
 
 /**
  * WAREHOUSE → LOGISTICS HANDOVER — the §4 chain's acts, on the work surface
@@ -48,9 +49,15 @@ const MAX_SIZE = 10 * 1024 * 1024;
 export default function WarehouseHandoverBlock({
   doNumber,
   logisticsName,
+  headerAction = false,
+  onDone,
 }: {
   doNumber: string;
   logisticsName: string | null;
+  /** The object header owns the one primary operational action. Detailed
+   *  receiver/proof/count fields open from that action in a modal. */
+  headerAction?: boolean;
+  onDone?: () => void;
 }) {
   const detailQ = useDeliveryOrder(doNumber);
   const d = detailQ.data?.deliveryOrder;
@@ -89,6 +96,7 @@ export default function WarehouseHandoverBlock({
   // ── Confirm receipt form state (logistics' OWN count) ─────────────────────
   const [receiptQty, setReceiptQty] = useState<Record<string, string>>({});
   const [receiptNote, setReceiptNote] = useState("");
+  const [formOpen, setFormOpen] = useState(false);
 
   if (!detailQ.data || !d) return null;
   // A cancelled document has no handover; a resulted trip's chain is history.
@@ -152,9 +160,51 @@ export default function WarehouseHandoverBlock({
         setProofPath(null);
         setReceiptQty({});
         setReceiptNote("");
+        onDone?.();
       },
       onError: (err) => toast.error(err.message),
     });
+
+  if (headerAction) {
+    if (closed || !next) return null;
+    const label =
+      next === "ready_for_handover"
+        ? "Mark ready for handover"
+        : next === "handed_over"
+          ? "Record handover"
+          : "Confirm logistics receipt";
+    return (
+      <>
+        <button
+          type="button"
+          data-testid="do-object-primary-action"
+          className="btn-primary inline-flex h-7 items-center px-2.5 text-meta"
+          disabled={record.isPending}
+          onClick={() => {
+            if (next === "ready_for_handover") {
+              recordFact(
+                { kind: "ready_for_handover" },
+                "Ready for handover recorded",
+              );
+            } else {
+              setFormOpen(true);
+            }
+          }}
+        >
+          {label}
+        </button>
+        {formOpen ? (
+          <Modal title={label} onClose={() => setFormOpen(false)}>
+            <WarehouseHandoverBlock
+              doNumber={doNumber}
+              logisticsName={logisticsName}
+              onDone={() => setFormOpen(false)}
+            />
+          </Modal>
+        ) : null}
+      </>
+    );
+  }
 
   return (
     <div className="px-4 py-3 border-t border-base-100" data-testid="handover-block">

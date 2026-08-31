@@ -253,29 +253,28 @@ describe("the DELIVERY DATE rail", () => {
 
   it("⭐ shows the near-term operating dates even at ZERO — a planner needs the empty day", () => {
     // A rail that lists only the days already holding work cannot be used to
-    // plan: the operator cannot see that Sunday is free because Sunday is not
-    // on it (owner ruling 2026-08-24).
+    // plan, but Sunday is closed and must not be offered as empty capacity.
     const rail = buildDateRail(rows, TODAY, (iso) => `printed:${iso}`);
     for (const iso of nearTermDates(TODAY)) {
       expect(rail.find((r) => r.label === `printed:${iso}`)).toBeDefined();
     }
-    expect(rail.find((r) => r.label === "printed:2026-08-23")?.count).toBe(0);
+    expect(rail.find((r) => r.label === "printed:2026-08-23")).toBeUndefined();
   });
 
-  it("the near-term window starts today and runs seven days", () => {
+  it("the near-term window starts today and runs seven operating days", () => {
     expect(nearTermDates(TODAY)).toEqual([
       "2026-08-21",
       "2026-08-22",
-      "2026-08-23",
       "2026-08-24",
       "2026-08-25",
       "2026-08-26",
       "2026-08-27",
+      "2026-08-28",
     ]);
   });
 
-  it("crosses a month end without inventing a 32nd", () => {
-    expect(nearTermDates("2026-08-30", 3)).toEqual(["2026-08-30", "2026-08-31", "2026-09-01"]);
+  it("crosses a month end and skips a Sunday start", () => {
+    expect(nearTermDates("2026-08-30", 3)).toEqual(["2026-08-31", "2026-09-01", "2026-09-02"]);
   });
 
   it("keeps a PICKED day on the rail after its last scope moves away", () => {

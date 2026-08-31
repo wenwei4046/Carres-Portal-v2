@@ -64,6 +64,9 @@ export interface WorkRow extends WorkItem {
    *  the PO-duty holder for Purchasing's work, else the PIC. Null for a named
    *  non-account owner (a salesperson) and for a duty word. */
   ownerId: string | null;
+  /** Delivery's active document door. Null means the work belongs to the
+   *  arrangement/scope rather than an issued Delivery Order. */
+  deliveryDoNumber: string | null;
 }
 
 /** One person's share of the open set. `overdue` is a subset of `open`. */
@@ -201,6 +204,7 @@ export function useOpenWorkSet(): OpenWorkSet {
              item is composed, so the Work row, the Quick Rail peek and the
              action sentence above all name the customer identically. */
           customer: displayCustomerName(o.customer_name) ?? null,
+          deliveryDoNumber: o.do_number?.trim() || null,
           /* The RESOLVED owner's account (2026-08-27) — the PO-duty holder
              for Purchasing's work, else the PIC; never the PIC borrowed for
              another rule's item. */
@@ -286,7 +290,13 @@ export function useOpenWorkSet(): OpenWorkSet {
         holidayOpts,
       );
       for (const it of workItems) {
-        out.push({ ...it, line: it.action, customer: null, ownerId: it.ownerUserId });
+        out.push({
+          ...it,
+          line: it.action,
+          customer: null,
+          ownerId: it.ownerUserId,
+          deliveryDoNumber: null,
+        });
       }
     }
     return out;

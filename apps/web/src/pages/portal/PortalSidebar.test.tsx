@@ -120,6 +120,33 @@ describe("PortalSidebar — role visibility", () => {
   });
 });
 
+describe("PortalSidebar — narrow desktop", () => {
+  it("starts as the 60px icon rail below 1280", () => {
+    const previous = window.matchMedia;
+    Object.defineProperty(window, "matchMedia", {
+      configurable: true,
+      value: vi.fn().mockImplementation((query: string) => ({
+        matches: query === "(max-width: 1279px)",
+        media: query,
+        onchange: null,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      })),
+    });
+
+    try {
+      renderAt("/operation?tab=delivery");
+      expect(screen.getByRole("complementary")).toHaveStyle({ width: "60px" });
+      expect(screen.getByRole("button", { name: "Show menu" })).toBeInTheDocument();
+    } finally {
+      Object.defineProperty(window, "matchMedia", { configurable: true, value: previous });
+    }
+  });
+});
+
 /**
  * ⭐ THE CARD'S OWN SHAPE (Jess, 2026-08-19 afternoon).
  *
