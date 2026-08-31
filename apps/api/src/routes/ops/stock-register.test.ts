@@ -8,6 +8,7 @@ import {
   type KeyLike,
 } from "jose";
 import { Hono } from "hono";
+import { readFileSync, readdirSync } from "node:fs";
 import { authMiddleware, _setJwksForTesting } from "../../middleware/auth";
 import stockRouter from "./stock";
 import type { AppEnv } from "../../types";
@@ -86,6 +87,34 @@ beforeEach(() => {
 });
 
 afterAll(() => _setJwksForTesting(null));
+
+describe("stock_unit_register_v — governed display names", () => {
+  it("projects Site and holder names from their governed rows", () => {
+    const migrationsUrl = new URL("../../../../../supabase/migrations/", import.meta.url);
+    const definingMigration = readdirSync(migrationsUrl)
+      .filter((name) => name.endsWith(".sql"))
+      .sort()
+      .reverse()
+      .find((name) =>
+        readFileSync(new URL(name, migrationsUrl), "utf8").includes(
+          "create or replace view public.stock_unit_register_v",
+        ),
+      );
+
+    expect(definingMigration, "a migration must define the Stock Register view").toBeTruthy();
+    const sql = readFileSync(new URL(definingMigration!, migrationsUrl), "utf8");
+
+    expect(sql).toMatch(/left join public\.warehouses\s+w\s+on\s+w\.id\s*=\s*v\.warehouse_id/i);
+    expect(sql).toMatch(/w\.name\s+as\s+site_name/i);
+    expect(sql).toMatch(
+      /left join public\.stock_operating_parties\s+p\s+on\s+p\.id\s*=\s*v\.holder_party_id/i,
+    );
+    expect(sql).toMatch(/p\.name\s+as\s+holder_name/i);
+    expect(sql).toMatch(/with\s*\(security_invoker\s*=\s*true\)/i);
+    expect(sql).toMatch(/revoke all on public\.stock_unit_register_v from authenticated, anon/i);
+    expect(sql).toMatch(/grant select on public\.stock_unit_register_v to authenticated/i);
+  });
+});
 
 /** A row exactly as `stock_unit_register_v` returns it (shape taken from the
  *  live view on 2026-08-21). */

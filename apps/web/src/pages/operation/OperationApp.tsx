@@ -169,6 +169,11 @@ export default function OperationApp() {
      Manual Purchase needed before it. A page that draws a header joins this
      list in the PR that gives it one. */
   const isEditDeliveryUrl = location.pathname.startsWith("/operation/delivery/edit");
+  /* One exact Unit is an object route, addressed by its permanent Unit ID.
+     The route was declared below but omitted from this gate, so a direct load
+     retained the URL while rendering Dashboard. URL routes join both the
+     render gate and the one-header suppression in the same change. */
+  const isStockUnitUrl = location.pathname.startsWith("/operation/stock/unit/");
   /* The one Settings Workspace is its own route, not a module tab — the
      Page Header gear is the ERP's single Settings entry (ui/MASTER.md). */
   const isSettingsUrl = location.pathname.startsWith("/operation/settings");
@@ -181,7 +186,7 @@ export default function OperationApp() {
        the production walk, invisible to a component test that never mounts the
        router. A new route joins BOTH lists in the same commit. */
     isEditDeliveryUrl ||
-    isDeliveryOrdersUrl || isSettingsUrl || isIssuesUrl;
+    isDeliveryOrdersUrl || isStockUnitUrl || isSettingsUrl || isIssuesUrl;
 
   const [tab, setTab] = useState<string>("dashboard");
   // Sidebar collapse moved into PortalSidebar (Unified Internal Portal,
@@ -324,6 +329,7 @@ export default function OperationApp() {
         {!isOrdersUrl &&
           !isDeliveryOrdersUrl &&
           !isEditDeliveryUrl &&
+          !isStockUnitUrl &&
           !isOldOrdersUrl &&
           !isProcurementUrl &&
           !isToOrderUrl &&

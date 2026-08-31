@@ -73,6 +73,9 @@ vi.mock("./OperationDelivery", () => ({
 vi.mock("./EditDelivery", () => ({
   default: () => <div data-testid="edit-delivery-stub">edit-delivery</div>,
 }));
+vi.mock("./WarehouseUnitDetail", () => ({
+  default: () => <div data-testid="warehouse-unit-stub">warehouse-unit</div>,
+}));
 // The right rail self-fetches (tasks/notes) — stub it; this suite tests routing.
 vi.mock("./components/OperationRightRail", () => ({
   default: () => <div data-testid="right-rail-stub">rail</div>,
@@ -284,6 +287,27 @@ describe("OperationApp — Edit Delivery mounts at its URL", () => {
   it("a leg keeps its query string", () => {
     renderApp("/operation/delivery/edit/order-1?leg=2");
     expect(screen.getByTestId("edit-delivery-stub")).toBeInTheDocument();
+  });
+});
+
+/**
+ * A Unit ID is a permanent object address. Declaring the descendant Route is
+ * not enough: the shell must also enter its URL-driven branch, otherwise a
+ * direct load keeps the URL but renders Dashboard underneath it.
+ */
+describe("OperationApp — an exact Stock Unit mounts at its permanent URL", () => {
+  it("/operation/stock/unit/:unitCode mounts Unit Detail, not Dashboard", () => {
+    renderApp("/operation/stock/unit/id-yjk864506");
+    expect(screen.getByTestId("warehouse-unit-stub")).toBeInTheDocument();
+    expect(screen.queryByTestId("dashboard-stub")).not.toBeInTheDocument();
+    expect(screen.getByTestId("location-probe")).toHaveTextContent(
+      "/operation/stock/unit/id-yjk864506",
+    );
+  });
+
+  it("stands the slim global bar down because Unit Detail owns its header", () => {
+    renderApp("/operation/stock/unit/id-yjk864506");
+    expect(screen.queryByTestId("global-topbar-stub")).not.toBeInTheDocument();
   });
 });
 
