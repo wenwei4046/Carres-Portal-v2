@@ -1,8 +1,8 @@
 # Purchase Orders Register and Object Design
 
-**Owner-reviewed:** 30 Aug 2026  
-**Scope:** Purchasing → Purchase Orders  
-**Status:** Approved in sections; written review pending  
+**Owner-reviewed:** 30 Aug 2026
+**Scope:** Purchasing → Purchase Orders
+**Status:** Approved in sections; written review pending
 
 ## 1. Outcome
 
