@@ -1235,8 +1235,9 @@ facts:
   `Pending Delivery Qty`. Extra quantity is recorded separately. Damaged/wrong/extra never reduce
   Pending Delivery Qty and never create available stock.
 - Supplier DO, channel/evidence, recorder and event times remain auditable. Finishing receiving
-  allocates and stores one formal `GRN-YYYYMMDD-RRRR` and moves only valid received goods into Stock
-  custody. Retry returns the same GRN; a reversed number is never reused.
+  allocates and stores one formal `GRN-YYYYMMDD-RRRR`; its date segment is the Malaysia posting
+  date, never `Goods Received At`. Only valid received goods move into Stock custody. Retry returns
+  the same GRN; a reversed number is never reused.
 - Receiving-owned work deep-links the exact PO/Receiving Session. A Purchasing supplier chase
   deep-links the exact PO. Merely opening WhatsApp/email completes nothing.
 - The 240px `RECEIVING DATE` rail shows `Late`, six actual Warehouse work dates, `Later` and

@@ -456,7 +456,8 @@ Case outcomes · Finance/AP read-only continuation.
 - The **Receiving Session / Goods Receipt** — ONE physical delivery, one session, from a PO or CO.
 - The supplier's DO reference/evidence and Carres's numbered GRN. The supplier provides its DO;
   Carres creates and stores the formal `GRN-YYYYMMDD-RRRR` identity only after physical receiving —
-  one cannot substitute for the other and a voided number is never reused.
+  `YYYYMMDD` is the Malaysia posting date, never `Goods Received At`; one cannot substitute for the
+  other and a voided number is never reused.
 - The three times (goods received at · submitted at · posted at) and the append-only event
   ledger. **Amend and Void are its acts; history is never edited in place.**
 - **`purchase_order_lines.received_qty` moves only through this module.**
