@@ -1,5 +1,6 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { PanelLeftOpen } from "lucide-react";
 import {
   applyRailSelection,
   ATTENTION_REASONS,
@@ -28,6 +29,11 @@ import { fmtDate } from "@/lib/fmt-date";
 import { useStockRegister } from "@/lib/queries";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import ModuleHeader from "./components/ModuleHeader";
+import {
+  FilterRail,
+  FilterRailGroup,
+  FilterRailRow,
+} from "./components/workspace-rail";
 
 /**
  * THE STOCK REGISTER — Warehouse's one current listing of controlled Units.
@@ -79,6 +85,11 @@ const CONDITION_LABEL: Record<string, string> = {
   damaged: "Damaged",
 };
 
+const FILTER_RAIL_STORAGE_KEY = {
+  stock: "carres.warehouse.stock.filterRail.v1",
+  ready: "carres.warehouse.ready.filterRail.v1",
+} as const;
+
 /** Availability decides the dot's colour. The ARITHMETIC is 0366's; this only
  *  paints the answer it was handed. */
 const AVAILABILITY_DOT: Record<UnitAvailability, string> = {
@@ -90,10 +101,23 @@ const AVAILABILITY_DOT: Record<UnitAvailability, string> = {
   ended: "bg-kit-slate-5",
 };
 
-export default function WarehouseStockRegister() {
+export default function WarehouseStockRegister({
+  scope = "stock",
+}: {
+  scope?: "stock" | "ready";
+} = {}) {
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const { data, isLoading, isError, error, refetch } = useStockRegister();
+  const isReady = scope === "ready";
+  const railStorageKey = FILTER_RAIL_STORAGE_KEY[scope];
+  const [railOpen, setRailOpen] = useState(() => {
+    try {
+      return window.localStorage.getItem(railStorageKey) !== "0";
+    } catch {
+      return true;
+    }
+  });
 
   /** The rail lives in the URL so a narrowed view can be sent to a colleague
    *  and comes back the same (Card §6 — deep-link behaviour). */
@@ -113,7 +137,24 @@ export default function WarehouseStockRegister() {
 
   const [search, setSearch] = useState("");
   const now = useMemo(() => new Date(), []);
-  const allUnits = useMemo(() => data?.units ?? [], [data]);
+  const authorityUnits = useMemo(() => data?.units ?? [], [data]);
+  const allUnits = useMemo(
+    () =>
+      isReady
+        ? authorityUnits.filter((u) => u.availability === "available" && u.qty === 1)
+        : authorityUnits,
+    [authorityUnits, isReady],
+  );
+
+  const setRailVisible = useCallback((open: boolean) => {
+    setRailOpen(open);
+    try {
+      window.localStorage.setItem(railStorageKey, open ? "1" : "0");
+    } catch {
+      // A locked-down browser may refuse storage; this visit still keeps the
+      // live choice and the Register remains fully usable.
+    }
+  }, [railStorageKey]);
 
   function setRail(key: keyof StockRailSelection, value: string | null) {
     const next = new URLSearchParams(params);
@@ -125,7 +166,19 @@ export default function WarehouseStockRegister() {
   }
 
   function clearAll() {
-    setParams(new URLSearchParams(), { replace: true });
+    const next = new URLSearchParams(params);
+    for (const key of [
+      "attention",
+      "availability",
+      "site",
+      "ownership",
+      "category",
+      "changed",
+      "history",
+    ]) {
+      next.delete(key);
+    }
+    setParams(next, { replace: true });
     setSearch("");
   }
 
@@ -379,27 +432,46 @@ export default function WarehouseStockRegister() {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <ModuleHeader
-        testId="stock-register-destination-header"
-        word="Stock"
-        docTitle="Stock · Warehouse — Carres"
+        testId={isReady ? "ready-stock-destination-header" : "stock-register-destination-header"}
+        word={isReady ? "Ready stock" : "Stock"}
+        docTitle={`${isReady ? "Ready stock" : "Stock"} · Warehouse — Carres`}
         destinationHeader
       />
-      <div className="flex min-h-0 flex-1 gap-4 p-2" data-testid="stock-register">
+      <div
+        className="flex min-h-0 min-w-0 flex-1 bg-white"
+        data-testid={isReady ? "ready-stock-register" : "stock-register"}
+      >
+        {isError ? (
+          <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 bg-white">
+            <p className="text-body text-base-700">
+              {isReady ? "Ready stock could not be loaded" : "Stock could not be loaded"}
+            </p>
+            {(error as Error | undefined)?.message ? (
+              <p className="text-meta text-base-500">{(error as Error).message}</p>
+            ) : null}
+            <button
+              type="button"
+              className="rounded-control border border-kit-slate-6 bg-white px-3 py-1.5 text-meta font-medium text-kit-slate-11 hover:bg-kit-slate-3"
+              onClick={() => void refetch()}
+            >
+              Try again
+            </button>
+          </div>
+        ) : (
+          <>
         {/* ── LEFT FILTER RAIL (Card §3) ─────────────────────────────────── */}
-        <aside
-          className="w-[196px] shrink-0 space-y-3 overflow-y-auto"
-          data-testid="stock-rail"
-          aria-label="Filter stock"
-        >
+        {railOpen ? (
+          <FilterRail testId="stock-rail" onHide={() => setRailVisible(false)}>
           <RailButton
-            label="All stock"
+            label={isReady ? "All ready stock" : "All stock"}
             n={allUnits.filter(isCurrentUnit).length}
             active={!filtered}
             onClick={clearAll}
             testId="rail-all-stock"
           />
 
-          <RailSection title="Attention">
+          {!isReady ? (
+            <RailSection title="Attention">
             {ATTENTION_REASONS.filter((r) => (counts.attention.get(r) ?? 0) > 0).length === 0 ? (
               <p className="px-1 text-meta text-base-400">Nothing needs attention</p>
             ) : (
@@ -409,14 +481,15 @@ export default function WarehouseStockRegister() {
                   label={ATTENTION_REASON_LABEL[r]}
                   n={counts.attention.get(r) ?? 0}
                   active={sel.attention === r}
-                  tone="warning"
                   onClick={() => setRail("attention", r)}
                 />
               ))
             )}
-          </RailSection>
+            </RailSection>
+          ) : null}
 
-          <RailSection title="Availability">
+          {!isReady ? (
+            <RailSection title="Availability">
             {UNIT_AVAILABILITY.filter((a) => a !== "ended").map((a) => (
               <RailButton
                 key={a}
@@ -426,7 +499,8 @@ export default function WarehouseStockRegister() {
                 onClick={() => setRail("availability", a)}
               />
             ))}
-          </RailSection>
+            </RailSection>
+          ) : null}
 
           {/* A filter offering ONE choice is not a filter. Today there is one
               Site and one ownership value, so neither section is drawn. Each
@@ -500,7 +574,8 @@ export default function WarehouseStockRegister() {
             ) : null}
           </RailSection>
 
-          <RailSection title="History">
+          {!isReady ? (
+            <RailSection title="History">
             {/* Delivered and ended Units are a DESTINATION, not a filter mixed
                 into today's shelf (Card §1). Exact-ID search finds them either
                 way. */}
@@ -511,49 +586,51 @@ export default function WarehouseStockRegister() {
               onClick={() => setRail("showEnded", sel.showEnded ? null : "1")}
               testId="rail-history"
             />
-          </RailSection>
-        </aside>
+            </RailSection>
+          ) : null}
+          </FilterRail>
+        ) : null}
 
         {/* ── THE REGISTER ───────────────────────────────────────────────── */}
-        <div className="flex min-h-0 flex-1 flex-col" data-testid="register-column">
-          {isError ? (
-            <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 bg-white">
-              <p className="text-body text-base-700">Stock could not be loaded</p>
-              {(error as Error | undefined)?.message ? (
-                <p className="text-meta text-base-500">{(error as Error).message}</p>
-              ) : null}
-              <button
-                type="button"
-                className="rounded-md border border-base-200 bg-white px-3 py-1.5 text-meta font-medium text-base-700 hover:bg-base-50"
-                onClick={() => void refetch()}
-              >
-                Try again
-              </button>
-            </div>
-          ) : (
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col" data-testid="register-column">
             <DataGrid<StockRegisterUnit>
               appearance="reference"
               rows={rows}
               columns={columns}
-              storageKey="carres.warehouse.stockRegister.v1"
+              storageKey={`carres.warehouse.${scope}Register.v1`}
               rowKey={(u) => u.id}
-              exportName="Stock"
+              exportName={isReady ? "Ready stock" : "Stock"}
               searchPlaceholder="Unit ID, product, PO, SO or supplier…"
               isLoading={isLoading}
               onSearchChange={setSearch}
+              toolbarStart={!railOpen ? (
+                <button
+                  type="button"
+                  aria-label="Show filters"
+                  title="Show filters"
+                  className="grid h-7 w-7 place-items-center rounded-control border border-kit-slate-6 bg-white text-kit-slate-11 hover:bg-kit-slate-3 hover:text-kit-slate-12"
+                  onClick={() => setRailVisible(true)}
+                >
+                  <PanelLeftOpen size={16} strokeWidth={1.75} aria-hidden />
+                </button>
+              ) : null}
               stickyIdentity
               groupBanner={false}
               chooserGroupOrder={["Unit", "Place", "Source", "Dates"]}
               onRowDoubleClick={(u) => navigate(`/operation/stock/unit/${u.unitCode}`)}
               emptyMessage={
                 allUnits.length === 0
-                  ? "No Units yet — a Unit is created when a purchase order or consignment order is confirmed, and Receiving checks it in against the ID the supplier put on the label."
+                  ? isReady
+                    ? "No exact Units are ready for a new customer promise."
+                    : "No Units yet — a Unit is created when a purchase order or consignment order is confirmed, and Receiving checks it in against the ID the supplier put on the label."
                   : "No Units match these filters."
               }
               statusSummary={() => {
                 /* UI MASTER §6.7: the 32px footer carries the summary. No KPI
                    strip above the table — a Register is truth, not a dashboard. */
-                const line = registerSummaryLine(totals, currentUnits.length);
+                const line = isReady
+                  ? `${rows.length} ready ${rows.length === 1 ? "Unit" : "Units"}`
+                  : registerSummaryLine(totals, currentUnits.length);
                 return (
                   <span className="block truncate" title={line}>
                     {line}
@@ -561,8 +638,9 @@ export default function WarehouseStockRegister() {
                 );
               }}
             />
-          )}
         </div>
+          </>
+        )}
       </div>
     </div>
   );
@@ -585,14 +663,7 @@ function attentionSentence(u: StockRegisterUnit): string | null {
 }
 
 function RailSection({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="rounded border border-base-200 bg-white p-2">
-      <div className="px-1 pb-1 text-[11px] font-semibold uppercase tracking-wide text-base-500">
-        {title}
-      </div>
-      <div className="flex flex-col gap-0.5">{children}</div>
-    </div>
-  );
+  return <FilterRailGroup title={title}>{children}</FilterRailGroup>;
 }
 
 function RailButton({
@@ -600,31 +671,21 @@ function RailButton({
   n,
   active,
   onClick,
-  tone,
   testId,
 }: {
   label: string;
   n: number;
   active: boolean;
   onClick: () => void;
-  tone?: "warning";
   testId?: string;
 }) {
   return (
-    <button
-      type="button"
+    <FilterRailRow
+      label={label}
+      count={n}
+      active={active}
       onClick={onClick}
-      aria-pressed={active}
-      data-testid={testId}
-      className={[
-        "flex w-full items-center justify-between gap-2 rounded px-2 py-1 text-left text-meta",
-        active ? "bg-primary/10 font-semibold text-primary" : "text-base-700 hover:bg-hovertint",
-      ].join(" ")}
-    >
-      <span className="truncate">{label}</span>
-      <span className={tone === "warning" && n > 0 && !active ? "text-kit-amber-11" : "text-base-500"}>
-        {n}
-      </span>
-    </button>
+      testId={testId ?? `stock-filter-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
+    />
   );
 }

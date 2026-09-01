@@ -348,7 +348,9 @@ export default function OperationApp() {
           tab !== "receiving" &&
           tab !== "claims" &&
           tab !== "purchasing-report" &&
-          tab !== "purchasing-settings" && <GlobalTopBar />}
+          tab !== "purchasing-settings" &&
+          tab !== "stock-onhand" &&
+          tab !== "stock-plan" && <GlobalTopBar />}
         <div
           className={`flex-1 min-h-0 ${
             isSalesOrdersRegisterUrl || isDeliveryOrdersRegisterUrl

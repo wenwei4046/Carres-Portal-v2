@@ -19,6 +19,7 @@ import StockTabs from "./StockTabs";
 import UrgentRestockPanel from "./components/UrgentRestockPanel";
 import PoolUsagePanel from "./components/PoolUsagePanel";
 import StockHealthPanel from "./components/StockHealthPanel";
+import WarehouseStockRegister from "./WarehouseStockRegister";
 
 /**
  * Ready stock — the monthly plan (card K2, migration 0287).
@@ -54,7 +55,17 @@ function thisMonth(): string {
   return new Date(Date.now() + 8 * 3_600_000).toISOString().slice(0, 7);
 }
 
+/**
+ * Ready stock is Warehouse truth: the exact Units that can be promised now.
+ * The former monthly ordering cycle remains named and testable below while its
+ * future destination is reconciled with Purchasing; it is no longer presented
+ * as Warehouse Ready stock and no writer has moved into Stock.
+ */
 export default function OperationStockPlan() {
+  return <WarehouseStockRegister scope="ready" />;
+}
+
+export function PurchasingReplenishmentPlan() {
   const [period, setPeriod] = useState<string>(() => thisMonth());
   const { data, isLoading, isError, error } = useStockPlan(period);
   const openM = useOpenStockPlan();

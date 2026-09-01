@@ -76,6 +76,12 @@ vi.mock("./EditDelivery", () => ({
 vi.mock("./WarehouseUnitDetail", () => ({
   default: () => <div data-testid="warehouse-unit-stub">warehouse-unit</div>,
 }));
+vi.mock("./WarehouseStockRegister", () => ({
+  default: () => <div data-testid="stock-register-destination-header">stock</div>,
+}));
+vi.mock("./OperationStockPlan", () => ({
+  default: () => <div data-testid="ready-stock-destination-header">ready-stock</div>,
+}));
 // The right rail self-fetches (tasks/notes) — stub it; this suite tests routing.
 vi.mock("./components/OperationRightRail", () => ({
   default: () => <div data-testid="right-rail-stub">rail</div>,
@@ -307,6 +313,20 @@ describe("OperationApp — an exact Stock Unit mounts at its permanent URL", () 
 
   it("stands the slim global bar down because Unit Detail owns its header", () => {
     renderApp("/operation/stock/unit/id-yjk864506");
+    expect(screen.queryByTestId("global-topbar-stub")).not.toBeInTheDocument();
+  });
+});
+
+describe("OperationApp — Warehouse registers own the only Destination Header", () => {
+  it("Stock mounts its Destination Header and the global utility row stands down", () => {
+    renderApp("/operation?tab=stock-onhand");
+    expect(screen.getByTestId("stock-register-destination-header")).toBeInTheDocument();
+    expect(screen.queryByTestId("global-topbar-stub")).not.toBeInTheDocument();
+  });
+
+  it("Ready stock mounts its Destination Header and the global utility row stands down", () => {
+    renderApp("/operation?tab=stock-plan");
+    expect(screen.getByTestId("ready-stock-destination-header")).toBeInTheDocument();
     expect(screen.queryByTestId("global-topbar-stub")).not.toBeInTheDocument();
   });
 });

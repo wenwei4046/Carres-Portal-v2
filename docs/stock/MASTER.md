@@ -520,6 +520,33 @@ that is the next Warehouse scope.**
 own confirmation copy, permission surface and evidence rule; wiring them half-way would put five
 buttons on screen whose refusals nobody had designed. They are the scope after the relocation.
 
+### 12.5 · IN BUILD / NOT PRODUCTION-VERIFIED — the Warehouse P0 cutover (PR #1005)
+
+Stock and Ready stock each draw one 50px Destination Header; the Operation shell stands its
+separate global utility row down for both addresses. Stock now uses the shared 240px `FilterRail`,
+`FilterRailGroup` and `FilterRailRow` grammar. The rail keeps its width while the Register scrolls,
+can be hidden from its panel-left control, and returns from the Register toolbar.
+
+A failed `stock_unit_register_v` read is a problem state, never an empty stock fact. The page hides
+the rail and Register until a retry succeeds, so it cannot print `All stock 0`, `Nothing needs
+attention`, zero availability or a zero footer from an unread authority.
+
+For the seven-day cutover, **Ready stock is the honest exact-Unit fallback**: it reads the same Unit
+authority and lists only `Available` records whose quantity is exactly one. The approved Catalog
+product + Site grouping and expansion to exact IDs remains the next Ready stock presentation card;
+no rollup becomes a second availability fact while it waits.
+
+The superseded monthly ordering cycle is retained, with its data and writers unchanged, under the
+code name **Purchasing Replenishment Plan**. Its future operator home is Purchasing and its page word
+is **Replenishment plan**; it has no Warehouse route during this cutover. Purchasing must admit that
+destination through its own authority before navigation is added. Stock neither writes the plan nor
+duplicates Receiving, PO or delivery facts.
+
+This state remains **NOT PRODUCTION-VERIFIED** until PR #1000 is merged exactly, the Stock read-only
+migration is rebased to the then-current repository tail (`0410` is the present candidate because
+main already owns `0409`), all gates pass on the resulting ancestry, and real roles prove the exact
+deploy SHA at desktop and genuine sub-1280 widths.
+
 ## 13 · Resolved contradictions and plan state
 
 Resolved: legacy tab shell to Warehouse destinations; On hand to Stock; Ready stock planning to

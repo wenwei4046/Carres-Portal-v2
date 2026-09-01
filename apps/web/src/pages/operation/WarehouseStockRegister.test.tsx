@@ -93,6 +93,10 @@ describe("the destination is Stock", () => {
     renderRegister();
     const header = await screen.findByTestId("stock-register-destination-header");
     expect(within(header).getByText("Stock")).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Jump to" })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: "Alerts" })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: "Help" })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: "Settings" })).toHaveLength(1);
     expect(screen.queryByText(/On hand/i)).not.toBeInTheDocument();
   });
 
@@ -147,6 +151,18 @@ describe("every number derives from the Unit authority (Card §6)", () => {
 });
 
 describe("the rail filters the same authority (Card §3)", () => {
+  it("uses the shared readable rail and can give its width back to the register", async () => {
+    await renderLoaded();
+    const rail = screen.getByTestId("stock-rail");
+    expect(rail).toHaveClass("w-[240px]", "shrink-0", "border-r", "p-3");
+    expect(screen.getByTestId("register-column")).toHaveClass("min-w-0");
+
+    fireEvent.click(within(rail).getByRole("button", { name: "Hide filters" }));
+    expect(screen.queryByTestId("stock-rail")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Show filters" }));
+    expect(screen.getByTestId("stock-rail")).toBeInTheDocument();
+  });
+
   it("narrows to one availability and the footer follows", async () => {
     await renderLoaded();
     const rail = screen.getByTestId("stock-rail");
@@ -183,6 +199,25 @@ describe("the rail filters the same authority (Card §3)", () => {
     // A filter offering one choice is not a filter (03-page-patterns.md:149).
     expect(within(rail).queryByText("Where")).not.toBeInTheDocument();
     expect(within(rail).queryByText("Ownership")).not.toBeInTheDocument();
+  });
+});
+
+describe("a failed authority read never becomes stock facts", () => {
+  it("shows one problem action and suppresses every zero-derived rail claim", async () => {
+    apiFetchMock.mockImplementation((path: string) => {
+      if (path.startsWith("/api/ops/stock/register")) {
+        return Promise.reject(new Error("missing site_name"));
+      }
+      return Promise.resolve({});
+    });
+    renderRegister();
+
+    expect(await screen.findByText("Stock could not be loaded")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
+    expect(screen.queryByTestId("stock-rail")).not.toBeInTheDocument();
+    expect(screen.queryByText(/All stock\s*0/i)).not.toBeInTheDocument();
+    expect(screen.queryByText("Nothing needs attention")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("work-toolbar")).not.toBeInTheDocument();
   });
 });
 
