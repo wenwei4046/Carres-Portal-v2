@@ -79,10 +79,10 @@ export default function WarehouseUnitDetail() {
       <div className="min-h-0 flex-1 overflow-y-auto px-9 py-6" data-testid="stock-unit-detail">
         <button
           type="button"
-          onClick={() => navigate("/operation/stock")}
+          onClick={() => navigate("/operation?tab=stock-onhand")}
           className="mb-4 text-meta text-base-500 hover:text-base-800"
         >
-          ← Stock
+          ← Inventory
         </button>
 
         {isLoading ? (
@@ -97,7 +97,7 @@ export default function WarehouseUnitDetail() {
             <p className="mt-1 text-meta text-base-500">
               {(error as { status?: number } | undefined)?.status === 404
                 ? "Check the Unit ID and open the record again."
-                : "Try again. If it still fails, ask the system owner to check the Stock Register."}
+                : "Try again. If it still fails, ask the system owner to check Inventory."}
             </p>
           </div>
         ) : unit ? (

@@ -35,20 +35,18 @@ import EscalationInboxCard from "./components/EscalationInboxCard";
  *
  * Side card "View all" links:
  *   - Manage POs → procurement
- *   - Open warehouse → warehouse
+ *   - Open warehouse → Inventory
  */
 interface Props {
   setTab: (t: string) => void;
-  /** Cross-tab jump to the warehouse tab WITH a prefill (the alert filter).
-   *  Wired by OperationApp; the StockAlertsTile "View alerts" button uses it.
-   *  Falls back to a plain `setTab("warehouse")` when absent (isolated tests). */
+  /** Cross-tab jump to Inventory, optionally carrying alert intent. */
   goWarehouse?: (prefill?: { alert?: boolean }) => void;
 }
 
 // StockAlertsTile "View alerts" → jump to the warehouse "Alerts" view. We pass
 // a handler that prefers `goWarehouse({ alert: true })` (seeds the alert filter
 // via OperationApp's tab-state prefill) and falls back to a plain
-// `setTab("warehouse")` when the shell didn't wire goWarehouse (isolated tests).
+// `setTab("stock-onhand")` when the shell did not wire the shared jump.
 // No URL write — closes `phase-4.5-chunk-2-alerts-tab-routing`.
 
 const RM = (n: number) => `RM ${Math.round(Number(n) || 0).toLocaleString()}`;
@@ -209,10 +207,13 @@ export default function OperationDashboard({ setTab, goWarehouse }: Props) {
           (fetches its own alerts feed via TanStack Query). */}
       <div className="grid grid-cols-3 gap-3.5">
         <OpenPOsCard pos={open_pos} onViewAll={() => setTab("procurement")} />
-        <LowStockCard lowStock={low_stock} onViewAll={() => setTab("warehouse")} />
+        <LowStockCard
+          lowStock={low_stock}
+          onViewAll={() => goWarehouse ? goWarehouse() : setTab("stock-onhand")}
+        />
         <StockAlertsTile
           onJumpToWarehouse={() =>
-            goWarehouse ? goWarehouse({ alert: true }) : setTab("warehouse")
+            goWarehouse ? goWarehouse({ alert: true }) : setTab("stock-onhand")
           }
           // K1 — a `Reorder stock` alert is answered on the Stock door, which
           // is where the reorder point itself is set.

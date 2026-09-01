@@ -1160,7 +1160,7 @@ describe("PortalSidebar — Delivery is one page", () => {
 });
 
 describe("PortalSidebar — the Warehouse module's pages", () => {
-  it("Stock is the one built Warehouse register", () => {
+  it("Inventory is the one built Warehouse register", () => {
     renderAt("/operation?tab=stock-onhand");
     expect(child("stock")).toHaveAttribute("href", "/operation?tab=stock-onhand");
     expect(screen.queryByTestId("nav-child-stock-plan")).not.toBeInTheDocument();
@@ -1191,15 +1191,14 @@ describe("PortalSidebar — the Warehouse module's pages", () => {
    * The old assertion banned the WORD anywhere in the rail, which was always
    * wider than the ruling it enforced. It now checks the thing that was actually
    * ruled: no MODULE row says Stock, and the module row says Warehouse. */
-  it("no bare `Stock` MODULE row survives — the module is Warehouse, Stock is its page", () => {
+  it("the module is Warehouse and its goods pool is Inventory", () => {
     renderAt("/operation?tab=stock-onhand");
     expect(within(module_("warehouse")).getByText("Warehouse")).toBeInTheDocument();
-    // `Stock` exists exactly once, and it is a CHILD.
-    expect(screen.getByTestId("nav-child-stock")).toHaveTextContent("Stock");
+    expect(screen.getByTestId("nav-child-stock")).toHaveTextContent("Inventory");
     const moduleRows = Array.from(
       document.querySelectorAll("[data-testid^='nav-module-']"),
     ).map((el) => el.textContent?.trim());
-    expect(moduleRows).not.toContain("Stock");
+    expect(moduleRows).not.toContain("Inventory");
   });
 
   it("the blueprint keeps Reports and Settings central — neither joins the module", () => {
@@ -1211,7 +1210,8 @@ describe("PortalSidebar — the Warehouse module's pages", () => {
     ).map((el) => el.textContent?.replace("Coming soon", "").trim());
     /* `Stock`, not `On hand` — CARD-2026-08-20-stock-register §1. The learned
      * ORDER is untouched: the rail never reshuffles under an operator. */
-    expect(rows).toEqual(["Schedule", "Stock", "Transfers", "Counts"]);
+    expect(rows).toEqual(["Schedule", "Inventory", "Transfers", "Counts"]);
+    expect(rows).not.toContain("Dashboard");
   });
 });
 

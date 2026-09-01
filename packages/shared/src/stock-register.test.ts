@@ -199,6 +199,19 @@ describe("rail sections combine; one selection applies within a section (Card §
     expect(out.map((r) => r.id)).toEqual(["a"]);
   });
 
+  it("Held by matches a governed party and the honest Not recorded bucket", () => {
+    const held = unit({ id: "held", holderPartyId: "party-1", holderName: "NETS Warehouse" });
+    const unheld = unit({ id: "unheld", holderPartyId: null, holderName: null });
+    expect(applyRailSelection([held, unheld], {
+      ...EMPTY_RAIL_SELECTION,
+      holder: "party-1",
+    }, now).map((row) => row.id)).toEqual(["held"]);
+    expect(applyRailSelection([held, unheld], {
+      ...EMPTY_RAIL_SELECTION,
+      holder: "__not_recorded__",
+    }, now).map((row) => row.id)).toEqual(["unheld"]);
+  });
+
   it("a filtered rail reports itself as filtered", () => {
     expect(isRailFiltered({ ...EMPTY_RAIL_SELECTION, category: "sofa" })).toBe(true);
     expect(isRailFiltered({ ...EMPTY_RAIL_SELECTION, query: "  " })).toBe(false);
@@ -231,7 +244,7 @@ describe("the footer tells the truth about what can be promised", () => {
       unit({ id: "b", availability: "available", qty: 555 }),
       unit({ id: "c", availability: "reserved", qty: 1 }),
     ];
-    expect(summariseRegister(rows)).toEqual({ units: 3, available: 1, bulkOnHand: 555 });
+    expect(summariseRegister(rows)).toEqual({ units: 2, available: 1, bulkOnHand: 555 });
   });
 
   it("a bulk record NEVER counts as promisable — 0366 forbids it being reserved", () => {

@@ -116,9 +116,15 @@ export function exactUnitRecords(units: StockRegisterUnit[]): StockRegisterUnit[
  */
 export const NO_CATALOG_KEY = "__none__";
 export const NO_CATALOG_LABEL = "Not in catalog";
+export const NO_HOLDER_KEY = "__not_recorded__";
+export const NO_HOLDER_LABEL = "Not recorded";
 
 export function categoryKeyOf(u: Pick<StockRegisterUnit, "category">): string {
   return u.category ?? NO_CATALOG_KEY;
+}
+
+export function holderKeyOf(u: Pick<StockRegisterUnit, "holderPartyId">): string {
+  return u.holderPartyId ?? NO_HOLDER_KEY;
 }
 
 // ---------------------------------------------------------------------------
@@ -212,6 +218,7 @@ export interface StockRailSelection {
   attention: AttentionReason | null;
   availability: UnitAvailability | null;
   site: string | null;
+  holder: string | null;
   ownership: string | null;
   category: string | null;
   changed: ChangedScope | null;
@@ -225,6 +232,7 @@ export const EMPTY_RAIL_SELECTION: StockRailSelection = {
   attention: null,
   availability: null,
   site: null,
+  holder: null,
   ownership: null,
   category: null,
   changed: null,
@@ -237,6 +245,7 @@ export function isRailFiltered(sel: StockRailSelection): boolean {
     sel.attention !== null ||
     sel.availability !== null ||
     sel.site !== null ||
+    sel.holder !== null ||
     sel.ownership !== null ||
     sel.category !== null ||
     sel.changed !== null ||
@@ -249,7 +258,7 @@ export function isRailFiltered(sel: StockRailSelection): boolean {
 export function matchesRegisterQuery(u: StockRegisterUnit, rawQuery: string): boolean {
   const q = rawQuery.trim().toLowerCase();
   if (q === "") return true;
-  return [u.unitCode, u.sku, u.poNo, u.reservedRef, u.supplier, u.siteName]
+  return [u.unitCode, u.sku, u.poNo, u.reservedRef, u.supplier, u.siteName, u.holderName]
     .filter(Boolean)
     .some((v) => (v as string).toLowerCase().includes(q));
 }
@@ -269,6 +278,7 @@ export function applyRailSelection(
     if (sel.attention && !hasAttention(u, sel.attention)) return false;
     if (sel.availability && u.availability !== sel.availability) return false;
     if (sel.site && u.warehouseId !== sel.site) return false;
+    if (sel.holder && holderKeyOf(u) !== sel.holder) return false;
     if (sel.ownership && u.ownership !== sel.ownership) return false;
     if (sel.category && categoryKeyOf(u) !== sel.category) return false;
     if (sel.changed && !changedWithin(u, sel.changed, now)) return false;
@@ -301,14 +311,16 @@ export interface StockRegisterTotals {
  * visible to Jess instead of buried.
  */
 export function summariseRegister(units: StockRegisterUnit[]): StockRegisterTotals {
+  let exactUnits = 0;
   let available = 0;
   let bulkOnHand = 0;
   for (const u of units) {
+    if (u.qty === 1) exactUnits += 1;
     if (u.availability !== "available") continue;
     if (u.qty > 1) bulkOnHand += u.qty;
     else available += 1;
   }
-  return { units: units.length, available, bulkOnHand };
+  return { units: exactUnits, available, bulkOnHand };
 }
 
 /** The one sentence the footer prints. Plural-correct, never a bare count. */

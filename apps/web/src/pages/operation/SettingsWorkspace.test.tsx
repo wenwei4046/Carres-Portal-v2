@@ -27,7 +27,7 @@ describe("SettingsWorkspace navigation", () => {
       "/operation/settings/purchasing",
     );
     expect(screen.getByRole("link", { name: "Issue Tracker Settings" })).toHaveAttribute("href", "/operation/settings/issue-tracker");
-    expect(screen.getByRole("link", { name: "Stock Settings" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Inventory Settings" })).toHaveAttribute(
       "href",
       "/operation/settings/stock",
     );

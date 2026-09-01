@@ -7,17 +7,18 @@ import {
   ATTENTION_REASON_LABEL,
   availabilityLabel,
   categoryKeyOf,
-  changedWithin,
   exactUnitRecords,
   CHANGED_SCOPES,
   CHANGED_SCOPE_LABEL,
   hasAttention,
+  holderKeyOf,
   isCurrentUnit,
   isRailFiltered,
   nextMovementLabel,
   stockAvailabilityLabel,
   NO_CATALOG_KEY,
   NO_CATALOG_LABEL,
+  NO_HOLDER_LABEL,
   registerSummaryLine,
   summariseRegister,
   UNIT_AVAILABILITY,
@@ -118,11 +119,14 @@ export default function WarehouseStockRegister() {
       attention: (params.get("attention") as AttentionReason | null) ?? null,
       availability: (params.get("availability") as UnitAvailability | null) ?? null,
       site: params.get("site"),
+      holder: params.get("holder"),
       ownership: params.get("ownership"),
       category: params.get("category"),
       changed: (params.get("changed") as ChangedScope | null) ?? null,
       query: "",
-      showEnded: params.get("history") === "1",
+      // Retired history URLs no longer widen Inventory. Ended Units remain
+      // reachable only when their exact permanent ID is searched.
+      showEnded: false,
     }),
     [params],
   );
@@ -157,6 +161,7 @@ export default function WarehouseStockRegister() {
       "attention",
       "availability",
       "site",
+      "holder",
       "ownership",
       "category",
       "changed",
@@ -175,45 +180,48 @@ export default function WarehouseStockRegister() {
     [allUnits, sel.showEnded],
   );
 
-  const counts = useMemo(() => {
-    const availability = new Map<string, number>();
-    const attention = new Map<string, number>();
-    const site = new Map<string, { name: string; n: number }>();
-    const ownership = new Map<string, number>();
-    const category = new Map<string, number>();
-    const changed = new Map<string, number>();
-
-    for (const u of currentUnits) {
-      availability.set(u.availability, (availability.get(u.availability) ?? 0) + 1);
-      for (const r of ATTENTION_REASONS) {
-        if (hasAttention(u, r)) attention.set(r, (attention.get(r) ?? 0) + 1);
-      }
-      if (u.warehouseId) {
-        const prev = site.get(u.warehouseId);
-        site.set(u.warehouseId, { name: u.siteName ?? "Unnamed site", n: (prev?.n ?? 0) + 1 });
-      }
-      ownership.set(u.ownership, (ownership.get(u.ownership) ?? 0) + 1);
-      const ck = categoryKeyOf(u);
-      category.set(ck, (category.get(ck) ?? 0) + 1);
-      for (const scope of CHANGED_SCOPES) {
-        if (changedWithin(u, scope, now)) changed.set(scope, (changed.get(scope) ?? 0) + 1);
-      }
-    }
-    return { availability, attention, site, ownership, category, changed };
-  }, [currentUnits, now]);
-
   const rows = useMemo(
     () => applyRailSelection(allUnits, { ...sel, query: search }, now),
     [allUnits, sel, search, now],
   );
 
+  /** Each option says what the Register would contain after choosing it. The
+   *  choice replaces only its own section and keeps every other active filter. */
+  const predictedCount = useCallback(
+    (key: keyof StockRailSelection, value: string | boolean | null) =>
+      applyRailSelection(
+        allUnits,
+        { ...sel, query: search, [key]: value } as StockRailSelection,
+        now,
+      ).length,
+    [allUnits, now, search, sel],
+  );
+
+  const railValues = useMemo(() => {
+    const sites = new Map<string, string>();
+    const holders = new Map<string, string>();
+    const ownership = new Set<string>();
+    const categories = new Set<string>();
+    const attention = new Set<AttentionReason>();
+    for (const u of currentUnits) {
+      if (u.warehouseId) sites.set(u.warehouseId, u.siteName ?? "Unnamed location");
+      holders.set(holderKeyOf(u), u.holderName ?? NO_HOLDER_LABEL);
+      ownership.add(u.ownership);
+      categories.add(categoryKeyOf(u));
+      for (const reason of ATTENTION_REASONS) {
+        if (hasAttention(u, reason)) attention.add(reason);
+      }
+    }
+    return { sites, holders, ownership, categories, attention };
+  }, [currentUnits]);
+
   const categoryKeys = useMemo(() => {
-    const present = [...counts.category.keys()].filter((k) => k !== NO_CATALOG_KEY);
+    const present = [...railValues.categories].filter((k) => k !== NO_CATALOG_KEY);
     return [
       ...CATEGORY_ORDER.filter((c) => present.includes(c)),
       ...present.filter((c) => !CATEGORY_ORDER.includes(c)).sort(),
     ];
-  }, [counts.category]);
+  }, [railValues.categories]);
 
   const columns: DataGridColumn<StockRegisterUnit>[] = useMemo(
     () => [
@@ -224,7 +232,7 @@ export default function WarehouseStockRegister() {
         sortable: true,
         searchValue: (u) => u.unitCode,
         exportValue: (u) => u.unitCode,
-        chooserGroup: "Stock",
+        chooserGroup: "Inventory",
         accessor: (u) => (
           <span className="font-mono text-meta text-base-900">{u.unitCode}</span>
         ),
@@ -236,7 +244,7 @@ export default function WarehouseStockRegister() {
         sortable: true,
         searchValue: (u) => u.sku,
         exportValue: (u) => u.sku,
-        chooserGroup: "Stock",
+        chooserGroup: "Inventory",
         accessor: (u) => (
           <div className="min-w-0">
             <div className="truncate text-body text-base-900" title={u.sku}>
@@ -253,7 +261,7 @@ export default function WarehouseStockRegister() {
         filterType: "enum",
         filterValue: (u) => stockAvailabilityLabel(u),
         exportValue: (u) => stockAvailabilityLabel(u),
-        chooserGroup: "Stock",
+        chooserGroup: "Inventory",
         accessor: (u) => (
           <span className="inline-flex items-center gap-1.5">
             <span className={`h-1.5 w-1.5 rounded-full ${AVAILABILITY_DOT[u.availability]}`} />
@@ -269,7 +277,7 @@ export default function WarehouseStockRegister() {
         filterType: "enum",
         filterValue: (u) => u.siteName ?? "—",
         exportValue: (u) => u.siteName ?? "",
-        chooserGroup: "Stock",
+        chooserGroup: "Inventory",
         accessor: (u) => (
           <span className="truncate text-meta text-base-800">{u.siteName ?? "—"}</span>
         ),
@@ -282,7 +290,7 @@ export default function WarehouseStockRegister() {
         filterType: "enum",
         filterValue: (u) => u.holderName ?? "Not recorded",
         exportValue: (u) => u.holderName ?? "",
-        chooserGroup: "Stock",
+        chooserGroup: "Inventory",
         accessor: (u) =>
           u.holderName ? (
             <span className="truncate text-meta text-base-800">{u.holderName}</span>
@@ -300,7 +308,7 @@ export default function WarehouseStockRegister() {
         filterType: "enum",
         filterValue: (u) => CONDITION_LABEL[u.condition] ?? u.condition,
         exportValue: (u) => CONDITION_LABEL[u.condition] ?? u.condition,
-        chooserGroup: "Stock",
+        chooserGroup: "Inventory",
         accessor: (u) => (
           <span className="text-meta text-base-800">{CONDITION_LABEL[u.condition] ?? u.condition}</span>
         ),
@@ -313,7 +321,7 @@ export default function WarehouseStockRegister() {
         filterType: "date",
         dateValue: (u) => u.lastEventAt,
         exportValue: (u) => u.lastEventAt ?? "",
-        chooserGroup: "Stock",
+        chooserGroup: "Inventory",
         accessor: (u) =>
           u.lastEventAt ? (
             <span className="text-meta text-base-700">{fmtDate(u.lastEventAt)}</span>
@@ -326,7 +334,7 @@ export default function WarehouseStockRegister() {
         label: "Next movement",
         minWidth: 240,
         exportValue: (u) => nextMovementLabel(u),
-        chooserGroup: "Stock",
+        chooserGroup: "Inventory",
         accessor: (u) => {
           const label = nextMovementLabel(u);
           return <span className={`truncate text-meta ${label === "—" ? "text-base-400" : "text-base-800"}`}>{label}</span>;
@@ -340,7 +348,7 @@ export default function WarehouseStockRegister() {
         filterType: "date",
         dateValue: (u) => u.moveDate ?? null,
         exportValue: (u) => u.moveDate ?? "",
-        chooserGroup: "Stock",
+        chooserGroup: "Inventory",
         accessor: (u) => u.moveDate ? (
           <span className="text-meta text-base-700">{fmtDate(u.moveDate)}</span>
         ) : (
@@ -352,22 +360,26 @@ export default function WarehouseStockRegister() {
         label: "Work",
         minWidth: 190,
         exportValue: () => "",
-        chooserGroup: "Stock",
+        chooserGroup: "Inventory",
         accessor: () => <span className="text-meta text-base-300">—</span>,
       },
     ],
     [],
   );
 
-  const totals = summariseRegister(rows);
+  const authorityRows = useMemo(
+    () => applyRailSelection(authorityUnits, { ...sel, query: search }, now),
+    [authorityUnits, now, search, sel],
+  );
+  const totals = summariseRegister(authorityRows);
   const filtered = isRailFiltered({ ...sel, query: search });
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <ModuleHeader
         testId="stock-register-destination-header"
-        word="Stock"
-        docTitle="Stock · Warehouse — Carres"
+        word="Inventory"
+        docTitle="Inventory · Warehouse — Carres"
         destinationHeader
       />
       <div
@@ -377,10 +389,10 @@ export default function WarehouseStockRegister() {
         {isError ? (
           <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 bg-white">
             <p className="text-body text-base-700">
-              Stock could not be loaded
+              Inventory could not be loaded
             </p>
             <p className="text-meta text-base-500">
-              Try again. If it still fails, ask the system owner to check the Stock Register.
+              Try again. If it still fails, ask the system owner to check Inventory.
             </p>
             <button
               type="button"
@@ -396,22 +408,22 @@ export default function WarehouseStockRegister() {
         {railOpen ? (
           <FilterRail testId="stock-rail" onHide={() => setRailVisible(false)}>
           <RailButton
-            label="All stock"
-            n={allUnits.filter(isCurrentUnit).length}
+            label="All inventory"
+            n={unitCount(allUnits.filter(isCurrentUnit).length)}
             active={!filtered}
             onClick={clearAll}
             testId="rail-all-stock"
           />
 
           <RailSection title="Attention">
-            {ATTENTION_REASONS.filter((r) => (counts.attention.get(r) ?? 0) > 0).length === 0 ? (
+            {railValues.attention.size === 0 ? (
               <p className="px-1 text-meta text-base-400">Nothing needs attention</p>
             ) : (
-              ATTENTION_REASONS.filter((r) => (counts.attention.get(r) ?? 0) > 0).map((r) => (
+              ATTENTION_REASONS.filter((r) => railValues.attention.has(r)).map((r) => (
                 <RailButton
                   key={r}
                   label={ATTENTION_REASON_LABEL[r]}
-                  n={counts.attention.get(r) ?? 0}
+                  n={unitCount(predictedCount("attention", r))}
                   active={sel.attention === r}
                   onClick={() => setRail("attention", r)}
                 />
@@ -424,61 +436,66 @@ export default function WarehouseStockRegister() {
               <RailButton
                 key={a}
                 label={availabilityLabel(a)}
-                n={counts.availability.get(a) ?? 0}
+                n={unitCount(predictedCount("availability", a))}
                 active={sel.availability === a}
                 onClick={() => setRail("availability", a)}
               />
             ))}
           </RailSection>
 
-          {/* A filter offering ONE choice is not a filter. Today there is one
-              Site and one ownership value, so neither section is drawn. Each
-              appears by itself the moment a second value exists. */}
-          {counts.site.size > 1 ? (
-            <RailSection title="Location">
-              {[...counts.site.entries()].map(([id, v]) => (
+          <RailSection title="Location">
+              {[...railValues.sites.entries()].map(([id, name]) => (
                 <RailButton
                   key={id}
-                  label={v.name}
-                  n={v.n}
+                  label={name}
+                  n={unitCount(predictedCount("site", id))}
                   active={sel.site === id}
                   onClick={() => setRail("site", id)}
                 />
               ))}
-            </RailSection>
-          ) : null}
+          </RailSection>
 
-          {counts.ownership.size > 1 ? (
-            <RailSection title="Ownership">
-              {[...counts.ownership.entries()].map(([o, n]) => (
+          <RailSection title="Held by">
+              {[...railValues.holders.entries()].map(([id, name]) => (
+                <RailButton
+                  key={id}
+                  label={name}
+                  n={unitCount(predictedCount("holder", id))}
+                  active={sel.holder === id}
+                  onClick={() => setRail("holder", id)}
+                />
+              ))}
+          </RailSection>
+
+          <RailSection title="Ownership">
+              {[...railValues.ownership].map((o) => (
                 <RailButton
                   key={o}
                   label={UNIT_OWNERSHIP_LABEL[o as keyof typeof UNIT_OWNERSHIP_LABEL] ?? o}
-                  n={n}
+                  n={unitCount(predictedCount("ownership", o))}
                   active={sel.ownership === o}
                   onClick={() => setRail("ownership", o)}
                 />
               ))}
-            </RailSection>
-          ) : null}
+          </RailSection>
 
-          <RailSection title="Category">
+          <RailSection title="Product category">
             {categoryKeys.map((c) => (
               <RailButton
                 key={c}
                 label={CATEGORY_LABEL[c] ?? c}
-                n={counts.category.get(c) ?? 0}
+                n={unitCount(predictedCount("category", c))}
                 active={sel.category === c}
                 onClick={() => setRail("category", c)}
               />
             ))}
-            {(counts.category.get(NO_CATALOG_KEY) ?? 0) > 0 ? (
+            {railValues.categories.has(NO_CATALOG_KEY) ? (
               /* NOT a category, and it never folds into Accessory: "we do not
                  know what this is" is a different fact from "this is an
                  accessory" (Card §3 — an honest bucket, Catalog was asked). */
               <RailButton
                 label={NO_CATALOG_LABEL}
-                n={counts.category.get(NO_CATALOG_KEY) ?? 0}
+                n={unitCount(predictedCount("category", NO_CATALOG_KEY))}
                 active={sel.category === NO_CATALOG_KEY}
                 onClick={() => setRail("category", NO_CATALOG_KEY)}
               />
@@ -490,12 +507,12 @@ export default function WarehouseStockRegister() {
               <RailButton
                 key={s}
                 label={CHANGED_SCOPE_LABEL[s]}
-                n={counts.changed.get(s) ?? 0}
+                n={unitCount(predictedCount("changed", s))}
                 active={sel.changed === s}
                 onClick={() => setRail("changed", s)}
               />
             ))}
-            {[...counts.changed.values()].every((n) => n === 0) ? (
+            {CHANGED_SCOPES.every((scope) => predictedCount("changed", scope) === 0) ? (
               <p className="px-1 pt-1 text-meta text-base-400">
                 No Unit has moved yet — this fills in as goods are received,
                 counted and handed over.
@@ -503,18 +520,6 @@ export default function WarehouseStockRegister() {
             ) : null}
           </RailSection>
 
-          <RailSection title="History">
-            {/* Delivered and ended Units are a DESTINATION, not a filter mixed
-                into today's shelf (Card §1). Exact-ID search finds them either
-                way. */}
-            <RailButton
-              label="Delivered / history"
-              n={allUnits.filter((u) => !isCurrentUnit(u)).length}
-              active={sel.showEnded}
-              onClick={() => setRail("showEnded", sel.showEnded ? null : "1")}
-              testId="rail-history"
-            />
-          </RailSection>
           </FilterRail>
         ) : null}
 
@@ -526,7 +531,7 @@ export default function WarehouseStockRegister() {
                 columns={columns}
                 storageKey="carres.warehouse.stockRegister.v1"
                 rowKey={(u) => u.id}
-                exportName="Stock"
+                exportName="Inventory"
                 searchPlaceholder="Unit ID, product, PO, SO or supplier…"
                 isLoading={isLoading}
                 onSearchChange={setSearch}
@@ -535,7 +540,7 @@ export default function WarehouseStockRegister() {
                 ) : null}
                 stickyIdentity
                 groupBanner={false}
-                chooserGroupOrder={["Stock"]}
+                chooserGroupOrder={["Inventory"]}
                 onRowDoubleClick={(u) => navigate(`/operation/stock/unit/${u.unitCode}`)}
                 emptyMessage={
                   allUnits.length === 0
@@ -581,7 +586,7 @@ function RailButton({
   testId,
 }: {
   label: string;
-  n: number;
+  n: number | string;
   active: boolean;
   onClick: () => void;
   testId?: string;
@@ -595,4 +600,8 @@ function RailButton({
       testId={testId ?? `stock-filter-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
     />
   );
+}
+
+function unitCount(n: number): string {
+  return `${n} ${n === 1 ? "Unit" : "Units"}`;
 }

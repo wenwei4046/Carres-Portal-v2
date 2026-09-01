@@ -9,7 +9,7 @@ import type { StockRegisterUnit } from "@carres/shared";
  * THE STOCK REGISTER — CARD-2026-08-20-stock-register §6.
  *
  * These tests are the card's verification list, not a coverage exercise: the
- * destination says Stock, every count derives from the Unit authority, the rail
+ * destination says Inventory, every count derives from the Unit authority, the rail
  * sections combine and clear, ended Units stay out of the default view, and the
  * old `On hand` wording is gone from the operator surface.
  */
@@ -53,7 +53,17 @@ function unit(p: Partial<StockRegisterUnit> & { id: string; unitCode: string }):
 const UNITS: StockRegisterUnit[] = [
   unit({ id: "1", unitCode: "id-aaa111111" }),
   unit({ id: "2", unitCode: "id-bbb222222", sku: "Essential Memory Pillow(L)", qty: 555, category: null }),
-  unit({ id: "3", unitCode: "id-ccc333333", availability: "reserved", status: "reserved", reservedRef: "SO-1319" }),
+  unit({
+    id: "3",
+    unitCode: "id-ccc333333",
+    availability: "reserved",
+    status: "reserved",
+    reservedRef: "SO-1319",
+    warehouseId: "showroom-pj",
+    siteName: "PJ Showroom",
+    holderPartyId: "nets",
+    holderName: "NETS Warehouse",
+  }),
   unit({
     id: "4",
     unitCode: "id-ddd444444",
@@ -99,16 +109,17 @@ beforeEach(() => {
   window.localStorage.clear();
 });
 
-describe("the destination is Stock", () => {
-  it("names the page Stock, and the old On hand wording is gone", async () => {
+describe("the destination is Inventory", () => {
+  it("names the page Inventory, and the superseded Stock / On hand wording is gone", async () => {
     renderRegister();
     const header = await screen.findByTestId("stock-register-destination-header");
-    expect(within(header).getByText("Stock")).toBeInTheDocument();
+    expect(within(header).getByText("Inventory")).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "Jump to" })).toHaveLength(1);
     expect(screen.getAllByRole("button", { name: "Alerts" })).toHaveLength(1);
     expect(screen.getAllByRole("button", { name: "Help" })).toHaveLength(1);
     expect(screen.getAllByRole("button", { name: "Settings" })).toHaveLength(1);
     expect(screen.queryByText(/On hand/i)).not.toBeInTheDocument();
+    expect(within(header).queryByText(/^Stock$/i)).not.toBeInTheDocument();
   });
 
   it("uses the final governed Stock columns", async () => {
@@ -150,18 +161,19 @@ describe("the default view is current Units (Card §1)", () => {
     expect(screen.queryByText("id-eee555555")).not.toBeInTheDocument();
   });
 
-  it("offers Delivered / history as its own destination, with a truthful count", async () => {
-    await renderLoaded();
-    const history = screen.getByTestId("rail-history");
-    expect(within(history).getByText("Delivered / history")).toBeInTheDocument();
-    expect(within(history).getByText("1")).toBeInTheDocument();
+  it("ignores the retired history URL so ended Units cannot silently widen Inventory", async () => {
+    renderRegister("/operation?tab=stock-onhand&history=1");
+    expect(await screen.findByText("id-aaa111111")).toBeInTheDocument();
+    expect(screen.queryByText("id-eee555555")).not.toBeInTheDocument();
+    expect(screen.getByTestId("rail-all-stock")).toHaveAttribute("aria-pressed", "true");
   });
+
 });
 
 describe("every number derives from exact Units in the authority (Card §6)", () => {
   it("the footer names exact Unit records and their promisable subset", async () => {
     renderRegister();
-    expect(await screen.findByText("3 Units · 1 you can promise")).toBeInTheDocument();
+    expect(await screen.findByText("3 Units · 1 you can promise · 555 pieces you cannot")).toBeInTheDocument();
   });
 
   it("does not force a quantity-controlled accessory record into a fake Unit row", async () => {
@@ -208,7 +220,7 @@ describe("the rail filters the same authority (Card §3)", () => {
     expect(screen.getByText("id-ddd444444")).toBeInTheDocument();
   });
 
-  it("All stock clears every filter", async () => {
+  it("All inventory clears every filter", async () => {
     await renderLoaded();
     const rail = screen.getByTestId("stock-rail");
     fireEvent.click(within(rail).getByRole("button", { name: /^Ordered — not received/ }));
@@ -230,12 +242,35 @@ describe("the rail filters the same authority (Card §3)", () => {
     expect(within(rail).getByText(/No Unit has moved yet/)).toBeInTheDocument();
   });
 
-  it("draws no Where or Ownership section when there is only one value to choose", async () => {
+  it("draws the exact governed filter groups, including Held by", async () => {
     await renderLoaded();
     const rail = screen.getByTestId("stock-rail");
-    // A filter offering one choice is not a filter (03-page-patterns.md:149).
-    expect(within(rail).queryByText("Location")).not.toBeInTheDocument();
-    expect(within(rail).queryByText("Ownership")).not.toBeInTheDocument();
+    for (const label of [
+      "All inventory",
+      "Attention",
+      "Availability",
+      "Location",
+      "Held by",
+      "Ownership",
+      "Product category",
+      "Changed",
+    ]) {
+      expect(within(rail).getByText(label)).toBeInTheDocument();
+    }
+    expect(within(rail).queryByText("History")).not.toBeInTheDocument();
+  });
+
+  it("every option prints Units and predicts its result under the other active filters", async () => {
+    await renderLoaded();
+    const rail = screen.getByTestId("stock-rail");
+    expect(within(rail).getByTestId("rail-all-stock")).toHaveTextContent("3 Units");
+    expect(within(rail).getByRole("button", { name: /NETS Warehouse.*1 Unit/ })).toBeInTheDocument();
+
+    fireEvent.click(within(rail).getByRole("button", { name: /^Ordered — not received/ }));
+    await waitFor(() => {
+      expect(within(rail).getByRole("button", { name: /PJ Showroom.*0 Units/ })).toBeInTheDocument();
+      expect(within(rail).getByRole("button", { name: /Carres Klang Warehouse.*1 Unit/ })).toBeInTheDocument();
+    });
   });
 });
 
@@ -249,14 +284,14 @@ describe("a failed authority read never becomes stock facts", () => {
     });
     renderRegister();
 
-    expect(await screen.findByText("Stock could not be loaded")).toBeInTheDocument();
+    expect(await screen.findByText("Inventory could not be loaded")).toBeInTheDocument();
     expect(
-      screen.getByText("Try again. If it still fails, ask the system owner to check the Stock Register."),
+      screen.getByText("Try again. If it still fails, ask the system owner to check Inventory."),
     ).toBeInTheDocument();
     expect(screen.queryByText("missing site_name")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
     expect(screen.queryByTestId("stock-rail")).not.toBeInTheDocument();
-    expect(screen.queryByText(/All stock\s*0/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/All inventory\s*0/i)).not.toBeInTheDocument();
     expect(screen.queryByText("Nothing needs attention")).not.toBeInTheDocument();
     expect(screen.queryByTestId("work-toolbar")).not.toBeInTheDocument();
   });
@@ -270,7 +305,7 @@ describe("Available to sell is a Stock filter, not a second page", () => {
     expect(screen.queryByText("id-ccc333333")).not.toBeInTheDocument();
     expect(screen.queryByText("id-ddd444444")).not.toBeInTheDocument();
     expect(screen.queryByText("id-bbb222222")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Available to sell 1" })).toHaveAttribute(
+    expect(screen.getByRole("button", { name: "Available to sell 1 Unit" })).toHaveAttribute(
       "aria-pressed",
       "true",
     );

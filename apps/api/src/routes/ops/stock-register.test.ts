@@ -131,7 +131,10 @@ describe("stock_unit_register_v — governed display names", () => {
 
     expect(sql).toMatch(/left join public\.purchase_orders\s+po\s+on\s+po\.id\s*=\s*v\.po_no/i);
     expect(sql).toMatch(/from public\.ops_delivery_orders\s+d/i);
+    expect(sql).toMatch(/v\.reserved_ref\s*=\s*'SO-'\s*\|\|\s*reserved_order\.so::text/i);
     expect(sql).toMatch(/d\.voided_at\s+is\s+null/i);
+    expect(sql).toMatch(/d\.trip_groups\s+is\s+null/i);
+    expect(sql).toMatch(/v\.category\s+in\s*\('mattress',\s*'bedframe'\)/i);
     expect(sql).toMatch(/when v\.status = 'transferred' then null/i);
     expect(sql).not.toMatch(/insert\s+into\s+public\.(?:purchase_orders|ops_delivery_orders|ops_stock_items)/i);
   });
@@ -157,6 +160,12 @@ describe("warehouse_schedule_v — read-only owner projection", () => {
     expect(sql).toContain("Customer delivery pickup");
     expect(sql).toContain("Customer handover");
     expect(sql).toContain("No collection evidence yet");
+    expect(sql).toMatch(/i\.status\s*<>\s*'voided'/i);
+    expect(sql).toMatch(/i\.reserved_ref\s*=\s*'SO-'\s*\|\|\s*delivery_order\.so::text/i);
+    expect(sql).toMatch(/delivery\.trip_groups\s+is\s+null/i);
+    expect(sql).toMatch(/au\.outcome\s*=\s*'delivered'/i);
+    expect(sql).toMatch(/where\s+exists\s*\([\s\S]*au\.attempt_id\s*=\s*attempt\.id[\s\S]*au\.outcome\s*=\s*'delivered'/i);
+    expect(sql).toContain("/operation/orders/so/");
     expect(sql).toMatch(/revoke all on public\.warehouse_schedule_v from authenticated, anon/i);
     expect(sql).toMatch(/grant select on public\.warehouse_schedule_v to authenticated/i);
     expect(sql).not.toMatch(/insert\s+into|update\s+public\.|delete\s+from/i);

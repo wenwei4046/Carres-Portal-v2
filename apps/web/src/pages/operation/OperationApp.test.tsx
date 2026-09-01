@@ -336,6 +336,15 @@ describe("OperationApp — Warehouse registers own the only Destination Header",
     expect(screen.queryByTestId("movements-stub")).not.toBeInTheDocument();
   });
 
+  it("retires the Warehouse Dashboard bookmark into Schedule", () => {
+    renderApp("/operation?tab=warehouse");
+    expect(screen.getByTestId("location-probe")).toHaveTextContent(
+      "/operation?tab=warehouse-schedule",
+    );
+    expect(screen.getByTestId("warehouse-schedule-destination-header")).toBeInTheDocument();
+    expect(screen.queryByTestId("warehouse-stub")).not.toBeInTheDocument();
+  });
+
   it("Stock mounts its Destination Header and the global utility row stands down", () => {
     renderApp("/operation?tab=stock-onhand");
     expect(screen.getByTestId("stock-register-destination-header")).toBeInTheDocument();

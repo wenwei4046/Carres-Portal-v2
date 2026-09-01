@@ -117,7 +117,7 @@ describe("the empty query", () => {
     expect(labels.slice(0, 5)).toEqual([
       "WorkOperations",
       "Sales OrdersOperations",
-      "StockOperations",
+      "InventoryOperations",
       "PaymentsOperations",
       // `Delivery Work` since the Delivery module's pages joined the rail
       // (CARD-2026-08-19-sidebar-expandable-modules) — same key, same route,

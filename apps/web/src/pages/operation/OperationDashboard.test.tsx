@@ -387,7 +387,7 @@ describe("OperationDashboard", () => {
     expect(setTab).toHaveBeenLastCalledWith("procurement");
 
     fireEvent.click(screen.getByRole("button", { name: /Open warehouse/ }));
-    expect(setTab).toHaveBeenLastCalledWith("warehouse");
+    expect(setTab).toHaveBeenLastCalledWith("stock-onhand");
   });
 
   it("StockAlertsTile 'View alerts' calls goWarehouse({ alert: true })", () => {
@@ -405,11 +405,11 @@ describe("OperationDashboard", () => {
     expect(setTab).not.toHaveBeenCalledWith("warehouse");
   });
 
-  it("StockAlertsTile falls back to setTab('warehouse') when goWarehouse is absent", () => {
+  it("StockAlertsTile falls back to Inventory when goWarehouse is absent", () => {
     setLoaded();
     const setTab = vi.fn();
     render(wrap(<OperationDashboard setTab={setTab} />));
     fireEvent.click(screen.getByTestId("stock-alerts-open"));
-    expect(setTab).toHaveBeenLastCalledWith("warehouse");
+    expect(setTab).toHaveBeenLastCalledWith("stock-onhand");
   });
 });

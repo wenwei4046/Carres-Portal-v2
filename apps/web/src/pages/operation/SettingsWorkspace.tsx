@@ -21,7 +21,7 @@ import StockSettings from "./StockSettings";
 const SECTIONS = [
   { slug: "sales-orders", group: "Sales Orders", label: "Sales Order Settings" },
   { slug: "purchasing", group: "Purchasing", label: "Purchasing Settings" },
-  { slug: "stock", group: "Warehouse", label: "Stock Settings" },
+  { slug: "stock", group: "Warehouse", label: "Inventory Settings" },
   { slug: "issue-tracker", group: "Issue Tracker", label: "Issue Tracker Settings" },
 ] as const;
 

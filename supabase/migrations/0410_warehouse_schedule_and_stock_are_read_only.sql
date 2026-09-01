@@ -44,10 +44,18 @@ with (security_invoker = true) as
   left join public.warehouses w on w.id = v.warehouse_id
   left join public.stock_operating_parties p on p.id = v.holder_party_id
   left join public.purchase_orders po on po.id = v.po_no
+  left join public.orders reserved_order
+    on v.reserved_ref = 'SO-' || reserved_order.so::text
   left join lateral (
     select d.id, d.do_number, d.delivery_date
       from public.ops_delivery_orders d
-     where d.order_id = v.sold_order_id and d.voided_at is null
+     where d.order_id = coalesce(v.sold_order_id, reserved_order.id)
+       and d.voided_at is null
+       and (
+         d.trip_groups is null
+         or ('bed' = any(d.trip_groups) and v.category in ('mattress', 'bedframe'))
+         or ('sofa' = any(d.trip_groups) and v.category = 'sofa')
+       )
      order by d.issued_at desc, d.id desc
      limit 1
   ) delivery on true
@@ -106,6 +114,7 @@ with latest_promises as (
         from public.ops_stock_items i
        where i.po_no = po.id
          and (pr.po_line_id is null or i.po_line_id = pr.po_line_id)
+         and i.status <> 'voided'
     ) units on true
 )
 select 'supplier-promise:' || p.id::text as id,
@@ -206,14 +215,23 @@ select 'delivery-pickup:' || delivery.id::text,
      order by e.recorded_at desc
      limit 1
   ) handover on true
+  join public.orders delivery_order on delivery_order.id = delivery.order_id
   left join lateral (
-    select coalesce(array_agg(i.unit_code order by i.unit_code)
+      select coalesce(array_agg(i.unit_code order by i.unit_code)
              filter (where i.qty = 1), array[]::text[]) as unit_codes,
            coalesce(sum(i.qty), 0)::integer as units_count,
            string_agg(distinct w.name, ', ' order by w.name) as from_location
       from public.ops_stock_items i
+      left join public.stock_unit_availability_v inventory on inventory.id = i.id
       left join public.warehouses w on w.id = i.warehouse_id
-     where i.sold_order_id = delivery.order_id
+     where (i.sold_order_id = delivery.order_id
+            or i.reserved_ref = 'SO-' || delivery_order.so::text)
+       and (
+         delivery.trip_groups is null
+         or ('bed' = any(delivery.trip_groups)
+             and inventory.category in ('mattress', 'bedframe'))
+         or ('sofa' = any(delivery.trip_groups) and inventory.category = 'sofa')
+       )
   ) stock on true
  where delivery.voided_at is null
    and coalesce(
@@ -235,7 +253,7 @@ select 'customer-handover:' || attempt.id::text,
        coalesce(attempt.do_number, 'SO-' || orders.so::text)::text,
        case when attempt.do_number is not null
               then ('/operation/delivery-orders/' || attempt.do_number)::text
-            else ('/operation/orders/' || orders.id::text)::text end,
+            else ('/operation/orders/so/' || orders.id::text)::text end,
        ('Actual · ' || to_char(
          attempt.recorded_at at time zone 'Asia/Kuala_Lumpur', 'HH24:MI'
        ))::text,
@@ -245,10 +263,17 @@ select 'customer-handover:' || attempt.id::text,
   left join lateral (
     select coalesce(array_agg(i.unit_code order by i.unit_code), array[]::text[]) as unit_codes,
            count(*)::integer as units_count
-      from public.delivery_attempt_units au
+     from public.delivery_attempt_units au
       join public.ops_stock_items i on i.id = au.item_id
      where au.attempt_id = attempt.id
-  ) units on true;
+       and au.outcome = 'delivered'
+  ) units on true
+ where exists (
+   select 1
+     from public.delivery_attempt_units au
+    where au.attempt_id = attempt.id
+      and au.outcome = 'delivered'
+ );
 
 comment on view public.warehouse_schedule_v is
   '0410 — Warehouse Monday–Saturday landing projection. Supplier promises, '
