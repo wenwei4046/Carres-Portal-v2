@@ -907,6 +907,48 @@ receipt; Stock owns the accepted Unit/holder/condition/eligibility; Supplier Cla
 quantity or damage consequence; Sales Order reads availability risk; Finance uses GRN and physical
 facts to verify Supplier Invoice.
 
+### 12.3 Ready Stock, Sales Order reservation and manually purchased goods
+
+**CURRENT CARRES →** legacy `Free`, Ready Stock, no SO No and Manual Purchase can be mistaken for
+the same fact; Ready Stock can appear as both a purchase plan and physical availability, and Sales
+and Operations may read different lists.
+
+**2990 / MATURE ERP LESSON →** keep 2990's On hand/Reserved/Incoming/Available distinction,
+oldest-suitable recommendation, source drilldown and sofa set/batch integrity. Mature reservation
+systems bind an obligation to eligible physical supply. Reject quantity-only reservation,
+ship/reserve despite shortage, silent substitution and UI language stored as database buckets.
+
+**RULING → IMPROVE + ADAPT + REJECT.** Ready Stock is an eligible saved view of the one Unit
+Register. The engine may recommend the oldest suitable Unit while Sales retains governed choice.
+No SO No means only unallocated; Manual Purchase means only the acquisition route; neither makes a
+Unit Ready Stock. Negative reservation, quantity-only promises and silent replacement are invalid.
+
+**RECOMMENDED CARRES BUSINESS FLOW →** Manual Purchase keeps one explicit category: `Ready Stock`,
+`Showroom Display`, `Service Case`, `Internal Staff Purchase`, `Subsidiary Purchase` or `Other
+Purchase`. After Receiving, the Unit retains that source category. A `Ready Stock` purchase still
+appears for Sales only when it is received, correctly identified, complete, acceptable, unreserved
+and free of issue/repair/transfer/control. Another unallocated Unit enters the view only through
+authorised `Make available for sale` and the same eligibility validation. Sales uses `Choose Ready
+Unit`; successful selection atomically binds the exact Unit to the SO. A governed SO release returns
+it to Ready Stock only if it remains eligible.
+
+**OPERATOR JOURNEY →** Sales opens `Sales → Ready Stock`, searches product/SKU/configuration/Site,
+reads exact Unit, holder, condition and earliest handover, then chooses the Unit and SO line.
+Operations opens `Inventory → Ready Stock`, reads the same Unit IDs plus physical/source facts,
+uses `Make available for sale` where permitted or `Report a problem`; Operations cannot substitute
+or release the SO promise.
+
+**UI / PAGE / OBJECT PLACEMENT →** the Inventory rail contains `Reserved for Sales Orders · Ready
+Stock · Showroom Display · Service Case · Needs checking`. Operations Ready Stock defaults to `Unit
+ID · Product · Who has it · Site · Condition · PO No · PO date · Received date · Days available ·
+Earliest handover · Work`. Sales uses a permission-reduced projection of the same Units. Unit Detail
+shows Stock use, eligibility, reserved SO, source purchase category and PO/Receiving history.
+
+**CROSS-MODULE CONNECTION →** Purchasing owns purchase category/PO; Receiving proves receipt;
+Stock owns physical eligibility and `Make available for sale`; Sales Order owns choose/bind/release/
+substitute; Delivery consumes the exact reserved Unit and dated readiness; Finance owns cost and
+ownership accounting without deciding sale availability.
+
 ## 13 · Current implementation reality — evidence, not law
 
 The superseded implementation has one Stock entry with On hand, In & out and a reorder-planning
