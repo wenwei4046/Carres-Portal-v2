@@ -12,6 +12,7 @@ import { useAuth } from "@/lib/auth";
 import { useOperationSuppliers, usePatchCatalogSku } from "@/lib/queries";
 import { INPUT_CLS } from "@/pages/operation/components/Modal";
 import { CategoryChip, CATEGORY_LABEL, CodeChip } from "../components/atoms";
+import { fmtRm } from "../format";
 import { skuMargin } from "../margin";
 import { SupplierOffersStrip } from "../components/SupplierOffers";
 import NewSkuModal from "./NewSkuModal";
@@ -76,13 +77,6 @@ interface FlatRow {
   model: ProductModelDto | undefined;
   category: ProductCategory | undefined;
   productName: string;
-}
-
-function fmtRm(n: number): string {
-  return `RM ${n.toLocaleString("en-MY", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
 }
 
 export default function OperationSkuCostTab({ catalog }: { catalog: CatalogResponse }) {
