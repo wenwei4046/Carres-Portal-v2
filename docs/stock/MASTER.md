@@ -159,6 +159,40 @@ facts. Partial handover changes only affected Units. A Unit not confirmed at des
 with its last confirmed holder. Customer Delivery remains Delivery's record; Stock reads its
 handover facts instead of creating a duplicate Transfer.
 
+Transfer is one Stock object projected into two dated Warehouse destinations, never a fifth top
+page: Outbound holds the origin check/handover work; Inbound holds destination receipt work;
+Inventory shows the resulting current holder and History. It is used only for governed Site-to-Site
+movement within Carres control. Customer Delivery uses its DO/Journey, while Supplier Return and
+Repair retain their own source documents and reuse the same physical-handover contract.
+
+Transfer Detail follows the Object Detail Template and shows `Transfer No · source request · exact
+Units · From · To · collection date · arrival date · delivery party · Outbound work · Inbound work ·
+evidence · History`. Its lifecycle is factual: `Planned → Collected from origin → With delivery
+party → Arrived at destination`. `Moved` is not a sufficient status.
+
+At origin, the individually identified holder scans the exact Units and records handover to the
+actual NETS Delivery person/party with evidence; only affected Units change to that holder. At
+destination, the individually signed-in Site person scans and checks arrival; only received Units
+change to the destination Site. If two of three Units move, the third remains with its last
+confirmed holder and its original dated work stays not done.
+
+Origin handover and delivery-party receipt are separate evidence. If origin records two Units and
+NETS Delivery confirms one, both records remain; the exact unmatched Unit enters `Needs checking`.
+Likewise, a collected Unit without destination receipt remains with the recorded delivery party and
+creates `Confirm where {Unit ID} is by {actual date}` for the governed owner. No whole-Transfer
+status may hide a per-Unit difference.
+
+A planned collection/arrival date change records reason and history and re-resolves only future
+Work. It never moves a Unit or rewrites an actual handover. A Transfer may be cancelled with reason
+only before collection, leaving Units at origin. After collection, cancel cannot teleport goods
+back; a governed return or redirect journey records the next handover while `Who has it` continues
+to state the actual current holder.
+
+The requesting module explains why the movement is needed. Stock owns the Transfer and Unit-holder
+truth; origin operator, NETS Delivery and destination operator own their own physical evidence. The
+COO handles only major unexplained difference/Adjustment. No one changes location through a status
+selector.
+
 A Singapore SO has two Delivery legs: Carres Klang Warehouse to the selected JB partner warehouse,
 then that warehouse to the Singapore customer through EU or SSY. Each leg has its own logistics
 partner, linked DO or trip scope, dates, handovers and proof.
