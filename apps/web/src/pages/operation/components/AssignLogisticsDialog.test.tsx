@@ -32,10 +32,12 @@ function scope(over: {
     confirmedTime: null,
     goods: "",
     doNumber: null,
-    status: "waiting_customer_date",
+    // The functions under test never read status; the fixture carries a
+    // placeholder, which is why the object needs the unknown hop.
+    status: { kind: "waiting_customer_date" },
     hasArrangement: false,
-    o: { customer_address: over.address } as DeliveryScopeRow["o"],
-  } as DeliveryScopeRow;
+    o: { customer_address: over.address },
+  } as unknown as DeliveryScopeRow;
 }
 
 const TEOW: DeliveryPartnerRow = {
