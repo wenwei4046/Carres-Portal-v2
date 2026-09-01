@@ -179,8 +179,9 @@ engine plan; internal buying is keyed in when somebody needs something.
 is ours"* (Loo): the factory receives a PDF either way, so consolidating a
 customer's mattress with the shelf's into one document buys nothing and costs
 the answer to *why did we buy this?* Two lanes therefore issue their own POs,
-and Report can split the month by reason — `Customer Sales · Ready Stock ·
-Display · Office · Warranty` — instead of reconstructing it.
+and Report can split the month by reason — `Customer Sales · Ready Stock · Showroom Display ·
+Service Case · Internal Staff Purchase · Subsidiary Purchase · Other Purchase` — instead of
+reconstructing it.
 
 > **🔴 What this ruling needs and the database does not have (measured
 > 2026-08-06): `purchase_orders` carries NO reason column and
@@ -539,6 +540,11 @@ customer orders**. Purchase Orders MANAGES the documents once they exist.
 > question — what have customers ordered that we still have to buy. The rename to
 > **`SO Batch Purchase`** rides the rail (shipped with the sidebar card); this page's
 > own grid rebuild is `CARD-2026-08-18-so-batch-purchase.md`.
+>
+> **SUPERSEDED PURPOSE WORDING — owner ruling 2026-09-01.** The list above is historical build
+> evidence only. Current Manual Purchase `Need for` is exactly `Ready Stock · Showroom Display ·
+> Service Case · Internal Staff Purchase · Subsidiary Purchase · Other Purchase`. `Office`,
+> `Spare Parts`, bare `Display` and `Warranty` are not approved current categories.
 
 > ### ⭐ THE GRID BECOMES A HIERARCHY, AND SOFA GROUPS DIFFERENTLY (Jess, 2026-08-18)
 > **APPROVED, NOT YET BUILT.** Today's grid is FLAT — one row per SO line. Four customers
@@ -617,7 +623,8 @@ customer orders**. Purchase Orders MANAGES the documents once they exist.
 > behind it has no reason on the record. The pattern is the Purchase Requisition every mature
 > ERP carries (SAP `ME57` / `ME59N`, Dynamics' purchase requisitions, Oracle's AutoCreate).
 >
-> **Anyone raises it, in six fields:** `Need for` (Ready Stock · Display · Office · Spare Parts)
+> **Anyone raises it, in six fields:** `Need for` (Ready Stock · Showroom Display · Service Case ·
+> Internal Staff Purchase · Subsidiary Purchase · Other Purchase)
 > · what · how many · where to · needed by · **why**. `why` may not be blank — it is the
 > sentence the approver reads, and *"restock"* answers nothing.
 >
@@ -1363,10 +1370,13 @@ its number and stays in `To receive` reading `6 of 10`**, which is the whole poi
 that arrives at 17:30 does not have to be finished by 18:00, and tomorrow morning nobody has to
 hunt for what they were doing.
 
-`Session exists → Receiving Mode → Save → Posted`. An Office receive writes ONE `posted` event,
+`Session exists → Receiving Mode → Save → Posted`. A Carres-staff receipt at a Carres-controlled
+destination writes ONE `posted` event,
 through the same validator and the same receive engine the warehouse uses. **A `submitted` event
-is deliberately NOT written for the Office path** — one operator pressing Save once is the Office,
-and an event records what happened in the BUSINESS world, not the steps the system walked.
+is deliberately NOT written for that personally performed receipt path** — one operator pressing
+Save once performs the physical check and post, and an event records what happened in the BUSINESS
+world, not the steps the system walked. This is a receiving method, not a Manual Purchase `Office`
+category.
 
 **GOODS THAT LAND AWAY FROM THE OFFICE USE THE WAREHOUSE'S TWO ACTS** (Jess, 2026-08-18). Three
 office staff cannot stand at HOUZS Balakong when a van arrives. Whoever is THERE counts, checks
@@ -1501,7 +1511,9 @@ payload:** `do_number` · `goods_received_at` · `units_counted` · `entry_sourc
 (`office | warehouse`) · `reason` · `claims_linked` · `changes`.
 **Both doors write the same five keys on `posted`**, so a report over the ledger reads the same
 regardless of which desk keyed the count — which is why the Office's single act **widened the
-payload rather than manufacturing a `submitted` event nobody performed.**
+payload rather than manufacturing a `submitted` event nobody performed.** Here legacy
+`entry_source = office` names the Carres-staff receipt method; it is not an approved Manual
+Purchase `Need for` category.
 
 ### FROZEN RULES
 - **The Supplier DO number is THEIRS.** No default, no suggestion — a number we invent is a
@@ -1953,8 +1965,12 @@ order-by buffer             days kept back to arrange the delivery
 PO days                     Mon / Wed / Fri
 company holidays            the one calendar every engine counts on
 
-approval required?          Ready Stock  yes    Display      yes
-                            Office       yes    Spare Parts  yes
+approval required?          Ready Stock              yes
+                            Showroom Display         yes
+                            Service Case             yes
+                            Internal Staff Purchase  yes
+                            Subsidiary Purchase      yes
+                            Other Purchase           yes
                             a customer order needs none — the order IS the authority
 
 no-answer rounds            3, then the work changes from "call the supplier"
