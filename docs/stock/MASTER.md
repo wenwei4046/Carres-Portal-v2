@@ -151,6 +151,17 @@ Counts are dated Site work. The first count hides the expected list. After submi
 are per Unit. A repeat creates new evidence and says **Count these Units again**. Multiple
 mismatches say **Find out why {n} Units do not match the count**.
 
+For governed traceable goods, the individually signed-in counter scans each Unit ID. Duplicate
+scan, unreadable label and an unregistered Unit are explicit observed results with evidence; a
+counter cannot skip required scope and still submit Complete. Only genuinely interchangeable goods
+use a quantity count. The first pass offers no `Match all` and reveals no expected Unit list or
+expected quantity that could coach the answer.
+
+Submission compares, but never adjusts, the facts. The result separates exact matches, Units not
+found, Units found at another Site, unregistered Units, unreadable IDs and duplicates. A result such
+as `Portal record 136 · Counted 135 · 132 match · 2 not found · 1 another Site · 1 unregistered`
+drills to the affected IDs; the category totals never replace those details.
+
 Cannot find does not reduce Stock. The flow checks last handover and holder, incomplete journeys
 and an exact-Unit repeat count. Only an unexplained result becomes a proposed adjustment, and the
 proposer cannot approve a material adjustment.
@@ -311,6 +322,32 @@ investigation, Adjustment request, COO approval, completion and reversal in one 
 The first count is blind. Difference is evidence requiring comparison and recount; it is not an
 automatic Adjustment.
 
+The page starts with the shared actual-date strip. Its Register defaults are:
+
+```
+Count No · Site · Stock date · Count date · Must submit by · Result · Work
+```
+
+It retains scheduled, submitted, differences found, Count again, investigation, Adjustment waiting
+for COO, completed and reversed records in this one view. The governed path is:
+
+```
+blind first Count → compare → Count again → investigate Receiving/handovers/Delivery/repair/
+Transfers → record result → Correct this record OR Request Adjustment → COO decision
+```
+
+NETS performs physical Count and Unit-level Count again with evidence. The current GRN Duty
+investigates a persistent difference and submits any Adjustment request. Only the COO approves or
+rejects an Adjustment or write-off; the requester cannot approve it. An Adjustment request exposes
+Unit, Portal fact, first and second Count results, last evidence, investigation performed, requester
+and approval state. Original Count and investigation evidence remain immutable.
+
+`Correct this record` applies when the physical Unit exists and an earlier Portal fact was wrong. It
+preserves before, corrected fact, reason, evidence, actor, actual time and required approval and is
+not a quantity Adjustment. `Request Adjustment` is available only when recount and evidence review
+cannot explain the physical difference. Reversal preserves the posted Adjustment and records the
+counter-event; nothing material is deleted.
+
 Outbound is a dated Warehouse work page, not a document, second DO or inventory-event register. It
 brings together every governed reason physical goods leave a Site: customer DO, Site transfer,
 Supplier Return, send for repair, Internal Staff Purchase and Subsidiary Purchase. The source module
@@ -409,6 +446,16 @@ Each month produces a formal Month-end Stock Confirmation:
 - Stock date: final calendar day at 11:59 PM;
 - count date: actual date, allowed within two calendar days before or after Stock date;
 - submission date: governed Warehouse date after the window.
+
+The page prints all three as actual dates, for example `Stock date Mon, 31 Aug · Actual count Tue,
+1 Sep · Must submit by Wed, 2 Sep`. A Count performed inside the permitted window keeps its true
+Count date. The Portal reconciles every receipt, handover, Delivery, return and correction between
+the Count time and Stock date; it never pretends the late/early Count happened at month-end.
+
+If the submission fact does not exist by the governed date, the original date reads `not done` and
+the shared Work Engine keeps two distinct responsibilities visible: the named NETS operator must
+complete and submit the physical Count, while the current GRN Duty receives the dated action to
+check why NETS has not submitted. Neither action becomes a generic `Overdue` reminder.
 
 Stock operations never close. The Portal reconciles exact timestamped Unit events between count and
 Stock date; it never guesses, backdates or adjusts a total to match. The frozen report separates
