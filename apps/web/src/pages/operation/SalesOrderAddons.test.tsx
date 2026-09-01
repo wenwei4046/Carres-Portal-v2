@@ -131,6 +131,31 @@ describe("SalesOrderAddons — the office may add a service, and take back a mis
     expect(h.removed).toEqual([{ addonId: "00000000-0000-0000-0000-0000000000a1" }]);
   });
 
+  /* ⛔ THE DOUBLING BUG (2026-08-31). `Add one more` was gated on the lane
+     alone while Remove checked the key, so a Stair carry row shipped with a
+     live +1 and one click doubled a fee nobody quoted. Both controls are now
+     on the same condition, and 0406 refuses the key in the database so a
+     hidden button is not the only thing standing between the customer and a
+     double charge. */
+  it("offers NEITHER control on a server-computed fee, so the fee cannot be doubled", () => {
+    draw({ addons: [row({ addon_key: "STAIR_CARRY", qty: 1, unit_price: 250 })] });
+    const r = screen.getByTestId("so-addon-row-STAIR_CARRY");
+    const labels = [...r.querySelectorAll("button")].map((b) => b.textContent ?? "");
+    expect(labels).not.toContain("Add one more");
+    expect(labels).not.toContain("Remove");
+    /* The row itself still SHOWS — the customer is being charged it, so it is
+       read on the order; it simply carries no controls. */
+    expect(r).toBeTruthy();
+  });
+
+  it("still offers both controls on a service a human actually picked", () => {
+    draw({ addons: [row({ qty: 1 })] });
+    const r = screen.getByTestId("so-addon-row-dispose-mattress");
+    const labels = [...r.querySelectorAll("button")].map((b) => b.textContent ?? "");
+    expect(labels).toContain("Add one more");
+    expect(labels).toContain("Remove");
+  });
+
   it("offers no Remove on a SERVER-COMPUTED fee — nobody picked it, so nobody misclicked it", () => {
     draw({ addons: [row({ addon_key: "STAIR_CARRY", qty: 1 })] });
     expect(screen.queryByTestId("so-addon-remove-STAIR_CARRY")).toBeNull();
