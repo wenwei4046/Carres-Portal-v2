@@ -42,12 +42,16 @@ Warehouse/Purchasing Work; this card computes and displays the date).
 3. **API** — extend `GET /api/operation/partners` and add
    `PUT /:id/journey-calendar` (same guard, zod input, whole-profile write, 422 words an
    operator can act on).
-4. **UI** — extend `PartnerRulesEditor` with the pickup-day picker, per-region delivery-day
-   pickers and surcharge display (plain words, Sunday never offered). In
-   `AssignLogisticsDialog` (not a #999 file), when the chosen partner has a calendar and the
-   scope has a customer/confirmed date, show the read-only computed line:
-   `Latest Carres Warehouse ready date: {weekday, date}` — never Today/Tomorrow, never a block,
-   silence when facts are missing.
+4. **UI** — in `AssignLogisticsDialog` (not a #999 file), when the chosen partner has a
+   calendar and the scope has a customer/confirmed date, show the read-only computed line:
+   `{partner} picks up from KL on {weekday, date} — Latest Carres Warehouse ready date:
+   {weekday, date}`, plus the surcharge-areas fact — never Today/Tomorrow, never a block,
+   silence when facts are missing. **Scope adjustment (build decision, recorded):** the
+   calendar EDITOR (pickup-day picker, per-region rows) belongs to the Delivery Settings
+   surface card, not to the 0283 booking-warning panel inside the Sales Order drawer — that
+   panel's response contract does not carry the journey calendar, and widening the Orders
+   booking route for a Delivery Settings fact would cross the module seam. Until that card,
+   the governed data lives in 0411's seeds and the audited API door.
 5. **Tests** — engine table tests (TEOW Melaka same-week, TEOW JB cross-day, TT Wednesday-only,
    holiday collision, absence silence), API contract tests (auth, validation, audit write),
    editor + dialog UI tests. Negative controls: non-operation role 403; no wide-column UPDATE

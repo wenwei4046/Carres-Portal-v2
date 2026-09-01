@@ -1253,12 +1253,23 @@ export {
   type PartnerWarningKey,
 } from "./partner-delivery-rules";
 export {
+  latestWarehouseReadyDate,
+  partnerJourneyCalendar,
+  type JourneyChain,
+  type JourneyChainInput,
+  type JourneyRegionRule,
+  type PartnerJourneyCalendar,
+} from "./partner-journey";
+export {
   partnerDeliveryRulesSchema,
   setPartnerDeliveryRulesInput,
+  journeyRegionRuleSchema,
+  setPartnerJourneyCalendarInput,
   partnerBookingWarningSchema,
   partnerBookingCheckResponseSchema,
   type PartnerDeliveryRulesWire,
   type SetPartnerDeliveryRulesInput,
+  type SetPartnerJourneyCalendarInput,
   type PartnerBookingWarningWire,
   type PartnerBookingCheckResponse,
 } from "./schemas/delivery-partner-rules";

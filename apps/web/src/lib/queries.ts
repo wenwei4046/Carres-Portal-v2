@@ -2767,6 +2767,11 @@ export interface DeliveryPartnerRow {
   blackout_dates?: string[] | null;
   daily_capacity?: number | null;
   booking_lead_days?: number | null;
+  /** Delivery Card 03 (0411) — the carrier's own journey calendar. OPTIONAL for
+   *  the same older-Worker degrade reason: absence = "not recorded" = silence. */
+  pickup_days?: number[] | null;
+  journey_regions?: unknown;
+  surcharge_areas?: string[] | null;
 }
 export interface DeliveryPartnersListResponse {
   partners: DeliveryPartnerRow[];
