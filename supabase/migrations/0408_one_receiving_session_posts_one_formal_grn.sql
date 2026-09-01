@@ -1,5 +1,5 @@
 -- ============================================================================
--- 0407 — one Receiving Session posts one formal GRN
+-- 0408 — one Receiving Session posts one formal GRN
 --
 -- This migration defines the governed database authority. It does NOT authorise
 -- a production apply. Production apply remains a separate Owner-governed gate.
@@ -180,11 +180,11 @@ create unique index warehouse_receipts_grn_number_uq
   where grn_number is not null;
 
 comment on column public.warehouse_receipts.grn_number is
-  '0407: allocated and stored only when posting succeeds. Retries return this same number; void never releases it.';
+  '0408: allocated and stored only when posting succeeds. Retries return this same number; void never releases it.';
 comment on column public.warehouse_receipts.goods_received_timestamp is
-  '0407: when the goods physically arrived. Separate from PO Issued, PO Delivery Date, Supplier Delivery Date and formal GRN posting time.';
+  '0408: when the goods physically arrived. Separate from PO Issued, PO Delivery Date, Supplier Delivery Date and formal GRN posting time.';
 comment on column public.warehouse_receipts.grn_snapshot is
-  '0407: immutable official GRN evidence frozen at posting. Print/reprint reads this snapshot only.';
+  '0408: immutable official GRN evidence frozen at posting. Print/reprint reads this snapshot only.';
 
 create or replace function public.receiving_grn_snapshot_is_immutable()
 returns trigger
@@ -1424,39 +1424,39 @@ begin
   select count(*) into v_count
     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
    where n.nspname = 'public' and p.proname = 'post_receiving_session';
-  if v_count <> 1 then raise exception '0407: exactly one post_receiving_session is required'; end if;
+  if v_count <> 1 then raise exception '0408: exactly one post_receiving_session is required'; end if;
   if has_function_privilege('anon', 'public.post_receiving_session(uuid,integer)', 'execute') then
-    raise exception '0407: anon may not post a GRN';
+    raise exception '0408: anon may not post a GRN';
   end if;
   if has_function_privilege('authenticated', 'public.allocate_grn_number(date)', 'execute') then
-    raise exception '0407: clients may not allocate GRN numbers';
+    raise exception '0408: clients may not allocate GRN numbers';
   end if;
   if has_function_privilege('authenticated', 'public.operation_receive_po_with_do(text,text,text,jsonb)', 'execute') then
-    raise exception '0407: retired operation receive writer remains executable';
+    raise exception '0408: retired operation receive writer remains executable';
   end if;
   if has_function_privilege('authenticated', 'public.office_receive_post(text,text,text,text,jsonb,date)', 'execute') then
-    raise exception '0407: retired office receive writer remains executable';
+    raise exception '0408: retired office receive writer remains executable';
   end if;
   if has_function_privilege('authenticated', 'public.warehouse_submit_receipt(text,text,text,text,jsonb,date)', 'execute') then
-    raise exception '0407: retired warehouse submit writer remains executable';
+    raise exception '0408: retired warehouse submit writer remains executable';
   end if;
   if has_function_privilege('authenticated', 'public.warehouse_resubmit_receipt(uuid,text,text,text,jsonb,date)', 'execute') then
-    raise exception '0407: retired warehouse resubmit writer remains executable';
+    raise exception '0408: retired warehouse resubmit writer remains executable';
   end if;
   if has_function_privilege('authenticated', 'public.warehouse_receipt_check_in(uuid)', 'execute') then
-    raise exception '0407: retired warehouse check-in writer remains executable';
+    raise exception '0408: retired warehouse check-in writer remains executable';
   end if;
   if has_function_privilege('authenticated', 'public.warehouse_receipt_return(uuid,text)', 'execute') then
-    raise exception '0407: retired warehouse return writer remains executable';
+    raise exception '0408: retired warehouse return writer remains executable';
   end if;
   if (select count(*) from pg_indexes
        where schemaname = 'public' and indexname = 'warehouse_receipts_grn_number_uq') <> 1 then
-    raise exception '0407: stored GRN identity must be unique';
+    raise exception '0408: stored GRN identity must be unique';
   end if;
   if (select count(*) from pg_policies
        where schemaname = 'public' and tablename = 'receiving_session_unit_outcomes'
          and cmd <> 'SELECT') <> 0 then
-    raise exception '0407: Unit outcomes are RPC-write only';
+    raise exception '0408: Unit outcomes are RPC-write only';
   end if;
 end;
 $$;

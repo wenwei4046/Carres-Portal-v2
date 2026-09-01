@@ -10,7 +10,7 @@
  *
  * ── One gate, three readers ─────────────────────────────────────────────────
  * New writes use `ReceivingSessionInput`. Historical readers retain a narrow
- * compatibility mapper for pre-0407 `received_now` payloads.
+ * compatibility mapper for pre-0408 `received_now` payloads.
  *
  * The claim rules are NOT re-implemented here: a damaged/wrong line is checked
  * by R2's own `receiveLineClaimProblems`, so the evidence law has exactly one

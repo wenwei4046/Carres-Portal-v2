@@ -95,7 +95,7 @@ export interface ReceivingQuantities {
 - Create: `supabase/migrations/0406_one_receiving_session_posts_one_formal_grn.sql`
 - Modify: `scripts/check-migrations.mjs` only if an existing migration-law test exposes a real naming-rule gap; otherwise leave it unchanged.
 
-**Migration filename law:** `0406` is the next legal prefix on `origin/main` SHA `fe1e6780`. Immediately before creating the file, fetch/rebase and run `pnpm ci:migrations`. If main has claimed `0406`, rename this not-yet-applied migration to the next checker-approved prefix before committing. Never rename an applied migration.
+**Migration filename law:** this plan originally reserved `0406` on `origin/main` SHA `fe1e6780`. Current main `c35adc60` later claimed `0406`, so the still-unapplied Purchasing pair is renumbered to `0407` for supplier answer/PO and `0408` for Receiving/GRN. The collision was resolved before either file was applied. Never rename an applied migration.
 
 - [ ] Start the migration with `begin;` and end with `commit;`; include comments saying no production apply is authorised.
 - [ ] Add immutable/session columns to `warehouse_receipts`: `source_kind`, `source_id`, `source_version`, `source_snapshot`, `destination_snapshot`, `supplier_snapshot`, `grn_number`, `grn_posting_date`, `normal_grn_duty_user_id`, `grn_cover_user_id`, `post_authority`, `lock_version`, `amended_at`, and `voided_at`. Backfill existing rows as `purchase_order` sources without rewriting their physical dates.

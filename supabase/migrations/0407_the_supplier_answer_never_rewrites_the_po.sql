@@ -1,5 +1,5 @@
 -- ============================================================================
--- 0406 — the supplier answer never rewrites the official PO
+-- 0407 — the supplier answer never rewrites the official PO
 --
 -- `placed_at` is the PO Issued fact. `po_delivery_date` is the supplier-facing
 -- date printed on the current official document. A supplier's later answer is
@@ -8,6 +8,8 @@
 -- planning date as an official document fact without evidence.
 -- ============================================================================
 
+begin;
+
 -- ---------------------------------------------------------------------------
 -- 1 · the official date carried by the current PO version
 -- ---------------------------------------------------------------------------
@@ -15,7 +17,7 @@ alter table public.purchase_orders
   add column if not exists po_delivery_date date;
 
 comment on column public.purchase_orders.po_delivery_date is
-  '0406: the delivery date printed on the current official PO version. Legacy rows stay NULL because eta_date may already contain a later supplier answer.';
+  '0407: the delivery date printed on the current official PO version. Legacy rows stay NULL because eta_date may already contain a later supplier answer.';
 
 -- Every governed PO creation door ultimately inserts `eta_date` through
 -- `_operation_create_po_inner`. For NEW rows only, that reviewed input is also
@@ -78,13 +80,13 @@ alter table public.po_supplier_promises
   );
 
 comment on column public.po_supplier_promises.channel is
-  '0406: how the supplier gave this answer. NULL only on legacy rows.';
+  '0407: how the supplier gave this answer. NULL only on legacy rows.';
 comment on column public.po_supplier_promises.evidence is
-  '0406: immutable file evidence for WhatsApp/email, or a structured note for phone/in-person. NULL only on legacy rows.';
+  '0407: immutable file evidence for WhatsApp/email, or a structured note for phone/in-person. NULL only on legacy rows.';
 comment on column public.po_supplier_promises.supplier_answered_at is
-  '0406: when the supplier actually answered; separate from recorded_at.';
+  '0407: when the supplier actually answered; separate from recorded_at.';
 comment on column public.po_supplier_promises.reported_by is
-  '0406: who heard or saw the supplier answer; separate from recorded_by, the actual Portal actor.';
+  '0407: who heard or saw the supplier answer; separate from recorded_by, the actual Portal actor.';
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values (
@@ -492,7 +494,7 @@ grant execute on function public.purchasing_record_supplier_answer(
 comment on function public.purchasing_record_supplier_answer(
   text, text, date, date, text, jsonb, timestamptz, uuid, text, text
 ) is
-  '0406: the ONE evidence door for the supplier delivery answer. It appends channel, evidence, reporter, recorder and both times; it never rewrites purchase_orders.';
+  '0407: the ONE evidence door for the supplier delivery answer. It appends channel, evidence, reporter, recorder and both times; it never rewrites purchase_orders.';
 
 -- 0310's supplier-call writer rewrites eta_date and has no governed evidence.
 -- Keep it only as migration history; browsers must use the one door above.
@@ -631,7 +633,7 @@ end;
 $po_document$;
 
 comment on function public.purchasing_po_document(text) is
-  '0406: the official PO prints placed_at as PO Issued and po_delivery_date as PO Delivery Date. Supplier answers never alter it.';
+  '0407: the official PO prints placed_at as PO Issued and po_delivery_date as PO Delivery Date. Supplier answers never alter it.';
 
 revoke execute on function public.purchasing_po_document(text) from public, anon;
 grant execute on function public.purchasing_po_document(text) to authenticated;
@@ -870,6 +872,8 @@ begin
       join pg_namespace n on n.oid = p.pronamespace
      where n.nspname = 'public' and p.proname = 'purchasing_revise_po'
   ) <> 1 then
-    raise exception '0406: purchasing_revise_po must have exactly ONE signature';
+    raise exception '0407: purchasing_revise_po must have exactly ONE signature';
   end if;
 end $$;
+
+commit;

@@ -13,9 +13,9 @@ const MIGRATIONS = join(
   "migrations",
 );
 
-function migration(prefix: string): string {
-  const file = readdirSync(MIGRATIONS).find((name) => name.startsWith(prefix));
-  expect(file, `no migration starting ${prefix}`).toBeTruthy();
+function migrationNamed(suffix: string): string {
+  const file = readdirSync(MIGRATIONS).find((name) => name.endsWith(suffix));
+  expect(file, `no migration ending ${suffix}`).toBeTruthy();
   return readFileSync(join(MIGRATIONS, file!), "utf8");
 }
 
@@ -75,8 +75,8 @@ describe("supplier answer evidence", () => {
   });
 });
 
-describe("0401 keeps the official PO date separate", () => {
-  const sql = migration("0406_");
+describe("0407 keeps the official PO date separate", () => {
+  const sql = migrationNamed("the_supplier_answer_never_rewrites_the_po.sql");
 
   it("adds a separate official date without backfilling legacy rows", () => {
     expect(sql).toContain("add column if not exists po_delivery_date date");

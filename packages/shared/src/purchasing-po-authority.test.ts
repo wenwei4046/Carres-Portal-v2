@@ -129,7 +129,13 @@ describe("Operations Superuser uses the same PO authority", () => {
   });
 });
 
-describe("0406 · supplier evidence reuses the same PO authority", () => {
+describe("0407 · supplier evidence reuses the same PO authority", () => {
+  it("is one explicit transaction before production apply", () => {
+    const code = strip(SUPPLIER_ANSWER).trim();
+    expect(code).toMatch(/^begin;/i);
+    expect(code).toMatch(/commit;$/i);
+  });
+
   it("checks the shared duty, cover or Operations Superuser gate", () => {
     expect(SUPPLIER_ANSWER).toMatch(/public\.purchasing_actor_may_issue\(v_actor\)/);
     expect(SUPPLIER_ANSWER).not.toMatch(/purchasing_is_operations_superuser/);

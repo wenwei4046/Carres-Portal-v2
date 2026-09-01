@@ -3,11 +3,11 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const sql = readFileSync(
-  join(import.meta.dirname ?? __dirname, "../../../supabase/migrations/0407_one_receiving_session_posts_one_formal_grn.sql"),
+  join(import.meta.dirname ?? __dirname, "../../../supabase/migrations/0408_one_receiving_session_posts_one_formal_grn.sql"),
   "utf8",
 );
 
-describe("0407 Receiving database authority", () => {
+describe("0408 Receiving database authority", () => {
   it("makes Warehouse save and submit one atomic database call", () => {
     expect(sql).toMatch(/create or replace function public\.save_and_submit_receiving_session\s*\(/i);
     expect(sql).toMatch(/save_and_submit_receiving_session[\s\S]*save_receiving_session[\s\S]*submit_receiving_session/i);
