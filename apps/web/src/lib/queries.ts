@@ -1307,6 +1307,19 @@ export function useAddOrderLines(
       qc.setQueryData(qk.order(orderId), order);
       await qc.invalidateQueries({ queryKey: qk.order(orderId), exact: true });
       void qc.invalidateQueries({ queryKey: ["orders"] });
+      /* ⭐ THE OFFICE READS THIS ORDER THROUGH ITS OWN KEY (YH, 2026-09-01 —
+         "ensure numbers and generated SO are correct").
+         `["orders"]` does not reach `["operation","orders",id]`: React Query
+         matches a key by PREFIX, and the office key does not start with
+         `orders`. So the Sales Order workspace never refetched after a service
+         was added — the operator pressed `Add`, the panel closed, and the
+         Goods table, the document preview and the Money total all went on
+         showing the order without it until the page was reloaded.
+         `useEditOrderAddon` and `useRemoveOrderAddon` both invalidate this key
+         and both point AT THIS HOOK in their comments — "see
+         `useAddOrderLines`. Both surfaces refresh, or they disagree." The
+         comment described a rule this hook never followed. */
+      void qc.invalidateQueries({ queryKey: ["operation", "orders"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
   });
