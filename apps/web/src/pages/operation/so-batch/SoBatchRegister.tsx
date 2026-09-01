@@ -720,6 +720,32 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
         </FilterRail>}
 
         <div className="flex min-w-0 flex-1 flex-col p-2">
+          {/* ⭐ A PAGE THAT CANNOT BUY SAYS SO (YH, 2026-09-01 — "the boxes are
+              all not clickable").
+              Every control on this page that starts a purchase needs a Deliver
+              To destination to allocate a tick to. With no destination, or with
+              destinations but none marked as the default, the checkboxes are
+              silently inert (`:210`, `:228`) — and so, for the same reason, are
+              the row-level Deliver To dropdown and the Split editor's Apply.
+              Nothing said a word, so the page looked normal and broken at the
+              same time, and the operator had no way to tell it from a bug in
+              the grid.
+              THE SERVER NOW REFUSES A FAILED READ OUTRIGHT
+              (`purchase-demands.ts`), so an empty list here means the rows are
+              genuinely absent — nobody has set a destination up, or RLS is
+              hiding them — which is a Settings answer, not an outage. Both
+              cases name the fix. */}
+          {(data.destinations.length === 0 || !data.defaultDestinationId) && (
+            <p
+              className="mb-2 rounded-control bg-kit-amber-3 px-3 py-2 text-meta text-kit-amber-11"
+              data-testid="so-batch-no-destination"
+            >
+              {data.destinations.length === 0
+                ? "No Deliver To destinations are set, so nothing can be bought on this page."
+                : "No Deliver To destination is marked as the default, so nothing can be ticked."}{" "}
+              Set one in Purchasing → Settings.
+            </p>
+          )}
           <div
             className="min-h-0 flex-1"
             data-testid="so-batch-grid"

@@ -1158,10 +1158,62 @@ describe("the object never issues (Card 05)", () => {
         refusedAt: null,
         refuseReason: null,
         lines: [
-          { qty: 1, issuedQty: 1, remainingQty: 0, cancelledAt: null, poId: "PO-1", received: true },
+          { qty: 1, issuedQty: 1, cancelledAt: null, poId: "PO-1", received: true },
         ],
       }).label,
     ).toBe("Arrived");
+  });
+
+  /* ⭐ THE APPROVER'S CUT REACHES THE STATUS (YH, 2026-09-01).
+     The status read the database's generated `qty − issued_qty`, which does
+     not know an approval cut exists, while every other number on this page
+     used the governed remainder that does. A request for 5 cut to 2 and then
+     fully issued reported 3 outstanding: `Ready to order` after its purchase
+     order was raised, stuck in `All not ordered` for ever, and untickable at
+     the same time. */
+  it("a request cut by its approver and fully issued reads Ordered, not Ready to order", () => {
+    expect(
+      manualPurchaseStatusOf({
+        approvalRequired: true,
+        approvedAt: "2026-08-30T02:00:00Z",
+        refusedAt: null,
+        refuseReason: null,
+        lines: [
+          { qty: 5, approvedQty: 2, issuedQty: 2, cancelledAt: null, poId: "PO-1" },
+        ],
+      }).label,
+    ).toBe("Ordered");
+  });
+
+  /* A line cut to NOTHING never reaches the issue door, so it never gets a
+     `po_id` — and `every(… poId !== null)` could never be satisfied on a
+     request containing one. It is excluded from what the request is still
+     pursuing rather than blocking it for ever. */
+  it("a line cut to zero does not hold the whole request open", () => {
+    expect(
+      manualPurchaseStatusOf({
+        approvalRequired: true,
+        approvedAt: "2026-08-30T02:00:00Z",
+        refusedAt: null,
+        refuseReason: null,
+        lines: [
+          { qty: 3, approvedQty: 3, issuedQty: 3, cancelledAt: null, poId: "PO-1" },
+          { qty: 2, approvedQty: 0, issuedQty: 0, cancelledAt: null, poId: null },
+        ],
+      }).label,
+    ).toBe("Ordered");
+  });
+
+  it("a request whose every line was cut to zero is not going ahead", () => {
+    expect(
+      manualPurchaseStatusOf({
+        approvalRequired: true,
+        approvedAt: "2026-08-30T02:00:00Z",
+        refusedAt: null,
+        refuseReason: null,
+        lines: [{ qty: 2, approvedQty: 0, issuedQty: 0, cancelledAt: null, poId: null }],
+      }).label,
+    ).toBe("Not going ahead");
   });
 });
 
