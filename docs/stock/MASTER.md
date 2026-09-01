@@ -1040,6 +1040,51 @@ Receiving and Delivery/Outbound supply missing receipt/handover facts; Purchasin
 quantity/product consequence; Finance consumes approved results and the Month-end version; COO
 alone approves governed material or unexplained Adjustment.
 
+### 12.6 Outbound exact-Unit handover
+
+**CURRENT CARRES →** legacy Take out or status mutation can make digital Stock leave before the
+physical handover. Delivery may select Units without one complete Warehouse scan chain; `Outbound`
+can be mistaken for another DO editor; quantity-only rows and a company-level NETS identity can hide
+the exact SO/DO/Unit and people involved.
+
+**2990 / MATURE ERP LESSON →** keep 2990 OUT movement source links, actual date and movement
+history. Mature WMS confirms exact-item check, load-list verification, two-sided custody evidence
+and hard blockers for wrong/missing/controlled goods. Reject 2990 ship-despite-shortage or
+quantity-only deduction, document-post-equals-physical-handover, Warehouse costing/freight and
+unproven wave, staging bay/rack, pallet/license-plate, forklift or route-optimisation work.
+
+**RULING → ADAPT + IMPROVE + REJECT.** Outbound is an actual-dated exact-Unit check, pack and
+handover workspace driven by the owning DO/Journey. Every affected Unit changes holder only through
+an accepted physical handover. Missing/incorrect/ineligible Units block only their own handover and
+remain with the last confirmed holder; a whole-document status cannot conceal partial truth.
+
+**RECOMMENDED CARRES BUSINESS FLOW →** Delivery works backward from customer delivery through the
+governed journey/calendar and supplies DO, leg, partner, collection date and exact Unit scope.
+Outbound gives NETS Warehouse the dated action. The individually identified warehouse operator
+checks Unit ID/product/condition/completeness, packs and scans each Unit; the individually
+identified NETS Delivery person accepts the Units and evidence. Only matched two-sided evidence
+changes `Who has it` to that delivery person/journey. A Singapore SO preserves separate KL-to-JB
+and JB-to-customer legs and their own handovers/proof.
+
+**OPERATOR JOURNEY →** NETS Warehouse opens Outbound on the actual date; reads DO No, SO No,
+destination, collection time and exact Units; scans each Unit; Portal validates source,
+reservation, issue/control and prior handover; operator checks/packs; actual NETS Delivery person
+signs in and scans acceptance; both identities/evidence are retained. NETS Delivery then completes
+journey arrivals through Delivery, not Outbound.
+
+**UI / PAGE / OBJECT PLACEMENT →** Outbound Register defaults are `Required handover · DO No · SO
+No · SO date · Journey/leg · From · To · Logistics partner · Units required · Handed over · Not
+handed over · Warehouse operator avatar · Delivery person avatar · Evidence · Work`. The linked
+Workspace shows exact Unit, product, reservation, check, pack, both scans, evidence, not-handed-over
+reason and History. It cannot edit customer date, route, partner, SO, DO or price; `Confirm
+handover` appears only when the physical checkpoint is valid. No Zone/Rack/staging/wave page exists.
+
+**CROSS-MODULE CONNECTION →** Sales Order owns customer promise and exact reservation; Delivery
+owns DO/Journey/partners/dates and customer outcome; Stock owns Unit eligibility and holder; NETS
+Warehouse owns check/pack/handover evidence; NETS Delivery owns acceptance/transport/arrival/return
+evidence; Purchasing receives dated shortage/late-arrival work; Finance consumes events without
+controlling physical handover.
+
 ## 13 · Current implementation reality — evidence, not law
 
 The superseded implementation has one Stock entry with On hand, In & out and a reorder-planning
