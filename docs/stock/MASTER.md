@@ -523,6 +523,38 @@ date, the action contract is incomplete and cannot enter Work.
 The Inventory rail finds Units. Quick Rail finds actions. Calendar shows dated Count, collection,
 arrival, return, inspection, repair, supplier collection and month-end commitments.
 
+Every Warehouse Action uses the shared contract `Trigger · Owner rule · Resolved owner · Action ·
+Completion fact · governed date · source object · cover rule`. Module rows render the owner as a
+separate avatar/metadata chip and keep the sentence to the action. My Work omits the current user's
+repeated avatar and groups under actual dates; owner context appears only for cover/handover.
+Team Work groups the one work set under avatar/full name and `{n} actions to do · {n} late`, then
+shows source identity, fact and action without repeating the grouped person on every row.
+
+The shared Quick Rail remains `Team · Calendar · My Work · Activity`:
+
+- **Team** shows every active Carres staff member, including zero work, current PO/GRN Duty,
+  buddy/cover and counts from the same Work Engine. Team is the only duty edit door. External NETS
+  people appear only inside their permitted Warehouse/partner scope; they do not gain the full
+  Carres team view.
+- **Calendar** projects expected arrivals, Counts/Count again, collections, arrivals, Outbound
+  handovers, returns, repair out/back, supplier collection and Month-end commitment on their actual
+  dates. It deep-links to the source and never edits it.
+- **My Work** is only the compact preview of formal My Work, never another work set.
+- **Activity** projects append-only Unit/receipt/Count/handover facts with actual date/time,
+  actor/avatar and source link. It never replaces Unit or object History.
+
+Open actions re-resolve when duty, cover, active staff or last-working-date facts change; completed
+actions and historical actors/evidence never change. One active Carres staff member may visibly
+hold both PO and GRN Duty. With any assignable staff, routine duty-owned Work cannot say
+`Not assigned`.
+
+NETS physical Work first belongs to the authorised organisation/Site queue when no individual has
+accepted it. The first authorised NETS person to accept or begin the governed scan becomes the
+resolved individual operator; organisation and personal identity both remain visible. If that
+person is disabled before work starts, it returns to the authorised queue. If work has started, a
+governed handover to an authorised replacement preserves the first person's scans/evidence and
+names the replacement. A shared `NW` identity may never stand in for multiple people.
+
 Warehouse does not create another rota. It consumes the one approved PO Duty / GRN Duty rotation
 through the shared Duty Resolver and Work Engine governed by `../ERP-ARCHITECTURE.md` Law F. Team is
 the one duty edit door; People supplies active/access and last-working-date facts; Warehouse pages
